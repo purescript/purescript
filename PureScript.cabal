@@ -1,0 +1,36 @@
+name: Purescript
+version: 0.0.1
+cabal-version: >=1.2
+build-type: Simple
+license: MIT
+license-file: LICENSE
+copyright: (c) Phil Freeman 2013
+maintainer: Phil Freeman <paf31@cantab.net>
+stability: experimental
+synopsis: PureScript Programming Language Compiler
+description: A small compile-to-JS language with extensible records and type-safe blocks
+author: Phil Freeman <paf31@cantab.net>
+data-dir: ""
+
+library
+    build-depends: base -any, cmdtheline -any, containers -any,
+                   mtl -any, parsec -any, utf8-string -any
+    exposed-modules: PureScript
+    exposed: True
+    buildable: True
+    hs-source-dirs: src
+    other-modules: Test Main PureScript.CodeGen PureScript.Kinds
+                   PureScript.Parser PureScript.TypeChecker PureScript.Types
+                   PureScript.Values PureScript.Parser.Common
+                   PureScript.Parser.Declarations PureScript.Parser.Types
+                   PureScript.Parser.Values PureScript.TypeChecker.Kinds
+                   PureScript.TypeChecker.Monad PureScript.TypeChecker.Types
+
+executable psc
+    build-depends: base -any, cmdtheline -any, containers -any,
+                   mtl -any, parsec -any, utf8-string -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: src
+    other-modules: Test
+
