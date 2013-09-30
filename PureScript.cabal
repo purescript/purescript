@@ -19,7 +19,7 @@ library
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules: Test Main PureScript.CodeGen PureScript.Kinds
+    other-modules: Main PureScript.CodeGen PureScript.Kinds
                    PureScript.Parser PureScript.TypeChecker PureScript.Types
                    PureScript.Values PureScript.Parser.Common
                    PureScript.Parser.Declarations PureScript.Parser.Types
@@ -32,5 +32,4 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules: Test
 
