@@ -27,6 +27,7 @@ import PureScript.TypeChecker.Kinds
 import PureScript.TypeChecker.Types
 
 import Data.List
+import Data.Maybe
 import Data.Function
 
 import PureScript.Values
@@ -47,20 +48,21 @@ typeCheck (DataDeclaration dcs@(DataConstructors
   })) = rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
   env <- get
   guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-  kinds <- kindsOf args (map snd ctors)
-  let ctorKind = foldl FunKind Star kinds
+  ctorKind <- kindsOf name args (catMaybes $ map snd ctors)
   put $ env { types = M.insert name ctorKind (types env) }
-  flip mapM_ ctors $ \(dctor, ty) -> rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
-    env' <- get
-    guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
-    let ctorType = Function [ty] $ foldl TypeApp (TypeConstructor name) (map TypeVar args)
-    put $ env' { names = M.insert dctor ctorType (names env) }
+  flip mapM_ ctors $ \(dctor, maybeTy) ->
+    rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
+      env' <- get
+      guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
+      let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
+      let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
+      put $ env' { names = M.insert dctor dctorTy (names env') }
 typeCheck (ValueDeclaration name val) = rethrow (("Error in declaration " ++ name ++ ": ") ++) $ do
   env <- get
   case M.lookup name (names env) of
     Just ty -> throwError $ name ++ " is already defined"
     Nothing -> do
-      ty <- typeOf val
+      ty <- typeOf name val
       put (env { names = M.insert name ty (names env) })
 
 typeCheckAll :: [Declaration] -> Check ()

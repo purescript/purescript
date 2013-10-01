@@ -62,7 +62,7 @@ parseApp = App <$> parseValue
                <*> (C.parens $ C.commaSep parseValue)
 
 parseVar :: P.Parsec String () Value
-parseVar = Var <$> C.identifier
+parseVar = Var <$> (C.identifier <|> C.properName)
 
 parseCase :: P.Parsec String () Value
 parseCase = Case <$> P.between (C.reserved "case") (C.reserved "of") parseValue
@@ -88,9 +88,9 @@ parseValueAtom = P.choice $ map P.try
             , C.parens parseValue ]
 
 parseValue :: P.Parsec String () Value
-parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue') (C.lexeme funArgs) App
+parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.lexeme funArgs) App
   where
-  typedValue' = C.augment parseValueAtom parseTypeAnnotation TypedValue
+  typedValue = C.augment parseValueAtom parseTypeAnnotation TypedValue
   funArgs = C.parens $ C.commaSep parseValue
   parseTypeAnnotation = C.lexeme (P.string "::") *> parseType
   operators = [ [ Postfix $ (Accessor <$> (C.dot *> C.identifier)) ]
@@ -168,9 +168,11 @@ parseStatement = P.choice $ map P.try
 parseVarBinder :: P.Parsec String () Binder
 parseVarBinder = VarBinder <$> C.lexeme C.identifier
 
-parseConstructorBinder :: P.Parsec String () Binder
-parseConstructorBinder = ConstructorBinder <$> C.lexeme C.properName
-                                           <*> parseBinder
+parseNullaryBinder :: P.Parsec String () Binder
+parseNullaryBinder = NullaryBinder <$> C.lexeme C.properName
+
+parseUnaryBinder :: P.Parsec String () Binder
+parseUnaryBinder = UnaryBinder <$> C.lexeme C.properName <*> parseBinder
 
 parseObjectBinder :: P.Parsec String () Binder
 parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep parseIdentifierAndBinder)
@@ -185,6 +187,7 @@ parseIdentifierAndBinder = do
 parseBinder :: P.Parsec String () Binder
 parseBinder = P.choice $ map P.try
                   [ parseVarBinder
-                  , parseConstructorBinder
+                  , parseUnaryBinder
+                  , parseNullaryBinder
                   , parseObjectBinder
                   , C.parens parseBinder ]

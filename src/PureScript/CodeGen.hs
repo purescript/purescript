@@ -23,7 +23,10 @@ import PureScript.Declarations
 declToJs :: Declaration -> Maybe String
 declToJs (ValueDeclaration name val) = Just $ "var " ++ name ++ " = " ++ valueToJs val ++ ";"
 declToJs (DataDeclaration dcs@(DataConstructors { dataConstructors = ctors })) =
-  Just $ concatMap (\(ctor, _) -> "var " ++ ctor ++ " = function (value) { return { ctor: '" ++ ctor ++ "', value: value }; };") ctors
+  Just $ flip concatMap ctors $ \(ctor, maybeTy) ->
+    case maybeTy of
+      Nothing -> "var " ++ ctor ++ " =  { ctor: '" ++ ctor ++ "' };"
+      Just _ -> "var " ++ ctor ++ " = function (value) { return { ctor: '" ++ ctor ++ "', value: value }; };"
 declToJs _ = Nothing
 
 valueToJs :: Value -> String
@@ -77,7 +80,11 @@ binaryOperatorString Concat = "+"
 
 binderToJs :: Int -> Int -> Binder -> String -> (String, Int)
 binderToJs varName fresh (VarBinder s) done = ("var " ++ s ++ " = _" ++ show varName ++ "; " ++ done, fresh)
-binderToJs varName fresh (ConstructorBinder ctor b) done =
+binderToJs varName fresh (NullaryBinder ctor) done =
+  ("if (_" ++ show varName ++ ".ctor === \"" ++ ctor ++ "\") {"
+  ++ done
+  ++ "}", fresh)
+binderToJs varName fresh (UnaryBinder ctor b) done =
   ("if (_" ++ show varName ++ ".ctor === \"" ++ ctor ++ "\") {"
   ++ "var _" ++ show fresh' ++ " = _" ++ show varName ++ ".value;"
   ++ js

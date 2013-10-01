@@ -35,8 +35,8 @@ emptyEnvironment = Environment M.empty M.empty
 
 newtype Check a = Check { unCheck :: StateT Environment (Either String) a } deriving (Functor, Monad, Applicative, MonadPlus, MonadState Environment, MonadError String)
 
-check :: Check a -> Either String a
-check = flip evalStateT emptyEnvironment . unCheck
+check :: Check a -> Either String (a, Environment)
+check = flip runStateT emptyEnvironment . unCheck
 
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()

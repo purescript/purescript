@@ -15,7 +15,6 @@
 module Main where
 
 import PureScript
-import Text.Parsec
 import Data.Maybe (mapMaybe)
 import Data.List (intercalate)
 import System.Console.CmdTheLine
@@ -26,7 +25,7 @@ import qualified System.IO.UTF8 as U
 compile :: [FilePath] -> Maybe FilePath -> IO ()
 compile inputFiles outputFile = do
   input <- fmap concat $ mapM U.readFile inputFiles
-  let ast = parse parseDeclarations "" input
+  let ast = parseDeclarations input
   case ast of
     Left err -> do
       U.print err

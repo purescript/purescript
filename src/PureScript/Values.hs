@@ -76,5 +76,6 @@ data Statement
 
 data Binder
   = VarBinder String
-  | ConstructorBinder String Binder
+  | NullaryBinder String
+  | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)] deriving Show

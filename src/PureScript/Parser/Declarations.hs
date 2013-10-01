@@ -17,12 +17,16 @@ module PureScript.Parser.Declarations (
     parseDeclarations
 ) where
 
-import PureScript.Values
-import PureScript.Types
-import PureScript.Parser.Common
+import Data.Char
+import Data.List
+import Data.Function
 import Control.Applicative
 import qualified Text.Parsec as P
 import Control.Arrow (Arrow(..))
+
+import PureScript.Values
+import PureScript.Types
+import PureScript.Parser.Common
 import PureScript.Declarations
 import PureScript.Parser.Values
 import PureScript.Parser.Types
@@ -33,7 +37,7 @@ parseDataDeclaration = do
   name <- properName
   tyArgs <- many identifier
   lexeme $ P.char '='
-  ctors <- P.sepBy1 ((,) <$> properName <*> parseType) (lexeme $ P.char '|')
+  ctors <- P.sepBy1 ((,) <$> properName <*> P.optionMaybe parseType) (lexeme $ P.char '|')
   return $ DataDeclaration $ DataConstructors name tyArgs ctors
 
 parseValueDeclaration :: P.Parsec String () Declaration
@@ -43,5 +47,8 @@ parseDeclaration :: P.Parsec String () Declaration
 parseDeclaration = parseDataDeclaration
                    P.<|> parseValueDeclaration
 
-parseDeclarations :: P.Parsec String () [Declaration]
-parseDeclarations = whiteSpace *> P.sepEndBy parseDeclaration semi <* P.eof
+parseDeclarations :: String -> Either P.ParseError [Declaration]
+parseDeclarations = mapM (P.parse (parseDeclaration <* whiteSpace <* P.eof) "Declaration") . splitFileIntoDeclarations
+
+splitFileIntoDeclarations :: String -> [String]
+splitFileIntoDeclarations = map unlines . filter (not . all isSpace . head) . groupBy ((==) `on` (all isSpace)) . lines

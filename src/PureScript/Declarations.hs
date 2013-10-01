@@ -28,5 +28,5 @@ data Declaration
 data DataConstructors = DataConstructors
   { typeConstructorName :: String
   , typeArguments :: [String]
-  , dataConstructors :: [(String, Type)]
+  , dataConstructors :: [(String, Maybe Type)]
   } deriving Show

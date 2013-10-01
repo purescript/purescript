@@ -18,6 +18,8 @@ module PureScript.TypeChecker.Types (
     typeOf
 ) where
 
+import Debug.Trace
+
 import Data.List
 import Data.Function
 
@@ -43,10 +45,11 @@ newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Ro
 emptyTypeSolution :: TypeSolution
 emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
-typeOf :: Value -> Check Type
-typeOf val = do
-  (cs, n, _) <- typeConstraints 0 M.empty val
-  solution <- solveTypeConstraints cs emptyTypeSolution
+typeOf :: String -> Value -> Check Type
+typeOf name val = do
+  let me = 0
+  (cs, n, _) <- typeConstraints 1 (M.singleton name me) val
+  solution <- solveTypeConstraints ((TypeConstraint me (TUnknown n)) : cs) emptyTypeSolution
   return $ varIfUnknown $ fst (runTypeSolution solution) n
 
 varIfUnknown :: Type -> Type
@@ -213,25 +216,44 @@ symBinOpConstraints ty left right result = [TypeConstraint left ty, TypeConstrai
 typeConstraintsForBinder :: Int -> M.Map String Int -> Int -> Binder -> Check ([TypeConstraint], Int, M.Map String Int)
 typeConstraintsForBinder n m val (VarBinder name) =
   return ([TypeConstraint n (TUnknown val)], n, M.insert name n m)
-typeConstraintsForBinder n m val (ConstructorBinder ctor binder) = do
+typeConstraintsForBinder n m val (NullaryBinder ctor) = do
+  env <- get
+  case M.lookup ctor (names env) of
+    Just ret -> do
+      let (ret', max1) = replaceVarsWithUnknowns n ret
+      return ([TypeConstraint val ret'], max1, m)
+    _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
+typeConstraintsForBinder n m val (UnaryBinder ctor binder) = do
   env <- get
   case M.lookup ctor (names env) of
     Just f@(Function [ty] ret) -> do
       let obj = n
-      let (Function [ty'] ret', max1) = replaceVarsWithUnknowns n f
+      let (Function [ty'] ret', max1) = replaceVarsWithUnknowns (n + 1) f
       (cs, max2, m1) <- typeConstraintsForBinder (max1 + 1) m obj binder
       return ((TypeConstraint val ret') : (TypeConstraint obj ty') : cs, max2, m1)
-    Just _ -> throwError $ ctor ++ " is not a constructor"
+    Just _ -> throwError $ ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
-typeConstraintsForBinder n m val (ObjectBinder props) = do undefined
+typeConstraintsForBinder n m val (ObjectBinder props) = do
+  let row = n
+  let rest = n + 1
+  (cs, max1, m1) <- typeConstraintsForProperties (n + 2) m row (RUnknown rest) props
+  return ((TypeConstraint val (Object (RUnknown row))) : cs, max1, m1)
+  where
+  typeConstraintsForProperties :: Int -> M.Map String Int -> Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], Int, M.Map String Int)
+  typeConstraintsForProperties n m nrow row [] = return ([RowConstraint nrow row], n, m)
+  typeConstraintsForProperties n m nrow row ((name, binder):binders) = do
+    let propTy = n
+    (cs1, max1, m1) <- typeConstraintsForBinder (n + 1) m propTy binder
+    (cs2, max2, m2) <- typeConstraintsForProperties (max1 + 1) m1 nrow (RCons name (TUnknown propTy) row) binders
+    return (cs1 ++ cs2, max2, m2)
 
 typeConstraintsForBinders :: Int -> M.Map String Int -> Int -> Int -> [(Binder, Value)] -> Check ([TypeConstraint], Int)
 typeConstraintsForBinders n _ _ _ [] = return ([], n)
 typeConstraintsForBinders n m nval ret ((binder, val):bs) = do
   (cs1, max1, m1) <- typeConstraintsForBinder n m nval binder
   (cs2, n2, max2) <- typeConstraints (max1 + 1) m1 val
-  (cs3, max2) <- typeConstraintsForBinders (max2 + 1) m nval ret bs
-  return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3, max2)
+  (cs3, max3) <- typeConstraintsForBinders (max2 + 1) m nval ret bs
+  return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3, max3)
 
 typeConstraintsForStatement :: Int -> M.Map String Int -> M.Map String Int -> Int -> Statement -> Check ([TypeConstraint], Bool, Int, M.Map String Int)
 typeConstraintsForStatement n m mass ret (VariableIntroduction name val) = do
@@ -291,7 +313,7 @@ typeConstraintsAll n m (t:ts) = do
 
 solveTypeConstraints :: [TypeConstraint] -> TypeSolution -> Check TypeSolution
 solveTypeConstraints [] s = return s
-solveTypeConstraints (TypeConstraint n t:cs) s = do
+solveTypeConstraints all@(TypeConstraint n t:cs) s = do
   guardWith "Occurs check failed" $ not $ typeOccursCheck n t
   let s' = let (f, g) = runTypeSolution s
            in TypeSolution (replaceTypeInType n t . f, replaceTypeInRow n t . g)
@@ -343,8 +365,9 @@ replaceRowInRow n r (RCons name ty row) = RCons name (replaceRowInType n r ty) (
 replaceRowInRow _ _ other = other
 
 unifyTypes :: Type -> Type -> Check [TypeConstraint]
+unifyTypes (TUnknown u1) (TUnknown u2) | u1 == u2 = return []
 unifyTypes (TUnknown u) t = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck u t
+  guardWith "Occurs check failed for " $ not $ typeOccursCheck u t
   return [TypeConstraint u t]
 unifyTypes t (TUnknown u) = do
   guardWith "Occurs check failed" $ not $ typeOccursCheck u t
