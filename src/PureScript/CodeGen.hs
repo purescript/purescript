@@ -349,7 +349,7 @@ typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   operators :: OperatorTable Type String
   operators =
     OperatorTable $ [ AssocL typeApp $ \f x -> f ++ " " ++ x
-                    , Split function $ \args ret -> "(" ++ intercalate "," (map typeToPs args) ++ ") -> " ++ typeToPs ret ]
+                    , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret ]
 
 externToJs :: (String, Type) -> String
 externToJs (name, ty) = "extern " ++ name ++ " :: " ++ typeToPs ty

@@ -196,7 +196,7 @@ typeConstraints m (Case val binders) = do
   return (cs1 ++ cs2, ret)
 typeConstraints m (TypedValue val ty) = do
   (cs, n1) <- typeConstraints m val
-  return ([TypeConstraint n1 ty], n1)
+  return (TypeConstraint n1 ty : cs, n1)
   -- TODO: Kind-check the type
 
 unaryOperatorConstraints :: UnaryOperator -> Int -> Int -> [TypeConstraint]
