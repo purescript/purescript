@@ -14,7 +14,6 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 ## TODO
 
 - IfThenElse expressions
-- Accessors and indices in assignments
 - Type Synonyms
 - User defined operators
 - Mutually recursive functions

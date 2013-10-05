@@ -181,25 +181,29 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
                     , Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]"
                     , Wrap app $ \args val -> val ++ "(" ++ args ++ ")"
                     , Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }"
-                    , unary     Not                 "!"
-                    , unary     BitwiseNot          "~"
-                    , unary     Negate              "-"
-                    , binary    Multiply            "*"
-                    , binary    Divide              "/"
-                    , binary    Modulus             "%"
-                    , binary    Concat              "++"
-                    , binary    Add                 "+"
-                    , binary    Subtract            "-"
-                    , binary    ShiftLeft           "<<"
-                    , binary    ShiftRight          ">>"
-                    , binary    ZeroFillShiftRight  ">>>"
-                    , binary    EqualTo             "==="
-                    , binary    NotEqualTo          "!=="
-                    , binary    BitwiseAnd          "&"
-                    , binary    BitwiseXor          "^"
-                    , binary    BitwiseOr           "|"
-                    , binary    And                 "&&"
-                    , binary    Or                  "||"
+                    , binary    LessThan             "<"
+                    , binary    LessThanOrEqualTo    "<="
+                    , binary    GreaterThan          ">"
+                    , binary    GreaterThanOrEqualTo ">="
+                    , unary     Not                  "!"
+                    , unary     BitwiseNot           "~"
+                    , unary     Negate               "-"
+                    , binary    Multiply             "*"
+                    , binary    Divide               "/"
+                    , binary    Modulus              "%"
+                    , binary    Concat               "++"
+                    , binary    Add                  "+"
+                    , binary    Subtract             "-"
+                    , binary    ShiftLeft            "<<"
+                    , binary    ShiftRight           ">>"
+                    , binary    ZeroFillShiftRight   ">>>"
+                    , binary    EqualTo              "==="
+                    , binary    NotEqualTo           "!=="
+                    , binary    BitwiseAnd           "&"
+                    , binary    BitwiseXor           "^"
+                    , binary    BitwiseOr            "|"
+                    , binary    And                  "&&"
+                    , binary    Or                   "||"
                     ]
 
 unaryOperatorString :: UnaryOperator -> String
@@ -275,7 +279,7 @@ objectPropertyToJs (key, value) = key ++ ":" ++ valueToJs value
 
 statementToJs :: Statement -> String
 statementToJs (VariableIntroduction name value) = "var " ++ name ++ " = " ++ valueToJs value
-statementToJs (Assignment target value) = target ++ " = " ++ valueToJs value
+statementToJs (Assignment target value) = assignmentTargetToJs target ++ " = " ++ valueToJs value
 statementToJs (While cond sts) = "while ("
   ++ valueToJs cond ++ ") {"
   ++ intercalate ";" (map statementToJs sts) ++ "}"
@@ -290,3 +294,8 @@ statementToJs (IfThenElse cond thens elses) = "if ("
   ++ flip (maybe "") elses (\sts ->
     " else {" ++ intercalate ";" (map statementToJs sts) ++ "}")
 statementToJs (Return value) = "return " ++ valueToJs value
+
+assignmentTargetToJs :: AssignmentTarget -> String
+assignmentTargetToJs (AssignVariable var) = var
+assignmentTargetToJs (AssignArrayIndex index tgt) = assignmentTargetToJs tgt ++ "[" ++ valueToJs index ++ "]"
+assignmentTargetToJs (AssignObjectProperty prop tgt) = assignmentTargetToJs tgt ++ "." ++ prop

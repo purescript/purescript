@@ -17,7 +17,8 @@ module PureScript.Values (
   BinaryOperator (..),
   Value (..),
   Statement (..),
-  Binder (..)
+  Binder (..),
+  AssignmentTarget (..)
 ) where
 
 import PureScript.Types
@@ -69,7 +70,7 @@ data Value
 
 data Statement
   = VariableIntroduction String Value
-  | Assignment String Value
+  | Assignment AssignmentTarget Value
   | While Value [Statement]
   | For (Statement, Value, Statement) [Statement]
   | IfThenElse (Value) [Statement] (Maybe [Statement])
@@ -84,3 +85,8 @@ data Binder
   | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)]
   | ArrayBinder [Binder] (Maybe Binder) deriving Show
+
+data AssignmentTarget
+  = AssignVariable String
+  | AssignObjectProperty String AssignmentTarget
+  | AssignArrayIndex Value AssignmentTarget deriving Show

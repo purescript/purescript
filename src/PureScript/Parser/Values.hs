@@ -22,6 +22,7 @@ import qualified PureScript.Parser.Common as C
 import Control.Applicative
 import qualified Text.Parsec as P
 import Text.Parsec.Expr
+import Control.Monad
 import Control.Arrow (Arrow(..))
 import PureScript.Parser.Types
 import PureScript.Types
@@ -74,7 +75,7 @@ parseCaseAlternative :: P.Parsec String () (Binder, Value)
 parseCaseAlternative = (,) <$> (parseBinder <* C.lexeme (P.string "->")) <*> parseValue
 
 parseBlock :: P.Parsec String () Value
-parseBlock = Block <$> (C.braces $ P.many parseStatement)
+parseBlock = Block <$> (C.braces $ P.many (parseStatement True))
 
 parseValueAtom :: P.Parsec String () Value
 parseValueAtom = P.choice $ map P.try
@@ -100,7 +101,10 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
               , [ Prefix $ C.lexeme (P.char '!') >> return (Unary Not)
                 , Prefix $ C.lexeme (P.char '~') >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.char '-') >> return (Unary Negate) ]
-              , [ Infix (C.lexeme (P.char '*') >> return (Binary Multiply)) AssocRight
+              , [ Infix (C.lexeme (P.try (P.string "<=")) >> return (Binary LessThanOrEqualTo)) AssocRight
+                , Infix (C.lexeme (P.try (P.string ">=")) >> return (Binary GreaterThanOrEqualTo)) AssocRight
+                , Infix (C.lexeme (P.try (P.char '<' <* P.notFollowedBy (P.char '<'))) >> return (Binary LessThan)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (P.char '>' <* P.notFollowedBy (P.char '>'))) >> return (Binary GreaterThan)) AssocRight
                 , Infix (C.lexeme (P.char '/') >> return (Binary Divide)) AssocRight
                 , Infix (C.lexeme (P.char '%') >> return (Binary Modulus)) AssocRight ]
               , [ Infix (C.lexeme (P.try (P.string "++")) >> return (Binary Concat)) AssocRight
@@ -118,25 +122,25 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
               , [ Infix (C.lexeme (P.string "||") >> return (Binary Or)) AssocRight ]
               ]
 
-parseVariableIntroduction :: P.Parsec String () Statement
-parseVariableIntroduction = do
+parseVariableIntroduction :: Bool -> P.Parsec String () Statement
+parseVariableIntroduction requireSemi = do
   C.reserved "var"
   name <- C.identifier
   C.lexeme $ P.char '='
   value <- parseValue
-  C.semi
+  when requireSemi (void C.semi)
   return $ VariableIntroduction name value
 
-parseAssignment :: P.Parsec String () (Statement)
-parseAssignment = do
-  tgt <- C.identifier
+parseAssignment :: Bool -> P.Parsec String () (Statement)
+parseAssignment requireSemi = do
+  tgt <- parseAssignmentTarget
   C.lexeme $ P.char '='
   value <- parseValue
-  C.semi
+  when requireSemi (void C.semi)
   return $ Assignment tgt value
 
 parseManyStatements :: P.Parsec String () [Statement]
-parseManyStatements = C.braces $ P.many parseStatement
+parseManyStatements = C.braces $ P.many (parseStatement True)
 
 parseWhile :: P.Parsec String () Statement
 parseWhile = While <$> (C.reserved "while" *> C.parens parseValue)
@@ -146,9 +150,9 @@ parseFor :: P.Parsec String () Statement
 parseFor = For <$> (C.reserved "for" *> C.parens forIntro)
                <*> parseManyStatements
   where
-  forIntro = (,,) <$> parseStatement
+  forIntro = (,,) <$> parseStatement False
                   <*> (C.semi *> parseValue)
-                  <*> (C.semi *> parseStatement)
+                  <*> (C.semi *> parseStatement False)
 
 parseIfThenElse :: P.Parsec String () Statement
 parseIfThenElse = IfThenElse
@@ -156,17 +160,17 @@ parseIfThenElse = IfThenElse
                     <*> parseManyStatements
                     <*> P.optionMaybe (C.reserved "else" *> parseManyStatements)
 
-parseReturn :: P.Parsec String () Statement
-parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.semi)
+parseReturn :: Bool -> P.Parsec String () Statement
+parseReturn requireSemi = Return <$> (C.reserved "return" *> parseValue <* when requireSemi (void C.semi))
 
-parseStatement :: P.Parsec String () Statement
-parseStatement = P.choice $ map P.try
-                 [ parseVariableIntroduction
-                 , parseAssignment
+parseStatement :: Bool -> P.Parsec String () Statement
+parseStatement requireSemi = P.choice $ map P.try
+                 [ parseVariableIntroduction requireSemi
+                 , parseAssignment requireSemi
                  , parseWhile
                  , parseFor
                  , parseIfThenElse
-                 , parseReturn ]
+                 , parseReturn requireSemi ]
 
 parseStringBinder :: P.Parsec String () Binder
 parseStringBinder = StringBinder <$> C.stringLiteral
@@ -210,3 +214,9 @@ parseBinder = P.choice $ map P.try
                   , parseObjectBinder
                   , parseArrayBinder
                   , C.parens parseBinder ]
+
+parseAssignmentTarget :: P.Parsec String () AssignmentTarget
+parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.identifier)
+  where
+  operators = [ [ Postfix $ AssignArrayIndex <$> C.squares parseValue
+                , Postfix $ AssignObjectProperty <$> (C.dot *> C.identifier) ] ]

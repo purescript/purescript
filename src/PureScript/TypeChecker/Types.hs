@@ -210,10 +210,10 @@ binaryOperatorConstraints Subtract = symBinOpConstraints Number
 binaryOperatorConstraints Multiply = symBinOpConstraints Number
 binaryOperatorConstraints Divide = symBinOpConstraints Number
 binaryOperatorConstraints Modulus = symBinOpConstraints Number
-binaryOperatorConstraints LessThan = symBinOpConstraints Number
-binaryOperatorConstraints LessThanOrEqualTo = symBinOpConstraints Number
-binaryOperatorConstraints GreaterThan = symBinOpConstraints Number
-binaryOperatorConstraints GreaterThanOrEqualTo = symBinOpConstraints Number
+binaryOperatorConstraints LessThan = asymBinOpConstraints Number Boolean
+binaryOperatorConstraints LessThanOrEqualTo = asymBinOpConstraints Number Boolean
+binaryOperatorConstraints GreaterThan = asymBinOpConstraints Number Boolean
+binaryOperatorConstraints GreaterThanOrEqualTo = asymBinOpConstraints Number Boolean
 binaryOperatorConstraints BitwiseAnd = symBinOpConstraints Number
 binaryOperatorConstraints BitwiseOr = symBinOpConstraints Number
 binaryOperatorConstraints BitwiseXor = symBinOpConstraints Number
@@ -230,7 +230,10 @@ equalityBinOpConstraints :: Int -> Int -> Int -> [TypeConstraint]
 equalityBinOpConstraints left right result = [TypeConstraint left (TUnknown right), TypeConstraint result Boolean]
 
 symBinOpConstraints :: Type -> Int -> Int -> Int -> [TypeConstraint]
-symBinOpConstraints ty left right result = [TypeConstraint left ty, TypeConstraint right ty, TypeConstraint result ty]
+symBinOpConstraints ty left right result = asymBinOpConstraints ty ty left right result
+
+asymBinOpConstraints :: Type -> Type -> Int -> Int -> Int -> [TypeConstraint]
+asymBinOpConstraints ty res left right result = [TypeConstraint left ty, TypeConstraint right ty, TypeConstraint result res]
 
 typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map String Int)
 typeConstraintsForBinder val (StringBinder _) = constantBinder val String
@@ -298,12 +301,10 @@ typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
       (cs1, n1) <- typeConstraints m val
       return $ (cs1, False, M.insert name n1 mass)
     Just ty -> throwError $ "Variable with name " ++ name ++ " already exists."
-typeConstraintsForStatement m mass ret (Assignment name val) = do
-  case M.lookup name (m `M.union` mass) of
-    Nothing -> throwError $ "No local variable with name " ++ name
-    Just ty -> do
-      (cs1, n1) <- typeConstraints m val
-      return ((TypeConstraint n1 (TUnknown ty)) : cs1, False, mass)
+typeConstraintsForStatement m mass ret (Assignment tgt val) = do
+  (cs1, n1) <- typeConstraints m val
+  cs2 <- typeConstraintsForAssignmentTarget m mass n1 tgt
+  return (cs1 ++ cs2, False, mass)
 typeConstraintsForStatement m mass ret (While val inner) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
@@ -326,8 +327,25 @@ typeConstraintsForStatement m mass ret (For (init, cond, cont) inner) = do
   (cs4, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass2) mass2 ret inner
   return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3 ++ cs4, allCodePathsReturn, mass)
 typeConstraintsForStatement m mass ret (Return val) = do
-  (cs1, n1) <- typeConstraints m val
+  (cs1, n1) <- typeConstraints (m `M.union` mass) val
   return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, mass)
+
+typeConstraintsForAssignmentTarget :: M.Map String Int -> M.Map String Int -> Int -> AssignmentTarget -> Check [TypeConstraint]
+typeConstraintsForAssignmentTarget m mass nval (AssignVariable var) =
+  case M.lookup var mass of
+    Nothing -> throwError $ "No local variable with name " ++ var
+    Just ty -> do
+     return [TypeConstraint nval (TUnknown ty)]
+typeConstraintsForAssignmentTarget m mass nval (AssignArrayIndex index tgt) = do
+  arr <- fresh
+  (cs1, n1) <- typeConstraints (m `M.union` mass) index
+  cs2 <- typeConstraintsForAssignmentTarget m mass arr tgt
+  return $ (TypeConstraint arr (Array (TUnknown nval))) : (TypeConstraint n1 Number) : cs1 ++ cs2
+typeConstraintsForAssignmentTarget m mass nval (AssignObjectProperty prop tgt) =  do
+  obj <- fresh
+  row <- fresh
+  cs <- typeConstraintsForAssignmentTarget m mass obj tgt
+  return $ (TypeConstraint obj (Object (RCons prop (TUnknown nval) $ RUnknown row))) : cs
 
 typeConstraintsForBlock :: M.Map String Int -> M.Map String Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map String Int)
 typeConstraintsForBlock _ mass _ [] = return ([], False, mass)
