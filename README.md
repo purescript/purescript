@@ -9,7 +9,7 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 - Extensible records
 - Type-safe blocks with for/while/assignment etc.
 - Functions with multiple arguments
-- Pattern matching, object patterns
+- Pattern matching
 
 ## TODO
 
