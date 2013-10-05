@@ -26,15 +26,17 @@ import Control.Arrow (Arrow(..))
 import PureScript.Parser.Types
 import PureScript.Types
 
+booleanLiteral :: P.Parsec String () Bool
+booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
+
 parseNumericLiteral :: P.Parsec String () Value
-parseNumericLiteral = NumericLiteral <$> either fromIntegral id <$> C.naturalOrFloat
+parseNumericLiteral = NumericLiteral <$> C.naturalOrFloat
 
 parseStringLiteral :: P.Parsec String () Value
 parseStringLiteral = StringLiteral <$> C.stringLiteral
 
 parseBooleanLiteral :: P.Parsec String () Value
-parseBooleanLiteral = BooleanLiteral <$> ((P.string "true" >> return True)
-                                    P.<|> (P.string "false" >> return False))
+parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
 parseArrayLiteral :: P.Parsec String () Value
 parseArrayLiteral = ArrayLiteral <$> (C.squares $ C.commaSep parseValue)
@@ -51,8 +53,8 @@ parseIdentifierAndValue = do
 
 parseAbs :: P.Parsec String () Value
 parseAbs = do
-  P.char '\\'
-  args <- C.commaSep1 C.identifier
+  C.lexeme $ P.char '\\'
+  args <- C.commaSep C.identifier
   C.lexeme $ P.string "->"
   value <- parseValue
   return $ Abs args value
@@ -93,26 +95,27 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
   typedValue = C.augment parseValueAtom parseTypeAnnotation TypedValue
   funArgs = C.parens $ C.commaSep parseValue
   parseTypeAnnotation = C.lexeme (P.string "::") *> parseType
-  operators = [ [ Postfix $ (Accessor <$> (C.dot *> C.identifier)) ]
-              , [ Infix (C.lexeme (P.try (P.string "||")) >> return (Binary Or)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.string "&&")) >> return (Binary And)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '|') >> return (Binary BitwiseOr)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '^') >> return (Binary BitwiseXor)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '&') >> return (Binary BitwiseAnd)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "==") >> return (Binary EqualTo)) AssocRight
-                , Infix (C.lexeme (P.try (P.string "!=")) >> return (Binary NotEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "<<") >> return (Binary ShiftLeft)) AssocRight
-                , Infix (C.lexeme (P.try (P.string ">>>")) >> return (Binary ZeroFillShiftRight)) AssocRight
-                , Infix (C.lexeme (P.string ">>") >> return (Binary ShiftRight)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.string "++")) >> return (Binary Concat)) AssocRight
-                , Infix (C.lexeme (P.char '+') >> return (Binary Add)) AssocRight
-                , Infix (C.lexeme (P.char '-') >> return (Binary Subtract)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '*') >> return (Binary Multiply)) AssocRight
-                , Infix (C.lexeme (P.char '/') >> return (Binary Divide)) AssocRight
-                , Infix (C.lexeme (P.char '%') >> return (Binary Modulus)) AssocRight ]
+  operators = [ [ Postfix $ Accessor <$> (C.dot *> C.identifier)
+                , Postfix $ Indexer <$> C.squares parseValue ]
               , [ Prefix $ C.lexeme (P.char '!') >> return (Unary Not)
                 , Prefix $ C.lexeme (P.char '~') >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.char '-') >> return (Unary Negate) ]
+              , [ Infix (C.lexeme (P.char '*') >> return (Binary Multiply)) AssocRight
+                , Infix (C.lexeme (P.char '/') >> return (Binary Divide)) AssocRight
+                , Infix (C.lexeme (P.char '%') >> return (Binary Modulus)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (P.string "++")) >> return (Binary Concat)) AssocRight
+                , Infix (C.lexeme (P.char '+') >> return (Binary Add)) AssocRight
+                , Infix (C.lexeme (P.char '-') >> return (Binary Subtract)) AssocRight ]
+              , [ Infix (C.lexeme (P.string "<<") >> return (Binary ShiftLeft)) AssocRight
+                , Infix (C.lexeme (P.try (P.string ">>>")) >> return (Binary ZeroFillShiftRight)) AssocRight
+                , Infix (C.lexeme (P.string ">>") >> return (Binary ShiftRight)) AssocRight ]
+              , [ Infix (C.lexeme (P.string "==") >> return (Binary EqualTo)) AssocRight
+                , Infix (C.lexeme (P.try (P.string "!=")) >> return (Binary NotEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (P.char '&' <* P.notFollowedBy (P.char '&'))) >> return (Binary BitwiseAnd)) AssocRight ]
+              , [ Infix (C.lexeme (P.char '^') >> return (Binary BitwiseXor)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (P.char '|' <* P.notFollowedBy (P.char '|'))) >> return (Binary BitwiseOr)) AssocRight ]
+              , [ Infix (C.lexeme (P.string "&&") >> return (Binary And)) AssocRight ]
+              , [ Infix (C.lexeme (P.string "||") >> return (Binary Or)) AssocRight ]
               ]
 
 parseVariableIntroduction :: P.Parsec String () Statement
@@ -165,6 +168,15 @@ parseStatement = P.choice $ map P.try
                  , parseIfThenElse
                  , parseReturn ]
 
+parseStringBinder :: P.Parsec String () Binder
+parseStringBinder = StringBinder <$> C.stringLiteral
+
+parseBooleanBinder :: P.Parsec String () Binder
+parseBooleanBinder = BooleanBinder <$> booleanLiteral
+
+parseNumberBinder :: P.Parsec String () Binder
+parseNumberBinder = NumberBinder <$> C.naturalOrFloat
+
 parseVarBinder :: P.Parsec String () Binder
 parseVarBinder = VarBinder <$> C.lexeme C.identifier
 
@@ -177,6 +189,9 @@ parseUnaryBinder = UnaryBinder <$> C.lexeme C.properName <*> parseBinder
 parseObjectBinder :: P.Parsec String () Binder
 parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep parseIdentifierAndBinder)
 
+parseArrayBinder :: P.Parsec String () Binder
+parseArrayBinder = C.squares $ ArrayBinder <$> (C.commaSep parseBinder) <*> P.optionMaybe (C.colon *> parseBinder)
+
 parseIdentifierAndBinder :: P.Parsec String () (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme C.identifier
@@ -186,8 +201,12 @@ parseIdentifierAndBinder = do
 
 parseBinder :: P.Parsec String () Binder
 parseBinder = P.choice $ map P.try
-                  [ parseVarBinder
+                  [ parseStringBinder
+                  , parseBooleanBinder
+                  , parseNumberBinder
+                  , parseVarBinder
                   , parseUnaryBinder
                   , parseNullaryBinder
                   , parseObjectBinder
+                  , parseArrayBinder
                   , C.parens parseBinder ]

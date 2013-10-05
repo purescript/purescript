@@ -47,71 +47,81 @@ emptyKindSolution = KindSolution KUnknown
 
 kindsOf :: String -> [String] -> [Type] -> Check Kind
 kindsOf name args ts = do
-  let tyCon = 0
-  let nargs = [1..length args]
-  (cs, ns, _, m) <- kindConstraintsAll (length args + 1) (M.insert name tyCon $ M.fromList (zipWith (,) args nargs)) ts
+  tyCon <- fresh
+  nargs <- replicateM (length args) fresh
+  (cs, ns, m) <- kindConstraintsAll (M.insert name tyCon $ M.fromList (zipWith (,) args nargs)) ts
   let extraConstraints = KindConstraint tyCon (foldr FunKind Star (map KUnknown nargs)) : map (flip KindConstraint Star) ns
   solution <- solveKindConstraints (extraConstraints ++ cs) emptyKindSolution
-  return $ starIfUnknown $ runKindSolution solution 0
+  return $ starIfUnknown $ runKindSolution solution tyCon
 
 starIfUnknown :: Kind -> Kind
 starIfUnknown (KUnknown _) = Star
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
-kindConstraintsAll :: Int -> M.Map String Int -> [Type] -> Check ([KindConstraint], [Int], Int, M.Map String Int)
-kindConstraintsAll n m [] = return ([], [], n, m)
-kindConstraintsAll n m (t:ts) = do
-  (cs, n1, max1, m') <- kindConstraints n m t
-  (cs', ns, max2, m'') <- kindConstraintsAll (max1 + 1) m' ts
-  return ((KindConstraint n1 Star) : cs ++ cs', n1:ns, max2, m'')
+kindConstraintsAll :: M.Map String Int -> [Type] -> Check ([KindConstraint], [Int], M.Map String Int)
+kindConstraintsAll m [] = return ([], [], m)
+kindConstraintsAll m (t:ts) = do
+  (cs, n1, m') <- kindConstraints m t
+  (cs', ns, m'') <- kindConstraintsAll m' ts
+  return ((KindConstraint n1 Star) : cs ++ cs', n1:ns, m'')
 
-kindConstraints :: Int -> M.Map String Int -> Type -> Check ([KindConstraint], Int, Int, M.Map String Int)
-kindConstraints n m (Array t) = do
-  let me = n
-  (cs, n1, max1, m') <- kindConstraints (n + 1) m t
-  return ((KindConstraint n1 Star) : (KindConstraint me Star) : cs, me, max1, m')
-kindConstraints n m (Object row) = do
-  let me = n
-  (cs, row, max1, m') <- kindConstraintsForRow (n + 1) m row
-  return ((KindConstraint me Star) : (KindConstraint row Row) : cs, me, max1, m')
-kindConstraints n m (Function args ret) = do
-  let me = n
-  (cs, ns, max1, m') <- kindConstraintsAll (n + 1) m args
-  (cs', retN, max2, m'') <- kindConstraints (max1 + 1) m' ret
-  return ((KindConstraint retN Star) : (KindConstraint me Star) : (map (flip KindConstraint Star) ns) ++ cs, me, max2, m'')
-kindConstraints n m (TypeVar v) =
-  let n' = maybe n id (M.lookup v m)
-  in return ([], n', n, M.insert v n' m)
-kindConstraints n m (TypeConstructor v) = do
-  env <- get
-  kind <- case M.lookup v m of
+kindConstraints :: M.Map String Int -> Type -> Check ([KindConstraint], Int, M.Map String Int)
+kindConstraints m (Array t) = do
+  me <- fresh
+  (cs, n1, m') <- kindConstraints m t
+  return ((KindConstraint n1 Star) : (KindConstraint me Star) : cs, me, m')
+kindConstraints m (Object row) = do
+  me <- fresh
+  (cs, row, m') <- kindConstraintsForRow m row
+  return ((KindConstraint me Star) : (KindConstraint row Row) : cs, me, m')
+kindConstraints m (Function args ret) = do
+  me <- fresh
+  (cs, ns, m') <- kindConstraintsAll m args
+  (cs', retN, m'') <- kindConstraints m' ret
+  return ((KindConstraint retN Star) : (KindConstraint me Star) : (map (flip KindConstraint Star) ns) ++ cs, me, m'')
+kindConstraints m (TypeVar v) = do
+  me <- case M.lookup v m of
+    Just u -> return u
+    Nothing -> fresh
+  return ([], me, M.insert v me m)
+kindConstraints m (TypeConstructor v) = do
+  env <- getEnv
+  me <- fresh
+  case M.lookup v m of
     Nothing -> case M.lookup v (types env) of
       Nothing -> throwError $ "Unknown type constructor '" ++ v ++ "'"
-      Just k -> return k
-    Just u -> return (KUnknown u)
-  return ([KindConstraint n kind], n, n, m)
-kindConstraints n m (TypeApp t1 t2) = do
-  let me = n
-  (cs1, n1, max1, m1) <- kindConstraints (n + 1) m t1
-  (cs2, n2, max2, m2) <- kindConstraints (max1 + 1) m1 t2
-  return ((KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me))) : cs1 ++ cs2, me, max2, m2)
-kindConstraints n m _ = return ([KindConstraint n Star], n, n, m)
+      Just kind -> return ([KindConstraint me kind], me, m)
+    Just u -> do
+      return ([KindConstraint me (KUnknown u)], me, m)
+kindConstraints m (TypeApp t1 t2) = do
+  me <- fresh
+  (cs1, n1, m1) <- kindConstraints m t1
+  (cs2, n2, m2) <- kindConstraints m1 t2
+  return ((KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me))) : cs1 ++ cs2, me, m2)
+kindConstraints m _ = do
+  me <- fresh
+  return ([KindConstraint me Star], me, m)
 
-kindConstraintsForRow :: Int -> M.Map String Int -> Row -> Check ([KindConstraint], Int, Int, M.Map String Int)
-kindConstraintsForRow n m (RowVar v) =
-  let n' = maybe n id (M.lookup v m)
-  in return ([KindConstraint n' Row], n', n, M.insert v n' m)
-kindConstraintsForRow n m REmpty = return ([KindConstraint n Row], n, n, m)
-kindConstraintsForRow n m (RCons _ ty row) = do
-  (cs1, n1, max1, m1) <- kindConstraints (n + 1) m ty
-  (cs2, n2, max2, m2) <- kindConstraintsForRow (max1 + 1) m1 row
-  return ((KindConstraint n Row) : (KindConstraint n1 Star) : (KindConstraint n2 Row) : cs1 ++ cs2, n, max2, m2)
+kindConstraintsForRow :: M.Map String Int -> Row -> Check ([KindConstraint], Int, M.Map String Int)
+kindConstraintsForRow m (RowVar v) = do
+  me <- case M.lookup v m of
+    Just u -> return u
+    Nothing -> fresh
+  return ([KindConstraint me Row], me, M.insert v me m)
+kindConstraintsForRow m REmpty = do
+  me <- fresh
+  return ([KindConstraint me Row], me, m)
+kindConstraintsForRow m (RCons _ ty row) = do
+  me <- fresh
+  (cs1, n1, m1) <- kindConstraints m ty
+  (cs2, n2, m2) <- kindConstraintsForRow m1 row
+  return ((KindConstraint me Row) : (KindConstraint n1 Star) : (KindConstraint n2 Row) : cs1 ++ cs2, me, m2)
 
 solveKindConstraints :: [KindConstraint] -> KindSolution -> Check KindSolution
 solveKindConstraints [] s = return s
 solveKindConstraints all@(KindConstraint n k:cs) s = do
-  guardWith "Occurs check failed" $ not $ kindOccursCheck n k
+  guardWith "Occurs check failed" $ not $ kindOccursCheck False n k
   let s' = KindSolution $ replaceUnknownKind n k . runKindSolution s
   cs' <- fmap concat $ mapM (substituteKindConstraint n k) cs
   solveKindConstraints cs' s'
@@ -131,10 +141,10 @@ replaceUnknownKind n k = f
 unifyKinds :: Kind -> Kind -> Check [KindConstraint]
 unifyKinds (KUnknown u1) (KUnknown u2) | u1 == u2 = return []
 unifyKinds (KUnknown u) k = do
-  guardWith "Occurs check failed" $ not $ kindOccursCheck u k
+  guardWith "Occurs check failed" $ not $ kindOccursCheck False u k
   return [KindConstraint u k]
 unifyKinds k (KUnknown u) = do
-  guardWith "Occurs check failed" $ not $ kindOccursCheck u k
+  guardWith "Occurs check failed" $ not $ kindOccursCheck False u k
   return [KindConstraint u k]
 unifyKinds Star Star = return []
 unifyKinds Row Row = return []
@@ -144,7 +154,7 @@ unifyKinds (FunKind k1 k2) (FunKind k3 k4) = do
   return $ cs1 ++ cs2
 unifyKinds k1 k2 = throwError $ "Cannot unify " ++ show k1 ++ " with " ++ show k2 ++ "."
 
-kindOccursCheck :: Int -> Kind -> Bool
-kindOccursCheck u (KUnknown u') | u == u' = True
-kindOccursCheck u (FunKind k1 k2) = kindOccursCheck u k1 || kindOccursCheck u k2
-kindOccursCheck _ _ = False
+kindOccursCheck :: Bool -> Int -> Kind -> Bool
+kindOccursCheck b u (KUnknown u') | u == u' = b
+kindOccursCheck _ u (FunKind k1 k2) = kindOccursCheck True u k1 || kindOccursCheck True u k2
+kindOccursCheck _ _ _ = False

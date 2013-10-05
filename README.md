@@ -13,14 +13,13 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 
 ## TODO
 
-- Array indexing
+- IfThenElse expressions
+- Accessors and indices in assignments
 - Type Synonyms
-- Better code generation, fewer parens
 - User defined operators
 - Mutually recursive functions
 - Modules
 - FFI
 - Top level pattern matching
-- Pattern matching booleans
 - Guards
 - Type classes

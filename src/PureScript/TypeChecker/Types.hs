@@ -18,8 +18,6 @@ module PureScript.TypeChecker.Types (
     typeOf
 ) where
 
-import Debug.Trace
-
 import Data.List
 import Data.Function
 
@@ -31,7 +29,7 @@ import Control.Monad.State
 import Control.Monad.Error
 
 import Control.Applicative
-import Control.Arrow (Kleisli(..), (***))
+import Control.Arrow (Kleisli(..), (***), (&&&))
 import qualified Control.Category as C
 
 import qualified Data.Map as M
@@ -47,8 +45,8 @@ emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
 typeOf :: String -> Value -> Check Type
 typeOf name val = do
-  let me = 0
-  (cs, n, _) <- typeConstraints 1 (M.singleton name me) val
+  me <- fresh
+  (cs, n) <- typeConstraints (M.singleton name me) val
   solution <- solveTypeConstraints ((TypeConstraint me (TUnknown n)) : cs) emptyTypeSolution
   return $ varIfUnknown $ fst (runTypeSolution solution) n
 
@@ -81,103 +79,124 @@ varIfUnknown = flip evalState M.empty . varIfUnknown'
   varIfUnknown'' (RCons name ty row) = RCons name ty <$> varIfUnknown'' row
   varIfUnknown'' r = return r
 
-replaceVarsWithUnknowns :: Int -> Type -> (Type, Int)
-replaceVarsWithUnknowns n = (id *** fst) . flip runState (n, M.empty) . replaceVarsWithUnknowns'
+replaceVarsWithUnknowns :: Type -> Check Type
+replaceVarsWithUnknowns = flip evalStateT M.empty . replaceVarsWithUnknowns'
   where
-  replaceVarsWithUnknowns' :: Type -> State (Int, M.Map String Int) Type
+  replaceVarsWithUnknowns' :: Type -> StateT (M.Map String Int) Check Type
   replaceVarsWithUnknowns' (Array t) = Array <$> replaceVarsWithUnknowns' t
   replaceVarsWithUnknowns' (Object row) = Object <$> replaceVarsWithUnknowns'' row
   replaceVarsWithUnknowns' (Function args ret) = Function <$> mapM replaceVarsWithUnknowns' args <*> replaceVarsWithUnknowns' ret
   replaceVarsWithUnknowns' (TypeApp t1 t2) = TypeApp <$> replaceVarsWithUnknowns' t1 <*> replaceVarsWithUnknowns' t2
   replaceVarsWithUnknowns' (TypeVar var) = do
-    (n, m) <- get
+    m <- get
+    n <- lift fresh
     case M.lookup var m of
       Nothing -> do
-        put (n + 1, M.insert var n m)
+        put (M.insert var n m)
         return $ TUnknown n
       Just u -> return $ TUnknown u
   replaceVarsWithUnknowns' t = return t
-  replaceVarsWithUnknowns'' :: Row -> State (Int, M.Map String Int) Row
+  replaceVarsWithUnknowns'' :: Row -> StateT (M.Map String Int) Check Row
   replaceVarsWithUnknowns'' (RowVar var) = do
-    (n, m) <- get
+    m <- get
+    n <- lift fresh
     case M.lookup var m of
       Nothing -> do
-        put (n + 1, M.insert var n m)
+        put (M.insert var n m)
         return $ RUnknown n
       Just u -> return $ RUnknown u
   replaceVarsWithUnknowns'' (RCons name ty row) = RCons name <$> replaceVarsWithUnknowns' ty <*> replaceVarsWithUnknowns'' row
   replaceVarsWithUnknowns'' r = return r
 
-typeConstraints :: Int -> M.Map String Int -> Value -> Check ([TypeConstraint], Int, Int)
-typeConstraints n _ (NumericLiteral _) = return ([TypeConstraint n Number], n, n)
-typeConstraints n _ (StringLiteral _) = return ([TypeConstraint n String], n, n)
-typeConstraints n _ (BooleanLiteral _) = return ([TypeConstraint n Boolean], n, n)
-typeConstraints n m (ArrayLiteral vals) = do
-  (cs, ns, max1) <- typeConstraintsAll n m vals
-  let me = max1 + 1
-  return (cs ++ map (TypeConstraint me . Array . TUnknown) ns, me, me)
-typeConstraints n m (Unary op val) = do
-  (cs, n1, max1) <- typeConstraints n m val
-  let me = max1 + 1
-  return (cs ++ unaryOperatorConstraints op n1 me, me, me)
-typeConstraints n m (Binary op left right) = do
-  (cs1, n1, max1) <- typeConstraints n m left
-  (cs2, n2, max2) <- typeConstraints (max1 + 1) m right
-  let me = max1 + 1
-  return (cs1 ++ cs2 ++ binaryOperatorConstraints op n1 n2 me, me, me)
-typeConstraints n m (ObjectLiteral ps) = do
-  (cs, ns, max1) <- typeConstraintsAll n m (map snd ps)
-  let me = max1 + 1
+typeConstraints :: M.Map String Int -> Value -> Check ([TypeConstraint], Int)
+typeConstraints _ (NumericLiteral _) = do
+  me <- fresh
+  return ([TypeConstraint me Number], me)
+typeConstraints _ (StringLiteral _) = do
+  me <- fresh
+  return ([TypeConstraint me String], me)
+typeConstraints _ (BooleanLiteral _) = do
+  me <- fresh
+  return ([TypeConstraint me Boolean], me)
+typeConstraints m (ArrayLiteral vals) = do
+  all <- mapM (typeConstraints m) vals
+  let (cs, ns) = (concat . map fst &&& map snd) all
+  me <- fresh
+  return (cs ++ map (TypeConstraint me . Array . TUnknown) ns, me)
+typeConstraints m (Unary op val) = do
+  (cs, n1) <- typeConstraints m val
+  me <- fresh
+  return (cs ++ unaryOperatorConstraints op n1 me, me)
+typeConstraints m (Binary op left right) = do
+  (cs1, n1) <- typeConstraints m left
+  (cs2, n2) <- typeConstraints m right
+  me <- fresh
+  return (cs1 ++ cs2 ++ binaryOperatorConstraints op n1 n2 me, me)
+typeConstraints m (ObjectLiteral ps) = do
+  all <- mapM (typeConstraints m . snd) ps
+  let (cs, ns) = (concat . map fst &&& map snd) all
+  me <- fresh
   let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
-  return ((TypeConstraint me (Object (typesToRow tys))) : cs, me, me)
+  return ((TypeConstraint me (Object (typesToRow tys))) : cs, me)
   where
     typesToRow [] = REmpty
     typesToRow ((name, ty):tys) = RCons name ty (typesToRow tys)
-typeConstraints n m (Accessor prop val) = do
-  (cs, n1, max1) <- typeConstraints n m val
-  let me = max1 + 1
-  let rest = max1 + 2
-  return ((TypeConstraint n1 (Object (RCons prop (TUnknown me) (RUnknown rest)))) : cs, me, rest)
-typeConstraints n m (Abs args ret) = do
-  let ns = [n..n + length args - 1]
-  let next = n + length args
+typeConstraints m (Indexer index val) = do
+  (cs1, n1) <- typeConstraints m index
+  (cs2, n2) <- typeConstraints m val
+  me <- fresh
+  return ((TypeConstraint n1 Number) : (TypeConstraint n2 (Array (TUnknown me))) : cs1 ++ cs2, me)
+typeConstraints m (Accessor prop val) = do
+  (cs, n1) <- typeConstraints m val
+  me <- fresh
+  rest <- fresh
+  return ((TypeConstraint n1 (Object (RCons prop (TUnknown me) (RUnknown rest)))) : cs, me)
+typeConstraints m (Abs args ret) = do
+  ns <- replicateM (length args) fresh
   let m' = m `M.union` M.fromList (zipWith (,) args ns)
-  (cs, n', max1) <- typeConstraints next m' ret
-  let me = max1 + 1
-  return ((TypeConstraint me (Function (map TUnknown ns) (TUnknown n'))) : cs, me, me)
-typeConstraints n m (App f xs) = do
-  (cs1, n1, max1) <- typeConstraints n m f
-  (cs2, ns, max2) <- typeConstraintsAll (max1 + 1) m xs
-  let me = max2 + 1
-  return ((TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me))) : cs1 ++ cs2, me, me)
-typeConstraints n m (Var var) =
+  (cs, n') <- typeConstraints m' ret
+  me <- fresh
+  return ((TypeConstraint me (Function (map TUnknown ns) (TUnknown n'))) : cs, me)
+typeConstraints m (App f xs) = do
+  (cs1, n1) <- typeConstraints m f
+  all <- mapM (typeConstraints m) xs
+  let (cs2, ns) = (concat . map fst &&& map snd) all
+  me <- fresh
+  return ((TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me))) : cs1 ++ cs2, me)
+typeConstraints m (Var var) =
   case M.lookup var m of
     Nothing -> do
-      env <- get
+      env <- getEnv
       case M.lookup var (names env) of
         Nothing -> throwError $ var ++ " is undefined"
-        Just ty -> let (replaced, max1) = replaceVarsWithUnknowns (n + 1) ty
-                   in return ([TypeConstraint n replaced], n, max1)
-    Just u -> return ([TypeConstraint u (TUnknown n)], n, n)
-typeConstraints n m (Block ss) = do
-  let ret = n + 1
-  (cs, allCodePathsReturn, max1, _) <- typeConstraintsForBlock (ret + 1) m M.empty ret ss
+        Just ty -> do
+          me <- fresh
+          replaced <- replaceVarsWithUnknowns ty
+          return ([TypeConstraint me replaced], me)
+    Just u -> do
+      me <- fresh
+      return ([TypeConstraint u (TUnknown me)], me)
+typeConstraints m (Block ss) = do
+  ret <- fresh
+  (cs, allCodePathsReturn, _) <- typeConstraintsForBlock m M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return (cs, ret, max1)
-typeConstraints n m (Constructor c) = do
-  env <- get
+  return (cs, ret)
+typeConstraints m (Constructor c) = do
+  env <- getEnv
   case M.lookup c (names env) of
     Nothing -> throwError $ c ++ " is undefined"
-    Just ty -> let (replaced, max1) = replaceVarsWithUnknowns (n + 1) ty
-               in return ([TypeConstraint n replaced], n, max1)
-typeConstraints n m (Case val binders) = do
-  (cs1, n1, max1) <- typeConstraints n m val
-  let ret = max1 + 1
-  (cs2, max2) <- typeConstraintsForBinders (ret + 1) m n1 ret binders
-  return (cs1 ++ cs2, ret, max2)
-typeConstraints n m (TypedValue val ty) = do
-  (cs, n1, max1) <- typeConstraints n m val
-  return ([TypeConstraint n1 ty], n1, max1)
+    Just ty -> do
+      me <- fresh
+      replaced <- replaceVarsWithUnknowns ty
+      return ([TypeConstraint me replaced], me)
+typeConstraints m (Case val binders) = do
+  (cs1, n1) <- typeConstraints m val
+  ret <- fresh
+  cs2 <- typeConstraintsForBinders m n1 ret binders
+  return (cs1 ++ cs2, ret)
+typeConstraints m (TypedValue val ty) = do
+  (cs, n1) <- typeConstraints m val
+  return ([TypeConstraint n1 ty], n1)
   -- TODO: Kind-check the type
 
 unaryOperatorConstraints :: UnaryOperator -> Int -> Int -> [TypeConstraint]
@@ -213,114 +232,124 @@ equalityBinOpConstraints left right result = [TypeConstraint left (TUnknown righ
 symBinOpConstraints :: Type -> Int -> Int -> Int -> [TypeConstraint]
 symBinOpConstraints ty left right result = [TypeConstraint left ty, TypeConstraint right ty, TypeConstraint result ty]
 
-typeConstraintsForBinder :: Int -> M.Map String Int -> Int -> Binder -> Check ([TypeConstraint], Int, M.Map String Int)
-typeConstraintsForBinder n m val (VarBinder name) =
-  return ([TypeConstraint n (TUnknown val)], n, M.insert name n m)
-typeConstraintsForBinder n m val (NullaryBinder ctor) = do
-  env <- get
+typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map String Int)
+typeConstraintsForBinder val (StringBinder _) = constantBinder val String
+typeConstraintsForBinder val (NumberBinder _) = constantBinder val Number
+typeConstraintsForBinder val (BooleanBinder _) = constantBinder val Boolean
+typeConstraintsForBinder val (VarBinder name) = do
+  me <- fresh
+  return ([TypeConstraint me (TUnknown val)], M.singleton name me)
+typeConstraintsForBinder val (NullaryBinder ctor) = do
+  env <- getEnv
   case M.lookup ctor (names env) of
     Just ret -> do
-      let (ret', max1) = replaceVarsWithUnknowns n ret
-      return ([TypeConstraint val ret'], max1, m)
+      ret' <- replaceVarsWithUnknowns ret
+      return ([TypeConstraint val ret'], M.empty)
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
-typeConstraintsForBinder n m val (UnaryBinder ctor binder) = do
-  env <- get
+typeConstraintsForBinder val (UnaryBinder ctor binder) = do
+  env <- getEnv
   case M.lookup ctor (names env) of
     Just f@(Function [ty] ret) -> do
-      let obj = n
-      let (Function [ty'] ret', max1) = replaceVarsWithUnknowns (n + 1) f
-      (cs, max2, m1) <- typeConstraintsForBinder (max1 + 1) m obj binder
-      return ((TypeConstraint val ret') : (TypeConstraint obj ty') : cs, max2, m1)
+      obj <- fresh
+      Function [ty'] ret' <- replaceVarsWithUnknowns f
+      (cs, m1) <- typeConstraintsForBinder obj binder
+      return ((TypeConstraint val ret') : (TypeConstraint obj ty') : cs, m1)
     Just _ -> throwError $ ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
-typeConstraintsForBinder n m val (ObjectBinder props) = do
-  let row = n
-  let rest = n + 1
-  (cs, max1, m1) <- typeConstraintsForProperties (n + 2) m row (RUnknown rest) props
-  return ((TypeConstraint val (Object (RUnknown row))) : cs, max1, m1)
+typeConstraintsForBinder val (ObjectBinder props) = do
+  row <- fresh
+  rest <- fresh
+  (cs, m1) <- typeConstraintsForProperties row (RUnknown rest) props
+  return ((TypeConstraint val (Object (RUnknown row))) : cs, m1)
   where
-  typeConstraintsForProperties :: Int -> M.Map String Int -> Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], Int, M.Map String Int)
-  typeConstraintsForProperties n m nrow row [] = return ([RowConstraint nrow row], n, m)
-  typeConstraintsForProperties n m nrow row ((name, binder):binders) = do
-    let propTy = n
-    (cs1, max1, m1) <- typeConstraintsForBinder (n + 1) m propTy binder
-    (cs2, max2, m2) <- typeConstraintsForProperties (max1 + 1) m1 nrow (RCons name (TUnknown propTy) row) binders
-    return (cs1 ++ cs2, max2, m2)
+  typeConstraintsForProperties :: Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], M.Map String Int)
+  typeConstraintsForProperties nrow row [] = return ([RowConstraint nrow row], M.empty)
+  typeConstraintsForProperties nrow row ((name, binder):binders) = do
+    propTy <- fresh
+    (cs1, m1) <- typeConstraintsForBinder propTy binder
+    (cs2, m2) <- typeConstraintsForProperties nrow (RCons name (TUnknown propTy) row) binders
+    return (cs1 ++ cs2, M.union m1 m2)
+typeConstraintsForBinder val (ArrayBinder binders rest) = do
+  el <- fresh
+  all <- mapM (typeConstraintsForBinder el) binders
+  let (cs1, m1) = (concat . map fst &&& M.unions . map snd) all
+  let arrayConstraint = TypeConstraint val (Array (TUnknown el))
+  case rest of
+    Nothing -> return (arrayConstraint : cs1, m1)
+    Just binder -> do
+      (cs2, m2) <- typeConstraintsForBinder val binder
+      return (arrayConstraint : cs1 ++ cs2, M.union m1 m2)
 
-typeConstraintsForBinders :: Int -> M.Map String Int -> Int -> Int -> [(Binder, Value)] -> Check ([TypeConstraint], Int)
-typeConstraintsForBinders n _ _ _ [] = return ([], n)
-typeConstraintsForBinders n m nval ret ((binder, val):bs) = do
-  (cs1, max1, m1) <- typeConstraintsForBinder n m nval binder
-  (cs2, n2, max2) <- typeConstraints (max1 + 1) m1 val
-  (cs3, max3) <- typeConstraintsForBinders (max2 + 1) m nval ret bs
-  return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3, max3)
+constantBinder :: Int -> Type -> Check ([TypeConstraint], M.Map String Int)
+constantBinder val ty = return ([TypeConstraint val ty], M.empty)
 
-typeConstraintsForStatement :: Int -> M.Map String Int -> M.Map String Int -> Int -> Statement -> Check ([TypeConstraint], Bool, Int, M.Map String Int)
-typeConstraintsForStatement n m mass ret (VariableIntroduction name val) = do
+typeConstraintsForBinders :: M.Map String Int -> Int -> Int -> [(Binder, Value)] -> Check [TypeConstraint]
+typeConstraintsForBinders _ _ _ [] = return []
+typeConstraintsForBinders m nval ret ((binder, val):bs) = do
+  (cs1, m1) <- typeConstraintsForBinder nval binder
+  (cs2, n2) <- typeConstraints (M.union m m1) val
+  cs3 <- typeConstraintsForBinders m nval ret bs
+  return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3)
+
+typeConstraintsForStatement :: M.Map String Int -> M.Map String Int -> Int -> Statement -> Check ([TypeConstraint], Bool, M.Map String Int)
+typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
   case M.lookup name (m `M.union` mass) of
     Nothing -> do
-      (cs1, n1, max1) <- typeConstraints n m val
-      return $ (cs1, False, max1, M.insert name n1 mass)
+      (cs1, n1) <- typeConstraints m val
+      return $ (cs1, False, M.insert name n1 mass)
     Just ty -> throwError $ "Variable with name " ++ name ++ " already exists."
-typeConstraintsForStatement n m mass ret (Assignment name val) = do
+typeConstraintsForStatement m mass ret (Assignment name val) = do
   case M.lookup name (m `M.union` mass) of
     Nothing -> throwError $ "No local variable with name " ++ name
     Just ty -> do
-      (cs1, n1, max1) <- typeConstraints n m val
-      return ((TypeConstraint n1 (TUnknown ty)) : cs1, False, max1, mass)
-typeConstraintsForStatement n m mass ret (While val inner) = do
-  (cs1, n1, max1) <- typeConstraints n m val
-  (cs2, allCodePathsReturn, max2, _) <- typeConstraintsForBlock (max1 + 1) m mass ret inner
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, max2, mass)
-typeConstraintsForStatement n m mass ret (IfThenElse val thens Nothing) = do
-  (cs1, n1, max1) <- typeConstraints n m val
-  (cs2, allCodePathsReturn, max2, _) <- typeConstraintsForBlock (max1 + 1) m mass ret thens
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, max2, mass)
-typeConstraintsForStatement n m mass ret (IfThenElse val thens (Just elses)) = do
-  (cs1, n1, max1) <- typeConstraints n m val
-  (cs2, allCodePathsReturn1, max2, _) <- typeConstraintsForBlock (max1 + 1) m mass ret thens
-  (cs3, allCodePathsReturn2, max3, _) <- typeConstraintsForBlock (max2 + 1) m mass ret elses
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2, max3, mass)
-typeConstraintsForStatement n m mass ret (For (init, cond, cont) inner) = do
-  (cs1, b1, max1, mass1) <- typeConstraintsForStatement n m mass ret init
+      (cs1, n1) <- typeConstraints m val
+      return ((TypeConstraint n1 (TUnknown ty)) : cs1, False, mass)
+typeConstraintsForStatement m mass ret (While val inner) = do
+  (cs1, n1) <- typeConstraints m val
+  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
+  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, mass)
+typeConstraintsForStatement m mass ret (IfThenElse val thens Nothing) = do
+  (cs1, n1) <- typeConstraints m val
+  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret thens
+  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, mass)
+typeConstraintsForStatement m mass ret (IfThenElse val thens (Just elses)) = do
+  (cs1, n1) <- typeConstraints m val
+  (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
+  (cs3, allCodePathsReturn2, _) <- typeConstraintsForBlock m mass ret elses
+  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2, mass)
+typeConstraintsForStatement m mass ret (For (init, cond, cont) inner) = do
+  (cs1, b1, mass1) <- typeConstraintsForStatement m mass ret init
   guardWith "Cannot return from inside for" $ not b1
-  (cs2, n1, max2) <- typeConstraints (max1 + 1) (m `M.union` mass1) cond
-  (cs3, b2, max3, mass2) <- typeConstraintsForStatement (max2 + 1) (m `M.union` mass1) mass1 ret cont
+  (cs2, n1) <- typeConstraints (m `M.union` mass1) cond
+  (cs3, b2, mass2) <- typeConstraintsForStatement (m `M.union` mass1) mass1 ret cont
   guardWith "Cannot return from inside for" $ not b2
-  (cs4, allCodePathsReturn, max4, _) <- typeConstraintsForBlock (max3 + 1) (m `M.union` mass2) mass2 ret inner
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3 ++ cs4, allCodePathsReturn, max4, mass)
-typeConstraintsForStatement n m mass ret (Return val) = do
-  (cs1, n1, max1) <- typeConstraints n m val
-  return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, max1, mass)
+  (cs4, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass2) mass2 ret inner
+  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3 ++ cs4, allCodePathsReturn, mass)
+typeConstraintsForStatement m mass ret (Return val) = do
+  (cs1, n1) <- typeConstraints m val
+  return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, mass)
 
-typeConstraintsForBlock :: Int -> M.Map String Int -> M.Map String Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, Int, M.Map String Int)
-typeConstraintsForBlock n _ mass _ [] = return ([], False, n, mass)
-typeConstraintsForBlock n m mass ret (s:ss) = do
-  (cs1, b1, max1, mass1) <- typeConstraintsForStatement n (m `M.union` mass) mass ret s
+typeConstraintsForBlock :: M.Map String Int -> M.Map String Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map String Int)
+typeConstraintsForBlock _ mass _ [] = return ([], False, mass)
+typeConstraintsForBlock m mass ret (s:ss) = do
+  (cs1, b1, mass1) <- typeConstraintsForStatement (m `M.union` mass) mass ret s
   case (b1, ss) of
-    (True, []) -> return (cs1, True, max1, mass1)
+    (True, []) -> return (cs1, True, mass1)
     (True, _) -> throwError "Unreachable code"
     (False, ss) -> do
-      (cs2, b2, max2, mass2) <- typeConstraintsForBlock (max1 + 1) m mass1 ret ss
-      return (cs1 ++ cs2, b2, max2, mass2)
-
-typeConstraintsAll :: Int -> M.Map String Int -> [Value] -> Check ([TypeConstraint], [Int], Int)
-typeConstraintsAll n _ [] = return ([], [], n)
-typeConstraintsAll n m (t:ts) = do
-  (cs, n', max1) <- typeConstraints n m t
-  (cs', ns, max2) <- typeConstraintsAll (max1 + 1) m ts
-  return (cs ++ cs', n':ns, max2)
+      (cs2, b2, mass2) <- typeConstraintsForBlock m mass1 ret ss
+      return (cs1 ++ cs2, b2, mass2)
 
 solveTypeConstraints :: [TypeConstraint] -> TypeSolution -> Check TypeSolution
 solveTypeConstraints [] s = return s
 solveTypeConstraints all@(TypeConstraint n t:cs) s = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck n t
+  guardWith "Occurs check failed" $ not $ typeOccursCheck False n t
   let s' = let (f, g) = runTypeSolution s
            in TypeSolution (replaceTypeInType n t . f, replaceTypeInRow n t . g)
   cs' <- fmap concat $ mapM (substituteTypeInConstraint n t) cs
   solveTypeConstraints cs' s'
 solveTypeConstraints (RowConstraint n r:cs) s = do
-  guardWith "Occurs check failed" $ not $ rowOccursCheck n r
+  guardWith "Occurs check failed" $ not $ rowOccursCheck False n r
   let s' = let (f, g) = runTypeSolution s
            in TypeSolution $ (replaceRowInType n r . f, replaceRowInRow n r . g)
   cs' <- fmap concat $ mapM (substituteRowInConstraint n r) cs
@@ -367,10 +396,10 @@ replaceRowInRow _ _ other = other
 unifyTypes :: Type -> Type -> Check [TypeConstraint]
 unifyTypes (TUnknown u1) (TUnknown u2) | u1 == u2 = return []
 unifyTypes (TUnknown u) t = do
-  guardWith "Occurs check failed for " $ not $ typeOccursCheck u t
+  guardWith "Occurs check failed" $ not $ typeOccursCheck False u t
   return [TypeConstraint u t]
 unifyTypes t (TUnknown u) = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck u t
+  guardWith "Occurs check failed" $ not $ typeOccursCheck False u t
   return [TypeConstraint u t]
 unifyTypes Number Number = return []
 unifyTypes String String = return []
@@ -378,6 +407,7 @@ unifyTypes Boolean Boolean = return []
 unifyTypes (Array s) (Array t) = unifyTypes s t
 unifyTypes (Object row1) (Object row2) = unifyRows row1 row2
 unifyTypes (Function args1 ret1) (Function args2 ret2) = do
+  guardWith "Function applied to incorrect number of args" $ length args1 == length args2
   cs1 <- fmap concat $ zipWithM unifyTypes args1 args2
   cs2 <- unifyTypes ret1 ret2
   return $ cs1 ++ cs2
@@ -400,19 +430,19 @@ unifyRows r1 r2 =
     sd2 = [ (name, t2) | (name, t2) <- s2, not (elem name (map fst s1)) ]
   in rethrow (const $ "Cannot unify " ++ show r1 ++ " with " ++ show r2) $ do
     cs1 <- fmap concat $ mapM (uncurry unifyTypes) int
-    cs2 <- unifyRows' (fromList (sd1, r1')) (fromList (sd2, r2'))
+    cs2 <- unifyRows' sd1 r1' sd2 r2'
     return $ cs1 ++ cs2
   where
-  unifyRows' :: Row -> Row -> Check [TypeConstraint]
-  unifyRows' r (RUnknown u) = do
-    guardWith "Occurs check failed" $ not $ rowOccursCheck u r
-    return [RowConstraint u r]
-  unifyRows' (RUnknown u) r = do
-    guardWith "Occurs check failed" $ not $ rowOccursCheck u r
-    return [RowConstraint u r]
-  unifyRows' (RowVar v1) (RowVar v2) | v1 == v2 = return []
-  unifyRows' REmpty REmpty = return []
-  unifyRows' r1 r2 = throwError $ "Cannot unify " ++ show r1 ++ " with " ++ show r2 ++ "."
+  unifyRows' :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Check [TypeConstraint]
+  unifyRows' [] (RUnknown u) sd r = do
+    guardWith "Occurs check failed" $ not $ rowOccursCheck False u r
+    return [RowConstraint u (fromList (sd, r))]
+  unifyRows' ((name, ty):row) r others (RUnknown u) = do
+    u' <- fresh
+    cs <- unifyRows' row r others (RUnknown u')
+    return [ RowConstraint u (RCons name ty (RUnknown u')) ]
+  unifyRows' [] REmpty [] REmpty = return []
+  unifyRows' sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ show (fromList (sd1, r1)) ++ " with " ++ show (fromList (sd2, r2)) ++ "."
   toList :: Row -> ([(String, Type)], Row)
   toList (RCons name ty row) = let (tys, rest) = toList row
                                in ((name, ty):tys, rest)
@@ -421,15 +451,15 @@ unifyRows r1 r2 =
   fromList ([], r) = r
   fromList ((name, t):ts, r) = RCons name t (fromList (ts, r))
 
-typeOccursCheck :: Int -> Type -> Bool
-typeOccursCheck u (TUnknown u') | u == u' = True
-typeOccursCheck u (Array t) = typeOccursCheck u t
-typeOccursCheck u (Object row) = rowOccursCheck u row
-typeOccursCheck u (Function args ret) = any (typeOccursCheck u) args || typeOccursCheck u ret
-typeOccursCheck u (TypeApp s t) = typeOccursCheck u s || typeOccursCheck u t
-typeOccursCheck _ _ = False
+typeOccursCheck :: Bool -> Int -> Type -> Bool
+typeOccursCheck b u (TUnknown u') | u == u' = b
+typeOccursCheck _ u (Array t) = typeOccursCheck True u t
+typeOccursCheck _ u (Object row) = rowOccursCheck True u row
+typeOccursCheck _ u (Function args ret) = any (typeOccursCheck True u) args || typeOccursCheck True u ret
+typeOccursCheck _ u (TypeApp s t) = typeOccursCheck True u s || typeOccursCheck True u t
+typeOccursCheck _ _ _ = False
 
-rowOccursCheck :: Int -> Row -> Bool
-rowOccursCheck u (RUnknown u') | u == u' = True
-rowOccursCheck u (RCons name ty row) = typeOccursCheck u ty || rowOccursCheck u row
-rowOccursCheck _ _ = False
+rowOccursCheck :: Bool -> Int -> Row -> Bool
+rowOccursCheck b u (RUnknown u') | u == u' = b
+rowOccursCheck _ u (RCons name ty row) = typeOccursCheck True u ty || rowOccursCheck True u row
+rowOccursCheck _ _ _ = False

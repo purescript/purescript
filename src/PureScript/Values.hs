@@ -50,12 +50,13 @@ data BinaryOperator
   | Concat deriving (Show, Eq)
 
 data Value
-  = NumericLiteral Double
+  = NumericLiteral (Either Integer Double)
   | StringLiteral String
   | BooleanLiteral Bool
   | Unary UnaryOperator Value
   | Binary BinaryOperator Value Value
   | ArrayLiteral [Value]
+  | Indexer Value Value
   | ObjectLiteral [(String, Value)]
   | Accessor String Value
   | Abs [String] Value
@@ -75,7 +76,11 @@ data Statement
   | Return Value deriving Show
 
 data Binder
-  = VarBinder String
+  = BooleanBinder Bool
+  | StringBinder String
+  | NumberBinder (Either Integer Double)
+  | VarBinder String
   | NullaryBinder String
   | UnaryBinder String Binder
-  | ObjectBinder [(String, Binder)] deriving Show
+  | ObjectBinder [(String, Binder)]
+  | ArrayBinder [Binder] (Maybe Binder) deriving Show
