@@ -5,11 +5,14 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 
 ## Current Features
 
+- Full Type Inference
+- Higher Kinded Polymorphism
 - Support for basic Javascript types
 - Extensible records
 - Type-safe blocks with for/while/assignment etc.
 - Functions with multiple arguments
 - Pattern matching
+- Simple FFI
 
 ## TODO
 
@@ -18,7 +21,6 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 - User defined operators
 - Mutually recursive functions
 - Modules
-- FFI
 - Top level pattern matching
 - Guards
 - Type classes

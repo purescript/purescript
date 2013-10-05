@@ -20,10 +20,4 @@ data Kind
   = KUnknown Int
   | Star
   | Row
-  | FunKind Kind Kind deriving Eq
-
-instance Show Kind where
-  show (KUnknown _) = "?"
-  show Star = "*"
-  show Row = "R"
-  show (FunKind k1 k2) = "(" ++ show k1 ++ ") -> (" ++ show k2 ++ ")"
+  | FunKind Kind Kind deriving (Show, Eq)

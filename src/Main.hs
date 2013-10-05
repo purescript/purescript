@@ -21,9 +21,10 @@ import System.Console.CmdTheLine
 import Control.Applicative
 import System.Exit (exitSuccess, exitFailure)
 import qualified System.IO.UTF8 as U
+import qualified Data.Map as M
 
-compile :: [FilePath] -> Maybe FilePath -> IO ()
-compile inputFiles outputFile = do
+compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+compile inputFiles outputFile externsFile = do
   input <- fmap concat $ mapM U.readFile inputFiles
   let ast = parseDeclarations input
   case ast of
@@ -35,11 +36,14 @@ compile inputFiles outputFile = do
         Left typeError -> do
           U.putStrLn typeError
           exitFailure
-        Right _ -> do
+        Right (_, env) -> do
           let js = intercalate "\n" $ mapMaybe declToJs decls
           case outputFile of
             Just path -> U.writeFile path js
             Nothing -> U.putStrLn js
+          case externsFile of
+            Nothing -> return ()
+            Just filePath -> U.writeFile filePath $ intercalate "\n\n" $ map externToJs $ M.toList $ names env
           exitSuccess
 
 inputFiles :: Term [FilePath]
@@ -50,8 +54,12 @@ outputFile :: Term (Maybe FilePath)
 outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
      { optDoc = "The output .js file" }
 
+externsFile :: Term (Maybe FilePath)
+externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
+     { optDoc = "The output .e.ps file" }
+
 term :: Term (IO ())
-term = compile <$> inputFiles <*> outputFile
+term = compile <$> inputFiles <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI

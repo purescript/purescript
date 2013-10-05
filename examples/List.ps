@@ -3,7 +3,7 @@ data List a
   | Cons
     { head :: a
     ; tail :: List a
-    ; {} }
+    }
 
 null = \l -> case l of
   { Nil -> true

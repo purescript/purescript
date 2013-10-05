@@ -15,7 +15,8 @@
 {-# LANGUAGE GADTs, GeneralizedNewtypeDeriving #-}
 
 module PureScript.CodeGen (
-    declToJs
+    declToJs,
+    externToJs
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -29,6 +30,7 @@ import qualified Control.Arrow as A
 import Control.Arrow ((***))
 
 import PureScript.Values
+import PureScript.Types
 import PureScript.Declarations
 
 -- First Order Patterns
@@ -299,3 +301,55 @@ assignmentTargetToJs :: AssignmentTarget -> String
 assignmentTargetToJs (AssignVariable var) = var
 assignmentTargetToJs (AssignArrayIndex index tgt) = assignmentTargetToJs tgt ++ "[" ++ valueToJs index ++ "]"
 assignmentTargetToJs (AssignObjectProperty prop tgt) = assignmentTargetToJs tgt ++ "." ++ prop
+
+-- Externs
+
+typeLiterals :: Pattern Type String
+typeLiterals = Pattern $ A.Kleisli match
+  where
+  match Number = Just "Number"
+  match String = Just "String"
+  match Boolean = Just "Boolean"
+  match (Array ty) = Just $ "[" ++ typeToPs ty ++ "]"
+  match (Object row) = Just $ "{ " ++ rowToPs row ++ " }"
+  match (TypeVar var) = Just var
+  match (TypeConstructor ctor) = Just ctor
+  match _ = Nothing
+
+rowToPs :: Row -> String
+rowToPs = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList
+  where
+  nameAndTypeToPs :: String -> Type -> String
+  nameAndTypeToPs name ty = name ++ " :: " ++ typeToPs ty
+  tailToPs :: Row -> String
+  tailToPs REmpty = ""
+  tailToPs (RowVar var) = "| " ++ var
+  toList :: Row -> ([(String, Type)], Row)
+  toList (RCons name ty row) = let (tys, rest) = toList row
+                               in ((name, ty):tys, rest)
+  toList r = ([], r)
+
+typeApp :: Pattern Type (Type, Type)
+typeApp = Pattern $ A.Kleisli match
+  where
+  match (TypeApp f x) = Just (f, x)
+  match _ = Nothing
+
+function :: Pattern Type ([Type], Type)
+function = Pattern $ A.Kleisli match
+  where
+  match (Function args ret) = Just (args, ret)
+  match _ = Nothing
+
+typeToPs :: Type -> String
+typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
+  where
+  matchType :: Pattern Type String
+  matchType = buildPrettyPrinter operators (typeLiterals <|> fmap parens matchType)
+  operators :: OperatorTable Type String
+  operators =
+    OperatorTable $ [ AssocL typeApp $ \f x -> f ++ " " ++ x
+                    , Split function $ \args ret -> "(" ++ intercalate "," (map typeToPs args) ++ ") -> " ++ typeToPs ret ]
+
+externToJs :: (String, Type) -> String
+externToJs (name, ty) = "extern " ++ name ++ " :: " ++ typeToPs ty

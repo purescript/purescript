@@ -18,7 +18,6 @@ module PureScript.TypeChecker (
     module PureScript.TypeChecker.Monad,
     module PureScript.TypeChecker.Kinds,
     module PureScript.TypeChecker.Types,
-    typeCheck,
     typeCheckAll,
 ) where
 
@@ -40,30 +39,42 @@ import Control.Monad.Error
 
 import qualified Data.Map as M
 
-typeCheck :: Declaration -> Check ()
-typeCheck (DataDeclaration dcs@(DataConstructors
+typeCheckAll :: [Declaration] -> Check ()
+typeCheckAll [] = return ()
+typeCheckAll (DataDeclaration dcs@(DataConstructors
   { typeConstructorName = name
   , typeArguments = args
   , dataConstructors = ctors
-  })) = rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
-  env <- getEnv
-  guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-  ctorKind <- kindsOf name args (catMaybes $ map snd ctors)
-  putEnv $ env { types = M.insert name ctorKind (types env) }
-  flip mapM_ ctors $ \(dctor, maybeTy) ->
-    rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
-      env' <- getEnv
-      guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
-      let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
-      let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-      putEnv $ env' { names = M.insert dctor dctorTy (names env') }
-typeCheck (ValueDeclaration name val) = rethrow (("Error in declaration " ++ name ++ ": ") ++) $ do
-  env <- getEnv
-  case M.lookup name (names env) of
-    Just ty -> throwError $ name ++ " is already defined"
-    Nothing -> do
-      ty <- typeOf name val
-      putEnv (env { names = M.insert name ty (names env) })
-
-typeCheckAll :: [Declaration] -> Check ()
-typeCheckAll = mapM_ typeCheck
+  }) : rest) = do
+  rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
+    env <- getEnv
+    guardWith (name ++ " is already defined") $ not $ M.member name (types env)
+    ctorKind <- kindsOf name args (catMaybes $ map snd ctors)
+    putEnv $ env { types = M.insert name ctorKind (types env) }
+    flip mapM_ ctors $ \(dctor, maybeTy) ->
+      rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
+        env' <- getEnv
+        guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
+        let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
+        let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
+        putEnv $ env' { names = M.insert dctor dctorTy (names env') }
+  typeCheckAll rest
+typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' val : rest) | name == name' =
+  typeCheckAll (ValueDeclaration name (TypedValue val ty) : rest)
+typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ name
+typeCheckAll (ValueDeclaration name val : rest) = do
+  rethrow (("Error in declaration " ++ name ++ ": ") ++) $ do
+    env <- getEnv
+    case M.lookup name (names env) of
+      Just ty -> throwError $ name ++ " is already defined"
+      Nothing -> do
+        ty <- typeOf name val
+        putEnv (env { names = M.insert name ty (names env) })
+  typeCheckAll rest
+typeCheckAll (ExternDeclaration name ty : rest) = do
+  rethrow (("Error in extern declaration " ++ name ++ ": ") ++) $ do
+    env <- getEnv
+    case M.lookup name (names env) of
+      Just _ -> throwError $ name ++ " is already defined"
+      Nothing -> putEnv (env { names = M.insert name ty (names env) })
+  typeCheckAll rest

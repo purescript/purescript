@@ -31,7 +31,8 @@ langDef = PL.haskellStyle
                        , "else"
                        , "return"
                        , "true"
-                       , "false" ]
+                       , "false"
+                       , "extern" ]
   }
 
 tokenParser      = PT.makeTokenParser   langDef

@@ -23,7 +23,8 @@ import PureScript.Types
 data Declaration
   = DataDeclaration DataConstructors
   | TypeDeclaration String Type
-  | ValueDeclaration String Value deriving Show
+  | ValueDeclaration String Value
+  | ExternDeclaration String Type deriving Show
 
 data DataConstructors = DataConstructors
   { typeConstructorName :: String

@@ -31,28 +31,10 @@ data Type
   | Function [Type] Type
   | TypeVar String
   | TypeConstructor String
-  | TypeApp Type Type
+  | TypeApp Type Type deriving Show
 
 data Row
   = RUnknown Int
   | RowVar String
   | REmpty
-  | RCons String Type Row
-
-instance Show Type where
-  show (TUnknown _) = "?"
-  show Number = "Number"
-  show String = "String"
-  show Boolean = "Boolean"
-  show (Array t) = "[" ++ show t ++ "]"
-  show (Object row) = "{ " ++ show row ++ " }"
-  show (Function args ret) = "(" ++ intercalate ", " (map show args) ++ ") -> " ++ show ret
-  show (TypeVar v) = v
-  show (TypeConstructor c) = c
-  show (TypeApp t1 t2) = "(" ++ show t1 ++ ") (" ++ show t2 ++ ")"
-
-instance Show Row where
-  show (RUnknown _) = "?"
-  show REmpty = "{}"
-  show (RowVar v) = v
-  show (RCons name ty row) = name ++ " :: " ++ show ty ++ "; " ++ show row
+  | RCons String Type Row deriving Show
