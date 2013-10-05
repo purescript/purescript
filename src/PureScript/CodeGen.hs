@@ -323,7 +323,7 @@ rowToPs = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) 
   nameAndTypeToPs name ty = name ++ " :: " ++ typeToPs ty
   tailToPs :: Row -> String
   tailToPs REmpty = ""
-  tailToPs (RowVar var) = "| " ++ var
+  tailToPs (RowVar var) = " | " ++ var
   toList :: Row -> ([(String, Type)], Row)
   toList (RCons name ty row) = let (tys, rest) = toList row
                                in ((name, ty):tys, rest)
