@@ -12,14 +12,14 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module PureScript.Types (
     Type (..),
     Row(..)
 ) where
 
-import Data.List (intercalate)
+import Data.Data
 
 data Type
   = TUnknown Int
@@ -31,10 +31,11 @@ data Type
   | Function [Type] Type
   | TypeVar String
   | TypeConstructor String
-  | TypeApp Type Type deriving Show
+  | TypeApp Type Type
+  | ForAll [String] Type deriving (Show, Data, Typeable)
 
 data Row
   = RUnknown Int
   | RowVar String
   | REmpty
-  | RCons String Type Row deriving Show
+  | RCons String Type Row deriving (Show, Data, Typeable)

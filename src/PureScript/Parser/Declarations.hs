@@ -19,6 +19,7 @@ module PureScript.Parser.Declarations (
 
 import Data.Char
 import Data.List
+import Data.Maybe
 import Data.Function
 import Control.Applicative
 import qualified Text.Parsec as P
@@ -38,10 +39,13 @@ parseDataDeclaration = do
   tyArgs <- many identifier
   lexeme $ P.char '='
   ctors <- P.sepBy1 ((,) <$> properName <*> P.optionMaybe parseType) (lexeme $ P.char '|')
-  return $ DataDeclaration $ DataConstructors name tyArgs ctors
+  return $ DataDeclaration name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String () Declaration
 parseTypeDeclaration = TypeDeclaration <$> identifier <*> (lexeme (P.string "::") *> parseType)
+
+parseTypeSynonymDeclaration :: P.Parsec String () Declaration
+parseTypeSynonymDeclaration = TypeSynonymDeclaration <$> (reserved "type" *> properName) <*> many identifier <*> (lexeme (P.char '=') *> parseType)
 
 parseValueDeclaration :: P.Parsec String () Declaration
 parseValueDeclaration = ValueDeclaration <$> identifier <*> (lexeme (P.char '=') *> parseValue)
@@ -53,11 +57,26 @@ parseDeclaration :: P.Parsec String () Declaration
 parseDeclaration = P.choice $ map P.try
                    [ parseDataDeclaration
                    , parseTypeDeclaration
+                   , parseTypeSynonymDeclaration
                    , parseValueDeclaration
                    , parseExternDeclaration ]
 
 parseDeclarations :: String -> Either P.ParseError [Declaration]
-parseDeclarations = mapM (P.parse (parseDeclaration <* whiteSpace <* P.eof) "Declaration") . splitFileIntoDeclarations
+parseDeclarations = fmap catMaybes . mapM (P.parse (whiteSpace *> (P.optionMaybe parseDeclaration <* whiteSpace) <* P.eof) "Declaration") . splitFileIntoDeclarations
+
+isIndented :: String -> Bool
+isIndented = any isSpace . take 1
 
 splitFileIntoDeclarations :: String -> [String]
-splitFileIntoDeclarations = map unlines . filter (not . all isSpace . head) . groupBy ((==) `on` (all isSpace)) . lines
+splitFileIntoDeclarations = reverse . map (dropWhile isSpace . unlines . reverse) . go [] [] . lines
+  where
+  go [] sss [] = sss
+  go ss sss [] = ss:sss
+  go ss sss (s:rest)
+    | all isSpace s = go ss sss rest
+    | isIndented s = go (s:ss) sss rest
+    | null ss = go [s] sss rest
+    | otherwise = go [s] (ss:sss) rest
+
+
+

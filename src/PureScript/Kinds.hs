@@ -12,12 +12,16 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module PureScript.Kinds (
   Kind (..)
 ) where
+
+import Data.Data
 
 data Kind
   = KUnknown Int
   | Star
   | Row
-  | FunKind Kind Kind deriving (Show, Eq)
+  | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)

@@ -15,10 +15,12 @@
 module PureScript.TypeChecker.Kinds (
     KindConstraint(..),
     KindSolution(..),
-    kindsOf
+    kindsOf,
+    kindOf
 ) where
 
 import Data.List
+import Data.Maybe (fromMaybe)
 import Data.Function
 
 import PureScript.Types
@@ -45,11 +47,17 @@ newtype KindSolution = KindSolution { runKindSolution :: Int -> Kind }
 emptyKindSolution :: KindSolution
 emptyKindSolution = KindSolution KUnknown
 
-kindsOf :: String -> [String] -> [Type] -> Check Kind
+kindOf :: Type -> Check Kind
+kindOf ty = do
+  (cs, n, m) <- kindConstraints M.empty ty
+  solution <- solveKindConstraints cs emptyKindSolution
+  return $ starIfUnknown $ runKindSolution solution n
+
+kindsOf :: Maybe String -> [String] -> [Type] -> Check Kind
 kindsOf name args ts = do
   tyCon <- fresh
   nargs <- replicateM (length args) fresh
-  (cs, ns, m) <- kindConstraintsAll (M.insert name tyCon $ M.fromList (zipWith (,) args nargs)) ts
+  (cs, ns, m) <- kindConstraintsAll (maybe id (flip M.insert tyCon) name $ M.fromList (zipWith (,) args nargs)) ts
   let extraConstraints = KindConstraint tyCon (foldr FunKind Star (map KUnknown nargs)) : map (flip KindConstraint Star) ns
   solution <- solveKindConstraints (extraConstraints ++ cs) emptyKindSolution
   return $ starIfUnknown $ runKindSolution solution tyCon
@@ -81,17 +89,16 @@ kindConstraints m (Function args ret) = do
   (cs', retN, m'') <- kindConstraints m' ret
   return ((KindConstraint retN Star) : (KindConstraint me Star) : (map (flip KindConstraint Star) ns) ++ cs, me, m'')
 kindConstraints m (TypeVar v) = do
-  me <- case M.lookup v m of
-    Just u -> return u
-    Nothing -> fresh
-  return ([], me, M.insert v me m)
+  case M.lookup v m of
+    Just u -> return ([], u, m)
+    Nothing -> throwError $ "Unbound type variable " ++ v
 kindConstraints m (TypeConstructor v) = do
   env <- getEnv
   me <- fresh
   case M.lookup v m of
     Nothing -> case M.lookup v (types env) of
       Nothing -> throwError $ "Unknown type constructor '" ++ v ++ "'"
-      Just kind -> return ([KindConstraint me kind], me, m)
+      Just (kind, _) -> return ([KindConstraint me kind], me, m)
     Just u -> do
       return ([KindConstraint me (KUnknown u)], me, m)
 kindConstraints m (TypeApp t1 t2) = do
@@ -99,6 +106,9 @@ kindConstraints m (TypeApp t1 t2) = do
   (cs1, n1, m1) <- kindConstraints m t1
   (cs2, n2, m2) <- kindConstraints m1 t2
   return ((KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me))) : cs1 ++ cs2, me, m2)
+kindConstraints m (ForAll idents ty) = do
+  ns <- replicateM (length idents) fresh
+  kindConstraints (m `M.union` M.fromList (zip idents ns)) ty
 kindConstraints m _ = do
   me <- fresh
   return ([KindConstraint me Star], me, m)

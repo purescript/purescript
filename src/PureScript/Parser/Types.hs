@@ -51,6 +51,10 @@ parseTypeVariable = TypeVar <$> identifier
 parseTypeConstructor :: P.Parsec String () Type
 parseTypeConstructor = TypeConstructor <$> properName
 
+parseForAllType :: P.Parsec String () Type
+parseForAllType = ForAll <$> (reserved "forall" *> many identifier)
+                         <*> (dot *> parseType)
+
 parseTypeAtom :: P.Parsec String () Type
 parseTypeAtom = P.choice $ map P.try
             [ parseNumber
@@ -59,6 +63,7 @@ parseTypeAtom = P.choice $ map P.try
             , parseArray
             , parseObject
             , parseFunction
+            , parseForAllType
             , parseTypeVariable
             , parseTypeConstructor
             , parens parseType ]

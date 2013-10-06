@@ -11,15 +11,16 @@ synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 author: Phil Freeman <paf31@cantab.net>
 data-dir: ""
- 
+
 library
-    build-depends: base -any, cmdtheline -any, containers -any,
+    build-depends: base -any, syb -any, cmdtheline -any, containers -any,
                    mtl -any, parsec -any, utf8-string -any
     exposed-modules: PureScript
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.CodeGen.Externs PureScript.CodeGen.JS
+    other-modules: PureScript.TypeChecker.Synonyms
+                   PureScript.CodeGen.Externs PureScript.CodeGen.JS
                    PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common Main
                    PureScript.CodeGen PureScript.Kinds PureScript.Parser
                    PureScript.TypeChecker PureScript.Types PureScript.Values
@@ -27,13 +28,14 @@ library
                    PureScript.Parser.Types PureScript.Parser.Values
                    PureScript.TypeChecker.Kinds PureScript.TypeChecker.Monad
                    PureScript.TypeChecker.Types
- 
+
 executable psc
     build-depends: base -any, cmdtheline -any, containers -any,
                    mtl -any, parsec -any, utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.CodeGen.Externs PureScript.CodeGen.JS
+    other-modules: PureScript.TypeChecker.Synonyms
+                   PureScript.CodeGen.Externs PureScript.CodeGen.JS
                    PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common
- 
+

@@ -12,6 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module PureScript.Values (
   UnaryOperator (..),
   BinaryOperator (..),
@@ -23,10 +25,12 @@ module PureScript.Values (
 
 import PureScript.Types
 
+import Data.Data
+
 data UnaryOperator
   = Negate
   | Not
-  | BitwiseNot deriving (Show, Eq)
+  | BitwiseNot deriving (Show, Eq, Data, Typeable)
 
 data BinaryOperator
   = Add
@@ -48,7 +52,7 @@ data BinaryOperator
   | ShiftLeft
   | ShiftRight
   | ZeroFillShiftRight
-  | Concat deriving (Show, Eq)
+  | Concat deriving (Show, Eq, Data, Typeable)
 
 data Value
   = NumericLiteral (Either Integer Double)
@@ -66,7 +70,7 @@ data Value
   | Block [Statement]
   | Constructor String
   | Case Value [(Binder, Value)]
-  | TypedValue Value Type deriving Show
+  | TypedValue Value Type deriving (Show, Data, Typeable)
 
 data Statement
   = VariableIntroduction String Value
@@ -74,7 +78,7 @@ data Statement
   | While Value [Statement]
   | For (Statement, Value, Statement) [Statement]
   | IfThenElse (Value) [Statement] (Maybe [Statement])
-  | Return Value deriving Show
+  | Return Value deriving (Show, Data, Typeable)
 
 data Binder
   = BooleanBinder Bool
@@ -84,9 +88,9 @@ data Binder
   | NullaryBinder String
   | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)]
-  | ArrayBinder [Binder] (Maybe Binder) deriving Show
+  | ArrayBinder [Binder] (Maybe Binder) deriving (Show, Data, Typeable)
 
 data AssignmentTarget
   = AssignVariable String
   | AssignObjectProperty String AssignmentTarget
-  | AssignArrayIndex Value AssignmentTarget deriving Show
+  | AssignArrayIndex Value AssignmentTarget deriving (Show, Data, Typeable)

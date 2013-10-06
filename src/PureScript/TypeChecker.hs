@@ -24,6 +24,7 @@ module PureScript.TypeChecker (
 import PureScript.TypeChecker.Monad
 import PureScript.TypeChecker.Kinds
 import PureScript.TypeChecker.Types
+import PureScript.TypeChecker.Synonyms
 
 import Data.List
 import Data.Maybe
@@ -41,23 +42,28 @@ import qualified Data.Map as M
 
 typeCheckAll :: [Declaration] -> Check ()
 typeCheckAll [] = return ()
-typeCheckAll (DataDeclaration dcs@(DataConstructors
-  { typeConstructorName = name
-  , typeArguments = args
-  , dataConstructors = ctors
-  }) : rest) = do
+typeCheckAll (DataDeclaration name args ctors : rest) = do
   rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
     env <- getEnv
     guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-    ctorKind <- kindsOf name args (catMaybes $ map snd ctors)
-    putEnv $ env { types = M.insert name ctorKind (types env) }
+    ctorKind <- kindsOf (Just name) args (catMaybes $ map snd ctors)
+    putEnv $ env { types = M.insert name (ctorKind, Data) (types env) }
     flip mapM_ ctors $ \(dctor, maybeTy) ->
       rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
         env' <- getEnv
         guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
         let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-        putEnv $ env' { names = M.insert dctor dctorTy (names env') }
+        let quantified = ForAll args dctorTy
+        putEnv $ env' { names = M.insert dctor (quantified, DataConstructor) (names env') }
+  typeCheckAll rest
+typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
+  rethrow (("Error in type synonym " ++ name ++ ": ") ++) $ do
+    env <- getEnv
+    guardWith (name ++ " is already defined") $ not $ M.member name (types env)
+    kind <- kindsOf (Just name) args [ty]
+    putEnv $ env { types = M.insert name (kind, TypeSynonym) (types env)
+                 , typeSynonyms = M.insert name (args, ty) (typeSynonyms env) }
   typeCheckAll rest
 typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' val : rest) | name == name' =
   typeCheckAll (ValueDeclaration name (TypedValue val ty) : rest)
@@ -69,12 +75,14 @@ typeCheckAll (ValueDeclaration name val : rest) = do
       Just ty -> throwError $ name ++ " is already defined"
       Nothing -> do
         ty <- typeOf name val
-        putEnv (env { names = M.insert name ty (names env) })
+        putEnv (env { names = M.insert name (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
   rethrow (("Error in extern declaration " ++ name ++ ": ") ++) $ do
     env <- getEnv
+    kind <- kindOf ty
+    guardWith "Expected kind *" $ kind == Star
     case M.lookup name (names env) of
       Just _ -> throwError $ name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert name ty (names env) })
+      Nothing -> putEnv (env { names = M.insert name (ty, Extern) (names env) })
   typeCheckAll rest

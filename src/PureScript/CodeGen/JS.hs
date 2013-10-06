@@ -29,7 +29,7 @@ import PureScript.CodeGen.Common.Gen
 
 declToJs :: Declaration -> Maybe String
 declToJs (ValueDeclaration name val) = Just $ "var " ++ name ++ " = " ++ valueToJs val ++ ";"
-declToJs (DataDeclaration dcs@(DataConstructors { dataConstructors = ctors })) =
+declToJs (DataDeclaration _ _ ctors) =
   Just $ flip concatMap ctors $ \(ctor, maybeTy) ->
     case maybeTy of
       Nothing -> "var " ++ ctor ++ " =  { ctor: '" ++ ctor ++ "' };"

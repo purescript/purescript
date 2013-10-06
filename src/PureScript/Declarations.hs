@@ -12,22 +12,20 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module PureScript.Declarations (
-    Declaration (..),
-    DataConstructors (..)
+    Declaration (..)
 ) where
 
 import PureScript.Values
 import PureScript.Types
 
+import Data.Data
+
 data Declaration
-  = DataDeclaration DataConstructors
+  = DataDeclaration String [String] [(String, Maybe Type)]
+  | TypeSynonymDeclaration String [String] Type
   | TypeDeclaration String Type
   | ValueDeclaration String Value
-  | ExternDeclaration String Type deriving Show
-
-data DataConstructors = DataConstructors
-  { typeConstructorName :: String
-  , typeArguments :: [String]
-  , dataConstructors :: [(String, Maybe Type)]
-  } deriving Show
+  | ExternDeclaration String Type deriving (Show, Data, Typeable)

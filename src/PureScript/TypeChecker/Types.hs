@@ -20,10 +20,15 @@ module PureScript.TypeChecker.Types (
 
 import Data.List
 import Data.Function
+import Data.Data (Data(..))
+import Data.Generics (everywhere, everywhereM, everything, mkT, mkM, mkQ, extM, extQ)
 
 import PureScript.Values
 import PureScript.Types
+import PureScript.Kinds
 import PureScript.TypeChecker.Monad
+import PureScript.TypeChecker.Kinds
+import PureScript.TypeChecker.Synonyms
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -51,10 +56,14 @@ typeOf name val = do
   return $ varIfUnknown $ fst (runTypeSolution solution) n
 
 varIfUnknown :: Type -> Type
-varIfUnknown = flip evalState M.empty . varIfUnknown'
+varIfUnknown ty =
+  let
+    (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
+  in
+    ForAll (sort $ nub $ M.elems m) ty'
   where
-  varIfUnknown' :: Type -> State (M.Map Int String) Type
-  varIfUnknown' (TUnknown n) = do
+  f :: Type -> State (M.Map Int String) Type
+  f (TUnknown n) = do
     m <- get
     case M.lookup n m of
       Nothing -> do
@@ -62,13 +71,9 @@ varIfUnknown = flip evalState M.empty . varIfUnknown'
         put $ M.insert n name m
         return $ TypeVar name
       Just name -> return $ TypeVar name
-  varIfUnknown' (Array t) = Array <$> varIfUnknown' t
-  varIfUnknown' (Object row) = Object <$> varIfUnknown'' row
-  varIfUnknown' (Function args ret) = Function <$> mapM varIfUnknown' args <*> varIfUnknown' ret
-  varIfUnknown' (TypeApp t1 t2) = TypeApp <$> varIfUnknown' t1 <*> varIfUnknown' t2
-  varIfUnknown' t = return t
-  varIfUnknown'' :: Row -> State (M.Map Int String) Row
-  varIfUnknown'' (RUnknown n) = do
+  f t = return t
+  g :: Row -> State (M.Map Int String) Row
+  g (RUnknown n) = do
     m <- get
     case M.lookup n m of
       Nothing -> do
@@ -76,18 +81,13 @@ varIfUnknown = flip evalState M.empty . varIfUnknown'
         put $ M.insert n name m
         return $ RowVar name
       Just name -> return $ RowVar name
-  varIfUnknown'' (RCons name ty row) = RCons name ty <$> varIfUnknown'' row
-  varIfUnknown'' r = return r
+  g r = return r
 
-replaceVarsWithUnknowns :: Type -> Check Type
-replaceVarsWithUnknowns = flip evalStateT M.empty . replaceVarsWithUnknowns'
+replaceVarsWithUnknowns :: [String] -> Type -> Check Type
+replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
   where
-  replaceVarsWithUnknowns' :: Type -> StateT (M.Map String Int) Check Type
-  replaceVarsWithUnknowns' (Array t) = Array <$> replaceVarsWithUnknowns' t
-  replaceVarsWithUnknowns' (Object row) = Object <$> replaceVarsWithUnknowns'' row
-  replaceVarsWithUnknowns' (Function args ret) = Function <$> mapM replaceVarsWithUnknowns' args <*> replaceVarsWithUnknowns' ret
-  replaceVarsWithUnknowns' (TypeApp t1 t2) = TypeApp <$> replaceVarsWithUnknowns' t1 <*> replaceVarsWithUnknowns' t2
-  replaceVarsWithUnknowns' (TypeVar var) = do
+  f :: Type -> StateT (M.Map String Int) Check Type
+  f (TypeVar var) | var `elem` idents = do
     m <- get
     n <- lift fresh
     case M.lookup var m of
@@ -95,9 +95,9 @@ replaceVarsWithUnknowns = flip evalStateT M.empty . replaceVarsWithUnknowns'
         put (M.insert var n m)
         return $ TUnknown n
       Just u -> return $ TUnknown u
-  replaceVarsWithUnknowns' t = return t
-  replaceVarsWithUnknowns'' :: Row -> StateT (M.Map String Int) Check Row
-  replaceVarsWithUnknowns'' (RowVar var) = do
+  f t = return t
+  g :: Row -> StateT (M.Map String Int) Check Row
+  g (RowVar var) | var `elem` idents = do
     m <- get
     n <- lift fresh
     case M.lookup var m of
@@ -105,8 +105,35 @@ replaceVarsWithUnknowns = flip evalStateT M.empty . replaceVarsWithUnknowns'
         put (M.insert var n m)
         return $ RUnknown n
       Just u -> return $ RUnknown u
-  replaceVarsWithUnknowns'' (RCons name ty row) = RCons name <$> replaceVarsWithUnknowns' ty <*> replaceVarsWithUnknowns'' row
-  replaceVarsWithUnknowns'' r = return r
+  g r = return r
+
+replaceType :: (Data d) => Int -> Type -> d -> d
+replaceType n t = everywhere (mkT go)
+  where
+  go (TUnknown m) | m == n = t
+  go t = t
+
+replaceRow :: (Data d) => Int -> Row -> d -> d
+replaceRow n r = everywhere (mkT go)
+  where
+  go (RUnknown m) | m == n = r
+  go r = r
+
+typeOccursCheck :: Int -> Type -> Check ()
+typeOccursCheck u (TUnknown _) = return ()
+typeOccursCheck u t = when (occursCheck u t) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ show t
+
+rowOccursCheck :: Int -> Row -> Check ()
+rowOccursCheck u (RUnknown _) = return ()
+rowOccursCheck u r = when (occursCheck u r) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ show r
+
+occursCheck :: (Data d) => Int -> d -> Bool
+occursCheck u = everything (||) $ flip extQ g $ mkQ False f
+  where
+  f (TUnknown u') | u' == u = True
+  f _ = False
+  g (RUnknown u') | u' == u = True
+  g _ = False
 
 typeConstraints :: M.Map String Int -> Value -> Check ([TypeConstraint], Int)
 typeConstraints _ (NumericLiteral _) = do
@@ -169,10 +196,9 @@ typeConstraints m (Var var) =
       env <- getEnv
       case M.lookup var (names env) of
         Nothing -> throwError $ var ++ " is undefined"
-        Just ty -> do
+        Just (ty, _) -> do
           me <- fresh
-          replaced <- replaceVarsWithUnknowns ty
-          return ([TypeConstraint me replaced], me)
+          return ([TypeConstraint me ty], me)
     Just u -> do
       me <- fresh
       return ([TypeConstraint u (TUnknown me)], me)
@@ -185,19 +211,30 @@ typeConstraints m (Constructor c) = do
   env <- getEnv
   case M.lookup c (names env) of
     Nothing -> throwError $ c ++ " is undefined"
-    Just ty -> do
+    Just (ty, _) -> do
       me <- fresh
-      replaced <- replaceVarsWithUnknowns ty
-      return ([TypeConstraint me replaced], me)
+      return ([TypeConstraint me ty], me)
 typeConstraints m (Case val binders) = do
   (cs1, n1) <- typeConstraints m val
   ret <- fresh
   cs2 <- typeConstraintsForBinders m n1 ret binders
   return (cs1 ++ cs2, ret)
 typeConstraints m (TypedValue val ty) = do
+  kind <- kindOf ty
+  guardWith ("Expected type of kind *, was " ++ show kind) $ kind == Star
+  ty' <- replaceAllTypeSynonyms ty
   (cs, n1) <- typeConstraints m val
-  return (TypeConstraint n1 ty : cs, n1)
-  -- TODO: Kind-check the type
+  return (TypeConstraint n1 ty' : cs, n1)
+
+replaceAllTypeSynonyms :: Type -> Check Type
+replaceAllTypeSynonyms ty = do
+  env <- getEnv
+  go (M.toList $ typeSynonyms env) ty
+  where
+  go [] ty = return ty
+  go ((name, (args, repl)):rest) ty = do
+    ty' <- either throwError return (substituteTypeSynonym name args repl ty)
+    go rest ty'
 
 unaryOperatorConstraints :: UnaryOperator -> Int -> Int -> [TypeConstraint]
 unaryOperatorConstraints Negate val result = [TypeConstraint val Number, TypeConstraint result Number]
@@ -245,18 +282,18 @@ typeConstraintsForBinder val (VarBinder name) = do
 typeConstraintsForBinder val (NullaryBinder ctor) = do
   env <- getEnv
   case M.lookup ctor (names env) of
-    Just ret -> do
-      ret' <- replaceVarsWithUnknowns ret
+    Just (ForAll args ret, DataConstructor) -> do
+      ret' <- replaceVarsWithUnknowns args ret
       return ([TypeConstraint val ret'], M.empty)
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
 typeConstraintsForBinder val (UnaryBinder ctor binder) = do
   env <- getEnv
   case M.lookup ctor (names env) of
-    Just f@(Function [ty] ret) -> do
+    Just (ForAll args f@(Function [_] _), DataConstructor) -> do
       obj <- fresh
-      Function [ty'] ret' <- replaceVarsWithUnknowns f
+      (Function [ty] ret) <- replaceVarsWithUnknowns args f
       (cs, m1) <- typeConstraintsForBinder obj binder
-      return ((TypeConstraint val ret') : (TypeConstraint obj ty') : cs, m1)
+      return ((TypeConstraint val ret) : (TypeConstraint obj ty) : cs, m1)
     Just _ -> throwError $ ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
 typeConstraintsForBinder val (ObjectBinder props) = do
@@ -361,64 +398,42 @@ typeConstraintsForBlock m mass ret (s:ss) = do
 solveTypeConstraints :: [TypeConstraint] -> TypeSolution -> Check TypeSolution
 solveTypeConstraints [] s = return s
 solveTypeConstraints all@(TypeConstraint n t:cs) s = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck False n t
+  typeOccursCheck n t
   let s' = let (f, g) = runTypeSolution s
-           in TypeSolution (replaceTypeInType n t . f, replaceTypeInRow n t . g)
+           in TypeSolution (replaceType n t . f, replaceType n t . g)
   cs' <- fmap concat $ mapM (substituteTypeInConstraint n t) cs
   solveTypeConstraints cs' s'
 solveTypeConstraints (RowConstraint n r:cs) s = do
-  guardWith "Occurs check failed" $ not $ rowOccursCheck False n r
+  rowOccursCheck n r
   let s' = let (f, g) = runTypeSolution s
-           in TypeSolution $ (replaceRowInType n r . f, replaceRowInRow n r . g)
+           in TypeSolution $ (replaceRow n r . f, replaceRow n r . g)
   cs' <- fmap concat $ mapM (substituteRowInConstraint n r) cs
   solveTypeConstraints cs' s'
 
 substituteTypeInConstraint :: Int -> Type -> TypeConstraint -> Check [TypeConstraint]
 substituteTypeInConstraint n s (TypeConstraint m t)
   | n == m = unifyTypes s t
-  | otherwise = return [TypeConstraint m (replaceTypeInType n s t)]
+  | otherwise = return [TypeConstraint m (replaceType n s t)]
 substituteTypeInConstraint n s (RowConstraint m r)
-  = return [RowConstraint m (replaceTypeInRow n s r)]
+  = return [RowConstraint m (replaceType n s r)]
 
 substituteRowInConstraint :: Int -> Row -> TypeConstraint -> Check [TypeConstraint]
 substituteRowInConstraint n r (TypeConstraint m t)
-  = return [TypeConstraint m (replaceRowInType n r t)]
+  = return [TypeConstraint m (replaceRow n r t)]
 substituteRowInConstraint n r (RowConstraint m r1)
   | m == n = unifyRows r r1
-  | otherwise = return [RowConstraint m (replaceRowInRow n r r1)]
-
-replaceTypeInType :: Int -> Type -> Type -> Type
-replaceTypeInType n t (TUnknown m) | m == n = t
-replaceTypeInType n t (Array t1) = Array $ replaceTypeInType n t t1
-replaceTypeInType n t (Object row) = Object $ replaceTypeInRow n t row
-replaceTypeInType n t (Function args ret) = Function (map (replaceTypeInType n t) args) (replaceTypeInType n t ret)
-replaceTypeInType n t (TypeApp t1 t2) = TypeApp (replaceTypeInType n t t1) (replaceTypeInType n t t2)
-replaceTypeInType _ _ other = other
-
-replaceTypeInRow :: Int -> Type -> Row -> Row
-replaceTypeInRow n t (RCons name ty row) = RCons name (replaceTypeInType n t ty) (replaceTypeInRow n t row)
-replaceTypeInRow n t other = other
-
-replaceRowInType :: Int -> Row -> Type -> Type
-replaceRowInType n r (Array t1) = Array $ replaceRowInType n r t1
-replaceRowInType n r (Object row) = Object $ replaceRowInRow n r row
-replaceRowInType n r (Function args ret) = Function (map (replaceRowInType n r) args) (replaceRowInType n r ret)
-replaceRowInType n r (TypeApp t1 t2) = TypeApp (replaceRowInType n r t1) (replaceRowInType n r t2)
-replaceRowInType _ _ other = other
-
-replaceRowInRow :: Int -> Row -> Row -> Row
-replaceRowInRow n r (RUnknown m) | m == n = r
-replaceRowInRow n r (RCons name ty row) = RCons name (replaceRowInType n r ty) (replaceRowInRow n r row)
-replaceRowInRow _ _ other = other
+  | otherwise = return [RowConstraint m (replaceRow n r r1)]
 
 unifyTypes :: Type -> Type -> Check [TypeConstraint]
 unifyTypes (TUnknown u1) (TUnknown u2) | u1 == u2 = return []
 unifyTypes (TUnknown u) t = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck False u t
+  typeOccursCheck u t
   return [TypeConstraint u t]
 unifyTypes t (TUnknown u) = do
-  guardWith "Occurs check failed" $ not $ typeOccursCheck False u t
+  typeOccursCheck u t
   return [TypeConstraint u t]
+unifyTypes (ForAll idents t1) t2 = join $ flip unifyTypes t2 <$> replaceVarsWithUnknowns idents t1
+unifyTypes t1 (ForAll idents t2) = join $ unifyTypes t1 <$> replaceVarsWithUnknowns idents t2
 unifyTypes Number Number = return []
 unifyTypes String String = return []
 unifyTypes Boolean Boolean = return []
@@ -446,14 +461,14 @@ unifyRows r1 r2 =
     int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
     sd1 = [ (name, t1) | (name, t1) <- s1, not (elem name (map fst s2)) ]
     sd2 = [ (name, t2) | (name, t2) <- s2, not (elem name (map fst s1)) ]
-  in rethrow (const $ "Cannot unify " ++ show r1 ++ " with " ++ show r2) $ do
+  in rethrow (\e -> "Cannot unify " ++ show r1 ++ " with " ++ show r2 ++ ": " ++ e) $ do
     cs1 <- fmap concat $ mapM (uncurry unifyTypes) int
     cs2 <- unifyRows' sd1 r1' sd2 r2'
     return $ cs1 ++ cs2
   where
   unifyRows' :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Check [TypeConstraint]
   unifyRows' [] (RUnknown u) sd r = do
-    guardWith "Occurs check failed" $ not $ rowOccursCheck False u r
+    rowOccursCheck u r
     return [RowConstraint u (fromList (sd, r))]
   unifyRows' ((name, ty):row) r others (RUnknown u) = do
     u' <- fresh
@@ -468,16 +483,3 @@ unifyRows r1 r2 =
   fromList :: ([(String, Type)], Row) -> Row
   fromList ([], r) = r
   fromList ((name, t):ts, r) = RCons name t (fromList (ts, r))
-
-typeOccursCheck :: Bool -> Int -> Type -> Bool
-typeOccursCheck b u (TUnknown u') | u == u' = b
-typeOccursCheck _ u (Array t) = typeOccursCheck True u t
-typeOccursCheck _ u (Object row) = rowOccursCheck True u row
-typeOccursCheck _ u (Function args ret) = any (typeOccursCheck True u) args || typeOccursCheck True u ret
-typeOccursCheck _ u (TypeApp s t) = typeOccursCheck True u s || typeOccursCheck True u t
-typeOccursCheck _ _ _ = False
-
-rowOccursCheck :: Bool -> Int -> Row -> Bool
-rowOccursCheck b u (RUnknown u') | u == u' = b
-rowOccursCheck _ u (RCons name ty row) = typeOccursCheck True u ty || rowOccursCheck True u row
-rowOccursCheck _ _ _ = False

@@ -23,6 +23,7 @@ langDef = PL.haskellStyle
   { PT.identStart    = P.lower <|> P.char '_'
   , PT.reservedNames = [ "case"
                        , "data"
+                       , "type"
                        , "var"
                        , "while"
                        , "for"
@@ -32,7 +33,8 @@ langDef = PL.haskellStyle
                        , "return"
                        , "true"
                        , "false"
-                       , "extern" ]
+                       , "extern"
+                       , "forall" ]
   }
 
 tokenParser      = PT.makeTokenParser   langDef
