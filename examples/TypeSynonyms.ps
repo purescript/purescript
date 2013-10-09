@@ -1,12 +1,14 @@
-type Monad m = 
-  { ret :: forall a. (a) -> m a
-  ; bind :: forall a b. (m a) -> ((a) -> m b) -> m b
+type Lens a b = 
+  { get :: (a) -> b
+  ; set :: (a) -> (b) -> b
   }
 
-data List a = Nil | Cons { head :: a; tail :: List a }
-
-replicateM :: forall m a. ((Number, Monad m, m a) -> m (List a))
-replicateM = \n, m, x -> case n of 
-  { 0 -> (m.ret)(Nil)
-  ; n -> (m.bind)(x)(\a -> (m.bind)(replicateM(n - 1, m, x))(\as -> (m.ret)(Cons({ head: a, tail: as }))))
+composeLenses :: forall a b c. (Lens a b) -> (Lens b c) -> Lens a c
+composeLenses = \l1 -> \l2 ->
+  { get: \a -> (l2.get)((l1.get)(a))
+  , set: \a -> \c -> {
+      var b = (l1.get)(a);
+      var b1 = (l2.set)(b)(c);
+      return (l1.set)(a)(b1);
+    }
   }

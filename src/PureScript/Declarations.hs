@@ -14,9 +14,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PureScript.Declarations (
-    Declaration (..)
-) where
+module PureScript.Declarations where
 
 import PureScript.Values
 import PureScript.Types
@@ -26,6 +24,6 @@ import Data.Data
 data Declaration
   = DataDeclaration String [String] [(String, Maybe Type)]
   | TypeSynonymDeclaration String [String] Type
-  | TypeDeclaration String Type
+  | TypeDeclaration String PolyType
   | ValueDeclaration String Value
-  | ExternDeclaration String Type deriving (Show, Data, Typeable)
+  | ExternDeclaration String PolyType deriving (Show, Data, Typeable)

@@ -14,6 +14,7 @@
 
 module PureScript.Parser.Types (
     parseType,
+    parsePolyType,
     parseRow
 ) where
 
@@ -51,10 +52,6 @@ parseTypeVariable = TypeVar <$> identifier
 parseTypeConstructor :: P.Parsec String () Type
 parseTypeConstructor = TypeConstructor <$> properName
 
-parseForAllType :: P.Parsec String () Type
-parseForAllType = ForAll <$> (reserved "forall" *> many identifier)
-                         <*> (dot *> parseType)
-
 parseTypeAtom :: P.Parsec String () Type
 parseTypeAtom = P.choice $ map P.try
             [ parseNumber
@@ -63,10 +60,13 @@ parseTypeAtom = P.choice $ map P.try
             , parseArray
             , parseObject
             , parseFunction
-            , parseForAllType
             , parseTypeVariable
             , parseTypeConstructor
             , parens parseType ]
+
+parsePolyType :: P.Parsec String () PolyType
+parsePolyType = PolyType <$> (P.option [] (reserved "forall" *> many identifier <* dot))
+                         <*> parseType
 
 parseType :: P.Parsec String () Type
 parseType = fold (lexeme parseTypeAtom) (lexeme parseTypeAtom) TypeApp

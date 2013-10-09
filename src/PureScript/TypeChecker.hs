@@ -42,20 +42,20 @@ import qualified Data.Map as M
 
 typeCheckAll :: [Declaration] -> Check ()
 typeCheckAll [] = return ()
-typeCheckAll (DataDeclaration name args ctors : rest) = do
+typeCheckAll (DataDeclaration name args dctors : rest) = do
   rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
     env <- getEnv
     guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-    ctorKind <- kindsOf (Just name) args (catMaybes $ map snd ctors)
+    ctorKind <- kindsOf (Just name) args (catMaybes $ map snd dctors)
     putEnv $ env { types = M.insert name (ctorKind, Data) (types env) }
-    flip mapM_ ctors $ \(dctor, maybeTy) ->
+    flip mapM_ dctors $ \(dctor, maybeTy) ->
       rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
         env' <- getEnv
         guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
         let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-        let quantified = ForAll args dctorTy
-        putEnv $ env' { names = M.insert dctor (quantified, DataConstructor) (names env') }
+        let polyType = PolyType args dctorTy
+        putEnv $ env' { dataConstructors = M.insert dctor polyType (dataConstructors env') }
   typeCheckAll rest
 typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
   rethrow (("Error in type synonym " ++ name ++ ": ") ++) $ do

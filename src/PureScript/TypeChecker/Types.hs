@@ -48,19 +48,20 @@ newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Ro
 emptyTypeSolution :: TypeSolution
 emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
-typeOf :: String -> Value -> Check Type
+typeOf :: String -> Value -> Check PolyType
 typeOf name val = do
   me <- fresh
   (cs, n) <- typeConstraints (M.singleton name me) val
   solution <- solveTypeConstraints ((TypeConstraint me (TUnknown n)) : cs) emptyTypeSolution
   return $ varIfUnknown $ fst (runTypeSolution solution) n
 
-varIfUnknown :: Type -> Type
+varIfUnknown :: Type -> PolyType
 varIfUnknown ty =
   let
     (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
+    -- TODO : check no nested unknowns
   in
-    ForAll (sort $ nub $ M.elems m) ty'
+    PolyType (sort $ nub $ M.elems m) ty'
   where
   f :: Type -> State (M.Map Int String) Type
   f (TUnknown n) = do
@@ -196,9 +197,10 @@ typeConstraints m (Var var) =
       env <- getEnv
       case M.lookup var (names env) of
         Nothing -> throwError $ var ++ " is undefined"
-        Just (ty, _) -> do
+        Just (PolyType idents ty, _) -> do
           me <- fresh
-          return ([TypeConstraint me ty], me)
+          replaced <- replaceVarsWithUnknowns idents ty
+          return ([TypeConstraint me replaced], me)
     Just u -> do
       me <- fresh
       return ([TypeConstraint u (TUnknown me)], me)
@@ -209,22 +211,23 @@ typeConstraints m (Block ss) = do
   return (cs, ret)
 typeConstraints m (Constructor c) = do
   env <- getEnv
-  case M.lookup c (names env) of
-    Nothing -> throwError $ c ++ " is undefined"
-    Just (ty, _) -> do
+  case M.lookup c (dataConstructors env) of
+    Nothing -> throwError $ "Constructor " ++ c ++ " is undefined"
+    Just (PolyType idents ty) -> do
       me <- fresh
-      return ([TypeConstraint me ty], me)
+      replaced <- replaceVarsWithUnknowns idents ty
+      return ([TypeConstraint me replaced], me)
 typeConstraints m (Case val binders) = do
   (cs1, n1) <- typeConstraints m val
   ret <- fresh
   cs2 <- typeConstraintsForBinders m n1 ret binders
   return (cs1 ++ cs2, ret)
-typeConstraints m (TypedValue val ty) = do
-  kind <- kindOf ty
+typeConstraints m (TypedValue val poly@(PolyType idents ty)) = do
+  kind <- kindOf poly
   guardWith ("Expected type of kind *, was " ++ show kind) $ kind == Star
-  ty' <- replaceAllTypeSynonyms ty
+  desugared <- replaceAllTypeSynonyms ty
   (cs, n1) <- typeConstraints m val
-  return (TypeConstraint n1 ty' : cs, n1)
+  return (TypeConstraint n1 desugared : cs, n1)
 
 replaceAllTypeSynonyms :: Type -> Check Type
 replaceAllTypeSynonyms ty = do
@@ -281,17 +284,17 @@ typeConstraintsForBinder val (VarBinder name) = do
   return ([TypeConstraint me (TUnknown val)], M.singleton name me)
 typeConstraintsForBinder val (NullaryBinder ctor) = do
   env <- getEnv
-  case M.lookup ctor (names env) of
-    Just (ForAll args ret, DataConstructor) -> do
+  case M.lookup ctor (dataConstructors env) of
+    Just (PolyType args ret) -> do
       ret' <- replaceVarsWithUnknowns args ret
       return ([TypeConstraint val ret'], M.empty)
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
 typeConstraintsForBinder val (UnaryBinder ctor binder) = do
   env <- getEnv
-  case M.lookup ctor (names env) of
-    Just (ForAll args f@(Function [_] _), DataConstructor) -> do
+  case M.lookup ctor (dataConstructors env) of
+    Just (PolyType idents f@(Function [_] _)) -> do
       obj <- fresh
-      (Function [ty] ret) <- replaceVarsWithUnknowns args f
+      (Function [ty] ret) <- replaceVarsWithUnknowns idents f
       (cs, m1) <- typeConstraintsForBinder obj binder
       return ((TypeConstraint val ret) : (TypeConstraint obj ty) : cs, m1)
     Just _ -> throwError $ ctor ++ " is not a unary constructor"
@@ -432,8 +435,6 @@ unifyTypes (TUnknown u) t = do
 unifyTypes t (TUnknown u) = do
   typeOccursCheck u t
   return [TypeConstraint u t]
-unifyTypes (ForAll idents t1) t2 = join $ flip unifyTypes t2 <$> replaceVarsWithUnknowns idents t1
-unifyTypes t1 (ForAll idents t2) = join $ unifyTypes t1 <$> replaceVarsWithUnknowns idents t2
 unifyTypes Number Number = return []
 unifyTypes String String = return []
 unifyTypes Boolean Boolean = return []

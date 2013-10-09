@@ -47,9 +47,10 @@ newtype KindSolution = KindSolution { runKindSolution :: Int -> Kind }
 emptyKindSolution :: KindSolution
 emptyKindSolution = KindSolution KUnknown
 
-kindOf :: Type -> Check Kind
-kindOf ty = do
-  (cs, n, m) <- kindConstraints M.empty ty
+kindOf :: PolyType -> Check Kind
+kindOf (PolyType idents ty) = do
+  ns <- replicateM (length idents) fresh
+  (cs, n, m) <- kindConstraints (M.fromList (zip idents ns)) ty
   solution <- solveKindConstraints cs emptyKindSolution
   return $ starIfUnknown $ runKindSolution solution n
 
@@ -106,9 +107,6 @@ kindConstraints m (TypeApp t1 t2) = do
   (cs1, n1, m1) <- kindConstraints m t1
   (cs2, n2, m2) <- kindConstraints m1 t2
   return ((KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me))) : cs1 ++ cs2, me, m2)
-kindConstraints m (ForAll idents ty) = do
-  ns <- replicateM (length idents) fresh
-  kindConstraints (m `M.union` M.fromList (zip idents ns)) ty
 kindConstraints m _ = do
   me <- fresh
   return ([KindConstraint me Star], me, m)

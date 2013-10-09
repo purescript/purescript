@@ -14,14 +14,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PureScript.Values (
-  UnaryOperator (..),
-  BinaryOperator (..),
-  Value (..),
-  Statement (..),
-  Binder (..),
-  AssignmentTarget (..)
-) where
+module PureScript.Values where
 
 import PureScript.Types
 
@@ -70,7 +63,7 @@ data Value
   | Block [Statement]
   | Constructor String
   | Case Value [(Binder, Value)]
-  | TypedValue Value Type deriving (Show, Data, Typeable)
+  | TypedValue Value PolyType deriving (Show, Data, Typeable)
 
 data Statement
   = VariableIntroduction String Value

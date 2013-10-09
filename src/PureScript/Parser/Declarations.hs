@@ -42,7 +42,7 @@ parseDataDeclaration = do
   return $ DataDeclaration name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String () Declaration
-parseTypeDeclaration = TypeDeclaration <$> identifier <*> (lexeme (P.string "::") *> parseType)
+parseTypeDeclaration = TypeDeclaration <$> identifier <*> (lexeme (P.string "::") *> parsePolyType)
 
 parseTypeSynonymDeclaration :: P.Parsec String () Declaration
 parseTypeSynonymDeclaration = TypeSynonymDeclaration <$> (reserved "type" *> properName) <*> many identifier <*> (lexeme (P.char '=') *> parseType)
@@ -51,7 +51,7 @@ parseValueDeclaration :: P.Parsec String () Declaration
 parseValueDeclaration = ValueDeclaration <$> identifier <*> (lexeme (P.char '=') *> parseValue)
 
 parseExternDeclaration :: P.Parsec String () Declaration
-parseExternDeclaration = ExternDeclaration <$> (reserved "extern" *> (identifier <|> properName)) <*> (lexeme (P.string "::") *> parseType)
+parseExternDeclaration = ExternDeclaration <$> (reserved "extern" *> (identifier <|> properName)) <*> (lexeme (P.string "::") *> parsePolyType)
 
 parseDeclaration :: P.Parsec String () Declaration
 parseDeclaration = P.choice $ map P.try

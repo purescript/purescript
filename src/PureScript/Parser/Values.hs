@@ -65,7 +65,10 @@ parseApp = App <$> parseValue
                <*> (C.parens $ C.commaSep parseValue)
 
 parseVar :: P.Parsec String () Value
-parseVar = Var <$> (C.identifier <|> C.properName)
+parseVar = Var <$> C.identifier
+
+parseConstructor :: P.Parsec String () Value
+parseConstructor = Constructor <$> C.properName
 
 parseCase :: P.Parsec String () Value
 parseCase = Case <$> P.between (C.reserved "case") (C.reserved "of") parseValue
@@ -86,6 +89,7 @@ parseValueAtom = P.choice $ map P.try
             , parseObjectLiteral
             , parseAbs
             , parseVar
+            , parseConstructor
             , parseBlock
             , parseCase
             , C.parens parseValue ]
@@ -95,7 +99,7 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
   where
   typedValue = C.augment parseValueAtom parseTypeAnnotation TypedValue
   funArgs = C.parens $ C.commaSep parseValue
-  parseTypeAnnotation = C.lexeme (P.string "::") *> parseType
+  parseTypeAnnotation = C.lexeme (P.string "::") *> parsePolyType
   operators = [ [ Postfix $ Accessor <$> (C.dot *> C.identifier)
                 , Postfix $ Indexer <$> C.squares parseValue ]
               , [ Prefix $ C.lexeme (P.char '!') >> return (Unary Not)

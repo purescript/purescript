@@ -27,18 +27,19 @@ import Control.Arrow ((***))
 
 import qualified Data.Map as M
 
-data NameKind = Value | DataConstructor | Extern deriving Show
+data NameKind = Value | Extern deriving Show
 
 data TypeDeclarationKind = Data | TypeSynonym deriving Show
 
 data Environment = Environment
-  { names :: M.Map String (Type, NameKind)
+  { names :: M.Map String (PolyType, NameKind)
   , types :: M.Map String (Kind, TypeDeclarationKind)
+  , dataConstructors :: M.Map String PolyType
   , typeSynonyms :: M.Map String ([String], Type)
   }
 
 emptyEnvironment :: Environment
-emptyEnvironment = Environment M.empty M.empty M.empty
+emptyEnvironment = Environment M.empty M.empty M.empty M.empty
 
 newtype Check a = Check { unCheck :: StateT (Environment, Int) (Either String) a } deriving (Functor, Monad, Applicative, MonadPlus, MonadState (Environment, Int), MonadError String)
 

@@ -14,9 +14,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PureScript.Kinds (
-  Kind (..)
-) where
+module PureScript.Kinds where
 
 import Data.Data
 

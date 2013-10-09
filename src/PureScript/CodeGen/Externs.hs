@@ -29,8 +29,8 @@ import PureScript.Declarations
 import PureScript.TypeChecker.Monad
 import PureScript.CodeGen.Common
 
-externToPs :: String -> (Type, NameKind) -> String
-externToPs name (ty, _) = "extern " ++ name ++ " :: " ++ typeToPs ty
+externToPs :: String -> (PolyType, NameKind) -> String
+externToPs name (ty, _) = "extern " ++ name ++ " :: " ++ polyTypeToPs ty
 
 typeLiterals :: Pattern Type String
 typeLiterals = Pattern $ A.Kleisli match
@@ -71,12 +71,6 @@ function = Pattern $ A.Kleisli match
   match (Function args ret) = Just (args, ret)
   match _ = Nothing
 
-forAll :: Pattern Type ([String], Type)
-forAll = Pattern $ A.Kleisli match
-  where
-  match (ForAll args t) = Just (args, t)
-  match _ = Nothing
-
 typeToPs :: Type -> String
 typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   where
@@ -86,6 +80,8 @@ typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   operators =
     OperatorTable $ [ AssocL typeApp $ \f x -> f ++ " " ++ x
                     , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret
-                    , Wrap forAll $ \args t -> "forall " ++ intercalate " " args ++ ". " ++ t
                     ]
 
+polyTypeToPs :: PolyType -> String
+polyTypeToPs (PolyType [] ty) = typeToPs ty
+polyTypeToPs (PolyType idents ty) = "forall " ++ intercalate " " idents ++ ". " ++ typeToPs ty
