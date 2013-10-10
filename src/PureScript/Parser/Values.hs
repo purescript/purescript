@@ -55,7 +55,7 @@ parseIdentifierAndValue = do
 parseAbs :: P.Parsec String () Value
 parseAbs = do
   C.lexeme $ P.char '\\'
-  args <- C.commaSep C.identifier
+  args <- C.commaSep C.parseIdent
   C.lexeme $ P.string "->"
   value <- parseValue
   return $ Abs args value
@@ -65,7 +65,7 @@ parseApp = App <$> parseValue
                <*> (C.parens $ C.commaSep parseValue)
 
 parseVar :: P.Parsec String () Value
-parseVar = Var <$> C.identifier
+parseVar = Var <$> C.parseIdent
 
 parseConstructor :: P.Parsec String () Value
 parseConstructor = Constructor <$> C.properName
@@ -105,10 +105,12 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
               , [ Prefix $ C.lexeme (P.char '!') >> return (Unary Not)
                 , Prefix $ C.lexeme (P.char '~') >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.char '-') >> return (Unary Negate) ]
+              , [ Infix (C.lexeme (C.parseIdentInfix >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
               , [ Infix (C.lexeme (P.try (P.string "<=")) >> return (Binary LessThanOrEqualTo)) AssocRight
-                , Infix (C.lexeme (P.try (P.string ">=")) >> return (Binary GreaterThanOrEqualTo)) AssocRight
-                , Infix (C.lexeme (P.try (P.char '<' <* P.notFollowedBy (P.char '<'))) >> return (Binary LessThan)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.char '>' <* P.notFollowedBy (P.char '>'))) >> return (Binary GreaterThan)) AssocRight
+                , Infix (C.lexeme (P.try (P.string ">=")) >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (P.char '<' <* P.notFollowedBy (P.char '<'))) >> return (Binary LessThan)) AssocRight
+                , Infix (C.lexeme (P.try (P.char '>' <* P.notFollowedBy (P.char '>'))) >> return (Binary GreaterThan)) AssocRight ]
+              , [ Infix (C.lexeme (P.char '*') >> return (Binary Multiply)) AssocRight
                 , Infix (C.lexeme (P.char '/') >> return (Binary Divide)) AssocRight
                 , Infix (C.lexeme (P.char '%') >> return (Binary Modulus)) AssocRight ]
               , [ Infix (C.lexeme (P.try (P.string "++")) >> return (Binary Concat)) AssocRight
@@ -129,7 +131,7 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
 parseVariableIntroduction :: Bool -> P.Parsec String () Statement
 parseVariableIntroduction requireSemi = do
   C.reserved "var"
-  name <- C.identifier
+  name <- C.parseIdent
   C.lexeme $ P.char '='
   value <- parseValue
   when requireSemi (void C.semi)
@@ -186,7 +188,7 @@ parseNumberBinder :: P.Parsec String () Binder
 parseNumberBinder = NumberBinder <$> C.naturalOrFloat
 
 parseVarBinder :: P.Parsec String () Binder
-parseVarBinder = VarBinder <$> C.lexeme C.identifier
+parseVarBinder = VarBinder <$> C.parseIdent
 
 parseNullaryBinder :: P.Parsec String () Binder
 parseNullaryBinder = NullaryBinder <$> C.lexeme C.properName
@@ -220,7 +222,7 @@ parseBinder = P.choice $ map P.try
                   , C.parens parseBinder ]
 
 parseAssignmentTarget :: P.Parsec String () AssignmentTarget
-parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.identifier)
+parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.parseIdent)
   where
   operators = [ [ Postfix $ AssignArrayIndex <$> C.squares parseValue
                 , Postfix $ AssignObjectProperty <$> (C.dot *> C.identifier) ] ]

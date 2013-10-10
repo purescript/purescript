@@ -18,12 +18,13 @@ module PureScript.Declarations where
 
 import PureScript.Values
 import PureScript.Types
+import PureScript.Names
 
 import Data.Data
 
 data Declaration
   = DataDeclaration String [String] [(String, Maybe Type)]
   | TypeSynonymDeclaration String [String] Type
-  | TypeDeclaration String PolyType
-  | ValueDeclaration String Value
-  | ExternDeclaration String PolyType deriving (Show, Data, Typeable)
+  | TypeDeclaration Ident PolyType
+  | ValueDeclaration Ident Value
+  | ExternDeclaration Ident PolyType deriving (Show, Data, Typeable)

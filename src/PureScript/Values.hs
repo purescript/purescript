@@ -17,6 +17,7 @@
 module PureScript.Values where
 
 import PureScript.Types
+import PureScript.Names
 
 import Data.Data
 
@@ -57,16 +58,16 @@ data Value
   | Indexer Value Value
   | ObjectLiteral [(String, Value)]
   | Accessor String Value
-  | Abs [String] Value
+  | Abs [Ident] Value
   | App Value [Value]
-  | Var String
+  | Var Ident
   | Block [Statement]
   | Constructor String
   | Case Value [(Binder, Value)]
   | TypedValue Value PolyType deriving (Show, Data, Typeable)
 
 data Statement
-  = VariableIntroduction String Value
+  = VariableIntroduction Ident Value
   | Assignment AssignmentTarget Value
   | While Value [Statement]
   | For (Statement, Value, Statement) [Statement]
@@ -77,13 +78,13 @@ data Binder
   = BooleanBinder Bool
   | StringBinder String
   | NumberBinder (Either Integer Double)
-  | VarBinder String
+  | VarBinder Ident
   | NullaryBinder String
   | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)]
   | ArrayBinder [Binder] (Maybe Binder) deriving (Show, Data, Typeable)
 
 data AssignmentTarget
-  = AssignVariable String
+  = AssignVariable Ident
   | AssignObjectProperty String AssignmentTarget
   | AssignArrayIndex Value AssignmentTarget deriving (Show, Data, Typeable)

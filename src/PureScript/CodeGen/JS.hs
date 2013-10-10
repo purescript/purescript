@@ -16,6 +16,7 @@ module PureScript.CodeGen.JS (
     declToJs
 ) where
 
+import Data.Char
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import qualified Control.Arrow as A
@@ -23,12 +24,20 @@ import Control.Applicative
 
 import PureScript.Types
 import PureScript.Values
+import PureScript.Names
 import PureScript.Declarations
 import PureScript.CodeGen.Common
 import PureScript.CodeGen.Common.Gen
 
+identToJs :: Ident -> String
+identToJs (Ident name) = name
+identToJs (Op op) = concatMap opCharToString op
+  where
+  opCharToString :: Char -> String
+  opCharToString = (:) '$'. show . ord
+
 declToJs :: Declaration -> Maybe String
-declToJs (ValueDeclaration name val) = Just $ "var " ++ name ++ " = " ++ valueToJs val ++ ";"
+declToJs (ValueDeclaration ident val) = Just $ "var " ++ identToJs ident ++ " = " ++ valueToJs val ++ ";"
 declToJs (DataDeclaration _ _ ctors) =
   Just $ flip concatMap ctors $ \(ctor, maybeTy) ->
     case maybeTy of
@@ -56,7 +65,7 @@ literals = Pattern $ A.Kleisli match
          let js = valueToJs result
          binderToJs valName ("return " ++ js ++ ";") binder
       return $ "function (" ++ valName ++ ") {" ++ concat jss ++ "throw \"Failed pattern match\"; }"
-  match (Var ident) = Just ident
+  match (Var ident) = Just (identToJs ident)
   match _ = Nothing
 
 accessor :: Pattern Value (String, Value)
@@ -80,7 +89,7 @@ app = Pattern $ A.Kleisli match
 lam :: Pattern Value ([String], Value)
 lam = Pattern $ A.Kleisli match
   where
-  match (Abs args val) = Just (args, val)
+  match (Abs args val) = Just (map identToJs args, val)
   match _ = Nothing
 
 unary :: UnaryOperator -> String -> Operator Value String
@@ -173,8 +182,8 @@ binderToJs varName done (BooleanBinder True) =
   return $ "if (" ++ varName ++ ") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder False) =
   return $ "if (!" ++ varName ++ ") {" ++ done ++ " }"
-binderToJs varName done (VarBinder s) =
-  return $ "var " ++ s ++ " = " ++ varName ++ "; " ++ done
+binderToJs varName done (VarBinder ident) =
+  return $ "var " ++ identToJs ident ++ " = " ++ varName ++ "; " ++ done
 binderToJs varName done (NullaryBinder ctor) =
   return $ "if (" ++ varName ++ ".ctor === \"" ++ ctor ++ "\") { " ++ done ++ " }"
 binderToJs varName done (UnaryBinder ctor b) = do
@@ -209,7 +218,7 @@ objectPropertyToJs :: (String, Value) -> String
 objectPropertyToJs (key, value) = key ++ ":" ++ valueToJs value
 
 statementToJs :: Statement -> String
-statementToJs (VariableIntroduction name value) = "var " ++ name ++ " = " ++ valueToJs value
+statementToJs (VariableIntroduction ident value) = "var " ++ identToJs ident ++ " = " ++ valueToJs value
 statementToJs (Assignment target value) = assignmentTargetToJs target ++ " = " ++ valueToJs value
 statementToJs (While cond sts) = "while ("
   ++ valueToJs cond ++ ") {"
@@ -227,6 +236,6 @@ statementToJs (IfThenElse cond thens elses) = "if ("
 statementToJs (Return value) = "return " ++ valueToJs value
 
 assignmentTargetToJs :: AssignmentTarget -> String
-assignmentTargetToJs (AssignVariable var) = var
+assignmentTargetToJs (AssignVariable ident) = identToJs ident
 assignmentTargetToJs (AssignArrayIndex index tgt) = assignmentTargetToJs tgt ++ "[" ++ valueToJs index ++ "]"
 assignmentTargetToJs (AssignObjectProperty prop tgt) = assignmentTargetToJs tgt ++ "." ++ prop

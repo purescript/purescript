@@ -26,6 +26,7 @@ import Data.Generics (everywhere, everywhereM, everything, mkT, mkM, mkQ, extM, 
 import PureScript.Values
 import PureScript.Types
 import PureScript.Kinds
+import PureScript.Names
 import PureScript.TypeChecker.Monad
 import PureScript.TypeChecker.Kinds
 import PureScript.TypeChecker.Synonyms
@@ -48,7 +49,7 @@ newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Ro
 emptyTypeSolution :: TypeSolution
 emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
-typeOf :: String -> Value -> Check PolyType
+typeOf :: Ident -> Value -> Check PolyType
 typeOf name val = do
   me <- fresh
   (cs, n) <- typeConstraints (M.singleton name me) val
@@ -136,7 +137,7 @@ occursCheck u = everything (||) $ flip extQ g $ mkQ False f
   g (RUnknown u') | u' == u = True
   g _ = False
 
-typeConstraints :: M.Map String Int -> Value -> Check ([TypeConstraint], Int)
+typeConstraints :: M.Map Ident Int -> Value -> Check ([TypeConstraint], Int)
 typeConstraints _ (NumericLiteral _) = do
   me <- fresh
   return ([TypeConstraint me Number], me)
@@ -196,7 +197,7 @@ typeConstraints m (Var var) =
     Nothing -> do
       env <- getEnv
       case M.lookup var (names env) of
-        Nothing -> throwError $ var ++ " is undefined"
+        Nothing -> throwError $ show var ++ " is undefined"
         Just (PolyType idents ty, _) -> do
           me <- fresh
           replaced <- replaceVarsWithUnknowns idents ty
@@ -275,7 +276,7 @@ symBinOpConstraints ty left right result = asymBinOpConstraints ty ty left right
 asymBinOpConstraints :: Type -> Type -> Int -> Int -> Int -> [TypeConstraint]
 asymBinOpConstraints ty res left right result = [TypeConstraint left ty, TypeConstraint right ty, TypeConstraint result res]
 
-typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map String Int)
+typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map Ident Int)
 typeConstraintsForBinder val (StringBinder _) = constantBinder val String
 typeConstraintsForBinder val (NumberBinder _) = constantBinder val Number
 typeConstraintsForBinder val (BooleanBinder _) = constantBinder val Boolean
@@ -305,7 +306,7 @@ typeConstraintsForBinder val (ObjectBinder props) = do
   (cs, m1) <- typeConstraintsForProperties row (RUnknown rest) props
   return ((TypeConstraint val (Object (RUnknown row))) : cs, m1)
   where
-  typeConstraintsForProperties :: Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], M.Map String Int)
+  typeConstraintsForProperties :: Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], M.Map Ident Int)
   typeConstraintsForProperties nrow row [] = return ([RowConstraint nrow row], M.empty)
   typeConstraintsForProperties nrow row ((name, binder):binders) = do
     propTy <- fresh
@@ -323,10 +324,10 @@ typeConstraintsForBinder val (ArrayBinder binders rest) = do
       (cs2, m2) <- typeConstraintsForBinder val binder
       return (arrayConstraint : cs1 ++ cs2, M.union m1 m2)
 
-constantBinder :: Int -> Type -> Check ([TypeConstraint], M.Map String Int)
+constantBinder :: Int -> Type -> Check ([TypeConstraint], M.Map Ident Int)
 constantBinder val ty = return ([TypeConstraint val ty], M.empty)
 
-typeConstraintsForBinders :: M.Map String Int -> Int -> Int -> [(Binder, Value)] -> Check [TypeConstraint]
+typeConstraintsForBinders :: M.Map Ident Int -> Int -> Int -> [(Binder, Value)] -> Check [TypeConstraint]
 typeConstraintsForBinders _ _ _ [] = return []
 typeConstraintsForBinders m nval ret ((binder, val):bs) = do
   (cs1, m1) <- typeConstraintsForBinder nval binder
@@ -334,13 +335,13 @@ typeConstraintsForBinders m nval ret ((binder, val):bs) = do
   cs3 <- typeConstraintsForBinders m nval ret bs
   return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3)
 
-typeConstraintsForStatement :: M.Map String Int -> M.Map String Int -> Int -> Statement -> Check ([TypeConstraint], Bool, M.Map String Int)
+typeConstraintsForStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> Statement -> Check ([TypeConstraint], Bool, M.Map Ident Int)
 typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
   case M.lookup name (m `M.union` mass) of
     Nothing -> do
       (cs1, n1) <- typeConstraints m val
       return $ (cs1, False, M.insert name n1 mass)
-    Just ty -> throwError $ "Variable with name " ++ name ++ " already exists."
+    Just ty -> throwError $ "Variable with name " ++ show name ++ " already exists."
 typeConstraintsForStatement m mass ret (Assignment tgt val) = do
   (cs1, n1) <- typeConstraints m val
   cs2 <- typeConstraintsForAssignmentTarget m mass n1 tgt
@@ -370,10 +371,10 @@ typeConstraintsForStatement m mass ret (Return val) = do
   (cs1, n1) <- typeConstraints (m `M.union` mass) val
   return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, mass)
 
-typeConstraintsForAssignmentTarget :: M.Map String Int -> M.Map String Int -> Int -> AssignmentTarget -> Check [TypeConstraint]
+typeConstraintsForAssignmentTarget :: M.Map Ident Int -> M.Map Ident Int -> Int -> AssignmentTarget -> Check [TypeConstraint]
 typeConstraintsForAssignmentTarget m mass nval (AssignVariable var) =
   case M.lookup var mass of
-    Nothing -> throwError $ "No local variable with name " ++ var
+    Nothing -> throwError $ "No local variable with name " ++ show var
     Just ty -> do
      return [TypeConstraint nval (TUnknown ty)]
 typeConstraintsForAssignmentTarget m mass nval (AssignArrayIndex index tgt) = do
@@ -387,7 +388,7 @@ typeConstraintsForAssignmentTarget m mass nval (AssignObjectProperty prop tgt) =
   cs <- typeConstraintsForAssignmentTarget m mass obj tgt
   return $ (TypeConstraint obj (Object (RCons prop (TUnknown nval) $ RUnknown row))) : cs
 
-typeConstraintsForBlock :: M.Map String Int -> M.Map String Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map String Int)
+typeConstraintsForBlock :: M.Map Ident Int -> M.Map Ident Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map Ident Int)
 typeConstraintsForBlock _ mass _ [] = return ([], False, mass)
 typeConstraintsForBlock m mass ret (s:ss) = do
   (cs1, b1, mass1) <- typeConstraintsForStatement (m `M.union` mass) mass ret s

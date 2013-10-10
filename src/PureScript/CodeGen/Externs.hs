@@ -25,12 +25,13 @@ import Control.Applicative
 
 import PureScript.Values
 import PureScript.Types
+import PureScript.Names
 import PureScript.Declarations
 import PureScript.TypeChecker.Monad
 import PureScript.CodeGen.Common
 
-externToPs :: String -> (PolyType, NameKind) -> String
-externToPs name (ty, _) = "extern " ++ name ++ " :: " ++ polyTypeToPs ty
+externToPs :: Ident -> (PolyType, NameKind) -> String
+externToPs name (ty, _) = "extern " ++ show name ++ " :: " ++ polyTypeToPs ty
 
 typeLiterals :: Pattern Type String
 typeLiterals = Pattern $ A.Kleisli match

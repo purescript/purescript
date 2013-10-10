@@ -19,6 +19,8 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
 import qualified Text.Parsec.Language as PL
 
+import PureScript.Names
+
 langDef = PL.haskellStyle
   { PT.identStart    = P.lower <|> P.char '_'
   , PT.reservedNames = [ "case"
@@ -35,6 +37,8 @@ langDef = PL.haskellStyle
                        , "false"
                        , "extern"
                        , "forall" ]
+  , PT.reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
+                         , "==", "!=", "&", "^", "|", "&&", "||" ]
   }
 
 tokenParser      = PT.makeTokenParser   langDef
@@ -60,6 +64,8 @@ semiSep1         = PT.semiSep1          tokenParser
 commaSep         = PT.commaSep          tokenParser
 commaSep1        = PT.commaSep1         tokenParser
 
+tick             = lexeme (P.char '`')
+
 properName :: P.Parsec String u String
 properName = lexeme $ P.try properName'
   where
@@ -73,3 +79,9 @@ fold first more combine = do
   a <- first
   bs <- P.many more
   return $ foldl combine a bs
+
+parseIdent :: P.Parsec String () Ident
+parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
+
+parseIdentInfix :: P.Parsec String () Ident
+parseIdentInfix = (Ident <$> P.between tick tick identifier) <|> (Op <$> operator)

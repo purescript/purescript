@@ -18,6 +18,7 @@ module PureScript.TypeChecker.Monad where
 
 import PureScript.Types
 import PureScript.Kinds
+import PureScript.Names
 
 import Control.Applicative
 import Control.Monad.State
@@ -32,7 +33,7 @@ data NameKind = Value | Extern deriving Show
 data TypeDeclarationKind = Data | TypeSynonym deriving Show
 
 data Environment = Environment
-  { names :: M.Map String (PolyType, NameKind)
+  { names :: M.Map Ident (PolyType, NameKind)
   , types :: M.Map String (Kind, TypeDeclarationKind)
   , dataConstructors :: M.Map String PolyType
   , typeSynonyms :: M.Map String ([String], Type)

@@ -51,7 +51,7 @@ typeCheckAll (DataDeclaration name args dctors : rest) = do
     flip mapM_ dctors $ \(dctor, maybeTy) ->
       rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
         env' <- getEnv
-        guardWith (dctor ++ " is already defined") $ not $ flip M.member (names env') dctor
+        guardWith (dctor ++ " is already defined") $ not $ flip M.member (dataConstructors env') dctor
         let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
         let polyType = PolyType args dctorTy
@@ -67,22 +67,22 @@ typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
   typeCheckAll rest
 typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' val : rest) | name == name' =
   typeCheckAll (ValueDeclaration name (TypedValue val ty) : rest)
-typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ name
+typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
 typeCheckAll (ValueDeclaration name val : rest) = do
-  rethrow (("Error in declaration " ++ name ++ ": ") ++) $ do
+  rethrow (("Error in declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
     case M.lookup name (names env) of
-      Just ty -> throwError $ name ++ " is already defined"
+      Just ty -> throwError $ show name ++ " is already defined"
       Nothing -> do
         ty <- typeOf name val
         putEnv (env { names = M.insert name (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
-  rethrow (("Error in extern declaration " ++ name ++ ": ") ++) $ do
+  rethrow (("Error in extern declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
     kind <- kindOf ty
     guardWith "Expected kind *" $ kind == Star
     case M.lookup name (names env) of
-      Just _ -> throwError $ name ++ " is already defined"
+      Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> putEnv (env { names = M.insert name (ty, Extern) (names env) })
   typeCheckAll rest
