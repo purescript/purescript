@@ -16,14 +16,14 @@ module PureScript.Parser.Common where
 
 import Control.Applicative
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Indent as I
 import qualified Text.Parsec.Token as PT
 import qualified Text.Parsec.Language as PL
 
 import PureScript.Names
 
-langDef = PL.haskellStyle
-  { PT.identStart    = P.lower <|> P.char '_'
-  , PT.reservedNames = [ "case"
+langDef = PT.LanguageDef
+  { PT.reservedNames = [ "case"
                        , "data"
                        , "type"
                        , "var"
@@ -39,34 +39,57 @@ langDef = PL.haskellStyle
                        , "forall" ]
   , PT.reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
                          , "==", "!=", "&", "^", "|", "&&", "||" ]
+  , PT.commentStart   = "{-"
+  , PT.commentEnd     = "-}"
+  , PT.commentLine    = "--"
+  , PT.nestedComments = True
+  , PT.identStart     = P.lower <|> P.oneOf "_$"
+  , PT.identLetter    = P.alphaNum <|> P.oneOf "_'"
+  , PT.opStart        = P.oneOf ":#?@\\"
+  , PT.opLetter       = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
+  , PT.caseSensitive  = True
   }
 
-tokenParser      = PT.makeTokenParser   langDef
-lexeme           = PT.lexeme            tokenParser
-identifier       = PT.identifier        tokenParser
-reserved         = PT.reserved          tokenParser
-operator         = PT.operator          tokenParser
-stringLiteral    = PT.stringLiteral     tokenParser
-natural          = PT.natural           tokenParser
-naturalOrFloat   = PT.naturalOrFloat    tokenParser
-whiteSpace       = PT.whiteSpace        tokenParser
-parens           = PT.parens            tokenParser
-braces           = PT.braces            tokenParser
-angles           = PT.angles            tokenParser
-brackets         = PT.brackets          tokenParser
-squares          = PT.squares           tokenParser
-semi             = PT.semi              tokenParser
-comma            = PT.comma             tokenParser
-colon            = PT.colon             tokenParser
-dot              = PT.dot               tokenParser
-semiSep          = PT.semiSep           tokenParser
-semiSep1         = PT.semiSep1          tokenParser
-commaSep         = PT.commaSep          tokenParser
-commaSep1        = PT.commaSep1         tokenParser
+tokenParser = PT.makeTokenParser langDef
+
+whiteSpace = P.skipMany $ (P.oneOf " \t" >> return ()) <|> P.try (P.skipMany1 (P.oneOf "\r\n")) >> I.indented <|> P.try lineComment <|> P.try blockComment
+
+lineComment = do
+  P.string $ PT.commentLine langDef
+  P.skipMany $ P.satisfy (/= '\n')
+  I.indented
+
+blockComment = do
+  P.string $ PT.commentStart langDef
+  P.manyTill P.anyChar $ P.try $ P.string $ PT.commentEnd langDef
+  return ()
+
+lexeme p         = p <* whiteSpace
+identifier       = lexeme $ PT.identifier        tokenParser
+reserved s       = lexeme $ PT.reserved          tokenParser s
+operator         = lexeme $ PT.operator          tokenParser
+stringLiteral    = lexeme $ PT.stringLiteral     tokenParser
+natural          = lexeme $ PT.natural           tokenParser
+naturalOrFloat   = lexeme $ PT.naturalOrFloat    tokenParser
+
+semi             = lexeme $ PT.semi              tokenParser
+comma            = lexeme $ PT.comma             tokenParser
+colon            = lexeme $ PT.colon             tokenParser
+dot              = lexeme $ PT.dot               tokenParser
+
+semiSep p        = P.sepBy p semi
+semiSep1 p       = P.sepBy1 p semi
+commaSep p       = P.sepBy p comma
+commaSep1 p      = P.sepBy1 p comma
+
+parens p         = lexeme (P.char '(') *> lexeme p <* lexeme (P.char ')')
+braces p         = lexeme (P.char '{') *> lexeme p <* lexeme (P.char '}')
+angles p         = lexeme (P.char '<') *> lexeme p <* lexeme (P.char '>')
+squares p        = lexeme (P.char '[') *> lexeme p <* lexeme (P.char ']')
 
 tick             = lexeme (P.char '`')
 
-properName :: P.Parsec String u String
+properName :: I.IndentParser String u String
 properName = lexeme $ P.try properName'
   where
   properName' = (:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name"
@@ -80,8 +103,8 @@ fold first more combine = do
   bs <- P.many more
   return $ foldl combine a bs
 
-parseIdent :: P.Parsec String () Ident
+parseIdent :: I.IndentParser String () Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
 
-parseIdentInfix :: P.Parsec String () Ident
+parseIdentInfix :: I.IndentParser String () Ident
 parseIdentInfix = (Ident <$> P.between tick tick identifier) <|> (Op <$> operator)

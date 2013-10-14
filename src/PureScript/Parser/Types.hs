@@ -22,37 +22,38 @@ import PureScript.Types
 import PureScript.Parser.Common
 import Control.Applicative
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Indent as I
 import Control.Arrow (Arrow(..))
 
-parseNumber :: P.Parsec String () Type
+parseNumber :: I.IndentParser String () Type
 parseNumber = const Number <$> P.string "Number"
 
-parseString :: P.Parsec String () Type
+parseString :: I.IndentParser String () Type
 parseString = const String <$> P.string "String"
 
-parseBoolean :: P.Parsec String () Type
+parseBoolean :: I.IndentParser String () Type
 parseBoolean = const Boolean <$> P.string "Boolean"
 
-parseArray :: P.Parsec String () Type
+parseArray :: I.IndentParser String () Type
 parseArray = squares $ Array <$> parseType
 
-parseObject :: P.Parsec String () Type
+parseObject :: I.IndentParser String () Type
 parseObject = braces $ Object <$> parseRow
 
-parseFunction :: P.Parsec String () Type
+parseFunction :: I.IndentParser String () Type
 parseFunction = do
   args <- lexeme $ parens $ commaSep parseType
   lexeme $ P.string "->"
   resultType <- parseType
   return $ Function args resultType
 
-parseTypeVariable :: P.Parsec String () Type
+parseTypeVariable :: I.IndentParser String () Type
 parseTypeVariable = TypeVar <$> identifier
 
-parseTypeConstructor :: P.Parsec String () Type
+parseTypeConstructor :: I.IndentParser String () Type
 parseTypeConstructor = TypeConstructor <$> properName
 
-parseTypeAtom :: P.Parsec String () Type
+parseTypeAtom :: I.IndentParser String () Type
 parseTypeAtom = P.choice $ map P.try
             [ parseNumber
             , parseString
@@ -64,20 +65,20 @@ parseTypeAtom = P.choice $ map P.try
             , parseTypeConstructor
             , parens parseType ]
 
-parsePolyType :: P.Parsec String () PolyType
+parsePolyType :: I.IndentParser String () PolyType
 parsePolyType = PolyType <$> (P.option [] (reserved "forall" *> many identifier <* dot))
                          <*> parseType
 
-parseType :: P.Parsec String () Type
+parseType :: I.IndentParser String () Type
 parseType = fold (lexeme parseTypeAtom) (lexeme parseTypeAtom) TypeApp
 
-parseNameAndType :: P.Parsec String () (String, Type)
+parseNameAndType :: I.IndentParser String () (String, Type)
 parseNameAndType = (,) <$> (identifier <* lexeme (P.string "::")) <*> parseType
 
-parseRowEnding :: P.Parsec String () Row
+parseRowEnding :: I.IndentParser String () Row
 parseRowEnding = P.option REmpty (RowVar <$> (lexeme (P.char '|') *> identifier))
 
-parseRow :: P.Parsec String () Row
+parseRow :: I.IndentParser String () Row
 parseRow = fromList <$> semiSep parseNameAndType <*> parseRowEnding
   where
   fromList :: [(String, Type)] -> Row -> Row
