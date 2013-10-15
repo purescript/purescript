@@ -472,6 +472,9 @@ unifyRows r1 r2 =
   unifyRows' [] (RUnknown u) sd r = do
     rowOccursCheck u r
     return [RowConstraint u (fromList (sd, r))]
+  unifyRows' sd r [] (RUnknown u) = do
+    rowOccursCheck u r
+    return [RowConstraint u (fromList (sd, r))]
   unifyRows' ((name, ty):row) r others (RUnknown u) = do
     u' <- fresh
     cs <- unifyRows' row r others (RUnknown u')
