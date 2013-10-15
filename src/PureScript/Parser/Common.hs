@@ -59,9 +59,15 @@ opLetter = P.oneOf ":#$%&*+./<=>?@^|"
 whiteSpace :: I.IndentParser String u ()
 whiteSpace = P.skipMany $ P.choice
   [ P.oneOf " \t" >> return ()
-  , P.try $ P.skipMany1 (P.oneOf "\r\n") >> P.skipMany1 (P.oneOf " \t") >> I.indented
+  , P.try $ P.skipMany1 (P.oneOf " \t\r\n") >> I.indented
   , P.try lineComment
   , P.try blockComment ]
+
+unindentedBlock :: I.IndentParser String u a -> I.IndentParser String u [a]
+unindentedBlock p = I.block $ I.withPos (p <* P.skipMany (P.oneOf "\r\n"))
+
+indentedBlock :: I.IndentParser String u a -> I.IndentParser String u [a]
+indentedBlock p = I.block $ I.withPos (p <* P.skipMany (P.oneOf " \t\r\n"))
 
 lineComment :: I.IndentParser String u ()
 lineComment = do

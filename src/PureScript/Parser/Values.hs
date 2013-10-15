@@ -73,13 +73,13 @@ parseConstructor = Constructor <$> C.properName
 
 parseCase :: I.IndentParser String () Value
 parseCase = Case <$> P.between (C.reserved "case") (C.reserved "of") parseValue
-                      <*> C.braces (C.semiSep parseCaseAlternative)
+                 <*> I.withPos (C.indentedBlock parseCaseAlternative)
 
 parseCaseAlternative :: I.IndentParser String () (Binder, Value)
 parseCaseAlternative = (,) <$> (parseBinder <* C.lexeme (P.string "->")) <*> parseValue
 
 parseBlock :: I.IndentParser String () Value
-parseBlock = Block <$> (C.braces $ P.many (parseStatement True))
+parseBlock = Block <$> (C.braces $ I.withPos $ C.indentedBlock $ parseStatement True)
 
 parseValueAtom :: I.IndentParser String () Value
 parseValueAtom = P.choice $ map P.try
@@ -147,7 +147,7 @@ parseAssignment requireSemi = do
   return $ Assignment tgt value
 
 parseManyStatements :: I.IndentParser String () [Statement]
-parseManyStatements = C.braces $ P.many (parseStatement True)
+parseManyStatements = C.braces $ I.withPos $ C.indentedBlock $ parseStatement True
 
 parseWhile :: I.IndentParser String () Statement
 parseWhile = While <$> (C.reserved "while" *> C.parens parseValue)
