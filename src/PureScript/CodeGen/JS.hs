@@ -48,7 +48,7 @@ declToJs _ = Nothing
 literals :: Pattern Value String
 literals = Pattern $ A.Kleisli match
   where
-  match (NumericLiteral n) = Just $ either show show n
+  match (NumericLiteral n) = Just n
   match (StringLiteral s) = Just $ show s
   match (BooleanLiteral True) = Just "true"
   match (BooleanLiteral False) = Just "false"
@@ -177,7 +177,7 @@ binderToJs :: String -> String -> Binder -> Gen String
 binderToJs varName done (StringBinder str) =
   return $ "if (" ++ varName ++ " === \"" ++ str ++ "\") {" ++ done ++ " }"
 binderToJs varName done (NumberBinder num) =
-  return $ "if (" ++ varName ++ " === \"" ++ either show show num ++ "\") {" ++ done ++ " }"
+  return $ "if (" ++ varName ++ " === \"" ++ num ++ "\") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder True) =
   return $ "if (" ++ varName ++ ") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder False) =

@@ -32,7 +32,7 @@ booleanLiteral :: I.IndentParser String () Bool
 booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
 
 parseNumericLiteral :: I.IndentParser String () Value
-parseNumericLiteral = NumericLiteral <$> C.naturalOrFloat
+parseNumericLiteral = NumericLiteral <$> C.signedNumber
 
 parseStringLiteral :: I.IndentParser String () Value
 parseStringLiteral = StringLiteral <$> C.stringLiteral
@@ -103,30 +103,30 @@ parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.l
   parseTypeAnnotation = C.lexeme (P.string "::") *> parsePolyType
   operators = [ [ Postfix $ Accessor <$> (C.dot *> C.identifier)
                 , Postfix $ Indexer <$> C.squares parseValue ]
-              , [ Prefix $ C.lexeme (P.char '!') >> return (Unary Not)
-                , Prefix $ C.lexeme (P.char '~') >> return (Unary BitwiseNot)
-                , Prefix $ C.lexeme (P.char '-') >> return (Unary Negate) ]
-              , [ Infix (C.lexeme (C.parseIdentInfix >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.string "<=")) >> return (Binary LessThanOrEqualTo)) AssocRight
-                , Infix (C.lexeme (P.try (P.string ">=")) >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.char '<' <* P.notFollowedBy (P.char '<'))) >> return (Binary LessThan)) AssocRight
-                , Infix (C.lexeme (P.try (P.char '>' <* P.notFollowedBy (P.char '>'))) >> return (Binary GreaterThan)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '*') >> return (Binary Multiply)) AssocRight
-                , Infix (C.lexeme (P.char '/') >> return (Binary Divide)) AssocRight
-                , Infix (C.lexeme (P.char '%') >> return (Binary Modulus)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.string "++")) >> return (Binary Concat)) AssocRight
-                , Infix (C.lexeme (P.char '+') >> return (Binary Add)) AssocRight
-                , Infix (C.lexeme (P.char '-') >> return (Binary Subtract)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "<<") >> return (Binary ShiftLeft)) AssocRight
-                , Infix (C.lexeme (P.try (P.string ">>>")) >> return (Binary ZeroFillShiftRight)) AssocRight
-                , Infix (C.lexeme (P.string ">>") >> return (Binary ShiftRight)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "==") >> return (Binary EqualTo)) AssocRight
-                , Infix (C.lexeme (P.try (P.string "!=")) >> return (Binary NotEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.char '&' <* P.notFollowedBy (P.char '&'))) >> return (Binary BitwiseAnd)) AssocRight ]
-              , [ Infix (C.lexeme (P.char '^') >> return (Binary BitwiseXor)) AssocRight ]
-              , [ Infix (C.lexeme (P.try (P.char '|' <* P.notFollowedBy (P.char '|'))) >> return (Binary BitwiseOr)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "&&") >> return (Binary And)) AssocRight ]
-              , [ Infix (C.lexeme (P.string "||") >> return (Binary Or)) AssocRight ]
+              , [ Prefix $ C.lexeme (P.try $ C.reservedOp "!") >> return (Unary Not)
+                , Prefix $ C.lexeme (P.try $ C.reservedOp "~") >> return (Unary BitwiseNot)
+                , Prefix $ C.lexeme (P.try $ C.reservedOp "-") >> return (Unary Negate) ]
+              , [ Infix (C.lexeme (P.try C.parseIdentInfix >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "<") >> return (Binary LessThan)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp ">") >> return (Binary GreaterThan)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "*") >> return (Binary Multiply)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp "/") >> return (Binary Divide)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp "%") >> return (Binary Modulus)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "++") >> return (Binary Concat)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp "+") >> return (Binary Add)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp "-") >> return (Binary Subtract)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "<<") >> return (Binary ShiftLeft)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp ">>>") >> return (Binary ZeroFillShiftRight)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp ">>") >> return (Binary ShiftRight)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "==") >> return (Binary EqualTo)) AssocRight
+                , Infix (C.lexeme (P.try $ C.reservedOp "!=") >> return (Binary NotEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "&") >> return (Binary BitwiseAnd)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "^") >> return (Binary BitwiseXor)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "|") >> return (Binary BitwiseOr)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "&&") >> return (Binary And)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.reservedOp "||") >> return (Binary Or)) AssocRight ]
               ]
 
 parseVariableIntroduction :: Bool -> I.IndentParser String () Statement
@@ -186,7 +186,7 @@ parseBooleanBinder :: I.IndentParser String () Binder
 parseBooleanBinder = BooleanBinder <$> booleanLiteral
 
 parseNumberBinder :: I.IndentParser String () Binder
-parseNumberBinder = NumberBinder <$> C.naturalOrFloat
+parseNumberBinder = NumberBinder <$> C.signedNumber
 
 parseVarBinder :: I.IndentParser String () Binder
 parseVarBinder = VarBinder <$> C.parseIdent

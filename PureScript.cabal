@@ -32,7 +32,8 @@ library
 
 executable psc
     build-depends: base -any, cmdtheline -any, containers -any,
-                   mtl -any, parsec -any, utf8-string -any, indents -any
+                   mtl -any, parsec -any, utf8-string -any,
+                   indents -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src

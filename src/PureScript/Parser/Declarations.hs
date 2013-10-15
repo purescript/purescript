@@ -65,8 +65,8 @@ parseDeclaration = P.choice $ map P.try
                    , parseExternDeclaration ]
 
 parseManyDeclarations :: I.IndentParser String () [Declaration]
-parseManyDeclarations = I.block $ I.withPos parseDeclaration
+parseManyDeclarations = I.block $ I.withPos (parseDeclaration <* P.skipMany (P.oneOf "\r\n"))
 
 parseDeclarations :: String -> Either P.ParseError [Declaration]
-parseDeclarations = flip evalState (P.initialPos "Declarations") . P.runPT parseManyDeclarations () "Declarations"
+parseDeclarations = flip evalState (P.initialPos "Declarations") . P.runPT (parseManyDeclarations <* P.eof) () "Declarations"
 

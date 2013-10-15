@@ -49,7 +49,7 @@ data BinaryOperator
   | Concat deriving (Show, Eq, Data, Typeable)
 
 data Value
-  = NumericLiteral (Either Integer Double)
+  = NumericLiteral String
   | StringLiteral String
   | BooleanLiteral Bool
   | Unary UnaryOperator Value
@@ -77,7 +77,7 @@ data Statement
 data Binder
   = BooleanBinder Bool
   | StringBinder String
-  | NumberBinder (Either Integer Double)
+  | NumberBinder String
   | VarBinder Ident
   | NullaryBinder String
   | UnaryBinder String Binder
