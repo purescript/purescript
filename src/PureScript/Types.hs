@@ -28,7 +28,7 @@ data Type
   | Function [Type] Type
   | TypeVar String
   | TypeConstructor String
-  | TypeApp Type Type deriving (Show, Data, Typeable)
+  | TypeApp Type Type deriving (Show, Eq, Data, Typeable)
 
 data PolyType = PolyType [String] Type deriving (Show, Data, Typeable)
 
@@ -36,7 +36,7 @@ data Row
   = RUnknown Int
   | RowVar String
   | REmpty
-  | RCons String Type Row deriving (Show, Data, Typeable)
+  | RCons String Type Row deriving (Show, Eq, Data, Typeable)
 
 monoType :: Type -> PolyType
 monoType = PolyType []

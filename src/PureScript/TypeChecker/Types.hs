@@ -53,14 +53,47 @@ typeOf :: Ident -> Value -> Check PolyType
 typeOf name val = do
   me <- fresh
   (cs, n) <- typeConstraints (M.singleton name me) val
-  solution <- solveTypeConstraints ((TypeConstraint me (TUnknown n)) : cs) emptyTypeSolution
-  return $ varIfUnknown $ fst (runTypeSolution solution) n
+  let allConstraints = TypeConstraint me (TUnknown n) : cs
+  solution <- solveTypeConstraints allConstraints emptyTypeSolution
+  let ty = fst (runTypeSolution solution) n
+  allUnknownsBecameQuantified allConstraints solution ty
+  return $ varIfUnknown ty
+
+allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
+allUnknownsBecameQuantified cs solution ty = do
+  let
+    typesMentioned = findUnknownTypes ty
+    unknownTypes = nub $ flip concatMap cs $ \c -> case c of
+      TypeConstraint u t -> u : findUnknownTypes t
+      RowConstraint _ r -> findUnknownTypes r
+    unsolvedTypes = filter (\n -> TUnknown n == fst (runTypeSolution solution) n) unknownTypes
+  guardWith "Unsolved type variable" $ null $ unsolvedTypes \\ typesMentioned
+  let
+    rowsMentioned = findUnknownRows ty
+    unknownRows = nub $ flip concatMap cs $ \c -> case c of
+      TypeConstraint _ t -> findUnknownRows t
+      RowConstraint u r -> u : findUnknownRows r
+    unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
+  guardWith ("Unsolved row variable" ++ show (unsolvedRows \\ rowsMentioned) ++ ", " ++ show cs) $ null $ unsolvedRows \\ rowsMentioned
+
+findUnknownTypes :: (Data d) => d -> [Int]
+findUnknownTypes = everything (++) (mkQ [] f)
+  where
+  f :: Type -> [Int]
+  f (TUnknown n) = [n]
+  f _ = []
+
+findUnknownRows :: (Data d) => d -> [Int]
+findUnknownRows = everything (++) (mkQ [] f)
+  where
+  f :: Row -> [Int]
+  f (RUnknown n) = [n]
+  f _ = []
 
 varIfUnknown :: Type -> PolyType
 varIfUnknown ty =
   let
     (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
-    -- TODO : check no nested unknowns
   in
     PolyType (sort $ nub $ M.elems m) ty'
   where
@@ -478,7 +511,7 @@ unifyRows r1 r2 =
   unifyRows' ((name, ty):row) r others (RUnknown u) = do
     u' <- fresh
     cs <- unifyRows' row r others (RUnknown u')
-    return [ RowConstraint u (RCons name ty (RUnknown u')) ]
+    return (RowConstraint u (RCons name ty (RUnknown u')) : cs)
   unifyRows' [] REmpty [] REmpty = return []
   unifyRows' sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ show (fromList (sd1, r1)) ++ " with " ++ show (fromList (sd2, r2)) ++ "."
   toList :: Row -> ([(String, Type)], Row)
