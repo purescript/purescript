@@ -5,7 +5,7 @@ data List a
     ; tail :: List a
     }
 
-null = \l -> case l of
+isNull = \l -> case l of
   Nil -> true
   _ -> false
 
