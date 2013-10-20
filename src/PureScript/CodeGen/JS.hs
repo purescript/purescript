@@ -48,7 +48,7 @@ declToJs _ = Nothing
 literals :: Pattern Value String
 literals = Pattern $ A.Kleisli match
   where
-  match (NumericLiteral n) = Just n
+  match (NumericLiteral n) = Just $ either show show n
   match (StringLiteral s) = Just $ show s
   match (BooleanLiteral True) = Just "true"
   match (BooleanLiteral False) = Just "false"
@@ -177,7 +177,7 @@ binderToJs :: String -> String -> Binder -> Gen String
 binderToJs varName done (StringBinder str) =
   return $ "if (" ++ varName ++ " === \"" ++ str ++ "\") {" ++ done ++ " }"
 binderToJs varName done (NumberBinder num) =
-  return $ "if (" ++ varName ++ " === \"" ++ num ++ "\") {" ++ done ++ " }"
+  return $ "if (" ++ varName ++ " === \"" ++ either show show num ++ "\") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder True) =
   return $ "if (" ++ varName ++ ") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder False) =
@@ -228,12 +228,19 @@ statementToJs (For (init, cond, done) sts) = "for (" ++
   ++ "; " ++ valueToJs cond
   ++ "; " ++ statementToJs done
   ++ ") {" ++ intercalate ";" (map statementToJs sts) ++ "}"
-statementToJs (IfThenElse cond thens elses) = "if ("
+statementToJs (If ifst) = ifStatementToJs ifst
+statementToJs (Return value) = "return " ++ valueToJs value
+
+ifStatementToJs :: IfStatement -> String
+ifStatementToJs (IfStatement cond thens elst) =
+  "if ("
   ++ valueToJs cond ++ ") {"
   ++ intercalate ";" (map statementToJs thens) ++ "}"
-  ++ flip (maybe "") elses (\sts ->
-    " else {" ++ intercalate ";" (map statementToJs sts) ++ "}")
-statementToJs (Return value) = "return " ++ valueToJs value
+  ++ maybe "" elseStatementToJs elst
+
+elseStatementToJs :: ElseStatement -> String
+elseStatementToJs (Else sts) = " else {" ++ intercalate ";" (map statementToJs sts) ++ "}"
+elseStatementToJs (ElseIf ifst) = " else " ++ ifStatementToJs ifst
 
 assignmentTargetToJs :: AssignmentTarget -> String
 assignmentTargetToJs (AssignVariable ident) = identToJs ident

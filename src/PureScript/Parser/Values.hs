@@ -21,68 +21,67 @@ import PureScript.Values
 import qualified PureScript.Parser.Common as C
 import Control.Applicative
 import qualified Text.Parsec as P
-import qualified Text.Parsec.Indent as I
 import Text.Parsec.Expr
 import Control.Monad
 import Control.Arrow (Arrow(..))
 import PureScript.Parser.Types
 import PureScript.Types
 
-booleanLiteral :: I.IndentParser String () Bool
+booleanLiteral :: P.Parsec String P.Column Bool
 booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
 
-parseNumericLiteral :: I.IndentParser String () Value
-parseNumericLiteral = NumericLiteral <$> C.signedNumber
+parseNumericLiteral :: P.Parsec String P.Column Value
+parseNumericLiteral = NumericLiteral <$> C.integerOrFloat
 
-parseStringLiteral :: I.IndentParser String () Value
+parseStringLiteral :: P.Parsec String P.Column Value
 parseStringLiteral = StringLiteral <$> C.stringLiteral
 
-parseBooleanLiteral :: I.IndentParser String () Value
+parseBooleanLiteral :: P.Parsec String P.Column Value
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
-parseArrayLiteral :: I.IndentParser String () Value
-parseArrayLiteral = ArrayLiteral <$> (C.squares $ C.commaSep parseValue)
+parseArrayLiteral :: P.Parsec String P.Column Value
+parseArrayLiteral = ArrayLiteral <$> (C.squares $ parseValue `P.sepBy` (C.indented *> C.comma))
 
-parseObjectLiteral :: I.IndentParser String () Value
-parseObjectLiteral = ObjectLiteral <$> (C.braces $ C.commaSep parseIdentifierAndValue)
+parseObjectLiteral :: P.Parsec String P.Column Value
+parseObjectLiteral = ObjectLiteral <$> (C.braces $ parseIdentifierAndValue `P.sepBy` (C.indented *> C.comma))
 
-parseIdentifierAndValue :: I.IndentParser String () (String, Value)
-parseIdentifierAndValue = do
-  name <- C.lexeme C.identifier
-  C.colon
-  value <- parseValue
-  return (name, value)
+parseIdentifierAndValue :: P.Parsec String P.Column (String, Value)
+parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C.colon)
+                              <*> (C.indented *> parseValue)
 
-parseAbs :: I.IndentParser String () Value
+parseAbs :: P.Parsec String P.Column Value
 parseAbs = do
   C.lexeme $ P.char '\\'
-  args <- C.commaSep C.parseIdent
-  C.lexeme $ P.string "->"
+  args <- (C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma)
+  C.lexeme $ C.indented *> P.string "->"
   value <- parseValue
   return $ Abs args value
 
-parseApp :: I.IndentParser String () Value
+parseApp :: P.Parsec String P.Column Value
 parseApp = App <$> parseValue
-               <*> (C.parens $ C.commaSep parseValue)
+               <*> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
 
-parseVar :: I.IndentParser String () Value
+parseVar :: P.Parsec String P.Column Value
 parseVar = Var <$> C.parseIdent
 
-parseConstructor :: I.IndentParser String () Value
+parseConstructor :: P.Parsec String P.Column Value
 parseConstructor = Constructor <$> C.properName
 
-parseCase :: I.IndentParser String () Value
-parseCase = Case <$> P.between (C.reserved "case") (C.reserved "of") parseValue
-                 <*> I.withPos (C.indentedBlock parseCaseAlternative)
+parseCase :: P.Parsec String P.Column Value
+parseCase = Case <$> (P.between (C.reserved "case") (C.indented *> C.reserved "of") parseValue)
+                 <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
-parseCaseAlternative :: I.IndentParser String () (Binder, Value)
+parseCaseAlternative :: P.Parsec String P.Column (Binder, Value)
 parseCaseAlternative = (,) <$> (parseBinder <* C.lexeme (P.string "->")) <*> parseValue
 
-parseBlock :: I.IndentParser String () Value
-parseBlock = Block <$> (C.braces $ I.withPos $ C.indentedBlock $ parseStatement True)
+parseBlock :: P.Parsec String P.Column Value
+parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
 
-parseValueAtom :: I.IndentParser String () Value
-parseValueAtom = P.choice $ map P.try
+parseManyStatements :: P.Parsec String P.Column [Statement]
+parseManyStatements = C.indented *> (C.mark $ P.many $ C.same *> C.mark parseStatement)
+
+parseValueAtom :: P.Parsec String P.Column Value
+parseValueAtom = C.indented *> P.choice (map P.try
             [ parseNumericLiteral
             , parseStringLiteral
             , parseBooleanLiteral
@@ -93,125 +92,128 @@ parseValueAtom = P.choice $ map P.try
             , parseConstructor
             , parseBlock
             , parseCase
-            , C.parens parseValue ]
+            , C.parens parseValue ])
 
-parseValue :: I.IndentParser String () Value
+parseValue :: P.Parsec String P.Column Value
 parseValue = buildExpressionParser operators $ C.fold (C.lexeme typedValue) (C.lexeme funArgs) App
   where
   typedValue = C.augment parseValueAtom parseTypeAnnotation TypedValue
-  funArgs = C.parens $ C.commaSep parseValue
-  parseTypeAnnotation = C.lexeme (P.string "::") *> parsePolyType
-  operators = [ [ Postfix $ Accessor <$> (C.dot *> C.identifier)
-                , Postfix $ Indexer <$> C.squares parseValue ]
-              , [ Prefix $ C.lexeme (P.try $ C.reservedOp "!") >> return (Unary Not)
-                , Prefix $ C.lexeme (P.try $ C.reservedOp "~") >> return (Unary BitwiseNot)
-                , Prefix $ C.lexeme (P.try $ C.reservedOp "-") >> return (Unary Negate) ]
-              , [ Infix (C.lexeme (P.try C.parseIdentInfix >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "<") >> return (Binary LessThan)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp ">") >> return (Binary GreaterThan)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "*") >> return (Binary Multiply)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp "/") >> return (Binary Divide)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp "%") >> return (Binary Modulus)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "++") >> return (Binary Concat)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp "+") >> return (Binary Add)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp "-") >> return (Binary Subtract)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "<<") >> return (Binary ShiftLeft)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp ">>>") >> return (Binary ZeroFillShiftRight)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp ">>") >> return (Binary ShiftRight)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "==") >> return (Binary EqualTo)) AssocRight
-                , Infix (C.lexeme (P.try $ C.reservedOp "!=") >> return (Binary NotEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "&") >> return (Binary BitwiseAnd)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "^") >> return (Binary BitwiseXor)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "|") >> return (Binary BitwiseOr)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "&&") >> return (Binary And)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.reservedOp "||") >> return (Binary Or)) AssocRight ]
+  funArgs = C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma))
+  parseTypeAnnotation = P.try $ C.lexeme (C.indented *> P.string "::") *> parsePolyType
+  operators = [ [ Postfix $ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
+                , Postfix $ Indexer <$> (C.indented *> C.squares parseValue) ]
+              , [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
+                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
+                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate) ]
+              , [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix) >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<") >> return (Binary LessThan)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">") >> return (Binary GreaterThan)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "*") >> return (Binary Multiply)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "/") >> return (Binary Divide)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "%") >> return (Binary Modulus)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "++") >> return (Binary Concat)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return (Binary Add)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Binary Subtract)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<<") >> return (Binary ShiftLeft)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">>>") >> return (Binary ZeroFillShiftRight)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">>") >> return (Binary ShiftRight)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "==") >> return (Binary EqualTo)) AssocRight
+                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "!=") >> return (Binary NotEqualTo)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "&") >> return (Binary BitwiseAnd)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "^") >> return (Binary BitwiseXor)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "|") >> return (Binary BitwiseOr)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "&&") >> return (Binary And)) AssocRight ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "||") >> return (Binary Or)) AssocRight ]
               ]
 
-parseVariableIntroduction :: Bool -> I.IndentParser String () Statement
-parseVariableIntroduction requireSemi = do
+parseVariableIntroduction :: P.Parsec String P.Column Statement
+parseVariableIntroduction = do
   C.reserved "var"
-  name <- C.parseIdent
-  C.lexeme $ P.char '='
+  name <- C.indented *> C.parseIdent
+  C.lexeme $ C.indented *> P.char '='
   value <- parseValue
-  when requireSemi (void C.semi)
   return $ VariableIntroduction name value
 
-parseAssignment :: Bool -> I.IndentParser String () (Statement)
-parseAssignment requireSemi = do
+parseAssignment :: P.Parsec String P.Column Statement
+parseAssignment = do
   tgt <- parseAssignmentTarget
-  C.lexeme $ P.char '='
+  C.lexeme $ C.indented *> P.char '='
   value <- parseValue
-  when requireSemi (void C.semi)
   return $ Assignment tgt value
 
-parseManyStatements :: I.IndentParser String () [Statement]
-parseManyStatements = C.braces $ I.withPos $ C.indentedBlock $ parseStatement True
-
-parseWhile :: I.IndentParser String () Statement
-parseWhile = While <$> (C.reserved "while" *> C.parens parseValue)
+parseWhile :: P.Parsec String P.Column Statement
+parseWhile = While <$> (C.reserved "while" *> C.indented *> parseValue <* C.indented <* C.colon)
                    <*> parseManyStatements
 
-parseFor :: I.IndentParser String () Statement
-parseFor = For <$> (C.reserved "for" *> C.parens forIntro)
+parseFor :: P.Parsec String P.Column Statement
+parseFor = For <$> (C.reserved "for" *> C.indented *> C.parens forIntro <* C.indented <* C.colon)
                <*> parseManyStatements
   where
-  forIntro = (,,) <$> parseStatement False
-                  <*> (C.semi *> parseValue)
-                  <*> (C.semi *> parseStatement False)
+  forIntro = (,,) <$> (C.indented *> parseStatement)
+                  <*> (C.indented *> C.semi *> C.indented *> parseValue)
+                  <*> (C.indented *> C.semi *> C.indented *> parseStatement)
 
-parseIfThenElse :: I.IndentParser String () Statement
-parseIfThenElse = IfThenElse
-                    <$> (C.reserved "if" *> C.parens parseValue)
-                    <*> parseManyStatements
-                    <*> P.optionMaybe (C.reserved "else" *> parseManyStatements)
+parseIf :: P.Parsec String P.Column Statement
+parseIf = If <$> parseIfStatement
 
-parseReturn :: Bool -> I.IndentParser String () Statement
-parseReturn requireSemi = Return <$> (C.reserved "return" *> parseValue <* when requireSemi (void C.semi))
+parseIfStatement :: P.Parsec String P.Column IfStatement
+parseIfStatement =
+  IfStatement <$> (C.reserved "if" *> C.indented *> parseValue <* C.indented <* C.colon)
+              <*> parseManyStatements
+              <*> P.optionMaybe (C.same *> parseElseStatement)
 
-parseStatement :: Bool -> I.IndentParser String () Statement
-parseStatement requireSemi = P.choice $ map P.try
-                 [ parseVariableIntroduction requireSemi
-                 , parseAssignment requireSemi
+parseElseStatement :: P.Parsec String P.Column ElseStatement
+parseElseStatement = C.reserved "else" >> (ElseIf <$> (C.indented *> parseIfStatement)
+                                           <|> Else <$> (C.indented *> C.colon *> parseManyStatements))
+
+parseReturn :: P.Parsec String P.Column Statement
+parseReturn = Return <$> (C.reserved "return" *> parseValue)
+
+parseStatement :: P.Parsec String P.Column Statement
+parseStatement = P.choice (map P.try
+                 [ parseVariableIntroduction
+                 , parseAssignment
                  , parseWhile
                  , parseFor
-                 , parseIfThenElse
-                 , parseReturn requireSemi ]
+                 , parseIf
+                 , parseReturn ])
 
-parseStringBinder :: I.IndentParser String () Binder
+parseStringBinder :: P.Parsec String P.Column Binder
 parseStringBinder = StringBinder <$> C.stringLiteral
 
-parseBooleanBinder :: I.IndentParser String () Binder
+parseBooleanBinder :: P.Parsec String P.Column Binder
 parseBooleanBinder = BooleanBinder <$> booleanLiteral
 
-parseNumberBinder :: I.IndentParser String () Binder
-parseNumberBinder = NumberBinder <$> C.signedNumber
+parseNumberBinder :: P.Parsec String P.Column Binder
+parseNumberBinder = NumberBinder <$> C.integerOrFloat
 
-parseVarBinder :: I.IndentParser String () Binder
+parseVarBinder :: P.Parsec String P.Column Binder
 parseVarBinder = VarBinder <$> C.parseIdent
 
-parseNullaryBinder :: I.IndentParser String () Binder
+parseNullaryBinder :: P.Parsec String P.Column Binder
 parseNullaryBinder = NullaryBinder <$> C.lexeme C.properName
 
-parseUnaryBinder :: I.IndentParser String () Binder
-parseUnaryBinder = UnaryBinder <$> C.lexeme C.properName <*> parseBinder
+parseUnaryBinder :: P.Parsec String P.Column Binder
+parseUnaryBinder = UnaryBinder <$> C.lexeme C.properName <*> (C.indented *> parseBinder)
 
-parseObjectBinder :: I.IndentParser String () Binder
-parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep parseIdentifierAndBinder)
+parseObjectBinder :: P.Parsec String P.Column Binder
+parseObjectBinder = ObjectBinder <$> C.braces ((C.indented *> parseIdentifierAndBinder) `P.sepBy` (C.indented *> C.comma))
 
-parseArrayBinder :: I.IndentParser String () Binder
-parseArrayBinder = C.squares $ ArrayBinder <$> (C.commaSep parseBinder) <*> P.optionMaybe (C.colon *> parseBinder)
+parseArrayBinder :: P.Parsec String P.Column Binder
+parseArrayBinder = C.squares $ ArrayBinder <$> ((C.indented *> parseBinder) `P.sepBy` (C.indented *> C.comma))
+                                           <*> P.optionMaybe (C.indented *> C.colon *> C.indented *> parseBinder)
 
-parseIdentifierAndBinder :: I.IndentParser String () (String, Binder)
+parseIdentifierAndBinder :: P.Parsec String P.Column (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme C.identifier
-  C.lexeme $ P.char '='
-  binder <- parseBinder
+  C.lexeme $ C.indented *> P.char '='
+  binder <- C.indented *> parseBinder
   return (name, binder)
 
-parseBinder :: I.IndentParser String () Binder
-parseBinder = P.choice $ map P.try
+parseBinder :: P.Parsec String P.Column Binder
+parseBinder = P.choice (map P.try
                   [ parseStringBinder
                   , parseBooleanBinder
                   , parseNumberBinder
@@ -220,10 +222,10 @@ parseBinder = P.choice $ map P.try
                   , parseNullaryBinder
                   , parseObjectBinder
                   , parseArrayBinder
-                  , C.parens parseBinder ]
+                  , C.parens parseBinder ])
 
-parseAssignmentTarget :: I.IndentParser String () AssignmentTarget
+parseAssignmentTarget :: P.Parsec String P.Column AssignmentTarget
 parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.parseIdent)
   where
-  operators = [ [ Postfix $ AssignArrayIndex <$> C.squares parseValue
-                , Postfix $ AssignObjectProperty <$> (C.dot *> C.identifier) ] ]
+  operators = [ [ Postfix $ AssignArrayIndex <$> (C.indented *> C.squares parseValue)
+                , Postfix $ AssignObjectProperty <$> (C.indented *> C.dot *> C.indented *> C.identifier) ] ]

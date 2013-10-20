@@ -383,15 +383,9 @@ typeConstraintsForStatement m mass ret (While val inner) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
   return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (IfThenElse val thens Nothing) = do
-  (cs1, n1) <- typeConstraints m val
-  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret thens
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (IfThenElse val thens (Just elses)) = do
-  (cs1, n1) <- typeConstraints m val
-  (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
-  (cs3, allCodePathsReturn2, _) <- typeConstraintsForBlock m mass ret elses
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2, mass)
+typeConstraintsForStatement m mass ret (If ifst) = do
+  (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
+  return $ (cs, allCodePathsReturn, mass)
 typeConstraintsForStatement m mass ret (For (init, cond, cont) inner) = do
   (cs1, b1, mass1) <- typeConstraintsForStatement m mass ret init
   guardWith "Cannot return from inside for" $ not b1
@@ -403,6 +397,25 @@ typeConstraintsForStatement m mass ret (For (init, cond, cont) inner) = do
 typeConstraintsForStatement m mass ret (Return val) = do
   (cs1, n1) <- typeConstraints (m `M.union` mass) val
   return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, mass)
+
+typeConstraintsForIfStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> IfStatement -> Check ([TypeConstraint], Bool)
+typeConstraintsForIfStatement m mass ret (IfStatement val thens Nothing) = do
+  (cs1, n1) <- typeConstraints m val
+  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret thens
+  return ((TypeConstraint n1 Boolean) : cs1 ++ cs2, allCodePathsReturn)
+typeConstraintsForIfStatement m mass ret (IfStatement val thens (Just elses)) = do
+  (cs1, n1) <- typeConstraints m val
+  (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
+  (cs3, allCodePathsReturn2) <- typeConstraintsForElseStatement m mass ret elses
+  return ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2)
+
+typeConstraintsForElseStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> ElseStatement -> Check ([TypeConstraint], Bool)
+typeConstraintsForElseStatement m mass ret (Else elses) = do
+  (cs, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret elses
+  return (cs, allCodePathsReturn)
+typeConstraintsForElseStatement m mass ret (ElseIf ifst) = do
+  (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
+  return (cs, allCodePathsReturn)
 
 typeConstraintsForAssignmentTarget :: M.Map Ident Int -> M.Map Ident Int -> Int -> AssignmentTarget -> Check [TypeConstraint]
 typeConstraintsForAssignmentTarget m mass nval (AssignVariable var) =

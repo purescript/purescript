@@ -20,13 +20,14 @@ import Data.List (intercalate)
 import System.Console.CmdTheLine
 import Control.Applicative
 import System.Exit (exitSuccess, exitFailure)
+import qualified Text.Parsec as P
 import qualified System.IO.UTF8 as U
 import qualified Data.Map as M
 
 compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile inputFiles outputFile externsFile = do
   input <- fmap concat $ mapM U.readFile inputFiles
-  let ast = parseDeclarations input
+  let ast = runIndentParser 0 parseDeclarations input
   case ast of
     Left err -> do
       U.print err

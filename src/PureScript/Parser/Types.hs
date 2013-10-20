@@ -22,39 +22,38 @@ import PureScript.Types
 import PureScript.Parser.Common
 import Control.Applicative
 import qualified Text.Parsec as P
-import qualified Text.Parsec.Indent as I
 import Control.Arrow (Arrow(..))
 
-parseNumber :: I.IndentParser String () Type
+parseNumber :: P.Parsec String P.Column Type
 parseNumber = const Number <$> P.string "Number"
 
-parseString :: I.IndentParser String () Type
+parseString :: P.Parsec String P.Column Type
 parseString = const String <$> P.string "String"
 
-parseBoolean :: I.IndentParser String () Type
+parseBoolean :: P.Parsec String P.Column Type
 parseBoolean = const Boolean <$> P.string "Boolean"
 
-parseArray :: I.IndentParser String () Type
+parseArray :: P.Parsec String P.Column Type
 parseArray = squares $ Array <$> parseType
 
-parseObject :: I.IndentParser String () Type
+parseObject :: P.Parsec String P.Column Type
 parseObject = braces $ Object <$> parseRow
 
-parseFunction :: I.IndentParser String () Type
+parseFunction :: P.Parsec String P.Column Type
 parseFunction = do
   args <- lexeme $ parens $ commaSep parseType
   lexeme $ P.string "->"
   resultType <- parseType
   return $ Function args resultType
 
-parseTypeVariable :: I.IndentParser String () Type
+parseTypeVariable :: P.Parsec String P.Column Type
 parseTypeVariable = TypeVar <$> identifier
 
-parseTypeConstructor :: I.IndentParser String () Type
+parseTypeConstructor :: P.Parsec String P.Column Type
 parseTypeConstructor = TypeConstructor <$> properName
 
-parseTypeAtom :: I.IndentParser String () Type
-parseTypeAtom = P.choice $ map P.try
+parseTypeAtom :: P.Parsec String P.Column Type
+parseTypeAtom = indented *> P.choice (map P.try
             [ parseNumber
             , parseString
             , parseBoolean
@@ -63,23 +62,23 @@ parseTypeAtom = P.choice $ map P.try
             , parseFunction
             , parseTypeVariable
             , parseTypeConstructor
-            , parens parseType ]
+            , parens parseType ])
 
-parsePolyType :: I.IndentParser String () PolyType
-parsePolyType = PolyType <$> (P.option [] (reserved "forall" *> many identifier <* dot))
+parsePolyType :: P.Parsec String P.Column PolyType
+parsePolyType = PolyType <$> (P.option [] (indented *> reserved "forall" *> many (indented *> identifier) <* indented <* dot))
                          <*> parseType
 
-parseType :: I.IndentParser String () Type
+parseType :: P.Parsec String P.Column Type
 parseType = fold (lexeme parseTypeAtom) (lexeme parseTypeAtom) TypeApp
 
-parseNameAndType :: I.IndentParser String () (String, Type)
-parseNameAndType = (,) <$> (identifier <* lexeme (P.string "::")) <*> parseType
+parseNameAndType :: P.Parsec String P.Column (String, Type)
+parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parseType
 
-parseRowEnding :: I.IndentParser String () Row
-parseRowEnding = P.option REmpty (RowVar <$> (lexeme (P.char '|') *> identifier))
+parseRowEnding :: P.Parsec String P.Column Row
+parseRowEnding = P.option REmpty (RowVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
-parseRow :: I.IndentParser String () Row
-parseRow = fromList <$> semiSep parseNameAndType <*> parseRowEnding
+parseRow :: P.Parsec String P.Column Row
+parseRow = fromList <$> (parseNameAndType `P.sepBy` (indented *> semi)) <*> parseRowEnding
   where
   fromList :: [(String, Type)] -> Row -> Row
   fromList [] r = r

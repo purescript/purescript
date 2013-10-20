@@ -26,7 +26,6 @@ import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
-import qualified Text.Parsec.Indent as I
 
 import PureScript.Values
 import PureScript.Types
@@ -35,28 +34,37 @@ import PureScript.Declarations
 import PureScript.Parser.Values
 import PureScript.Parser.Types
 
-parseDataDeclaration :: I.IndentParser String () Declaration
+parseDataDeclaration :: P.Parsec String P.Column Declaration
 parseDataDeclaration = do
   reserved "data"
-  name <- properName
-  tyArgs <- many identifier
-  lexeme $ P.char '='
-  ctors <- P.sepBy1 ((,) <$> properName <*> P.optionMaybe parseType) (lexeme $ P.char '|')
+  name <- indented *> properName
+  tyArgs <- many (indented *> identifier)
+  lexeme $ indented *> P.char '='
+  ctors <- P.sepBy1 ((,) <$> (indented *> properName) <*> P.optionMaybe parseType) (lexeme $ indented *> P.char '|')
   return $ DataDeclaration name tyArgs ctors
 
-parseTypeDeclaration :: I.IndentParser String () Declaration
-parseTypeDeclaration = TypeDeclaration <$> parseIdent <*> (lexeme (P.string "::") *> parsePolyType)
+parseTypeDeclaration :: P.Parsec String P.Column Declaration
+parseTypeDeclaration =
+  TypeDeclaration <$> parseIdent
+                  <*> (lexeme (indented *> P.string "::") *> parsePolyType)
 
-parseTypeSynonymDeclaration :: I.IndentParser String () Declaration
-parseTypeSynonymDeclaration = TypeSynonymDeclaration <$> (reserved "type" *> properName) <*> many identifier <*> (lexeme (P.char '=') *> parseType)
+parseTypeSynonymDeclaration :: P.Parsec String P.Column Declaration
+parseTypeSynonymDeclaration =
+  TypeSynonymDeclaration <$> (reserved "type" *> indented *> properName)
+                         <*> many (indented *> identifier)
+                         <*> (lexeme (indented *> P.char '=') *> parseType)
 
-parseValueDeclaration :: I.IndentParser String () Declaration
-parseValueDeclaration = ValueDeclaration <$> parseIdent <*> (lexeme (P.char '=') *> parseValue)
+parseValueDeclaration :: P.Parsec String P.Column Declaration
+parseValueDeclaration =
+  ValueDeclaration <$> parseIdent
+                   <*> (lexeme (indented *> P.char '=') *> parseValue)
 
-parseExternDeclaration :: I.IndentParser String () Declaration
-parseExternDeclaration = ExternDeclaration <$> (reserved "extern" *> parseIdent) <*> (lexeme (P.string "::") *> parsePolyType)
+parseExternDeclaration :: P.Parsec String P.Column Declaration
+parseExternDeclaration =
+  ExternDeclaration <$> (reserved "extern" *> indented *> parseIdent)
+                    <*> (lexeme (indented *> P.string "::") *> parsePolyType)
 
-parseDeclaration :: I.IndentParser String () Declaration
+parseDeclaration :: P.Parsec String P.Column Declaration
 parseDeclaration = P.choice $ map P.try
                    [ parseDataDeclaration
                    , parseTypeDeclaration
@@ -64,9 +72,5 @@ parseDeclaration = P.choice $ map P.try
                    , parseValueDeclaration
                    , parseExternDeclaration ]
 
-parseManyDeclarations :: I.IndentParser String () [Declaration]
-parseManyDeclarations = I.withPos $ unindentedBlock parseDeclaration
-
-parseDeclarations :: String -> Either P.ParseError [Declaration]
-parseDeclarations = flip evalState (P.initialPos "Declarations") . P.runPT (parseManyDeclarations <* P.eof) () "Declarations"
-
+parseDeclarations :: P.Parsec String P.Column [Declaration]
+parseDeclarations = whiteSpace *> mark (same *> P.many parseDeclaration) <* P.eof

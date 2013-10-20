@@ -1,7 +1,5 @@
-test = \ -> {
-    var x = [];
-    for (var i = 0; i < 10; i = i + 1) {
-      x[i] = i;
-    }
-    return x;
-  }
+test = \ -> do
+  var x = []
+  for (var i = 0; i < 10; i = i + 1):
+    x[i] = i
+  return x

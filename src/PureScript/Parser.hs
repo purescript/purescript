@@ -13,11 +13,13 @@
 -----------------------------------------------------------------------------
 
 module PureScript.Parser (
+    module PureScript.Parser.Common,
     module PureScript.Parser.Types,
     module PureScript.Parser.Values,
     module PureScript.Parser.Declarations
 ) where
 
+import PureScript.Parser.Common
 import PureScript.Parser.Types
 import PureScript.Parser.Values
 import PureScript.Parser.Declarations

@@ -49,7 +49,7 @@ data BinaryOperator
   | Concat deriving (Show, Eq, Data, Typeable)
 
 data Value
-  = NumericLiteral String
+  = NumericLiteral (Either Integer Double)
   | StringLiteral String
   | BooleanLiteral Bool
   | Unary UnaryOperator Value
@@ -71,13 +71,19 @@ data Statement
   | Assignment AssignmentTarget Value
   | While Value [Statement]
   | For (Statement, Value, Statement) [Statement]
-  | IfThenElse (Value) [Statement] (Maybe [Statement])
+  | If IfStatement
   | Return Value deriving (Show, Data, Typeable)
+
+data IfStatement = IfStatement Value [Statement] (Maybe ElseStatement) deriving (Show, Data, Typeable)
+
+data ElseStatement
+  = Else [Statement]
+  | ElseIf IfStatement deriving (Show, Data, Typeable)
 
 data Binder
   = BooleanBinder Bool
   | StringBinder String
-  | NumberBinder String
+  | NumberBinder (Either Integer Double)
   | VarBinder Ident
   | NullaryBinder String
   | UnaryBinder String Binder

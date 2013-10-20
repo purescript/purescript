@@ -19,3 +19,4 @@ concat = \l1 -> \l2 -> case l1 of
 flatten = \xss -> case xss of 
   Nil -> Nil
   Cons cons -> concat(cons.head)(flatten(cons.tail))
+
