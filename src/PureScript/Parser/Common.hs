@@ -138,6 +138,9 @@ fold first more combine = do
   bs <- P.many more
   return $ foldl combine a bs
 
+buildPostfixParser :: P.Stream s m t => [P.ParsecT s u m (a -> a)] -> P.ParsecT s u m a -> P.ParsecT s u m a
+buildPostfixParser f x = fold x (P.choice (map P.try f)) (flip ($))
+
 parseIdent :: P.Parsec String u Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
 
