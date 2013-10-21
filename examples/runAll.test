@@ -13,3 +13,11 @@ mkdir -p tests &&  ../dist/build/psc/psc List.ps -o tests/List.js && cat tests/L
 [ 1, 2 ]
 >>>2
 >>>= 0
+
+# Foreach
+mkdir -p tests &&  ../dist/build/psc/psc Foreach.ps -o tests/Foreach.js && cat tests/Foreach.js Foreach.js | node
+<<<
+>>>
+15
+>>>2
+>>>= 0

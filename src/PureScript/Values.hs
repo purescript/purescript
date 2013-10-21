@@ -70,7 +70,8 @@ data Statement
   = VariableIntroduction Ident Value
   | Assignment AssignmentTarget Value
   | While Value [Statement]
-  | For (Statement, Value, Statement) [Statement]
+  | For Ident Value Value [Statement]
+  | ForEach Ident Value [Statement]
   | If IfStatement
   | Return Value deriving (Show, Data, Typeable)
 

@@ -223,11 +223,14 @@ statementToJs (Assignment target value) = assignmentTargetToJs target ++ " = " +
 statementToJs (While cond sts) = "while ("
   ++ valueToJs cond ++ ") {"
   ++ intercalate ";" (map statementToJs sts) ++ "}"
-statementToJs (For (init, cond, done) sts) = "for (" ++
-  statementToJs init
-  ++ "; " ++ valueToJs cond
-  ++ "; " ++ statementToJs done
-  ++ ") {" ++ intercalate ";" (map statementToJs sts) ++ "}"
+statementToJs (For ident start end sts) = "for (" ++
+  identToJs ident ++ " = " ++ valueToJs start ++ ";"
+  ++ identToJs ident ++ " < " ++ valueToJs end ++ ";"
+  ++ identToJs ident ++ "++) {"
+  ++ intercalate ";" (map statementToJs sts) ++ "}"
+statementToJs (ForEach ident arr sts) = valueToJs arr
+  ++ ".forEach(function(" ++ identToJs ident ++ ") {"
+  ++ intercalate ";" (map statementToJs sts) ++ "})"
 statementToJs (If ifst) = ifStatementToJs ifst
 statementToJs (Return value) = "return " ++ valueToJs value
 

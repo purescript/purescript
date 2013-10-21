@@ -34,6 +34,7 @@ reservedNames = [ "case"
                 , "val"
                 , "while"
                 , "for"
+                , "foreach"
                 , "if"
                 , "then"
                 , "else"
@@ -42,7 +43,9 @@ reservedNames = [ "case"
                 , "false"
                 , "extern"
                 , "forall"
-                , "do" ]
+                , "do"
+                , "until"
+                , "in" ]
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"

@@ -148,12 +148,15 @@ parseWhile = While <$> (C.reserved "while" *> C.indented *> parseValue <* C.inde
                    <*> parseManyStatements
 
 parseFor :: P.Parsec String P.Column Statement
-parseFor = For <$> (C.reserved "for" *> C.indented *> C.parens forIntro <* C.indented <* C.colon)
+parseFor = For <$> (C.reserved "for" *> C.indented *> C.parseIdent)
+               <*> (C.indented *> C.lexeme (P.string "<-") *> parseValue)
+               <*> (C.indented *> C.reserved "until" *> parseValue <* C.colon)
                <*> parseManyStatements
-  where
-  forIntro = (,,) <$> (C.indented *> parseStatement)
-                  <*> (C.indented *> C.semi *> C.indented *> parseValue)
-                  <*> (C.indented *> C.semi *> C.indented *> parseStatement)
+
+parseForEach :: P.Parsec String P.Column Statement
+parseForEach = ForEach <$> (C.reserved "foreach" *> C.indented *> C.parseIdent)
+                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.colon)
+                       <*> parseManyStatements
 
 parseIf :: P.Parsec String P.Column Statement
 parseIf = If <$> parseIfStatement
@@ -177,6 +180,7 @@ parseStatement = P.choice (map P.try
                  , parseAssignment
                  , parseWhile
                  , parseFor
+                 , parseForEach
                  , parseIf
                  , parseReturn ])
 

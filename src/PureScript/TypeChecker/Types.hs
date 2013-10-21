@@ -368,13 +368,17 @@ typeConstraintsForBinders m nval ret ((binder, val):bs) = do
   cs3 <- typeConstraintsForBinders m nval ret bs
   return ((TypeConstraint n2 (TUnknown ret)) : cs1 ++ cs2 ++ cs3)
 
+assignVariable :: Ident -> M.Map Ident Int -> Check ()
+assignVariable name m =
+  case M.lookup name m of
+    Nothing -> return ()
+    Just _ -> throwError $ "Variable with name " ++ show name ++ " already exists."
+
 typeConstraintsForStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> Statement -> Check ([TypeConstraint], Bool, M.Map Ident Int)
 typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
-  case M.lookup name (m `M.union` mass) of
-    Nothing -> do
-      (cs1, n1) <- typeConstraints m val
-      return $ (cs1, False, M.insert name n1 mass)
-    Just ty -> throwError $ "Variable with name " ++ show name ++ " already exists."
+  assignVariable name (m `M.union` mass)
+  (cs1, n1) <- typeConstraints m val
+  return $ (cs1, False, M.insert name n1 mass)
 typeConstraintsForStatement m mass ret (Assignment tgt val) = do
   (cs1, n1) <- typeConstraints m val
   cs2 <- typeConstraintsForAssignmentTarget m mass n1 tgt
@@ -386,14 +390,21 @@ typeConstraintsForStatement m mass ret (While val inner) = do
 typeConstraintsForStatement m mass ret (If ifst) = do
   (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
   return $ (cs, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (For (init, cond, cont) inner) = do
-  (cs1, b1, mass1) <- typeConstraintsForStatement m mass ret init
-  guardWith "Cannot return from inside for" $ not b1
-  (cs2, n1) <- typeConstraints (m `M.union` mass1) cond
-  (cs3, b2, mass2) <- typeConstraintsForStatement (m `M.union` mass1) mass1 ret cont
-  guardWith "Cannot return from inside for" $ not b2
-  (cs4, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass2) mass2 ret inner
-  return $ ((TypeConstraint n1 Boolean) : cs1 ++ cs2 ++ cs3 ++ cs4, allCodePathsReturn, mass)
+typeConstraintsForStatement m mass ret (For ident start end inner) = do
+  assignVariable ident (m `M.union` mass)
+  (cs1, n1) <- typeConstraints (m `M.union` mass) start
+  (cs2, n2) <- typeConstraints (m `M.union` mass) end
+  let mass1 = M.insert ident n1 mass
+  (cs3, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
+  return $ ((TypeConstraint n1 Number) : (TypeConstraint n2 Number) : cs1 ++ cs2 ++ cs3, allCodePathsReturn, mass)
+typeConstraintsForStatement m mass ret (ForEach ident vals inner) = do
+  assignVariable ident (m `M.union` mass)
+  val <- fresh
+  (cs1, n1) <- typeConstraints (m `M.union` mass) vals
+  let mass1 = M.insert ident val mass
+  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
+  guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
+  return $ ((TypeConstraint n1 (Array (TUnknown val))) : cs1 ++ cs2, False, mass)
 typeConstraintsForStatement m mass ret (Return val) = do
   (cs1, n1) <- typeConstraints (m `M.union` mass) val
   return ((TypeConstraint n1 (TUnknown ret)) : cs1, True, mass)
