@@ -22,6 +22,7 @@ import PureScript.Types
 import PureScript.Parser.Common
 import Control.Applicative
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Expr as P
 import Control.Arrow (Arrow(..))
 
 parseNumber :: P.Parsec String P.Column Type
@@ -69,7 +70,11 @@ parsePolyType = PolyType <$> (P.option [] (indented *> reserved "forall" *> many
                          <*> parseType
 
 parseType :: P.Parsec String P.Column Type
-parseType = fold (lexeme parseTypeAtom) (lexeme parseTypeAtom) TypeApp
+parseType = P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom
+  where
+  postfixTable :: [P.Parsec String P.Column (Type -> Type)]
+  postfixTable = [ flip TypeApp <$> parseTypeAtom ]
+  operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocLeft ] ]
 
 parseNameAndType :: P.Parsec String P.Column (String, Type)
 parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parseType

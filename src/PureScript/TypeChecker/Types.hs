@@ -83,6 +83,13 @@ findUnknownTypes = everything (++) (mkQ [] f)
   f (TUnknown n) = [n]
   f _ = []
 
+findTypeVars :: (Data d) => d -> [String]
+findTypeVars = everything (++) (mkQ [] f)
+  where
+  f :: Type -> [String]
+  f (TypeVar v) = [v]
+  f _ = []
+
 findUnknownRows :: (Data d) => d -> [Int]
 findUnknownRows = everything (++) (mkQ [] f)
   where
@@ -95,7 +102,7 @@ varIfUnknown ty =
   let
     (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
   in
-    PolyType (sort $ nub $ M.elems m) ty'
+    PolyType (sort $ nub $ M.elems m ++ findTypeVars ty) ty'
   where
   f :: Type -> State (M.Map Int String) Type
   f (TUnknown n) = do

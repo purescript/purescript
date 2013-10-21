@@ -66,6 +66,12 @@ typeApp = Pattern $ A.Kleisli match
   match (TypeApp f x) = Just (f, x)
   match _ = Nothing
 
+singleArgumentFunction :: Pattern Type (Type, Type)
+singleArgumentFunction = Pattern $ A.Kleisli match
+  where
+  match (Function [arg] ret) = Just (arg, ret)
+  match _ = Nothing
+
 function :: Pattern Type ([Type], Type)
 function = Pattern $ A.Kleisli match
   where
@@ -81,6 +87,7 @@ typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   operators =
     OperatorTable $ [ AssocL typeApp $ \f x -> f ++ " " ++ x
                     , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret
+                    , AssocL singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
                     ]
 
 polyTypeToPs :: PolyType -> String
