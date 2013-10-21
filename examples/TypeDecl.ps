@@ -7,6 +7,6 @@ k = \x -> \y -> x
 iterate :: forall a. (Number) -> ((a) -> a) -> (a) -> a
 iterate = \n -> \f -> \a -> do
   var result = a
-  for (var i = 0; i < n; i = i + 1):
+  for i <- 0 until n:
     result = f(result)
   return result
