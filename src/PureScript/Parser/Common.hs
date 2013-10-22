@@ -28,6 +28,7 @@ import PureScript.Names
 
 reservedNames :: [String]
 reservedNames = [ "case"
+                , "of"
                 , "data"
                 , "type"
                 , "var"
@@ -69,7 +70,7 @@ reservedNames = [ "case"
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&", "^", "|", "&&", "||" ]
+                  , "==", "!=", "&", "^", "|", "&&", "||", "->" ]
 
 identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_$"
@@ -129,7 +130,7 @@ properName :: P.Parsec String u String
 properName = lexeme $ P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
 
 integerOrFloat :: P.Parsec String u (Either Integer Double)
-integerOrFloat = Left <$> P.try (PT.integer tokenParser) <|>
+integerOrFloat = Left <$> P.try (PT.natural tokenParser) <|>
                  Right <$> P.try (PT.float tokenParser)
 
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a

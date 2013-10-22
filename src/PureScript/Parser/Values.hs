@@ -95,15 +95,18 @@ parseValueAtom = C.indented *> P.choice (map P.try
             , C.parens parseValue ])
 
 parseValue :: P.Parsec String P.Column Value
-parseValue = buildExpressionParser operators . C.buildPostfixParser postfixTable $ parseValueAtom
+parseValue = buildExpressionParser operators . C.buildPostfixParser postfixTable2 $ indexersAndAccessors
   where
-  postfixTable = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                 , Indexer <$> (C.indented *> C.squares parseValue)
-                 , flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
-                 , flip TypedValue <$> (P.try $ C.lexeme (C.indented *> P.string "::") *> parsePolyType) ]
+  indexersAndAccessors = C.buildPostfixParser postfixTable1 $ parseValueAtom
+  postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
+                  , Indexer <$> (C.indented *> C.squares parseValue) ]
+  postfixTable2 = [ C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])
+                  , flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
+                  , flip TypedValue <$> (P.try $ C.lexeme (C.indented *> P.string "::") *> parsePolyType) ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
-                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate) ]
+                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
+                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               , [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix) >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
                 , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]

@@ -170,7 +170,7 @@ binderToJs :: String -> String -> Binder -> Gen String
 binderToJs varName done (StringBinder str) =
   return $ "if (" ++ varName ++ " === \"" ++ str ++ "\") {" ++ done ++ " }"
 binderToJs varName done (NumberBinder num) =
-  return $ "if (" ++ varName ++ " === \"" ++ either show show num ++ "\") {" ++ done ++ " }"
+  return $ "if (" ++ varName ++ " === " ++ either show show num ++ ") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder True) =
   return $ "if (" ++ varName ++ ") {" ++ done ++ " }"
 binderToJs varName done (BooleanBinder False) =
