@@ -15,19 +15,19 @@ data-dir: ""
 library
     build-depends: base -any, syb -any, cmdtheline -any,
                    containers -any, mtl -any, parsec -any, utf8-string -any
-    exposed-modules: PureScript
+    exposed-modules: PureScript PureScript.Declarations PureScript.Names PureScript.TypeChecker.Synonyms
+                     PureScript.CodeGen.Externs PureScript.CodeGen.JS
+                     PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common Main
+                     PureScript.CodeGen PureScript.Kinds PureScript.Parser
+                     PureScript.TypeChecker PureScript.Types PureScript.Values
+                     PureScript.Parser.Common PureScript.Parser.Declarations
+                     PureScript.Parser.Types PureScript.Parser.Values
+                     PureScript.TypeChecker.Kinds PureScript.TypeChecker.Monad
+                     PureScript.TypeChecker.Types
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.Names PureScript.TypeChecker.Synonyms
-                   PureScript.CodeGen.Externs PureScript.CodeGen.JS
-                   PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common Main
-                   PureScript.CodeGen PureScript.Kinds PureScript.Parser
-                   PureScript.TypeChecker PureScript.Types PureScript.Values
-                   PureScript.Parser.Common PureScript.Parser.Declarations
-                   PureScript.Parser.Types PureScript.Parser.Values
-                   PureScript.TypeChecker.Kinds PureScript.TypeChecker.Monad
-                   PureScript.TypeChecker.Types
+    other-modules:
 
 executable psc
     build-depends: base -any, cmdtheline -any, containers -any,
@@ -35,7 +35,4 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.Names PureScript.TypeChecker.Synonyms
-                   PureScript.CodeGen.Externs PureScript.CodeGen.JS
-                   PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common
-
+    other-modules:

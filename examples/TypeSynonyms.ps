@@ -1,9 +1,9 @@
 type Lens a b = 
-  { get :: (a) -> b
-  ; set :: (a) -> (b) -> b
+  { get :: a -> b
+  ; set :: a -> b -> b
   }
 
-composeLenses :: forall a b c. (Lens a b) -> (Lens b c) -> Lens a c
+composeLenses :: forall a b c. Lens a b -> Lens b c -> Lens a c
 composeLenses = \l1 -> \l2 ->
   { get: \a -> l2.get(l1.get(a))
   , set: \a -> \c -> do

@@ -17,6 +17,7 @@ module PureScript (
     module PureScript.Types,
     module PureScript.Kinds,
     module PureScript.Declarations,
+    module PureScript.Names,
     module PureScript.Parser,
     module PureScript.CodeGen,
     module PureScript.TypeChecker
@@ -26,6 +27,7 @@ import PureScript.Values
 import PureScript.Types
 import PureScript.Kinds
 import PureScript.Declarations
+import PureScript.Names
 import PureScript.Parser
 import PureScript.CodeGen
 import PureScript.TypeChecker

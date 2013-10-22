@@ -26,13 +26,13 @@ import qualified Text.Parsec.Expr as P
 import Control.Arrow (Arrow(..))
 
 parseNumber :: P.Parsec String P.Column Type
-parseNumber = const Number <$> P.string "Number"
+parseNumber = const Number <$> reserved "Number"
 
 parseString :: P.Parsec String P.Column Type
-parseString = const String <$> P.string "String"
+parseString = const String <$> reserved "String"
 
 parseBoolean :: P.Parsec String P.Column Type
-parseBoolean = const Boolean <$> P.string "Boolean"
+parseBoolean = const Boolean <$> reserved "Boolean"
 
 parseArray :: P.Parsec String P.Column Type
 parseArray = squares $ Array <$> parseType
@@ -73,8 +73,8 @@ parseType :: P.Parsec String P.Column Type
 parseType = P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom
   where
   postfixTable :: [P.Parsec String P.Column (Type -> Type)]
-  postfixTable = [ flip TypeApp <$> parseTypeAtom ]
-  operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocLeft ] ]
+  postfixTable = [ flip TypeApp <$> (indented *> parseTypeAtom) ]
+  operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
 
 parseNameAndType :: P.Parsec String P.Column (String, Type)
 parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parseType

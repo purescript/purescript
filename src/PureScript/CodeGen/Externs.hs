@@ -21,6 +21,7 @@ module PureScript.CodeGen.Externs (
 import Data.Maybe (fromMaybe)
 import Data.List (intersperse, intercalate)
 import qualified Control.Arrow as A
+import qualified Data.Map as M
 import Control.Applicative
 
 import PureScript.Values
@@ -30,8 +31,15 @@ import PureScript.Declarations
 import PureScript.TypeChecker.Monad
 import PureScript.CodeGen.Common
 
-externToPs :: Ident -> (PolyType, NameKind) -> String
-externToPs name (ty, _) = "extern " ++ show name ++ " :: " ++ polyTypeToPs ty
+externToPs :: Environment -> Declaration -> Maybe String
+externToPs env (ValueDeclaration name _) = do
+  (ty, _) <- M.lookup name $ names env
+  return $ "extern " ++ show name ++ " :: " ++ polyTypeToPs ty
+externToPs env (ExternDeclaration name ty) =
+  return $ "extern " ++ show name ++ " :: " ++ polyTypeToPs ty
+externToPs env (TypeSynonymDeclaration name args ty) =
+  return $ "type " ++ name ++ " " ++ intercalate " " args ++ " = " ++ typeToPs ty
+externToPs _ _ = Nothing
 
 typeLiterals :: Pattern Type String
 typeLiterals = Pattern $ A.Kleisli match
@@ -85,9 +93,10 @@ typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   matchType = buildPrettyPrinter operators (typeLiterals <|> fmap parens matchType)
   operators :: OperatorTable Type String
   operators =
-    OperatorTable $ [ AssocL typeApp $ \f x -> f ++ " " ++ x
-                    , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret
-                    , AssocL singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
+    OperatorTable $ [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
+                    , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
+                      , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret
+                      ]
                     ]
 
 polyTypeToPs :: PolyType -> String

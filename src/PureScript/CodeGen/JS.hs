@@ -29,13 +29,6 @@ import PureScript.Declarations
 import PureScript.CodeGen.Common
 import PureScript.CodeGen.Common.Gen
 
-identToJs :: Ident -> String
-identToJs (Ident name) = name
-identToJs (Op op) = concatMap opCharToString op
-  where
-  opCharToString :: Char -> String
-  opCharToString = (:) '$'. show . ord
-
 declToJs :: Declaration -> Maybe String
 declToJs (ValueDeclaration ident val) = Just $ "var " ++ identToJs ident ++ " = " ++ valueToJs val ++ ";"
 declToJs (DataDeclaration _ _ ctors) =
@@ -117,33 +110,33 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
   matchValue = buildPrettyPrinter operators (literals <|> fmap parens matchValue)
   operators :: OperatorTable Value String
   operators =
-    OperatorTable $ [ Wrap accessor $ \prop val -> val ++ "." ++ prop
-                    , Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]"
-                    , Wrap app $ \args val -> val ++ "(" ++ args ++ ")"
-                    , Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }"
-                    , binary    LessThan             "<"
-                    , binary    LessThanOrEqualTo    "<="
-                    , binary    GreaterThan          ">"
-                    , binary    GreaterThanOrEqualTo ">="
-                    , unary     Not                  "!"
-                    , unary     BitwiseNot           "~"
-                    , unary     Negate               "-"
-                    , binary    Multiply             "*"
-                    , binary    Divide               "/"
-                    , binary    Modulus              "%"
-                    , binary    Concat               "++"
-                    , binary    Add                  "+"
-                    , binary    Subtract             "-"
-                    , binary    ShiftLeft            "<<"
-                    , binary    ShiftRight           ">>"
-                    , binary    ZeroFillShiftRight   ">>>"
-                    , binary    EqualTo              "==="
-                    , binary    NotEqualTo           "!=="
-                    , binary    BitwiseAnd           "&"
-                    , binary    BitwiseXor           "^"
-                    , binary    BitwiseOr            "|"
-                    , binary    And                  "&&"
-                    , binary    Or                   "||"
+    OperatorTable $ [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
+                    , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
+                    , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
+                    , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }" ]
+                    , [ binary    LessThan             "<" ]
+                    , [ binary    LessThanOrEqualTo    "<=" ]
+                    , [ binary    GreaterThan          ">" ]
+                    , [ binary    GreaterThanOrEqualTo ">=" ]
+                    , [ unary     Not                  "!" ]
+                    , [ unary     BitwiseNot           "~" ]
+                    , [ unary     Negate               "-" ]
+                    , [ binary    Multiply             "*" ]
+                    , [ binary    Divide               "/" ]
+                    , [ binary    Modulus              "%" ]
+                    , [ binary    Concat               "++" ]
+                    , [ binary    Add                  "+" ]
+                    , [ binary    Subtract             "-" ]
+                    , [ binary    ShiftLeft            "<<" ]
+                    , [ binary    ShiftRight           ">>" ]
+                    , [ binary    ZeroFillShiftRight   ">>>" ]
+                    , [ binary    EqualTo              "===" ]
+                    , [ binary    NotEqualTo           "!==" ]
+                    , [ binary    BitwiseAnd           "&" ]
+                    , [ binary    BitwiseXor           "^" ]
+                    , [ binary    BitwiseOr            "|" ]
+                    , [ binary    And                  "&&" ]
+                    , [ binary    Or                   "||" ]
                     ]
 
 unaryOperatorString :: UnaryOperator -> String

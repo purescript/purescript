@@ -62,7 +62,10 @@ reservedNames = [ "case"
                 , "try"
                 , "typeof"
                 , "void"
-                , "with" ]
+                , "with"
+                , "Number"
+                , "String"
+                , "Boolean" ]
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"

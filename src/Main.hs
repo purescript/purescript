@@ -45,7 +45,7 @@ compile inputFiles outputFile externsFile = do
             Nothing -> U.putStrLn js
           case externsFile of
             Nothing -> return ()
-            Just filePath -> U.writeFile filePath $ intercalate "\n" $ map (uncurry externToPs) $ M.toList $ names env
+            Just filePath -> U.writeFile filePath $ intercalate "\n" $ mapMaybe (externToPs env) decls
           exitSuccess
 
 inputFiles :: Term [FilePath]
