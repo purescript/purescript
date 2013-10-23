@@ -124,7 +124,7 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
                     , [ binary    Multiply             "*" ]
                     , [ binary    Divide               "/" ]
                     , [ binary    Modulus              "%" ]
-                    , [ binary    Concat               "++" ]
+                    , [ binary    Concat               "+" ]
                     , [ binary    Add                  "+" ]
                     , [ binary    Subtract             "-" ]
                     , [ binary    ShiftLeft            "<<" ]
