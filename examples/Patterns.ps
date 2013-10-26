@@ -2,3 +2,7 @@ test = \x -> case x of
   { str = "Foo", bool = true } -> true
   { str = "Bar", bool = b } -> b
   _ -> false
+
+f = \o -> case o of
+  { foo = "Foo" } -> o.bar
+  _ -> 0

@@ -13,3 +13,7 @@ test4 = 1 `k` 2
 test5 = 1 %% 2 %% 3
 
 test6 = ((\x -> x) `k` 2) 3
+
+(<>) = \s1 -> \s2 -> s1 ++ s2
+
+test7 = "Hello" <> "World!"
