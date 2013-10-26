@@ -21,6 +21,7 @@ module PureScript.CodeGen.Externs (
 import Data.Maybe (fromMaybe)
 import Data.List (intersperse, intercalate)
 import qualified Control.Arrow as A
+import Control.Arrow ((<+>))
 import qualified Data.Map as M
 import Control.Applicative
 
@@ -90,12 +91,12 @@ typeToPs :: Type -> String
 typeToPs = fromMaybe (error "Incomplete pattern") . pattern matchType
   where
   matchType :: Pattern Type String
-  matchType = buildPrettyPrinter operators (typeLiterals <|> fmap parens matchType)
+  matchType = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchType)
   operators :: OperatorTable Type String
   operators =
     OperatorTable $ [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
                     , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
-                      , Split function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ typeToPs ret
+                      , Wrap function $ \args ret -> "(" ++ intercalate ", " (map typeToPs args) ++ ") -> " ++ ret
                       ]
                     ]
 

@@ -20,6 +20,7 @@ import Data.Char
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import qualified Control.Arrow as A
+import Control.Arrow ((<+>))
 import Control.Applicative
 
 import PureScript.Types
@@ -107,7 +108,7 @@ valueToJs :: Value -> String
 valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
   where
   matchValue :: Pattern Value String
-  matchValue = buildPrettyPrinter operators (literals <|> fmap parens matchValue)
+  matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
   operators :: OperatorTable Value String
   operators =
     OperatorTable $ [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
