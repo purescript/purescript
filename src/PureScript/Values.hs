@@ -82,14 +82,17 @@ data ElseStatement
   | ElseIf IfStatement deriving (Show, Data, Typeable)
 
 data Binder
-  = BooleanBinder Bool
+  = NullBinder
+  | BooleanBinder Bool
   | StringBinder String
   | NumberBinder (Either Integer Double)
   | VarBinder Ident
   | NullaryBinder String
   | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)]
-  | ArrayBinder [Binder] (Maybe Binder) deriving (Show, Data, Typeable)
+  | ArrayBinder [Binder] (Maybe Binder) 
+  | NamedBinder Ident Binder
+  | GuardedBinder Value Binder deriving (Show, Data, Typeable)
 
 data AssignmentTarget
   = AssignVariable Ident

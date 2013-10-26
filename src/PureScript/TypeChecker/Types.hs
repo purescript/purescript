@@ -317,6 +317,7 @@ asymBinOpConstraints :: Type -> Type -> Int -> Int -> Int -> [TypeConstraint]
 asymBinOpConstraints ty res left right result = [TypeConstraint left ty, TypeConstraint right ty, TypeConstraint result res]
 
 typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map Ident Int)
+typeConstraintsForBinder _ NullBinder = return ([], M.empty)
 typeConstraintsForBinder val (StringBinder _) = constantBinder val String
 typeConstraintsForBinder val (NumberBinder _) = constantBinder val Number
 typeConstraintsForBinder val (BooleanBinder _) = constantBinder val Boolean
@@ -363,6 +364,14 @@ typeConstraintsForBinder val (ArrayBinder binders rest) = do
     Just binder -> do
       (cs2, m2) <- typeConstraintsForBinder val binder
       return (arrayConstraint : cs1 ++ cs2, M.union m1 m2)
+typeConstraintsForBinder val (NamedBinder name binder) = do
+  me <- fresh
+  (cs, m) <- typeConstraintsForBinder val binder
+  return (TypeConstraint me (TUnknown val) : cs, M.insert name me m)
+typeConstraintsForBinder val (GuardedBinder cond binder) = do
+  (cs1, m) <- typeConstraintsForBinder val binder
+  (cs2, n) <- typeConstraints m cond
+  return (TypeConstraint n Boolean : cs1 ++ cs2, m)
 
 constantBinder :: Int -> Type -> Check ([TypeConstraint], M.Map Ident Int)
 constantBinder val ty = return ([TypeConstraint val ty], M.empty)

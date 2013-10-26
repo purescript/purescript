@@ -72,7 +72,7 @@ parseCase = Case <$> (P.between (C.reserved "case") (C.indented *> C.reserved "o
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: P.Parsec String P.Column (Binder, Value)
-parseCaseAlternative = (,) <$> (parseBinder <* C.lexeme (P.string "->")) <*> parseValue
+parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->")) <*> parseValue
 
 parseBlock :: P.Parsec String P.Column Value
 parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
@@ -211,6 +211,13 @@ parseArrayBinder :: P.Parsec String P.Column Binder
 parseArrayBinder = C.squares $ ArrayBinder <$> ((C.indented *> parseBinder) `P.sepBy` (C.indented *> C.comma))
                                            <*> P.optionMaybe (C.indented *> C.colon *> C.indented *> parseBinder)
 
+parseNamedBinder :: P.Parsec String P.Column Binder
+parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* C.lexeme (P.char '@'))
+                               <*> (C.indented *> parseBinder)
+
+parseNullBinder :: P.Parsec String P.Column Binder
+parseNullBinder = C.lexeme (P.char '_') *> P.notFollowedBy C.identLetter *> return NullBinder
+
 parseIdentifierAndBinder :: P.Parsec String P.Column (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme C.identifier
@@ -220,15 +227,20 @@ parseIdentifierAndBinder = do
 
 parseBinder :: P.Parsec String P.Column Binder
 parseBinder = P.choice (map P.try
-                  [ parseStringBinder
+                  [ parseNullBinder
+                  , parseStringBinder
                   , parseBooleanBinder
                   , parseNumberBinder
+                  , parseNamedBinder
                   , parseVarBinder
                   , parseUnaryBinder
                   , parseNullaryBinder
                   , parseObjectBinder
                   , parseArrayBinder
                   , C.parens parseBinder ])
+
+parseGuardedBinder :: P.Parsec String P.Column Binder
+parseGuardedBinder = flip ($) <$> parseBinder <*> P.option id (GuardedBinder <$> (C.indented *> C.lexeme (P.char '|') *> C.indented *> parseValue))
 
 parseAssignmentTarget :: P.Parsec String P.Column AssignmentTarget
 parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.parseIdent)

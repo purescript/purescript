@@ -167,6 +167,7 @@ binaryOperatorString Or = "||"
 binaryOperatorString Concat = "+"
 
 binderToJs :: String -> String -> Binder -> Gen String
+binderToJs varName done NullBinder = return done
 binderToJs varName done (StringBinder str) =
   return $ "if (" ++ varName ++ " === \"" ++ str ++ "\") {" ++ done ++ " }"
 binderToJs varName done (NumberBinder num) =
@@ -191,7 +192,7 @@ binderToJs varName done (ObjectBinder bs) = go done bs
     done' <- go done bs
     js <- binderToJs propVar done' binder
     return $ "var " ++ propVar ++ " = " ++ varName ++ "." ++ prop ++ ";" ++ js
-binderToJs done varName (ArrayBinder bs rest) = do
+binderToJs varName done (ArrayBinder bs rest) = do
   js <- go done rest 0 bs
   return $ "if (" ++ varName ++ ".length " ++ cmp ++ " " ++ show (length bs) ++ ") { " ++ js ++ " }"
   where
@@ -206,6 +207,12 @@ binderToJs done varName (ArrayBinder bs rest) = do
     done' <- go done rest (index + 1) bs
     js <- binderToJs elVar done' binder
     return $ "var " ++ elVar ++ " = " ++ varName ++ "[" ++ show index ++ "]; " ++ js
+binderToJs varName done (NamedBinder ident binder) = do
+  js <- binderToJs varName done binder
+  return $ "var " ++ identToJs ident ++ " = " ++ varName ++ "; " ++ js
+binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' binder 
+  where 
+  done' = "if (" ++ valueToJs cond ++ ") { " ++ done ++ "}"
 
 objectPropertyToJs :: (String, Value) -> String
 objectPropertyToJs (key, value) = key ++ ":" ++ valueToJs value
