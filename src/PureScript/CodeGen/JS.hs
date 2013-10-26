@@ -31,6 +31,7 @@ import PureScript.CodeGen.Common
 import PureScript.CodeGen.Common.Gen
 
 declToJs :: Declaration -> Maybe String
+declToJs (ValueDeclaration ident (Abs args ret)) = Just $ "function " ++ identToJs ident ++ "(" ++ intercalate "," (map identToJs args) ++ ") { return " ++ valueToJs ret ++ "; }" 
 declToJs (ValueDeclaration ident val) = Just $ "var " ++ identToJs ident ++ " = " ++ valueToJs val ++ ";"
 declToJs (DataDeclaration _ _ ctors) =
   Just $ flip concatMap ctors $ \(ctor, maybeTy) ->

@@ -51,12 +51,15 @@ emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
 typeOf :: Ident -> Value -> Check PolyType
 typeOf name val = do
-  me <- fresh
-  (cs, n) <- typeConstraints (M.singleton name me) val
-  let allConstraints = TypeConstraint me (TUnknown n) : cs
-  solution <- solveTypeConstraints allConstraints emptyTypeSolution
+  (cs, n) <- case val of 
+    Abs _ _ -> do
+      me <- fresh
+      (cs, n) <- typeConstraints (M.singleton name me) val
+      return (TypeConstraint me (TUnknown n) : cs, n)
+    _ -> typeConstraints M.empty val
+  solution <- solveTypeConstraints cs emptyTypeSolution
   let ty = fst (runTypeSolution solution) n
-  allUnknownsBecameQuantified allConstraints solution ty
+  allUnknownsBecameQuantified cs solution ty
   return $ varIfUnknown ty
 
 allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
