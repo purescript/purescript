@@ -266,6 +266,11 @@ typeConstraints m (Case val binders) = do
   ret <- fresh
   cs2 <- typeConstraintsForBinders m n1 ret binders
   return (cs1 ++ cs2, ret)
+typeConstraints m (IfThenElse cond th el) = do
+  (cs1, n1) <- typeConstraints m cond
+  (cs2, n2) <- typeConstraints m th
+  (cs3, n3) <- typeConstraints m el
+  return (TypeConstraint n1 Boolean : TypeConstraint n2 (TUnknown n3) : cs1 ++ cs2 ++ cs3, n2)
 typeConstraints m (TypedValue val poly@(PolyType idents ty)) = do
   kind <- kindOf poly
   guardWith ("Expected type of kind *, was " ++ show kind) $ kind == Star

@@ -63,6 +63,12 @@ literals = Pattern $ A.Kleisli match
   match (Var ident) = Just (identToJs ident)
   match _ = Nothing
 
+ifThenElse :: Pattern Value ((Value, Value), Value)
+ifThenElse = Pattern $ A.Kleisli match
+  where
+  match (IfThenElse cond th el) = Just ((th, el), cond)
+  match _ = Nothing
+
 accessor :: Pattern Value (String, Value)
 accessor = Pattern $ A.Kleisli match
   where
@@ -116,6 +122,7 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
                     , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
                     , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                     , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }" ]
+                    , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ valueToJs th ++ " : " ++ valueToJs el ]
                     , [ binary    LessThan             "<" ]
                     , [ binary    LessThanOrEqualTo    "<=" ]
                     , [ binary    GreaterThan          ">" ]

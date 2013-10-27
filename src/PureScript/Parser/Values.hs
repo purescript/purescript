@@ -74,6 +74,11 @@ parseCase = Case <$> (P.between (C.reserved "case") (C.indented *> C.reserved "o
 parseCaseAlternative :: P.Parsec String P.Column (Binder, Value)
 parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->")) <*> parseValue
 
+parseIfThenElse :: P.Parsec String P.Column Value
+parseIfThenElse = IfThenElse <$> (C.reserved "if" *> C.indented *> parseValue)
+                             <*> (C.indented *> C.reserved "then" *> C.indented *> parseValue)
+                             <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
+ 
 parseBlock :: P.Parsec String P.Column Value
 parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
 
@@ -92,6 +97,7 @@ parseValueAtom = C.indented *> P.choice (map P.try
             , parseConstructor
             , parseBlock
             , parseCase
+            , parseIfThenElse
             , C.parens parseValue ])
 
 parseValue :: P.Parsec String P.Column Value

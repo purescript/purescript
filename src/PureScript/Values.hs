@@ -61,6 +61,7 @@ data Value
   | Abs [Ident] Value
   | App Value [Value]
   | Var Ident
+  | IfThenElse Value Value Value
   | Block [Statement]
   | Constructor String
   | Case Value [(Binder, Value)]
