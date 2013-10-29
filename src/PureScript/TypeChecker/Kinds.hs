@@ -89,7 +89,7 @@ kindConstraints m (Function args ret) = do
   me <- fresh
   (cs, ns, m') <- kindConstraintsAll m args
   (cs', retN, m'') <- kindConstraints m' ret
-  return ((KindConstraint retN Star) : (KindConstraint me Star) : (map (flip KindConstraint Star) ns) ++ cs, me, m'')
+  return ((KindConstraint retN Star) : (KindConstraint me Star) : (map (flip KindConstraint Star) ns) ++ cs ++ cs', me, m'')
 kindConstraints m (TypeVar v) = do
   case M.lookup v m of
     Just u -> return ([], u, m)

@@ -19,6 +19,7 @@ module PureScript.Declarations where
 import PureScript.Values
 import PureScript.Types
 import PureScript.Names
+import PureScript.Kinds
 
 import qualified Data.Data as D
 
@@ -34,4 +35,5 @@ data Declaration
   | TypeDeclaration Ident PolyType
   | ValueDeclaration Ident Value
   | ExternDeclaration Ident PolyType
+  | ExternDataDeclaration String Kind
   | FixityDeclaration Fixity String deriving (Show, D.Data, D.Typeable)

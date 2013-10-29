@@ -79,6 +79,11 @@ typeCheckAll (ValueDeclaration name val : rest) = do
         ty <- typeOf name val
         putEnv (env { names = M.insert name (ty, Value) (names env) })
   typeCheckAll rest
+typeCheckAll (ExternDataDeclaration name kind : rest) = do
+  env <- getEnv
+  guardWith (name ++ " is already defined") $ not $ M.member name (types env)
+  putEnv $ env { types = M.insert name (kind, TypeSynonym) (types env) }
+  typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
   rethrow (("Error in extern declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv

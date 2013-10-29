@@ -30,7 +30,7 @@ import qualified Data.Map as M
 
 data NameKind = Value | Extern deriving Show
 
-data TypeDeclarationKind = Data | TypeSynonym deriving Show
+data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
 
 data Environment = Environment
   { names :: M.Map Ident (PolyType, NameKind)

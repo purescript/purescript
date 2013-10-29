@@ -35,6 +35,7 @@ import PureScript.Parser.Common
 import PureScript.Declarations
 import PureScript.Parser.Values
 import PureScript.Parser.Types
+import PureScript.Parser.Kinds
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
@@ -62,9 +63,11 @@ parseValueDeclaration =
                    <*> (lexeme (indented *> P.char '=') *> parseValue)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
-parseExternDeclaration =
-  ExternDeclaration <$> (reserved "extern" *> indented *> parseIdent)
-                    <*> (lexeme (indented *> P.string "::") *> parsePolyType)
+parseExternDeclaration = reserved "extern" *> indented *>
+  (ExternDataDeclaration <$> (reserved "data" *> indented *> properName)
+                        <*> (lexeme (indented *> P.string "::") *> parseKind)
+   <|> ExternDeclaration <$> parseIdent
+                        <*> (lexeme (indented *> P.string "::") *> parsePolyType))
 
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =

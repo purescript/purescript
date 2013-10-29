@@ -30,7 +30,8 @@ library
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.CodeGen.Pretty.Kinds
+    other-modules: PureScript.Parser.Kinds
+                   PureScript.CodeGen.Pretty.Kinds
  
 executable psc
     build-depends: base -any, cmdtheline -any, containers -any,
@@ -38,6 +39,6 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules: PureScript.CodeGen.Pretty.Kinds
-                   PureScript.CodeGen.Pretty.Types
+    other-modules: PureScript.Parser.Kinds
+                   PureScript.CodeGen.Pretty.Kinds PureScript.CodeGen.Pretty.Types
  

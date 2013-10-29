@@ -1,0 +1,13 @@
+extern data IO :: * -> *
+
+extern fmap :: forall a b. IO a -> (a -> b) -> IO b
+
+extern ret :: forall a. a -> IO a
+
+extern bind :: forall a b. IO a -> (a -> IO b) -> IO b
+
+extern showMessage :: String -> IO { }
+
+extern prompt :: IO String
+
+main = prompt `bind` \s -> showMessage s
