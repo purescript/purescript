@@ -1,0 +1,95 @@
+-----------------------------------------------------------------------------
+--
+-- Module      :  PureScript.CodeGen.Pretty.Types
+-- Copyright   :  (c) Phil Freeman 2013
+-- License     :  MIT
+--
+-- Maintainer  :  Phil Freeman <paf31@cantab.net>
+-- Stability   :  experimental
+-- Portability :
+--
+-- |
+--
+-----------------------------------------------------------------------------
+
+module PureScript.CodeGen.Pretty.Types (
+    prettyPrintType,
+    prettyPrintRow,
+    prettyPrintPolyType
+) where
+
+import Data.Maybe (fromMaybe)
+import Data.List (intersperse, intercalate)
+import qualified Control.Arrow as A
+import Control.Arrow ((<+>))
+import qualified Data.Map as M
+import Control.Applicative
+
+import PureScript.Values
+import PureScript.Types
+import PureScript.Names
+import PureScript.Declarations
+import PureScript.TypeChecker.Monad
+import PureScript.CodeGen.Common
+
+typeLiterals :: Pattern Type String
+typeLiterals = Pattern $ A.Kleisli match
+  where
+  match Number = Just "Number"
+  match String = Just "String"
+  match Boolean = Just "Boolean"
+  match (Array ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
+  match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
+  match (TypeVar var) = Just var
+  match (TypeConstructor ctor) = Just ctor
+  match (TUnknown u) = Just $ "u" ++ show u
+  match _ = Nothing
+
+prettyPrintRow :: Row -> String
+prettyPrintRow = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList
+  where
+  nameAndTypeToPs :: String -> Type -> String
+  nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
+  tailToPs :: Row -> String
+  tailToPs REmpty = ""
+  tailToPs (RUnknown u) = show u
+  tailToPs (RowVar var) = " | " ++ var
+  toList :: Row -> ([(String, Type)], Row)
+  toList (RCons name ty row) = let (tys, rest) = toList row
+                               in ((name, ty):tys, rest)
+  toList r = ([], r)
+
+typeApp :: Pattern Type (Type, Type)
+typeApp = Pattern $ A.Kleisli match
+  where
+  match (TypeApp f x) = Just (f, x)
+  match _ = Nothing
+
+singleArgumentFunction :: Pattern Type (Type, Type)
+singleArgumentFunction = Pattern $ A.Kleisli match
+  where
+  match (Function [arg] ret) = Just (arg, ret)
+  match _ = Nothing
+
+function :: Pattern Type ([Type], Type)
+function = Pattern $ A.Kleisli match
+  where
+  match (Function args ret) = Just (args, ret)
+  match _ = Nothing
+
+prettyPrintType :: Type -> String
+prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType
+  where
+  matchType :: Pattern Type String
+  matchType = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchType)
+  operators :: OperatorTable Type String
+  operators =
+    OperatorTable $ [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
+                    , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
+                      , Wrap function $ \args ret -> "(" ++ intercalate ", " (map prettyPrintType args) ++ ") -> " ++ ret
+                      ]
+                    ]
+
+prettyPrintPolyType :: PolyType -> String
+prettyPrintPolyType (PolyType [] ty) = prettyPrintType ty
+prettyPrintPolyType (PolyType idents ty) = "forall " ++ intercalate " " idents ++ ". " ++ prettyPrintType ty

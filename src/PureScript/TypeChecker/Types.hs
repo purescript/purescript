@@ -30,6 +30,8 @@ import PureScript.Names
 import PureScript.TypeChecker.Monad
 import PureScript.TypeChecker.Kinds
 import PureScript.TypeChecker.Synonyms
+import PureScript.CodeGen.Pretty.Types
+import PureScript.CodeGen.Pretty.Kinds
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -51,7 +53,7 @@ emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
 typeOf :: Ident -> Value -> Check PolyType
 typeOf name val = do
-  (cs, n) <- case val of 
+  (cs, n) <- case val of
     Abs _ _ -> do
       me <- fresh
       (cs, n) <- typeConstraints (M.singleton name me) val
@@ -77,7 +79,7 @@ allUnknownsBecameQuantified cs solution ty = do
       TypeConstraint _ t -> findUnknownRows t
       RowConstraint u r -> u : findUnknownRows r
     unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
-  guardWith ("Unsolved row variable" ++ show (unsolvedRows \\ rowsMentioned) ++ ", " ++ show cs) $ null $ unsolvedRows \\ rowsMentioned
+  guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
 
 findUnknownTypes :: (Data d) => d -> [Int]
 findUnknownTypes = everything (++) (mkQ [] f)
@@ -166,11 +168,11 @@ replaceRow n r = everywhere (mkT go)
 
 typeOccursCheck :: Int -> Type -> Check ()
 typeOccursCheck u (TUnknown _) = return ()
-typeOccursCheck u t = when (occursCheck u t) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ show t
+typeOccursCheck u t = when (occursCheck u t) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ prettyPrintType t
 
 rowOccursCheck :: Int -> Row -> Check ()
 rowOccursCheck u (RUnknown _) = return ()
-rowOccursCheck u r = when (occursCheck u r) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ show r
+rowOccursCheck u r = when (occursCheck u r) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ prettyPrintRow r
 
 occursCheck :: (Data d) => Int -> d -> Bool
 occursCheck u = everything (||) $ flip extQ g $ mkQ False f
@@ -273,7 +275,7 @@ typeConstraints m (IfThenElse cond th el) = do
   return (TypeConstraint n1 Boolean : TypeConstraint n2 (TUnknown n3) : cs1 ++ cs2 ++ cs3, n2)
 typeConstraints m (TypedValue val poly@(PolyType idents ty)) = do
   kind <- kindOf poly
-  guardWith ("Expected type of kind *, was " ++ show kind) $ kind == Star
+  guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   desugared <- replaceAllTypeSynonyms ty
   (cs, n1) <- typeConstraints m val
   return (TypeConstraint n1 desugared : cs, n1)
@@ -534,7 +536,7 @@ unifyTypes (TypeApp t1 t2) (TypeApp t3 t4) = do
   cs1 <- unifyTypes t1 t3
   cs2 <- unifyTypes t2 t4
   return $ cs1 ++ cs2
-unifyTypes t1 t2 = throwError $ "Cannot unify " ++ show t1 ++ " with " ++ show t2 ++ "."
+unifyTypes t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
 
 unifyRows :: Row -> Row -> Check [TypeConstraint]
 unifyRows r1 r2 =
@@ -544,7 +546,7 @@ unifyRows r1 r2 =
     int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
     sd1 = [ (name, t1) | (name, t1) <- s1, not (elem name (map fst s2)) ]
     sd2 = [ (name, t2) | (name, t2) <- s2, not (elem name (map fst s1)) ]
-  in rethrow (\e -> "Cannot unify " ++ show r1 ++ " with " ++ show r2 ++ ": " ++ e) $ do
+  in rethrow (\e -> "Cannot unify " ++ prettyPrintRow r1 ++ " with " ++ prettyPrintRow r2 ++ ": " ++ e) $ do
     cs1 <- fmap concat $ mapM (uncurry unifyTypes) int
     cs2 <- unifyRows' sd1 r1' sd2 r2'
     return $ cs1 ++ cs2
@@ -561,7 +563,7 @@ unifyRows r1 r2 =
     cs <- unifyRows' row r others (RUnknown u')
     return (RowConstraint u (RCons name ty (RUnknown u')) : cs)
   unifyRows' [] REmpty [] REmpty = return []
-  unifyRows' sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ show (fromList (sd1, r1)) ++ " with " ++ show (fromList (sd2, r2)) ++ "."
+  unifyRows' sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (fromList (sd1, r1)) ++ " with " ++ prettyPrintRow (fromList (sd2, r2)) ++ "."
   toList :: Row -> ([(String, Type)], Row)
   toList (RCons name ty row) = let (tys, rest) = toList row
                                in ((name, ty):tys, rest)

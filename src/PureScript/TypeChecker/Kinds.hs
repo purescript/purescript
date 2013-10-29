@@ -27,6 +27,7 @@ import PureScript.Types
 import PureScript.Kinds
 import PureScript.Declarations
 import PureScript.TypeChecker.Monad
+import PureScript.CodeGen.Pretty.Kinds
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -160,7 +161,7 @@ unifyKinds (FunKind k1 k2) (FunKind k3 k4) = do
   cs1 <- unifyKinds k1 k3
   cs2 <- unifyKinds k2 k4
   return $ cs1 ++ cs2
-unifyKinds k1 k2 = throwError $ "Cannot unify " ++ show k1 ++ " with " ++ show k2 ++ "."
+unifyKinds k1 k2 = throwError $ "Cannot unify " ++ prettyPrintKind k1 ++ " with " ++ prettyPrintKind k2 ++ "."
 
 kindOccursCheck :: Bool -> Int -> Kind -> Bool
 kindOccursCheck b u (KUnknown u') | u == u' = b
