@@ -8,6 +8,8 @@ k = \x -> \y -> x
 
 test4 = 1 `k` 2
 
+infixl 5 %%
+
 (%%) = \x -> \y -> x * y + y
 
 test5 = 1 %% 2 %% 3

@@ -20,11 +20,18 @@ import PureScript.Values
 import PureScript.Types
 import PureScript.Names
 
-import Data.Data
+import qualified Data.Data as D
+
+type Precedence = Integer
+
+data Associativity = Infixl | Infixr deriving (Show, D.Data, D.Typeable)
+
+data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
 
 data Declaration
   = DataDeclaration String [String] [(String, Maybe Type)]
   | TypeSynonymDeclaration String [String] Type
   | TypeDeclaration Ident PolyType
   | ValueDeclaration Ident Value
-  | ExternDeclaration Ident PolyType deriving (Show, Data, Typeable)
+  | ExternDeclaration Ident PolyType
+  | FixityDeclaration Fixity String deriving (Show, D.Data, D.Typeable)

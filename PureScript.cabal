@@ -13,9 +13,11 @@ author: Phil Freeman <paf31@cantab.net>
 data-dir: ""
 
 library
-    build-depends: base -any, syb -any, cmdtheline -any,
-                   containers -any, mtl -any, parsec -any, utf8-string -any
-    exposed-modules: PureScript PureScript.Declarations PureScript.Names PureScript.TypeChecker.Synonyms
+    build-depends: base -any, syb -any,
+                   cmdtheline -any, containers -any, mtl -any, transformers -any, parsec -any,
+                   utf8-string -any
+    exposed-modules: PureScript PureScript.Declarations
+                     PureScript.Names PureScript.TypeChecker.Synonyms
                      PureScript.CodeGen.Externs PureScript.CodeGen.JS
                      PureScript.CodeGen.Common.Gen PureScript.CodeGen.Common Main
                      PureScript.CodeGen PureScript.Kinds PureScript.Parser
@@ -23,16 +25,16 @@ library
                      PureScript.Parser.Common PureScript.Parser.Declarations
                      PureScript.Parser.Types PureScript.Parser.Values
                      PureScript.TypeChecker.Kinds PureScript.TypeChecker.Monad
-                     PureScript.TypeChecker.Types
+                     PureScript.TypeChecker.Types PureScript.Parser.State
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules:
 
 executable psc
-    build-depends: base -any, cmdtheline -any, containers -any,
-                   mtl -any, parsec -any, utf8-string -any
+    build-depends: base -any,
+                   cmdtheline -any, containers -any, mtl -any, transformers -any, parsec -any,
+                   utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules:
+

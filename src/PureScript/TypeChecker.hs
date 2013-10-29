@@ -29,9 +29,11 @@ import PureScript.TypeChecker.Synonyms
 import Data.List
 import Data.Maybe
 import Data.Function
+import qualified Data.Map as M
 
 import PureScript.Values
 import PureScript.Types
+import PureScript.Names
 import PureScript.Kinds
 import PureScript.Declarations
 
@@ -86,3 +88,7 @@ typeCheckAll (ExternDeclaration name ty : rest) = do
       Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> putEnv (env { names = M.insert name (ty, Extern) (names env) })
   typeCheckAll rest
+typeCheckAll (FixityDeclaration _ name : rest) = do
+  typeCheckAll rest
+  env <- getEnv
+  guardWith ("Fixity declaration with no binding: " ++ name) $ M.member (Op name) $ names env

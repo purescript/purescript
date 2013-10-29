@@ -28,7 +28,7 @@ compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile inputFiles outputFile externsFile = do
   asts <- fmap (fmap concat . sequence) $ flip mapM inputFiles $ \inputFile -> do
     text <- U.readFile inputFile
-    return $ runIndentParser 0 parseDeclarations text
+    return $ runIndentParser parseDeclarations text
   case asts of
     Left err -> do
       U.print err

@@ -20,6 +20,8 @@ import Data.Char (isSpace)
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
+import PureScript.Parser.State
+import qualified Data.Map as M
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Token as PT
@@ -66,7 +68,9 @@ reservedNames = [ "case"
                 , "with"
                 , "Number"
                 , "String"
-                , "Boolean" ]
+                , "Boolean"
+                , "infixl"
+                , "infixr" ]
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
@@ -122,6 +126,7 @@ semiSep          = PT.semiSep           tokenParser
 semiSep1         = PT.semiSep1          tokenParser
 commaSep         = PT.commaSep          tokenParser
 commaSep1        = PT.commaSep1         tokenParser
+natural          = PT.natural           tokenParser
 
 tick :: P.Parsec String u Char
 tick = lexeme $ P.char '`'
@@ -151,26 +156,26 @@ parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
 parseIdentInfix :: P.Parsec String u Ident
 parseIdentInfix = (Ident <$> P.between tick tick identifier) <|> (Op <$> operator)
 
-mark :: P.Parsec String P.Column a -> P.Parsec String P.Column a
+mark :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 mark p = do
-  current <- P.getState
+  current <- indentationLevel <$> P.getState
   pos <- P.sourceColumn <$> P.getPosition
-  P.putState pos
+  P.modifyState $ \st -> st { indentationLevel = pos }
   a <- p
-  P.putState current
+  P.modifyState $ \st -> st { indentationLevel = current }
   return a
 
-checkIndentation :: (P.Column -> P.Column -> Bool) -> P.Parsec String P.Column ()
+checkIndentation :: (P.Column -> P.Column -> Bool) -> P.Parsec String ParseState ()
 checkIndentation rel = (do
   col <- P.sourceColumn <$> P.getPosition
-  current <- P.getState
+  current <- indentationLevel <$> P.getState
   guard $ col `rel` current) <|> P.parserFail "Indentation check"
 
-indented :: P.Parsec String P.Column ()
+indented :: P.Parsec String ParseState ()
 indented = checkIndentation (>)
 
-same :: P.Parsec String P.Column ()
+same :: P.Parsec String ParseState ()
 same = checkIndentation (==)
 
-runIndentParser :: P.Column -> P.Parsec String P.Column a -> String -> Either P.ParseError a
-runIndentParser col p = P.runParser p 0 ""
+runIndentParser :: P.Parsec String ParseState a -> String -> Either P.ParseError a
+runIndentParser p = P.runParser p (ParseState 0 M.empty) ""
