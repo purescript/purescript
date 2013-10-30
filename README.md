@@ -435,9 +435,9 @@ The patterns above can be combined to create larger patterns.
 For example:
 
     f = \o -> case o of
-      { arr = [] } -> 0
-      { arr = [x:_], take = "head" } -> x
-      { arr = [_:xs], take = "tail" } -> sum xs
+      { arr = [x:_], take = "car" } -> x
+      { arr = [_,x:_], take = "cadr" } -> x
+      _ -> 0
 
 ## Named Patterns
 
