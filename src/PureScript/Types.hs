@@ -28,7 +28,8 @@ data Type
   | Function [Type] Type
   | TypeVar String
   | TypeConstructor String
-  | TypeApp Type Type deriving (Show, Eq, Data, Typeable)
+  | TypeApp Type Type
+  | SaturatedTypeSynonym String [Type] deriving (Show, Eq, Data, Typeable)
 
 data PolyType = PolyType [String] Type deriving (Show, Data, Typeable)
 

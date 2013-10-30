@@ -65,7 +65,7 @@ typeOf name val = do
   solution <- solveTypeConstraints desugared emptyTypeSolution
   let ty = fst (runTypeSolution solution) n
   allUnknownsBecameQuantified desugared solution ty
-  return $ varIfUnknown ty
+  return $ varIfUnknown $ desaturateAllTypeSynonyms ty
 
 allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
 allUnknownsBecameQuantified cs solution ty = do
@@ -133,6 +133,14 @@ varIfUnknown ty =
       Just name -> return $ RowVar name
   g r = return r
 
+replaceTypeVars :: M.Map String Type -> Type -> Type
+replaceTypeVars m = everywhere (mkT replace)
+  where
+  replace (TypeVar v) = case M.lookup v m of
+    Just ty -> ty
+    _ -> TypeVar v
+  replace t = t
+
 replaceVarsWithUnknowns :: [String] -> Type -> Check Type
 replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
   where
@@ -158,14 +166,16 @@ replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip ext
   g r = return r
 
 replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
-replaceAllTypeSynonyms ty = do
+replaceAllTypeSynonyms d = do
   env <- getEnv
-  go (M.toList $ typeSynonyms env) ty
+  let syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
+  either throwError return $ saturateAllTypeSynonyms syns d
+
+desaturateAllTypeSynonyms :: (D.Data d) => d -> d
+desaturateAllTypeSynonyms = everywhere (mkT $ replace)
   where
-  go [] d = return d
-  go ((name, (args, repl)):rest) d = do
-    d' <- either throwError return (substituteTypeSynonym name args repl d)
-    go rest d'
+  replace (SaturatedTypeSynonym name args) = foldl (\t arg -> TypeApp t arg) (TypeConstructor name) args
+  replace t = t
 
 replaceType :: (D.Data d) => Int -> Type -> d -> d
 replaceType n t = everywhere (mkT go)
@@ -521,6 +531,17 @@ unifyTypes (TUnknown u) t = do
 unifyTypes t (TUnknown u) = do
   typeOccursCheck u t
   return [TypeConstraint u t]
+unifyTypes (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args2) | name1 == name2 =
+  fmap concat $ zipWithM unifyTypes args1 args2
+unifyTypes (SaturatedTypeSynonym name args) ty = do
+  env <- getEnv
+  case M.lookup name (typeSynonyms env) of
+    Just (synArgs, body) -> do
+      let m = M.fromList $ zip synArgs args
+      let replaced = replaceTypeVars m body
+      unifyTypes replaced ty
+    Nothing -> error "Type synonym was not defined"
+unifyTypes ty s@(SaturatedTypeSynonym _ _) = unifyTypes s ty
 unifyTypes Number Number = return []
 unifyTypes String String = return []
 unifyTypes Boolean Boolean = return []

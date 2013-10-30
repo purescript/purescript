@@ -15,7 +15,8 @@
 {-# LANGUAGE Rank2Types #-}
 
 module PureScript.TypeChecker.Synonyms (
-    substituteTypeSynonym
+    saturateTypeSynonym,
+    saturateAllTypeSynonyms
 ) where
 
 import PureScript.Types
@@ -29,20 +30,13 @@ import Control.Monad.Writer
 import Control.Monad.Error
 import qualified Data.Map as M
 
-replaceTypeVars :: M.Map String Type -> Type -> Type
-replaceTypeVars m = everywhere (mkT replace)
+buildTypeSubstitution :: String -> Int -> Type -> Either String (Maybe Type)
+buildTypeSubstitution name n = go n []
   where
-  replace :: Type -> Type
-  replace t@(TypeVar var) = fromMaybe t (M.lookup var m)
-  replace t = t
-
-buildTypeSubstitution :: String -> Type -> [String] -> Type -> Either String (Maybe Type)
-buildTypeSubstitution name ty args = go (reverse args) M.empty
-  where
-  go :: [String] -> M.Map String Type -> Type -> Either String (Maybe Type)
-  go [] m (TypeConstructor ctor) | name == ctor = return (Just $ replaceTypeVars m ty)
-  go (_:_) _ (TypeConstructor ctor) | name == ctor = throwError $ "Partially applied type synonym " ++ name
-  go (arg:args) m (TypeApp f x) = go args (M.insert arg x m) f
+  go :: Int -> [Type] -> Type -> Either String (Maybe Type)
+  go 0 args (TypeConstructor ctor) | name == ctor = return (Just $ SaturatedTypeSynonym ctor args)
+  go n _ (TypeConstructor ctor) | n > 0 && name == ctor = throwError $ "Partially applied type synonym " ++ name
+  go n args (TypeApp f arg) = go (n - 1) (arg:args) f
   go _ _ _ = return Nothing
 
 everywhereM' :: (Monad m, Data d) => (forall d. (Data d) => d -> m d) -> d -> m d
@@ -50,7 +44,13 @@ everywhereM' f x = do
   y <- f x
   gmapM (everywhereM' f) y
 
-substituteTypeSynonym :: (Data d) => String -> [String] -> Type -> d -> Either String d
-substituteTypeSynonym name args ty = everywhereM' (mkM replace)
+saturateTypeSynonym :: (Data d) => String -> Int -> d -> Either String d
+saturateTypeSynonym name n = everywhereM' (mkM replace)
   where
-  replace t = fmap (fromMaybe t) $ buildTypeSubstitution name ty args t
+  replace t = fmap (fromMaybe t) $ buildTypeSubstitution name n t
+
+saturateAllTypeSynonyms :: (Data d) => [(String, Int)] -> d -> Either String d
+saturateAllTypeSynonyms syns d = foldM (\d (name, n) -> saturateTypeSynonym name n d) d syns
+
+
+

@@ -43,6 +43,7 @@ typeLiterals = Pattern $ A.Kleisli match
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just ctor
   match (TUnknown u) = Just $ "u" ++ show u
+  match (SaturatedTypeSynonym name args) = Just $ name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
