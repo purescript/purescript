@@ -61,11 +61,11 @@ The following code defines a `Person` data type and a function to generate a str
       , age :: Number 
       }
 	
-	  extern itoa :: Number -> String
+    extern itoa :: Number -> String
 	
-	  showPerson :: Person -> String
-	  showPerson = \p -> case p of
-	    Person o -> o.name ++ ", aged " ++ itoa(o.age)
+    showPerson :: Person -> String
+    showPerson = \p -> case p of
+      Person o -> o.name ++ ", aged " ++ itoa(o.age)
 
 Line by line, this reads as follows:
 
@@ -77,20 +77,20 @@ Line by line, this reads as follows:
 
 The generated Javascript looks like this:
 
-	var Person = function (value) { 
-		return { ctor: 'Person', value: value }; 
-	};
-	var showPerson = function (p) { 
-		return (function (_0) {
-			if (_0.ctor === "Person") { 
-				var _1 = _0.value; 
-				var o = _1; 
-				return o.name ++ ", aged " 
-					++ itoa(o.age); 
-			}
-			throw "Failed pattern match"; 
-		})(p); 
-	};
+    var Person = function (value) { 
+      return { ctor: 'Person', value: value }; 
+    };
+    
+    var showPerson = function (p) { 
+      return (function (_0) {
+        if (_0.ctor === "Person") { 
+          var _1 = _0.value; 
+          var o = _1; 
+          return o.name ++ ", aged " ++ itoa(o.age); 
+        }
+	throw "Failed pattern match"; 
+      })(p); 
+    };
 
 ## Type System
 
@@ -291,17 +291,17 @@ This function can be rewritten as follows:
 
     incr = \n -> do
       var m = n
-		  m = m + 1 
-		  return m
+      m = m + 1 
+      return m
 
 Object properties and array elements can also be mutated inside a block. For example:
 
     createObject = do
-		  var a = [1, 2, 3]
-		  a[1] = 4
-		  var o = { foo: [] }
-		  o.foo = a
-		  return o
+      var a = [1, 2, 3]
+      a[1] = 4
+      var o = { foo: [] }
+      o.foo = a
+      return o
 
 ## For loops
 
@@ -414,7 +414,7 @@ For example:
     f = \arr -> case arr of
       [x] -> x
       [x, y : xs] -> x * y + f(xs)
-		  _ -> 0
+      _ -> 0
 
 Here, the first pattern only matches arrays of length one, and brings the first element of the array into scope.
 
@@ -426,7 +426,7 @@ Record patterns match an input which is a record, and bring its properties into 
 
     f = \o -> case o of
       { foo = "Foo" } -> o.bar
-		  _ -> 0
+      _ -> 0
 
 ## Nested Patterns
 
@@ -466,7 +466,7 @@ E.g. to create a synonym for string concatenation:
 
     (<>) = \s1 -> \s2 -> s1 ++ s2
 	
-	  "Hello" <> "World!"
+    greeting = "Hello" <> "World!"
 	  
 Regular functions can be used as operators by enclosing their names in backticks:
 
@@ -483,12 +483,12 @@ Fixity declarations can associate a precedence level, which is a natural number,
 
 The `extern` keyword declares a value which is defined in Javascript, and its type:
 
-	  extern pow :: (Number, Number) -> Number
+    extern pow :: (Number, Number) -> Number
 	
 To declare a new type with no constructors, use `extern data` and provide the kind:
 
-	  extern IO :: * -> *
+    extern IO :: * -> *
 	
-  	extern console :: { 
-		  log :: String -> IO {} 
-	  }
+    extern console :: { 
+      log :: String -> IO {} 
+    }
