@@ -201,7 +201,7 @@ objectPropertyToJs (key, value) = key ++ ":" ++ valueToJs value
 
 statementToJs :: Statement -> String
 statementToJs (VariableIntroduction ident value) = "var " ++ identToJs ident ++ " = " ++ valueToJs value
-statementToJs (Assignment target value) = assignmentTargetToJs target ++ " = " ++ valueToJs value
+statementToJs (Assignment target value) = identToJs target ++ " = " ++ valueToJs value
 statementToJs (While cond sts) = "while ("
   ++ valueToJs cond ++ ") {"
   ++ intercalate ";" (map statementToJs sts) ++ "}"
@@ -226,8 +226,3 @@ ifStatementToJs (IfStatement cond thens elst) =
 elseStatementToJs :: ElseStatement -> String
 elseStatementToJs (Else sts) = " else {" ++ intercalate ";" (map statementToJs sts) ++ "}"
 elseStatementToJs (ElseIf ifst) = " else " ++ ifStatementToJs ifst
-
-assignmentTargetToJs :: AssignmentTarget -> String
-assignmentTargetToJs (AssignVariable ident) = identToJs ident
-assignmentTargetToJs (AssignArrayIndex index tgt) = assignmentTargetToJs tgt ++ "[" ++ valueToJs index ++ "]"
-assignmentTargetToJs (AssignObjectProperty prop tgt) = assignmentTargetToJs tgt ++ "." ++ prop

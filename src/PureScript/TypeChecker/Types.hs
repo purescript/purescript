@@ -48,12 +48,12 @@ import qualified Data.Map as M
 data TypeConstraintOrigin
   = ValueOrigin Value
   | BinderOrigin Binder
-  | AssignmentTargetOrigin AssignmentTarget deriving (Show, D.Data, D.Typeable)
+  | AssignmentTargetOrigin Ident deriving (Show, D.Data, D.Typeable)
 
 prettyPrintOrigin :: TypeConstraintOrigin -> String
 prettyPrintOrigin (ValueOrigin val) = prettyPrintValue val
 prettyPrintOrigin (BinderOrigin binder) = prettyPrintBinder binder
-prettyPrintOrigin (AssignmentTargetOrigin assign) = prettyPrintAssignmentTarget assign
+prettyPrintOrigin (AssignmentTargetOrigin ident) = show ident
 
 data TypeConstraint
   = TypeConstraint Int Type TypeConstraintOrigin
@@ -428,10 +428,12 @@ typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
   assignVariable name (m `M.union` mass)
   (cs1, n1) <- typeConstraints m val
   return $ (cs1, False, M.insert name n1 mass)
-typeConstraintsForStatement m mass ret (Assignment tgt val) = do
+typeConstraintsForStatement m mass ret (Assignment ident val) = do
   (cs1, n1) <- typeConstraints m val
-  cs2 <- typeConstraintsForAssignmentTarget m mass n1 tgt
-  return (cs1 ++ cs2, False, mass)
+  case M.lookup ident mass of
+    Nothing -> throwError $ "No local variable with name " ++ show ident
+    Just ty -> do
+     return (TypeConstraint n1 (TUnknown ty) (AssignmentTargetOrigin ident) : cs1, False, mass)
 typeConstraintsForStatement m mass ret (While val inner) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
@@ -476,23 +478,6 @@ typeConstraintsForElseStatement m mass ret (Else elses) = do
 typeConstraintsForElseStatement m mass ret (ElseIf ifst) = do
   (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
   return (cs, allCodePathsReturn)
-
-typeConstraintsForAssignmentTarget :: M.Map Ident Int -> M.Map Ident Int -> Int -> AssignmentTarget -> Check [TypeConstraint]
-typeConstraintsForAssignmentTarget m mass nval a@(AssignVariable var) =
-  case M.lookup var mass of
-    Nothing -> throwError $ "No local variable with name " ++ show var
-    Just ty -> do
-     return [TypeConstraint nval (TUnknown ty) (AssignmentTargetOrigin a)]
-typeConstraintsForAssignmentTarget m mass nval a@(AssignArrayIndex index tgt) = do
-  arr <- fresh
-  (cs1, n1) <- typeConstraints (m `M.union` mass) index
-  cs2 <- typeConstraintsForAssignmentTarget m mass arr tgt
-  return $ (TypeConstraint arr (Array (TUnknown nval)) (AssignmentTargetOrigin a)) : (TypeConstraint n1 Number (ValueOrigin index)) : cs1 ++ cs2
-typeConstraintsForAssignmentTarget m mass nval a@(AssignObjectProperty prop tgt) =  do
-  obj <- fresh
-  row <- fresh
-  cs <- typeConstraintsForAssignmentTarget m mass obj tgt
-  return $ (TypeConstraint obj (Object (RCons prop (TUnknown nval) $ RUnknown row)) (AssignmentTargetOrigin a)) : cs
 
 typeConstraintsForBlock :: M.Map Ident Int -> M.Map Ident Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map Ident Int)
 typeConstraintsForBlock _ mass _ [] = return ([], False, mass)

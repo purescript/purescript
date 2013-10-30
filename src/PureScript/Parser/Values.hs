@@ -178,7 +178,7 @@ parseVariableIntroduction = do
 
 parseAssignment :: P.Parsec String ParseState Statement
 parseAssignment = do
-  tgt <- parseAssignmentTarget
+  tgt <- C.parseIdent
   C.lexeme $ C.indented *> P.char '='
   value <- parseValue
   return $ Assignment tgt value
@@ -279,9 +279,3 @@ parseBinder = P.choice (map P.try
 
 parseGuardedBinder :: P.Parsec String ParseState Binder
 parseGuardedBinder = flip ($) <$> parseBinder <*> P.option id (GuardedBinder <$> (C.indented *> C.lexeme (P.char '|') *> C.indented *> parseValue))
-
-parseAssignmentTarget :: P.Parsec String ParseState AssignmentTarget
-parseAssignmentTarget = buildExpressionParser operators (AssignVariable <$> C.parseIdent)
-  where
-  operators = [ [ Postfix $ AssignArrayIndex <$> (C.indented *> C.squares parseValue)
-                , Postfix $ AssignObjectProperty <$> (C.indented *> C.dot *> C.indented *> C.identifier) ] ]

@@ -69,7 +69,7 @@ data Value
 
 data Statement
   = VariableIntroduction Ident Value
-  | Assignment AssignmentTarget Value
+  | Assignment Ident Value
   | While Value [Statement]
   | For Ident Value Value [Statement]
   | ForEach Ident Value [Statement]
@@ -91,11 +91,6 @@ data Binder
   | NullaryBinder String
   | UnaryBinder String Binder
   | ObjectBinder [(String, Binder)]
-  | ArrayBinder [Binder] (Maybe Binder) 
+  | ArrayBinder [Binder] (Maybe Binder)
   | NamedBinder Ident Binder
   | GuardedBinder Value Binder deriving (Show, Data, Typeable)
-
-data AssignmentTarget
-  = AssignVariable Ident
-  | AssignObjectProperty String AssignmentTarget
-  | AssignArrayIndex Value AssignmentTarget deriving (Show, Data, Typeable)

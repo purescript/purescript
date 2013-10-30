@@ -14,8 +14,7 @@
 
 module PureScript.CodeGen.Pretty.Values (
     prettyPrintValue,
-    prettyPrintBinder,
-    prettyPrintAssignmentTarget
+    prettyPrintBinder
 ) where
 
 import Data.Char
@@ -155,7 +154,7 @@ prettyPrintObjectProperty key value = key ++ ": " ++ prettyPrintValue value
 
 prettyPrintStatement :: Statement -> String
 prettyPrintStatement (VariableIntroduction ident value) = "var " ++ show ident ++ " = " ++ prettyPrintValue value
-prettyPrintStatement (Assignment target value) = prettyPrintAssignmentTarget target ++ " = " ++ prettyPrintValue value
+prettyPrintStatement (Assignment target value) = show target ++ " = " ++ prettyPrintValue value
 prettyPrintStatement (While cond sts) = "while " ++ prettyPrintValue cond ++ ": {" ++ intercalate ";" (map prettyPrintStatement sts) ++ " }"
 prettyPrintStatement (For ident start end sts) = "for " ++ show ident
   ++ " <- " ++ prettyPrintValue start
@@ -177,8 +176,3 @@ prettyPrintIfStatement (IfStatement cond thens elst) =
 prettyPrintElseStatement :: ElseStatement -> String
 prettyPrintElseStatement (Else sts) = "else: {" ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
 prettyPrintElseStatement (ElseIf ifst) = "else " ++ prettyPrintIfStatement ifst
-
-prettyPrintAssignmentTarget :: AssignmentTarget -> String
-prettyPrintAssignmentTarget (AssignVariable ident) = identToJs ident
-prettyPrintAssignmentTarget (AssignArrayIndex index tgt) = prettyPrintAssignmentTarget tgt ++ "[" ++ prettyPrintValue index ++ "]"
-prettyPrintAssignmentTarget (AssignObjectProperty prop tgt) = prettyPrintAssignmentTarget tgt ++ "." ++ prop
