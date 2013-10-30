@@ -31,7 +31,7 @@ import PureScript.CodeGen.Common
 import PureScript.CodeGen.Common.Gen
 
 declToJs :: Declaration -> Maybe String
-declToJs (ValueDeclaration ident (Abs args ret)) = Just $ "function " ++ identToJs ident ++ "(" ++ intercalate "," (map identToJs args) ++ ") { return " ++ valueToJs ret ++ "; }" 
+declToJs (ValueDeclaration ident (Abs args ret)) = Just $ "function " ++ identToJs ident ++ "(" ++ intercalate "," (map identToJs args) ++ ") { return " ++ valueToJs ret ++ "; }"
 declToJs (ValueDeclaration ident val) = Just $ "var " ++ identToJs ident ++ " = " ++ valueToJs val ++ ";"
 declToJs (DataDeclaration _ _ ctors) =
   Just $ flip concatMap ctors $ \(ctor, maybeTy) ->
@@ -148,33 +148,6 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
                     , [ binary    Or                   "||" ]
                     ]
 
-unaryOperatorString :: UnaryOperator -> String
-unaryOperatorString Negate = "-"
-unaryOperatorString Not = "!"
-unaryOperatorString BitwiseNot = "~"
-
-binaryOperatorString :: BinaryOperator -> String
-binaryOperatorString Add = "+"
-binaryOperatorString Subtract = "-"
-binaryOperatorString Multiply = "*"
-binaryOperatorString Divide = "/"
-binaryOperatorString Modulus = "%"
-binaryOperatorString LessThan = "<"
-binaryOperatorString LessThanOrEqualTo = "<="
-binaryOperatorString GreaterThan = ">"
-binaryOperatorString GreaterThanOrEqualTo = ">="
-binaryOperatorString BitwiseAnd = "&"
-binaryOperatorString BitwiseOr = "|"
-binaryOperatorString BitwiseXor = "^"
-binaryOperatorString ShiftLeft = "<<"
-binaryOperatorString ShiftRight = ">>"
-binaryOperatorString ZeroFillShiftRight = ">>>"
-binaryOperatorString EqualTo = "==="
-binaryOperatorString NotEqualTo = "!=="
-binaryOperatorString And = "&&"
-binaryOperatorString Or = "||"
-binaryOperatorString Concat = "+"
-
 binderToJs :: String -> String -> Binder -> Gen String
 binderToJs varName done NullBinder = return done
 binderToJs varName done (StringBinder str) =
@@ -219,8 +192,8 @@ binderToJs varName done (ArrayBinder bs rest) = do
 binderToJs varName done (NamedBinder ident binder) = do
   js <- binderToJs varName done binder
   return $ "var " ++ identToJs ident ++ " = " ++ varName ++ "; " ++ js
-binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' binder 
-  where 
+binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' binder
+  where
   done' = "if (" ++ valueToJs cond ++ ") { " ++ done ++ "}"
 
 objectPropertyToJs :: (String, Value) -> String
