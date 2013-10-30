@@ -12,6 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module PureScript.TypeChecker.Types (
     TypeConstraint(..),
     TypeSolution(..),
@@ -20,7 +22,7 @@ module PureScript.TypeChecker.Types (
 
 import Data.List
 import Data.Function
-import Data.Data (Data(..))
+import qualified Data.Data as D
 import Data.Generics (everywhere, everywhereM, everything, mkT, mkM, mkQ, extM, extQ)
 
 import PureScript.Values
@@ -44,7 +46,7 @@ import qualified Data.Map as M
 
 data TypeConstraint
   = TypeConstraint Int Type
-  | RowConstraint Int Row deriving Show
+  | RowConstraint Int Row deriving (Show, D.Data, D.Typeable)
 
 newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Row) }
 
@@ -59,9 +61,10 @@ typeOf name val = do
       (cs, n) <- typeConstraints (M.singleton name me) val
       return (TypeConstraint me (TUnknown n) : cs, n)
     _ -> typeConstraints M.empty val
-  solution <- solveTypeConstraints cs emptyTypeSolution
+  desugared <- replaceAllTypeSynonyms cs
+  solution <- solveTypeConstraints desugared emptyTypeSolution
   let ty = fst (runTypeSolution solution) n
-  allUnknownsBecameQuantified cs solution ty
+  allUnknownsBecameQuantified desugared solution ty
   return $ varIfUnknown ty
 
 allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
@@ -81,21 +84,21 @@ allUnknownsBecameQuantified cs solution ty = do
     unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
   guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
 
-findUnknownTypes :: (Data d) => d -> [Int]
+findUnknownTypes :: (D.Data d) => d -> [Int]
 findUnknownTypes = everything (++) (mkQ [] f)
   where
   f :: Type -> [Int]
   f (TUnknown n) = [n]
   f _ = []
 
-findTypeVars :: (Data d) => d -> [String]
+findTypeVars :: (D.Data d) => d -> [String]
 findTypeVars = everything (++) (mkQ [] f)
   where
   f :: Type -> [String]
   f (TypeVar v) = [v]
   f _ = []
 
-findUnknownRows :: (Data d) => d -> [Int]
+findUnknownRows :: (D.Data d) => d -> [Int]
 findUnknownRows = everything (++) (mkQ [] f)
   where
   f :: Row -> [Int]
@@ -154,13 +157,23 @@ replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip ext
       Just u -> return $ RUnknown u
   g r = return r
 
-replaceType :: (Data d) => Int -> Type -> d -> d
+replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
+replaceAllTypeSynonyms ty = do
+  env <- getEnv
+  go (M.toList $ typeSynonyms env) ty
+  where
+  go [] d = return d
+  go ((name, (args, repl)):rest) d = do
+    d' <- either throwError return (substituteTypeSynonym name args repl d)
+    go rest d'
+
+replaceType :: (D.Data d) => Int -> Type -> d -> d
 replaceType n t = everywhere (mkT go)
   where
   go (TUnknown m) | m == n = t
   go t = t
 
-replaceRow :: (Data d) => Int -> Row -> d -> d
+replaceRow :: (D.Data d) => Int -> Row -> d -> d
 replaceRow n r = everywhere (mkT go)
   where
   go (RUnknown m) | m == n = r
@@ -174,7 +187,7 @@ rowOccursCheck :: Int -> Row -> Check ()
 rowOccursCheck u (RUnknown _) = return ()
 rowOccursCheck u r = when (occursCheck u r) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ prettyPrintRow r
 
-occursCheck :: (Data d) => Int -> d -> Bool
+occursCheck :: (D.Data d) => Int -> d -> Bool
 occursCheck u = everything (||) $ flip extQ g $ mkQ False f
   where
   f (TUnknown u') | u' == u = True
@@ -276,19 +289,8 @@ typeConstraints m (IfThenElse cond th el) = do
 typeConstraints m (TypedValue val poly@(PolyType idents ty)) = do
   kind <- kindOf poly
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  desugared <- replaceAllTypeSynonyms ty
   (cs, n1) <- typeConstraints m val
-  return (TypeConstraint n1 desugared : cs, n1)
-
-replaceAllTypeSynonyms :: Type -> Check Type
-replaceAllTypeSynonyms ty = do
-  env <- getEnv
-  go (M.toList $ typeSynonyms env) ty
-  where
-  go [] ty = return ty
-  go ((name, (args, repl)):rest) ty = do
-    ty' <- either throwError return (substituteTypeSynonym name args repl ty)
-    go rest ty'
+  return (TypeConstraint n1 ty : cs, n1)
 
 unaryOperatorConstraints :: UnaryOperator -> Int -> Int -> [TypeConstraint]
 unaryOperatorConstraints Negate val result = [TypeConstraint val Number, TypeConstraint result Number]

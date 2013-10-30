@@ -21,6 +21,7 @@ import qualified Data.Map as M
 import PureScript.Declarations
 import PureScript.TypeChecker.Monad
 import PureScript.CodeGen.Pretty.Types
+import PureScript.CodeGen.Pretty.Kinds
 
 externToPs :: Environment -> Declaration -> Maybe String
 externToPs env (ValueDeclaration name _) = do
@@ -28,6 +29,8 @@ externToPs env (ValueDeclaration name _) = do
   return $ "extern " ++ show name ++ " :: " ++ prettyPrintPolyType ty
 externToPs env (ExternDeclaration name ty) =
   return $ "extern " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+externToPs env (ExternDataDeclaration name kind) =
+  return $ "extern data " ++ name ++ " :: " ++ prettyPrintKind kind
 externToPs env (TypeSynonymDeclaration name args ty) =
   return $ "type " ++ name ++ " " ++ intercalate " " args ++ " = " ++ prettyPrintType ty
 externToPs _ _ = Nothing

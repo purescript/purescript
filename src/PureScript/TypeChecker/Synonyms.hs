@@ -36,23 +36,21 @@ replaceTypeVars m = everywhere (mkT replace)
   replace t@(TypeVar var) = fromMaybe t (M.lookup var m)
   replace t = t
 
-buildTypeSubstitution :: String -> Type -> [String] -> Type -> WriterT Any (Either String) (Maybe Type)
+buildTypeSubstitution :: String -> Type -> [String] -> Type -> Either String (Maybe Type)
 buildTypeSubstitution name ty args = go (reverse args) M.empty
   where
-  go :: [String] -> M.Map String Type -> Type -> WriterT Any (Either String) (Maybe Type)
-  go [] m (TypeConstructor ctor) | name == ctor = tell (Any True) >> return (Just $ replaceTypeVars m ty)
-  go (_:_) _ (TypeConstructor ctor) | name == ctor = lift . throwError $ "Partially applied type synonym " ++ name
+  go :: [String] -> M.Map String Type -> Type -> Either String (Maybe Type)
+  go [] m (TypeConstructor ctor) | name == ctor = return (Just $ replaceTypeVars m ty)
+  go (_:_) _ (TypeConstructor ctor) | name == ctor = throwError $ "Partially applied type synonym " ++ name
   go (arg:args) m (TypeApp f x) = go args (M.insert arg x m) f
   go _ _ _ = return Nothing
 
-everywhereButM' :: (Monad m, Data d) => (forall d. (Data d) => d -> WriterT Any m d) -> d -> m d
-everywhereButM' f x = do
-  (y, halt) <- runWriterT $ f x
-  case getAny halt of
-    True -> return y
-    _ -> gmapM (everywhereButM' f) y
+everywhereM' :: (Monad m, Data d) => (forall d. (Data d) => d -> m d) -> d -> m d
+everywhereM' f x = do
+  y <- f x
+  gmapM (everywhereM' f) y
 
-substituteTypeSynonym :: String -> [String] -> Type -> Type -> Either String Type
-substituteTypeSynonym name args ty = everywhereButM' (mkM replace)
+substituteTypeSynonym :: (Data d) => String -> [String] -> Type -> d -> Either String d
+substituteTypeSynonym name args ty = everywhereM' (mkM replace)
   where
   replace t = fmap (fromMaybe t) $ buildTypeSubstitution name ty args t
