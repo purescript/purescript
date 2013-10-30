@@ -36,6 +36,6 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parens parseKind ])
 
 parseKind :: P.Parsec String ParseState Kind
-parseKind = P.buildExpressionParser operators $ parseTypeAtom
+parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
   operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return FunKind) P.AssocRight ] ]

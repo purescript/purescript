@@ -135,8 +135,8 @@ properName :: P.Parsec String u String
 properName = lexeme $ P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
 
 integerOrFloat :: P.Parsec String u (Either Integer Double)
-integerOrFloat = Left <$> P.try (PT.natural tokenParser) <|>
-                 Right <$> P.try (PT.float tokenParser)
+integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
+                  Right <$> P.try (PT.float tokenParser)) P.<?> "number"
 
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 augment p q f = (flip $ maybe id $ flip f) <$> p <*> P.optionMaybe q
@@ -166,16 +166,16 @@ mark p = do
   return a
 
 checkIndentation :: (P.Column -> P.Column -> Bool) -> P.Parsec String ParseState ()
-checkIndentation rel = (do
+checkIndentation rel = do
   col <- P.sourceColumn <$> P.getPosition
   current <- indentationLevel <$> P.getState
-  guard $ col `rel` current) <|> P.parserFail "Indentation check"
+  guard (col `rel` current)
 
 indented :: P.Parsec String ParseState ()
-indented = checkIndentation (>)
+indented = checkIndentation (>) P.<?> "indentation"
 
 same :: P.Parsec String ParseState ()
-same = checkIndentation (==)
+same = checkIndentation (==) P.<?> "no indentation"
 
 runIndentParser :: P.Parsec String ParseState a -> String -> Either P.ParseError a
 runIndentParser p = P.runParser p (ParseState 0 M.empty) ""

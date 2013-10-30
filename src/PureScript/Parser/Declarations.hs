@@ -88,13 +88,13 @@ parseFixityDeclaration = do
   return $ FixityDeclaration fixity name
 
 parseDeclaration :: P.Parsec String ParseState Declaration
-parseDeclaration = P.choice $ map P.try
+parseDeclaration = P.choice (map P.try
                    [ parseDataDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
                    , parseExternDeclaration
-                   , parseFixityDeclaration ]
+                   , parseFixityDeclaration ]) P.<?> "declaration"
 
 parseDeclarations :: P.Parsec String ParseState [Declaration]
 parseDeclarations = whiteSpace *> mark (same *> P.many parseDeclaration) <* P.eof

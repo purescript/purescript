@@ -67,11 +67,11 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parens parseType ])
 
 parsePolyType :: P.Parsec String ParseState PolyType
-parsePolyType = PolyType <$> (P.option [] (indented *> reserved "forall" *> many (indented *> identifier) <* indented <* dot))
-                         <*> parseType
+parsePolyType = (PolyType <$> (P.option [] (indented *> reserved "forall" *> many (indented *> identifier) <* indented <* dot))
+                          <*> parseType) P.<?> "polymorphic type"
 
 parseType :: P.Parsec String ParseState Type
-parseType = P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom
+parseType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"
   where
   postfixTable :: [P.Parsec String ParseState (Type -> Type)]
   postfixTable = [ flip TypeApp <$> (indented *> parseTypeAtom) ]
@@ -84,7 +84,7 @@ parseRowEnding :: P.Parsec String ParseState Row
 parseRowEnding = P.option REmpty (RowVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
 parseRow :: P.Parsec String ParseState Row
-parseRow = fromList <$> (parseNameAndType `P.sepBy` (indented *> semi)) <*> parseRowEnding
+parseRow = (fromList <$> (parseNameAndType `P.sepBy` (indented *> semi)) <*> parseRowEnding) P.<?> "row"
   where
   fromList :: [(String, Type)] -> Row -> Row
   fromList [] r = r

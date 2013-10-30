@@ -79,7 +79,9 @@ parseCase = Case <$> (P.between (C.reserved "case") (C.indented *> C.reserved "o
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: P.Parsec String ParseState (Binder, Value)
-parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->")) <*> parseValue
+parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->"))
+                           <*> parseValue
+                           P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Value
 parseIfThenElse = IfThenElse <$> (C.reserved "if" *> C.indented *> parseValue)
@@ -90,7 +92,7 @@ parseBlock :: P.Parsec String ParseState Value
 parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
 
 parseManyStatements :: P.Parsec String ParseState [Statement]
-parseManyStatements = C.indented *> (C.mark $ P.many $ C.same *> C.mark parseStatement)
+parseManyStatements = C.indented *> (C.mark $ P.many $ C.same *> C.mark parseStatement) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
 parseValueAtom = C.indented *> P.choice (map P.try
@@ -110,7 +112,9 @@ parseValueAtom = C.indented *> P.choice (map P.try
 parseValue :: P.Parsec String ParseState Value
 parseValue = do
   customOps <- fixities <$> P.getState
-  buildExpressionParser (operators customOps) . C.buildPostfixParser postfixTable2 $ indexersAndAccessors
+  (buildExpressionParser (operators customOps)
+   . C.buildPostfixParser postfixTable2
+   $ indexersAndAccessors) P.<?> "expression"
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 $ parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
@@ -124,7 +128,7 @@ parseValue = do
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               ] ++ customOperatorTable user ++
-              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix) >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
+              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
                 , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<") >> return (Binary LessThan)) AssocRight
@@ -157,7 +161,7 @@ customOperatorTable fixities =
     flip map levels (map (\(name, (a, _)) -> flip Infix (toAssoc a) $ do
       C.lexeme $ P.try $ do
         C.indented
-        C.reservedOp name
+        C.reservedOp name P.<?> "operator"
       return $ \t1 t2 -> App (App (Var (Op name)) [t1]) [t2]))
 
 toAssoc :: Associativity -> Assoc
@@ -218,7 +222,7 @@ parseStatement = P.choice (map P.try
                  , parseFor
                  , parseForEach
                  , parseIf
-                 , parseReturn ])
+                 , parseReturn ]) P.<?> "statement"
 
 parseStringBinder :: P.Parsec String ParseState Binder
 parseStringBinder = StringBinder <$> C.stringLiteral
@@ -271,7 +275,7 @@ parseBinder = P.choice (map P.try
                   , parseNullaryBinder
                   , parseObjectBinder
                   , parseArrayBinder
-                  , C.parens parseBinder ])
+                  , C.parens parseBinder ]) P.<?> "binder"
 
 parseGuardedBinder :: P.Parsec String ParseState Binder
 parseGuardedBinder = flip ($) <$> parseBinder <*> P.option id (GuardedBinder <$> (C.indented *> C.lexeme (P.char '|') *> C.indented *> parseValue))
