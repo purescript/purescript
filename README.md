@@ -88,7 +88,7 @@ The generated Javascript looks like this:
           var o = _1; 
           return o.name ++ ", aged " ++ itoa(o.age); 
         }
-	throw "Failed pattern match"; 
+        throw "Failed pattern match"; 
       })(p); 
     };
 
@@ -303,7 +303,7 @@ Object properties and array elements can also be mutated inside a block. For exa
       o.foo = a
       return o
 
-## For loops
+## For Loops
 
 For loops look like this:
 
@@ -315,7 +315,7 @@ For loops look like this:
 
 The bounds `0` and `10` are inclusive and exclusive respectively.
       
-## For-each loops
+## For-Each Loops
 
 For each loops loop over the elements in an array using the `Object.forEach` method. A polyfill may be required for some browsers:
 
@@ -325,7 +325,7 @@ For each loops loop over the elements in an array using the `Object.forEach` met
         n = n + i
       return n
 
-## While loops
+## While Loops
 
 The syntax of a while loop is similar to a foreach loop:
 
@@ -337,7 +337,7 @@ The syntax of a while loop is similar to a foreach loop:
         count = count + 1
       return count
 
-## If-Then-Else statements
+## If-Then-Else Statements
 
 Else branches are optional, and may contain further `if` statements, just as in Javascript:
 
