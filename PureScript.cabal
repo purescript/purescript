@@ -1,6 +1,6 @@
-name: Purescript
+name: purescript
 version: 0.0.1
-cabal-version: >=1.2
+cabal-version: >=1.8
 build-type: Simple
 license: MIT
 license-file: LICENSE
@@ -33,9 +33,17 @@ library
     hs-source-dirs: src
     other-modules:
 
+Test-Suite tests
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    hs-source-dirs: tests
+    build-depends: base -any, syb -any, directory -any, filepath -any,
+                   containers -any, mtl -any, transformers -any, parsec -any,
+                   utf8-string -any, purescript -any
+
 executable psc
     build-depends: base -any, cmdtheline -any, containers -any,
-                   mtl -any, transformers -any, parsec -any, utf8-string -any
+                   mtl -any, transformers -any, parsec -any, utf8-string -any, syb -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src

@@ -31,7 +31,7 @@ data Type
   | TypeApp Type Type
   | SaturatedTypeSynonym String [Type] deriving (Show, Eq, Data, Typeable)
 
-data PolyType = PolyType [String] Type deriving (Show, Data, Typeable)
+data PolyType = PolyType [String] Type deriving (Show, Eq, Data, Typeable)
 
 data Row
   = RUnknown Int
