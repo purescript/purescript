@@ -1,0 +1,142 @@
+id :: forall a. a -> a
+id = \x -> x
+
+flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+flip = \f -> \b -> \a -> f a b
+
+const :: forall a b. a -> b -> a
+const = \a -> \b -> a
+
+(|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
+(|>) = \f -> \g -> \a -> g (f a)
+
+(<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
+(<|) = flip (|>)
+
+-- Maybe
+
+data Maybe a = Nothing | Just a
+
+maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
+maybe = \b -> \f -> \m -> case m of 
+  Nothing -> b
+  Just a -> f a
+
+fromMaybe :: forall a. a -> Maybe a -> a
+fromMaybe = \a -> maybe a id
+
+-- Arrays
+
+head :: forall a. [a] -> a
+head = \xs -> case xs of
+  [x:_] -> x
+
+headSafe :: forall a. [a] -> Maybe a
+headSafe = \xs -> case xs of 
+  [x:_] -> Just x
+  _ -> Nothing
+
+tail :: forall a. [a] -> [a]
+tail = \xs -> case xs of
+  [_:xs] -> xs
+
+tailSafe :: forall a. [a] -> Maybe [a]
+tailSafe = \xs -> case xs of
+  [_:xs] -> Just xs
+  _ -> Nothing
+
+extern length :: forall a. [a] -> Number
+
+extern indexOf :: forall a. [a] -> a -> Number
+
+extern lastIndexOf :: forall a. [a] -> a -> Number
+
+extern concat :: forall a. [a] -> [a] -> [a]
+
+extern join :: [String] -> String
+
+extern joinWith :: [String] -> String -> String
+
+extern push :: forall a. [a] -> a -> [a]
+
+extern reverse :: forall a. [a] -> [a]
+
+extern shift :: forall a. [a] -> [a]
+
+extern slice :: forall a. Number -> Number -> [a] -> [a]
+
+extern sort :: forall a. [a] -> [a]
+
+extern splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
+
+-- Strings
+
+extern lengthS :: String -> Number
+
+extern charAt :: Number -> String -> String
+
+extern indexOfS :: String -> String -> Number
+
+extern lastIndexOfS :: String -> String -> Number
+
+extern localeCompare :: String -> String -> Number
+
+extern replace :: String -> String -> String -> String
+
+extern sliceS :: Number -> Number -> String -> String
+
+extern split :: String -> String -> [String]
+
+extern substr :: Number -> Number -> String -> String
+
+extern substring :: Number -> Number -> String -> String
+
+extern toLower :: String -> String
+
+extern toUpper :: String -> String
+
+extern trim :: String -> String
+
+-- Regex
+
+extern data Regex :: *
+
+extern regex :: String -> String -> Regex
+
+extern test :: Regex -> String -> Boolean
+
+extern match :: Regex -> String -> [String]
+
+extern replaceR :: Regex -> String -> String -> String
+
+extern search :: Regex -> String -> Number
+
+-- Globals
+
+extern nan :: Number
+
+extern infinity :: Number
+
+extern toExponential :: Number -> String
+
+extern toFixed :: Number -> Number -> String
+
+extern toPrecision :: Number -> Number -> String
+
+extern numberToString :: Number -> String
+
+extern isNaN :: Number -> Boolean
+
+extern isFinite :: Number -> Boolean
+
+extern parseFloat :: String -> Number
+
+extern parseInt :: String -> Number
+
+extern encodeURIComponent :: String -> String
+
+extern decodeURIComponent :: String -> String
+
+extern encodeURI :: String -> String
+
+extern decodeURI :: String -> String
