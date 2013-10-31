@@ -238,7 +238,7 @@ All types can be inferred, but annotations can optionally be provided.
 
 ## Kind System
 
-There are two primitive kinds, the kind of types and the kind of rows. Higher kinded types are also supported. That is, a type variable can refer to not only a type or a row, but a type constructor, or row constructor etc.
+There are two primitive kinds, the kind `*` of types and the kind `#` of rows. Higher kinded types are also supported. That is, a type variable can refer to not only a type or a row, but a type constructor, or row constructor etc.
 
 ## Whitespace
 
@@ -342,6 +342,14 @@ Else branches are optional, and may contain further `if` statements, just as in 
           m = m * 3 + 1
         count = count + 1
       return count
+      
+## If-Then-Else Expressions
+
+The `if`, `then` and `else` keywords can also be used to create conditional expressions. In this case, the `else` block is always required.
+
+For example,
+
+    conditional = if 2 > 1 then "ok" else "oops"
 
 ## Pattern Matching
 
