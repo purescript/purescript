@@ -49,6 +49,9 @@ literals = Pattern $ A.Kleisli match
   match (BooleanLiteral False) = Just "false"
   match (ArrayLiteral xs) = Just $ "[" ++ intercalate "," (map valueToJs xs) ++ "]"
   match (ObjectLiteral ps) = Just $ "{" ++ intercalate "," (map objectPropertyToJs ps) ++ "}"
+  match (ObjectUpdate o ps) = Just $ "Object.extend("
+    ++ valueToJs o ++ ", { "
+    ++ intercalate ", " (map objectPropertyToJs ps) ++ " }"
   match (Constructor name) = Just name
   match (Block sts) = Just $ "(function () {" ++ intercalate ";" (map statementToJs sts) ++ "})()"
   match (Case value binders) = Just $ "(" ++ runGen (bindersToJs binders) ++  ")(" ++ valueToJs value ++ ")"
@@ -197,7 +200,7 @@ binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' b
   done' = "if (" ++ valueToJs cond ++ ") { " ++ done ++ "}"
 
 objectPropertyToJs :: (String, Value) -> String
-objectPropertyToJs (key, value) = key ++ ":" ++ valueToJs value
+objectPropertyToJs (key, value) = key ++ ": " ++ valueToJs value
 
 statementToJs :: Statement -> String
 statementToJs (VariableIntroduction ident value) = "var " ++ identToJs ident ++ " = " ++ valueToJs value

@@ -47,18 +47,17 @@ typeLiterals = Pattern $ A.Kleisli match
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
-prettyPrintRow = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList
+prettyPrintRow = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList []
   where
   nameAndTypeToPs :: String -> Type -> String
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Row -> String
   tailToPs REmpty = ""
-  tailToPs (RUnknown u) = show u
+  tailToPs (RUnknown u) = " | " ++ show u
   tailToPs (RowVar var) = " | " ++ var
-  toList :: Row -> ([(String, Type)], Row)
-  toList (RCons name ty row) = let (tys, rest) = toList row
-                               in ((name, ty):tys, rest)
-  toList r = ([], r)
+  toList :: [(String, Type)] -> Row -> ([(String, Type)], Row)
+  toList tys (RCons name ty row) = toList ((name, ty):tys) row
+  toList tys r = (tys, r)
 
 typeApp :: Pattern Type (Type, Type)
 typeApp = Pattern $ A.Kleisli match

@@ -58,6 +58,7 @@ data Value
   | Indexer Value Value
   | ObjectLiteral [(String, Value)]
   | Accessor String Value
+  | ObjectUpdate Value [(String, Value)]
   | Abs [Ident] Value
   | App Value [Value]
   | Var Ident

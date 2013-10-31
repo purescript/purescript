@@ -109,6 +109,13 @@ parseValueAtom = C.indented *> P.choice (map P.try
             , parseIfThenElse
             , C.parens parseValue ])
 
+parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
+parsePropertyUpdate = do
+  name <- C.lexeme C.identifier
+  C.lexeme $ C.indented *> P.char '='
+  value <- C.indented *> parseValue
+  return (name, value)
+
 parseValue :: P.Parsec String ParseState Value
 parseValue = do
   customOps <- fixities <$> P.getState
@@ -118,7 +125,8 @@ parseValue = do
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 $ parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                  , Indexer <$> (C.indented *> C.squares parseValue) ]
+                  , Indexer <$> (C.indented *> C.squares parseValue)
+                  , flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
   postfixTable2 = [ C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])
                   , flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
                   , flip TypedValue <$> (P.try $ C.lexeme (C.indented *> P.string "::") *> parsePolyType) ]

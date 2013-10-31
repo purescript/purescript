@@ -20,6 +20,8 @@ module PureScript.TypeChecker.Types (
     typeOf
 ) where
 
+import Debug.Trace
+
 import Data.List
 import Data.Function
 import qualified Data.Data as D
@@ -76,7 +78,7 @@ typeOf name val = do
   solution <- solveTypeConstraints desugared emptyTypeSolution
   let ty = fst (runTypeSolution solution) n
   allUnknownsBecameQuantified desugared solution ty
-  return $ varIfUnknown $ desaturateAllTypeSynonyms ty
+  return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
 
 allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
 allUnknownsBecameQuantified cs solution ty = do
@@ -94,6 +96,12 @@ allUnknownsBecameQuantified cs solution ty = do
       RowConstraint u r _ -> u : findUnknownRows r
     unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
   guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
+
+setify :: Row -> Row
+setify = rowFromList . (M.toList . M.fromList *** id) . rowToList
+
+setifyAll :: (D.Data d) => d -> d
+setifyAll = everywhere (mkT setify)
 
 findUnknownTypes :: (D.Data d) => d -> [Int]
 findUnknownTypes = everything (++) (mkQ [] f)
@@ -216,6 +224,22 @@ occursCheck u = everything (||) $ flip extQ g $ mkQ False f
   g (RUnknown u') | u' == u = True
   g _ = False
 
+typesToRow :: [(String, Type)] -> Row
+typesToRow [] = REmpty
+typesToRow ((name, ty):tys) = RCons name ty (typesToRow tys)
+
+rowToList :: Row -> ([(String, Type)], Row)
+rowToList (RCons name ty row) = let (tys, rest) = rowToList row
+                               in ((name, ty):tys, rest)
+rowToList r = ([], r)
+
+rowFromList :: ([(String, Type)], Row) -> Row
+rowFromList ([], r) = r
+rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
+
+ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
+ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
+
 typeConstraints :: M.Map Ident Int -> Value -> Check ([TypeConstraint], Int)
 typeConstraints _ v@(NumericLiteral _) = do
   me <- fresh
@@ -241,14 +265,20 @@ typeConstraints m b@(Binary op left right) = do
   me <- fresh
   return (cs1 ++ cs2 ++ binaryOperatorConstraints b op n1 n2 me, me)
 typeConstraints m v@(ObjectLiteral ps) = do
+  ensureNoDuplicateProperties ps
   all <- mapM (typeConstraints m . snd) ps
   let (cs, ns) = (concat . map fst &&& map snd) all
   me <- fresh
   let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
   return ((TypeConstraint me (Object (typesToRow tys)) (ValueOrigin v)) : cs, me)
-  where
-    typesToRow [] = REmpty
-    typesToRow ((name, ty):tys) = RCons name ty (typesToRow tys)
+typeConstraints m v@(ObjectUpdate o ps) = do
+  ensureNoDuplicateProperties ps
+  (cs1, n1) <- typeConstraints m o
+  all <- mapM (typeConstraints m . snd) ps
+  let (cs2, ns) = (concat . map fst &&& map snd) all
+  row <- fresh
+  let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
+  return (TypeConstraint n1 (Object (rowFromList (tys, RUnknown row))) (ValueOrigin v) : cs1 ++ cs2, n1)
 typeConstraints m v@(Indexer index val) = do
   (cs1, n1) <- typeConstraints m index
   (cs2, n2) <- typeConstraints m val
@@ -563,8 +593,8 @@ unifyTypes _ t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " wit
 unifyRows :: TypeConstraintOrigin -> Row -> Row -> Check [TypeConstraint]
 unifyRows o r1 r2 =
   let
-    (s1, r1') = toList r1
-    (s2, r2') = toList r2
+    (s1, r1') = rowToList r1
+    (s2, r2') = rowToList r2
     int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
     sd1 = [ (name, t1) | (name, t1) <- s1, not (elem name (map fst s2)) ]
     sd2 = [ (name, t2) | (name, t2) <- s2, not (elem name (map fst s1)) ]
@@ -576,20 +606,14 @@ unifyRows o r1 r2 =
   unifyRows' :: TypeConstraintOrigin -> [(String, Type)] -> Row -> [(String, Type)] -> Row -> Check [TypeConstraint]
   unifyRows' o [] (RUnknown u) sd r = do
     rowOccursCheck u r
-    return [RowConstraint u (fromList (sd, r)) o]
+    return [RowConstraint u (rowFromList (sd, r)) o]
   unifyRows' o sd r [] (RUnknown u) = do
     rowOccursCheck u r
-    return [RowConstraint u (fromList (sd, r)) o]
-  unifyRows' o ((name, ty):row) r others (RUnknown u) = do
+    return [RowConstraint u (rowFromList (sd, r)) o]
+  unifyRows' o ns@((name, ty):row) r others (RUnknown u) | not (occursCheck u (ty, row)) = do
     u' <- fresh
     cs <- unifyRows' o row r others (RUnknown u')
     return (RowConstraint u (RCons name ty (RUnknown u')) o : cs)
   unifyRows' _ [] REmpty [] REmpty = return []
-  unifyRows' _ sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (fromList (sd1, r1)) ++ " with " ++ prettyPrintRow (fromList (sd2, r2)) ++ "."
-  toList :: Row -> ([(String, Type)], Row)
-  toList (RCons name ty row) = let (tys, rest) = toList row
-                               in ((name, ty):tys, rest)
-  toList r = ([], r)
-  fromList :: ([(String, Type)], Row) -> Row
-  fromList ([], r) = r
-  fromList ((name, t):ts, r) = RCons name t (fromList (ts, r))
+  unifyRows' _ [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return []
+  unifyRows' _ sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd1, r1)) ++ " with " ++ prettyPrintRow (rowFromList (sd2, r2)) ++ "."

@@ -65,6 +65,12 @@ indexer = Pattern $ A.Kleisli match
   match (Indexer index val) = Just (prettyPrintValue index, val)
   match _ = Nothing
 
+objectUpdate :: Pattern Value ([String], Value)
+objectUpdate = Pattern $ A.Kleisli match
+  where
+  match (ObjectUpdate o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ prettyPrintValue val, o)
+  match _ = Nothing
+
 app :: Pattern Value (String, Value)
 app = Pattern $ A.Kleisli match
   where
@@ -104,6 +110,7 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue
   operators =
     OperatorTable $ [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                     , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
+                    , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
                     , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                     , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ prettyPrintValue val ++ "; }" ]
                     , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
