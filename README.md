@@ -511,7 +511,7 @@ The `extern` keyword declares a value which is defined in Javascript, and its ty
 	
 To declare a new type with no constructors, use `extern data` and provide the kind:
 
-    extern IO :: * -> *
+    extern data IO :: * -> *
 	
     extern console :: { 
       log :: String -> IO {} 
