@@ -136,7 +136,7 @@ parseValue = do
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               ] ++ customOperatorTable user ++
-              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocRight ]
+              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocLeft ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
                 , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<") >> return (Binary LessThan)) AssocRight
