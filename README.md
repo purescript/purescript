@@ -448,6 +448,31 @@ Guards are used to impose additional constraints inside a pattern using boolean-
       [] -> 0
       [x:xs] | x % 2 == 0 -> 1 + evens xs
       [_:xs] -> evens xs
+      
+## Type Synonyms
+
+For convenience, it is possible to declare a synonym for a type using the `type` keyword. Type synonyms can include type arguments.
+
+For example:
+
+    type Foo = { foo :: Number, bar Number }
+    
+    addFoo :: Foo -> Number
+    addFoo = \o -> o.foo + o.bar
+      
+## Record Updates
+
+Properties on records can be updated using the following syntax: `o { key = value, ..., key = value }`
+
+For example, the following function increments the `foo` property on its argument:
+
+    incr = \o -> o { foo = o.foo + 1 }
+
+The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is
+
+    Object.prootype.extend = function(o, p) {
+      return $.extend({}, o, p);
+    };
 
 ## Operators
 
