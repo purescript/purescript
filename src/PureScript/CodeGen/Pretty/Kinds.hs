@@ -30,7 +30,7 @@ typeLiterals :: Pattern Kind String
 typeLiterals = Pattern $ A.Kleisli match
   where
   match Star = Just "*"
-  match Row = Just "ρ"
+  match Row = Just "#"
   match (KUnknown u) = Just $ "u" ++ show u
   match _ = Nothing
 

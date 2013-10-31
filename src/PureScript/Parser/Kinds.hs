@@ -27,7 +27,7 @@ parseStar :: P.Parsec String ParseState Kind
 parseStar = const Star <$> lexeme (P.char '*')
 
 parseRow :: P.Parsec String ParseState Kind
-parseRow = const Row <$> lexeme (P.char 'ρ')
+parseRow = const Row <$> lexeme (P.char '#')
 
 parseTypeAtom :: P.Parsec String ParseState Kind
 parseTypeAtom = indented *> P.choice (map P.try
