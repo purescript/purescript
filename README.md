@@ -294,15 +294,6 @@ This function can be rewritten as follows:
       m = m + 1 
       return m
 
-Object properties and array elements can also be mutated inside a block. For example:
-
-    createObject = do
-      var a = [1, 2, 3]
-      a[1] = 4
-      var o = { foo: [] }
-      o.foo = a
-      return o
-
 ## For Loops
 
 For loops look like this:
