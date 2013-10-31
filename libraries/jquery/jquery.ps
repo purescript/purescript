@@ -1,0 +1,23 @@
+-- The jQuery wrapper type
+extern data JQuery :: *
+
+-- Wrapper function for jQuery selection $('..')
+extern select :: String -> JQuery
+
+-- Wrapper function for jQuery creation e.g. $('<div>')
+extern create :: String -> JQuery
+
+-- .attr({ ... })
+extern attr :: forall attr. JQuery -> { | attr } -> JQuery
+
+-- .css({ ... })
+extern css :: forall css. JQuery -> { | css } -> JQuery
+
+-- .append(...)
+extern append :: JQuery -> JQuery -> JQuery
+
+-- .appendTo(...)
+extern appendTo :: JQuery -> JQuery -> JQuery
+
+-- .append(...)
+extern appendText :: JQuery -> String -> JQuery
