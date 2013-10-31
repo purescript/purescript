@@ -132,7 +132,7 @@ Examples:
 
 PureScript arrays correspond to Javascript arrays at runtime, but all elements must have the same type.
 
-Array literals look like Javascript array literals: `[1, 2, 3]
+Array literals look like Javascript array literals: `[1, 2, 3]`
 
 Array elements can be read using array index notation `arr[0]`
 
@@ -478,7 +478,7 @@ For example, the following function increments the `foo` property on its argumen
 
 The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is
 
-    Object.prootype.extend = function(o, p) {
+    Object.prototype.extend = function(o, p) {
       return $.extend({}, o, p);
     };
 
