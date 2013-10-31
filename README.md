@@ -132,7 +132,7 @@ Examples:
 
 PureScript arrays correspond to Javascript arrays at runtime, but all elements must have the same type.
 
-Array literals look like Javascript array literals: `[1, 2, 3]
+Array literals look like Javascript array literals: `[1, 2, 3]`
 
 Array elements can be read using array index notation `arr[0]`
 
