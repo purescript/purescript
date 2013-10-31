@@ -58,7 +58,7 @@ The following code defines a `Person` data type and a function to generate a str
 
     data Person = Person 
       { name :: String
-      , age :: Number 
+      ; age :: Number 
       }
 	
     extern itoa :: Number -> String
