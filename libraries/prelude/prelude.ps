@@ -164,3 +164,20 @@ type Math =
   }
 
 extern math :: Math
+
+-- 
+
+extern map :: forall a b. (a -> b) -> [a] -> [b]
+
+foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
+foldr = \f -> \a -> \bs -> case bs of
+  [b:bs] -> f (foldr f a bs) b
+  [] -> a
+
+foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
+foldl = \f -> \b -> \as -> do
+  var result = b
+  foreach a in as:
+    result = f a result
+  return result
+
