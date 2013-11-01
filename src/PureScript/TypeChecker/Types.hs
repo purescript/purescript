@@ -66,14 +66,21 @@ newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Ro
 emptyTypeSolution :: TypeSolution
 emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
 
+isFunction :: Value -> Bool
+isFunction (Abs _ _) = True
+isFunction (TypedValue untyped _) = isFunction untyped
+isFunction _ = False
+
+allConstraints :: Ident -> Value -> Check ([TypeConstraint], Int)
+allConstraints name val | isFunction val = do
+  me <- fresh
+  (cs, n) <- typeConstraints (M.singleton name me) val
+  return (TypeConstraint me (TUnknown n) (ValueOrigin val): cs, n)
+allConstraints _ val = typeConstraints M.empty val
+
 typeOf :: Ident -> Value -> Check PolyType
 typeOf name val = do
-  (cs, n) <- case val of
-    Abs _ _ -> do
-      me <- fresh
-      (cs, n) <- typeConstraints (M.singleton name me) val
-      return (TypeConstraint me (TUnknown n) (ValueOrigin val): cs, n)
-    _ -> typeConstraints M.empty val
+  (cs, n) <- allConstraints name val
   desugared <- replaceAllTypeSynonyms cs
   solution <- solveTypeConstraints desugared emptyTypeSolution
   let ty = fst (runTypeSolution solution) n
