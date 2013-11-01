@@ -58,15 +58,15 @@ The following code defines a `Person` data type and a function to generate a str
 
 ```haskell
 data Person = Person 
-{ name :: String
-; age :: Number 
-}
+  { name :: String
+  ; age :: Number   
+  }
 
 extern itoa :: Number -> String
 
 showPerson :: Person -> String
 showPerson = \p -> case p of
-Person o -> o.name ++ ", aged " ++ itoa(o.age)
+  Person o -> o.name ++ ", aged " ++ itoa(o.age)
 ```
 
 Line by line, this reads as follows:
@@ -81,18 +81,18 @@ The generated Javascript looks like this:
 
 ```javascript
 var Person = function (value) { 
-return { ctor: 'Person', value: value }; 
+  return { ctor: 'Person', value: value }; 
 };
 
 var showPerson = function (p) { 
-return (function (_0) {
-if (_0.ctor === "Person") { 
-  var _1 = _0.value; 
-  var o = _1; 
-  return o.name ++ ", aged " ++ itoa(o.age); 
-}
-throw "Failed pattern match"; 
-})(p); 
+  return (function (_0) {
+    if (_0.ctor === "Person") { 
+      var _1 = _0.value; 
+      var o = _1; 
+      return o.name ++ ", aged " ++ itoa(o.age); 
+    }
+    throw "Failed pattern match"; 
+  })(p); 
 };
 ```
 
@@ -588,6 +588,7 @@ extern pow :: (Number, Number) -> Number
 
 To declare a new type with no constructors, use `extern data` and provide the kind:
 
+```haskell
 extern data IO :: * -> *
 	
 extern console :: { 
