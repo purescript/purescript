@@ -166,7 +166,7 @@ In the example, Foo is a tagged union type which has two constructors. It's firs
 
 ## Functions
 
-Functions in TypeScript can have zero or more arguments in general, just like in Javascript.
+Functions in PureScript can have zero or more arguments in general, just like in Javascript.
 
 Functions are introduced by using a backslash followed by a comma separated list of argument names:
 
