@@ -56,16 +56,18 @@ PureScript can also be seen as a trade-off between a theoretically ideal languag
 
 The following code defines a `Person` data type and a function to generate a string representation for a `Person`:
 
-    data Person = Person 
-      { name :: String
-      ; age :: Number 
-      }
-	
-    extern itoa :: Number -> String
-	
-    showPerson :: Person -> String
-    showPerson = \p -> case p of
-      Person o -> o.name ++ ", aged " ++ itoa(o.age)
+```haskell
+data Person = Person 
+{ name :: String
+; age :: Number 
+}
+
+extern itoa :: Number -> String
+
+showPerson :: Person -> String
+showPerson = \p -> case p of
+Person o -> o.name ++ ", aged " ++ itoa(o.age)
+```
 
 Line by line, this reads as follows:
 
@@ -77,20 +79,22 @@ Line by line, this reads as follows:
 
 The generated Javascript looks like this:
 
-    var Person = function (value) { 
-      return { ctor: 'Person', value: value }; 
-    };
-    
-    var showPerson = function (p) { 
-      return (function (_0) {
-        if (_0.ctor === "Person") { 
-          var _1 = _0.value; 
-          var o = _1; 
-          return o.name ++ ", aged " ++ itoa(o.age); 
-        }
-        throw "Failed pattern match"; 
-      })(p); 
-    };
+```javascript
+var Person = function (value) { 
+return { ctor: 'Person', value: value }; 
+};
+
+var showPerson = function (p) { 
+return (function (_0) {
+if (_0.ctor === "Person") { 
+  var _1 = _0.value; 
+  var o = _1; 
+  return o.name ++ ", aged " ++ itoa(o.age); 
+}
+throw "Failed pattern match"; 
+})(p); 
+};
+```
 
 ## Type System
 
@@ -124,9 +128,11 @@ PureScript supports the same binary and unary operations on primitive types as J
 
 Examples:
 
-    num = 1 + 2 * 3
-    str = "Hello, " ++ "World!"
-    bool = 1 > 2 || true
+```haskell
+num = 1 + 2 * 3
+str = "Hello, " ++ "World!"
+bool = 1 > 2 || true
+```
 
 ## Arrays
 
@@ -152,14 +158,16 @@ Tagged unions can only be created using their constructors, and deconstructed th
 
 For example:
 
-    data Foo a = Foo | Bar String
-    
-    runFoo = \foo -> case foo of
-      Foo -> "It's a Foo"
-      Bar s -> "It's a Bar. The string is " ++ s
-      
-    runFoo Foo ++ runFoo (Bar "Test")
-    
+```haskell
+data Foo a = Foo | Bar String
+
+runFoo = \foo -> case foo of
+Foo -> "It's a Foo"
+Bar s -> "It's a Bar. The string is " ++ s
+
+runFoo Foo ++ runFoo (Bar "Test")
+```
+
 In the example, Foo is a tagged union type which has two constructors. It's first constructor `Foo` takes no argument, and it's second `Bar` takes one, which must be a String.
 
 `runFoo` is an example of pattern matching on a tagged union type to discover its constructor, and the last line shows how `Foo`s are constructed.
@@ -170,34 +178,42 @@ Functions in PureScript can have zero or more arguments in general, just like in
 
 Functions are introduced by using a backslash followed by a comma separated list of argument names:
 
-    test1 = \a, b, c -> a + b + c
-    
+```haskell
+test1 = \a, b, c -> a + b + c
+```
+
 which would correspond to the Javascript `function test1(a, b, c) { return a + b + c; }`
     
 A function taking no arguments would look like this:
 
-    test2 = \ -> 100
-    
+```haskell
+test2 = \ -> 100
+```
+
 which would correspond to the Javascript `function test2() { return 100; }`
 
 Functions are applied by providing their arguments inside parentheses:
 
-    test1(1, 2, 3)
-    test2()
-    
+```haskell
+test1(1, 2, 3)
+test2()
+```
+
 A special case is made in the case of functions with one argument. These functions can be applied without parentheses, and function application associates to the left:
 
-    -- has type Number -> Number -> Number -> Number
-    addThree = \a -> \b -> \c -> a + b + c
-    
-    -- has type Number -> Number -> Number
-    addThree 1 
-    
-    -- has type Number -> Number
-    addThree 1 2 
-    
-    -- has type Number
-    addThree 1 2 3 
+```haskell
+-- has type Number -> Number -> Number -> Number
+addThree = \a -> \b -> \c -> a + b + c
+
+-- has type Number -> Number -> Number
+addThree 1 
+
+-- has type Number -> Number
+addThree 1 2 
+
+-- has type Number
+addThree 1 2 3 
+```
 
 ## Polymorphic Types
 
@@ -205,28 +221,38 @@ Expressions defined at the top level may have polymorphic types.
 
 Here is an example:
 
-    identity = \x -> x
-    
+```haskell
+identity = \x -> x
+```
+
 `identity` is inferred to have (polymorphic) type `forall t0. t0 -> t0`. This means that for any type `t0`, `identity` can be given a value of type `t0` and will give back a value of the same type.
 
 A type annotation can also be provided:
 
-    identity :: forall a. a -> a
-    identity = \x -> x
-    
+```haskell
+identity :: forall a. a -> a
+identity = \x -> x
+```
+
 Functions may also be polymorphic in row types or type variables with other kinds (see "Kind System"):
 
-    addProps = \o -> o.foo + o.bar
+```haskell
+addProps = \o -> o.foo + o.bar
+```
     
 Here, `addProps` is inferred to have type `forall r. { foo :: Number; bar :: Number | r } -> Number`. That is, it can take any type which has properties `Foo` and `Bar`, and *any other record properties*.
 
 So, the following compiles:
 
-    addProps { foo: 1, bar: 2, baz: 3 }
+```haskell
+addProps { foo: 1, bar: 2, baz: 3 }
+```
     
 but the following does not:
 
-    addProps { foo: 1 }
+```haskell
+addProps { foo: 1 }
+```
     
 since the `bar` property is missing.
 
@@ -246,13 +272,17 @@ Syntax is whitespace sensitive. The general rule of thumb is that declarations w
 
 That is, the following is valid:
 
-    foo = bar(x) + 
-      baz(x)
+```haskell
+foo = bar(x) + 
+  baz(x)
+```
 
 But this is not:
 
-    foo = bar(x) + 
-    baz(x)
+```haskell
+foo = bar(x) + 
+baz(x)
+```
 
 ## Do Notation
 
@@ -271,38 +301,46 @@ The following types of statement are supported:
 
 Here is an example of a power function defined using a block:
 
-    pow = \n, p -> do
-	    var m = n
-		  for i <- 0 until p:
-		    m = m * n
-		  return m
+```haskell
+pow = \n, p -> do
+    var m = n
+	  for i <- 0 until p:
+	    m = m * n
+	  return m
+```
 
 Blocks enable local mutation of their variables, but mutation is not allowed in general. The type system prevents mutable variables from escaping their scope.
 
 That is, while the example above is valid, the following does not compile:
 
-    incr = \n -> do
-		  n = n + 1 
-		  return n
+```haskell
+incr = \n -> do
+  n = n + 1 
+  return n
+```
 
 The variable `n` is not mutable, and so the assignment in the first line of the `do` block is not allowed.
 
 This function can be rewritten as follows:
 
-    incr = \n -> do
-      var m = n
-      m = m + 1 
-      return m
+```haskell
+incr = \n -> do
+  var m = n
+  m = m + 1 
+  return m
+```
 
 ## For Loops
 
 For loops look like this:
 
-    total = do
-      var n = 0
-      for i <- 0 until 10:
-        n = n + i
-      return n
+```haskell
+total = do
+  var n = 0
+  for i <- 0 until 10:
+  n = n + i
+  return n
+```
 
 The bounds `0` and `10` are inclusive and exclusive respectively.
       
@@ -310,38 +348,44 @@ The bounds `0` and `10` are inclusive and exclusive respectively.
 
 For each loops loop over the elements in an array using the `Object.forEach` method. A polyfill may be required for some browsers:
 
-    total = \arr -> do
-      var n = 0
-      foreach i in arr:
-        n = n + i
-      return n
+```haskell
+total = \arr -> do
+  var n = 0
+  foreach i in arr:
+    n = n + i
+  return n
+```
 
 ## While Loops
 
 The syntax of a while loop is similar to a foreach loop:
 
-    log2 = \n -> do
-      var count = 0
-      var m = n
-      while m > 1:
-        m = m / 2
-        count = count + 1
-      return count
+```haskell
+log2 = \n -> do
+  var count = 0
+  var m = n
+  while m > 1:
+    m = m / 2
+    count = count + 1
+  return count
+```
 
 ## If-Then-Else Statements
 
 Else branches are optional, and may contain further `if` statements, just as in Javascript:
 
-    collatz = \n -> do
-      var count = 0
-      var m = n
-      while m > 1:
-        if m % 2 == 0:
-          m = m / 2
-        else:
-          m = m * 3 + 1
-        count = count + 1
-      return count
+```haskell
+collatz = \n -> do
+  var count = 0
+  var m = n
+  while m > 1:
+    if m % 2 == 0:
+      m = m / 2
+    else:
+      m = m * 3 + 1
+    count = count + 1
+  return count
+```
       
 ## If-Then-Else Expressions
 
@@ -349,7 +393,9 @@ The `if`, `then` and `else` keywords can also be used to create conditional expr
 
 For example,
 
-    conditional = if 2 > 1 then "ok" else "oops"
+```haskell
+conditional = if 2 > 1 then "ok" else "oops"
+```
 
 ## Pattern Matching
 
@@ -357,10 +403,12 @@ Pattern matching deconstructs a value to bring zero or more expressions into sco
 
 Pattern matches have the following general form
 
-    case value of
-      pattern -> result
-      ...
-      pattern -> result
+```haskell
+case value of
+  pattern -> result
+  -- ...
+  pattern -> result
+```
 
 The following pattern types are supported:
 
@@ -378,31 +426,37 @@ Patterns need not be exhaustive. A pattern match failed exception will be thrown
 
 The wilcard `_` matches any input and brings nothing into scope:
 
-    case x of 
-      _ -> 0
+```haskell
+case x of 
+  _ -> 0
+```
       
 ## Literal Patterns
 
 Literal patterns are provided to match on primitives:
 
-    case booleanValue of 
-      true -> 0
-      false -> 1
-      
-    case stringValue of 
-      "Foo" -> 0
-      _ -> 1
-      
-    case numericValue of 
-      0 -> 0
-      _ -> 1
+```haskell
+case booleanValue of 
+  true -> 0
+  false -> 1
+  
+case stringValue of 
+  "Foo" -> 0
+  _ -> 1
+  
+case numericValue of 
+  0 -> 0
+  _ -> 1
+```
 
 ## Variable Pattern
 
 A variable pattern matches any input and binds that input to its name:
 
-    case foo(x) of
-      result -> bar(result)
+```haskell
+case foo(x) of
+  result -> bar(result)
+```
 
 ## Array Patterns
 
@@ -410,10 +464,12 @@ Array patterns match an input which is an array, and bring its elements into sco
 
 For example:
 
-    f = \arr -> case arr of
-      [x] -> x
-      [x, y : xs] -> x * y + f(xs)
-      _ -> 0
+```haskell
+f = \arr -> case arr of
+  [x] -> x
+  [x, y : xs] -> x * y + f(xs)
+  _ -> 0
+```
 
 Here, the first pattern only matches arrays of length one, and brings the first element of the array into scope.
 
@@ -423,9 +479,11 @@ The second pattern matches arrays with two or more elements, and brings the firs
 
 Record patterns match an input which is a record, and bring its properties into scope.
 
-    f = \o -> case o of
-      { foo = "Foo" } -> o.bar
-      _ -> 0
+```haskell
+f = \o -> case o of
+  { foo = "Foo" } -> o.bar
+  _ -> 0
+```
 
 ## Nested Patterns
 
@@ -433,54 +491,65 @@ The patterns above can be combined to create larger patterns.
 
 For example:
 
-    f = \o -> case o of
-      { arr = [x:_], take = "car" } -> x
-      { arr = [_,x:_], take = "cadr" } -> x
-      _ -> 0
+```haskell
+f = \o -> case o of
+  { arr = [x:_], take = "car" } -> x
+  { arr = [_,x:_], take = "cadr" } -> x
+  _ -> 0
+```
 
 ## Named Patterns
 
 Named patterns bring additional names into scope when using nested patterns. Any pattern can be named by using the `@` symbol:
 
-    f = \arr -> case arr of
-      a@[_,_:_] -> a
-      a -> a
-      
+```haskell
+f = \arr -> case arr of
+  a@[_,_:_] -> a
+  a -> a
+```
+     
 Here, in the first pattern, any array with two or more elements will be matched and bound to the variable `a`.
 
 ## Guards
 
 Guards are used to impose additional constraints inside a pattern using boolean-valued expressions, and are introduced with a pipe after the pattern:
 
-    evens = \arr -> case arr of 
-      [] -> 0
-      [x:xs] | x % 2 == 0 -> 1 + evens xs
-      [_:xs] -> evens xs
-      
+```haskell
+evens = \arr -> case arr of 
+  [] -> 0
+  [x:xs] | x % 2 == 0 -> 1 + evens xs
+  [_:xs] -> evens xs
+```
+
 ## Type Synonyms
 
 For convenience, it is possible to declare a synonym for a type using the `type` keyword. Type synonyms can include type arguments.
 
 For example:
 
-    type Foo = { foo :: Number, bar Number }
-    
-    addFoo :: Foo -> Number
-    addFoo = \o -> o.foo + o.bar
-      
+```haskell
+type Foo = { foo :: Number, bar Number }
+
+addFoo :: Foo -> Number
+addFoo = \o -> o.foo + o.bar
+```
 ## Record Updates
 
 Properties on records can be updated using the following syntax: `o { key = value, ..., key = value }`
 
 For example, the following function increments the `foo` property on its argument:
 
-    incr = \o -> o { foo = o.foo + 1 }
+```haskell
+incr = \o -> o { foo = o.foo + 1 }
+```
 
 The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is
 
-    Object.prototype.extend = function(o, p) {
-      return $.extend({}, o, p);
-    };
+```haskell
+Object.prototype.extend = function(o, p) {
+    return $.extend({}, o, p);
+};
+```
 
 ## Operators
 
@@ -488,31 +557,40 @@ In addition to the standard operators, user-defined infix operators can be creat
 
 E.g. to create a synonym for string concatenation:
 
-    (<>) = \s1 -> \s2 -> s1 ++ s2
-	
-    greeting = "Hello" <> "World!"
-	  
+```haskell
+(<>) = \s1 -> \s2 -> s1 ++ s2
+
+greeting = "Hello" <> "World!"
+```
+
 Regular functions can be used as operators by enclosing their names in backticks:
 
-    foo = \x -> \y -> x * y + y
-    
-    test = 10 `foo` 20
+```haskell
+foo = \x -> \y -> x * y + y
+
+test = 10 `foo` 20
+```
     
 Fixity declarations can associate a precedence level, which is a natural number, to a user-defined operator, and specify which way it associates:
 
-    infixl 5 <>
-    infixr 7 %%
+```haskell
+infixl 5 <>
+infixr 7 %%
+```
 
 ## Foreign Function Interface
 
 The `extern` keyword declares a value which is defined in Javascript, and its type:
 
-    extern pow :: (Number, Number) -> Number
-	
+```haskell
+extern pow :: (Number, Number) -> Number
+```
+
 To declare a new type with no constructors, use `extern data` and provide the kind:
 
-    extern data IO :: * -> *
+extern data IO :: * -> *
 	
-    extern console :: { 
-      log :: String -> IO {} 
-    }
+extern console :: { 
+  log :: String -> IO {} 
+}
+```
