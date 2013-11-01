@@ -70,9 +70,9 @@ kindsOf :: Maybe String -> [String] -> [Type] -> Check Kind
 kindsOf name args ts = do
   tyCon <- fresh
   nargs <- replicateM (length args) fresh
-  (cs, ns, m) <- kindConstraintsAll (maybe id (flip M.insert tyCon) name $ M.fromList (zipWith (,) args nargs)) ts
+  (cs, ns, m) <- kindConstraintsAll (maybe id (`M.insert` tyCon) name $ M.fromList (zip args nargs)) ts
   let extraConstraints =
-        KindConstraint tyCon (foldr FunKind Star (map KUnknown nargs)) DataDeclOrigin
+        KindConstraint tyCon (foldr (FunKind . KUnknown) Star nargs) DataDeclOrigin
         : zipWith (\n arg -> KindConstraint n Star (TypeOrigin arg)) ns ts
   solution <- solveKindConstraints (extraConstraints ++ cs) emptyKindSolution
   return $ starIfUnknown $ runKindSolution solution tyCon
@@ -87,23 +87,23 @@ kindConstraintsAll m [] = return ([], [], m)
 kindConstraintsAll m (t:ts) = do
   (cs, n1, m') <- kindConstraints m t
   (cs', ns, m'') <- kindConstraintsAll m' ts
-  return ((KindConstraint n1 Star (TypeOrigin t)) : cs ++ cs', n1:ns, m'')
+  return (KindConstraint n1 Star (TypeOrigin t) : cs ++ cs', n1:ns, m'')
 
 kindConstraints :: M.Map String Int -> Type -> Check ([KindConstraint], Int, M.Map String Int)
 kindConstraints m a@(Array t) = do
   me <- fresh
   (cs, n1, m') <- kindConstraints m t
-  return ((KindConstraint n1 Star (TypeOrigin t)) : (KindConstraint me Star (TypeOrigin a)) : cs, me, m')
+  return (KindConstraint n1 Star (TypeOrigin t) : KindConstraint me Star (TypeOrigin a) : cs, me, m')
 kindConstraints m o@(Object row) = do
   me <- fresh
   (cs, r, m') <- kindConstraintsForRow m row
-  return ((KindConstraint me Star (TypeOrigin o)) : (KindConstraint r Row (RowOrigin row)) : cs, me, m')
+  return (KindConstraint me Star (TypeOrigin o) : KindConstraint r Row (RowOrigin row) : cs, me, m')
 kindConstraints m f@(Function args ret) = do
   me <- fresh
   (cs, ns, m') <- kindConstraintsAll m args
   (cs', retN, m'') <- kindConstraints m' ret
-  return ((KindConstraint retN Star (TypeOrigin ret)) : (KindConstraint me Star (TypeOrigin f)) : (zipWith (\n arg -> KindConstraint n Star (TypeOrigin arg)) ns args) ++ cs ++ cs', me, m'')
-kindConstraints m (TypeVar v) = do
+  return (KindConstraint retN Star (TypeOrigin ret) : KindConstraint me Star (TypeOrigin f) : zipWith (\n arg -> KindConstraint n Star (TypeOrigin arg)) ns args ++ cs ++ cs', me, m'')
+kindConstraints m (TypeVar v) =
   case M.lookup v m of
     Just u -> return ([], u, m)
     Nothing -> throwError $ "Unbound type variable " ++ v
@@ -114,13 +114,12 @@ kindConstraints m c@(TypeConstructor v) = do
     Nothing -> case M.lookup v (types env) of
       Nothing -> throwError $ "Unknown type constructor '" ++ v ++ "'"
       Just (kind, _) -> return ([KindConstraint me kind (TypeOrigin c)], me, m)
-    Just u -> do
-      return ([KindConstraint me (KUnknown u) (TypeOrigin c)], me, m)
+    Just u -> return ([KindConstraint me (KUnknown u) (TypeOrigin c)], me, m)
 kindConstraints m a@(TypeApp t1 t2) = do
   me <- fresh
   (cs1, n1, m1) <- kindConstraints m t1
   (cs2, n2, m2) <- kindConstraints m1 t2
-  return ((KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me)) (TypeOrigin a)) : cs1 ++ cs2, me, m2)
+  return (KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me)) (TypeOrigin a) : cs1 ++ cs2, me, m2)
 kindConstraints m t = do
   me <- fresh
   return ([KindConstraint me Star (TypeOrigin t)], me, m)
@@ -138,7 +137,7 @@ kindConstraintsForRow m r@(RCons _ ty row) = do
   me <- fresh
   (cs1, n1, m1) <- kindConstraints m ty
   (cs2, n2, m2) <- kindConstraintsForRow m1 row
-  return ((KindConstraint me Row (RowOrigin r)) : (KindConstraint n1 Star (TypeOrigin ty)) : (KindConstraint n2 Row (RowOrigin r)) : cs1 ++ cs2, me, m2)
+  return (KindConstraint me Row (RowOrigin r) : KindConstraint n1 Star (TypeOrigin ty) : KindConstraint n2 Row (RowOrigin r) : cs1 ++ cs2, me, m2)
 
 solveKindConstraints :: [KindConstraint] -> KindSolution -> Check KindSolution
 solveKindConstraints [] s = return s

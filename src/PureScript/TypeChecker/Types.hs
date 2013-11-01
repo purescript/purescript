@@ -42,7 +42,7 @@ import Control.Monad.State
 import Control.Monad.Error
 
 import Control.Applicative
-import Control.Arrow (Kleisli(..), (***), (&&&))
+import Control.Arrow (Kleisli(..), (***), (&&&), first)
 import qualified Control.Category as C
 
 import qualified Data.Map as M
@@ -105,7 +105,7 @@ allUnknownsBecameQuantified cs solution ty = do
   guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
 
 setify :: Row -> Row
-setify = rowFromList . (M.toList . M.fromList *** id) . rowToList
+setify = rowFromList . first (M.toList . M.fromList) . rowToList
 
 setifyAll :: (D.Data d) => d -> d
 setifyAll = everywhere (mkT setify)
@@ -143,7 +143,7 @@ varIfUnknown ty =
     m <- get
     case M.lookup n m of
       Nothing -> do
-        let name = "t" ++ show (M.size m)
+        let name = 't' : show (M.size m)
         put $ M.insert n name m
         return $ TypeVar name
       Just name -> return $ TypeVar name
@@ -153,7 +153,7 @@ varIfUnknown ty =
     m <- get
     case M.lookup n m of
       Nothing -> do
-        let name = "r" ++ show (M.size m)
+        let name = 'r' : show (M.size m)
         put $ M.insert n name m
         return $ RowVar name
       Just name -> return $ RowVar name
@@ -198,9 +198,9 @@ replaceAllTypeSynonyms d = do
   either throwError return $ saturateAllTypeSynonyms syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
-desaturateAllTypeSynonyms = everywhere (mkT $ replace)
+desaturateAllTypeSynonyms = everywhere (mkT replace)
   where
-  replace (SaturatedTypeSynonym name args) = foldl (\t arg -> TypeApp t arg) (TypeConstructor name) args
+  replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replace t = t
 
 replaceType :: (D.Data d) => Int -> Type -> d -> d
@@ -259,7 +259,7 @@ typeConstraints _ v@(BooleanLiteral _) = do
   return ([TypeConstraint me Boolean (ValueOrigin v)], me)
 typeConstraints m v@(ArrayLiteral vals) = do
   all <- mapM (typeConstraints m) vals
-  let (cs, ns) = (concat . map fst &&& map snd) all
+  let (cs, ns) = (concatMap fst &&& map snd) all
   me <- fresh
   return (cs ++ zipWith (\n el -> TypeConstraint me (Array $ TUnknown n) (ValueOrigin el)) ns vals, me)
 typeConstraints m u@(Unary op val) = do
@@ -274,15 +274,15 @@ typeConstraints m b@(Binary op left right) = do
 typeConstraints m v@(ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   all <- mapM (typeConstraints m . snd) ps
-  let (cs, ns) = (concat . map fst &&& map snd) all
+  let (cs, ns) = (concatMap fst &&& map snd) all
   me <- fresh
   let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
-  return ((TypeConstraint me (Object (typesToRow tys)) (ValueOrigin v)) : cs, me)
+  return (TypeConstraint me (Object (typesToRow tys)) (ValueOrigin v) : cs, me)
 typeConstraints m v@(ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   (cs1, n1) <- typeConstraints m o
   all <- mapM (typeConstraints m . snd) ps
-  let (cs2, ns) = (concat . map fst &&& map snd) all
+  let (cs2, ns) = (concatMap fst &&& map snd) all
   row <- fresh
   let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
   return (TypeConstraint n1 (Object (rowFromList (tys, RUnknown row))) (ValueOrigin v) : cs1 ++ cs2, n1)
@@ -290,24 +290,24 @@ typeConstraints m v@(Indexer index val) = do
   (cs1, n1) <- typeConstraints m index
   (cs2, n2) <- typeConstraints m val
   me <- fresh
-  return ((TypeConstraint n1 Number (ValueOrigin index)) : (TypeConstraint n2 (Array (TUnknown me)) (ValueOrigin v)) : cs1 ++ cs2, me)
+  return (TypeConstraint n1 Number (ValueOrigin index) : TypeConstraint n2 (Array (TUnknown me)) (ValueOrigin v) : cs1 ++ cs2, me)
 typeConstraints m v@(Accessor prop val) = do
   (cs, n1) <- typeConstraints m val
   me <- fresh
   rest <- fresh
-  return ((TypeConstraint n1 (Object (RCons prop (TUnknown me) (RUnknown rest))) (ValueOrigin v)) : cs, me)
+  return (TypeConstraint n1 (Object (RCons prop (TUnknown me) (RUnknown rest))) (ValueOrigin v) : cs, me)
 typeConstraints m v@(Abs args ret) = do
   ns <- replicateM (length args) fresh
-  let m' = m `M.union` M.fromList (zipWith (,) args ns)
+  let m' = m `M.union` M.fromList (zip args ns)
   (cs, n') <- typeConstraints m' ret
   me <- fresh
-  return ((TypeConstraint me (Function (map TUnknown ns) (TUnknown n')) (ValueOrigin v)) : cs, me)
+  return (TypeConstraint me (Function (map TUnknown ns) (TUnknown n')) (ValueOrigin v) : cs, me)
 typeConstraints m v@(App f xs) = do
   (cs1, n1) <- typeConstraints m f
   all <- mapM (typeConstraints m) xs
-  let (cs2, ns) = (concat . map fst &&& map snd) all
+  let (cs2, ns) = (concatMap fst &&& map snd) all
   me <- fresh
-  return ((TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me)) (ValueOrigin v)) : cs1 ++ cs2, me)
+  return (TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me)) (ValueOrigin v) : cs1 ++ cs2, me)
 typeConstraints m v@(Var var) =
   case M.lookup var m of
     Nothing -> do
@@ -381,7 +381,7 @@ equalityBinOpConstraints :: Value -> Int -> Int -> Int -> [TypeConstraint]
 equalityBinOpConstraints v left right result = [TypeConstraint left (TUnknown right) (ValueOrigin v), TypeConstraint result Boolean (ValueOrigin v)]
 
 symBinOpConstraints :: Value -> Type -> Int -> Int -> Int -> [TypeConstraint]
-symBinOpConstraints v ty left right result = asymBinOpConstraints v ty ty left right result
+symBinOpConstraints v ty = asymBinOpConstraints v ty ty
 
 asymBinOpConstraints :: Value -> Type -> Type -> Int -> Int -> Int -> [TypeConstraint]
 asymBinOpConstraints v ty res left right result = [TypeConstraint left ty (ValueOrigin v), TypeConstraint right ty (ValueOrigin v), TypeConstraint result res (ValueOrigin v)]
@@ -408,14 +408,14 @@ typeConstraintsForBinder val b@(UnaryBinder ctor binder) = do
       obj <- fresh
       (Function [ty] ret) <- replaceVarsWithUnknowns idents f
       (cs, m1) <- typeConstraintsForBinder obj binder
-      return ((TypeConstraint val ret (BinderOrigin b)) : (TypeConstraint obj ty (BinderOrigin b)) : cs, m1)
+      return (TypeConstraint val ret (BinderOrigin b) : TypeConstraint obj ty (BinderOrigin b) : cs, m1)
     Just _ -> throwError $ ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
 typeConstraintsForBinder val b@(ObjectBinder props) = do
   row <- fresh
   rest <- fresh
   (cs, m1) <- typeConstraintsForProperties row (RUnknown rest) props
-  return ((TypeConstraint val (Object (RUnknown row)) (BinderOrigin b)) : cs, m1)
+  return (TypeConstraint val (Object (RUnknown row)) (BinderOrigin b) : cs, m1)
   where
   typeConstraintsForProperties :: Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], M.Map Ident Int)
   typeConstraintsForProperties nrow row [] = return ([RowConstraint nrow row (BinderOrigin b)], M.empty)
@@ -423,17 +423,17 @@ typeConstraintsForBinder val b@(ObjectBinder props) = do
     propTy <- fresh
     (cs1, m1) <- typeConstraintsForBinder propTy binder
     (cs2, m2) <- typeConstraintsForProperties nrow (RCons name (TUnknown propTy) row) binders
-    return (cs1 ++ cs2, M.union m1 m2)
+    return (cs1 ++ cs2, m1 `M.union` m2)
 typeConstraintsForBinder val b@(ArrayBinder binders rest) = do
   el <- fresh
   all <- mapM (typeConstraintsForBinder el) binders
-  let (cs1, m1) = (concat . map fst &&& M.unions . map snd) all
+  let (cs1, m1) = (concatMap fst &&& M.unions . map snd) all
   let arrayConstraint = TypeConstraint val (Array (TUnknown el)) (BinderOrigin b)
   case rest of
     Nothing -> return (arrayConstraint : cs1, m1)
     Just binder -> do
       (cs2, m2) <- typeConstraintsForBinder val binder
-      return (arrayConstraint : cs1 ++ cs2, M.union m1 m2)
+      return (arrayConstraint : cs1 ++ cs2, m1 `M.union` m2)
 typeConstraintsForBinder val b@(NamedBinder name binder) = do
   me <- fresh
   (cs, m) <- typeConstraintsForBinder val binder
@@ -450,9 +450,9 @@ typeConstraintsForBinders :: M.Map Ident Int -> Int -> Int -> [(Binder, Value)] 
 typeConstraintsForBinders _ _ _ [] = return []
 typeConstraintsForBinders m nval ret ((binder, val):bs) = do
   (cs1, m1) <- typeConstraintsForBinder nval binder
-  (cs2, n2) <- typeConstraints (M.union m m1) val
+  (cs2, n2) <- typeConstraints (m `M.union` m1) val
   cs3 <- typeConstraintsForBinders m nval ret bs
-  return ((TypeConstraint n2 (TUnknown ret) (BinderOrigin binder)) : cs1 ++ cs2 ++ cs3)
+  return (TypeConstraint n2 (TUnknown ret) (BinderOrigin binder) : cs1 ++ cs2 ++ cs3)
 
 assignVariable :: Ident -> M.Map Ident Int -> Check ()
 assignVariable name m =
@@ -464,27 +464,27 @@ typeConstraintsForStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> Stat
 typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
   assignVariable name (m `M.union` mass)
   (cs1, n1) <- typeConstraints m val
-  return $ (cs1, False, M.insert name n1 mass)
+  return (cs1, False, M.insert name n1 mass)
 typeConstraintsForStatement m mass ret (Assignment ident val) = do
   (cs1, n1) <- typeConstraints m val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
-    Just ty -> do
+    Just ty ->
      return (TypeConstraint n1 (TUnknown ty) (AssignmentTargetOrigin ident) : cs1, False, mass)
 typeConstraintsForStatement m mass ret (While val inner) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
-  return $ ((TypeConstraint n1 Boolean (ValueOrigin val)) : cs1 ++ cs2, allCodePathsReturn, mass)
+  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2, allCodePathsReturn, mass)
 typeConstraintsForStatement m mass ret (If ifst) = do
   (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
-  return $ (cs, allCodePathsReturn, mass)
+  return (cs, allCodePathsReturn, mass)
 typeConstraintsForStatement m mass ret (For ident start end inner) = do
   assignVariable ident (m `M.union` mass)
   (cs1, n1) <- typeConstraints (m `M.union` mass) start
   (cs2, n2) <- typeConstraints (m `M.union` mass) end
   let mass1 = M.insert ident n1 mass
   (cs3, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
-  return $ ((TypeConstraint n1 Number (ValueOrigin start)) : (TypeConstraint n2 Number (ValueOrigin end)) : cs1 ++ cs2 ++ cs3, allCodePathsReturn, mass)
+  return (TypeConstraint n1 Number (ValueOrigin start) : TypeConstraint n2 Number (ValueOrigin end) : cs1 ++ cs2 ++ cs3, allCodePathsReturn, mass)
 typeConstraintsForStatement m mass ret (ForEach ident vals inner) = do
   assignVariable ident (m `M.union` mass)
   val <- fresh
@@ -492,21 +492,21 @@ typeConstraintsForStatement m mass ret (ForEach ident vals inner) = do
   let mass1 = M.insert ident val mass
   (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
-  return $ ((TypeConstraint n1 (Array (TUnknown val)) (ValueOrigin vals)) : cs1 ++ cs2, False, mass)
+  return (TypeConstraint n1 (Array (TUnknown val)) (ValueOrigin vals) : cs1 ++ cs2, False, mass)
 typeConstraintsForStatement m mass ret (Return val) = do
   (cs1, n1) <- typeConstraints (m `M.union` mass) val
-  return ((TypeConstraint n1 (TUnknown ret) (ValueOrigin val)) : cs1, True, mass)
+  return (TypeConstraint n1 (TUnknown ret) (ValueOrigin val) : cs1, True, mass)
 
 typeConstraintsForIfStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> IfStatement -> Check ([TypeConstraint], Bool)
 typeConstraintsForIfStatement m mass ret (IfStatement val thens Nothing) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, _, _) <- typeConstraintsForBlock m mass ret thens
-  return ((TypeConstraint n1 Boolean (ValueOrigin val)) : cs1 ++ cs2, False)
+  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2, False)
 typeConstraintsForIfStatement m mass ret (IfStatement val thens (Just elses)) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
   (cs3, allCodePathsReturn2) <- typeConstraintsForElseStatement m mass ret elses
-  return ((TypeConstraint n1 Boolean (ValueOrigin val)) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2)
+  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2)
 
 typeConstraintsForElseStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> ElseStatement -> Check ([TypeConstraint], Bool)
 typeConstraintsForElseStatement m mass ret (Else elses) = do
@@ -541,7 +541,7 @@ solveTypeConstraints (RowConstraint n r o:cs) s = do
   (cs', s') <- rethrow (\err -> "Error in " ++ prettyPrintOrigin o ++ ": " ++ err) $ do
     rowOccursCheck n r
     let s' = let (f, g) = runTypeSolution s
-             in TypeSolution $ (replaceRow n r . f, replaceRow n r . g)
+             in TypeSolution (replaceRow n r . f, replaceRow n r . g)
     cs' <- fmap concat $ mapM (substituteRowInConstraint n r) cs
     return (cs', s')
   solveTypeConstraints cs' s'
@@ -603,8 +603,8 @@ unifyRows o r1 r2 =
     (s1, r1') = rowToList r1
     (s2, r2') = rowToList r2
     int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-    sd1 = [ (name, t1) | (name, t1) <- s1, not (elem name (map fst s2)) ]
-    sd2 = [ (name, t2) | (name, t2) <- s2, not (elem name (map fst s1)) ]
+    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
   in do
     cs1 <- fmap concat $ mapM (uncurry $ unifyTypes o) int
     cs2 <- unifyRows' o sd1 r1' sd2 r2'

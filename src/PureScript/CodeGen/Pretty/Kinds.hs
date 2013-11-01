@@ -31,7 +31,7 @@ typeLiterals = Pattern $ A.Kleisli match
   where
   match Star = Just "*"
   match Row = Just "#"
-  match (KUnknown u) = Just $ "u" ++ show u
+  match (KUnknown u) = Just $ 'u' : show u
   match _ = Nothing
 
 funKind :: Pattern Kind (Kind, Kind)
@@ -47,4 +47,4 @@ prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
   operators :: OperatorTable Kind String
   operators =
-    OperatorTable $ [ [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]
+    OperatorTable [ [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]

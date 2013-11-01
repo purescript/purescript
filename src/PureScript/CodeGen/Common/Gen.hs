@@ -28,4 +28,4 @@ fresh :: Gen String
 fresh = do
   n <- get
   modify (+ 1)
-  return $ "_" ++ show n
+  return $ '_' : show n

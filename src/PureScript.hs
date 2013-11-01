@@ -12,22 +12,15 @@
 --
 -----------------------------------------------------------------------------
 
-module PureScript (
-    module PureScript.Values,
-    module PureScript.Types,
-    module PureScript.Kinds,
-    module PureScript.Declarations,
-    module PureScript.Names,
-    module PureScript.Parser,
-    module PureScript.CodeGen,
-    module PureScript.TypeChecker
-) where
+module PureScript (module P) where
 
-import PureScript.Values
-import PureScript.Types
-import PureScript.Kinds
-import PureScript.Declarations
-import PureScript.Names
-import PureScript.Parser
-import PureScript.CodeGen
-import PureScript.TypeChecker
+import PureScript.Values as P
+import PureScript.Types as P
+import PureScript.Kinds as P
+import PureScript.Declarations as P
+import PureScript.Names as P
+import PureScript.Parser as P
+import PureScript.CodeGen as P
+import PureScript.TypeChecker as P
+import PureScript.Pretty as P
+

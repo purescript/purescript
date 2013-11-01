@@ -67,7 +67,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parens parseType ])
 
 parsePolyType :: P.Parsec String ParseState PolyType
-parsePolyType = (PolyType <$> (P.option [] (indented *> reserved "forall" *> many (indented *> identifier) <* indented <* dot))
+parsePolyType = (PolyType <$> P.option [] (indented *> reserved "forall" *> many (indented *> identifier) <* indented <* dot)
                           <*> parseType) P.<?> "polymorphic type"
 
 parseType :: P.Parsec String ParseState Type

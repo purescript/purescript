@@ -139,7 +139,7 @@ integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
                   Right <$> P.try (PT.float tokenParser)) P.<?> "number"
 
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
-augment p q f = (flip $ maybe id $ flip f) <$> p <*> P.optionMaybe q
+augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 
 fold :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 fold first more combine = do

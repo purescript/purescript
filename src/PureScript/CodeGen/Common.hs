@@ -51,16 +51,16 @@ parens :: String -> String
 parens s = ('(':s) ++ ")"
 
 chainl :: Pattern a (a, a) -> (r -> r -> r) -> Pattern a r -> Pattern a r
-chainl split f p = fix $ \c -> (split >>> ((c <+> p) *** p) >>> A.arr (uncurry f))
+chainl split f p = fix $ \c -> split >>> ((c <+> p) *** p) >>> A.arr (uncurry f)
 
 chainr :: Pattern a (a, a) -> (r -> r -> r) -> Pattern a r -> Pattern a r
-chainr split f p = fix $ \c -> (split >>> (p *** (c <+> p)) >>> A.arr (uncurry f))
+chainr split f p = fix $ \c -> split >>> (p *** (c <+> p)) >>> A.arr (uncurry f)
 
 wrap :: Pattern a (s, a) -> (s -> r -> r) -> Pattern a r -> Pattern a r
-wrap split f p = fix $ \c -> (split >>> (C.id *** (c <+> p)) >>> A.arr (uncurry f))
+wrap split f p = fix $ \c -> split >>> (C.id *** (c <+> p)) >>> A.arr (uncurry f)
 
 split :: Pattern a (s, t) -> (s -> t -> r) -> Pattern a r -> Pattern a r
-split s f p = (s >>> A.arr (uncurry f))
+split s f p = s >>> A.arr (uncurry f)
 
 data OperatorTable a r = OperatorTable { runOperatorTable :: [ [Operator a r] ] }
 

@@ -19,6 +19,7 @@ import Data.Maybe (mapMaybe)
 import Data.List (intercalate)
 import System.Console.CmdTheLine
 import Control.Applicative
+import Control.Monad (forM)
 import System.Exit (exitSuccess, exitFailure)
 import qualified Text.Parsec as P
 import qualified System.IO.UTF8 as U
@@ -26,14 +27,14 @@ import qualified Data.Map as M
 
 compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile inputFiles outputFile externsFile = do
-  asts <- fmap (fmap concat . sequence) $ flip mapM inputFiles $ \inputFile -> do
+  asts <- fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
     text <- U.readFile inputFile
     return $ runIndentParser parseDeclarations text
   case asts of
     Left err -> do
       U.print err
       exitFailure
-    Right decls -> do
+    Right decls ->
       case check (typeCheckAll decls) of
         Left typeError -> do
           U.putStrLn typeError

@@ -21,6 +21,7 @@ import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import qualified Control.Arrow as A
 import Control.Arrow ((<+>))
+import Control.Monad (forM)
 import Control.Applicative
 
 import PureScript.Types
@@ -59,7 +60,7 @@ literals = Pattern $ A.Kleisli match
     bindersToJs ::  [(Binder, Value)] -> Gen String
     bindersToJs binders = do
       valName <- fresh
-      jss <- flip mapM binders $ \(binder, result) -> do
+      jss <- forM binders $ \(binder, result) -> do
          let js = valueToJs result
          binderToJs valName ("return " ++ js ++ ";") binder
       return $ "function (" ++ valName ++ ") {" ++ concat jss ++ "throw \"Failed pattern match\"; }"
@@ -121,34 +122,34 @@ valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
   matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
   operators :: OperatorTable Value String
   operators =
-    OperatorTable $ [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
-                    , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
-                    , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
-                    , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }" ]
-                    , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ valueToJs th ++ " : " ++ valueToJs el ]
-                    , [ binary    LessThan             "<" ]
-                    , [ binary    LessThanOrEqualTo    "<=" ]
-                    , [ binary    GreaterThan          ">" ]
-                    , [ binary    GreaterThanOrEqualTo ">=" ]
-                    , [ unary     Not                  "!" ]
-                    , [ unary     BitwiseNot           "~" ]
-                    , [ unary     Negate               "-" ]
-                    , [ binary    Multiply             "*" ]
-                    , [ binary    Divide               "/" ]
-                    , [ binary    Modulus              "%" ]
-                    , [ binary    Concat               "+" ]
-                    , [ binary    Add                  "+" ]
-                    , [ binary    Subtract             "-" ]
-                    , [ binary    ShiftLeft            "<<" ]
-                    , [ binary    ShiftRight           ">>" ]
-                    , [ binary    ZeroFillShiftRight   ">>>" ]
-                    , [ binary    EqualTo              "===" ]
-                    , [ binary    NotEqualTo           "!==" ]
-                    , [ binary    BitwiseAnd           "&" ]
-                    , [ binary    BitwiseXor           "^" ]
-                    , [ binary    BitwiseOr            "|" ]
-                    , [ binary    And                  "&&" ]
-                    , [ binary    Or                   "||" ]
+    OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
+                  , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
+                  , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
+                  , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }" ]
+                  , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ valueToJs th ++ " : " ++ valueToJs el ]
+                  , [ binary    LessThan             "<" ]
+                  , [ binary    LessThanOrEqualTo    "<=" ]
+                  , [ binary    GreaterThan          ">" ]
+                  , [ binary    GreaterThanOrEqualTo ">=" ]
+                  , [ unary     Not                  "!" ]
+                  , [ unary     BitwiseNot           "~" ]
+                  , [ unary     Negate               "-" ]
+                  , [ binary    Multiply             "*" ]
+                  , [ binary    Divide               "/" ]
+                  , [ binary    Modulus              "%" ]
+                  , [ binary    Concat               "+" ]
+                  , [ binary    Add                  "+" ]
+                  , [ binary    Subtract             "-" ]
+                  , [ binary    ShiftLeft            "<<" ]
+                  , [ binary    ShiftRight           ">>" ]
+                  , [ binary    ZeroFillShiftRight   ">>>" ]
+                  , [ binary    EqualTo              "===" ]
+                  , [ binary    NotEqualTo           "!==" ]
+                  , [ binary    BitwiseAnd           "&" ]
+                  , [ binary    BitwiseXor           "^" ]
+                  , [ binary    BitwiseOr            "|" ]
+                  , [ binary    And                  "&&" ]
+                  , [ binary    Or                   "||" ]
                     ]
 
 binderToJs :: String -> String -> Binder -> Gen String

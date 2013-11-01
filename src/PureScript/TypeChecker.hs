@@ -12,19 +12,17 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module PureScript.TypeChecker (
-    module PureScript.TypeChecker.Monad,
-    module PureScript.TypeChecker.Kinds,
-    module PureScript.TypeChecker.Types,
-    typeCheckAll,
+module T,
+    typeCheckAll
 ) where
 
-import PureScript.TypeChecker.Monad
-import PureScript.TypeChecker.Kinds
-import PureScript.TypeChecker.Types
-import PureScript.TypeChecker.Synonyms
+import PureScript.TypeChecker.Monad as T
+import PureScript.TypeChecker.Kinds as T
+import PureScript.TypeChecker.Types as T
+import PureScript.TypeChecker.Synonyms as T
 
 import Data.List
 import Data.Maybe
@@ -37,10 +35,9 @@ import PureScript.Names
 import PureScript.Kinds
 import PureScript.Declarations
 
+import Control.Monad (forM_)
 import Control.Monad.State
 import Control.Monad.Error
-
-import qualified Data.Map as M
 
 typeCheckAll :: [Declaration] -> Check ()
 typeCheckAll [] = return ()
@@ -48,12 +45,12 @@ typeCheckAll (DataDeclaration name args dctors : rest) = do
   rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
     env <- getEnv
     guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-    ctorKind <- kindsOf (Just name) args (catMaybes $ map snd dctors)
+    ctorKind <- kindsOf (Just name) args (mapMaybe snd dctors)
     putEnv $ env { types = M.insert name (ctorKind, Data) (types env) }
-    flip mapM_ dctors $ \(dctor, maybeTy) ->
+    forM_ dctors $ \(dctor, maybeTy) ->
       rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
         env' <- getEnv
-        guardWith (dctor ++ " is already defined") $ not $ flip M.member (dataConstructors env') dctor
+        guardWith (dctor ++ " is already defined") $ not $ M.member dctor (dataConstructors env')
         let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
         let polyType = PolyType args dctorTy

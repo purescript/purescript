@@ -24,7 +24,7 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
 
-import Control.Arrow ((***))
+import Control.Arrow ((***), first, second)
 
 import qualified Data.Map as M
 
@@ -48,7 +48,7 @@ getEnv :: Check Environment
 getEnv = fmap fst get
 
 putEnv :: Environment -> Check ()
-putEnv env = fmap (const env *** id) get >>= put
+putEnv env = fmap (first (const env)) get >>= put
 
 fresh :: Check Int
 fresh = do
@@ -57,7 +57,7 @@ fresh = do
   return n
 
 check :: Check a -> Either String (a, Environment)
-check = fmap (id *** fst) . flip runStateT (emptyEnvironment, 0) . unCheck
+check = fmap (second fst) . flip runStateT (emptyEnvironment, 0) . unCheck
 
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()

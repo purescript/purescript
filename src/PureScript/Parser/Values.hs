@@ -47,10 +47,10 @@ parseBooleanLiteral :: P.Parsec String ParseState Value
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
 parseArrayLiteral :: P.Parsec String ParseState Value
-parseArrayLiteral = ArrayLiteral <$> (C.squares $ parseValue `P.sepBy` (C.indented *> C.comma))
+parseArrayLiteral = ArrayLiteral <$> C.squares (parseValue `P.sepBy` (C.indented *> C.comma))
 
 parseObjectLiteral :: P.Parsec String ParseState Value
-parseObjectLiteral = ObjectLiteral <$> (C.braces $ parseIdentifierAndValue `P.sepBy` (C.indented *> C.comma))
+parseObjectLiteral = ObjectLiteral <$> C.braces (parseIdentifierAndValue `P.sepBy` (C.indented *> C.comma))
 
 parseIdentifierAndValue :: P.Parsec String ParseState (String, Value)
 parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C.colon)
@@ -75,7 +75,7 @@ parseConstructor :: P.Parsec String ParseState Value
 parseConstructor = Constructor <$> C.properName
 
 parseCase :: P.Parsec String ParseState Value
-parseCase = Case <$> (P.between (C.reserved "case") (C.indented *> C.reserved "of") parseValue)
+parseCase = Case <$> P.between (C.reserved "case") (C.indented *> C.reserved "of") parseValue
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: P.Parsec String ParseState (Binder, Value)
@@ -92,7 +92,7 @@ parseBlock :: P.Parsec String ParseState Value
 parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
 
 parseManyStatements :: P.Parsec String ParseState [Statement]
-parseManyStatements = C.indented *> (C.mark $ P.many $ C.same *> C.mark parseStatement) P.<?> "block"
+parseManyStatements = C.indented *> C.mark (P.many (C.same *> C.mark parseStatement)) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
 parseValueAtom = C.indented *> P.choice (map P.try
@@ -123,13 +123,13 @@ parseValue = do
    . C.buildPostfixParser postfixTable2
    $ indexersAndAccessors) P.<?> "expression"
   where
-  indexersAndAccessors = C.buildPostfixParser postfixTable1 $ parseValueAtom
+  indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
                   , Indexer <$> (C.indented *> C.squares parseValue)
                   , flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
   postfixTable2 = [ C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])
                   , flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
-                  , flip TypedValue <$> (P.try $ C.lexeme (C.indented *> P.string "::") *> parsePolyType) ]
+                  , flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) ]
   operators user =
               [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
@@ -166,11 +166,14 @@ customOperatorTable fixities =
     sorted = sortBy (compare `on` (snd . snd)) ops
     levels = groupBy ((==) `on` (snd . snd)) sorted
   in
-    flip map levels (map (\(name, (a, _)) -> flip Infix (toAssoc a) $ do
-      C.lexeme $ P.try $ do
-        C.indented
-        C.reservedOp name P.<?> "operator"
-      return $ \t1 t2 -> App (App (Var (Op name)) [t1]) [t2]))
+    map (map $ \(name, (a, _)) ->
+      flip Infix (toAssoc a) $
+        C.lexeme $ P.try $ do
+          C.indented
+          C.reservedOp name P.<?> "operator"
+          return $ \t1 t2 -> App (App (Var (Op name)) [t1]) [t2])
+      levels
+
 
 toAssoc :: Associativity -> Assoc
 toAssoc Infixl = AssocLeft

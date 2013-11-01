@@ -1,5 +1,5 @@
 name: purescript
-version: 0.0.1
+version: 0.1.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -11,9 +11,9 @@ synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 author: Phil Freeman <paf31@cantab.net>
 data-dir: ""
-
+ 
 library
-    build-depends: base -any, syb -any, cmdtheline -any,
+    build-depends: base >=4 && <5, syb -any, cmdtheline -any,
                    containers -any, mtl -any, transformers -any, parsec -any,
                    utf8-string -any
     exposed-modules: PureScript.CodeGen.Pretty.Values
@@ -31,21 +31,22 @@ library
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules:
-
-Test-Suite tests
-    type: exitcode-stdio-1.0
-    main-is: Main.hs
-    hs-source-dirs: tests
-    build-depends: base -any, syb -any, directory -any, filepath -any,
-                   containers -any, mtl -any, transformers -any, parsec -any,
-                   utf8-string -any, purescript -any
-
+    other-modules: PureScript.Pretty
+ 
 executable psc
-    build-depends: base -any, cmdtheline -any, containers -any,
-                   mtl -any, transformers -any, parsec -any, utf8-string -any, syb -any
+    build-depends: base >=4 && <5, cmdtheline -any, containers -any,
+                   mtl -any, transformers -any, parsec -any, utf8-string -any,
+                   syb -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
-    other-modules:
-
+    other-modules: PureScript.Pretty
+ 
+test-suite tests
+    build-depends: base >=4 && <5, syb -any, directory -any,
+                   filepath -any, containers -any, mtl -any, transformers -any,
+                   parsec -any, utf8-string -any, purescript -any
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: tests

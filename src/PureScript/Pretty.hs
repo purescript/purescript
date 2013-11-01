@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  PureScript.Parser
+-- Module      :  PureScript.Pretty
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -12,11 +12,11 @@
 --
 -----------------------------------------------------------------------------
 
-module PureScript.Parser (module P) where
+module PureScript.Pretty (module P) where
 
-import PureScript.Parser.Common as P
-import PureScript.Parser.Types as P
-import PureScript.Parser.Values as P
-import PureScript.Parser.State as P
-import PureScript.Parser.Kinds as P
-import PureScript.Parser.Declarations as P
+import PureScript.CodeGen.Pretty.Kinds as P
+import PureScript.CodeGen.Pretty.Values as P
+import PureScript.CodeGen.Pretty.Types as P
+
+
+

@@ -32,5 +32,5 @@ externToPs env (ExternDeclaration name ty) =
 externToPs env (ExternDataDeclaration name kind) =
   return $ "extern data " ++ name ++ " :: " ++ prettyPrintKind kind
 externToPs env (TypeSynonymDeclaration name args ty) =
-  return $ "type " ++ name ++ " " ++ intercalate " " args ++ " = " ++ prettyPrintType ty
+  return $ "type " ++ name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
 externToPs _ _ = Nothing
