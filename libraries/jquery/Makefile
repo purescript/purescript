@@ -1,4 +1,4 @@
 all:
-	cat jquery-wrapper.js > example.js
-	../../dist/build/psc/psc jquery.ps example.ps >> example.js
-	echo "main()" >> example.js
+	../../dist/build/psc/psc jquery.ps example.ps -o all.js
+	cat jquery.js >> all.js
+	echo "main()" >> all.js
