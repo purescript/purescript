@@ -14,8 +14,7 @@
 
 module Main (main) where
 
-import PureScript
-import PureScript.CodeGen.Pretty.Types
+import Language.PureScript
 
 import Data.List (isSuffixOf)
 import Control.Applicative

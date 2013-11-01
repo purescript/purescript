@@ -14,7 +14,7 @@
 
 module Main where
 
-import PureScript
+import Language.PureScript
 import Data.Maybe (mapMaybe)
 import Data.List (intercalate)
 import System.Console.CmdTheLine
