@@ -52,3 +52,16 @@ function map(f) {
   };
 }
 
+function filter(xs) {
+  return function (p) {
+    var ys = [];
+    var j = 0;
+    for (var i = 0; i < xs.length; i++) {
+      var x = xs[i];
+      if (p(x)) {
+        ys[j++] = x;
+      }
+    }
+    return ys;
+  };
+}
