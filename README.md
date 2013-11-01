@@ -84,12 +84,12 @@ var Person = function (value) {
   return { ctor: 'Person', value: value }; 
 };
 
-var showPerson = function (p) { 
+function showPerson(p) { 
   return (function (_0) {
     if (_0.ctor === "Person") { 
       var _1 = _0.value; 
       var o = _1; 
-      return o.name ++ ", aged " ++ itoa(o.age); 
+      return o.name ++ ", aged " ++ numberToString(o.age); 
     }
     throw "Failed pattern match"; 
   })(p); 
