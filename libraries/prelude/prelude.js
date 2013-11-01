@@ -45,3 +45,6 @@ function toExponential(n) { return n.toExponential(); }
 function toFixed(d) { return function(n) { return n.toFixed(d); }; } 
 function toPrecision(d) { return function(n) { return n.toPrecision(d); }; }
 function numberToString(n) { return n.toString(); }
+
+// Math
+var math = Math;
