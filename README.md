@@ -62,18 +62,18 @@ data Person = Person
   ; age :: Number   
   }
 
-extern itoa :: Number -> String
+extern numberToString :: Number -> String
 
 showPerson :: Person -> String
 showPerson = \p -> case p of
-  Person o -> o.name ++ ", aged " ++ itoa(o.age)
+  Person o -> o.name ++ ", aged " ++ numberToString(o.age)
 ```
 
 Line by line, this reads as follows:
 
 - `Person` is a data type with one constructor, also called `Person`
     - The `Person` constructor takes an object with two properties, `name` which is a `String`, and `age` which is a `Number`
-- The `itoa` function is written in Javascript, and takes a `Number` and returns a `String`
+- The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
 - The `showPerson` function takes a `Person` and returns a `String`
 - `showPerson` works by case analysis on its argument `p`, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
 
