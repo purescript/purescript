@@ -500,8 +500,8 @@ typeConstraintsForStatement m mass ret (Return val) = do
 typeConstraintsForIfStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> IfStatement -> Check ([TypeConstraint], Bool)
 typeConstraintsForIfStatement m mass ret (IfStatement val thens Nothing) = do
   (cs1, n1) <- typeConstraints m val
-  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret thens
-  return ((TypeConstraint n1 Boolean (ValueOrigin val)) : cs1 ++ cs2, allCodePathsReturn)
+  (cs2, _, _) <- typeConstraintsForBlock m mass ret thens
+  return ((TypeConstraint n1 Boolean (ValueOrigin val)) : cs1 ++ cs2, False)
 typeConstraintsForIfStatement m mass ret (IfStatement val thens (Just elses)) = do
   (cs1, n1) <- typeConstraints m val
   (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
