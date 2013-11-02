@@ -40,7 +40,7 @@ compile inputFiles outputFile externsFile = do
           U.putStrLn typeError
           exitFailure
         Right (_, env) -> do
-          let js = intercalate "\n" $ mapMaybe declToJs decls
+          let js = intercalate "; " . map prettyPrintJS . concat . mapMaybe (declToJs) $ decls
           case outputFile of
             Just path -> U.writeFile path js
             Nothing -> U.putStrLn js

@@ -1,5 +1,5 @@
 name: purescript
-version: 0.1.0
+version: 0.1.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -9,37 +9,27 @@ maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
+category: Language
 author: Phil Freeman <paf31@cantab.net>
 data-dir: ""
-category: Language
 
 library
     build-depends: base >=4 && <5, syb -any, cmdtheline -any,
                    containers -any, mtl -any, transformers -any, parsec -any,
                    utf8-string -any
-    exposed-modules: Main
-                     Language.PureScript
-                     Language.PureScript.Declarations
-                     Language.PureScript.Names
-                     Language.PureScript.Types
-                     Language.PureScript.Values
-                     Language.PureScript.Kinds
-                     Language.PureScript.Pretty
-                     Language.PureScript.Pretty.Common
-                     Language.PureScript.Pretty.Values
-                     Language.PureScript.Pretty.Types
-                     Language.PureScript.Pretty.Kinds
-                     Language.PureScript.CodeGen
-                     Language.PureScript.CodeGen.Externs
-                     Language.PureScript.CodeGen.JS
-                     Language.PureScript.CodeGen.Monad
-                     Language.PureScript.Parser
-                     Language.PureScript.Parser.Common
+    exposed-modules: Language.PureScript.Pretty.JS
+                     Language.PureScript.CodeGen.JS.AST Main Language.PureScript
+                     Language.PureScript.Declarations Language.PureScript.Names
+                     Language.PureScript.Types Language.PureScript.Values
+                     Language.PureScript.Kinds Language.PureScript.Pretty
+                     Language.PureScript.Pretty.Common Language.PureScript.Pretty.Values
+                     Language.PureScript.Pretty.Types Language.PureScript.Pretty.Kinds
+                     Language.PureScript.CodeGen Language.PureScript.CodeGen.Externs
+                     Language.PureScript.CodeGen.JS Language.PureScript.CodeGen.Monad
+                     Language.PureScript.Parser Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
-                     Language.PureScript.Parser.Types
-                     Language.PureScript.Parser.Values
-                     Language.PureScript.Parser.State
-                     Language.PureScript.Parser.Kinds
+                     Language.PureScript.Parser.Types Language.PureScript.Parser.Values
+                     Language.PureScript.Parser.State Language.PureScript.Parser.Kinds
                      Language.PureScript.TypeChecker
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad
@@ -48,7 +38,6 @@ library
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules:
 
 executable psc
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
@@ -57,6 +46,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
+    other-modules:
 
 test-suite tests
     build-depends: base >=4 && <5, syb -any, directory -any,

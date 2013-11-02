@@ -17,6 +17,7 @@ module Language.PureScript.Pretty (module P) where
 import Language.PureScript.Pretty.Kinds as P
 import Language.PureScript.Pretty.Values as P
 import Language.PureScript.Pretty.Types as P
+import Language.PureScript.Pretty.JS as P
 
 
 

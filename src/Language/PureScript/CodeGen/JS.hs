@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.CodeGen.JS (
+    module AST,
     declToJs
 ) where
 
@@ -20,7 +21,7 @@ import Data.Char
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 import qualified Control.Arrow as A
-import Control.Arrow ((<+>))
+import Control.Arrow ((<+>), second)
 import Control.Monad (forM)
 import Control.Applicative
 
@@ -30,203 +31,110 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
+import Language.PureScript.CodeGen.JS.AST as AST
 
-declToJs :: Declaration -> Maybe String
-declToJs (ValueDeclaration ident (Abs args ret)) = Just $ "function " ++ identToJs ident ++ "(" ++ intercalate "," (map identToJs args) ++ ") { return " ++ valueToJs ret ++ "; }"
-declToJs (ValueDeclaration ident val) = Just $ "var " ++ identToJs ident ++ " = " ++ valueToJs val ++ ";"
+declToJs :: Declaration -> Maybe [JS]
+declToJs (ValueDeclaration ident (Abs args ret)) = Just [JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs ret)])]
+declToJs (ValueDeclaration ident val) = Just [JSVariableIntroduction ident (valueToJs val)]
 declToJs (DataDeclaration _ _ ctors) =
-  Just $ flip concatMap ctors $ \(ctor, maybeTy) ->
+  Just $ flip map ctors $ \(ctor, maybeTy) ->
     case maybeTy of
-      Nothing -> "var " ++ ctor ++ " =  { ctor: '" ++ ctor ++ "' };"
-      Just _ -> "var " ++ ctor ++ " = function (value) { return { ctor: '" ++ ctor ++ "', value: value }; };"
+      Nothing -> JSVariableIntroduction (Ident ctor) (JSObjectLiteral [ ("ctor", JSStringLiteral ctor) ])
+      Just _ -> JSFunction (Just (Ident ctor)) [Ident "value"]
+                  (JSBlock [JSReturn
+                    (JSObjectLiteral [ ("ctor", JSStringLiteral ctor)
+                                     , ("value", JSVar (Ident "value")) ])])
 declToJs _ = Nothing
 
-literals :: Pattern Value String
-literals = Pattern $ A.Kleisli match
-  where
-  match (NumericLiteral n) = Just $ either show show n
-  match (StringLiteral s) = Just $ show s
-  match (BooleanLiteral True) = Just "true"
-  match (BooleanLiteral False) = Just "false"
-  match (ArrayLiteral xs) = Just $ "[" ++ intercalate "," (map valueToJs xs) ++ "]"
-  match (ObjectLiteral ps) = Just $ "{" ++ intercalate "," (map objectPropertyToJs ps) ++ "}"
-  match (ObjectUpdate o ps) = Just $ "Object.extend("
-    ++ valueToJs o ++ ", { "
-    ++ intercalate ", " (map objectPropertyToJs ps) ++ " }"
-  match (Constructor name) = Just name
-  match (Block sts) = Just $ "(function () {" ++ intercalate ";" (map statementToJs sts) ++ "})()"
-  match (Case value binders) = Just $ "(" ++ runGen (bindersToJs binders) ++  ")(" ++ valueToJs value ++ ")"
-    where
-    bindersToJs ::  [(Binder, Value)] -> Gen String
-    bindersToJs binders = do
-      valName <- fresh
-      jss <- forM binders $ \(binder, result) -> do
-         let js = valueToJs result
-         binderToJs valName ("return " ++ js ++ ";") binder
-      return $ "function (" ++ valName ++ ") {" ++ concat jss ++ "throw \"Failed pattern match\"; }"
-  match (Var ident) = Just (identToJs ident)
-  match _ = Nothing
+valueToJs :: Value -> JS
+valueToJs (NumericLiteral n) = JSNumericLiteral n
+valueToJs (StringLiteral s) = JSStringLiteral s
+valueToJs (BooleanLiteral b) = JSBooleanLiteral b
+valueToJs (ArrayLiteral xs) = JSArrayLiteral (map valueToJs xs)
+valueToJs (ObjectLiteral ps) = JSObjectLiteral (map (second valueToJs) ps)
+valueToJs (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs o, JSObjectLiteral (map (second valueToJs) ps)]
+valueToJs (Constructor name) = JSVar (Ident name)
+valueToJs (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map statementToJs sts))) []
+valueToJs (Case value binders) = runGen (bindersToJs binders (valueToJs value))
+valueToJs (IfThenElse cond th el) = JSConditional (valueToJs cond) (valueToJs th) (valueToJs el)
+valueToJs (Accessor prop val) = JSAccessor prop (valueToJs val)
+valueToJs (Indexer index val) = JSIndexer (valueToJs index) (valueToJs val)
+valueToJs (App val args) = JSApp (valueToJs val) (map valueToJs args)
+valueToJs (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs val)])
+valueToJs (Unary op val) = JSUnary op (valueToJs val)
+valueToJs (Binary op v1 v2) = JSBinary op (valueToJs v1) (valueToJs v2)
+valueToJs (Var ident) = JSVar ident
+valueToJs (TypedValue val _) = valueToJs val
 
-ifThenElse :: Pattern Value ((Value, Value), Value)
-ifThenElse = Pattern $ A.Kleisli match
-  where
-  match (IfThenElse cond th el) = Just ((th, el), cond)
-  match _ = Nothing
+bindersToJs ::  [(Binder, Value)] -> JS -> Gen JS
+bindersToJs binders val = do
+  valName <- fresh
+  jss <- forM binders $ \(binder, result) -> binderToJs valName [JSReturn (valueToJs result)] binder
+  return $ JSApp (JSFunction Nothing [Ident valName] (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+                 [val]
 
-accessor :: Pattern Value (String, Value)
-accessor = Pattern $ A.Kleisli match
-  where
-  match (Accessor prop val) = Just (prop, val)
-  match _ = Nothing
-
-indexer :: Pattern Value (String, Value)
-indexer = Pattern $ A.Kleisli match
-  where
-  match (Indexer index val) = Just (valueToJs index, val)
-  match _ = Nothing
-
-app :: Pattern Value (String, Value)
-app = Pattern $ A.Kleisli match
-  where
-  match (App val args) = Just (intercalate "," (map valueToJs args), val)
-  match _ = Nothing
-
-lam :: Pattern Value ([String], Value)
-lam = Pattern $ A.Kleisli match
-  where
-  match (Abs args val) = Just (map identToJs args, val)
-  match _ = Nothing
-
-unary :: UnaryOperator -> String -> Operator Value String
-unary op str = Wrap pattern (++)
-  where
-  pattern :: Pattern Value (String, Value)
-  pattern = Pattern $ A.Kleisli match
-    where
-    match (Unary op' val) | op' == op = Just (str, val)
-    match _ = Nothing
-
-binary :: BinaryOperator -> String -> Operator Value String
-binary op str = AssocR pattern (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
-  where
-  pattern :: Pattern Value (Value, Value)
-  pattern = Pattern $ A.Kleisli match
-    where
-    match (Binary op' v1 v2) | op' == op = Just (v1, v2)
-    match _ = Nothing
-
-valueToJs :: Value -> String
-valueToJs = fromMaybe (error "Incomplete pattern") . pattern matchValue
-  where
-  matchValue :: Pattern Value String
-  matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
-  operators :: OperatorTable Value String
-  operators =
-    OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
-                  , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
-                  , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
-                  , [ Split lam $ \args val -> "function (" ++ intercalate "," args ++ ") { return " ++ valueToJs val ++ "; }" ]
-                  , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ valueToJs th ++ " : " ++ valueToJs el ]
-                  , [ binary    LessThan             "<" ]
-                  , [ binary    LessThanOrEqualTo    "<=" ]
-                  , [ binary    GreaterThan          ">" ]
-                  , [ binary    GreaterThanOrEqualTo ">=" ]
-                  , [ unary     Not                  "!" ]
-                  , [ unary     BitwiseNot           "~" ]
-                  , [ unary     Negate               "-" ]
-                  , [ binary    Multiply             "*" ]
-                  , [ binary    Divide               "/" ]
-                  , [ binary    Modulus              "%" ]
-                  , [ binary    Concat               "+" ]
-                  , [ binary    Add                  "+" ]
-                  , [ binary    Subtract             "-" ]
-                  , [ binary    ShiftLeft            "<<" ]
-                  , [ binary    ShiftRight           ">>" ]
-                  , [ binary    ZeroFillShiftRight   ">>>" ]
-                  , [ binary    EqualTo              "===" ]
-                  , [ binary    NotEqualTo           "!==" ]
-                  , [ binary    BitwiseAnd           "&" ]
-                  , [ binary    BitwiseXor           "^" ]
-                  , [ binary    BitwiseOr            "|" ]
-                  , [ binary    And                  "&&" ]
-                  , [ binary    Or                   "||" ]
-                    ]
-
-binderToJs :: String -> String -> Binder -> Gen String
+binderToJs :: String -> [JS] -> Binder -> Gen [JS]
 binderToJs varName done NullBinder = return done
 binderToJs varName done (StringBinder str) =
-  return $ "if (" ++ varName ++ " === \"" ++ str ++ "\") {" ++ done ++ " }"
+  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSStringLiteral str)) done Nothing]
 binderToJs varName done (NumberBinder num) =
-  return $ "if (" ++ varName ++ " === " ++ either show show num ++ ") {" ++ done ++ " }"
+  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSNumericLiteral num)) done Nothing]
 binderToJs varName done (BooleanBinder True) =
-  return $ "if (" ++ varName ++ ") {" ++ done ++ " }"
+  return [JSIfElse (JSVar (Ident varName)) done Nothing]
 binderToJs varName done (BooleanBinder False) =
-  return $ "if (!" ++ varName ++ ") {" ++ done ++ " }"
+  return [JSIfElse (JSUnary Not (JSVar (Ident varName))) done Nothing]
 binderToJs varName done (VarBinder ident) =
-  return $ "var " ++ identToJs ident ++ " = " ++ varName ++ "; " ++ done
+  return (JSVariableIntroduction ident (JSVar (Ident varName)) : done)
 binderToJs varName done (NullaryBinder ctor) =
-  return $ "if (" ++ varName ++ ".ctor === \"" ++ ctor ++ "\") { " ++ done ++ " }"
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) done Nothing]
 binderToJs varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs value done b
-  return $ "if (" ++ varName ++ ".ctor === \"" ++ ctor ++ "\") { " ++ "var " ++ value ++ " = " ++ varName ++ ".value; " ++ js ++ " }"
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) (JSVariableIntroduction (Ident value) (JSAccessor "value" (JSVar (Ident varName))) : js) Nothing]
 binderToJs varName done (ObjectBinder bs) = go done bs
   where
+  go :: [JS] -> [(String, Binder)] -> Gen [JS]
   go done [] = return done
   go done ((prop, binder):bs) = do
     propVar <- fresh
     done' <- go done bs
     js <- binderToJs propVar done' binder
-    return $ "var " ++ propVar ++ " = " ++ varName ++ "." ++ prop ++ ";" ++ js
+    return (JSVariableIntroduction (Ident propVar) (JSAccessor prop (JSVar (Ident varName))) : js)
 binderToJs varName done (ArrayBinder bs rest) = do
   js <- go done rest 0 bs
-  return $ "if (" ++ varName ++ ".length " ++ cmp ++ " " ++ show (length bs) ++ ") { " ++ js ++ " }"
+  return [JSIfElse (JSBinary cmp (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) js Nothing]
   where
-  cmp = maybe "===" (const ">=") rest
+  cmp :: BinaryOperator
+  cmp = maybe EqualTo (const GreaterThanOrEqualTo) rest
+  go :: [JS] -> Maybe Binder -> Integer -> [Binder] -> Gen [JS]
   go done Nothing _ [] = return done
   go done (Just binder) index [] = do
     restVar <- fresh
     js <- binderToJs restVar done binder
-    return $ "var " ++ restVar ++ " = " ++ varName ++ ".slice(" ++ show index ++ "); " ++ js
+    return (JSVariableIntroduction (Ident restVar) (JSApp (JSAccessor "slice" (JSVar (Ident varName))) [JSNumericLiteral (Left index)]) : js)
   go done rest index (binder:bs) = do
     elVar <- fresh
     done' <- go done rest (index + 1) bs
     js <- binderToJs elVar done' binder
-    return $ "var " ++ elVar ++ " = " ++ varName ++ "[" ++ show index ++ "]; " ++ js
+    return (JSVariableIntroduction (Ident elVar) (JSIndexer (JSNumericLiteral (Left index)) (JSVar (Ident varName))) : js)
 binderToJs varName done (NamedBinder ident binder) = do
   js <- binderToJs varName done binder
-  return $ "var " ++ identToJs ident ++ " = " ++ varName ++ "; " ++ js
+  return (JSVariableIntroduction ident (JSVar (Ident varName)) : js)
 binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' binder
   where
-  done' = "if (" ++ valueToJs cond ++ ") { " ++ done ++ "}"
+  done' = [JSIfElse (valueToJs cond) done Nothing]
 
-objectPropertyToJs :: (String, Value) -> String
-objectPropertyToJs (key, value) = key ++ ": " ++ valueToJs value
-
-statementToJs :: Statement -> String
-statementToJs (VariableIntroduction ident value) = "var " ++ identToJs ident ++ " = " ++ valueToJs value
-statementToJs (Assignment target value) = identToJs target ++ " = " ++ valueToJs value
-statementToJs (While cond sts) = "while ("
-  ++ valueToJs cond ++ ") {"
-  ++ intercalate ";" (map statementToJs sts) ++ "}"
-statementToJs (For ident start end sts) = "for (" ++
-  identToJs ident ++ " = " ++ valueToJs start ++ ";"
-  ++ identToJs ident ++ " < " ++ valueToJs end ++ ";"
-  ++ identToJs ident ++ "++) {"
-  ++ intercalate ";" (map statementToJs sts) ++ "}"
-statementToJs (ForEach ident arr sts) = valueToJs arr
-  ++ ".forEach(function(" ++ identToJs ident ++ ") {"
-  ++ intercalate ";" (map statementToJs sts) ++ "})"
-statementToJs (If ifst) = ifStatementToJs ifst
-statementToJs (Return value) = "return " ++ valueToJs value
-
-ifStatementToJs :: IfStatement -> String
-ifStatementToJs (IfStatement cond thens elst) =
-  "if ("
-  ++ valueToJs cond ++ ") {"
-  ++ intercalate ";" (map statementToJs thens) ++ "}"
-  ++ maybe "" elseStatementToJs elst
-
-elseStatementToJs :: ElseStatement -> String
-elseStatementToJs (Else sts) = " else {" ++ intercalate ";" (map statementToJs sts) ++ "}"
-elseStatementToJs (ElseIf ifst) = " else " ++ ifStatementToJs ifst
+statementToJs :: Statement -> JS
+statementToJs (VariableIntroduction ident value) = JSVariableIntroduction ident (valueToJs value)
+statementToJs (Assignment target value) = JSAssignment target (valueToJs value)
+statementToJs (While cond sts) = JSWhile (valueToJs cond) (map statementToJs sts)
+statementToJs (For ident start end sts) = JSFor ident (valueToJs start) (valueToJs end) (map statementToJs sts)
+statementToJs (ForEach ident arr sts) = JSApp (JSAccessor "forEach" (valueToJs arr)) [JSFunction Nothing [ident] (JSBlock (map statementToJs sts))]
+statementToJs (If ifst) = ifToJs ifst
+  where
+  ifToJs :: IfStatement -> JS
+  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs cond) (map statementToJs thens) (fmap elseToJs elses)
+  elseToJs :: ElseStatement -> JS
+  elseToJs (Else sts) = JSBlock (map statementToJs sts)
+  elseToJs (ElseIf ifst) = ifToJs ifst
+statementToJs (Return value) = JSReturn (valueToJs value)
