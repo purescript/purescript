@@ -57,10 +57,7 @@ PureScript can also be seen as a trade-off between a theoretically ideal languag
 The following code defines a `Person` data type and a function to generate a string representation for a `Person`:
 
 ```haskell
-data Person = Person 
-  { name :: String
-  ; age :: Number   
-  }
+data Person = Person { name :: String, age :: Number }
 
 extern numberToString :: Number -> String
 
@@ -104,7 +101,7 @@ The type system defines the following types:
 - Arrays 
     - E.g. `[String]`, `[[Number]]`
 - Records
-    - E.g. `{ foo :: String ; bar :: Number }`
+    - E.g. `{ foo :: String, bar :: Number }`
 - Tagged Unions
     - E.g. `data Foo a = Foo | Bar String`
 - Functions
@@ -237,7 +234,7 @@ Functions may also be polymorphic in row types or type variables with other kind
 addProps = \o -> o.foo + o.bar
 ```
     
-Here, `addProps` is inferred to have type `forall r. { foo :: Number; bar :: Number | r } -> Number`. That is, it can take any type which has properties `Foo` and `Bar`, and *any other record properties*.
+Here, `addProps` is inferred to have type `forall r. { foo :: Number, bar :: Number | r } -> Number`. That is, it can take any type which has properties `Foo` and `Bar`, and *any other record properties*.
 
 So, the following compiles:
 

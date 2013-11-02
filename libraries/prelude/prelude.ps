@@ -143,7 +143,7 @@ all = \p -> \as -> do
 
 -- Pairs
 
-type Tuple a b = { fst :: a ; snd :: b }
+type Tuple a b = { fst :: a, snd :: b }
 
 curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
 curry = \f -> \a -> \b -> f { fst: a, snd: b }
@@ -239,22 +239,22 @@ extern decodeURI :: String -> String
 
 type Math = 
   { abs :: Number -> Number
-  ; acos :: Number -> Number
-  ; asin :: Number -> Number
-  ; atan :: Number -> Number
-  ; atan2 :: (Number, Number) -> Number
-  ; aceil :: Number -> Number
-  ; cos :: Number -> Number
-  ; exp :: Number -> Number
-  ; floor :: Number -> Number
-  ; log :: Number -> Number
-  ; max :: (Number, Number) -> Number
-  ; pow :: (Number, Number) -> Number
-  ; random :: () -> Number
-  ; round :: Number -> Number
-  ; sin :: Number -> Number
-  ; sqrt :: Number -> Number
-  ; tan :: Number -> Number
+  , acos :: Number -> Number
+  , asin :: Number -> Number
+  , atan :: Number -> Number
+  , atan2 :: (Number, Number) -> Number
+  , aceil :: Number -> Number
+  , cos :: Number -> Number
+  , exp :: Number -> Number
+  , floor :: Number -> Number
+  , log :: Number -> Number
+  , max :: (Number, Number) -> Number
+  , pow :: (Number, Number) -> Number
+  , random :: () -> Number
+  , round :: Number -> Number
+  , sin :: Number -> Number
+  , sqrt :: Number -> Number
+  , tan :: Number -> Number
   }
 
 extern math :: Math

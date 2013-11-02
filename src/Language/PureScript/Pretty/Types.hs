@@ -47,7 +47,7 @@ typeLiterals = Pattern $ A.Kleisli match
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
-prettyPrintRow = (\(tys, tail) -> intercalate "; " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList []
+prettyPrintRow = (\(tys, tail) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList []
   where
   nameAndTypeToPs :: String -> Type -> String
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty

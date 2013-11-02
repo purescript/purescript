@@ -2,7 +2,7 @@ data List a
   = Nil 
   | Cons
     { head :: a
-    ; tail :: List a
+    , tail :: List a
     }
 
 isNull = \l -> case l of
