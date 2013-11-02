@@ -84,16 +84,13 @@ var Person = function (value) {
   return { ctor: 'Person', value: value }; 
 };
 
-function showPerson(p) { 
-  return (function (_0) {
-    if (_0.ctor === "Person") { 
-      var _1 = _0.value; 
-      var o = _1; 
-      return o.name ++ ", aged " ++ numberToString(o.age); 
-    }
-    throw "Failed pattern match"; 
-  })(p); 
-};
+function showPerson(p) {
+  if (p.ctor === "Person") {
+    return p.value.name + ", aged " + itoa(p.value.age)
+  };
+  throw "Failed pattern match" 
+}
+
 ```
 
 ## Type System
