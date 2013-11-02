@@ -76,21 +76,21 @@ bindersToJs binders val = do
 binderToJs :: String -> [JS] -> Binder -> Gen [JS]
 binderToJs varName done NullBinder = return done
 binderToJs varName done (StringBinder str) =
-  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSStringLiteral str)) done Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSStringLiteral str)) (JSBlock done) Nothing]
 binderToJs varName done (NumberBinder num) =
-  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSNumericLiteral num)) done Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSNumericLiteral num)) (JSBlock done) Nothing]
 binderToJs varName done (BooleanBinder True) =
-  return [JSIfElse (JSVar (Ident varName)) done Nothing]
+  return [JSIfElse (JSVar (Ident varName)) (JSBlock done) Nothing]
 binderToJs varName done (BooleanBinder False) =
-  return [JSIfElse (JSUnary Not (JSVar (Ident varName))) done Nothing]
+  return [JSIfElse (JSUnary Not (JSVar (Ident varName))) (JSBlock done) Nothing]
 binderToJs varName done (VarBinder ident) =
   return (JSVariableIntroduction ident (JSVar (Ident varName)) : done)
 binderToJs varName done (NullaryBinder ctor) =
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) done Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) (JSBlock done) Nothing]
 binderToJs varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs value done b
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) (JSVariableIntroduction (Ident value) (JSAccessor "value" (JSVar (Ident varName))) : js) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral ctor)) (JSBlock (JSVariableIntroduction (Ident value) (JSAccessor "value" (JSVar (Ident varName))) : js)) Nothing]
 binderToJs varName done (ObjectBinder bs) = go done bs
   where
   go :: [JS] -> [(String, Binder)] -> Gen [JS]
@@ -102,7 +102,7 @@ binderToJs varName done (ObjectBinder bs) = go done bs
     return (JSVariableIntroduction (Ident propVar) (JSAccessor prop (JSVar (Ident varName))) : js)
 binderToJs varName done (ArrayBinder bs rest) = do
   js <- go done rest 0 bs
-  return [JSIfElse (JSBinary cmp (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) js Nothing]
+  return [JSIfElse (JSBinary cmp (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
   where
   cmp :: BinaryOperator
   cmp = maybe EqualTo (const GreaterThanOrEqualTo) rest
@@ -122,18 +122,18 @@ binderToJs varName done (NamedBinder ident binder) = do
   return (JSVariableIntroduction ident (JSVar (Ident varName)) : js)
 binderToJs varName done (GuardedBinder cond binder) = binderToJs varName done' binder
   where
-  done' = [JSIfElse (valueToJs cond) done Nothing]
+  done' = [JSIfElse (valueToJs cond) (JSBlock done) Nothing]
 
 statementToJs :: Statement -> JS
 statementToJs (VariableIntroduction ident value) = JSVariableIntroduction ident (valueToJs value)
 statementToJs (Assignment target value) = JSAssignment target (valueToJs value)
-statementToJs (While cond sts) = JSWhile (valueToJs cond) (map statementToJs sts)
-statementToJs (For ident start end sts) = JSFor ident (valueToJs start) (valueToJs end) (map statementToJs sts)
+statementToJs (While cond sts) = JSWhile (valueToJs cond) (JSBlock (map statementToJs sts))
+statementToJs (For ident start end sts) = JSFor ident (valueToJs start) (valueToJs end) (JSBlock (map statementToJs sts))
 statementToJs (ForEach ident arr sts) = JSApp (JSAccessor "forEach" (valueToJs arr)) [JSFunction Nothing [ident] (JSBlock (map statementToJs sts))]
 statementToJs (If ifst) = ifToJs ifst
   where
   ifToJs :: IfStatement -> JS
-  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs cond) (map statementToJs thens) (fmap elseToJs elses)
+  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs cond) (JSBlock (map statementToJs thens)) (fmap elseToJs elses)
   elseToJs :: ElseStatement -> JS
   elseToJs (Else sts) = JSBlock (map statementToJs sts)
   elseToJs (ElseIf ifst) = ifToJs ifst

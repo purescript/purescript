@@ -40,16 +40,16 @@ literals = Pattern $ A.Kleisli match
   match (JSVariableIntroduction ident value) = Just $ "var " ++ identToJs ident ++ " = " ++ prettyPrintJS value
   match (JSAssignment target value) = Just $ identToJs target ++ " = " ++ prettyPrintJS value
   match (JSWhile cond sts) = Just $ "while ("
-    ++ prettyPrintJS cond ++ ") { "
-    ++ intercalate "; " (map prettyPrintJS sts) ++ " }"
+    ++ prettyPrintJS cond ++ ") "
+    ++ prettyPrintJS sts
   match (JSFor ident start end sts) = Just $ "for ("
     ++ identToJs ident ++ " = " ++ prettyPrintJS start ++ "; "
     ++ identToJs ident ++ " < " ++ prettyPrintJS end ++ "; "
-    ++ identToJs ident ++ "++) { "
-    ++ intercalate "; " (map prettyPrintJS sts) ++ " }"
+    ++ identToJs ident ++ "++) "
+    ++ prettyPrintJS sts
   match (JSIfElse cond thens elses) = Just $ "if ("
-    ++ prettyPrintJS cond ++ ") { "
-    ++ intercalate "; " (map prettyPrintJS thens) ++ " }"
+    ++ prettyPrintJS cond ++ ") "
+    ++ prettyPrintJS thens
     ++ maybe "" ((" else " ++) . prettyPrintJS) elses
   match (JSReturn value) = Just $ "return " ++ prettyPrintJS value
   match (JSThrow value) = Just $ "throw " ++ prettyPrintJS value

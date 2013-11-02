@@ -38,8 +38,8 @@ data JS
   | JSBlock [JS]
   | JSVariableIntroduction Ident JS
   | JSAssignment Ident JS
-  | JSWhile JS [JS]
-  | JSFor Ident JS JS [JS]
-  | JSIfElse JS [JS] (Maybe JS)
+  | JSWhile JS JS
+  | JSFor Ident JS JS JS
+  | JSIfElse JS JS (Maybe JS)
   | JSReturn JS
   | JSThrow JS deriving (Show, Data, Typeable)
