@@ -4,8 +4,8 @@ id = \x -> x
 flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 flip = \f -> \b -> \a -> f a b
 
-const :: forall a b. a -> b -> a
-const = \a -> \b -> a
+konst :: forall a b. a -> b -> a
+konst = \a -> \b -> a
 
 (|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
 (|>) = \f -> \g -> \a -> g (f a)
@@ -110,8 +110,8 @@ concatMap = \as -> \f -> do
 
 extern filter :: forall a. [a] -> (a -> Boolean) -> [a]
 
-null :: forall a. [a] -> Boolean
-null = \as -> case as of
+empty :: forall a. [a] -> Boolean
+empty = \as -> case as of
   [] -> true
   _ -> false
 
