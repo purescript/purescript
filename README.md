@@ -20,6 +20,10 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 
 See the `LICENSE` file
 
+## Contributing
+
+Contributions are always encouraged! Please see `CONTRIBUTING.md` for guidelines.
+
 ## Installation
 
 Install the Haskell Plaform, then `cabal install`
