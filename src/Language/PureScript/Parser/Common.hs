@@ -148,7 +148,7 @@ fold first more combine = do
   return $ foldl combine a bs
 
 buildPostfixParser :: P.Stream s m t => [P.ParsecT s u m (a -> a)] -> P.ParsecT s u m a -> P.ParsecT s u m a
-buildPostfixParser f x = fold x (P.choice (map P.try f)) (flip ($))
+buildPostfixParser f x = fold x (P.choice f) (flip ($))
 
 parseIdent :: P.Parsec String u Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)

@@ -48,31 +48,31 @@ parseDataDeclaration = do
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
-  TypeDeclaration <$> parseIdent
-                  <*> (lexeme (indented *> P.string "::") *> parsePolyType)
+  TypeDeclaration <$> P.try (parseIdent <* lexeme (indented *> P.string "::"))
+                  <*> parsePolyType
 
 parseTypeSynonymDeclaration :: P.Parsec String ParseState Declaration
 parseTypeSynonymDeclaration =
-  TypeSynonymDeclaration <$> (reserved "type" *> indented *> properName)
+  TypeSynonymDeclaration <$> (P.try (reserved "type") *> indented *> properName)
                          <*> many (indented *> identifier)
                          <*> (lexeme (indented *> P.char '=') *> parseType)
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
-  ValueDeclaration <$> parseIdent
-                   <*> (lexeme (indented *> P.char '=') *> parseValue)
+  ValueDeclaration <$> P.try (parseIdent <* lexeme (indented *> P.char '='))
+                   <*> parseValue
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
-parseExternDeclaration = reserved "extern" *> indented *>
-  (ExternDataDeclaration <$> (reserved "data" *> indented *> properName)
+parseExternDeclaration = P.try (reserved "extern") *> indented *>
+  (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                         <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> ExternDeclaration <$> parseIdent
                         <*> (lexeme (indented *> P.string "::") *> parsePolyType))
 
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =
-  (reserved "infixl" >> return Infixl) <|>
-  (reserved "infixr" >> return Infixr)
+  (P.try (reserved "infixl") >> return Infixl) <|>
+  (P.try (reserved "infixr") >> return Infixr)
 
 parseFixity :: P.Parsec String ParseState Fixity
 parseFixity = Fixity <$> parseAssociativity <*> (indented *> natural)
@@ -88,13 +88,13 @@ parseFixityDeclaration = do
   return $ FixityDeclaration fixity name
 
 parseDeclaration :: P.Parsec String ParseState Declaration
-parseDeclaration = P.choice (map P.try
+parseDeclaration = P.choice
                    [ parseDataDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
                    , parseExternDeclaration
-                   , parseFixityDeclaration ]) P.<?> "declaration"
+                   , parseFixityDeclaration ] P.<?> "declaration"
 
 parseDeclarations :: P.Parsec String ParseState [Declaration]
 parseDeclarations = whiteSpace *> mark (same *> P.many parseDeclaration) <* P.eof

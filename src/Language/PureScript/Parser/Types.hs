@@ -74,7 +74,7 @@ parseType :: P.Parsec String ParseState Type
 parseType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"
   where
   postfixTable :: [P.Parsec String ParseState (Type -> Type)]
-  postfixTable = [ flip TypeApp <$> (indented *> parseTypeAtom) ]
+  postfixTable = [ flip TypeApp <$> P.try (indented *> parseTypeAtom) ]
   operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
 
 parseNameAndType :: P.Parsec String ParseState (String, Type)

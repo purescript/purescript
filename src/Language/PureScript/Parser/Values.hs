@@ -75,7 +75,7 @@ parseConstructor :: P.Parsec String ParseState Value
 parseConstructor = Constructor <$> C.properName
 
 parseCase :: P.Parsec String ParseState Value
-parseCase = Case <$> P.between (C.reserved "case") (C.indented *> C.reserved "of") parseValue
+parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") parseValue
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: P.Parsec String ParseState (Binder, Value)
@@ -84,30 +84,30 @@ parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->"))
                            P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Value
-parseIfThenElse = IfThenElse <$> (C.reserved "if" *> C.indented *> parseValue)
+parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "then" *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
 
 parseBlock :: P.Parsec String ParseState Value
-parseBlock = Block <$> (C.reserved "do" *> parseManyStatements)
+parseBlock = Block <$> (P.try (C.reserved "do") *> parseManyStatements)
 
 parseManyStatements :: P.Parsec String ParseState [Statement]
 parseManyStatements = C.indented *> C.mark (P.many (C.same *> C.mark parseStatement)) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
-parseValueAtom = C.indented *> P.choice (map P.try
-            [ parseNumericLiteral
-            , parseStringLiteral
-            , parseBooleanLiteral
+parseValueAtom = C.indented *> P.choice
+            [ P.try parseNumericLiteral
+            , P.try parseStringLiteral
+            , P.try parseBooleanLiteral
             , parseArrayLiteral
             , parseObjectLiteral
             , parseAbs
-            , parseVar
-            , parseConstructor
+            , P.try parseVar
+            , P.try parseConstructor
             , parseBlock
             , parseCase
             , parseIfThenElse
-            , C.parens parseValue ])
+            , C.parens parseValue ]
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
 parsePropertyUpdate = do
@@ -125,10 +125,10 @@ parseValue = do
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                  , Indexer <$> (C.indented *> C.squares parseValue)
-                  , flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
-  postfixTable2 = [ C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])
-                  , flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
+                  , P.try $ Indexer <$> (C.indented *> C.squares parseValue)
+                  , P.try $ flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
+  postfixTable2 = [ P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2]))
+                  , P.try $ flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
                   , flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) ]
   operators user =
               [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
@@ -173,7 +173,6 @@ customOperatorTable fixities =
           C.reservedOp name P.<?> "operator"
           return $ \t1 t2 -> App (App (Var (Op name)) [t1]) [t2])
       levels
-
 
 toAssoc :: Associativity -> Assoc
 toAssoc Infixl = AssocLeft
