@@ -16,6 +16,10 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 - Pattern matching
 - Simple FFI
 
+## Try It!
+
+Try PureScript in the browser [here](http://tryps.functorial.com/).
+
 ## License
 
 See the `LICENSE` file
