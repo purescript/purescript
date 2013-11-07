@@ -598,9 +598,9 @@ foreign import console :: {
 }
 ```
 
-To alias a name of a field defined on a Javascript type to a PureScript function, use `foreign import member`. For example, to define a function `length` which accesses the ``length` member of an array:
+To alias a name of a field defined on a Javascript type to a PureScript function, use `foreign import member`. For example, to define a function `length` which accesses the `length` member of an array:
 
-```
+```haskell
 foreign import member "length" length :: forall a. [a] -> Number
 ```
 
