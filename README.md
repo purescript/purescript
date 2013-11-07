@@ -142,7 +142,7 @@ PureScript arrays correspond to Javascript arrays at runtime, but all elements m
 
 Array literals look like Javascript array literals: `[1, 2, 3]`
 
-Array elements can be read using array index notation `arr ! index`
+Array elements can be read using array index notation `arr !! index`
 
 ## Records
 
