@@ -113,7 +113,7 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Split lam $ \args val -> "\\" ++ intercalate ", " args ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
-                  , [ AssocR indexer (\index val -> val ++ " ! " ++ index) ]
+                  , [ AssocR indexer (\index val -> val ++ " !! " ++ index) ]
                   , [ binary    LessThan             "<" ]
                   , [ binary    LessThanOrEqualTo    "<=" ]
                   , [ binary    GreaterThan          ">" ]

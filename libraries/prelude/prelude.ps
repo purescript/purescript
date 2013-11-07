@@ -130,14 +130,14 @@ zipWith = \f -> \as -> \bs -> case { as: as, bs: bs } of
 any :: forall a. (a -> Boolean) -> [a] -> Boolean
 any = \p -> \as -> do
   for i <- 0 until length as:
-    if p (as ! i):
+    if p (as !! i):
       return true
   return false
 
 all :: forall a. (a -> Boolean) -> [a] -> Boolean
 all = \p -> \as -> do
   for i <- 0 until length as:
-    if !(p (as ! i)):
+    if !(p (as !! i)):
       return false
   return true
 
