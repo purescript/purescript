@@ -59,10 +59,10 @@ accessor = Pattern $ A.Kleisli match
   match (Accessor prop val) = Just (prop, val)
   match _ = Nothing
 
-indexer :: Pattern Value (String, Value)
+indexer :: Pattern Value (Value, Value)
 indexer = Pattern $ A.Kleisli match
   where
-  match (Indexer index val) = Just (prettyPrintValue index, val)
+  match (Indexer index val) = Just (index, val)
   match _ = Nothing
 
 objectUpdate :: Pattern Value ([String], Value)
@@ -109,11 +109,11 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue
   operators :: OperatorTable Value String
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
-                  , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
                   , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Split lam $ \args val -> "\\" ++ intercalate ", " args ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
+                  , [ AssocR indexer (\index val -> val ++ " ! " ++ index) ]
                   , [ binary    LessThan             "<" ]
                   , [ binary    LessThanOrEqualTo    "<=" ]
                   , [ binary    GreaterThan          ">" ]

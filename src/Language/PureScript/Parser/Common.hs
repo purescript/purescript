@@ -74,7 +74,7 @@ reservedNames = [ "case"
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&", "^", "|", "&&", "||", "->" ]
+                  , "==", "!=", "&", "^", "|", "&&", "||", "->", "!" ]
 
 identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_$"

@@ -125,7 +125,6 @@ parseValue = do
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                  , P.try $ Indexer <$> (C.indented *> C.squares parseValue)
                   , P.try $ flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
   postfixTable2 = [ P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2]))
                   , P.try $ flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
@@ -137,6 +136,7 @@ parseValue = do
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               ] ++ customOperatorTable user ++
               [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocLeft ]
+              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (flip Indexer)) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
                 , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<") >> return (Binary LessThan)) AssocRight
