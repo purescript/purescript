@@ -436,10 +436,13 @@ typeConstraintsForBinder val b@(NamedBinder name binder) = do
   me <- fresh
   (cs, m) <- typeConstraintsForBinder val binder
   return (TypeConstraint me (TUnknown val) (BinderOrigin b) : cs, M.insert name me m)
-typeConstraintsForBinder val b@(GuardedBinder cond binder) = do
-  (cs1, m) <- typeConstraintsForBinder val binder
-  (cs2, n) <- typeConstraints m cond
-  return (TypeConstraint n Boolean (ValueOrigin cond) : cs1 ++ cs2, m)
+
+typeConstraintsForGuardedBinder :: M.Map Ident Int -> Int -> Binder -> Check ([TypeConstraint], M.Map Ident Int)
+typeConstraintsForGuardedBinder m val b@(GuardedBinder cond binder) = do
+  (cs1, m1) <- typeConstraintsForBinder val binder
+  (cs2, n) <- typeConstraints (m `M.union` m1) cond
+  return (TypeConstraint n Boolean (ValueOrigin cond) : cs1 ++ cs2, m1)
+typeConstraintsForGuardedBinder m val b = typeConstraintsForBinder val b >>= return
 
 constantBinder :: Binder -> Int -> Type -> Check ([TypeConstraint], M.Map Ident Int)
 constantBinder b val ty = return ([TypeConstraint val ty (BinderOrigin b)], M.empty)
@@ -447,7 +450,7 @@ constantBinder b val ty = return ([TypeConstraint val ty (BinderOrigin b)], M.em
 typeConstraintsForBinders :: M.Map Ident Int -> Int -> Int -> [(Binder, Value)] -> Check [TypeConstraint]
 typeConstraintsForBinders _ _ _ [] = return []
 typeConstraintsForBinders m nval ret ((binder, val):bs) = do
-  (cs1, m1) <- typeConstraintsForBinder nval binder
+  (cs1, m1) <- typeConstraintsForGuardedBinder m nval binder
   (cs2, n2) <- typeConstraints (m `M.union` m1) val
   cs3 <- typeConstraintsForBinders m nval ret bs
   return (TypeConstraint n2 (TUnknown ret) (BinderOrigin binder) : cs1 ++ cs2 ++ cs3)
