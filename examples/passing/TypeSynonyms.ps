@@ -23,7 +23,7 @@ fst = {
 test1 :: forall a b c. Lens (Pair (Pair a b) c) a
 test1 = composeLenses fst fst
 
-extern head :: forall a. Lens [a] a
+foreign import head :: forall a. Lens [a] a
 
 test2 :: forall a b c. Lens (Pair [Pair a b] c) a
 test2 = composeLenses fst (composeLenses head fst)

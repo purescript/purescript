@@ -37,10 +37,11 @@ data Environment = Environment
   , types :: M.Map String (Kind, TypeDeclarationKind)
   , dataConstructors :: M.Map String PolyType
   , typeSynonyms :: M.Map String ([String], Type)
+  , members :: M.Map Ident String
   }
 
 emptyEnvironment :: Environment
-emptyEnvironment = Environment M.empty M.empty M.empty M.empty
+emptyEnvironment = Environment M.empty M.empty M.empty M.empty M.empty
 
 newtype Check a = Check { unCheck :: StateT (Environment, Int) (Either String) a } deriving (Functor, Monad, Applicative, MonadPlus, MonadState (Environment, Int), MonadError String)
 

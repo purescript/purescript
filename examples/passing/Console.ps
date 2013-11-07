@@ -1,12 +1,12 @@
-extern data IO :: * -> *
+foreign import data IO :: * -> *
 
-extern ret :: forall a. a -> IO a
+foreign import ret :: forall a. a -> IO a
 
-extern (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
+foreign import (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
 
 (*>) = \a -> \b -> a >>= \x -> b
 
-extern putStrLn :: String -> IO {}
+foreign import putStrLn :: String -> IO {}
 
 replicateM_ :: forall a. Number -> IO a -> IO {}
 replicateM_ = \n -> \x -> do

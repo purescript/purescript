@@ -35,5 +35,6 @@ data Declaration
   | TypeDeclaration Ident PolyType
   | ValueDeclaration Ident Value
   | ExternDeclaration Ident PolyType
+  | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration String Kind
   | FixityDeclaration Fixity String deriving (Show, D.Data, D.Typeable)

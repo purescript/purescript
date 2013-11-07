@@ -60,7 +60,7 @@ tailSafe = \xs -> case xs of
   [_:xs] -> Just xs
   _ -> Nothing
 
-extern map :: forall a b. (a -> b) -> [a] -> [b]
+foreign import map :: forall a b. (a -> b) -> [a] -> [b]
 
 foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
 foldr = \f -> \a -> \bs -> case bs of
@@ -74,29 +74,29 @@ foldl = \f -> \b -> \as -> do
     result = f a result
   return result
 
-extern length :: forall a. [a] -> Number
+foreign import member "length" length :: forall a. [a] -> Number
 
-extern indexOf :: forall a. [a] -> a -> Number
+foreign import indexOf :: forall a. [a] -> a -> Number
 
-extern lastIndexOf :: forall a. [a] -> a -> Number
+foreign import lastIndexOf :: forall a. [a] -> a -> Number
 
-extern concat :: forall a. [a] -> [a] -> [a]
+foreign import concat :: forall a. [a] -> [a] -> [a]
 
-extern join :: [String] -> String
+foreign import join :: [String] -> String
 
-extern joinWith :: [String] -> String -> String
+foreign import joinWith :: [String] -> String -> String
 
-extern push :: forall a. [a] -> a -> [a]
+foreign import push :: forall a. [a] -> a -> [a]
 
-extern reverse :: forall a. [a] -> [a]
+foreign import reverse :: forall a. [a] -> [a]
 
-extern shift :: forall a. [a] -> [a]
+foreign import shift :: forall a. [a] -> [a]
 
-extern slice :: forall a. Number -> Number -> [a] -> [a]
+foreign import slice :: forall a. Number -> Number -> [a] -> [a]
 
-extern sort :: forall a. [a] -> [a]
+foreign import sort :: forall a. [a] -> [a]
 
-extern splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
+foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
 
 cons :: forall a. a -> [a] -> [a]
 cons = \a -> concat([a])
@@ -108,7 +108,7 @@ concatMap = \as -> \f -> do
     result = result `concat` f a
   return result
 
-extern filter :: forall a. [a] -> (a -> Boolean) -> [a]
+foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
 
 empty :: forall a. [a] -> Boolean
 empty = \as -> case as of
@@ -165,75 +165,75 @@ unzip = \ts -> case ts of
 
 -- Strings
 
-extern lengthS :: String -> Number
+foreign import member "length" lengthS :: String -> Number
 
-extern charAt :: Number -> String -> String
+foreign import charAt :: Number -> String -> String
 
-extern indexOfS :: String -> String -> Number
+foreign import indexOfS :: String -> String -> Number
 
-extern lastIndexOfS :: String -> String -> Number
+foreign import lastIndexOfS :: String -> String -> Number
 
-extern localeCompare :: String -> String -> Number
+foreign import localeCompare :: String -> String -> Number
 
-extern replace :: String -> String -> String -> String
+foreign import replace :: String -> String -> String -> String
 
-extern sliceS :: Number -> Number -> String -> String
+foreign import sliceS :: Number -> Number -> String -> String
 
-extern split :: String -> String -> [String]
+foreign import split :: String -> String -> [String]
 
-extern substr :: Number -> Number -> String -> String
+foreign import substr :: Number -> Number -> String -> String
 
-extern substring :: Number -> Number -> String -> String
+foreign import substring :: Number -> Number -> String -> String
 
-extern toLower :: String -> String
+foreign import toLower :: String -> String
 
-extern toUpper :: String -> String
+foreign import toUpper :: String -> String
 
-extern trim :: String -> String
+foreign import trim :: String -> String
 
 -- Regex
 
-extern data Regex :: *
+foreign import data Regex :: *
 
-extern regex :: String -> String -> Regex
+foreign import regex :: String -> String -> Regex
 
-extern test :: Regex -> String -> Boolean
+foreign import test :: Regex -> String -> Boolean
 
-extern match :: Regex -> String -> [String]
+foreign import match :: Regex -> String -> [String]
 
-extern replaceR :: Regex -> String -> String -> String
+foreign import replaceR :: Regex -> String -> String -> String
 
-extern search :: Regex -> String -> Number
+foreign import search :: Regex -> String -> Number
 
 -- Globals
 
-extern nan :: Number
+foreign import nan :: Number
 
-extern infinity :: Number
+foreign import infinity :: Number
 
-extern toExponential :: Number -> String
+foreign import toExponential :: Number -> String
 
-extern toFixed :: Number -> Number -> String
+foreign import toFixed :: Number -> Number -> String
 
-extern toPrecision :: Number -> Number -> String
+foreign import toPrecision :: Number -> Number -> String
 
-extern numberToString :: Number -> String
+foreign import numberToString :: Number -> String
 
-extern isNaN :: Number -> Boolean
+foreign import isNaN :: Number -> Boolean
 
-extern isFinite :: Number -> Boolean
+foreign import isFinite :: Number -> Boolean
 
-extern parseFloat :: String -> Number
+foreign import parseFloat :: String -> Number
 
-extern parseInt :: String -> Number
+foreign import parseInt :: String -> Number
 
-extern encodeURIComponent :: String -> String
+foreign import encodeURIComponent :: String -> String
 
-extern decodeURIComponent :: String -> String
+foreign import decodeURIComponent :: String -> String
 
-extern encodeURI :: String -> String
+foreign import encodeURI :: String -> String
 
-extern decodeURI :: String -> String
+foreign import decodeURI :: String -> String
 
 -- Math
 
@@ -257,5 +257,5 @@ type Math =
   , tan :: Number -> Number
   }
 
-extern math :: Math
+foreign import math :: Math
 

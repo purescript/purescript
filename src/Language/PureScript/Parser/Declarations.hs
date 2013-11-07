@@ -63,10 +63,13 @@ parseValueDeclaration =
                    <*> parseValue
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
-parseExternDeclaration = P.try (reserved "extern") *> indented *>
-  (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
-                        <*> (lexeme (indented *> P.string "::") *> parseKind)
+parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
+   (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
+                             <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> ExternDeclaration <$> parseIdent
+                        <*> (lexeme (indented *> P.string "::") *> parsePolyType)
+   <|> ExternMemberDeclaration <$> (P.try (reserved "member") *> indented *> stringLiteral)
+                        <*> (indented *> parseIdent)
                         <*> (lexeme (indented *> P.string "::") *> parsePolyType))
 
 parseAssociativity :: P.Parsec String ParseState Associativity

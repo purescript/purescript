@@ -41,8 +41,8 @@ The following options are supported:
     -o --output 
         Write the generated Javascript to the specified file
         
-    -e --externs
-        Write a list of externs declarations to the specified file in addition to generating Javascript output
+    -e --foreign imports
+        Write a list of foreign imports declarations to the specified file in addition to generating Javascript output
 
 ## Motivation
 
@@ -67,7 +67,7 @@ The following code defines a `Person` data type and a function to generate a str
 ```haskell
 data Person = Person { name :: String, age :: Number }
 
-extern numberToString :: Number -> String
+foreign import numberToString :: Number -> String
 
 showPerson :: Person -> String
 showPerson = \p -> case p of
@@ -582,18 +582,26 @@ infixr 7 %%
 
 ## Foreign Function Interface
 
-The `extern` keyword declares a value which is defined in Javascript, and its type:
+The `foreign import` keyword declares a value which is defined in Javascript, and its type:
 
 ```haskell
-extern pow :: (Number, Number) -> Number
+foreign import pow :: (Number, Number) -> Number
 ```
 
-To declare a new type with no constructors, use `extern data` and provide the kind:
+To declare a new type with no constructors, use `foreign import data` and provide the kind:
 
 ```haskell
-extern data IO :: * -> *
+foreign import data IO :: * -> *
 	
-extern console :: { 
+foreign import console :: { 
   log :: String -> IO {} 
 }
 ```
+
+To alias a name of a field defined on a Javascript type to a PureScript function, use `foreign import member`. For example, to define a function `length` which accesses the ``length` member of an array:
+
+```
+foreign import member "length" length :: forall a. [a] -> Number
+```
+
+

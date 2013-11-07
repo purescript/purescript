@@ -25,11 +25,11 @@ import Language.PureScript.Pretty
 externToPs :: Environment -> Declaration -> Maybe String
 externToPs env (ValueDeclaration name _) = do
   (ty, _) <- M.lookup name $ names env
-  return $ "extern " ++ show name ++ " :: " ++ prettyPrintPolyType ty
-externToPs env (ExternDeclaration name ty) =
-  return $ "extern " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+  return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+externToPs env (ExternMemberDeclaration member name ty) =
+  return $ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintPolyType ty
 externToPs env (ExternDataDeclaration name kind) =
-  return $ "extern data " ++ name ++ " :: " ++ prettyPrintKind kind
+  return $ "foreign import data " ++ name ++ " :: " ++ prettyPrintKind kind
 externToPs env (TypeSynonymDeclaration name args ty) =
   return $ "type " ++ name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
 externToPs _ _ = Nothing

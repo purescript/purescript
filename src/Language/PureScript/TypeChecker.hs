@@ -81,8 +81,21 @@ typeCheckAll (ExternDataDeclaration name kind : rest) = do
   guardWith (name ++ " is already defined") $ not $ M.member name (types env)
   putEnv $ env { types = M.insert name (kind, TypeSynonym) (types env) }
   typeCheckAll rest
+typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
+  rethrow (("Error in foreign import member declaration " ++ show name ++ ": ") ++) $ do
+    env <- getEnv
+    kind <- kindOf ty
+    guardWith "Expected kind *" $ kind == Star
+    case M.lookup name (names env) of
+      Just _ -> throwError $ show name ++ " is already defined"
+      Nothing -> case ty of
+        (PolyType _ (Function [_] _)) -> do
+          putEnv (env { names = M.insert name (ty, Extern) (names env)
+                      , members = M.insert name member (members env) })
+        _ -> throwError "Foreign member declarations must have function types, with an single argument."
+  typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
-  rethrow (("Error in extern declaration " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in foreign import declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
     kind <- kindOf ty
     guardWith "Expected kind *" $ kind == Star

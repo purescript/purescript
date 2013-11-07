@@ -1,6 +1,6 @@
 data Person = Person { name :: String, age :: Number }
 
-extern itoa :: Number -> String
+foreign import itoa :: Number -> String
 	
 showPerson :: Person -> String
 showPerson = \p -> case p of

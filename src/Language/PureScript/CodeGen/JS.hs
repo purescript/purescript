@@ -36,6 +36,8 @@ import Language.PureScript.CodeGen.JS.AST as AST
 declToJs :: Declaration -> Maybe [JS]
 declToJs (ValueDeclaration ident (Abs args ret)) = Just [JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs ret)])]
 declToJs (ValueDeclaration ident val) = Just [JSVariableIntroduction ident (valueToJs val)]
+declToJs (ExternMemberDeclaration member ident _) =
+  Just [JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))])]
 declToJs (DataDeclaration _ _ ctors) =
   Just $ flip map ctors $ \(ctor, maybeTy) ->
     case maybeTy of

@@ -1,6 +1,5 @@
 // Arrays
 
-function lengthi(l) { return l.length; }
 function indexOf(l) { return function (e) { return l.indexOf(e); }; }
 function lastIndexOf(l) { return function (e) { return l.lastIndexOf(e); }; }
 function concat(l1) { return function (l2) { return l1.concat(l2); }; }
@@ -13,7 +12,6 @@ function slice(s) { return function(e) { return function (l) { return l.slice(s,
 function sort(l) { var l1 = l.slice(); l.sort(); return l1; }
 function splice(s) { return function(e) { return function(l1) { return function(l2) { return l2.splice(s, e, l1); }; }; }; }
 
-function lengthS(s) { return s.length; }
 function charAt(i) { return function(s) { return s.charAt(i); }; }
 function indexOfS(s1) { return function(s2) { return s2.indexOf(s2); }; } 
 function lastIndexOfS(s1) { return function(s2) { return s2.lastIndexOf(s2); }; } 
