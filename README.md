@@ -178,18 +178,40 @@ In the example, Foo is a tagged union type which has two constructors. It's firs
 
 Functions in PureScript can have zero or more arguments in general, just like in Javascript.
 
-Functions are introduced by using a backslash followed by a comma separated list of argument names:
+Functions are introduced by using a backslash followed by a list of argument names:
 
 ```haskell
-test1 = \a, b, c -> a + b + c
+test1 = \a b -> a + b
 ```
 
-which would correspond to the Javascript `function test1(a, b, c) { return a + b + c; }`
+which would correspond to the Javascript 
+
+```javascript
+function test1(a) {
+  return function (b) { 
+    return a + b;
+  }
+}
+```
+
+Multiple argument functions can be introduced by wrapping the arguments in parentheses, and separating them with commas:
+
+```haskell
+test1 = \(a, b) -> a + b
+```
+
+which generates
+
+```javascript
+function test1(a, b) { 
+  return a + b;
+}
+```
     
 A function taking no arguments would look like this:
 
 ```haskell
-test2 = \ -> 100
+test2 = \() -> 100
 ```
 
 which would correspond to the Javascript `function test2() { return 100; }`
@@ -205,7 +227,7 @@ A special case is made in the case of functions with one argument. These functio
 
 ```haskell
 -- has type Number -> Number -> Number -> Number
-addThree = \a -> \b -> \c -> a + b + c
+addThree = \a b c -> a + b + c
 
 -- has type Number -> Number -> Number
 addThree 1 
@@ -304,7 +326,7 @@ The following types of statement are supported:
 Here is an example of a power function defined using a block:
 
 ```haskell
-pow = \n, p -> do
+pow = \n p -> do
     var m = n
 	  for i <- 0 until p:
 	    m = m * n
@@ -560,7 +582,7 @@ In addition to the standard operators, user-defined infix operators can be creat
 E.g. to create a synonym for string concatenation:
 
 ```haskell
-(<>) = \s1 -> \s2 -> s1 ++ s2
+(<>) = \s1 s2 -> s1 ++ s2
 
 greeting = "Hello" <> "World!"
 ```
@@ -568,7 +590,7 @@ greeting = "Hello" <> "World!"
 Regular functions can be used as operators by enclosing their names in backticks:
 
 ```haskell
-foo = \x -> \y -> x * y + y
+foo = \x y -> x * y + y
 
 test = 10 `foo` 20
 ```
