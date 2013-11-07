@@ -1,8 +1,8 @@
-test1 = \x, y, z -> x * y + z(x)(y)
+test1 = \(x, y, z) -> x * y + z(x)(y)
 
 test2 = (\x -> x.foo false) { foo : \_ -> 1 }
 
-test3 = (\x, y -> x)(1 + 2 * (1 + 2), true && (false || false))
+test3 = (\(x, y) -> x)(1 + 2 * (1 + 2), true && (false || false))
 
 k = \x -> \y -> x
 

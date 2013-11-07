@@ -59,10 +59,20 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
   C.lexeme $ P.char '\\'
-  args <- (C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma)
-  C.lexeme $ C.indented *> P.string "->"
-  value <- parseValue
-  return $ Abs args value
+  uncurriedAbs <|> curriedAbs
+  where
+  uncurriedAbs :: P.Parsec String ParseState Value
+  uncurriedAbs = do
+    args <- C.indented *> C.parens ((C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma))
+    C.lexeme $ C.indented *> P.string "->"
+    value <- parseValue
+    return $ Abs args value
+  curriedAbs :: P.Parsec String ParseState Value
+  curriedAbs = do
+    args <- P.many1 (C.indented *> C.parseIdent)
+    C.lexeme $ C.indented *> P.string "->"
+    value <- parseValue
+    return $ foldl (\ret arg -> Abs [arg] ret) value args
 
 parseApp :: P.Parsec String ParseState Value
 parseApp = App <$> parseValue
