@@ -59,20 +59,20 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
   C.lexeme $ P.char '\\'
-  uncurriedAbs <|> curriedAbs
+  args <- P.many (C.indented *> (P.try singleArg <|> manyArgs))
+  C.lexeme $ C.indented *> P.string "->"
+  value <- parseValue
+  return $ toFunction args value
   where
-  uncurriedAbs :: P.Parsec String ParseState Value
-  uncurriedAbs = do
-    args <- C.indented *> C.parens ((C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma))
-    C.lexeme $ C.indented *> P.string "->"
-    value <- parseValue
-    return $ Abs args value
-  curriedAbs :: P.Parsec String ParseState Value
-  curriedAbs = do
-    args <- P.many1 (C.indented *> C.parseIdent)
-    C.lexeme $ C.indented *> P.string "->"
-    value <- parseValue
-    return $ foldl (\ret arg -> Abs [arg] ret) value args
+  manyArgs :: P.Parsec String ParseState (Value -> Value)
+  manyArgs = do
+    args <- C.parens ((C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma))
+    return $ Abs args
+  singleArg :: P.Parsec String ParseState (Value -> Value)
+  singleArg = Abs . return <$> C.parseIdent
+  toFunction :: [Value -> Value] -> Value -> Value
+  toFunction [] value = Abs [] value
+  toFunction args value = foldr (($)) value args
 
 parseApp :: P.Parsec String ParseState Value
 parseApp = App <$> parseValue

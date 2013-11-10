@@ -115,7 +115,7 @@ prettyPrintJS = fromMaybe (error "Incomplete pattern") . pattern matchValue
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Wrap lam $ \(name, args) ret -> "function "
                         ++ maybe "" identToJs name
-                        ++ "(" ++ intercalate "," (map identToJs args) ++ ") "
+                        ++ "(" ++ intercalate ", " (map identToJs args) ++ ") "
                         ++ ret ]
                   , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS th ++ " : " ++ prettyPrintJS el ]
                   , [ binary    LessThan             "<" ]
