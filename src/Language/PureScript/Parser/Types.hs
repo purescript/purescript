@@ -52,7 +52,7 @@ parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = TypeVar <$> identifier
 
 parseTypeConstructor :: P.Parsec String ParseState Type
-parseTypeConstructor = TypeConstructor <$> properName
+parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try

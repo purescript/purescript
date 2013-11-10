@@ -40,13 +40,13 @@ compile inputFiles outputFile externsFile = do
           U.putStrLn typeError
           exitFailure
         Right (_, env) -> do
-          let js = intercalate "; " . map (prettyPrintJS . optimize) . concat . mapMaybe (declToJs) $ decls
+          let js = intercalate "; " . map (prettyPrintJS . optimize) . concat . mapMaybe (declToJs Nothing global) $ decls
           case outputFile of
             Just path -> U.writeFile path js
             Nothing -> U.putStrLn js
           case externsFile of
             Nothing -> return ()
-            Just filePath -> U.writeFile filePath $ intercalate "\n" $ mapMaybe (externToPs env) decls
+            Just filePath -> U.writeFile filePath $ intercalate "\n" $ mapMaybe (externToPs 0 global env) decls
           exitSuccess
 
 inputFiles :: Term [FilePath]

@@ -90,6 +90,15 @@ parseFixityDeclaration = do
   P.modifyState $ \st -> st { fixities = M.insert name fixity current }
   return $ FixityDeclaration fixity name
 
+parseModuleDeclaration :: P.Parsec String ParseState Declaration
+parseModuleDeclaration = do
+  reserved "module"
+  indented
+  name <- properName
+  lexeme $ P.string "where"
+  decls <- mark (P.many (same *> parseDeclaration))
+  return $ ModuleDeclaration name decls
+
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
                    [ parseDataDeclaration
@@ -97,7 +106,8 @@ parseDeclaration = P.choice
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
                    , parseExternDeclaration
-                   , parseFixityDeclaration ] P.<?> "declaration"
+                   , parseFixityDeclaration
+                   , parseModuleDeclaration ] P.<?> "declaration"
 
 parseDeclarations :: P.Parsec String ParseState [Declaration]
-parseDeclarations = whiteSpace *> mark (same *> P.many parseDeclaration) <* P.eof
+parseDeclarations = whiteSpace *> mark (P.many (same *> parseDeclaration)) <* P.eof

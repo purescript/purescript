@@ -192,7 +192,7 @@ replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip ext
 replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  let syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
+  let syns = map (\((path, name), (args, _)) -> (Qualified path name, length args)) . M.toList $ typeSynonyms env
   either throwError return $ saturateAllTypeSynonyms syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
@@ -306,19 +306,25 @@ typeConstraints m v@(App f xs) = do
   let (cs2, ns) = (concatMap fst &&& map snd) all
   me <- fresh
   return (TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me)) (ValueOrigin v) : cs1 ++ cs2, me)
-typeConstraints m v@(Var var) =
-  case M.lookup var m of
-    Nothing -> do
-      env <- getEnv
-      case M.lookup var (names env) of
-        Nothing -> throwError $ show var ++ " is undefined"
-        Just (PolyType idents ty, _) -> do
+typeConstraints m v@(Var var@(Qualified mp name)) = do
+  case mp of
+    ModulePath [] ->
+      case M.lookup name m of
+        Just u -> do
           me <- fresh
-          replaced <- replaceVarsWithUnknowns idents ty
-          return ([TypeConstraint me replaced (ValueOrigin v)], me)
-    Just u -> do
-      me <- fresh
-      return ([TypeConstraint u (TUnknown me) (ValueOrigin v)], me)
+          return ([TypeConstraint u (TUnknown me) (ValueOrigin v)], me)
+        Nothing -> lookupGlobal
+    _ -> lookupGlobal
+  where
+  lookupGlobal = do
+    env <- getEnv
+    modulePath <- checkModulePath `fmap` get
+    case M.lookup (qualify modulePath var) (names env) of
+      Nothing -> throwError $ show var ++ " is undefined"
+      Just (PolyType idents ty, _) -> do
+        me <- fresh
+        replaced <- replaceVarsWithUnknowns idents ty
+        return ([TypeConstraint me replaced (ValueOrigin v)], me)
 typeConstraints m (Block ss) = do
   ret <- fresh
   (cs, allCodePathsReturn, _) <- typeConstraintsForBlock m M.empty ret ss
@@ -326,8 +332,9 @@ typeConstraints m (Block ss) = do
   return (cs, ret)
 typeConstraints m v@(Constructor c) = do
   env <- getEnv
-  case M.lookup c (dataConstructors env) of
-    Nothing -> throwError $ "Constructor " ++ c ++ " is undefined"
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath c) (dataConstructors env) of
+    Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just (PolyType idents ty) -> do
       me <- fresh
       replaced <- replaceVarsWithUnknowns idents ty
@@ -394,21 +401,23 @@ typeConstraintsForBinder val b@(VarBinder name) = do
   return ([TypeConstraint me (TUnknown val) (BinderOrigin b)], M.singleton name me)
 typeConstraintsForBinder val b@(NullaryBinder ctor) = do
   env <- getEnv
-  case M.lookup ctor (dataConstructors env) of
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just (PolyType args ret) -> do
       ret' <- replaceVarsWithUnknowns args ret
       return ([TypeConstraint val ret' (BinderOrigin b)], M.empty)
-    _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
+    _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 typeConstraintsForBinder val b@(UnaryBinder ctor binder) = do
   env <- getEnv
-  case M.lookup ctor (dataConstructors env) of
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just (PolyType idents f@(Function [_] _)) -> do
       obj <- fresh
       (Function [ty] ret) <- replaceVarsWithUnknowns idents f
       (cs, m1) <- typeConstraintsForBinder obj binder
       return (TypeConstraint val ret (BinderOrigin b) : TypeConstraint obj ty (BinderOrigin b) : cs, m1)
-    Just _ -> throwError $ ctor ++ " is not a unary constructor"
-    _ -> throwError $ "Constructor " ++ ctor ++ " is not defined"
+    Just _ -> throwError $ show ctor ++ " is not a unary constructor"
+    _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 typeConstraintsForBinder val b@(ObjectBinder props) = do
   row <- fresh
   rest <- fresh
@@ -573,7 +582,8 @@ unifyTypes o (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args
   fmap concat $ zipWithM (unifyTypes o) args1 args2
 unifyTypes o (SaturatedTypeSynonym name args) ty = do
   env <- getEnv
-  case M.lookup name (typeSynonyms env) of
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath name) (typeSynonyms env) of
     Just (synArgs, body) -> do
       let m = M.fromList $ zip synArgs args
       let replaced = replaceTypeVars m body
@@ -591,7 +601,10 @@ unifyTypes o (Function args1 ret1) (Function args2 ret2) = do
   cs2 <- unifyTypes o ret1 ret2
   return $ cs1 ++ cs2
 unifyTypes _ (TypeVar v1) (TypeVar v2) | v1 == v2 = return []
-unifyTypes _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = return []
+unifyTypes _ (TypeConstructor c1) (TypeConstructor c2) = do
+  modulePath <- checkModulePath `fmap` get
+  guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
+  return []
 unifyTypes o (TypeApp t1 t2) (TypeApp t3 t4) = do
   cs1 <- unifyTypes o t1 t3
   cs2 <- unifyTypes o t2 t4

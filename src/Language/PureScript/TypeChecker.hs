@@ -42,27 +42,29 @@ import Control.Monad.Error
 typeCheckAll :: [Declaration] -> Check ()
 typeCheckAll [] = return ()
 typeCheckAll (DataDeclaration name args dctors : rest) = do
-  rethrow (("Error in type constructor " ++ name ++ ": ") ++) $ do
+  rethrow (("Error in type constructor " ++ show name ++ ": ") ++) $ do
     env <- getEnv
-    guardWith (name ++ " is already defined") $ not $ M.member name (types env)
+    modulePath <- checkModulePath `fmap` get
+    guardWith (show name ++ " is already defined") $ not $ M.member (modulePath, name) (types env)
     ctorKind <- kindsOf (Just name) args (mapMaybe snd dctors)
-    putEnv $ env { types = M.insert name (ctorKind, Data) (types env) }
+    putEnv $ env { types = M.insert (modulePath, name) (ctorKind, Data) (types env) }
     forM_ dctors $ \(dctor, maybeTy) ->
-      rethrow (("Error in data constructor " ++ name ++ ": ") ++) $ do
+      rethrow (("Error in data constructor " ++ show name ++ ": ") ++) $ do
         env' <- getEnv
-        guardWith (dctor ++ " is already defined") $ not $ M.member dctor (dataConstructors env')
-        let retTy = foldl TypeApp (TypeConstructor name) (map TypeVar args)
+        guardWith (show dctor ++ " is already defined") $ not $ M.member (modulePath, dctor) (dataConstructors env')
+        let retTy = foldl TypeApp (TypeConstructor (Qualified modulePath name)) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
         let polyType = PolyType args dctorTy
-        putEnv $ env' { dataConstructors = M.insert dctor polyType (dataConstructors env') }
+        putEnv $ env' { dataConstructors = M.insert (modulePath, dctor) polyType (dataConstructors env') }
   typeCheckAll rest
 typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
-  rethrow (("Error in type synonym " ++ name ++ ": ") ++) $ do
+  rethrow (("Error in type synonym " ++ show name ++ ": ") ++) $ do
     env <- getEnv
-    guardWith (name ++ " is already defined") $ not $ M.member name (types env)
+    modulePath <- checkModulePath `fmap` get
+    guardWith (show name ++ " is already defined") $ not $ M.member (modulePath, name) (types env)
     kind <- kindsOf (Just name) args [ty]
-    putEnv $ env { types = M.insert name (kind, TypeSynonym) (types env)
-                 , typeSynonyms = M.insert name (args, ty) (typeSynonyms env) }
+    putEnv $ env { types = M.insert (modulePath, name) (kind, TypeSynonym) (types env)
+                 , typeSynonyms = M.insert (modulePath, name) (args, ty) (typeSynonyms env) }
   typeCheckAll rest
 typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' val : rest) | name == name' =
   typeCheckAll (ValueDeclaration name (TypedValue val ty) : rest)
@@ -70,40 +72,48 @@ typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaratio
 typeCheckAll (ValueDeclaration name val : rest) = do
   rethrow (("Error in declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
-    case M.lookup name (names env) of
+    modulePath <- checkModulePath `fmap` get
+    case M.lookup (modulePath, name) (names env) of
       Just ty -> throwError $ show name ++ " is already defined"
       Nothing -> do
         ty <- typeOf name val
-        putEnv (env { names = M.insert name (ty, Value) (names env) })
+        putEnv (env { names = M.insert (modulePath, name) (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ExternDataDeclaration name kind : rest) = do
   env <- getEnv
-  guardWith (name ++ " is already defined") $ not $ M.member name (types env)
-  putEnv $ env { types = M.insert name (kind, TypeSynonym) (types env) }
+  modulePath <- checkModulePath `fmap` get
+  guardWith (show name ++ " is already defined") $ not $ M.member (modulePath, name) (types env)
+  putEnv $ env { types = M.insert (modulePath, name) (kind, TypeSynonym) (types env) }
   typeCheckAll rest
 typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
   rethrow (("Error in foreign import member declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
+    modulePath <- checkModulePath `fmap` get
     kind <- kindOf ty
     guardWith "Expected kind *" $ kind == Star
-    case M.lookup name (names env) of
+    case M.lookup (modulePath, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> case ty of
         (PolyType _ (Function [_] _)) -> do
-          putEnv (env { names = M.insert name (ty, Extern) (names env)
-                      , members = M.insert name member (members env) })
+          putEnv (env { names = M.insert (modulePath, name) (ty, Extern) (names env)
+                      , members = M.insert (modulePath, name) member (members env) })
         _ -> throwError "Foreign member declarations must have function types, with an single argument."
   typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
   rethrow (("Error in foreign import declaration " ++ show name ++ ": ") ++) $ do
     env <- getEnv
+    modulePath <- checkModulePath `fmap` get
     kind <- kindOf ty
     guardWith "Expected kind *" $ kind == Star
-    case M.lookup name (names env) of
+    case M.lookup (modulePath, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert name (ty, Extern) (names env) })
+      Nothing -> putEnv (env { names = M.insert (modulePath, name) (ty, Extern) (names env) })
   typeCheckAll rest
 typeCheckAll (FixityDeclaration _ name : rest) = do
   typeCheckAll rest
   env <- getEnv
-  guardWith ("Fixity declaration with no binding: " ++ name) $ M.member (Op name) $ names env
+  modulePath <- checkModulePath `fmap` get
+  guardWith ("Fixity declaration with no binding: " ++ name) $ M.member (modulePath, Op name) $ names env
+typeCheckAll (ModuleDeclaration name decls : rest) = do
+  withModule name $ typeCheckAll decls
+  typeCheckAll rest

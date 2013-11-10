@@ -79,10 +79,10 @@ parseApp = App <$> parseValue
                <*> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
 
 parseVar :: P.Parsec String ParseState Value
-parseVar = Var <$> C.parseIdent
+parseVar = Var <$> C.parseQualified C.parseIdent
 
 parseConstructor :: P.Parsec String ParseState Value
-parseConstructor = Constructor <$> C.properName
+parseConstructor = Constructor <$> C.parseQualified C.properName
 
 parseCase :: P.Parsec String ParseState Value
 parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") parseValue
@@ -112,8 +112,8 @@ parseValueAtom = C.indented *> P.choice
             , parseArrayLiteral
             , parseObjectLiteral
             , parseAbs
-            , P.try parseVar
             , P.try parseConstructor
+            , P.try parseVar
             , parseBlock
             , parseCase
             , parseIfThenElse
@@ -145,7 +145,7 @@ parseValue = do
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               ] ++ customOperatorTable user ++
-              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocLeft ]
+              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseQualified C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocLeft ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "!!") >> return (flip Indexer)) AssocRight ]
               , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
                 , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
@@ -181,7 +181,7 @@ customOperatorTable fixities =
         C.lexeme $ P.try $ do
           C.indented
           C.reservedOp name P.<?> "operator"
-          return $ \t1 t2 -> App (App (Var (Op name)) [t1]) [t2])
+          return $ \t1 t2 -> App (App (Var (Qualified global (Op name))) [t1]) [t2])
       levels
 
 toAssoc :: Associativity -> Assoc
@@ -257,10 +257,10 @@ parseVarBinder :: P.Parsec String ParseState Binder
 parseVarBinder = VarBinder <$> C.parseIdent
 
 parseNullaryBinder :: P.Parsec String ParseState Binder
-parseNullaryBinder = NullaryBinder <$> C.lexeme C.properName
+parseNullaryBinder = NullaryBinder <$> C.lexeme (C.parseQualified C.properName)
 
 parseUnaryBinder :: P.Parsec String ParseState Binder
-parseUnaryBinder = UnaryBinder <$> C.lexeme C.properName <*> (C.indented *> parseBinder)
+parseUnaryBinder = UnaryBinder <$> C.lexeme (C.parseQualified C.properName) <*> (C.indented *> parseBinder)
 
 parseObjectBinder :: P.Parsec String ParseState Binder
 parseObjectBinder = ObjectBinder <$> C.braces ((C.indented *> parseIdentifierAndBinder) `P.sepBy` (C.indented *> C.comma))

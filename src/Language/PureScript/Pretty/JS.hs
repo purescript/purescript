@@ -37,8 +37,8 @@ literals = Pattern $ A.Kleisli match
   match (JSObjectLiteral ps) = Just $ "{ " ++ intercalate ", " (map (\(key, value) -> key ++ ": " ++ prettyPrintJS value) ps) ++ " }"
   match (JSBlock sts) = Just $ "{ " ++ intercalate "; " (map prettyPrintJS sts) ++ " }"
   match (JSVar ident) = Just (identToJs ident)
-  match (JSVariableIntroduction ident value) = Just $ "var " ++ identToJs ident ++ " = " ++ prettyPrintJS value
-  match (JSAssignment target value) = Just $ identToJs target ++ " = " ++ prettyPrintJS value
+  match (JSVariableIntroduction ident value) = Just $ "var " ++ identToJs ident ++ maybe "" ((" = " ++) . prettyPrintJS) value
+  match (JSAssignment target value) = Just $ targetToJs target ++ " = " ++ prettyPrintJS value
   match (JSWhile cond sts) = Just $ "while ("
     ++ prettyPrintJS cond ++ ") "
     ++ prettyPrintJS sts
@@ -54,6 +54,10 @@ literals = Pattern $ A.Kleisli match
   match (JSReturn value) = Just $ "return " ++ prettyPrintJS value
   match (JSThrow value) = Just $ "throw " ++ prettyPrintJS value
   match _ = Nothing
+
+targetToJs :: JSAssignment -> String
+targetToJs (JSAssignVariable ident) = identToJs ident
+targetToJs (JSAssignProperty prop target) = targetToJs target ++ "." ++ prop
 
 conditional :: Pattern JS ((JS, JS), JS)
 conditional = Pattern $ A.Kleisli match

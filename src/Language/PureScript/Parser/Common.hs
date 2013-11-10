@@ -72,7 +72,8 @@ reservedNames = [ "case"
                 , "String"
                 , "Boolean"
                 , "infixl"
-                , "infixr" ]
+                , "infixr"
+                , "module" ]
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
@@ -133,8 +134,16 @@ natural          = PT.natural           tokenParser
 tick :: P.Parsec String u Char
 tick = lexeme $ P.char '`'
 
-properName :: P.Parsec String u String
-properName = lexeme $ P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
+properName :: P.Parsec String u ProperName
+properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
+
+parseQualified :: P.Parsec String ParseState a -> P.Parsec String ParseState (Qualified a)
+parseQualified parser = part global
+  where
+  part path = (do name <- P.try (properName <* delimiter)
+                  part (subModule path name))
+              <|> (Qualified path <$> P.try parser)
+  delimiter = indented *> colon <* P.notFollowedBy colon
 
 integerOrFloat :: P.Parsec String u (Either Integer Double)
 integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>

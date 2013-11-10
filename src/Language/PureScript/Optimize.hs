@@ -35,7 +35,7 @@ isReassigned :: (Data d) => Ident -> d -> Bool
 isReassigned var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
-  check (JSAssignment var2 _) | var1 == var2 = True
+  check (JSAssignment (JSAssignVariable var2) _) | var1 == var2 = True
   check _ = False
 
 isUsed :: (Data d) => Ident -> d -> Bool
@@ -43,8 +43,11 @@ isUsed var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
   check (JSVar var2) | var1 == var2 = True
-  check (JSAssignment var2 _) | var1 == var2 = True
+  check (JSAssignment target _) | var1 == targetVariable target = True
   check _ = False
+  targetVariable :: JSAssignment -> Ident
+  targetVariable (JSAssignVariable var) = var
+  targetVariable (JSAssignProperty _ tgt) = targetVariable tgt
 
 shouldInline :: JS -> Bool
 shouldInline (JSVar _) = True
@@ -63,7 +66,7 @@ inlineVariables = everywhere (mkT removeFromBlock)
   removeFromBlock js = js
   go :: [JS] -> [JS]
   go [] = []
-  go (JSVariableIntroduction var js : sts) | shouldInline js && not (isReassigned var sts) = go (replaceIdent var js sts)
+  go (JSVariableIntroduction var (Just js) : sts) | shouldInline js && not (isReassigned var sts) = go (replaceIdent var js sts)
   go (s:sts) = s : go sts
 
 removeUnusedVariables :: JS -> JS

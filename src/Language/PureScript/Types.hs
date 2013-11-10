@@ -17,6 +17,7 @@
 module Language.PureScript.Types where
 
 import Data.Data
+import Language.PureScript.Names
 
 data Type
   = TUnknown Int
@@ -27,9 +28,9 @@ data Type
   | Object Row
   | Function [Type] Type
   | TypeVar String
-  | TypeConstructor String
+  | TypeConstructor (Qualified ProperName)
   | TypeApp Type Type
-  | SaturatedTypeSynonym String [Type] deriving (Show, Eq, Data, Typeable)
+  | SaturatedTypeSynonym (Qualified ProperName) [Type] deriving (Show, Eq, Data, Typeable)
 
 data PolyType = PolyType [String] Type deriving (Show, Eq, Data, Typeable)
 

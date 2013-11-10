@@ -61,10 +61,10 @@ data Value
   | ObjectUpdate Value [(String, Value)]
   | Abs [Ident] Value
   | App Value [Value]
-  | Var Ident
+  | Var (Qualified Ident)
   | IfThenElse Value Value Value
   | Block [Statement]
-  | Constructor String
+  | Constructor (Qualified ProperName)
   | Case Value [(Binder, Value)]
   | TypedValue Value PolyType deriving (Show, Data, Typeable)
 
@@ -89,8 +89,8 @@ data Binder
   | StringBinder String
   | NumberBinder (Either Integer Double)
   | VarBinder Ident
-  | NullaryBinder String
-  | UnaryBinder String Binder
+  | NullaryBinder (Qualified ProperName)
+  | UnaryBinder (Qualified ProperName) Binder
   | ObjectBinder [(String, Binder)]
   | ArrayBinder [Binder] (Maybe Binder)
   | NamedBinder Ident Binder

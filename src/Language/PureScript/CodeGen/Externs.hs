@@ -17,19 +17,26 @@ module Language.PureScript.CodeGen.Externs (
 ) where
 
 import Data.List (intercalate)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
+import Language.PureScript.Names
 
-externToPs :: Environment -> Declaration -> Maybe String
-externToPs env (ValueDeclaration name _) = do
-  (ty, _) <- M.lookup name $ names env
-  return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintPolyType ty
-externToPs env (ExternMemberDeclaration member name ty) =
-  return $ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintPolyType ty
-externToPs env (ExternDataDeclaration name kind) =
-  return $ "foreign import data " ++ name ++ " :: " ++ prettyPrintKind kind
-externToPs env (TypeSynonymDeclaration name args ty) =
-  return $ "type " ++ name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
-externToPs _ _ = Nothing
+externToPs :: Int -> ModulePath -> Environment -> Declaration -> Maybe String
+externToPs indent path env (ValueDeclaration name _) = do
+  (ty, _) <- M.lookup (path, name) $ names env
+  return $ replicate indent ' ' ++ "foreign import " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+externToPs indent path env (DataDeclaration name _ _) = do
+  (kind, _) <- M.lookup (path, name) $ types env
+  return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
+externToPs indent path env (ExternMemberDeclaration member name ty) =
+  return $ replicate indent ' ' ++ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+externToPs indent path env (ExternDataDeclaration name kind) =
+  return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
+externToPs indent path env (TypeSynonymDeclaration name args ty) =
+  return $ replicate indent ' ' ++ "type " ++ show name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
+externToPs indent path env (ModuleDeclaration name decls) =
+  return $ replicate indent ' ' ++ "module " ++ show name ++ " where\n" ++ unlines (mapMaybe (externToPs (indent + 2) (subModule path name) env) decls)
+externToPs _ _ _ _ = Nothing

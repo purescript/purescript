@@ -28,6 +28,7 @@ import Data.Data
 
 import Language.PureScript.Types
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
@@ -61,15 +62,15 @@ emptyKindSolution = KindSolution KUnknown
 kindOf :: PolyType -> Check Kind
 kindOf (PolyType idents ty) = do
   ns <- replicateM (length idents) fresh
-  (cs, n, m) <- kindConstraints (M.fromList (zip idents ns)) ty
+  (cs, n, m) <- kindConstraints Nothing (M.fromList (zip idents ns)) ty
   solution <- solveKindConstraints cs emptyKindSolution
   return $ starIfUnknown $ runKindSolution solution n
 
-kindsOf :: Maybe String -> [String] -> [Type] -> Check Kind
+kindsOf :: Maybe ProperName -> [String] -> [Type] -> Check Kind
 kindsOf name args ts = do
   tyCon <- fresh
   nargs <- replicateM (length args) fresh
-  (cs, ns, m) <- kindConstraintsAll (maybe id (`M.insert` tyCon) name $ M.fromList (zip args nargs)) ts
+  (cs, ns, m) <- kindConstraintsAll (fmap (\pn -> (pn, tyCon)) name) (M.fromList (zip args nargs)) ts
   let extraConstraints =
         KindConstraint tyCon (foldr (FunKind . KUnknown) Star nargs) DataDeclOrigin
         : zipWith (\n arg -> KindConstraint n Star (TypeOrigin arg)) ns ts
@@ -81,61 +82,65 @@ starIfUnknown (KUnknown _) = Star
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
-kindConstraintsAll :: M.Map String Int -> [Type] -> Check ([KindConstraint], [Int], M.Map String Int)
-kindConstraintsAll m [] = return ([], [], m)
-kindConstraintsAll m (t:ts) = do
-  (cs, n1, m') <- kindConstraints m t
-  (cs', ns, m'') <- kindConstraintsAll m' ts
+kindConstraintsAll :: Maybe (ProperName, Int) -> M.Map String Int -> [Type] -> Check ([KindConstraint], [Int], M.Map String Int)
+kindConstraintsAll _ m [] = return ([], [], m)
+kindConstraintsAll name m (t:ts) = do
+  (cs, n1, m') <- kindConstraints name m t
+  (cs', ns, m'') <- kindConstraintsAll name m' ts
   return (KindConstraint n1 Star (TypeOrigin t) : cs ++ cs', n1:ns, m'')
 
-kindConstraints :: M.Map String Int -> Type -> Check ([KindConstraint], Int, M.Map String Int)
-kindConstraints m a@(Array t) = do
+kindConstraints :: Maybe (ProperName, Int) -> M.Map String Int -> Type -> Check ([KindConstraint], Int, M.Map String Int)
+kindConstraints name m a@(Array t) = do
   me <- fresh
-  (cs, n1, m') <- kindConstraints m t
+  (cs, n1, m') <- kindConstraints name m t
   return (KindConstraint n1 Star (TypeOrigin t) : KindConstraint me Star (TypeOrigin a) : cs, me, m')
-kindConstraints m o@(Object row) = do
+kindConstraints name m o@(Object row) = do
   me <- fresh
-  (cs, r, m') <- kindConstraintsForRow m row
+  (cs, r, m') <- kindConstraintsForRow name m row
   return (KindConstraint me Star (TypeOrigin o) : KindConstraint r Row (RowOrigin row) : cs, me, m')
-kindConstraints m f@(Function args ret) = do
+kindConstraints name m f@(Function args ret) = do
   me <- fresh
-  (cs, ns, m') <- kindConstraintsAll m args
-  (cs', retN, m'') <- kindConstraints m' ret
+  (cs, ns, m') <- kindConstraintsAll name m args
+  (cs', retN, m'') <- kindConstraints name m' ret
   return (KindConstraint retN Star (TypeOrigin ret) : KindConstraint me Star (TypeOrigin f) : zipWith (\n arg -> KindConstraint n Star (TypeOrigin arg)) ns args ++ cs ++ cs', me, m'')
-kindConstraints m (TypeVar v) =
+kindConstraints _ m (TypeVar v) =
   case M.lookup v m of
     Just u -> return ([], u, m)
     Nothing -> throwError $ "Unbound type variable " ++ v
-kindConstraints m c@(TypeConstructor v) = do
+kindConstraints (Just (name, u)) m c@(TypeConstructor v@(Qualified (ModulePath []) pn)) | name == pn = do
   env <- getEnv
   me <- fresh
-  case M.lookup v m of
-    Nothing -> case M.lookup v (types env) of
-      Nothing -> throwError $ "Unknown type constructor '" ++ v ++ "'"
-      Just (kind, _) -> return ([KindConstraint me kind (TypeOrigin c)], me, m)
-    Just u -> return ([KindConstraint me (KUnknown u) (TypeOrigin c)], me, m)
-kindConstraints m a@(TypeApp t1 t2) = do
+  modulePath <- checkModulePath `fmap` get
+  return ([KindConstraint me (KUnknown u) (TypeOrigin c)], me, m)
+kindConstraints name m c@(TypeConstructor v) = do
+  env <- getEnv
   me <- fresh
-  (cs1, n1, m1) <- kindConstraints m t1
-  (cs2, n2, m2) <- kindConstraints m1 t2
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath v) (types env) of
+    Nothing -> throwError $ "Unknown type constructor '" ++ show v ++ "'"
+    Just (kind, _) -> return ([KindConstraint me kind (TypeOrigin c)], me, m)
+kindConstraints name m a@(TypeApp t1 t2) = do
+  me <- fresh
+  (cs1, n1, m1) <- kindConstraints name m t1
+  (cs2, n2, m2) <- kindConstraints name m1 t2
   return (KindConstraint n1 (FunKind (KUnknown n2) (KUnknown me)) (TypeOrigin a) : cs1 ++ cs2, me, m2)
-kindConstraints m t = do
+kindConstraints _ m t = do
   me <- fresh
   return ([KindConstraint me Star (TypeOrigin t)], me, m)
 
-kindConstraintsForRow :: M.Map String Int -> Row -> Check ([KindConstraint], Int, M.Map String Int)
-kindConstraintsForRow m r@(RowVar v) = do
+kindConstraintsForRow :: Maybe (ProperName, Int) -> M.Map String Int -> Row -> Check ([KindConstraint], Int, M.Map String Int)
+kindConstraintsForRow _ m r@(RowVar v) = do
   me <- case M.lookup v m of
     Just u -> return u
     Nothing -> fresh
   return ([KindConstraint me Row (RowOrigin r)], me, M.insert v me m)
-kindConstraintsForRow m r@REmpty = do
+kindConstraintsForRow _ m r@REmpty = do
   me <- fresh
   return ([KindConstraint me Row (RowOrigin r)], me, m)
-kindConstraintsForRow m r@(RCons _ ty row) = do
+kindConstraintsForRow name m r@(RCons _ ty row) = do
   me <- fresh
-  (cs1, n1, m1) <- kindConstraints m ty
-  (cs2, n2, m2) <- kindConstraintsForRow m1 row
+  (cs1, n1, m1) <- kindConstraints name m ty
+  (cs2, n2, m2) <- kindConstraintsForRow name m1 row
   return (KindConstraint me Row (RowOrigin r) : KindConstraint n1 Star (TypeOrigin ty) : KindConstraint n2 Row (RowOrigin r) : cs1 ++ cs2, me, m2)
 
 solveKindConstraints :: [KindConstraint] -> KindSolution -> Check KindSolution
