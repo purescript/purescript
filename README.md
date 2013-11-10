@@ -60,7 +60,25 @@ PureScript is *not* designed to be a general-purpose programming language. The p
 
 PureScript can also be seen as a trade-off between a theoretically ideal language and one which generates reasonably high performance code.
 
-## First Example
+## Hello, PureScript!
+
+As an introductory example, here is the usual "Hello World" written in PureScript:
+
+```haskell
+foreign import console :: { log :: String -> {} }
+
+main = \() -> console.log "Hello, World!"
+```
+
+which compiles to the following Javascript:
+
+```javascript
+function main() {
+    console.log("Hello, World!");
+}
+```
+
+## Another Example
 
 The following code defines a `Person` data type and a function to generate a string representation for a `Person`:
 
