@@ -226,13 +226,31 @@ function test1(a, b) {
 }
 ```
     
-A function taking no arguments would look like this:
+In the case of a function with no arguments, the parentheses may be omitted, as follows:
 
 ```haskell
-test2 = \() -> 100
+test2 = \ -> 100
 ```
 
 which would correspond to the Javascript `function test2() { return 100; }`
+
+Multiple-argument and single-argument syntax can be mixed, as follows:
+
+```haskell
+test3 = \a (b, c) d -> a + b + c + d
+```
+
+which generates
+
+```javascript
+function test3(a) {
+    return function (b, c) {
+        return function (d) {
+            return a + b + c + d;
+        }
+    }
+}
+```
 
 Functions are applied by providing their arguments inside parentheses:
 
