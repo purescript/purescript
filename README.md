@@ -638,6 +638,37 @@ infixl 5 <>
 infixr 7 %%
 ```
 
+## Modules
+
+Simple modules are supported by the `module` keyword.
+
+Introduce a module as follows, with a list of indented declarations:
+
+```haskell
+module A where
+
+    foo = \x -> x
+```
+
+Modules may be nested:
+
+```haskell
+module A where
+
+    foo = \x -> x
+    
+    module B where
+    
+        bar = \y -> y
+```
+
+Names may be qualified by using a colon:
+
+```
+foo = A:foo
+bar = A:B:bar
+```
+
 ## Foreign Function Interface
 
 The `foreign import` keyword declares a value which is defined in Javascript, and its type:
