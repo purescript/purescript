@@ -36,10 +36,10 @@ import Language.PureScript.CodeGen.JS.AST as AST
 declToJs :: Maybe Ident -> ModulePath -> Declaration -> Maybe [JS]
 declToJs mod mp (ValueDeclaration ident (Abs args ret)) =
   Just $ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp ret)]) :
-         maybe [] (return . setProperty (show ident) (JSVar ident)) mod
+         maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
 declToJs mod mp (ValueDeclaration ident val) =
   Just $ JSVariableIntroduction ident (Just (valueToJs mp val)) :
-         maybe [] (return . setProperty (show ident) (JSVar ident)) mod
+         maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
 declToJs mod _ (ExternMemberDeclaration member ident _) =
   Just $ JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))]) :
          maybe [] (return . setProperty (show ident) (JSVar ident)) mod

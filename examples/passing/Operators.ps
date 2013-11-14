@@ -19,3 +19,19 @@ test6 = ((\x -> x) `k` 2) 3
 (<>) = \s1 -> \s2 -> s1 ++ s2
 
 test7 = "Hello" <> "World!"
+
+module Ops where
+  
+  (@@) :: forall a b. (a -> b) -> a -> b
+  (@@) = \f x -> f x
+
+  foo :: String -> String
+  foo = \s -> s
+ 
+  test8 = foo @@ "Hello World"
+
+  bar = \s1 s2 -> s1 ++ s2
+
+test9 = Ops:foo Ops:@@ "Hello World"
+
+test10 = "Hello" `Ops:bar` "World"
