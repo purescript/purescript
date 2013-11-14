@@ -38,7 +38,7 @@ rebracket :: [Declaration] -> Either String [Declaration]
 rebracket ds = do
   m <- collectFixities ds
   let opTable = customOperatorTable m
-  ds' <- G.everywhereM (G.mkM (matchOperators opTable)) ds
+  ds' <- G.everywhereM' (G.mkM (matchOperators opTable)) ds
   return $ G.everywhere (G.mkT removeParens) ds'
 
 removeParens :: Value -> Value
@@ -104,25 +104,26 @@ globalOp :: String -> Qualified Ident
 globalOp = Qualified global . Op
 
 builtIns :: [(Qualified Ident, Value -> Value -> Value, Precedence, Associativity)]
-builtIns = [ (globalOp "!!", flip Indexer, 3, Infixl)
-           , (globalOp "&&", Binary And, 3, Infixr)
-           , (globalOp "||", Binary Or, 3, Infixr)
-           , (globalOp "<=", Binary LessThanOrEqualTo, 4, Infixl)
-           , (globalOp ">=", Binary GreaterThanOrEqualTo, 4, Infixl)
-           , (globalOp "<", Binary LessThan, 4, Infixl)
-           , (globalOp ">", Binary GreaterThan, 4, Infixl)
-           , (globalOp "==", Binary EqualTo, 4, Infixl)
-           , (globalOp "!=", Binary NotEqualTo, 4, Infixl)
-           , (globalOp "*", Binary Multiply, 7, Infixl)
-           , (globalOp "/", Binary Divide, 7, Infixl)
-           , (globalOp "%", Binary Modulus, 7, Infixl)
-           , (globalOp "++", Binary Concat, 5, Infixr)
-           , (globalOp "+", Binary Add, 6, Infixl)
-           , (globalOp "-", Binary Subtract, 6, Infixl)
-           , (globalOp "<<", Binary ShiftLeft, 7, Infixl)
-           , (globalOp ">>>", Binary ZeroFillShiftRight, 7, Infixl)
-           , (globalOp ">>", Binary ShiftRight, 7, Infixl)
-           , (globalOp "&", Binary BitwiseAnd, 7, Infixl)
-           , (globalOp "^", Binary BitwiseXor, 7, Infixl)
-           , (globalOp "|", Binary BitwiseOr, 7, Infixl)
+builtIns = [ (globalOp "<", Binary LessThan, 3, Infixl)
+           , (globalOp "<=", Binary LessThanOrEqualTo, 3, Infixl)
+           , (globalOp ">", Binary GreaterThan, 3, Infixl)
+           , (globalOp ">=", Binary GreaterThanOrEqualTo, 3, Infixl)
+           , (globalOp "!!", flip Indexer, 4, Infixl)
+           , (globalOp "*", Binary Multiply, 5, Infixl)
+           , (globalOp "/", Binary Divide, 5, Infixl)
+           , (globalOp "%", Binary Modulus, 5, Infixl)
+           , (globalOp "++", Binary Concat, 6, Infixr)
+           , (globalOp "+", Binary Add, 7, Infixl)
+           , (globalOp "-", Binary Subtract, 7, Infixl)
+           , (globalOp "<<", Binary ShiftLeft, 8, Infixl)
+           , (globalOp ">>", Binary ShiftRight, 8, Infixl)
+           , (globalOp ">>>", Binary ZeroFillShiftRight, 8, Infixl)
+           , (globalOp "==", Binary EqualTo, 9, Infixl)
+           , (globalOp "!=", Binary NotEqualTo, 9, Infixl)
+           , (globalOp "&", Binary BitwiseAnd, 10, Infixl)
+           , (globalOp "^", Binary BitwiseXor, 10, Infixl)
+           , (globalOp "|", Binary BitwiseOr, 10, Infixl)
+           , (globalOp "&&", Binary And, 11, Infixr)
+           , (globalOp "||", Binary Or, 11, Infixr)
            ]
+

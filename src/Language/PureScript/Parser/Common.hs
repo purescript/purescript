@@ -75,9 +75,12 @@ reservedNames = [ "case"
                 , "infixr"
                 , "module" ]
 
+builtInOperators :: [String]
+builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
+                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
+
 reservedOpNames :: [String]
-reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&", "^", "|", "&&", "||", "->", "!!" ]
+reservedOpNames = builtInOperators ++ [ "->" ]
 
 identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_$"
@@ -89,7 +92,7 @@ identLetter :: P.Parsec String u Char
 identLetter = P.alphaNum <|> P.oneOf "_'"
 
 opStart :: P.Parsec String u Char
-opStart = P.oneOf "!#$%&*+/<=>?@^|-~"
+opStart = P.oneOf "!#$%&*+/<=>?@^|~"
 
 opLetter :: P.Parsec String u Char
 opLetter = P.oneOf ":#$%&*+./<=>?@^|"
@@ -161,14 +164,14 @@ fold first more combine = do
 buildPostfixParser :: P.Stream s m t => [P.ParsecT s u m (a -> a)] -> P.ParsecT s u m a -> P.ParsecT s u m a
 buildPostfixParser f x = fold x (P.choice f) (flip ($))
 
-operatorOrReserved :: P.Parsec String u String
-operatorOrReserved = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) reservedOpNames)
+operatorOrBuiltIn :: P.Parsec String u String
+operatorOrBuiltIn = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) builtInOperators)
 
 parseIdent :: P.Parsec String u Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrReserved)
+parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrBuiltIn)
 
 parseIdentInfix :: P.Parsec String ParseState (Qualified Ident)
-parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> parseQualified (Op <$> operatorOrReserved)
+parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> parseQualified (Op <$> operatorOrBuiltIn)
 
 mark :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 mark p = do

@@ -143,7 +143,7 @@ parseValue =
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
               , [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
-                    return (BinaryNoParens ident))) AssocLeft ]
+                    return (BinaryNoParens ident))) AssocRight ]
               ]
 
 parseVariableIntroduction :: P.Parsec String ParseState Statement
