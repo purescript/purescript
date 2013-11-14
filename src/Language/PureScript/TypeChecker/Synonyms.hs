@@ -12,8 +12,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE Rank2Types #-}
-
 module Language.PureScript.TypeChecker.Synonyms (
     saturateTypeSynonym,
     saturateAllTypeSynonyms
@@ -26,6 +24,7 @@ import Language.PureScript.Names
 import Data.Maybe (fromMaybe)
 import Data.Data
 import Data.Generics
+import Data.Generics.Extras
 import Control.Arrow
 import Control.Monad.Writer
 import Control.Monad.Error
@@ -39,11 +38,6 @@ buildTypeSubstitution name n = go n []
   go n _ (TypeConstructor ctor) | n > 0 && name == ctor = throwError $ "Partially applied type synonym " ++ show name
   go n args (TypeApp f arg) = go (n - 1) (arg:args) f
   go _ _ _ = return Nothing
-
-everywhereM' :: (Monad m, Data d) => (forall d. (Data d) => d -> m d) -> d -> m d
-everywhereM' f x = do
-  y <- f x
-  gmapM (everywhereM' f) y
 
 saturateTypeSynonym :: (Data d) => Qualified ProperName -> Int -> d -> Either String d
 saturateTypeSynonym name n = everywhereM' (mkM replace)

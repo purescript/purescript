@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Parser.State
+-- Module      :  Data.Generics.Extras
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -12,15 +12,13 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Parser.State where
+{-# LANGUAGE Rank2Types #-}
 
-import Language.PureScript.Names
-import Language.PureScript.Declarations
+module Data.Generics.Extras where
 
-import qualified Text.Parsec as P
-import qualified Data.Map as M
+import Data.Data
 
-data ParseState = ParseState
-  { indentationLevel :: P.Column } deriving Show
-
-
+everywhereM' :: (Monad m, Data d) => (forall d. (Data d) => d -> m d) -> d -> m d
+everywhereM' f x = do
+  y <- f x
+  gmapM (everywhereM' f) y

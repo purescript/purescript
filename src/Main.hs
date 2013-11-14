@@ -14,7 +14,7 @@
 
 module Main where
 
-import Language.PureScript
+import qualified Language.PureScript as P
 import Data.Maybe (mapMaybe)
 import Data.List (intercalate)
 import System.Console.CmdTheLine
@@ -29,24 +29,23 @@ compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile inputFiles outputFile externsFile = do
   asts <- fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
     text <- U.readFile inputFile
-    return $ runIndentParser parseDeclarations text
+    return $ P.runIndentParser P.parseDeclarations text
   case asts of
     Left err -> do
       U.print err
       exitFailure
     Right decls ->
-      case check (typeCheckAll decls) of
-        Left typeError -> do
-          U.putStrLn typeError
+      case P.compile decls of
+        Left error -> do
+          U.putStrLn error
           exitFailure
-        Right (_, env) -> do
-          let js = intercalate "; " . map (prettyPrintJS . optimize) . concat . mapMaybe (declToJs Nothing global) $ decls
+        Right (js, exts, _) -> do
           case outputFile of
             Just path -> U.writeFile path js
             Nothing -> U.putStrLn js
           case externsFile of
             Nothing -> return ()
-            Just filePath -> U.writeFile filePath $ intercalate "\n" $ mapMaybe (externToPs 0 global env) decls
+            Just filePath -> U.writeFile filePath exts
           exitSuccess
 
 inputFiles :: Term [FilePath]

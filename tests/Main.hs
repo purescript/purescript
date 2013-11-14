@@ -14,7 +14,7 @@
 
 module Main (main) where
 
-import Language.PureScript
+import qualified Language.PureScript as P
 
 import Data.List (isSuffixOf)
 import Control.Applicative
@@ -25,20 +25,20 @@ import System.Directory (getCurrentDirectory, getDirectoryContents)
 import qualified System.IO.UTF8 as U
 import qualified Data.Map as M
 
-compile :: FilePath -> IO (Either String Environment)
+compile :: FilePath -> IO (Either String P.Environment)
 compile inputFile = do
-  ast <- runIndentParser parseDeclarations <$> U.readFile inputFile
+  ast <- P.runIndentParser P.parseDeclarations <$> U.readFile inputFile
   case ast of
     Left parseError -> do
       return (Left $ show parseError)
     Right decls -> do
-      case check (typeCheckAll decls) of
+      case P.compile decls of
         Left typeError -> do
           return (Left typeError)
-        Right (_, env) -> do
+        Right (_, _, env) -> do
           return (Right env)
 
-assert :: FilePath -> (Either String Environment -> Maybe String) -> IO ()
+assert :: FilePath -> (Either String P.Environment -> Maybe String) -> IO ()
 assert inputFile f = do
   e <- compile inputFile
   case f e of

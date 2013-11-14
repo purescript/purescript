@@ -77,7 +77,7 @@ reservedNames = [ "case"
 
 reservedOpNames :: [String]
 reservedOpNames = [ "!", "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&", "^", "|", "&&", "||", "->", "!" ]
+                  , "==", "!=", "&", "^", "|", "&&", "||", "->", "!!" ]
 
 identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_$"
@@ -161,11 +161,14 @@ fold first more combine = do
 buildPostfixParser :: P.Stream s m t => [P.ParsecT s u m (a -> a)] -> P.ParsecT s u m a -> P.ParsecT s u m a
 buildPostfixParser f x = fold x (P.choice f) (flip ($))
 
-parseIdent :: P.Parsec String u Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
+operatorOrReserved :: P.Parsec String u String
+operatorOrReserved = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) reservedOpNames)
 
-parseIdentInfix :: P.Parsec String u Ident
-parseIdentInfix = (Ident <$> P.between tick tick identifier) <|> (Op <$> operator)
+parseIdent :: P.Parsec String u Ident
+parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrReserved)
+
+parseIdentInfix :: P.Parsec String ParseState (Qualified Ident)
+parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> parseQualified (Op <$> operatorOrReserved)
 
 mark :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 mark p = do
@@ -189,4 +192,4 @@ same :: P.Parsec String ParseState ()
 same = checkIndentation (==) P.<?> "no indentation"
 
 runIndentParser :: P.Parsec String ParseState a -> String -> Either P.ParseError a
-runIndentParser p = P.runParser p (ParseState 0 M.empty) ""
+runIndentParser p = P.runParser p (ParseState 0) ""

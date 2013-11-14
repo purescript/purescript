@@ -85,9 +85,6 @@ parseFixityDeclaration = do
   fixity <- parseFixity
   indented
   name <- operator
-  current <- fixities <$> P.getState
-  when (name `M.member` current) (P.unexpected $ "redefined fixity for " ++ show name)
-  P.modifyState $ \st -> st { fixities = M.insert name fixity current }
   return $ FixityDeclaration fixity name
 
 parseModuleDeclaration :: P.Parsec String ParseState Declaration

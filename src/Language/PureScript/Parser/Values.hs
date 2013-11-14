@@ -117,7 +117,7 @@ parseValueAtom = C.indented *> P.choice
             , parseBlock
             , parseCase
             , parseIfThenElse
-            , C.parens parseValue ]
+            , Parens <$> C.parens parseValue ]
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
 parsePropertyUpdate = do
@@ -127,9 +127,8 @@ parsePropertyUpdate = do
   return (name, value)
 
 parseValue :: P.Parsec String ParseState Value
-parseValue = do
-  customOps <- fixities <$> P.getState
-  (buildExpressionParser (operators customOps)
+parseValue =
+  (buildExpressionParser operators
    . C.buildPostfixParser postfixTable2
    $ indexersAndAccessors) P.<?> "expression"
   where
@@ -139,54 +138,13 @@ parseValue = do
   postfixTable2 = [ P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2]))
                   , P.try $ flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
                   , flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) ]
-  operators user =
-              [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
+  operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
-              ] ++ customOperatorTable user ++
-              [ [ Infix (C.lexeme (P.try (C.indented *> C.parseQualified C.parseIdentInfix P.<?> "operator") >>= \ident -> return $ \t1 t2 -> App (App (Var ident) [t1]) [t2])) AssocLeft ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "!!") >> return (flip Indexer)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<=") >> return (Binary LessThanOrEqualTo)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">=") >> return (Binary GreaterThanOrEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<") >> return (Binary LessThan)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">") >> return (Binary GreaterThan)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "*") >> return (Binary Multiply)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "/") >> return (Binary Divide)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "%") >> return (Binary Modulus)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "++") >> return (Binary Concat)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return (Binary Add)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Binary Subtract)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "<<") >> return (Binary ShiftLeft)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">>>") >> return (Binary ZeroFillShiftRight)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp ">>") >> return (Binary ShiftRight)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "==") >> return (Binary EqualTo)) AssocRight
-                , Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "!=") >> return (Binary NotEqualTo)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "&") >> return (Binary BitwiseAnd)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "^") >> return (Binary BitwiseXor)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "|") >> return (Binary BitwiseOr)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "&&") >> return (Binary And)) AssocRight ]
-              , [ Infix (C.lexeme (P.try $ C.indented *> C.reservedOp "||") >> return (Binary Or)) AssocRight ]
+              , [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
+                    return (BinaryNoParens ident))) AssocLeft ]
               ]
-
-customOperatorTable :: M.Map String Fixity -> OperatorTable String ParseState Identity Value
-customOperatorTable fixities =
-  let
-    ops = map (\(name, Fixity a p) -> (name, (a, p))) . M.toList $ fixities
-    sorted = sortBy (compare `on` (snd . snd)) ops
-    levels = groupBy ((==) `on` (snd . snd)) sorted
-  in
-    map (map $ \(name, (a, _)) ->
-      flip Infix (toAssoc a) $
-        C.lexeme $ P.try $ do
-          C.indented
-          C.reservedOp name P.<?> "operator"
-          return $ \t1 t2 -> App (App (Var (Qualified global (Op name))) [t1]) [t2])
-      levels
-
-toAssoc :: Associativity -> Assoc
-toAssoc Infixl = AssocLeft
-toAssoc Infixr = AssocRight
 
 parseVariableIntroduction :: P.Parsec String ParseState Statement
 parseVariableIntroduction = do

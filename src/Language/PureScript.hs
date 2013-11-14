@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript (module P) where
+module Language.PureScript (module P, compile) where
 
 import Language.PureScript.Values as P
 import Language.PureScript.Types as P
@@ -24,6 +24,15 @@ import Language.PureScript.CodeGen as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Optimize as P
+import Language.PureScript.Operators as P
 
+import Data.List (intercalate)
+import Data.Maybe (mapMaybe)
 
-
+compile :: [Declaration] -> Either String (String, String, Environment)
+compile decls = do
+  bracketted <- rebracket decls
+  (_, env) <- check (typeCheckAll bracketted)
+  let js = intercalate "; " . map (prettyPrintJS . optimize) . concat . mapMaybe (declToJs Nothing global) $ bracketted
+  let exts = intercalate "\n" . mapMaybe (externToPs 0 global env) $ bracketted
+  return (js, exts, env)

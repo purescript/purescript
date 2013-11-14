@@ -54,6 +54,8 @@ data Value
   | BooleanLiteral Bool
   | Unary UnaryOperator Value
   | Binary BinaryOperator Value Value
+  | BinaryNoParens (Qualified Ident) Value Value
+  | Parens Value
   | ArrayLiteral [Value]
   | Indexer Value Value
   | ObjectLiteral [(String, Value)]
