@@ -25,94 +25,171 @@ import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Control.Arrow as A
 import Control.Arrow ((***), (<+>), first, second)
+import Control.Applicative
+import Control.Monad.State
 
-literals :: Pattern JS String
-literals = Pattern $ A.Kleisli match
+newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
+
+blockIndent :: Int
+blockIndent = 4
+
+withIndent :: StateT PrinterState Maybe String -> StateT PrinterState Maybe String
+withIndent s = do
+  current <- get
+  modify $ \s -> s { indent = indent s + blockIndent }
+  result <- s
+  modify $ \s -> s { indent = indent s - blockIndent }
+  return result
+
+currentIndent :: StateT PrinterState Maybe String
+currentIndent = do
+  current <- get
+  return $ replicate (indent current) ' '
+
+literals :: Pattern PrinterState JS String
+literals = mkPattern' match
   where
-  match (JSNumericLiteral n) = Just $ either show show n
-  match (JSStringLiteral s) = Just $ show s
-  match (JSBooleanLiteral True) = Just "true"
-  match (JSBooleanLiteral False) = Just "false"
-  match (JSArrayLiteral xs) = Just $ "[" ++ intercalate ", " (map prettyPrintJS xs) ++ "]"
-  match (JSObjectLiteral ps) = Just $ "{ " ++ intercalate ", " (map (\(key, value) -> key ++ ": " ++ prettyPrintJS value) ps) ++ " }"
-  match (JSBlock sts) = Just $ "{ " ++ intercalate "; " (map prettyPrintJS sts) ++ " }"
-  match (JSVar ident) = Just (identToJs ident)
-  match (JSVariableIntroduction ident value) = Just $ "var " ++ identToJs ident ++ maybe "" ((" = " ++) . prettyPrintJS) value
-  match (JSAssignment target value) = Just $ targetToJs target ++ " = " ++ prettyPrintJS value
-  match (JSWhile cond sts) = Just $ "while ("
-    ++ prettyPrintJS cond ++ ") "
-    ++ prettyPrintJS sts
-  match (JSFor ident start end sts) = Just $ "for ("
-    ++ identToJs ident ++ " = " ++ prettyPrintJS start ++ "; "
-    ++ identToJs ident ++ " < " ++ prettyPrintJS end ++ "; "
-    ++ identToJs ident ++ "++) "
-    ++ prettyPrintJS sts
-  match (JSIfElse cond thens elses) = Just $ "if ("
-    ++ prettyPrintJS cond ++ ") "
-    ++ prettyPrintJS thens
-    ++ maybe "" ((" else " ++) . prettyPrintJS) elses
-  match (JSReturn value) = Just $ "return " ++ prettyPrintJS value
-  match (JSThrow value) = Just $ "throw " ++ prettyPrintJS value
-  match _ = Nothing
+  match :: JS -> StateT PrinterState Maybe String
+  match (JSNumericLiteral n) = return $ either show show n
+  match (JSStringLiteral s) = return $ show s
+  match (JSBooleanLiteral True) = return "true"
+  match (JSBooleanLiteral False) = return "false"
+  match (JSArrayLiteral xs) = fmap concat $ sequence
+    [ return "[ "
+    , fmap (intercalate ", ") $ forM xs prettyPrintJS'
+    , return " ]"
+    ]
+  match (JSObjectLiteral ps) = fmap concat $ sequence
+    [ return "{\n"
+    , withIndent $ do
+        jss <- forM ps $ \(key, value) -> fmap ((key ++ ": ") ++) . prettyPrintJS' $ value
+        indentString <- currentIndent
+        return $ intercalate ", \n" $ map (indentString ++) jss
+    , return "\n"
+    , currentIndent
+    , return "}"
+    ]
+  match (JSBlock sts) = fmap concat $ sequence
+    [ return "{\n"
+    , withIndent $ do
+        jss <- forM sts prettyPrintJS'
+        indentString <- currentIndent
+        return $ intercalate "\n" $ map (++ "; ") $ map (indentString ++) jss
+    , return "\n"
+    , currentIndent
+    , return "}"
+    ]
+  match (JSVar ident) = return (identToJs ident)
+  match (JSVariableIntroduction ident value) = fmap concat $ sequence
+    [ return "var "
+    , return $ identToJs ident
+    , maybe (return "") (fmap (" = " ++) . prettyPrintJS') value
+    ]
+  match (JSAssignment target value) = fmap concat $ sequence
+    [ return $ targetToJs target
+    , return " = "
+    , prettyPrintJS' value
+    ]
+  match (JSWhile cond sts) = fmap concat $ sequence
+    [ return "while ("
+    , prettyPrintJS' cond
+    , return ") "
+    , prettyPrintJS' sts
+    ]
+  match (JSFor ident start end sts) = fmap concat $ sequence
+    [ return $ "for (" ++ identToJs ident ++ " = "
+    , prettyPrintJS' start
+    , return $ "; " ++ identToJs ident ++ " < "
+    , prettyPrintJS' end
+    , return $ "; " ++ identToJs ident ++ "++) "
+    , prettyPrintJS' sts
+    ]
+  match (JSIfElse cond thens elses) = fmap concat $ sequence
+    [ return "if ("
+    , prettyPrintJS' cond
+    , return ") "
+    , prettyPrintJS' thens
+    , maybe (return "") (fmap (" else " ++) . prettyPrintJS') elses
+    ]
+  match (JSReturn value) = fmap concat $ sequence
+    [ return "return "
+    , prettyPrintJS' value
+    ]
+  match (JSThrow value) = fmap concat $ sequence
+    [ return "throw "
+    , prettyPrintJS' value
+    ]
+  match _ = mzero
 
 targetToJs :: JSAssignment -> String
 targetToJs (JSAssignVariable ident) = identToJs ident
 targetToJs (JSAssignProperty prop target) = targetToJs target ++ "." ++ prop
 
-conditional :: Pattern JS ((JS, JS), JS)
-conditional = Pattern $ A.Kleisli match
+conditional :: Pattern PrinterState JS ((JS, JS), JS)
+conditional = mkPattern match
   where
   match (JSConditional cond th el) = Just ((th, el), cond)
   match _ = Nothing
 
-accessor :: Pattern JS (String, JS)
-accessor = Pattern $ A.Kleisli match
+accessor :: Pattern PrinterState JS (String, JS)
+accessor = mkPattern match
   where
   match (JSAccessor prop val) = Just (prop, val)
   match _ = Nothing
 
-indexer :: Pattern JS (String, JS)
-indexer = Pattern $ A.Kleisli match
+indexer :: Pattern PrinterState JS (String, JS)
+indexer = mkPattern' match
   where
-  match (JSIndexer index val) = Just (prettyPrintJS index, val)
-  match _ = Nothing
+  match (JSIndexer index val) = (,) <$> prettyPrintJS' index <*> pure val
+  match _ = mzero
 
-lam :: Pattern JS ((Maybe Ident, [Ident]), JS)
-lam = Pattern $ A.Kleisli match
+lam :: Pattern PrinterState JS ((Maybe Ident, [Ident]), JS)
+lam = mkPattern match
   where
   match (JSFunction name args ret) = Just ((name, args), ret)
   match _ = Nothing
 
-app :: Pattern JS (String, JS)
-app = Pattern $ A.Kleisli match
+app :: Pattern PrinterState JS (String, JS)
+app = mkPattern' match
   where
-  match (JSApp val args) = Just (intercalate "," (map prettyPrintJS args), val)
-  match _ = Nothing
+  match (JSApp val args) = do
+    jss <- mapM prettyPrintJS' args
+    return (intercalate ", " jss, val)
+  match _ = mzero
 
-unary :: UnaryOperator -> String -> Operator JS String
+unary :: UnaryOperator -> String -> Operator PrinterState JS String
 unary op str = Wrap pattern (++)
   where
-  pattern :: Pattern JS (String, JS)
-  pattern = Pattern $ A.Kleisli match
+  pattern :: Pattern PrinterState JS (String, JS)
+  pattern = mkPattern match
     where
     match (JSUnary op' val) | op' == op = Just (str, val)
     match _ = Nothing
 
-binary :: BinaryOperator -> String -> Operator JS String
+binary :: BinaryOperator -> String -> Operator PrinterState JS String
 binary op str = AssocR pattern (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
-  pattern :: Pattern JS (JS, JS)
-  pattern = Pattern $ A.Kleisli match
+  pattern :: Pattern PrinterState JS (JS, JS)
+  pattern = mkPattern match
     where
     match (JSBinary op' v1 v2) | op' == op = Just (v1, v2)
     match _ = Nothing
 
-prettyPrintJS :: JS -> String
-prettyPrintJS = fromMaybe (error "Incomplete pattern") . pattern matchValue
+prettyPrintJS1 :: JS -> String
+prettyPrintJS1 = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
+
+prettyPrintJS :: [JS] -> String
+prettyPrintJS sts = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) $ do
+  jss <- forM sts prettyPrintJS'
+  indentString <- currentIndent
+  return $ intercalate "\n" $ map (++ "; ") $ map (indentString ++) jss
+
+prettyPrintJS' :: JS -> StateT PrinterState Maybe String
+prettyPrintJS' = A.runKleisli $ runPattern matchValue
   where
-  matchValue :: Pattern JS String
+  matchValue :: Pattern PrinterState JS String
   matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
-  operators :: OperatorTable JS String
+  operators :: OperatorTable PrinterState JS String
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
@@ -121,7 +198,7 @@ prettyPrintJS = fromMaybe (error "Incomplete pattern") . pattern matchValue
                         ++ maybe "" identToJs name
                         ++ "(" ++ intercalate ", " (map identToJs args) ++ ") "
                         ++ ret ]
-                  , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS th ++ " : " ++ prettyPrintJS el ]
+                  , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS1 th ++ " : " ++ prettyPrintJS1 el ]
                   , [ binary    LessThan             "<" ]
                   , [ binary    LessThanOrEqualTo    "<=" ]
                   , [ binary    GreaterThan          ">" ]

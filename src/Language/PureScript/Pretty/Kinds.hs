@@ -26,25 +26,25 @@ import Control.Applicative
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
 
-typeLiterals :: Pattern Kind String
-typeLiterals = Pattern $ A.Kleisli match
+typeLiterals :: Pattern () Kind String
+typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Row = Just "#"
   match (KUnknown u) = Just $ 'u' : show u
   match _ = Nothing
 
-funKind :: Pattern Kind (Kind, Kind)
-funKind = Pattern $ A.Kleisli match
+funKind :: Pattern () Kind (Kind, Kind)
+funKind = mkPattern match
   where
   match (FunKind arg ret) = Just (arg, ret)
   match _ = Nothing
 
 prettyPrintKind :: Kind -> String
-prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind
+prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
   where
-  matchKind :: Pattern Kind String
+  matchKind :: Pattern () Kind String
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
-  operators :: OperatorTable Kind String
+  operators :: OperatorTable () Kind String
   operators =
     OperatorTable [ [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]

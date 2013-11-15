@@ -32,8 +32,8 @@ import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty.Common
 
-typeLiterals :: Pattern Type String
-typeLiterals = Pattern $ A.Kleisli match
+typeLiterals :: Pattern () Type String
+typeLiterals = mkPattern match
   where
   match Number = Just "Number"
   match String = Just "String"
@@ -59,30 +59,30 @@ prettyPrintRow = (\(tys, tail) -> intercalate ", " (map (uncurry nameAndTypeToPs
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)
 
-typeApp :: Pattern Type (Type, Type)
-typeApp = Pattern $ A.Kleisli match
+typeApp :: Pattern () Type (Type, Type)
+typeApp = mkPattern match
   where
   match (TypeApp f x) = Just (f, x)
   match _ = Nothing
 
-singleArgumentFunction :: Pattern Type (Type, Type)
-singleArgumentFunction = Pattern $ A.Kleisli match
+singleArgumentFunction :: Pattern () Type (Type, Type)
+singleArgumentFunction = mkPattern match
   where
   match (Function [arg] ret) = Just (arg, ret)
   match _ = Nothing
 
-function :: Pattern Type ([Type], Type)
-function = Pattern $ A.Kleisli match
+function :: Pattern () Type ([Type], Type)
+function = mkPattern match
   where
   match (Function args ret) = Just (args, ret)
   match _ = Nothing
 
 prettyPrintType :: Type -> String
-prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType
+prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
   where
-  matchType :: Pattern Type String
+  matchType :: Pattern () Type String
   matchType = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchType)
-  operators :: OperatorTable Type String
+  operators :: OperatorTable () Type String
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
                   , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret

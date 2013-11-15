@@ -29,8 +29,8 @@ import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 
-literals :: Pattern Value String
-literals = Pattern $ A.Kleisli match
+literals :: Pattern () Value String
+literals = mkPattern match
   where
   match (NumericLiteral n) = Just $ either show show n
   match (StringLiteral s) = Just $ show s
@@ -47,66 +47,66 @@ literals = Pattern $ A.Kleisli match
 prettyPrintCaseAlternative :: Binder -> Value -> String
 prettyPrintCaseAlternative binder val = prettyPrintBinder binder ++ " -> " ++ prettyPrintValue val
 
-ifThenElse :: Pattern Value ((Value, Value), Value)
-ifThenElse = Pattern $ A.Kleisli match
+ifThenElse :: Pattern () Value ((Value, Value), Value)
+ifThenElse = mkPattern match
   where
   match (IfThenElse cond th el) = Just ((th, el), cond)
   match _ = Nothing
 
-accessor :: Pattern Value (String, Value)
-accessor = Pattern $ A.Kleisli match
+accessor :: Pattern () Value (String, Value)
+accessor = mkPattern match
   where
   match (Accessor prop val) = Just (prop, val)
   match _ = Nothing
 
-indexer :: Pattern Value (Value, Value)
-indexer = Pattern $ A.Kleisli match
+indexer :: Pattern () Value (Value, Value)
+indexer = mkPattern match
   where
   match (Indexer index val) = Just (index, val)
   match _ = Nothing
 
-objectUpdate :: Pattern Value ([String], Value)
-objectUpdate = Pattern $ A.Kleisli match
+objectUpdate :: Pattern () Value ([String], Value)
+objectUpdate = mkPattern match
   where
   match (ObjectUpdate o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ prettyPrintValue val, o)
   match _ = Nothing
 
-app :: Pattern Value (String, Value)
-app = Pattern $ A.Kleisli match
+app :: Pattern () Value (String, Value)
+app = mkPattern match
   where
   match (App val args) = Just (intercalate "," (map prettyPrintValue args), val)
   match _ = Nothing
 
-lam :: Pattern Value ([String], Value)
-lam = Pattern $ A.Kleisli match
+lam :: Pattern () Value ([String], Value)
+lam = mkPattern match
   where
   match (Abs args val) = Just (map show args, val)
   match _ = Nothing
 
-unary :: UnaryOperator -> String -> Operator Value String
+unary :: UnaryOperator -> String -> Operator () Value String
 unary op str = Wrap pattern (++)
   where
-  pattern :: Pattern Value (String, Value)
-  pattern = Pattern $ A.Kleisli match
+  pattern :: Pattern () Value (String, Value)
+  pattern = mkPattern match
     where
     match (Unary op' val) | op' == op = Just (str, val)
     match _ = Nothing
 
-binary :: BinaryOperator -> String -> Operator Value String
+binary :: BinaryOperator -> String -> Operator () Value String
 binary op str = AssocR pattern (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
-  pattern :: Pattern Value (Value, Value)
-  pattern = Pattern $ A.Kleisli match
+  pattern :: Pattern () Value (Value, Value)
+  pattern = mkPattern match
     where
     match (Binary op' v1 v2) | op' == op = Just (v1, v2)
     match _ = Nothing
 
 prettyPrintValue :: Value -> String
-prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue
+prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue ()
   where
-  matchValue :: Pattern Value String
+  matchValue :: Pattern () Value String
   matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
-  operators :: OperatorTable Value String
+  operators :: OperatorTable () Value String
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
