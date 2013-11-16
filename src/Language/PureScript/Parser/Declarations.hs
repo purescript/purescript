@@ -107,7 +107,7 @@ parseImportDeclaration = do
     idents <- P.sepBy1 parseIdent (lexeme $ indented *> P.char ',')
     lexeme $ indented *> P.char ')'
     return idents
-  let modulePath = (mkModulePath (ModulePath [head segments]) (tail segments))
+  let modulePath = mkModulePath (ModulePath [head segments]) (tail segments)
   return $ ImportDeclaration modulePath idents
  where mkModulePath path (s:ss) = mkModulePath (subModule path s) ss
        mkModulePath path _      = path 
