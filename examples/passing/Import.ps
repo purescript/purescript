@@ -2,10 +2,11 @@ module Hello where
   id :: forall a. a -> a
   id = \x -> x
 
-  foo = id
+  module Nested where
+    import Hello (id)
 
-import Hello
-import Hello (id)
-import Hello (id, foo)
+    foo = id
+
+import Hello.Nested
 
 main = \() -> foo 42
