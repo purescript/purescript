@@ -38,4 +38,6 @@ data Declaration
   | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
-  | ModuleDeclaration ProperName [Declaration] deriving (Show, D.Data, D.Typeable)
+  | ModuleDeclaration ProperName [Declaration]
+  | ImportDeclaration [ProperName] (Maybe [Ident])
+  deriving (Show, D.Data, D.Typeable)
