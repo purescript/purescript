@@ -673,16 +673,12 @@ All the names in a module can be aliased using the `import` declaration:
 
 ```haskell
 import A
-
-foo 42
 ```
 
 You can also limit which names are going to be aliased:
 
 ```haskell
 import A.B (bar)
-
-bar 42
 ```
 
 ## Foreign Function Interface
