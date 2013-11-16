@@ -1,0 +1,11 @@
+module Hello where
+  id :: forall a. a -> a
+  id = \x -> x
+
+  foo = id
+
+import Hello
+import Hello (id)
+import Hello (id, foo)
+
+main = \() -> foo 42
