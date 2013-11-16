@@ -30,7 +30,10 @@ newtype ProperName = ProperName { runProperName :: String } deriving (Eq, Ord, D
 instance Show ProperName where
   show = runProperName
 
-data ModulePath = ModulePath [ProperName] deriving (Show, Eq, Ord, Data, Typeable)
+data ModulePath = ModulePath [ProperName] deriving (Eq, Ord, Data, Typeable)
+
+instance Show ModulePath where
+  show (ModulePath segments) = intercalate "." $ map show segments
 
 subModule :: ModulePath -> ProperName -> ModulePath
 subModule (ModulePath mp) name = ModulePath (mp ++ [name])

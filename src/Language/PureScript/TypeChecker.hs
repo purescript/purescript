@@ -117,3 +117,26 @@ typeCheckAll (FixityDeclaration _ name : rest) = do
 typeCheckAll (ModuleDeclaration name decls : rest) = do
   withModule name $ typeCheckAll decls
   typeCheckAll rest
+typeCheckAll (ImportDeclaration modulePath idents : rest) = do
+  env <- getEnv
+  omp <- checkModulePath `fmap` get
+  rethrow errorMessage $
+    guardWith "module does not exist" $ moduleExists env
+  case idents of
+    Nothing     -> do
+      let idents = map snd $ filterModule env
+      rethrow errorMessage $
+        bindIdents idents omp env
+      typeCheckAll rest
+    Just idents -> do
+      rethrow errorMessage $
+        bindIdents idents omp env
+      typeCheckAll rest
+ where errorMessage = (("Error importing " ++ show modulePath ++ ": ") ++)
+       filterModule env = filter (\(m, _) -> m == modulePath) (M.keys (names env))
+       moduleExists env = not $ null $ filterModule env
+       bindIdents idents omp env =
+         forM_ idents $ \ident ->
+           case M.lookup (modulePath, ident) (names env) of
+             Nothing      -> throwError $ show modulePath ++ "." ++ show ident ++ " is undefined"
+             Just (pt, _) -> putEnv (env { names = M.insert (omp, ident) (pt, Alias modulePath ident) (names env) })
