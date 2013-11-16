@@ -139,4 +139,5 @@ typeCheckAll (ImportDeclaration modulePath idents : rest) = do
          forM_ idents $ \ident ->
            case M.lookup (modulePath, ident) (names env) of
              Nothing      -> throwError $ show modulePath ++ "." ++ show ident ++ " is undefined"
-             Just (pt, _) -> putEnv (env { names = M.insert (omp, ident) (pt, Alias modulePath ident) (names env) })
+             Just (pt, _) -> getEnv >>= \env' ->
+               putEnv (env' { names = M.insert (omp, ident) (pt, Alias modulePath ident) (names env') })
