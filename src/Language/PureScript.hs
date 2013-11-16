@@ -33,6 +33,6 @@ compile :: [Declaration] -> Either String (String, String, Environment)
 compile decls = do
   bracketted <- rebracket decls
   (_, env) <- check (typeCheckAll bracketted)
-  let js = prettyPrintJS . map optimize . concat . mapMaybe (declToJs Nothing global) $ bracketted
+  let js = prettyPrintJS . map optimize . concat . mapMaybe (\decl -> declToJs Nothing global decl env) $ bracketted
   let exts = intercalate "\n" . mapMaybe (externToPs 0 global env) $ bracketted
   return (js, exts, env)

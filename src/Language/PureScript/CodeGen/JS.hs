@@ -20,11 +20,13 @@ module Language.PureScript.CodeGen.JS (
 import Data.Char
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (intercalate)
+import qualified Data.Map as M
 import qualified Control.Arrow as A
 import Control.Arrow ((<+>), second)
 import Control.Monad (forM)
 import Control.Applicative
 
+import Language.PureScript.TypeChecker (Environment, names)
 import Language.PureScript.Types
 import Language.PureScript.Values
 import Language.PureScript.Names
@@ -33,17 +35,17 @@ import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
 import Language.PureScript.CodeGen.JS.AST as AST
 
-declToJs :: Maybe Ident -> ModulePath -> Declaration -> Maybe [JS]
-declToJs mod mp (ValueDeclaration ident (Abs args ret)) =
+declToJs :: Maybe Ident -> ModulePath -> Declaration -> Environment -> Maybe [JS]
+declToJs mod mp (ValueDeclaration ident (Abs args ret)) _ =
   Just $ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp ret)]) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
-declToJs mod mp (ValueDeclaration ident val) =
+declToJs mod mp (ValueDeclaration ident val) _ =
   Just $ JSVariableIntroduction ident (Just (valueToJs mp val)) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
-declToJs mod _ (ExternMemberDeclaration member ident _) =
+declToJs mod _ (ExternMemberDeclaration member ident _) _ =
   Just $ JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))]) :
          maybe [] (return . setProperty (show ident) (JSVar ident)) mod
-declToJs mod mp (DataDeclaration _ _ ctors) =
+declToJs mod mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
     let
       ctorJs =
@@ -54,14 +56,22 @@ declToJs mod mp (DataDeclaration _ _ ctors) =
                         (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified mp pn)))
                                          , ("value", JSVar (Ident "value")) ])])
     in ctorJs : maybe [] (return . setProperty ctor (JSVar (Ident ctor))) mod
-declToJs mod mp (ModuleDeclaration pn@(ProperName name) decls) =
+declToJs mod mp (ModuleDeclaration pn@(ProperName name) decls) env =
   Just $ [ JSVariableIntroduction (Ident name) Nothing
          , JSApp (JSFunction Nothing [Ident name]
-                             (JSBlock (concat $ mapMaybe (declToJs (Just (Ident name)) (subModule mp pn)) decls)))
-                 [JSAssignment (JSAssignVariable (Ident name) )
+                             (JSBlock (concat $ mapMaybe (\decl -> declToJs (Just (Ident name)) (subModule mp pn) decl env) decls)))
+                 [JSAssignment (JSAssignVariable (Ident name))
                                (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]] ++
          maybe [] (return . setProperty name (JSVar (Ident name))) mod
-declToJs _ _ _ = Nothing
+declToJs mod omp (ImportDeclaration mp idents) env =
+  Just $ case idents of
+    Nothing     ->
+      let identPairs = filter (\(m, _) -> m == mp) (M.keys (names env))
+          idents     = map snd identPairs
+      in map mkLocal idents
+    Just idents -> map mkLocal idents
+ where mkLocal ident = JSVariableIntroduction ident (Just (qualifiedToJS identToJs (Qualified mp ident)))
+declToJs _ _ _ _ = Nothing
 
 setProperty :: String -> JS -> Ident -> JS
 setProperty prop val mod = JSAssignment (JSAssignProperty prop (JSAssignVariable mod)) val
@@ -87,10 +97,10 @@ valueToJs m (Var ident) = qualifiedToJS identToJs ident
 valueToJs m (TypedValue val _) = valueToJs m val
 
 qualifiedToJS :: (a -> String) -> Qualified a -> JS
-qualifiedToJS f (Qualified (ModulePath parts) a) = delimited (f a : reverse (map show parts))
-  where
-  delimited [part] = JSVar (Ident (part))
-  delimited (part:parts) = JSAccessor part (delimited parts)
+qualifiedToJS f (Qualified (ModulePath parts) a) =
+  delimited (f a : reverse (map show parts))
+ where delimited [part]       = JSVar (Ident (part))
+       delimited (part:parts) = JSAccessor part (delimited parts)
 
 bindersToJs :: ModulePath -> [(Binder, Value)] -> JS -> Gen JS
 bindersToJs m binders val = do
