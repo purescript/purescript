@@ -39,5 +39,5 @@ data Declaration
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ModuleDeclaration ProperName [Declaration]
-  | ImportDeclaration [ProperName] (Maybe [Ident])
+  | ImportDeclaration ModulePath (Maybe [Ident])
   deriving (Show, D.Data, D.Typeable)

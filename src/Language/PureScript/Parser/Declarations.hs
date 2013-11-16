@@ -28,6 +28,7 @@ import qualified Data.Map as M
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 
+import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
@@ -100,13 +101,16 @@ parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  module_ <- P.sepBy1 properName (lexeme $ P.char '.')
+  segments <- P.sepBy1 properName (lexeme $ P.char '.')
   idents <- P.optionMaybe $ do
     lexeme $ indented *> P.char '('
     idents <- P.sepBy1 parseIdent (lexeme $ indented *> P.char ',')
     lexeme $ indented *> P.char ')'
     return idents
-  return $ ImportDeclaration module_ idents
+  let modulePath = (mkModulePath (ModulePath [head segments]) (tail segments))
+  return $ ImportDeclaration modulePath idents
+ where mkModulePath path (s:ss) = mkModulePath (subModule path s) ss
+       mkModulePath path _      = path 
 
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
