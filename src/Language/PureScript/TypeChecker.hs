@@ -121,10 +121,10 @@ typeCheckAll (ImportDeclaration modulePath idents : rest) = do
   env <- getEnv
   omp <- checkModulePath `fmap` get
   rethrow errorMessage $ do
-   guardWith "module does not exist" $ moduleExists env
-   case idents of
-     Nothing     -> bindIdents (map snd $ filterModule env) omp env
-     Just idents -> bindIdents idents omp env
+    guardWith "module does not exist" $ moduleExists env
+    case idents of
+      Nothing     -> bindIdents (map snd $ filterModule env) omp env
+      Just idents -> bindIdents idents omp env
   typeCheckAll rest
  where errorMessage = (("Error importing " ++ show modulePath ++ ": ") ++)
        filterModule env = filter (\(m, _) -> m == modulePath) (M.keys (names env))
