@@ -669,6 +669,18 @@ foo = A:foo
 bar = A:B:bar
 ```
 
+All the names in a module can be aliased using the `import` declaration:
+
+```haskell
+import A
+```
+
+You can also limit which names are going to be aliased:
+
+```haskell
+import A.B (bar)
+```
+
 ## Foreign Function Interface
 
 The `foreign import` keyword declares a value which is defined in Javascript, and its type:

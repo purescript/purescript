@@ -28,7 +28,7 @@ import Control.Arrow ((***), first, second)
 
 import qualified Data.Map as M
 
-data NameKind = Value | Extern deriving Show
+data NameKind = Value | Extern | Alias ModulePath Ident deriving Show
 
 data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
 

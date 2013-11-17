@@ -28,6 +28,7 @@ import qualified Data.Map as M
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 
+import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
@@ -96,6 +97,21 @@ parseModuleDeclaration = do
   decls <- mark (P.many (same *> parseDeclaration))
   return $ ModuleDeclaration name decls
 
+parseImportDeclaration :: P.Parsec String ParseState Declaration
+parseImportDeclaration = do
+  reserved "import"
+  indented
+  segments <- P.sepBy1 properName (lexeme $ P.char '.')
+  idents <- P.optionMaybe $ do
+    lexeme $ indented *> P.char '('
+    idents <- P.sepBy1 parseIdent (lexeme $ indented *> P.char ',')
+    lexeme $ indented *> P.char ')'
+    return idents
+  let modulePath = mkModulePath (ModulePath [head segments]) (tail segments)
+  return $ ImportDeclaration modulePath idents
+ where mkModulePath path (s:ss) = mkModulePath (subModule path s) ss
+       mkModulePath path _      = path 
+
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
                    [ parseDataDeclaration
@@ -104,7 +120,8 @@ parseDeclaration = P.choice
                    , parseValueDeclaration
                    , parseExternDeclaration
                    , parseFixityDeclaration
-                   , parseModuleDeclaration ] P.<?> "declaration"
+                   , parseModuleDeclaration
+                   , parseImportDeclaration ] P.<?> "declaration"
 
 parseDeclarations :: P.Parsec String ParseState [Declaration]
 parseDeclarations = whiteSpace *> mark (P.many (same *> parseDeclaration)) <* P.eof
