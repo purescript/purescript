@@ -57,6 +57,9 @@ getEnv = fmap checkEnv get
 putEnv :: Environment -> Check ()
 putEnv env = modify (\s -> s { checkEnv = env })
 
+modifyEnv :: (Environment -> Environment) -> Check ()
+modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
+
 fresh :: Check Int
 fresh = do
   st <- get

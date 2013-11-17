@@ -120,22 +120,27 @@ reservedOp       = PT.reservedOp        tokenParser
 operator         = PT.operator          tokenParser
 stringLiteral    = PT.stringLiteral     tokenParser
 whiteSpace       = PT.whiteSpace        tokenParser
-parens           = PT.parens            tokenParser
-braces           = PT.braces            tokenParser
-angles           = PT.angles            tokenParser
 squares          = PT.squares           tokenParser
 semi             = PT.semi              tokenParser
 comma            = PT.comma             tokenParser
 colon            = PT.colon             tokenParser
 dot              = PT.dot               tokenParser
-semiSep          = PT.semiSep           tokenParser
-semiSep1         = PT.semiSep1          tokenParser
-commaSep         = PT.commaSep          tokenParser
-commaSep1        = PT.commaSep1         tokenParser
 natural          = PT.natural           tokenParser
 
-tick :: P.Parsec String u Char
+parens = P.between (lexeme $ P.char '(') (lexeme $ indented *> P.char ')') . (indented *>)
+braces = P.between (lexeme $ P.char '{') (lexeme $ indented *> P.char '}') . (indented *>)
+angles = P.between (lexeme $ P.char '<') (lexeme $ indented *> P.char '>') . (indented *>)
+
+sepBy p s = P.sepBy (indented *> p) (indented *> s)
+sepBy1 p s = P.sepBy1 (indented *> p) (indented *> s)
+
+semiSep          = flip sepBy semi
+semiSep1         = flip sepBy1 semi
+commaSep         = flip sepBy comma
+commaSep1        = flip sepBy1 comma
+
 tick = lexeme $ P.char '`'
+pipe = lexeme $ P.char '|'
 
 properName :: P.Parsec String u ProperName
 properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
@@ -167,7 +172,7 @@ buildPostfixParser f x = fold x (P.choice f) (flip ($))
 operatorOrBuiltIn :: P.Parsec String u String
 operatorOrBuiltIn = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) builtInOperators)
 
-parseIdent :: P.Parsec String u Ident
+parseIdent :: P.Parsec String ParseState Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrBuiltIn)
 
 parseIdentInfix :: P.Parsec String ParseState (Qualified Ident)

@@ -65,9 +65,8 @@ declToJs mod mp (ModuleDeclaration pn@(ProperName name) decls) env =
          maybe [] (return . setProperty name (JSVar (Ident name))) mod
 declToJs mod omp (ImportDeclaration mp idents) env =
   Just $ case idents of
-    Nothing     ->
-      let identPairs = filter (\(m, _) -> m == mp) (M.keys (names env))
-          idents     = map snd identPairs
+    Nothing ->
+      let idents = map snd  . filter ((== mp) . fst) . M.keys $ names env
       in map mkLocal idents
     Just idents -> map mkLocal idents
  where mkLocal ident = JSVariableIntroduction ident (Just (qualifiedToJS identToJs (Qualified mp ident)))

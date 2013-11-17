@@ -84,7 +84,7 @@ parseRowEnding :: P.Parsec String ParseState Row
 parseRowEnding = P.option REmpty (RowVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
 parseRow :: P.Parsec String ParseState Row
-parseRow = (fromList <$> (parseNameAndType `P.sepBy` (indented *> comma)) <*> parseRowEnding) P.<?> "row"
+parseRow = (fromList <$> (commaSep parseNameAndType) <*> parseRowEnding) P.<?> "row"
   where
   fromList :: [(String, Type)] -> Row -> Row
   fromList [] r = r

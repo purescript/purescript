@@ -44,7 +44,7 @@ parseDataDeclaration = do
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
   lexeme $ indented *> P.char '='
-  ctors <- P.sepBy1 ((,) <$> (indented *> properName) <*> P.optionMaybe parseType) (lexeme $ indented *> P.char '|')
+  ctors <- sepBy1 ((,) <$> properName <*> P.optionMaybe (indented *> parseType)) pipe
   return $ DataDeclaration name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
@@ -97,20 +97,16 @@ parseModuleDeclaration = do
   decls <- mark (P.many (same *> parseDeclaration))
   return $ ModuleDeclaration name decls
 
+parseModulePath :: P.Parsec String ParseState ModulePath
+parseModulePath = ModulePath <$> properName `sepBy1` dot
+
 parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  segments <- P.sepBy1 properName (lexeme $ P.char '.')
-  idents <- P.optionMaybe $ do
-    lexeme $ indented *> P.char '('
-    idents <- P.sepBy1 parseIdent (lexeme $ indented *> P.char ',')
-    lexeme $ indented *> P.char ')'
-    return idents
-  let modulePath = mkModulePath (ModulePath [head segments]) (tail segments)
+  modulePath <- parseModulePath
+  idents <- P.optionMaybe $ parens $ commaSep1 parseIdent
   return $ ImportDeclaration modulePath idents
- where mkModulePath path (s:ss) = mkModulePath (subModule path s) ss
-       mkModulePath path _      = path 
 
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice

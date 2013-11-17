@@ -119,20 +119,19 @@ typeCheckAll (ModuleDeclaration name decls : rest) = do
   typeCheckAll rest
 typeCheckAll (ImportDeclaration modulePath idents : rest) = do
   env <- getEnv
-  omp <- checkModulePath `fmap` get
+  currentModule <- checkModulePath `fmap` get
   rethrow errorMessage $ do
-    guardWith "module does not exist" $ moduleExists env
+    guardWith ("Module " ++ show modulePath ++ " does not exist") $ moduleExists env
     case idents of
-      Nothing     -> bindIdents (map snd $ filterModule env) omp env
-      Just idents -> bindIdents idents omp env
+      Nothing     -> bindIdents (map snd $ filterModule env) currentModule env
+      Just idents -> bindIdents idents currentModule env
   typeCheckAll rest
- where errorMessage = (("Error importing " ++ show modulePath ++ ": ") ++)
-       filterModule env = filter (\(m, _) -> m == modulePath) (M.keys (names env))
+ where errorMessage = (("Error in import declaration " ++ show modulePath ++ ": ") ++)
+       filterModule = filter ((== modulePath) . fst) . M.keys . names
        moduleExists env = not $ null $ filterModule env
-       bindIdents idents omp env =
-         forM_ idents $ \ident ->
-           case M.lookup (modulePath, ident) (names env) of
-             Nothing      -> throwError $ show modulePath ++ "." ++ show ident ++ " is undefined"
-             Just (pt, _) -> getEnv >>= \env' ->
-               putEnv (env' { names = M.insert (omp, ident) (pt, Alias modulePath ident)
-                                               (names env') })
+       bindIdents idents currentModule env =
+         forM_ idents $ \ident -> do
+           guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
+           case (modulePath, ident) `M.lookup` names env of
+             Just (pt, _) -> modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias modulePath ident) (names e) })
+             Nothing -> throwError (show modulePath ++ "." ++ show ident ++ " is undefined")

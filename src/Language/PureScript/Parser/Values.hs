@@ -47,10 +47,10 @@ parseBooleanLiteral :: P.Parsec String ParseState Value
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
 parseArrayLiteral :: P.Parsec String ParseState Value
-parseArrayLiteral = ArrayLiteral <$> C.squares (parseValue `P.sepBy` (C.indented *> C.comma))
+parseArrayLiteral = ArrayLiteral <$> C.squares (C.commaSep parseValue)
 
 parseObjectLiteral :: P.Parsec String ParseState Value
-parseObjectLiteral = ObjectLiteral <$> C.braces (parseIdentifierAndValue `P.sepBy` (C.indented *> C.comma))
+parseObjectLiteral = ObjectLiteral <$> C.braces (C.commaSep parseIdentifierAndValue)
 
 parseIdentifierAndValue :: P.Parsec String ParseState (String, Value)
 parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C.colon)
@@ -66,7 +66,7 @@ parseAbs = do
   where
   manyArgs :: P.Parsec String ParseState (Value -> Value)
   manyArgs = do
-    args <- C.parens ((C.indented *> C.parseIdent) `P.sepBy` (C.indented *> C.comma))
+    args <- C.parens (C.commaSep C.parseIdent)
     return $ Abs args
   singleArg :: P.Parsec String ParseState (Value -> Value)
   singleArg = Abs . return <$> C.parseIdent
@@ -76,7 +76,7 @@ parseAbs = do
 
 parseApp :: P.Parsec String ParseState Value
 parseApp = App <$> parseValue
-               <*> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
+               <*> (C.indented *> C.parens (C.commaSep parseValue))
 
 parseVar :: P.Parsec String ParseState Value
 parseVar = Var <$> C.parseQualified C.parseIdent
@@ -134,9 +134,9 @@ parseValue =
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                  , P.try $ flip ObjectUpdate <$> (C.indented *> C.braces ((C.indented *> parsePropertyUpdate) `P.sepBy1` (C.indented *> C.comma))) ]
+                  , P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) ]
   postfixTable2 = [ P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2]))
-                  , P.try $ flip App <$> (C.indented *> C.parens (parseValue `P.sepBy` (C.indented *> C.comma)))
+                  , P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue))
                   , flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
@@ -221,10 +221,10 @@ parseUnaryBinder :: P.Parsec String ParseState Binder
 parseUnaryBinder = UnaryBinder <$> C.lexeme (C.parseQualified C.properName) <*> (C.indented *> parseBinder)
 
 parseObjectBinder :: P.Parsec String ParseState Binder
-parseObjectBinder = ObjectBinder <$> C.braces ((C.indented *> parseIdentifierAndBinder) `P.sepBy` (C.indented *> C.comma))
+parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep (C.indented *> parseIdentifierAndBinder))
 
 parseArrayBinder :: P.Parsec String ParseState Binder
-parseArrayBinder = C.squares $ ArrayBinder <$> ((C.indented *> parseBinder) `P.sepBy` (C.indented *> C.comma))
+parseArrayBinder = C.squares $ ArrayBinder <$> (C.commaSep (C.indented *> parseBinder))
                                            <*> P.optionMaybe (C.indented *> C.colon *> C.indented *> parseBinder)
 
 parseNamedBinder :: P.Parsec String ParseState Binder
