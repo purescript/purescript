@@ -27,12 +27,12 @@ import Language.PureScript.Names
 externToPs :: Int -> ModulePath -> Environment -> Declaration -> Maybe String
 externToPs indent path env (ValueDeclaration name _) = do
   (ty, _) <- M.lookup (path, name) $ names env
-  return $ replicate indent ' ' ++ "foreign import " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+  return $ replicate indent ' ' ++ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
 externToPs indent path env (DataDeclaration name _ _) = do
   (kind, _) <- M.lookup (path, name) $ types env
   return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
 externToPs indent path env (ExternMemberDeclaration member name ty) =
-  return $ replicate indent ' ' ++ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintPolyType ty
+  return $ replicate indent ' ' ++ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintType ty
 externToPs indent path env (ExternDataDeclaration name kind) =
   return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
 externToPs indent path env (TypeSynonymDeclaration name args ty) =

@@ -76,7 +76,7 @@ allConstraints name val | isFunction val = do
   return (TypeConstraint me (TUnknown n) (ValueOrigin val): cs, n)
 allConstraints _ val = typeConstraints M.empty val
 
-typeOf :: Ident -> Value -> Check PolyType
+typeOf :: Ident -> Value -> Check Type
 typeOf name val = do
   (cs, n) <- allConstraints name val
   desugared <- replaceAllTypeSynonyms cs
@@ -129,12 +129,12 @@ findUnknownRows = everything (++) (mkQ [] f)
   f (RUnknown n) = [n]
   f _ = []
 
-varIfUnknown :: Type -> PolyType
+varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let
     (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
   in
-    PolyType (sort $ nub $ M.elems m ++ findTypeVars ty) ty'
+    ForAll (sort $ nub $ M.elems m ++ findTypeVars ty) ty'
   where
   f :: Type -> State (M.Map Int String) Type
   f (TUnknown n) = do
@@ -321,7 +321,7 @@ typeConstraints m v@(Var var@(Qualified mp name)) = do
     modulePath <- checkModulePath `fmap` get
     case M.lookup (qualify modulePath var) (names env) of
       Nothing -> throwError $ show var ++ " is undefined"
-      Just (PolyType idents ty, _) -> do
+      Just (ForAll idents ty, _) -> do
         me <- fresh
         replaced <- replaceVarsWithUnknowns idents ty
         return ([TypeConstraint me replaced (ValueOrigin v)], me)
@@ -335,7 +335,7 @@ typeConstraints m v@(Constructor c) = do
   modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (PolyType idents ty) -> do
+    Just (ForAll idents ty) -> do
       me <- fresh
       replaced <- replaceVarsWithUnknowns idents ty
       return ([TypeConstraint me replaced (ValueOrigin v)], me)
@@ -349,11 +349,15 @@ typeConstraints m v@(IfThenElse cond th el) = do
   (cs2, n2) <- typeConstraints m th
   (cs3, n3) <- typeConstraints m el
   return (TypeConstraint n1 Boolean (ValueOrigin cond) : TypeConstraint n2 (TUnknown n3) (ValueOrigin v) : cs1 ++ cs2 ++ cs3, n2)
-typeConstraints m v@(TypedValue val poly@(PolyType idents ty)) = do
-  kind <- kindOf poly
+typeConstraints m v@(TypedValue val ty) = do
+  kind <- kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  (cs, n1) <- typeConstraints m val
-  return (TypeConstraint n1 ty (ValueOrigin v) : cs, n1)
+  typeCheck m val ty
+  me <- fresh
+  return ([TypeConstraint me ty (ValueOrigin v)], me)
+
+typeCheck :: M.Map Ident Int -> Value -> Type -> Check ()
+typeCheck _ _ _ = return ()
 
 unaryOperatorConstraints :: Value -> UnaryOperator -> Int -> Int -> [TypeConstraint]
 unaryOperatorConstraints v Negate val result = [TypeConstraint val Number (ValueOrigin v), TypeConstraint result Number (ValueOrigin v)]
@@ -403,7 +407,7 @@ typeConstraintsForBinder val b@(NullaryBinder ctor) = do
   env <- getEnv
   modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
-    Just (PolyType args ret) -> do
+    Just (ForAll args ret) -> do
       ret' <- replaceVarsWithUnknowns args ret
       return ([TypeConstraint val ret' (BinderOrigin b)], M.empty)
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
@@ -411,7 +415,7 @@ typeConstraintsForBinder val b@(UnaryBinder ctor binder) = do
   env <- getEnv
   modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
-    Just (PolyType idents f@(Function [_] _)) -> do
+    Just (ForAll idents f@(Function [_] _)) -> do
       obj <- fresh
       (Function [ty] ret) <- replaceVarsWithUnknowns idents f
       (cs, m1) <- typeConstraintsForBinder obj binder
@@ -590,6 +594,10 @@ unifyTypes o (SaturatedTypeSynonym name args) ty = do
       unifyTypes o replaced ty
     Nothing -> error "Type synonym was not defined"
 unifyTypes o ty s@(SaturatedTypeSynonym _ _) = unifyTypes o s ty
+unifyTypes o (ForAll idents ty1) ty2 =do
+  sk <- skolemize idents ty1
+  unifyTypes o sk ty2
+unifyTypes o ty f@(ForAll _ _) = unifyTypes o f ty
 unifyTypes _ Number Number = return []
 unifyTypes _ String String = return []
 unifyTypes _ Boolean Boolean = return []
@@ -609,6 +617,7 @@ unifyTypes o (TypeApp t1 t2) (TypeApp t3 t4) = do
   cs1 <- unifyTypes o t1 t3
   cs2 <- unifyTypes o t2 t4
   return $ cs1 ++ cs2
+unifyTypes _ (Skolem s1) (Skolem s2) | s1 == s2 = return []
 unifyTypes _ t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
 
 unifyRows :: TypeConstraintOrigin -> Row -> Row -> Check [TypeConstraint]
@@ -638,3 +647,10 @@ unifyRows o r1 r2 =
   unifyRows' _ [] REmpty [] REmpty = return []
   unifyRows' _ [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return []
   unifyRows' _ sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd1, r1)) ++ " with " ++ prettyPrintRow (rowFromList (sd2, r2)) ++ "."
+
+skolemize :: [String] -> Type -> Check Type
+skolemize idents ty = do
+  sks <- replicateM (length idents) fresh
+  let m = M.fromList (zip idents (map Skolem sks))
+  return $ replaceTypeVars m ty
+

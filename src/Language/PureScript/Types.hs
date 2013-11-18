@@ -30,15 +30,14 @@ data Type
   | TypeVar String
   | TypeConstructor (Qualified ProperName)
   | TypeApp Type Type
-  | SaturatedTypeSynonym (Qualified ProperName) [Type] deriving (Show, Eq, Data, Typeable)
+  | SaturatedTypeSynonym (Qualified ProperName) [Type]
+  | ForAll [String] Type
+  | Skolem Int deriving (Show, Eq, Data, Typeable)
 
-data PolyType = PolyType [String] Type deriving (Show, Eq, Data, Typeable)
+type PolyType = Type
 
 data Row
   = RUnknown Int
   | RowVar String
   | REmpty
   | RCons String Type Row deriving (Show, Eq, Data, Typeable)
-
-monoType :: Type -> PolyType
-monoType = PolyType []

@@ -33,9 +33,9 @@ data NameKind = Value | Extern | Alias ModulePath Ident deriving Show
 data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
 
 data Environment = Environment
-  { names :: M.Map (ModulePath, Ident) (PolyType, NameKind)
+  { names :: M.Map (ModulePath, Ident) (Type, NameKind)
   , types :: M.Map (ModulePath, ProperName) (Kind, TypeDeclarationKind)
-  , dataConstructors :: M.Map (ModulePath, ProperName) PolyType
+  , dataConstructors :: M.Map (ModulePath, ProperName) Type
   , typeSynonyms :: M.Map (ModulePath, ProperName) ([String], Type)
   , members :: M.Map (ModulePath, Ident) String
   } deriving (Show)

@@ -14,8 +14,7 @@
 
 module Language.PureScript.Pretty.Types (
     prettyPrintType,
-    prettyPrintRow,
-    prettyPrintPolyType
+    prettyPrintRow
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -43,7 +42,10 @@ typeLiterals = mkPattern match
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown u) = Just $ 'u' : show u
+  match (Skolem s) = Just $ 's' : show s
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
+  match (ForAll idents ty) | not (null idents) = Just $ "forall " ++ unwords idents ++ ". " ++ prettyPrintType ty
+                           | otherwise = match ty
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
@@ -89,7 +91,3 @@ prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
                     , Wrap function $ \args ret -> "(" ++ intercalate ", " (map prettyPrintType args) ++ ") -> " ++ ret
                     ]
                   ]
-
-prettyPrintPolyType :: PolyType -> String
-prettyPrintPolyType (PolyType [] ty) = prettyPrintType ty
-prettyPrintPolyType (PolyType idents ty) = "forall " ++ unwords idents ++ ". " ++ prettyPrintType ty

@@ -54,7 +54,7 @@ typeCheckAll (DataDeclaration name args dctors : rest) = do
         guardWith (show dctor ++ " is already defined") $ not $ M.member (modulePath, dctor) (dataConstructors env')
         let retTy = foldl TypeApp (TypeConstructor (Qualified modulePath name)) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-        let polyType = PolyType args dctorTy
+        let polyType = ForAll args dctorTy
         putEnv $ env' { dataConstructors = M.insert (modulePath, dctor) polyType (dataConstructors env') }
   typeCheckAll rest
 typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
@@ -94,7 +94,7 @@ typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
     case M.lookup (modulePath, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> case ty of
-        (PolyType _ (Function [_] _)) -> do
+        (ForAll _ (Function [_] _)) -> do
           putEnv (env { names = M.insert (modulePath, name) (ty, Extern) (names env)
                       , members = M.insert (modulePath, name) member (members env) })
         _ -> throwError "Foreign member declarations must have function types, with an single argument."
