@@ -229,19 +229,6 @@ occursCheck u = everything (||) $ flip extQ g $ mkQ False f
   g (RUnknown u') | u' == u = True
   g _ = False
 
-typesToRow :: [(String, Type)] -> Row
-typesToRow [] = REmpty
-typesToRow ((name, ty):tys) = RCons name ty (typesToRow tys)
-
-rowToList :: Row -> ([(String, Type)], Row)
-rowToList (RCons name ty row) = let (tys, rest) = rowToList row
-                               in ((name, ty):tys, rest)
-rowToList r = ([], r)
-
-rowFromList :: ([(String, Type)], Row) -> Row
-rowFromList ([], r) = r
-rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
-
 ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 

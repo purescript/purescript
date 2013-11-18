@@ -25,6 +25,7 @@ import Control.Applicative
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 import Control.Arrow (Arrow(..))
+import Control.Monad (unless)
 
 parseNumber :: P.Parsec String ParseState Type
 parseNumber = const Number <$> reserved "Number"
@@ -43,7 +44,7 @@ parseObject = braces $ Object <$> parseRow
 
 parseFunction :: P.Parsec String ParseState Type
 parseFunction = do
-  args <- lexeme $ parens $ commaSep parseType
+  args <- lexeme $ parens $ commaSep parsePolyType
   lexeme $ P.string "->"
   resultType <- parseType
   return $ Function args resultType
@@ -53,6 +54,10 @@ parseTypeVariable = TypeVar <$> identifier
 
 parseTypeConstructor :: P.Parsec String ParseState Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
+
+parseForAll :: P.Parsec String ParseState Type
+parseForAll = (ForAll <$> (P.try (reserved "forall") *> many (indented *> identifier) <* indented <* dot)
+                      <*> parseType)
 
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try
@@ -64,19 +69,27 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseFunction
             , parseTypeVariable
             , parseTypeConstructor
+            , parseForAll
             , parens parseType ])
 
-parsePolyType :: P.Parsec String ParseState PolyType
-parsePolyType = (ForAll <$> (P.try (reserved "forall") *> many (indented *> identifier) <* indented <* dot)
-                        <*> parseType) <|>
-                (ForAll [] <$> parseType)
-
-parseType :: P.Parsec String ParseState Type
-parseType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"
+parseAnyType :: P.Parsec String ParseState Type
+parseAnyType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"
   where
   postfixTable :: [P.Parsec String ParseState (Type -> Type)]
   postfixTable = [ flip TypeApp <$> P.try (indented *> parseTypeAtom) ]
   operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
+
+parseType :: P.Parsec String ParseState Type
+parseType = do
+  ty <- parseAnyType
+  unless (isMonoType ty) $ P.unexpected "polymorphic type"
+  return ty
+
+parsePolyType :: P.Parsec String ParseState PolyType
+parsePolyType = do
+  ty <- parseAnyType
+  unless (isPolyType ty) $ P.unexpected "polymorphic type"
+  return ty
 
 parseNameAndType :: P.Parsec String ParseState (String, Type)
 parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parseType
