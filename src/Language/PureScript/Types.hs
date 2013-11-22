@@ -18,9 +18,10 @@ module Language.PureScript.Types where
 
 import Data.Data
 import Language.PureScript.Names
+import Language.PureScript.Unknown (Unknown(..))
 
 data Type
-  = TUnknown Int
+  = TUnknown (Unknown Type)
   | Number
   | String
   | Boolean
@@ -37,7 +38,7 @@ data Type
 type PolyType = Type
 
 data Row
-  = RUnknown Int
+  = RUnknown (Unknown Row)
   | RowVar String
   | REmpty
   | RCons String Type Row deriving (Show, Eq, Data, Typeable)

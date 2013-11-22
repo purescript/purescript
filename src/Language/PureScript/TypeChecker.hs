@@ -76,7 +76,7 @@ typeCheckAll (ValueDeclaration name val : rest) = do
     case M.lookup (modulePath, name) (names env) of
       Just ty -> throwError $ show name ++ " is already defined"
       Nothing -> do
-        ty <- typeOf name val
+        ty <- typeOf (Just name) val
         putEnv (env { names = M.insert (modulePath, name) (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ExternDataDeclaration name kind : rest) = do

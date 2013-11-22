@@ -15,8 +15,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Language.PureScript.TypeChecker.Types (
-    TypeConstraint(..),
-    TypeSolution(..),
     typeOf
 ) where
 
@@ -35,56 +33,127 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Pretty
+import Language.PureScript.Unknown
 
 import Control.Monad.State
 import Control.Monad.Error
 
 import Control.Applicative
-import Control.Arrow (Kleisli(..), (***), (&&&), first)
+import Control.Arrow (Arrow(..), Kleisli(..), (***), (&&&), second)
 import qualified Control.Category as C
 
 import qualified Data.Map as M
 
-data TypeConstraintOrigin
-  = ValueOrigin Value
-  | BinderOrigin Binder
-  | AssignmentTargetOrigin Ident deriving (Show, D.Data, D.Typeable)
+instance Unifiable Type where
+  unknown = TUnknown
+  isUnknown (TUnknown u) = Just u
+  isUnknown _ = Nothing
+  TUnknown u1 ~~ TUnknown u2 | u1 == u2 = return ()
+  TUnknown u ~~ t = replace u t
+  t ~~ TUnknown u = replace u t
+  SaturatedTypeSynonym name1 args1 ~~ SaturatedTypeSynonym name2 args2 | name1 == name2 =
+    zipWithM_ (~~) args1 args2
+  SaturatedTypeSynonym name args ~~ ty = do
+    env <- lift getEnv
+    modulePath <- checkModulePath `fmap` lift get
+    case M.lookup (qualify modulePath name) (typeSynonyms env) of
+      Just (synArgs, body) -> do
+        let m = M.fromList $ zip synArgs args
+        let replaced = replaceTypeVars m body
+        replaced ~~ ty
+      Nothing -> error "Type synonym was not defined"
+  ty ~~ s@(SaturatedTypeSynonym _ _) = s ~~ ty
+  ForAll idents ty1 ~~ ty2 = do
+    sk <- skolemize idents ty1
+    sk ~~ ty2
+  ty ~~ f@(ForAll _ _) = f ~~ ty
+  Number ~~ Number = return ()
+  String ~~ String = return ()
+  Boolean ~~ Boolean = return ()
+  Array s ~~ Array t = s ~~ t
+  Object row1 ~~ Object row2 = row1 ~~ row2
+  Function args1 ret1 ~~ Function args2 ret2 = do
+    guardWith "Function applied to incorrect number of args" $ length args1 == length args2
+    zipWithM_ (~~) args1 args2
+    ret1 ~~ ret2
+  TypeVar v1 ~~ TypeVar v2 | v1 == v2 = return ()
+  TypeConstructor c1 ~~ TypeConstructor c2 = do
+    modulePath <- checkModulePath `fmap` lift get
+    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
+  TypeApp t1 t2 ~~ TypeApp t3 t4 = do
+    t1 ~~ t3
+    t2 ~~ t4
+  Skolem s1 ~~ Skolem s2 | s1 == s2 = return ()
+  t1 ~~ t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
+  apply s (TUnknown u) = runSubstitution s u
+  apply s (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym name $ map (apply s) tys
+  apply s (ForAll idents ty) = ForAll idents $ apply s ty
+  apply s (Array t) = Array (apply s t)
+  apply s (Object r) = Object (apply s r)
+  apply s (Function args ret) = Function (map (apply s) args) (apply s ret)
+  apply s (TypeApp t1 t2) = TypeApp (apply s t1) (apply s t2)
+  apply _ t = t
+  unknowns (TUnknown (Unknown u)) = [u]
+  unknowns (SaturatedTypeSynonym _ tys) = concatMap unknowns tys
+  unknowns (ForAll idents ty) = unknowns ty
+  unknowns (Array t) = unknowns t
+  unknowns (Object r) = unknowns r
+  unknowns (Function args ret) = concatMap unknowns args ++ unknowns ret
+  unknowns (TypeApp t1 t2) = unknowns t1 ++ unknowns t2
+  unknowns _ = []
 
-prettyPrintOrigin :: TypeConstraintOrigin -> String
-prettyPrintOrigin (ValueOrigin val) = prettyPrintValue val
-prettyPrintOrigin (BinderOrigin binder) = prettyPrintBinder binder
-prettyPrintOrigin (AssignmentTargetOrigin ident) = show ident
-
-data TypeConstraint
-  = TypeConstraint Int Type TypeConstraintOrigin
-  | RowConstraint Int Row TypeConstraintOrigin deriving (Show, D.Data, D.Typeable)
-
-newtype TypeSolution = TypeSolution { runTypeSolution :: (Int -> Type, Int -> Row) }
-
-emptyTypeSolution :: TypeSolution
-emptyTypeSolution = TypeSolution (TUnknown, RUnknown)
+instance Unifiable Row where
+  unknown = RUnknown
+  isUnknown (RUnknown u) = Just u
+  isUnknown _ = Nothing
+  r1 ~~ r2 =
+      let
+        (s1, r1') = rowToList r1
+        (s2, r2') = rowToList r2
+        int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+        sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+        sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+      in do
+        forM_ int (uncurry (~~))
+        unifyRows sd1 r1' sd2 r2'
+      where
+      unifyRows :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Subst Check ()
+      unifyRows [] (RUnknown u) sd r = replace u (rowFromList (sd, r))
+      unifyRows sd r [] (RUnknown u) = replace u (rowFromList (sd, r))
+      unifyRows ns@((name, ty):row) r others u@(RUnknown un) = do
+        occursCheck un ty
+        forM row $ \(_, ty) -> occursCheck un ty
+        u' <- fresh
+        u ~~ RCons name ty u'
+        unifyRows row r others u'
+      unifyRows [] REmpty [] REmpty = return ()
+      unifyRows [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return ()
+      unifyRows sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd1, r1)) ++ " with " ++ prettyPrintRow (rowFromList (sd2, r2)) ++ "."
+  apply s (RUnknown u) = runSubstitution s u
+  apply s (RCons name ty r) = RCons name (apply s ty) (apply s r)
+  apply _ r = r
+  unknowns (RUnknown (Unknown u)) = [u]
+  unknowns (RCons _ ty r) = unknowns ty ++ unknowns r
+  unknowns _ = []
 
 isFunction :: Value -> Bool
 isFunction (Abs _ _) = True
 isFunction (TypedValue untyped _) = isFunction untyped
 isFunction _ = False
 
-allConstraints :: Ident -> Value -> Check ([TypeConstraint], Int)
-allConstraints name val | isFunction val = do
-  me <- fresh
-  (cs, n) <- typeConstraints (M.singleton name me) val
-  return (TypeConstraint me (TUnknown n) (ValueOrigin val): cs, n)
-allConstraints _ val = typeConstraints M.empty val
-
-typeOf :: Ident -> Value -> Check Type
+typeOf :: Maybe Ident -> Value -> Check Type
 typeOf name val = do
-  (cs, n) <- allConstraints name val
-  desugared <- replaceAllTypeSynonyms cs
-  solution <- solveTypeConstraints desugared emptyTypeSolution
-  let ty = fst (runTypeSolution solution) n
-  allUnknownsBecameQuantified desugared solution ty
+  ty <- runSubst $ case name of
+        Just ident -> do me <- fresh
+                         ty <- infer (M.singleton ident me) val
+                         me ~~ ty
+                         return ty
+        Nothing -> infer M.empty val
+  --desugared <- replaceAllTypeSynonyms cs
+  --TODO: allUnknownsBecameQuantified desugared solution ty
   return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
 
+{-
 allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
 allUnknownsBecameQuantified cs solution ty = do
   let
@@ -102,31 +171,32 @@ allUnknownsBecameQuantified cs solution ty = do
     unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
   guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
 
+findUnknownTypes :: (D.Data d) => d -> [Unknown Type]
+findUnknownTypes = everything (++) (mkQ [] f)
+  where
+  f :: Type -> [Unknown Type]
+  f (TUnknown n) = [n]
+  f _ = []
+
+findUnknownRows :: (D.Data d) => d -> [Unknown Row]
+findUnknownRows = everything (++) (mkQ [] f)
+  where
+  f :: Row -> [Unknown Row]
+  f (RUnknown n) = [n]
+  f _ = []
+-}
+
 setify :: Row -> Row
 setify = rowFromList . first (M.toList . M.fromList) . rowToList
 
 setifyAll :: (D.Data d) => d -> d
 setifyAll = everywhere (mkT setify)
 
-findUnknownTypes :: (D.Data d) => d -> [Int]
-findUnknownTypes = everything (++) (mkQ [] f)
-  where
-  f :: Type -> [Int]
-  f (TUnknown n) = [n]
-  f _ = []
-
 findTypeVars :: (D.Data d) => d -> [String]
 findTypeVars = everything (++) (mkQ [] f)
   where
   f :: Type -> [String]
   f (TypeVar v) = [v]
-  f _ = []
-
-findUnknownRows :: (D.Data d) => d -> [Int]
-findUnknownRows = everything (++) (mkQ [] f)
-  where
-  f :: Row -> [Int]
-  f (RUnknown n) = [n]
   f _ = []
 
 varIfUnknown :: Type -> Type
@@ -137,7 +207,7 @@ varIfUnknown ty =
     ForAll (sort $ nub $ M.elems m ++ findTypeVars ty) ty'
   where
   f :: Type -> State (M.Map Int String) Type
-  f (TUnknown n) = do
+  f (TUnknown (Unknown n)) = do
     m <- get
     case M.lookup n m of
       Nothing -> do
@@ -147,7 +217,7 @@ varIfUnknown ty =
       Just name -> return $ TypeVar name
   f t = return t
   g :: Row -> State (M.Map Int String) Row
-  g (RUnknown n) = do
+  g (RUnknown (Unknown n)) = do
     m <- get
     case M.lookup n m of
       Nothing -> do
@@ -165,28 +235,28 @@ replaceTypeVars m = everywhere (mkT replace)
     _ -> TypeVar v
   replace t = t
 
-replaceVarsWithUnknowns :: [String] -> Type -> Check Type
+replaceVarsWithUnknowns :: [String] -> Type -> Subst Check Type
 replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
   where
-  f :: Type -> StateT (M.Map String Int) Check Type
+  f :: Type -> StateT (M.Map String Int) (Subst Check) Type
   f (TypeVar var) | var `elem` idents = do
     m <- get
-    n <- lift fresh
+    n <- lift fresh'
     case M.lookup var m of
       Nothing -> do
         put (M.insert var n m)
-        return $ TUnknown n
-      Just u -> return $ TUnknown u
+        return $ TUnknown (Unknown n)
+      Just u -> return $ TUnknown (Unknown u)
   f t = return t
-  g :: Row -> StateT (M.Map String Int) Check Row
+  g :: Row -> StateT (M.Map String Int) (Subst Check) Row
   g (RowVar var) | var `elem` idents = do
     m <- get
-    n <- lift fresh
+    n <- lift fresh'
     case M.lookup var m of
       Nothing -> do
         put (M.insert var n m)
-        return $ RUnknown n
-      Just u -> return $ RUnknown u
+        return $ RUnknown (Unknown n)
+      Just u -> return $ RUnknown (Unknown u)
   g r = return r
 
 replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
@@ -201,443 +271,352 @@ desaturateAllTypeSynonyms = everywhere (mkT replace)
   replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replace t = t
 
-replaceType :: (D.Data d) => Int -> Type -> d -> d
-replaceType n t = everywhere (mkT go)
-  where
-  go (TUnknown m) | m == n = t
-  go t = t
-
-replaceRow :: (D.Data d) => Int -> Row -> d -> d
-replaceRow n r = everywhere (mkT go)
-  where
-  go (RUnknown m) | m == n = r
-  go r = r
-
-typeOccursCheck :: Int -> Type -> Check ()
-typeOccursCheck u (TUnknown _) = return ()
-typeOccursCheck u t = when (occursCheck u t) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ prettyPrintType t
-
-rowOccursCheck :: Int -> Row -> Check ()
-rowOccursCheck u (RUnknown _) = return ()
-rowOccursCheck u r = when (occursCheck u r) $ throwError $ "Occurs check failed: " ++ show u ++ " = " ++ prettyPrintRow r
-
-occursCheck :: (D.Data d) => Int -> d -> Bool
-occursCheck u = everything (||) $ flip extQ g $ mkQ False f
-  where
-  f (TUnknown u') | u' == u = True
-  f _ = False
-  g (RUnknown u') | u' == u = True
-  g _ = False
-
 ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
-typeConstraints :: M.Map Ident Int -> Value -> Check ([TypeConstraint], Int)
-typeConstraints _ v@(NumericLiteral _) = do
-  me <- fresh
-  return ([TypeConstraint me Number (ValueOrigin v)], me)
-typeConstraints _ v@(StringLiteral _) = do
-  me <- fresh
-  return ([TypeConstraint me String (ValueOrigin v)], me)
-typeConstraints _ v@(BooleanLiteral _) = do
-  me <- fresh
-  return ([TypeConstraint me Boolean (ValueOrigin v)], me)
-typeConstraints m v@(ArrayLiteral vals) = do
-  all <- mapM (typeConstraints m) vals
-  let (cs, ns) = (concatMap fst &&& map snd) all
-  me <- fresh
-  return (cs ++ zipWith (\n el -> TypeConstraint me (Array $ TUnknown n) (ValueOrigin el)) ns vals, me)
-typeConstraints m u@(Unary op val) = do
-  (cs, n1) <- typeConstraints m val
-  me <- fresh
-  return (cs ++ unaryOperatorConstraints u op n1 me, me)
-typeConstraints m b@(Binary op left right) = do
-  (cs1, n1) <- typeConstraints m left
-  (cs2, n2) <- typeConstraints m right
-  me <- fresh
-  return (cs1 ++ cs2 ++ binaryOperatorConstraints b op n1 n2 me, me)
-typeConstraints m v@(ObjectLiteral ps) = do
-  ensureNoDuplicateProperties ps
-  all <- mapM (typeConstraints m . snd) ps
-  let (cs, ns) = (concatMap fst &&& map snd) all
-  me <- fresh
-  let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
-  return (TypeConstraint me (Object (typesToRow tys)) (ValueOrigin v) : cs, me)
-typeConstraints m v@(ObjectUpdate o ps) = do
-  ensureNoDuplicateProperties ps
-  (cs1, n1) <- typeConstraints m o
-  all <- mapM (typeConstraints m . snd) ps
-  let (cs2, ns) = (concatMap fst &&& map snd) all
+infer :: M.Map Ident Type -> Value -> Subst Check Type
+infer _ (NumericLiteral _) = return Number
+infer _ (StringLiteral _) = return String
+infer _ (BooleanLiteral _) = return Boolean
+infer m (ArrayLiteral vals) = do
+  ts <- mapM (infer m) vals
+  arr <- fresh
+  forM_ ts $ \t -> arr ~~ Array t
+  return arr
+infer m (Unary op val) = do
+  t <- infer m val
+  inferUnary op t
+infer m (Binary op left right) = do
+  t1 <- infer m left
+  t2 <- infer m right
+  inferBinary op t1 t2
+infer m (ObjectLiteral ps) = do
+  lift $ ensureNoDuplicateProperties ps
+  ts <- mapM (infer m . snd) ps
+  let fields = zipWith (\(name, _) t -> (name, t)) ps ts
+  return $ Object $ typesToRow fields
+infer m (ObjectUpdate o ps) = do
+  lift $ ensureNoDuplicateProperties ps
+  obj <- infer m o
   row <- fresh
-  let tys = zipWith (\(name, _) u -> (name, TUnknown u)) ps ns
-  return (TypeConstraint n1 (Object (rowFromList (tys, RUnknown row))) (ValueOrigin v) : cs1 ++ cs2, n1)
-typeConstraints m v@(Indexer index val) = do
-  (cs1, n1) <- typeConstraints m index
-  (cs2, n2) <- typeConstraints m val
-  me <- fresh
-  return (TypeConstraint n1 Number (ValueOrigin index) : TypeConstraint n2 (Array (TUnknown me)) (ValueOrigin v) : cs1 ++ cs2, me)
-typeConstraints m v@(Accessor prop val) = do
-  (cs, n1) <- typeConstraints m val
-  me <- fresh
+  ts <- mapM (infer m . snd) ps
+  let tys = zipWith (\(name, _) t -> (name, t)) ps ts
+  obj ~~ Object (rowFromList (tys, row))
+  return obj
+infer m (Indexer index val) = do
+  el <- fresh
+  t1 <- infer m index
+  t2 <- infer m val
+  t1 ~~ Number
+  t2 ~~ Array el
+  return el
+infer m (Accessor prop val) = do
+  obj <- infer m val
+  field <- fresh
   rest <- fresh
-  return (TypeConstraint n1 (Object (RCons prop (TUnknown me) (RUnknown rest))) (ValueOrigin v) : cs, me)
-typeConstraints m v@(Abs args ret) = do
-  ns <- replicateM (length args) fresh
-  let m' = m `M.union` M.fromList (zip args ns)
-  (cs, n') <- typeConstraints m' ret
+  obj ~~ Object (RCons prop field rest)
+  return field
+infer m v@(Abs args ret) = do
+  ts <- replicateM (length args) fresh
+  let m' = m `M.union` M.fromList (zip args ts)
+  body <- infer m' ret
+  return $ Function ts body
+infer m v@(App f xs) = do
+  t1 <- infer m f
+  ts <- mapM (infer m) xs
   me <- fresh
-  return (TypeConstraint me (Function (map TUnknown ns) (TUnknown n')) (ValueOrigin v) : cs, me)
-typeConstraints m v@(App f xs) = do
-  (cs1, n1) <- typeConstraints m f
-  all <- mapM (typeConstraints m) xs
-  let (cs2, ns) = (concatMap fst &&& map snd) all
-  me <- fresh
-  return (TypeConstraint n1 (Function (map TUnknown ns) (TUnknown me)) (ValueOrigin v) : cs1 ++ cs2, me)
-typeConstraints m v@(Var var@(Qualified mp name)) = do
+  t1 ~~ Function ts me
+  return me
+infer m v@(Var var@(Qualified mp name)) = do
   case mp of
     ModulePath [] ->
       case M.lookup name m of
-        Just u -> do
-          me <- fresh
-          return ([TypeConstraint u (TUnknown me) (ValueOrigin v)], me)
+        Just ty -> lift $ replaceAllTypeSynonyms ty
         Nothing -> lookupGlobal
     _ -> lookupGlobal
   where
   lookupGlobal = do
-    env <- getEnv
-    modulePath <- checkModulePath `fmap` get
+    env <- lift getEnv
+    modulePath <- checkModulePath `fmap` lift get
     case M.lookup (qualify modulePath var) (names env) of
       Nothing -> throwError $ show var ++ " is undefined"
-      Just (ForAll idents ty, _) -> do
-        me <- fresh
-        replaced <- replaceVarsWithUnknowns idents ty
-        return ([TypeConstraint me replaced (ValueOrigin v)], me)
-typeConstraints m (Block ss) = do
+      Just (ty, _) -> lift $ replaceAllTypeSynonyms ty
+infer m (Block ss) = do
   ret <- fresh
-  (cs, allCodePathsReturn, _) <- typeConstraintsForBlock m M.empty ret ss
+  (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return (cs, ret)
-typeConstraints m v@(Constructor c) = do
-  env <- getEnv
-  modulePath <- checkModulePath `fmap` get
+  return ret
+infer m v@(Constructor c) = do
+  env <- lift getEnv
+  modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (ForAll idents ty) -> do
-      me <- fresh
-      replaced <- replaceVarsWithUnknowns idents ty
-      return ([TypeConstraint me replaced (ValueOrigin v)], me)
-typeConstraints m (Case val binders) = do
-  (cs1, n1) <- typeConstraints m val
+    Just (ForAll idents ty) -> replaceVarsWithUnknowns idents ty
+infer m (Case val binders) = do
+  t1 <- infer m val
   ret <- fresh
-  cs2 <- typeConstraintsForBinders m n1 ret binders
-  return (cs1 ++ cs2, ret)
-typeConstraints m v@(IfThenElse cond th el) = do
-  (cs1, n1) <- typeConstraints m cond
-  (cs2, n2) <- typeConstraints m th
-  (cs3, n3) <- typeConstraints m el
-  return (TypeConstraint n1 Boolean (ValueOrigin cond) : TypeConstraint n2 (TUnknown n3) (ValueOrigin v) : cs1 ++ cs2 ++ cs3, n2)
-typeConstraints m v@(TypedValue val ty) = do
-  kind <- kindOf ty
+  cs2 <- checkBinders m t1 ret binders
+  return ret
+infer m v@(IfThenElse cond th el) = do
+  t1 <- infer m cond
+  t2 <- infer m th
+  t3 <- infer m el
+  t1 ~~ Boolean
+  t2 ~~ t3
+  return t2
+infer m v@(TypedValue val ty) = do
+  kind <- lift $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  typeCheck m val ty
-  me <- fresh
-  return ([TypeConstraint me ty (ValueOrigin v)], me)
+  ty' <- lift $ replaceAllTypeSynonyms ty
+  cs <- check m val ty'
+  return ty'
 
-typeCheck :: M.Map Ident Int -> Value -> Type -> Check ()
-typeCheck _ _ _ = return ()
+inferUnary :: UnaryOperator -> Type -> Subst Check Type
+inferUnary Negate val = do
+  val ~~ Number
+  return Number
+inferUnary Not val = do
+  val ~~ Boolean
+  return Boolean
+inferUnary BitwiseNot val = do
+  val ~~ Number
+  return Number
 
-unaryOperatorConstraints :: Value -> UnaryOperator -> Int -> Int -> [TypeConstraint]
-unaryOperatorConstraints v Negate val result = [TypeConstraint val Number (ValueOrigin v), TypeConstraint result Number (ValueOrigin v)]
-unaryOperatorConstraints v Not val result = [TypeConstraint val Boolean (ValueOrigin v), TypeConstraint result Boolean (ValueOrigin v)]
-unaryOperatorConstraints v BitwiseNot val result = [TypeConstraint val Number (ValueOrigin v), TypeConstraint result Number (ValueOrigin v)]
+inferBinary :: BinaryOperator -> Type -> Type -> Subst Check Type
+inferBinary Add = inferSymBinary Number
+inferBinary Subtract = inferSymBinary Number
+inferBinary Multiply = inferSymBinary Number
+inferBinary Divide = inferSymBinary Number
+inferBinary Modulus = inferSymBinary Number
+inferBinary LessThan = inferAsymBinary Number Boolean
+inferBinary LessThanOrEqualTo = inferAsymBinary Number Boolean
+inferBinary GreaterThan = inferAsymBinary Number Boolean
+inferBinary GreaterThanOrEqualTo = inferAsymBinary Number Boolean
+inferBinary BitwiseAnd = inferSymBinary Number
+inferBinary BitwiseOr = inferSymBinary Number
+inferBinary BitwiseXor = inferSymBinary Number
+inferBinary ShiftLeft = inferSymBinary Number
+inferBinary ShiftRight = inferSymBinary Number
+inferBinary ZeroFillShiftRight = inferSymBinary Number
+inferBinary EqualTo = inferEqBinary
+inferBinary NotEqualTo = inferEqBinary
+inferBinary And = inferSymBinary Boolean
+inferBinary Or = inferSymBinary Boolean
+inferBinary Concat = inferSymBinary String
 
-binaryOperatorConstraints :: Value -> BinaryOperator -> Int -> Int -> Int -> [TypeConstraint]
-binaryOperatorConstraints v Add = symBinOpConstraints v Number
-binaryOperatorConstraints v Subtract = symBinOpConstraints v Number
-binaryOperatorConstraints v Multiply = symBinOpConstraints v Number
-binaryOperatorConstraints v Divide = symBinOpConstraints v Number
-binaryOperatorConstraints v Modulus = symBinOpConstraints v Number
-binaryOperatorConstraints v LessThan = asymBinOpConstraints v Number Boolean
-binaryOperatorConstraints v LessThanOrEqualTo = asymBinOpConstraints v Number Boolean
-binaryOperatorConstraints v GreaterThan = asymBinOpConstraints v Number Boolean
-binaryOperatorConstraints v GreaterThanOrEqualTo = asymBinOpConstraints v Number Boolean
-binaryOperatorConstraints v BitwiseAnd = symBinOpConstraints v Number
-binaryOperatorConstraints v BitwiseOr = symBinOpConstraints v Number
-binaryOperatorConstraints v BitwiseXor = symBinOpConstraints v Number
-binaryOperatorConstraints v ShiftLeft = symBinOpConstraints v Number
-binaryOperatorConstraints v ShiftRight = symBinOpConstraints v Number
-binaryOperatorConstraints v ZeroFillShiftRight = symBinOpConstraints v Number
-binaryOperatorConstraints v EqualTo = equalityBinOpConstraints v
-binaryOperatorConstraints v NotEqualTo = equalityBinOpConstraints v
-binaryOperatorConstraints v And = symBinOpConstraints v Boolean
-binaryOperatorConstraints v Or = symBinOpConstraints v Boolean
-binaryOperatorConstraints v Concat = symBinOpConstraints v String
+inferEqBinary :: Type -> Type -> Subst Check Type
+inferEqBinary left right = do
+  left ~~ right
+  return Boolean
 
-equalityBinOpConstraints :: Value -> Int -> Int -> Int -> [TypeConstraint]
-equalityBinOpConstraints v left right result = [TypeConstraint left (TUnknown right) (ValueOrigin v), TypeConstraint result Boolean (ValueOrigin v)]
+inferSymBinary :: Type -> Type -> Type -> Subst Check Type
+inferSymBinary ty = inferAsymBinary ty ty
 
-symBinOpConstraints :: Value -> Type -> Int -> Int -> Int -> [TypeConstraint]
-symBinOpConstraints v ty = asymBinOpConstraints v ty ty
+inferAsymBinary :: Type -> Type -> Type -> Type -> Subst Check Type
+inferAsymBinary input output left right = do
+  left ~~ input
+  right ~~ input
+  return output
 
-asymBinOpConstraints :: Value -> Type -> Type -> Int -> Int -> Int -> [TypeConstraint]
-asymBinOpConstraints v ty res left right result = [TypeConstraint left ty (ValueOrigin v), TypeConstraint right ty (ValueOrigin v), TypeConstraint result res (ValueOrigin v)]
-
-typeConstraintsForBinder :: Int -> Binder -> Check ([TypeConstraint], M.Map Ident Int)
-typeConstraintsForBinder _ NullBinder = return ([], M.empty)
-typeConstraintsForBinder val b@(StringBinder _) = constantBinder b val String
-typeConstraintsForBinder val b@(NumberBinder _) = constantBinder b val Number
-typeConstraintsForBinder val b@(BooleanBinder _) = constantBinder b val Boolean
-typeConstraintsForBinder val b@(VarBinder name) = do
-  me <- fresh
-  return ([TypeConstraint me (TUnknown val) (BinderOrigin b)], M.singleton name me)
-typeConstraintsForBinder val b@(NullaryBinder ctor) = do
-  env <- getEnv
-  modulePath <- checkModulePath `fmap` get
+inferBinder :: Type -> Binder -> Subst Check (M.Map Ident Type)
+inferBinder _ NullBinder = return M.empty
+inferBinder val (StringBinder _) = val ~~ String >> return M.empty
+inferBinder val (NumberBinder _) = val ~~ Number >> return M.empty
+inferBinder val (BooleanBinder _) = val ~~ Boolean >> return M.empty
+inferBinder val (VarBinder name) = return $ M.singleton name val
+inferBinder val (NullaryBinder ctor) = do
+  env <- lift getEnv
+  modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just (ForAll args ret) -> do
       ret' <- replaceVarsWithUnknowns args ret
-      return ([TypeConstraint val ret' (BinderOrigin b)], M.empty)
+      val ~~ ret'
+      return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
-typeConstraintsForBinder val b@(UnaryBinder ctor binder) = do
-  env <- getEnv
-  modulePath <- checkModulePath `fmap` get
+inferBinder val b@(UnaryBinder ctor binder) = do
+  env <- lift getEnv
+  modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just (ForAll idents f@(Function [_] _)) -> do
       obj <- fresh
       (Function [ty] ret) <- replaceVarsWithUnknowns idents f
-      (cs, m1) <- typeConstraintsForBinder obj binder
-      return (TypeConstraint val ret (BinderOrigin b) : TypeConstraint obj ty (BinderOrigin b) : cs, m1)
+      m1 <- inferBinder obj binder
+      val ~~ ret
+      obj ~~ ty
+      return m1
     Just _ -> throwError $ show ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
-typeConstraintsForBinder val b@(ObjectBinder props) = do
+inferBinder val b@(ObjectBinder props) = do
   row <- fresh
   rest <- fresh
-  (cs, m1) <- typeConstraintsForProperties row (RUnknown rest) props
-  return (TypeConstraint val (Object (RUnknown row)) (BinderOrigin b) : cs, m1)
+  m1 <- inferRowProperties row rest props
+  val ~~ Object row
+  return m1
   where
-  typeConstraintsForProperties :: Int -> Row -> [(String, Binder)] -> Check ([TypeConstraint], M.Map Ident Int)
-  typeConstraintsForProperties nrow row [] = return ([RowConstraint nrow row (BinderOrigin b)], M.empty)
-  typeConstraintsForProperties nrow row ((name, binder):binders) = do
+  inferRowProperties :: Row -> Row -> [(String, Binder)] -> Subst Check (M.Map Ident Type)
+  inferRowProperties nrow row [] = nrow ~~ row >> return M.empty
+  inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- fresh
-    (cs1, m1) <- typeConstraintsForBinder propTy binder
-    (cs2, m2) <- typeConstraintsForProperties nrow (RCons name (TUnknown propTy) row) binders
-    return (cs1 ++ cs2, m1 `M.union` m2)
-typeConstraintsForBinder val b@(ArrayBinder binders rest) = do
+    m1 <- inferBinder propTy binder
+    m2 <- inferRowProperties nrow (RCons name propTy row) binders
+    return $ m1 `M.union` m2
+inferBinder val (ArrayBinder binders rest) = do
   el <- fresh
-  all <- mapM (typeConstraintsForBinder el) binders
-  let (cs1, m1) = (concatMap fst &&& M.unions . map snd) all
-  let arrayConstraint = TypeConstraint val (Array (TUnknown el)) (BinderOrigin b)
+  m1 <- M.unions <$> mapM (inferBinder el) binders
+  val ~~ Array el
   case rest of
-    Nothing -> return (arrayConstraint : cs1, m1)
+    Nothing -> return m1
     Just binder -> do
-      (cs2, m2) <- typeConstraintsForBinder val binder
-      return (arrayConstraint : cs1 ++ cs2, m1 `M.union` m2)
-typeConstraintsForBinder val b@(NamedBinder name binder) = do
-  me <- fresh
-  (cs, m) <- typeConstraintsForBinder val binder
-  return (TypeConstraint me (TUnknown val) (BinderOrigin b) : cs, M.insert name me m)
+      m2 <- inferBinder val binder
+      return $ m1 `M.union` m2
+inferBinder val (NamedBinder name binder) = do
+  m <- inferBinder val binder
+  return $ M.insert name val m
 
-typeConstraintsForGuardedBinder :: M.Map Ident Int -> Int -> Binder -> Check ([TypeConstraint], M.Map Ident Int)
-typeConstraintsForGuardedBinder m val b@(GuardedBinder cond binder) = do
-  (cs1, m1) <- typeConstraintsForBinder val binder
-  (cs2, n) <- typeConstraints (m `M.union` m1) cond
-  return (TypeConstraint n Boolean (ValueOrigin cond) : cs1 ++ cs2, m1)
-typeConstraintsForGuardedBinder m val b = typeConstraintsForBinder val b >>= return
+inferGuardedBinder :: M.Map Ident Type -> Type -> Binder -> Subst Check (M.Map Ident Type)
+inferGuardedBinder m val b@(GuardedBinder cond binder) = do
+  m1 <- inferBinder val binder
+  ty <- infer (m `M.union` m1) cond
+  ty ~~ Boolean
+  return m1
+inferGuardedBinder m val b = inferBinder val b >>= return
 
-constantBinder :: Binder -> Int -> Type -> Check ([TypeConstraint], M.Map Ident Int)
-constantBinder b val ty = return ([TypeConstraint val ty (BinderOrigin b)], M.empty)
+checkBinders :: M.Map Ident Type -> Type -> Type -> [(Binder, Value)] -> Subst Check ()
+checkBinders _ _ _ [] = return ()
+checkBinders m nval ret ((binder, val):bs) = do
+  m1 <- inferGuardedBinder m nval binder
+  t <- infer (m `M.union` m1) val
+  t ~~ ret
+  checkBinders m nval ret bs
 
-typeConstraintsForBinders :: M.Map Ident Int -> Int -> Int -> [(Binder, Value)] -> Check [TypeConstraint]
-typeConstraintsForBinders _ _ _ [] = return []
-typeConstraintsForBinders m nval ret ((binder, val):bs) = do
-  (cs1, m1) <- typeConstraintsForGuardedBinder m nval binder
-  (cs2, n2) <- typeConstraints (m `M.union` m1) val
-  cs3 <- typeConstraintsForBinders m nval ret bs
-  return (TypeConstraint n2 (TUnknown ret) (BinderOrigin binder) : cs1 ++ cs2 ++ cs3)
-
-assignVariable :: Ident -> M.Map Ident Int -> Check ()
+assignVariable :: Ident -> M.Map Ident Type -> Subst Check ()
 assignVariable name m =
   case M.lookup name m of
     Nothing -> return ()
     Just _ -> throwError $ "Variable with name " ++ show name ++ " already exists."
 
-typeConstraintsForStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> Statement -> Check ([TypeConstraint], Bool, M.Map Ident Int)
-typeConstraintsForStatement m mass ret (VariableIntroduction name val) = do
+checkStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> Statement -> Subst Check (Bool, M.Map Ident Type)
+checkStatement m mass ret (VariableIntroduction name val) = do
   assignVariable name (m `M.union` mass)
-  (cs1, n1) <- typeConstraints m val
-  return (cs1, False, M.insert name n1 mass)
-typeConstraintsForStatement m mass ret (Assignment ident val) = do
-  (cs1, n1) <- typeConstraints m val
+  t <- infer m val
+  return (False, M.insert name t mass)
+checkStatement m mass ret (Assignment ident val) = do
+  t <- infer m val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
-    Just ty ->
-     return (TypeConstraint n1 (TUnknown ty) (AssignmentTargetOrigin ident) : cs1, False, mass)
-typeConstraintsForStatement m mass ret (While val inner) = do
-  (cs1, n1) <- typeConstraints m val
-  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret inner
-  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (If ifst) = do
-  (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
-  return (cs, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (For ident start end inner) = do
+    Just ty -> do t ~~ ty
+                  return (False, mass)
+checkStatement m mass ret (While val inner) = do
+  t1 <- infer m val
+  t1 ~~ Boolean
+  (allCodePathsReturn, _) <- checkBlock m mass ret inner
+  return (allCodePathsReturn, mass)
+checkStatement m mass ret (If ifst) = do
+  allCodePathsReturn <- checkIfStatement m mass ret ifst
+  return (allCodePathsReturn, mass)
+checkStatement m mass ret (For ident start end inner) = do
   assignVariable ident (m `M.union` mass)
-  (cs1, n1) <- typeConstraints (m `M.union` mass) start
-  (cs2, n2) <- typeConstraints (m `M.union` mass) end
-  let mass1 = M.insert ident n1 mass
-  (cs3, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
-  return (TypeConstraint n1 Number (ValueOrigin start) : TypeConstraint n2 Number (ValueOrigin end) : cs1 ++ cs2 ++ cs3, allCodePathsReturn, mass)
-typeConstraintsForStatement m mass ret (ForEach ident vals inner) = do
+  t1 <- infer (m `M.union` mass) start
+  t1 ~~ Number
+  t2 <- infer (m `M.union` mass) end
+  t2 ~~ Number
+  let mass1 = M.insert ident Number mass
+  (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
+  return (allCodePathsReturn, mass)
+checkStatement m mass ret (ForEach ident vals inner) = do
   assignVariable ident (m `M.union` mass)
   val <- fresh
-  (cs1, n1) <- typeConstraints (m `M.union` mass) vals
+  t1 <- infer (m `M.union` mass) vals
+  t1 ~~ Array val
   let mass1 = M.insert ident val mass
-  (cs2, allCodePathsReturn, _) <- typeConstraintsForBlock (m `M.union` mass1) mass1 ret inner
+  (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
-  return (TypeConstraint n1 (Array (TUnknown val)) (ValueOrigin vals) : cs1 ++ cs2, False, mass)
-typeConstraintsForStatement m mass ret (Return val) = do
-  (cs1, n1) <- typeConstraints (m `M.union` mass) val
-  return (TypeConstraint n1 (TUnknown ret) (ValueOrigin val) : cs1, True, mass)
+  return (False, mass)
+checkStatement m mass ret (Return val) = do
+  check (m `M.union` mass) val ret
+  return (True, mass)
 
-typeConstraintsForIfStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> IfStatement -> Check ([TypeConstraint], Bool)
-typeConstraintsForIfStatement m mass ret (IfStatement val thens Nothing) = do
-  (cs1, n1) <- typeConstraints m val
-  (cs2, _, _) <- typeConstraintsForBlock m mass ret thens
-  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2, False)
-typeConstraintsForIfStatement m mass ret (IfStatement val thens (Just elses)) = do
-  (cs1, n1) <- typeConstraints m val
-  (cs2, allCodePathsReturn1, _) <- typeConstraintsForBlock m mass ret thens
-  (cs3, allCodePathsReturn2) <- typeConstraintsForElseStatement m mass ret elses
-  return (TypeConstraint n1 Boolean (ValueOrigin val) : cs1 ++ cs2 ++ cs3, allCodePathsReturn1 && allCodePathsReturn2)
+checkIfStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> IfStatement -> Subst Check Bool
+checkIfStatement m mass ret (IfStatement val thens Nothing) = do
+  t1 <- infer m val
+  t1 ~~ Boolean
+  _ <- checkBlock m mass ret thens
+  return False
+checkIfStatement m mass ret (IfStatement val thens (Just elses)) = do
+  t1 <- infer m val
+  t1 ~~ Boolean
+  (allCodePathsReturn1, _) <- checkBlock m mass ret thens
+  allCodePathsReturn2 <- checkElseStatement m mass ret elses
+  return $ allCodePathsReturn1 && allCodePathsReturn2
 
-typeConstraintsForElseStatement :: M.Map Ident Int -> M.Map Ident Int -> Int -> ElseStatement -> Check ([TypeConstraint], Bool)
-typeConstraintsForElseStatement m mass ret (Else elses) = do
-  (cs, allCodePathsReturn, _) <- typeConstraintsForBlock m mass ret elses
-  return (cs, allCodePathsReturn)
-typeConstraintsForElseStatement m mass ret (ElseIf ifst) = do
-  (cs, allCodePathsReturn) <- typeConstraintsForIfStatement m mass ret ifst
-  return (cs, allCodePathsReturn)
+checkElseStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> ElseStatement -> Subst Check Bool
+checkElseStatement m mass ret (Else elses) = fst <$> checkBlock m mass ret elses
+checkElseStatement m mass ret (ElseIf ifst) = checkIfStatement m mass ret ifst
 
-typeConstraintsForBlock :: M.Map Ident Int -> M.Map Ident Int -> Int -> [Statement] -> Check ([TypeConstraint], Bool, M.Map Ident Int)
-typeConstraintsForBlock _ mass _ [] = return ([], False, mass)
-typeConstraintsForBlock m mass ret (s:ss) = do
-  (cs1, b1, mass1) <- typeConstraintsForStatement (m `M.union` mass) mass ret s
+checkBlock :: M.Map Ident Type -> M.Map Ident Type -> Type -> [Statement] -> Subst Check (Bool, M.Map Ident Type)
+checkBlock _ mass _ [] = return (False, mass)
+checkBlock m mass ret (s:ss) = do
+  (b1, mass1) <- checkStatement (m `M.union` mass) mass ret s
   case (b1, ss) of
-    (True, []) -> return (cs1, True, mass1)
+    (True, []) -> return (True, mass1)
     (True, _) -> throwError "Unreachable code"
     (False, ss) -> do
-      (cs2, b2, mass2) <- typeConstraintsForBlock m mass1 ret ss
-      return (cs1 ++ cs2, b2, mass2)
+      (b2, mass2) <- checkBlock m mass1 ret ss
+      return (b2, mass2)
 
-solveTypeConstraints :: [TypeConstraint] -> TypeSolution -> Check TypeSolution
-solveTypeConstraints [] s = return s
-solveTypeConstraints all@(TypeConstraint n t o:cs) s = do
-  (cs', s') <- rethrow (\err -> "Error in " ++ prettyPrintOrigin o ++ ": " ++ err) $ do
-    typeOccursCheck n t
-    let s' = let (f, g) = runTypeSolution s
-             in TypeSolution (replaceType n t . f, replaceType n t . g)
-    cs' <- fmap concat $ mapM (substituteTypeInConstraint n t) cs
-    return (cs', s')
-  solveTypeConstraints cs' s'
-solveTypeConstraints (RowConstraint n r o:cs) s = do
-  (cs', s') <- rethrow (\err -> "Error in " ++ prettyPrintOrigin o ++ ": " ++ err) $ do
-    rowOccursCheck n r
-    let s' = let (f, g) = runTypeSolution s
-             in TypeSolution (replaceRow n r . f, replaceRow n r . g)
-    cs' <- fmap concat $ mapM (substituteRowInConstraint n r) cs
-    return (cs', s')
-  solveTypeConstraints cs' s'
-
-substituteTypeInConstraint :: Int -> Type -> TypeConstraint -> Check [TypeConstraint]
-substituteTypeInConstraint n s (TypeConstraint m t v)
-  | n == m = unifyTypes v s t
-  | otherwise = return [TypeConstraint m (replaceType n s t) v]
-substituteTypeInConstraint n s (RowConstraint m r v)
-  = return [RowConstraint m (replaceType n s r) v]
-
-substituteRowInConstraint :: Int -> Row -> TypeConstraint -> Check [TypeConstraint]
-substituteRowInConstraint n r (TypeConstraint m t v)
-  = return [TypeConstraint m (replaceRow n r t) v]
-substituteRowInConstraint n r (RowConstraint m r1 v)
-  | m == n = unifyRows v r r1
-  | otherwise = return [RowConstraint m (replaceRow n r r1) v]
-
-unifyTypes :: TypeConstraintOrigin -> Type -> Type -> Check [TypeConstraint]
-unifyTypes _ (TUnknown u1) (TUnknown u2) | u1 == u2 = return []
-unifyTypes o (TUnknown u) t = do
-  typeOccursCheck u t
-  return [TypeConstraint u t o]
-unifyTypes o t (TUnknown u) = do
-  typeOccursCheck u t
-  return [TypeConstraint u t o]
-unifyTypes o (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args2) | name1 == name2 =
-  fmap concat $ zipWithM (unifyTypes o) args1 args2
-unifyTypes o (SaturatedTypeSynonym name args) ty = do
-  env <- getEnv
-  modulePath <- checkModulePath `fmap` get
-  case M.lookup (qualify modulePath name) (typeSynonyms env) of
-    Just (synArgs, body) -> do
-      let m = M.fromList $ zip synArgs args
-      let replaced = replaceTypeVars m body
-      unifyTypes o replaced ty
-    Nothing -> error "Type synonym was not defined"
-unifyTypes o ty s@(SaturatedTypeSynonym _ _) = unifyTypes o s ty
-unifyTypes o (ForAll idents ty1) ty2 =do
-  sk <- skolemize idents ty1
-  unifyTypes o sk ty2
-unifyTypes o ty f@(ForAll _ _) = unifyTypes o f ty
-unifyTypes _ Number Number = return []
-unifyTypes _ String String = return []
-unifyTypes _ Boolean Boolean = return []
-unifyTypes o (Array s) (Array t) = unifyTypes o s t
-unifyTypes o (Object row1) (Object row2) = unifyRows o row1 row2
-unifyTypes o (Function args1 ret1) (Function args2 ret2) = do
-  guardWith "Function applied to incorrect number of args" $ length args1 == length args2
-  cs1 <- fmap concat $ zipWithM (unifyTypes o) args1 args2
-  cs2 <- unifyTypes o ret1 ret2
-  return $ cs1 ++ cs2
-unifyTypes _ (TypeVar v1) (TypeVar v2) | v1 == v2 = return []
-unifyTypes _ (TypeConstructor c1) (TypeConstructor c2) = do
-  modulePath <- checkModulePath `fmap` get
-  guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
-  return []
-unifyTypes o (TypeApp t1 t2) (TypeApp t3 t4) = do
-  cs1 <- unifyTypes o t1 t3
-  cs2 <- unifyTypes o t2 t4
-  return $ cs1 ++ cs2
-unifyTypes _ (Skolem s1) (Skolem s2) | s1 == s2 = return []
-unifyTypes _ t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
-
-unifyRows :: TypeConstraintOrigin -> Row -> Row -> Check [TypeConstraint]
-unifyRows o r1 r2 =
-  let
-    (s1, r1') = rowToList r1
-    (s2, r2') = rowToList r2
-    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in do
-    cs1 <- fmap concat $ mapM (uncurry $ unifyTypes o) int
-    cs2 <- unifyRows' o sd1 r1' sd2 r2'
-    return $ cs1 ++ cs2
-  where
-  unifyRows' :: TypeConstraintOrigin -> [(String, Type)] -> Row -> [(String, Type)] -> Row -> Check [TypeConstraint]
-  unifyRows' o [] (RUnknown u) sd r = do
-    rowOccursCheck u r
-    return [RowConstraint u (rowFromList (sd, r)) o]
-  unifyRows' o sd r [] (RUnknown u) = do
-    rowOccursCheck u r
-    return [RowConstraint u (rowFromList (sd, r)) o]
-  unifyRows' o ns@((name, ty):row) r others (RUnknown u) | not (occursCheck u (ty, row)) = do
-    u' <- fresh
-    cs <- unifyRows' o row r others (RUnknown u')
-    return (RowConstraint u (RCons name ty (RUnknown u')) o : cs)
-  unifyRows' _ [] REmpty [] REmpty = return []
-  unifyRows' _ [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return []
-  unifyRows' _ sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd1, r1)) ++ " with " ++ prettyPrintRow (rowFromList (sd2, r2)) ++ "."
-
-skolemize :: [String] -> Type -> Check Type
+skolemize :: [String] -> Type -> Subst Check Type
 skolemize idents ty = do
-  sks <- replicateM (length idents) fresh
+  sks <- replicateM (length idents) fresh'
   let m = M.fromList (zip idents (map Skolem sks))
   return $ replaceTypeVars m ty
 
+check :: M.Map Ident Type -> Value -> Type -> Subst Check ()
+check m (NumericLiteral _) Number = return ()
+check m (StringLiteral _) String = return ()
+check m (BooleanLiteral _) Boolean = return ()
+check m (Unary Negate val) Number = check m val Number
+check m (Unary Not val) Boolean = check m val Boolean
+check m (Unary BitwiseNot val) Number = check m val Number
+check m (Binary _ t1 t2) Number = check m t1 Number >> check m t2 Number
+check m (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check m val ty)
+check m (Indexer index vals) ty = check m index Number >> check m vals (Array ty)
+check m (Abs args ret) (Function argTys retTy) = do
+  guardWith "Incorrect number of function arguments" (length args == length argTys)
+  let bindings = M.fromList (zip args argTys)
+  check (bindings `M.union` m) ret retTy
+check m (App f xs) ret = do
+  ft <- infer m f
+  checkFunctionApplication m ft xs ret
+check m val (ForAll idents ty) = do
+  sk <- skolemize idents ty
+  check m val sk
+check m val u@(TUnknown _) = do
+  t <- infer m val
+  t ~~ u
+check _ val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
+
+checkFunctionApplication :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
+checkFunctionApplication m (Function argTys retTy) args ret = do
+  guardWith "Incorrect number of function arguments" (length args == length argTys)
+  zipWithM (check m) args argTys
+  ret ~~ retTy
+checkFunctionApplication m (ForAll idents ty) args ret = do
+  replaced <- replaceVarsWithUnknowns idents ty
+  checkFunctionApplication m replaced args ret
+checkFunctionApplication _ fnTy args ret = throwError $ "Cannot apply function of type "
+  ++ prettyPrintType fnTy
+  ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
+  ++ ". Expecting value of type " ++ prettyPrintType ret ++ "."
+
+{-
+  | Binary BinaryOperator Value Value
+  | ObjectLiteral [(String, Value)]
+  | Accessor String Value
+  | ObjectUpdate Value [(String, Value)]
+  | Var (Qualified Ident)
+  | IfThenElse Value Value Value
+  | Block [Statement]
+  | Constructor (Qualified ProperName)
+  | Case Value [(Binder, Value)]
+  | TypedValue Value PolyType
+-}

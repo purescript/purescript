@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Kinds
+-- Module      :  Language.PureScript.Unknown
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -14,13 +14,12 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Language.PureScript.Kinds where
+module Language.PureScript.Unknown where
 
 import Data.Data
-import Language.PureScript.Unknown
+import Data.Typeable
 
-data Kind
-  = KUnknown (Unknown Kind)
-  | Star
-  | Row
-  | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)
+newtype Unknown t = Unknown { runUnknown :: Int } deriving (Show, Eq, Ord, Data, Typeable)
+
+
+

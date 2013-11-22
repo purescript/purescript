@@ -32,7 +32,7 @@ import Data.Maybe (mapMaybe)
 compile :: [Declaration] -> Either String (String, String, Environment)
 compile decls = do
   bracketted <- rebracket decls
-  (_, env) <- check (typeCheckAll bracketted)
+  (_, env) <- runCheck (typeCheckAll bracketted)
   let js = prettyPrintJS . map optimize . concat . mapMaybe (\decl -> declToJs Nothing global decl env) $ bracketted
   let exts = intercalate "\n" . mapMaybe (externToPs 0 global env) $ bracketted
   return (js, exts, env)

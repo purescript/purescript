@@ -1,0 +1,10 @@
+test1 :: (forall a. (a -> a)) -> Number
+test1 = \f -> f 0
+
+foreign import data ST :: * -> * -> *
+
+foreign import runST :: forall a. (forall s. ST s a) -> a
+
+foreign import exampleST :: forall s. ST s Number
+
+testST = runST exampleST
