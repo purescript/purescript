@@ -42,14 +42,14 @@ import Control.Monad.Error
 typeCheckAll :: [Declaration] -> Check ()
 typeCheckAll [] = return ()
 typeCheckAll (DataDeclaration name args dctors : rest) = do
-  rethrow (("Error in type constructor " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
     guardWith (show name ++ " is already defined") $ not $ M.member (modulePath, name) (types env)
     ctorKind <- kindsOf (Just name) args (mapMaybe snd dctors)
     putEnv $ env { types = M.insert (modulePath, name) (ctorKind, Data) (types env) }
     forM_ dctors $ \(dctor, maybeTy) ->
-      rethrow (("Error in data constructor " ++ show name ++ ": ") ++) $ do
+      rethrow (("Error in data constructor " ++ show name ++ ":\n") ++) $ do
         env' <- getEnv
         guardWith (show dctor ++ " is already defined") $ not $ M.member (modulePath, dctor) (dataConstructors env')
         let retTy = foldl TypeApp (TypeConstructor (Qualified modulePath name)) (map TypeVar args)
@@ -58,7 +58,7 @@ typeCheckAll (DataDeclaration name args dctors : rest) = do
         putEnv $ env' { dataConstructors = M.insert (modulePath, dctor) polyType (dataConstructors env') }
   typeCheckAll rest
 typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
-  rethrow (("Error in type synonym " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
     guardWith (show name ++ " is already defined") $ not $ M.member (modulePath, name) (types env)
@@ -70,7 +70,7 @@ typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' val : rest) | nam
   typeCheckAll (ValueDeclaration name (TypedValue val ty) : rest)
 typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
 typeCheckAll (ValueDeclaration name val : rest) = do
-  rethrow (("Error in declaration " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
     case M.lookup (modulePath, name) (names env) of
@@ -86,7 +86,7 @@ typeCheckAll (ExternDataDeclaration name kind : rest) = do
   putEnv $ env { types = M.insert (modulePath, name) (kind, TypeSynonym) (types env) }
   typeCheckAll rest
 typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
-  rethrow (("Error in foreign import member declaration " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in foreign import member declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
     kind <- kindOf ty
@@ -100,7 +100,7 @@ typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
         _ -> throwError "Foreign member declarations must have function types, with an single argument."
   typeCheckAll rest
 typeCheckAll (ExternDeclaration name ty : rest) = do
-  rethrow (("Error in foreign import declaration " ++ show name ++ ": ") ++) $ do
+  rethrow (("Error in foreign import declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
     kind <- kindOf ty
@@ -126,7 +126,7 @@ typeCheckAll (ImportDeclaration modulePath idents : rest) = do
       Nothing     -> bindIdents (map snd $ filterModule env) currentModule env
       Just idents -> bindIdents idents currentModule env
   typeCheckAll rest
- where errorMessage = (("Error in import declaration " ++ show modulePath ++ ": ") ++)
+ where errorMessage = (("Error in import declaration " ++ show modulePath ++ ":\n") ++)
        filterModule = filter ((== modulePath) . fst) . M.keys . names
        moduleExists env = not $ null $ filterModule env
        bindIdents idents currentModule env =

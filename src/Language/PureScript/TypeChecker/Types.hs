@@ -289,27 +289,29 @@ ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
 infer :: M.Map Ident Type -> Value -> Subst Check Type
-infer _ (NumericLiteral _) = return Number
-infer _ (StringLiteral _) = return String
-infer _ (BooleanLiteral _) = return Boolean
-infer m (ArrayLiteral vals) = do
+infer m val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' m val
+
+infer' _ (NumericLiteral _) = return Number
+infer' _ (StringLiteral _) = return String
+infer' _ (BooleanLiteral _) = return Boolean
+infer' m (ArrayLiteral vals) = do
   ts <- mapM (infer m) vals
   arr <- fresh
   forM_ ts $ \t -> arr ~~ Array t
   return arr
-infer m (Unary op val) = do
+infer' m (Unary op val) = do
   t <- infer m val
   inferUnary op t
-infer m (Binary op left right) = do
+infer' m (Binary op left right) = do
   t1 <- infer m left
   t2 <- infer m right
   inferBinary op t1 t2
-infer m (ObjectLiteral ps) = do
+infer' m (ObjectLiteral ps) = do
   lift $ ensureNoDuplicateProperties ps
   ts <- mapM (infer m . snd) ps
   let fields = zipWith (\(name, _) t -> (name, t)) ps ts
   return $ Object $ typesToRow fields
-infer m (ObjectUpdate o ps) = do
+infer' m (ObjectUpdate o ps) = do
   lift $ ensureNoDuplicateProperties ps
   obj <- infer m o
   row <- fresh
@@ -317,29 +319,27 @@ infer m (ObjectUpdate o ps) = do
   let tys = zipWith (\(name, _) t -> (name, t)) ps ts
   obj ~~ Object (rowFromList (tys, row))
   return obj
-infer m (Indexer index val) = do
+infer' m (Indexer index val) = do
   el <- fresh
   check m index Number
-  t2 <- infer m val
-  t2 ~~ Array el
+  check m val (Array el)
   return el
-infer m (Accessor prop val) = do
-  obj <- infer m val
+infer' m (Accessor prop val) = do
   field <- fresh
   rest <- fresh
-  obj ~~ Object (RCons prop field rest)
+  check m val (Object (RCons prop field rest))
   return field
-infer m v@(Abs args ret) = do
+infer' m v@(Abs args ret) = do
   ts <- replicateM (length args) fresh
   let m' = m `M.union` M.fromList (zip args ts)
   body <- infer m' ret
   return $ Function ts body
-infer m v@(App f xs) = do
+infer' m v@(App f xs) = do
   t1 <- infer m f
   ret <- fresh
   checkFunctionApplication m t1 xs ret
   return ret
-infer m v@(Var var@(Qualified mp name)) = do
+infer' m v@(Var var@(Qualified mp name)) = do
   case mp of
     ModulePath [] ->
       case M.lookup name m of
@@ -353,29 +353,29 @@ infer m v@(Var var@(Qualified mp name)) = do
     case M.lookup (qualify modulePath var) (names env) of
       Nothing -> throwError $ show var ++ " is undefined"
       Just (ty, _) -> lift $ replaceAllTypeSynonyms ty
-infer m (Block ss) = do
+infer' m (Block ss) = do
   ret <- fresh
   (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
   return ret
-infer m v@(Constructor c) = do
+infer' m v@(Constructor c) = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty -> lift $ replaceAllTypeSynonyms ty
-infer m (Case val binders) = do
+infer' m (Case val binders) = do
   t1 <- infer m val
   ret <- fresh
   checkBinders m t1 ret binders
   return ret
-infer m v@(IfThenElse cond th el) = do
+infer' m v@(IfThenElse cond th el) = do
   check m cond Boolean
   t2 <- infer m th
   t3 <- infer m el
   t2 ~~ t3
   return t2
-infer m v@(TypedValue val ty) = do
+infer' m v@(TypedValue val ty) = do
   kind <- lift $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- lift $ replaceAllTypeSynonyms ty
@@ -514,8 +514,7 @@ checkBinders :: M.Map Ident Type -> Type -> Type -> [(Binder, Value)] -> Subst C
 checkBinders _ _ _ [] = return ()
 checkBinders m nval ret ((binder, val):bs) = do
   m1 <- inferGuardedBinder m nval binder
-  t <- infer (m `M.union` m1) val
-  t ~~ ret
+  check (m `M.union` m1) val ret
   checkBinders m nval ret bs
 
 assignVariable :: Ident -> M.Map Ident Type -> Subst Check ()
@@ -536,8 +535,7 @@ checkStatement m mass ret (Assignment ident val) = do
     Just ty -> do t ~~ ty
                   return (False, mass)
 checkStatement m mass ret (While val inner) = do
-  t1 <- infer m val
-  t1 ~~ Boolean
+  check m val Boolean
   (allCodePathsReturn, _) <- checkBlock m mass ret inner
   return (allCodePathsReturn, mass)
 checkStatement m mass ret (If ifst) = do
@@ -545,18 +543,15 @@ checkStatement m mass ret (If ifst) = do
   return (allCodePathsReturn, mass)
 checkStatement m mass ret (For ident start end inner) = do
   assignVariable ident (m `M.union` mass)
-  t1 <- infer (m `M.union` mass) start
-  t1 ~~ Number
-  t2 <- infer (m `M.union` mass) end
-  t2 ~~ Number
+  check (m `M.union` mass) start Number
+  check (m `M.union` mass) end Number
   let mass1 = M.insert ident Number mass
   (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
   return (allCodePathsReturn, mass)
 checkStatement m mass ret (ForEach ident vals inner) = do
   assignVariable ident (m `M.union` mass)
   val <- fresh
-  t1 <- infer (m `M.union` mass) vals
-  t1 ~~ Array val
+  check (m `M.union` mass) vals (Array val)
   let mass1 = M.insert ident val mass
   (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
@@ -567,13 +562,11 @@ checkStatement m mass ret (Return val) = do
 
 checkIfStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> IfStatement -> Subst Check Bool
 checkIfStatement m mass ret (IfStatement val thens Nothing) = do
-  t1 <- infer m val
-  t1 ~~ Boolean
+  check m val Boolean
   _ <- checkBlock m mass ret thens
   return False
 checkIfStatement m mass ret (IfStatement val thens (Just elses)) = do
-  t1 <- infer m val
-  t1 ~~ Boolean
+  check m val Boolean
   (allCodePathsReturn1, _) <- checkBlock m mass ret thens
   allCodePathsReturn2 <- checkElseStatement m mass ret elses
   return $ allCodePathsReturn1 && allCodePathsReturn2
