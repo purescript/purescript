@@ -30,6 +30,7 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Unknown
 
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
@@ -41,11 +42,10 @@ typeLiterals = mkPattern match
   match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
-  match (TUnknown u) = Just $ 'u' : show u
+  match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
-  match (ForAll idents ty) | not (null idents) = Just $ "forall " ++ unwords idents ++ ". " ++ prettyPrintType ty
-                           | otherwise = match ty
+  match (ForAll ident ty) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
@@ -55,8 +55,9 @@ prettyPrintRow = (\(tys, tail) -> intercalate ", " (map (uncurry nameAndTypeToPs
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Row -> String
   tailToPs REmpty = ""
-  tailToPs (RUnknown u) = " | " ++ show u
+  tailToPs (RUnknown (Unknown u)) = " | u" ++ show u
   tailToPs (RowVar var) = " | " ++ var
+  tailToPs (RSkolem s) = " | s" ++ show s
   toList :: [(String, Type)] -> Row -> ([(String, Type)], Row)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)

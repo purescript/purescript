@@ -32,7 +32,7 @@ data Type
   | TypeConstructor (Qualified ProperName)
   | TypeApp Type Type
   | SaturatedTypeSynonym (Qualified ProperName) [Type]
-  | ForAll [String] Type
+  | ForAll String Type
   | Skolem Int deriving (Show, Eq, Data, Typeable)
 
 type PolyType = Type
@@ -41,7 +41,8 @@ data Row
   = RUnknown (Unknown Row)
   | RowVar String
   | REmpty
-  | RCons String Type Row deriving (Show, Eq, Data, Typeable)
+  | RCons String Type Row
+  | RSkolem Int deriving (Show, Eq, Data, Typeable)
 
 typesToRow :: [(String, Type)] -> Row
 typesToRow [] = REmpty
@@ -68,3 +69,6 @@ isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
 isPolyType (SaturatedTypeSynonym _ args) = all isMonoType args
 isPolyType (ForAll idents ty) = isPolyType ty
 isPolyType _ = True
+
+mkForAll :: [String] -> Type -> Type
+mkForAll = flip . foldl . flip $ ForAll

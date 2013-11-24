@@ -25,13 +25,14 @@ import Control.Applicative
 
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Unknown
 
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Row = Just "#"
-  match (KUnknown u) = Just $ 'u' : show u
+  match (KUnknown (Unknown u)) = Just $ 'u' : show u
   match _ = Nothing
 
 funKind :: Pattern () Kind (Kind, Kind)

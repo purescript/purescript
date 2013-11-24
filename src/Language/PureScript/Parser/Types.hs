@@ -56,8 +56,8 @@ parseTypeConstructor :: P.Parsec String ParseState Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: P.Parsec String ParseState Type
-parseForAll = (ForAll <$> (P.try (reserved "forall") *> many (indented *> identifier) <* indented <* dot)
-                      <*> parseType)
+parseForAll = (mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
+                        <*> parseType)
 
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try

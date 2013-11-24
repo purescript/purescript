@@ -65,13 +65,13 @@ kindOf :: Type -> Check Kind
 kindOf ty = runSubst $ starIfUnknown <$> infer Nothing M.empty ty
 
 kindsOf :: Maybe ProperName -> [String] -> [Type] -> Check Kind
-kindsOf name args ts = runSubst $ do
+kindsOf name args ts = fmap starIfUnknown $ runSubst $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   ks <- inferAll (fmap (\pn -> (pn, tyCon)) name) (M.fromList (zip args kargs)) ts
   tyCon ~~ foldr FunKind Star kargs
   forM_ ks $ \k -> k ~~ Star
-  return $ starIfUnknown tyCon
+  return tyCon
 
 starIfUnknown :: Kind -> Kind
 starIfUnknown (KUnknown _) = Star
@@ -79,22 +79,18 @@ starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
 inferAll :: Maybe (ProperName, Kind) -> M.Map String Kind -> [Type] -> Subst Check [Kind]
-inferAll _ _ [] = return []
-inferAll name m (t:ts) = do
-  k <- infer name m t
-  ks <- inferAll name m ts
-  return (k:ks)
+inferAll name m = mapM (infer name m)
 
 infer :: Maybe (ProperName, Kind) -> M.Map String Kind -> Type -> Subst Check Kind
-infer name m a@(Array t) = do
+infer name m (Array t) = do
   k <- infer name m t
   k ~~ Star
   return Star
-infer name m o@(Object row) = do
+infer name m (Object row) = do
   k <- inferRow name m row
   k ~~ Row
   return Star
-infer name m f@(Function args ret) = do
+infer name m (Function args ret) = do
   ks <- inferAll name m args
   k <- infer name m ret
   k ~~ Star
@@ -105,21 +101,21 @@ infer _ m (TypeVar v) =
     Just k -> return k
     Nothing -> throwError $ "Unbound type variable " ++ v
 infer (Just (name, k)) m c@(TypeConstructor v@(Qualified (ModulePath []) pn)) | name == pn = return k
-infer name m c@(TypeConstructor v) = do
+infer name m (TypeConstructor v) = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath v) (types env) of
     Nothing -> throwError $ "Unknown type constructor '" ++ show v ++ "'"
     Just (kind, _) -> return kind
-infer name m a@(TypeApp t1 t2) = do
+infer name m (TypeApp t1 t2) = do
   k0 <- fresh
   k1 <- infer name m t1
   k2 <- infer name m t2
   k1 ~~ FunKind k2 k0
   return k0
-infer name m (ForAll idents ty) = do
-  ks <- replicateM (length idents) fresh
-  infer name (M.fromList (zip idents ks) `M.union` m) ty
+infer name m (ForAll ident ty) = do
+  k <- fresh
+  infer name (M.insert ident k m) ty
 infer _ m t = return Star
 
 inferRow :: Maybe (ProperName, Kind) -> M.Map String Kind -> Row -> Subst Check Kind

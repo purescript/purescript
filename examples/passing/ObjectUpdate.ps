@@ -1,4 +1,7 @@
-update = \o -> o { foo = "Foo" }
+update1 = \o -> o { foo = "Foo" }
+
+update2 :: forall r. { foo :: String | r } -> { foo :: String | r }
+update2 = \o -> o { foo = "Foo" }
 
 replace = \o -> case o of
   { foo = "Foo" } -> o { foo = "Bar" }

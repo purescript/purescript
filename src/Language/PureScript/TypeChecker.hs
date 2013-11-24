@@ -54,7 +54,7 @@ typeCheckAll (DataDeclaration name args dctors : rest) = do
         guardWith (show dctor ++ " is already defined") $ not $ M.member (modulePath, dctor) (dataConstructors env')
         let retTy = foldl TypeApp (TypeConstructor (Qualified modulePath name)) (map TypeVar args)
         let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-        let polyType = ForAll args dctorTy
+        let polyType = mkForAll args dctorTy
         putEnv $ env' { dataConstructors = M.insert (modulePath, dctor) polyType (dataConstructors env') }
   typeCheckAll rest
 typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do

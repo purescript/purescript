@@ -36,6 +36,7 @@ library
                      Language.PureScript.TypeChecker.Monad
                      Language.PureScript.TypeChecker.Types
                      Language.PureScript.TypeChecker.Synonyms
+                     Language.PureScript.Unknown
     exposed: True
     buildable: True
     hs-source-dirs: src
