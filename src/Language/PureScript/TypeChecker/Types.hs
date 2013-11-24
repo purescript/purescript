@@ -18,8 +18,6 @@ module Language.PureScript.TypeChecker.Types (
     typeOf
 ) where
 
-import Debug.Trace
-
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Function
@@ -379,7 +377,7 @@ infer' m v@(TypedValue val ty) = do
   kind <- lift $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- lift $ replaceAllTypeSynonyms ty
-  trace (prettyPrintType ty') $ check m val ty'
+  check m val ty'
   return ty'
 
 inferUnary :: UnaryOperator -> Type -> Subst Check Type
