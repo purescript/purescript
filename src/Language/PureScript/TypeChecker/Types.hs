@@ -18,6 +18,8 @@ module Language.PureScript.TypeChecker.Types (
     typeOf
 ) where
 
+import Debug.Trace
+
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Function
@@ -361,7 +363,7 @@ infer m v@(Constructor c) = do
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just ty -> return ty
+    Just ty -> lift $ replaceAllTypeSynonyms ty
 infer m (Case val binders) = do
   t1 <- infer m val
   ret <- fresh
@@ -377,7 +379,7 @@ infer m v@(TypedValue val ty) = do
   kind <- lift $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- lift $ replaceAllTypeSynonyms ty
-  check m val ty'
+  trace (prettyPrintType ty') $ check m val ty'
   return ty'
 
 inferUnary :: UnaryOperator -> Type -> Subst Check Type
@@ -619,7 +621,9 @@ check m v@(Var var@(Qualified mp name)) ty = do
   case mp of
     ModulePath [] ->
       case M.lookup name m of
-        Just ty1 -> ty1 `subsumes` ty
+        Just ty1 -> do
+          repl <- lift $ replaceAllTypeSynonyms ty1
+          repl `subsumes` ty
         Nothing -> lookupGlobal
     _ -> lookupGlobal
   where
@@ -628,7 +632,9 @@ check m v@(Var var@(Qualified mp name)) ty = do
     modulePath <- checkModulePath `fmap` lift get
     case M.lookup (qualify modulePath var) (names env) of
       Nothing -> throwError $ show var ++ " is undefined"
-      Just (ty1, _) -> ty1 `subsumes` ty
+      Just (ty1, _) -> do
+        repl <- lift $ replaceAllTypeSynonyms ty1
+        repl `subsumes` ty
 check m val u@(TUnknown _) = do
   ty <- infer m val
   ty ~~ u
@@ -663,7 +669,9 @@ check m (Constructor c) ty = do
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just ty1 -> ty1 `subsumes` ty
+    Just ty1 -> do
+      repl <- lift $ replaceAllTypeSynonyms ty1
+      repl `subsumes` ty
 check m val (SaturatedTypeSynonym name args) = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
