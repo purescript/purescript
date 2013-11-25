@@ -28,6 +28,7 @@ import Language.PureScript.Types
 import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Pretty.Types
 
 literals :: Pattern () Value String
 literals = mkPattern match
@@ -83,6 +84,12 @@ lam = mkPattern match
   match (Abs args val) = Just (map show args, val)
   match _ = Nothing
 
+typed :: Pattern () Value (PolyType, Value)
+typed = mkPattern match
+  where
+  match (TypedValue val ty) = Just (ty, val)
+  match _ = Nothing
+
 unary :: UnaryOperator -> String -> Operator () Value String
 unary op str = Wrap pattern (++)
   where
@@ -113,6 +120,7 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Split lam $ \args val -> "\\" ++ intercalate ", " args ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
+                  , [ Wrap typed $ \ty val -> val ++ " :: " ++ prettyPrintType ty ]
                   , [ AssocR indexer (\index val -> val ++ " !! " ++ index) ]
                   , [ binary    LessThan             "<" ]
                   , [ binary    LessThanOrEqualTo    "<=" ]

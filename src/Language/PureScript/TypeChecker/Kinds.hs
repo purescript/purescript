@@ -62,10 +62,10 @@ instance Unifiable Kind where
   unknowns _ = []
 
 kindOf :: Type -> Check Kind
-kindOf ty = runSubst $ starIfUnknown <$> infer Nothing M.empty ty
+kindOf ty = fmap (\(k, _, _) -> k) . runSubst $ starIfUnknown <$> infer Nothing M.empty ty
 
 kindsOf :: Maybe ProperName -> [String] -> [Type] -> Check Kind
-kindsOf name args ts = fmap starIfUnknown $ runSubst $ do
+kindsOf name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   ks <- inferAll (fmap (\pn -> (pn, tyCon)) name) (M.fromList (zip args kargs)) ts

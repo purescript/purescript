@@ -19,7 +19,7 @@ module Language.PureScript.TypeChecker.Types (
 ) where
 
 import Data.List
-import Data.Maybe (fromMaybe)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Function
 import qualified Data.Data as D
 import Data.Generics (everywhere, everywhereM, everything, mkT, mkM, mkQ, extM, extQ)
@@ -147,48 +147,25 @@ isFunction _ = False
 
 typeOf :: Maybe Ident -> Value -> Check Type
 typeOf name val = do
-  ty <- runSubst $ case name of
-        Just ident -> do me <- fresh
-                         ty <- infer (M.singleton ident me) val
-                         me ~~ ty
-                         return ty
-        Nothing -> infer M.empty val
-  --desugared <- replaceAllTypeSynonyms cs
-  --TODO: allUnknownsBecameQuantified desugared solution ty
+  (ty, sub, checks) <- runSubst $ case name of
+        Just ident | isFunction val ->
+          do me <- fresh
+             ty <- infer (M.singleton ident me) val
+             me ~~ ty
+             return ty
+        _ -> infer M.empty val
+  escapeCheck checks ty sub
   return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
 
-{-
-allUnknownsBecameQuantified :: [TypeConstraint] -> TypeSolution -> Type -> Check ()
-allUnknownsBecameQuantified cs solution ty = do
+escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
+escapeCheck checks ty sub =
   let
-    typesMentioned = findUnknownTypes ty
-    unknownTypes = nub $ flip concatMap cs $ \c -> case c of
-      TypeConstraint u t _ -> u : findUnknownTypes t
-      RowConstraint _ r _ -> findUnknownTypes r
-    unsolvedTypes = filter (\n -> TUnknown n == fst (runTypeSolution solution) n) unknownTypes
-  guardWith "Unsolved type variable" $ null $ unsolvedTypes \\ typesMentioned
-  let
-    rowsMentioned = findUnknownRows ty
-    unknownRows = nub $ flip concatMap cs $ \c -> case c of
-      TypeConstraint _ t _ -> findUnknownRows t
-      RowConstraint u r _ -> u : findUnknownRows r
-    unsolvedRows = filter (\n -> RUnknown n == snd (runTypeSolution solution) n) unknownRows
-  guardWith "Unsolved row variable" $ null $ unsolvedRows \\ rowsMentioned
-
-findUnknownTypes :: (D.Data d) => d -> [Unknown Type]
-findUnknownTypes = everything (++) (mkQ [] f)
-  where
-  f :: Type -> [Unknown Type]
-  f (TUnknown n) = [n]
-  f _ = []
-
-findUnknownRows :: (D.Data d) => d -> [Unknown Row]
-findUnknownRows = everything (++) (mkQ [] f)
-  where
-  f :: Row -> [Unknown Row]
-  f (RUnknown n) = [n]
-  f _ = []
--}
+    visibleUnknowns = nub $ unknowns ty
+  in
+    forM_ checks $ \check -> case check of
+      AnyUnifiable t -> do
+        let unsolvedUnknowns = nub . unknowns $ apply sub t
+        guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
 
 setify :: Row -> Row
 setify = rowFromList . first (M.toList . M.fromList) . rowToList
@@ -287,7 +264,10 @@ ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
 infer :: M.Map Ident Type -> Value -> Subst Check Type
-infer m val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' m val
+infer m val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ do
+  ty <- infer' m val
+  escapeCheckLater ty
+  return ty
 
 infer' _ (NumericLiteral _) = return Number
 infer' _ (StringLiteral _) = return String
@@ -327,17 +307,17 @@ infer' m (Accessor prop val) = do
   rest <- fresh
   check m val (Object (RCons prop field rest))
   return field
-infer' m v@(Abs args ret) = do
+infer' m (Abs args ret) = do
   ts <- replicateM (length args) fresh
   let m' = m `M.union` M.fromList (zip args ts)
   body <- infer m' ret
   return $ Function ts body
-infer' m v@(App f xs) = do
+infer' m (App f xs) = do
   t1 <- infer m f
   ret <- fresh
   checkFunctionApplication m t1 xs ret
   return ret
-infer' m v@(Var var@(Qualified mp name)) = do
+infer' m (Var var@(Qualified mp name)) = do
   case mp of
     ModulePath [] ->
       case M.lookup name m of
@@ -356,7 +336,7 @@ infer' m (Block ss) = do
   (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
   return ret
-infer' m v@(Constructor c) = do
+infer' m (Constructor c) = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
@@ -367,13 +347,13 @@ infer' m (Case val binders) = do
   ret <- fresh
   checkBinders m t1 ret binders
   return ret
-infer' m v@(IfThenElse cond th el) = do
+infer' m (IfThenElse cond th el) = do
   check m cond Boolean
   t2 <- infer m th
   t3 <- infer m el
   t2 ~~ t3
   return t2
-infer' m v@(TypedValue val ty) = do
+infer' m (TypedValue val ty) = do
   kind <- lift $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- lift $ replaceAllTypeSynonyms ty
@@ -464,7 +444,7 @@ inferBinder val (NullaryBinder ctor) = do
       ty `subsumes` val
       return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
-inferBinder val b@(UnaryBinder ctor binder) = do
+inferBinder val (UnaryBinder ctor binder) = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
@@ -473,7 +453,7 @@ inferBinder val b@(UnaryBinder ctor binder) = do
       ty `subsumes` (Function [obj] val)
       inferBinder obj binder
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
-inferBinder val b@(ObjectBinder props) = do
+inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
   m1 <- inferRowProperties row rest props
@@ -501,7 +481,7 @@ inferBinder val (NamedBinder name binder) = do
   return $ M.insert name val m
 
 inferGuardedBinder :: M.Map Ident Type -> Type -> Binder -> Subst Check (M.Map Ident Type)
-inferGuardedBinder m val b@(GuardedBinder cond binder) = do
+inferGuardedBinder m val (GuardedBinder cond binder) = do
   m1 <- inferBinder val binder
   ty <- infer (m `M.union` m1) cond
   ty ~~ Boolean
@@ -591,24 +571,46 @@ skolemize ident ty = do
   return $ replaceRowVars (M.singleton ident rsk) $ replaceTypeVars (M.singleton ident tsk) ty
 
 check :: M.Map Ident Type -> Value -> Type -> Subst Check ()
-check m (NumericLiteral _) Number = return ()
-check m (StringLiteral _) String = return ()
-check m (BooleanLiteral _) Boolean = return ()
-check m (Unary op val) ty = checkUnary m op val ty
-check m (Binary op left right) ty = checkBinary m op left right ty
-check m (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check m val ty)
-check m (Indexer index vals) ty = check m index Number >> check m vals (Array ty)
-check m (Abs args ret) (Function argTys retTy) = do
+check m val ty = rethrow errorMessage $ check' m val ty
+  where
+  errorMessage msg =
+    "Error checking type of term " ++
+    prettyPrintValue val ++
+    " against type " ++
+    prettyPrintType ty ++
+    ":\n" ++
+    msg
+
+check' :: M.Map Ident Type -> Value -> Type -> Subst Check ()
+check' m val (ForAll idents ty) = do
+  sk <- skolemize idents ty
+  check m val sk
+check' m val (SaturatedTypeSynonym name args) = do
+  env <- lift getEnv
+  modulePath <- checkModulePath `fmap` lift get
+  case M.lookup (qualify modulePath name) (typeSynonyms env) of
+    Just (synArgs, body) -> do
+      let replaced = replaceTypeVars (M.fromList (zip synArgs args)) body
+      check m val replaced
+    Nothing -> error "Type synonym was not defined"
+check' m val u@(TUnknown _) = do
+  ty <- infer m val
+  ty ~~ u
+check' m (NumericLiteral _) Number = return ()
+check' m (StringLiteral _) String = return ()
+check' m (BooleanLiteral _) Boolean = return ()
+check' m (Unary op val) ty = checkUnary m op val ty
+check' m (Binary op left right) ty = checkBinary m op left right ty
+check' m (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check m val ty)
+check' m (Indexer index vals) ty = check m index Number >> check m vals (Array ty)
+check' m (Abs args ret) (Function argTys retTy) = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   let bindings = M.fromList (zip args argTys)
   check (bindings `M.union` m) ret retTy
-check m (App f xs) ret = do
+check' m (App f xs) ret = do
   ft <- infer m f
   checkFunctionApplication m ft xs ret
-check m val (ForAll idents ty) = do
-  sk <- skolemize idents ty
-  check m val sk
-check m v@(Var var@(Qualified mp name)) ty = do
+check' m v@(Var var@(Qualified mp name)) ty = do
   case mp of
     ModulePath [] ->
       case M.lookup name m of
@@ -626,36 +628,32 @@ check m v@(Var var@(Qualified mp name)) ty = do
       Just (ty1, _) -> do
         repl <- lift $ replaceAllTypeSynonyms ty1
         repl `subsumes` ty
-check m val u@(TUnknown _) = do
-  ty <- infer m val
-  ty ~~ u
-  return ()
-check m (TypedValue val ty1) ty2 = do
+check' m (TypedValue val ty1) ty2 = do
   kind <- lift $ kindOf ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
   check m val ty1
-check m (Case val binders) ret = do
+check' m (Case val binders) ret = do
   t1 <- infer m val
   checkBinders m t1 ret binders
-check m (IfThenElse cond th el) ty = do
+check' m (IfThenElse cond th el) ty = do
   check m cond Boolean
   check m th ty
   check m el ty
-check m (ObjectLiteral ps) (Object row) = do
+check' m (ObjectLiteral ps) (Object row) = do
   lift $ ensureNoDuplicateProperties ps
   checkProperties m ps row False
-check m (ObjectUpdate obj ps) objTy@(Object row) = do
+check' m (ObjectUpdate obj ps) objTy@(Object row) = do
   lift $ ensureNoDuplicateProperties ps
   check m obj objTy
   checkProperties m ps row True
-check m (Accessor prop val) ty = do
+check' m (Accessor prop val) ty = do
   rest <- fresh
   check m val (Object (RCons prop ty rest))
-check m (Block ss) ret = do
+check' m (Block ss) ret = do
   (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-check m (Constructor c) ty = do
+check' m (Constructor c) ty = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
@@ -663,15 +661,7 @@ check m (Constructor c) ty = do
     Just ty1 -> do
       repl <- lift $ replaceAllTypeSynonyms ty1
       repl `subsumes` ty
-check m val (SaturatedTypeSynonym name args) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
-  case M.lookup (qualify modulePath name) (typeSynonyms env) of
-    Just (synArgs, body) -> do
-      let replaced = replaceTypeVars (M.fromList (zip synArgs args)) body
-      check m val replaced
-    Nothing -> error "Type synonym was not defined"
-check _ val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
+check' _ val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 checkProperties :: M.Map Ident Type -> [(String, Value)] -> Row -> Bool -> Subst Check ()
 checkProperties m ps row lax = let (ts, r') = rowToList row in go ps ts r' where
@@ -699,17 +689,26 @@ checkProperties m ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
 checkFunctionApplication :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
-checkFunctionApplication m (Function argTys retTy) args ret = do
+checkFunctionApplication m fnTy args ret = rethrow errorMessage $ checkFunctionApplication' m fnTy args ret
+  where
+  errorMessage msg = "Error applying function of type "
+    ++ prettyPrintType fnTy
+    ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
+    ++ ", expecting value of type "
+    ++ prettyPrintType ret ++ ":\n" ++ msg
+
+checkFunctionApplication' :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
+checkFunctionApplication' m (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   zipWithM (check m) args argTys
-  ret ~~ retTy
-checkFunctionApplication m (ForAll ident ty) args ret = do
+  retTy `subsumes` ret
+checkFunctionApplication' m (ForAll ident ty) args ret = do
   replaced <- replaceVarsWithUnknowns [ident] ty
   checkFunctionApplication m replaced args ret
-checkFunctionApplication m u@(TUnknown _) args ret = do
-  tyArgs <- replicateM (length args) fresh
-  u ~~ Function tyArgs ret
-checkFunctionApplication _ fnTy args ret = throwError $ "Cannot apply function of type "
+checkFunctionApplication' m u@(TUnknown _) args ret = do
+  tyArgs <- mapM (infer m) args
+  u `subsumes` Function tyArgs ret
+checkFunctionApplication' _ fnTy args ret = throwError $ "Cannot apply function of type "
   ++ prettyPrintType fnTy
   ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
   ++ ". Expecting value of type " ++ prettyPrintType ret ++ "."
