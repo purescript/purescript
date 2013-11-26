@@ -94,11 +94,15 @@ typeCheckAll (ExternMemberDeclaration member name ty : rest) = do
     case M.lookup (modulePath, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> case ty of
-        (ForAll _ (Function [_] _)) -> do
+        _ | isSingleArgumentFunction ty -> do
           putEnv (env { names = M.insert (modulePath, name) (ty, Extern) (names env)
                       , members = M.insert (modulePath, name) member (members env) })
-        _ -> throwError "Foreign member declarations must have function types, with an single argument."
+          | otherwise -> throwError "Foreign member declarations must have function types, with an single argument."
   typeCheckAll rest
+  where
+    isSingleArgumentFunction (Function [_] _) = True
+    isSingleArgumentFunction (ForAll _ ty) = isSingleArgumentFunction ty
+    isSingleArgumentFunction _ = False
 typeCheckAll (ExternDeclaration name ty : rest) = do
   rethrow (("Error in foreign import declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv

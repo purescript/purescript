@@ -157,7 +157,7 @@ typeOf name val = do
         Just ident | isFunction val ->
           do me <- fresh
              ty <- infer (M.singleton ident me) val
-             me ~~ ty
+             ty `subsumes` me
              return ty
         _ -> infer M.empty val
   escapeCheck checks ty sub
@@ -229,6 +229,10 @@ replaceRowVars m = everywhere (mkT replace)
     Just r -> r
     _ -> RowVar v
   replace t = t
+
+replaceAllVarsWithUnknowns :: Type -> Subst Check Type
+replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarsWithUnknowns [ident] ty >>= replaceAllVarsWithUnknowns
+replaceAllVarsWithUnknowns ty = return ty
 
 replaceVarsWithUnknowns :: [String] -> Type -> Subst Check Type
 replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
@@ -318,10 +322,11 @@ infer' m (Abs args ret) = do
   let m' = m `M.union` M.fromList (zip args ts)
   body <- infer m' ret
   return $ Function ts body
-infer' m (App f xs) = do
-  t1 <- infer m f
+infer' m app@(App _ _) = do
+  let (f, argss) = unfoldApplication app
+  ft <- infer m f
   ret <- fresh
-  checkFunctionApplication m t1 xs ret
+  checkFunctionApplications m ft argss ret
   return ret
 infer' m (Var var@(Qualified mp name)) = do
   case mp of
@@ -601,7 +606,9 @@ check' m val (SaturatedTypeSynonym name args) = do
     Nothing -> error "Type synonym was not defined"
 check' m val u@(TUnknown _) = do
   ty <- infer m val
-  ty ~~ u
+  -- Don't unify an unknown with an inferred polytype
+  ty' <- replaceAllVarsWithUnknowns ty
+  ty' ~~ u
 check' m (NumericLiteral _) Number = return ()
 check' m (StringLiteral _) String = return ()
 check' m (BooleanLiteral _) Boolean = return ()
@@ -613,9 +620,10 @@ check' m (Abs args ret) (Function argTys retTy) = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   let bindings = M.fromList (zip args argTys)
   check (bindings `M.union` m) ret retTy
-check' m (App f xs) ret = do
+check' m app@(App _ _) ret = do
+  let (f, argss) = unfoldApplication app
   ft <- infer m f
-  checkFunctionApplication m ft xs ret
+  checkFunctionApplications m ft argss ret
 check' m v@(Var var@(Qualified mp name)) ty = do
   case mp of
     ModulePath [] ->
@@ -694,6 +702,20 @@ checkProperties m ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         go ps (delete (p, ty) ts) r
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
+unfoldApplication :: Value -> (Value, [[Value]])
+unfoldApplication = go []
+  where
+  go argss (App f args) = go (args:argss) f
+  go argss f = (f, argss)
+
+checkFunctionApplications :: M.Map Ident Type -> Type -> [[Value]] -> Type -> Subst Check ()
+checkFunctionApplications _ _ [] _ = error "Nullary function application"
+checkFunctionApplications m fnTy [args] ret = checkFunctionApplication m fnTy args ret
+checkFunctionApplications m fnTy (args:argss) ret = do
+  f <- fresh
+  checkFunctionApplication m fnTy args f
+  checkFunctionApplications m f argss ret
+
 checkFunctionApplication :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
 checkFunctionApplication m fnTy args ret = rethrow errorMessage $ checkFunctionApplication' m fnTy args ret
   where
@@ -712,8 +734,8 @@ checkFunctionApplication' m (ForAll ident ty) args ret = do
   replaced <- replaceVarsWithUnknowns [ident] ty
   checkFunctionApplication m replaced args ret
 checkFunctionApplication' m u@(TUnknown _) args ret = do
-  tyArgs <- mapM (infer m) args
-  u `subsumes` Function tyArgs ret
+  tyArgs <- mapM (\arg -> infer m arg >>= replaceAllVarsWithUnknowns) args
+  u ~~ Function tyArgs ret
 checkFunctionApplication' _ fnTy args ret = throwError $ "Cannot apply function of type "
   ++ prettyPrintType fnTy
   ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
