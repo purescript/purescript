@@ -241,6 +241,10 @@ desaturateAllTypeSynonyms = everywhere (mkT replace)
   replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replace t = t
 
+expandAllTypeSynonyms :: Type -> Subst Check Type
+expandAllTypeSynonyms (SaturatedTypeSynonym name args) = expandTypeSynonym name args >>= expandAllTypeSynonyms
+expandAllTypeSynonyms ty = return ty
+
 expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Check Type
 expandTypeSynonym name args = do
   env <- lift getEnv
@@ -294,10 +298,15 @@ infer' m (Indexer index val) = do
   check m val (Array el)
   return el
 infer' m (Accessor prop val) = do
-  field <- fresh
-  rest <- fresh
-  check m val (Object (RCons prop field rest))
-  return field
+  obj <- infer m val
+  propTy <- inferProperty obj prop
+  case propTy of
+    Nothing -> do
+      field <- fresh
+      rest <- fresh
+      obj `subsumes` Object (RCons prop field rest)
+      return field
+    Just ty -> return ty
 infer' m (Abs args ret) = do
   ts <- replicateM (length args) fresh
   let m' = m `M.union` M.fromList (zip args ts)
@@ -351,6 +360,18 @@ infer' m (TypedValue val ty) = do
   ty' <- lift $ replaceAllTypeSynonyms ty
   check m val ty'
   return ty'
+
+inferProperty :: Type -> String -> Subst Check (Maybe Type)
+inferProperty (Object row) prop = do
+  let (props, _) = rowToList row
+  return $ lookup prop props
+inferProperty (SaturatedTypeSynonym name args) prop = do
+  replaced <- expandTypeSynonym name args
+  inferProperty replaced prop
+inferProperty (ForAll ident ty) prop = do
+  replaced <- replaceVarsWithUnknowns [ident] ty
+  inferProperty replaced prop
+inferProperty _ prop = return Nothing
 
 inferUnary :: UnaryOperator -> Type -> Subst Check Type
 inferUnary op val =
