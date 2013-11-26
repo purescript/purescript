@@ -110,14 +110,8 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args2)
     | name1 == name2 = zipWithM_ unifyTypes args1 args2
   unifyTypes' (SaturatedTypeSynonym name args) ty = do
-    env <- lift getEnv
-    modulePath <- checkModulePath `fmap` lift get
-    case M.lookup (qualify modulePath name) (typeSynonyms env) of
-      Just (synArgs, body) -> do
-        let m = M.fromList $ zip synArgs args
-        let replaced = replaceTypeVars m body
-        replaced `unifyTypes` ty
-      Nothing -> error "Type synonym was not defined"
+    ty1 <- expandTypeSynonym name args
+    ty1 `unifyTypes` ty
   unifyTypes' ty s@(SaturatedTypeSynonym _ _) = s `unifyTypes` ty
   unifyTypes' (ForAll ident1 ty1) (ForAll ident2 ty2) = do
     sk <- skolemize ident1 ty1
@@ -246,6 +240,16 @@ desaturateAllTypeSynonyms = everywhere (mkT replace)
   where
   replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replace t = t
+
+expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Check Type
+expandTypeSynonym name args = do
+  env <- lift getEnv
+  modulePath <- checkModulePath `fmap` lift get
+  case M.lookup (qualify modulePath name) (typeSynonyms env) of
+    Just (synArgs, body) -> do
+      let m = M.fromList $ zip synArgs args
+      return $ replaceTypeVars m body
+    Nothing -> error "Type synonym was not defined"
 
 ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
@@ -573,14 +577,6 @@ check' :: M.Map Ident Type -> Value -> Type -> Subst Check ()
 check' m val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check m val sk
-check' m val (SaturatedTypeSynonym name args) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
-  case M.lookup (qualify modulePath name) (typeSynonyms env) of
-    Just (synArgs, body) -> do
-      let replaced = replaceTypeVars (M.fromList (zip synArgs args)) body
-      check m val replaced
-    Nothing -> error "Type synonym was not defined"
 check' m val u@(TUnknown _) = do
   ty <- infer m val
   -- Don't unify an unknown with an inferred polytype
@@ -652,6 +648,9 @@ check' m (Constructor c) ty = do
     Just ty1 -> do
       repl <- lift $ replaceAllTypeSynonyms ty1
       repl `subsumes` ty
+check' m val (SaturatedTypeSynonym name args) = do
+  ty <- expandTypeSynonym name args
+  check m val ty
 check' _ val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 checkProperties :: M.Map Ident Type -> [(String, Value)] -> Row -> Bool -> Subst Check ()
@@ -713,6 +712,9 @@ checkFunctionApplication' m (ForAll ident ty) args ret = do
 checkFunctionApplication' m u@(TUnknown _) args ret = do
   tyArgs <- mapM (\arg -> infer m arg >>= replaceAllVarsWithUnknowns) args
   u ~~ Function tyArgs ret
+checkFunctionApplication' m (SaturatedTypeSynonym name tyArgs) args ret = do
+  ty <- expandTypeSynonym name tyArgs
+  checkFunctionApplication' m ty args ret
 checkFunctionApplication' _ fnTy args ret = throwError $ "Cannot apply function of type "
   ++ prettyPrintType fnTy
   ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)

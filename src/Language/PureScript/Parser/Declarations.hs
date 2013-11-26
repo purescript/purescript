@@ -44,7 +44,7 @@ parseDataDeclaration = do
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
   lexeme $ indented *> P.char '='
-  ctors <- sepBy1 ((,) <$> properName <*> P.optionMaybe (indented *> parseType)) pipe
+  ctors <- sepBy1 ((,) <$> properName <*> P.optionMaybe (indented *> parsePolyType)) pipe
   return $ DataDeclaration name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
@@ -56,7 +56,7 @@ parseTypeSynonymDeclaration :: P.Parsec String ParseState Declaration
 parseTypeSynonymDeclaration =
   TypeSynonymDeclaration <$> (P.try (reserved "type") *> indented *> properName)
                          <*> many (indented *> identifier)
-                         <*> (lexeme (indented *> P.char '=') *> parseType)
+                         <*> (lexeme (indented *> P.char '=') *> parsePolyType)
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
