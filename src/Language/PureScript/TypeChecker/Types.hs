@@ -47,47 +47,7 @@ instance Unifiable Type where
   unknown = TUnknown
   isUnknown (TUnknown u) = Just u
   isUnknown _ = Nothing
-  TUnknown u1 ~~ TUnknown u2 | u1 == u2 = return ()
-  TUnknown u ~~ t = replace u t
-  t ~~ TUnknown u = replace u t
-  SaturatedTypeSynonym name1 args1 ~~ SaturatedTypeSynonym name2 args2 | name1 == name2 =
-    zipWithM_ (~~) args1 args2
-  SaturatedTypeSynonym name args ~~ ty = do
-    env <- lift getEnv
-    modulePath <- checkModulePath `fmap` lift get
-    case M.lookup (qualify modulePath name) (typeSynonyms env) of
-      Just (synArgs, body) -> do
-        let m = M.fromList $ zip synArgs args
-        let replaced = replaceTypeVars m body
-        replaced ~~ ty
-      Nothing -> error "Type synonym was not defined"
-  ty ~~ s@(SaturatedTypeSynonym _ _) = s ~~ ty
-  ForAll ident1 ty1 ~~ ForAll ident2 ty2 = do
-    sk <- skolemize ident1 ty1
-    replaced <- replaceVarsWithUnknowns [ident2] ty2
-    sk ~~ replaced
-  ForAll ident ty1 ~~ ty2 = do
-    sk <- skolemize ident ty1
-    sk ~~ ty2
-  ty ~~ f@(ForAll _ _) = f ~~ ty
-  Number ~~ Number = return ()
-  String ~~ String = return ()
-  Boolean ~~ Boolean = return ()
-  Array s ~~ Array t = s ~~ t
-  Object row1 ~~ Object row2 = row1 ~~ row2
-  Function args1 ret1 ~~ Function args2 ret2 = do
-    guardWith "Function applied to incorrect number of args" $ length args1 == length args2
-    zipWithM_ (~~) args1 args2
-    ret1 ~~ ret2
-  TypeVar v1 ~~ TypeVar v2 | v1 == v2 = return ()
-  TypeConstructor c1 ~~ TypeConstructor c2 = do
-    modulePath <- checkModulePath `fmap` lift get
-    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
-  TypeApp t1 t2 ~~ TypeApp t3 t4 = do
-    t1 ~~ t3
-    t2 ~~ t4
-  Skolem s1 ~~ Skolem s2 | s1 == s2 = return ()
-  t1 ~~ t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
+  (~~) = unifyTypes
   apply s (TUnknown u) = runSubstitution s u
   apply s (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym name $ map (apply s) tys
   apply s (ForAll idents ty) = ForAll idents $ apply s ty
@@ -139,6 +99,52 @@ instance Unifiable Row where
   unknowns (RUnknown (Unknown u)) = [u]
   unknowns (RCons _ ty r) = unknowns ty ++ unknowns r
   unknowns _ = []
+
+unifyTypes :: Type -> Type -> Subst Check ()
+unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $ do
+  unifyTypes' t1 t2
+  where
+  unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
+  unifyTypes' (TUnknown u) t = replace u t
+  unifyTypes' t (TUnknown u) = replace u t
+  unifyTypes' (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args2)
+    | name1 == name2 = zipWithM_ unifyTypes args1 args2
+  unifyTypes' (SaturatedTypeSynonym name args) ty = do
+    env <- lift getEnv
+    modulePath <- checkModulePath `fmap` lift get
+    case M.lookup (qualify modulePath name) (typeSynonyms env) of
+      Just (synArgs, body) -> do
+        let m = M.fromList $ zip synArgs args
+        let replaced = replaceTypeVars m body
+        replaced `unifyTypes` ty
+      Nothing -> error "Type synonym was not defined"
+  unifyTypes' ty s@(SaturatedTypeSynonym _ _) = s `unifyTypes` ty
+  unifyTypes' (ForAll ident1 ty1) (ForAll ident2 ty2) = do
+    sk <- skolemize ident1 ty1
+    replaced <- replaceVarsWithUnknowns [ident2] ty2
+    sk `unifyTypes` replaced
+  unifyTypes' (ForAll ident ty1) ty2 = do
+    sk <- skolemize ident ty1
+    sk `unifyTypes` ty2
+  unifyTypes' ty f@(ForAll _ _) = f `unifyTypes` ty
+  unifyTypes' Number Number = return ()
+  unifyTypes' String String = return ()
+  unifyTypes' Boolean Boolean = return ()
+  unifyTypes' (Array s) (Array t) = s `unifyTypes` t
+  unifyTypes' (Object row1) (Object row2) = row1 ~~ row2
+  unifyTypes' (Function args1 ret1) (Function args2 ret2) = do
+    guardWith "Function applied to incorrect number of args" $ length args1 == length args2
+    zipWithM_ unifyTypes args1 args2
+    ret1 `unifyTypes` ret2
+  unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
+  unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
+    modulePath <- checkModulePath `fmap` lift get
+    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
+  unifyTypes' (TypeApp t1 t2) (TypeApp t3 t4) = do
+    t1 `unifyTypes` t3
+    t2 `unifyTypes` t4
+  unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
+  unifyTypes' t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
 
 isFunction :: Value -> Bool
 isFunction (Abs _ _) = True
@@ -486,7 +492,7 @@ inferGuardedBinder m val (GuardedBinder cond binder) = do
   ty <- infer (m `M.union` m1) cond
   ty ~~ Boolean
   return m1
-inferGuardedBinder m val b = inferBinder val b >>= return
+inferGuardedBinder m val b = inferBinder val b
 
 checkBinders :: M.Map Ident Type -> Type -> Type -> [(Binder, Value)] -> Subst Check ()
 checkBinders _ _ _ [] = return ()
