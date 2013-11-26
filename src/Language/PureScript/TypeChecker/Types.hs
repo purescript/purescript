@@ -155,10 +155,18 @@ typeOf :: Maybe Ident -> Value -> Check Type
 typeOf name val = do
   (ty, sub, checks) <- runSubst $ case name of
         Just ident | isFunction val ->
-          do me <- fresh
-             ty <- infer (M.singleton ident me) val
-             ty `subsumes` me
-             return ty
+          case val of
+            TypedValue val ty -> do
+              kind <- lift $ kindOf ty
+              guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+              ty' <- lift $ replaceAllTypeSynonyms ty
+              check (M.singleton ident ty) val ty'
+              return ty'
+            _ -> do
+              me <- fresh
+              ty <- infer (M.singleton ident me) val
+              ty ~~ me
+              return ty
         _ -> infer M.empty val
   escapeCheck checks ty sub
   return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
@@ -179,40 +187,8 @@ setify = rowFromList . first (M.toList . M.fromList) . rowToList
 setifyAll :: (D.Data d) => d -> d
 setifyAll = everywhere (mkT setify)
 
-findTypeVars :: (D.Data d) => d -> [String]
-findTypeVars = everything (++) (mkQ [] f)
-  where
-  f :: Type -> [String]
-  f (TypeVar v) = [v]
-  f _ = []
-
 varIfUnknown :: Type -> Type
-varIfUnknown ty =
-  let
-    (ty', m) = flip runState M.empty $ everywhereM (flip extM g $ mkM f) ty
-  in
-    mkForAll (sort $ nub $ M.elems m ++ findTypeVars ty) ty'
-  where
-  f :: Type -> State (M.Map Int String) Type
-  f (TUnknown (Unknown n)) = do
-    m <- get
-    case M.lookup n m of
-      Nothing -> do
-        let name = 't' : show (M.size m)
-        put $ M.insert n name m
-        return $ TypeVar name
-      Just name -> return $ TypeVar name
-  f t = return t
-  g :: Row -> State (M.Map Int String) Row
-  g (RUnknown (Unknown n)) = do
-    m <- get
-    case M.lookup n m of
-      Nothing -> do
-        let name = 'r' : show (M.size m)
-        put $ M.insert n name m
-        return $ RowVar name
-      Just name -> return $ RowVar name
-  g r = return r
+varIfUnknown ty = mkForAll (sort . map ((:) 'u' . show) . nub $ unknowns ty) ty
 
 replaceTypeVars :: M.Map String Type -> Type -> Type
 replaceTypeVars m = everywhere (mkT replace)
