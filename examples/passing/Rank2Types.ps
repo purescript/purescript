@@ -8,3 +8,10 @@ foreign import runST :: forall a. (forall s. ST s a) -> a
 foreign import exampleST :: forall s. ST s Number
 
 testST = runST exampleST
+
+foreign import push :: forall el. el -> [el] -> [el]
+
+replicateM :: forall m a. (forall x. x -> m x) -> (forall x y. m x -> (x -> m y) -> m y) -> Number -> m a -> m [a]
+replicateM = \ret bind n m -> case n of
+  0 -> ret []
+  n -> bind m (\x -> bind (replicateM ret bind (n - 1) m) (\xs -> ret (push x xs)))

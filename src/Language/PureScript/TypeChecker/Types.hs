@@ -210,6 +210,7 @@ replaceAllVarsWithUnknowns :: Type -> Subst Check Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarsWithUnknowns [ident] ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
+-- TODO: need to be careful inside a forall, since variables might be renamed
 replaceVarsWithUnknowns :: [String] -> Type -> Subst Check Type
 replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
   where
