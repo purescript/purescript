@@ -64,9 +64,9 @@ isMonoType ty = isPolyType ty
 isPolyType :: Type -> Bool
 isPolyType (Array ty) = isMonoType ty
 isPolyType (Object ps) = all isPolyType (map snd . fst $ rowToList ps)
-isPolyType (Function args ret) = all isPolyType args && isMonoType ret
+isPolyType (Function args ret) = all isPolyType args && isPolyType ret
 isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
-isPolyType (SaturatedTypeSynonym _ args) = all isMonoType args
+isPolyType (SaturatedTypeSynonym _ args) = all isPolyType args
 isPolyType (ForAll idents ty) = isPolyType ty
 isPolyType _ = True
 

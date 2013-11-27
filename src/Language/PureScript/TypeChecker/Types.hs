@@ -145,6 +145,7 @@ isFunction (Abs _ _) = True
 isFunction (TypedValue untyped _) = isFunction untyped
 isFunction _ = False
 
+-- TODO: check skolems don't escape
 typeOf :: Maybe Ident -> Value -> Check Type
 typeOf name val = do
   (ty, sub, checks) <- runSubst $ case name of
