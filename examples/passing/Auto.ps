@@ -6,4 +6,4 @@ exists :: forall s1 i o. s1 -> (s1 -> i -> o) -> SomeAuto i o
 exists = \state step f -> f (Auto { state: state, step: step })
 
 run :: forall i o. SomeAuto i o -> i -> o
-run = \s i -> s (\a -> case a of Auto x -> x.step x.state i)
+run = \s i -> s (\a -> case a of Auto a -> a.step a.state i)

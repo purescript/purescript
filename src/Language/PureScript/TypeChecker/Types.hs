@@ -497,8 +497,7 @@ inferBinder val (NamedBinder name binder) = do
 inferGuardedBinder :: M.Map Ident Type -> Type -> Binder -> Subst Check (M.Map Ident Type)
 inferGuardedBinder m val (GuardedBinder cond binder) = do
   m1 <- inferBinder val binder
-  ty <- infer (m `M.union` m1) cond
-  ty ~~ Boolean
+  check (m1 `M.union` m) cond Boolean
   return m1
 inferGuardedBinder m val b = inferBinder val b
 
@@ -506,7 +505,7 @@ checkBinders :: M.Map Ident Type -> Type -> Type -> [(Binder, Value)] -> Subst C
 checkBinders _ _ _ [] = return ()
 checkBinders m nval ret ((binder, val):bs) = do
   m1 <- inferGuardedBinder m nval binder
-  check (m `M.union` m1) val ret
+  check (m1 `M.union` m) val ret
   checkBinders m nval ret bs
 
 assignVariable :: Ident -> M.Map Ident Type -> Subst Check ()
