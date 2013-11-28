@@ -23,8 +23,8 @@ import Data.Maybe (isJust, fromMaybe)
 import Data.Function
 import qualified Data.Data as D
 import Data.Generics
-       (something, everywhere, everywhereM, everything, everywhereBut,
-        mkT, mkM, mkQ, extM, extQ)
+       (extT, something, everywhere, everywhereM, everything,
+        everywhereBut, mkT, mkM, mkQ, extM, extQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -196,7 +196,17 @@ setifyAll :: (D.Data d) => d -> d
 setifyAll = everywhere (mkT setify)
 
 varIfUnknown :: Type -> Type
-varIfUnknown ty = mkForAll (sort . map ((:) 'u' . show) . nub $ unknowns ty) ty
+varIfUnknown ty =
+  let unks = nub $ unknowns ty
+      toName = (:) 't' . show
+      ty' = everywhere (mkT rowToVar) . everywhere (mkT typeToVar) $ ty
+      typeToVar :: Type -> Type
+      typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
+      typeToVar t = t
+      rowToVar :: Row -> Row
+      rowToVar (RUnknown (Unknown u)) = RowVar (toName u)
+      rowToVar t = t
+  in mkForAll (sort . map toName $ unks) ty'
 
 replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
@@ -705,8 +715,8 @@ checkFunctionApplications :: M.Map Ident Type -> Type -> [[Value]] -> Type -> Su
 checkFunctionApplications _ _ [] _ = error "Nullary function application"
 checkFunctionApplications m fnTy [args] ret = checkFunctionApplication m fnTy args ret
 checkFunctionApplications m fnTy (args:argss) ret = do
-  f <- fresh
-  checkFunctionApplication m fnTy args f
+  argTys <- mapM (infer m) args
+  f <- inferFunctionApplication m fnTy argTys
   checkFunctionApplications m f argss ret
 
 checkFunctionApplication :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
@@ -717,6 +727,26 @@ checkFunctionApplication m fnTy args ret = rethrow errorMessage $ checkFunctionA
     ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
     ++ ", expecting value of type "
     ++ prettyPrintType ret ++ ":\n" ++ msg
+
+inferFunctionApplication :: M.Map Ident Type -> Type -> [Type] -> Subst Check Type
+inferFunctionApplication m (Function argTys retTy) args = do
+  guardWith "Incorrect number of function arguments" (length args == length argTys)
+  zipWithM subsumes args argTys
+  return retTy
+inferFunctionApplication m (ForAll ident ty) args = do
+  replaced <- replaceVarWithUnknown ident ty
+  inferFunctionApplication m replaced args
+inferFunctionApplication m u@(TUnknown _) args = do
+  ret <- fresh
+  args' <- mapM replaceAllVarsWithUnknowns args
+  u ~~ Function args' ret
+  return ret
+inferFunctionApplication m (SaturatedTypeSynonym name tyArgs) args  = do
+  ty <- expandTypeSynonym name tyArgs
+  inferFunctionApplication m ty args
+inferFunctionApplication _ fnTy args = throwError $ "Cannot apply function of type "
+  ++ prettyPrintType fnTy
+  ++ " to argument(s) of type(s) " ++ intercalate ", " (map prettyPrintType args)
 
 checkFunctionApplication' :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
 checkFunctionApplication' m (Function argTys retTy) args ret = do
@@ -732,10 +762,10 @@ checkFunctionApplication' m u@(TUnknown _) args ret = do
 checkFunctionApplication' m (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
   checkFunctionApplication' m ty args ret
-checkFunctionApplication' _ fnTy args ret = throwError $ "Cannot apply function of type "
+checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
-  ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
-  ++ ". Expecting value of type " ++ prettyPrintType ret ++ "."
+  ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
+  ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
 
 subsumes :: Type -> Type -> Subst Check ()
 subsumes (ForAll ident ty1) ty2 = do
