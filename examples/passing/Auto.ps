@@ -2,7 +2,7 @@ data Auto s i o = Auto { state :: s, step :: s -> i -> o }
 
 type SomeAuto i o = forall r. (forall s. Auto s i o -> r) -> r
 
-exists :: forall s1 i o. s1 -> (s1 -> i -> o) -> SomeAuto i o
+exists :: forall s i o. s -> (s -> i -> o) -> SomeAuto i o
 exists = \state step f -> f (Auto { state: state, step: step })
 
 run :: forall i o. SomeAuto i o -> i -> o

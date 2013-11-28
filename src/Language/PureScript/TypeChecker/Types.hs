@@ -22,7 +22,7 @@ import Data.List
 import Data.Maybe (isJust, fromMaybe)
 import Data.Function
 import qualified Data.Data as D
-import Data.Generics (everywhere, everywhereM, everything, mkT, mkM, mkQ, extM, extQ)
+import Data.Generics (everywhere, everywhereM, everything, everywhereBut, mkT, mkM, mkQ, extM, extQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -185,27 +185,27 @@ setifyAll = everywhere (mkT setify)
 varIfUnknown :: Type -> Type
 varIfUnknown ty = mkForAll (sort . map ((:) 'u' . show) . nub $ unknowns ty) ty
 
-replaceTypeVars :: M.Map String Type -> Type -> Type
-replaceTypeVars m = everywhere (mkT replace)
-  where
-  replace (TypeVar v) = case M.lookup v m of
-    Just ty -> ty
-    _ -> TypeVar v
-  replace t = t
+replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
+replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
-replaceRowVars :: M.Map String Row -> Type -> Type
-replaceRowVars m = everywhere (mkT replace)
+replaceTypeVars :: (D.Data d) => String -> Type -> d -> d
+replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replace)
   where
-  replace (RowVar v) = case M.lookup v m of
-    Just r -> r
-    _ -> RowVar v
+  replace (TypeVar v) | v == name = t
+  replace t = t
+  isShadowed (ForAll v _) | v == name = True
+  isShadowed _ = False
+
+replaceRowVars :: (D.Data d) => String -> Row -> d -> d
+replaceRowVars name r = everywhere (mkT replace)
+  where
+  replace (RowVar v) | v == name = r
   replace t = t
 
 replaceAllVarsWithUnknowns :: Type -> Subst Check Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarsWithUnknowns [ident] ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
--- TODO: need to be careful inside a forall, since variables might be renamed
 replaceVarsWithUnknowns :: [String] -> Type -> Subst Check Type
 replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
   where
@@ -251,9 +251,7 @@ expandTypeSynonym name args = do
   env <- lift getEnv
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath name) (typeSynonyms env) of
-    Just (synArgs, body) -> do
-      let m = M.fromList $ zip synArgs args
-      return $ replaceTypeVars m body
+    Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
     Nothing -> error "Type synonym was not defined"
 
 ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
@@ -581,7 +579,7 @@ skolemize :: String -> Type -> Subst Check Type
 skolemize ident ty = do
   tsk <- Skolem <$> fresh'
   rsk <- RSkolem <$> fresh'
-  return $ replaceRowVars (M.singleton ident rsk) $ replaceTypeVars (M.singleton ident tsk) ty
+  return $ replaceRowVars ident rsk $ replaceTypeVars ident tsk ty
 
 check :: M.Map Ident Type -> Value -> Type -> Subst Check ()
 check m val ty = rethrow errorMessage $ check' m val ty
