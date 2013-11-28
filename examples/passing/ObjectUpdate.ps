@@ -6,4 +6,9 @@ update2 = \o -> o { foo = "Foo" }
 replace = \o -> case o of
   { foo = "Foo" } -> o { foo = "Bar" }
   { foo = "Bar" } -> o { bar = "Baz" }
-  o -> o 
+  o -> o
+
+polyUpdate :: forall a r. { foo :: a | r } -> { foo :: String | r }
+polyUpdate = \o -> o { foo = "Foo" }
+
+inferPolyUpdate = \o -> o { foo = "Foo" }

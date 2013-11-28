@@ -44,10 +44,6 @@ data Row
   | RCons String Type Row
   | RSkolem Int deriving (Show, Eq, Data, Typeable)
 
-typesToRow :: [(String, Type)] -> Row
-typesToRow [] = REmpty
-typesToRow ((name, ty):tys) = RCons name ty (typesToRow tys)
-
 rowToList :: Row -> ([(String, Type)], Row)
 rowToList (RCons name ty row) = let (tys, rest) = rowToList row
                                in ((name, ty):tys, rest)

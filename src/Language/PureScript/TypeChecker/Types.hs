@@ -295,15 +295,14 @@ infer' m (ObjectLiteral ps) = do
   lift $ ensureNoDuplicateProperties ps
   ts <- mapM (infer m . snd) ps
   let fields = zipWith (\(name, _) t -> (name, t)) ps ts
-  return $ Object $ typesToRow fields
+  return $ Object $ rowFromList (fields, REmpty)
 infer' m (ObjectUpdate o ps) = do
   lift $ ensureNoDuplicateProperties ps
-  obj <- infer m o
   row <- fresh
-  ts <- mapM (infer m . snd) ps
-  let tys = zipWith (\(name, _) t -> (name, t)) ps ts
-  obj ~~ Object (rowFromList (tys, row))
-  return obj
+  newTys <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer m . snd) ps
+  oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
+  check m o $ Object $ rowFromList (oldTys, row)
+  return $ Object $ rowFromList (newTys, row)
 infer' m (Indexer index val) = do
   el <- fresh
   check m index Number
@@ -662,9 +661,13 @@ check' m (IfThenElse cond th el) ty = do
 check' m (ObjectLiteral ps) (Object row) = do
   lift $ ensureNoDuplicateProperties ps
   checkProperties m ps row False
-check' m (ObjectUpdate obj ps) objTy@(Object row) = do
+check' m (ObjectUpdate obj ps) (Object row) = do
   lift $ ensureNoDuplicateProperties ps
-  check m obj objTy
+  us <- zip (map fst ps) <$> replicateM (length ps) fresh
+  let (propsToCheck, rest) = rowToList row
+      propsToRemove = map fst ps
+      remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
+  check m obj (Object (rowFromList (us ++ remainingProps, rest)))
   checkProperties m ps row True
 check' m (Accessor prop val) ty = do
   rest <- fresh
