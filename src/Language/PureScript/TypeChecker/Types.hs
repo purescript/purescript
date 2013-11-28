@@ -22,7 +22,9 @@ import Data.List
 import Data.Maybe (isJust, fromMaybe)
 import Data.Function
 import qualified Data.Data as D
-import Data.Generics (everywhere, everywhereM, everything, everywhereBut, mkT, mkM, mkQ, extM, extQ)
+import Data.Generics
+       (something, everywhere, everywhereM, everything, everywhereBut,
+        mkT, mkM, mkQ, extM, extQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -145,7 +147,6 @@ isFunction (Abs _ _) = True
 isFunction (TypedValue untyped _) = isFunction untyped
 isFunction _ = False
 
--- TODO: check skolems don't escape
 typeOf :: Maybe Ident -> Value -> Check Type
 typeOf name val = do
   (ty, sub, checks) <- runSubst $ case name of
@@ -164,6 +165,7 @@ typeOf name val = do
               return ty
         _ -> infer M.empty val
   escapeCheck checks ty sub
+  skolemEscapeCheck ty
   return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
 
 escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
@@ -175,6 +177,17 @@ escapeCheck checks ty sub =
       AnyUnifiable t -> do
         let unsolvedUnknowns = nub . unknowns $ apply sub t
         guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
+
+skolemEscapeCheck :: Type -> Check ()
+skolemEscapeCheck ty =
+  case something (extQ (mkQ Nothing findSkolems) findRSkolems) ty of
+    Nothing -> return ()
+    Just _ -> throwError "Skolem variables cannot escape. Consider adding a type signature."
+  where
+    findSkolems (Skolem _) = return ()
+    findSkolems _ = mzero
+    findRSkolems (RSkolem _) = return ()
+    findRSkolems _ = mzero
 
 setify :: Row -> Row
 setify = rowFromList . first (M.toList . M.fromList) . rowToList
