@@ -474,8 +474,8 @@ inferBinder val (UnaryBinder ctor binder) = do
   modulePath <- checkModulePath `fmap` lift get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just ty -> do
-      obj <- fresh
-      ty `subsumes` (Function [obj] val)
+      Function [obj] ret <- replaceAllVarsWithUnknowns ty
+      val `subsumes` ret
       inferBinder obj binder
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (ObjectBinder props) = do
