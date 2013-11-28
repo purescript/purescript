@@ -117,7 +117,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' ty s@(SaturatedTypeSynonym _ _) = s `unifyTypes` ty
   unifyTypes' (ForAll ident1 ty1) (ForAll ident2 ty2) = do
     sk <- skolemize ident1 ty1
-    replaced <- replaceVarsWithUnknowns [ident2] ty2
+    replaced <- replaceVarWithUnknown ident2 ty2
     sk `unifyTypes` replaced
   unifyTypes' (ForAll ident ty1) ty2 = do
     sk <- skolemize ident ty1
@@ -216,32 +216,14 @@ replaceRowVars name r = everywhere (mkT replace)
   replace t = t
 
 replaceAllVarsWithUnknowns :: Type -> Subst Check Type
-replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarsWithUnknowns [ident] ty >>= replaceAllVarsWithUnknowns
+replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
-replaceVarsWithUnknowns :: [String] -> Type -> Subst Check Type
-replaceVarsWithUnknowns idents = flip evalStateT M.empty . everywhereM (flip extM f $ mkM g)
-  where
-  f :: Type -> StateT (M.Map String Int) (Subst Check) Type
-  f (TypeVar var) | var `elem` idents = do
-    m <- get
-    n <- lift fresh'
-    case M.lookup var m of
-      Nothing -> do
-        put (M.insert var n m)
-        return $ TUnknown (Unknown n)
-      Just u -> return $ TUnknown (Unknown u)
-  f t = return t
-  g :: Row -> StateT (M.Map String Int) (Subst Check) Row
-  g (RowVar var) | var `elem` idents = do
-    m <- get
-    n <- lift fresh'
-    case M.lookup var m of
-      Nothing -> do
-        put (M.insert var n m)
-        return $ RUnknown (Unknown n)
-      Just u -> return $ RUnknown (Unknown u)
-  g r = return r
+replaceVarWithUnknown :: String -> Type -> Subst Check Type
+replaceVarWithUnknown ident ty = do
+  tu <- fresh
+  ru <- fresh
+  return $ replaceRowVars ident ru . replaceTypeVars ident tu $ ty
 
 replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
 replaceAllTypeSynonyms d = do
@@ -380,7 +362,7 @@ inferProperty (SaturatedTypeSynonym name args) prop = do
   replaced <- expandTypeSynonym name args
   inferProperty replaced prop
 inferProperty (ForAll ident ty) prop = do
-  replaced <- replaceVarsWithUnknowns [ident] ty
+  replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
 inferProperty _ prop = return Nothing
 
@@ -742,7 +724,7 @@ checkFunctionApplication' m (Function argTys retTy) args ret = do
   zipWithM (check m) args argTys
   retTy `subsumes` ret
 checkFunctionApplication' m (ForAll ident ty) args ret = do
-  replaced <- replaceVarsWithUnknowns [ident] ty
+  replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication m replaced args ret
 checkFunctionApplication' m u@(TUnknown _) args ret = do
   tyArgs <- mapM (\arg -> infer m arg >>= replaceAllVarsWithUnknowns) args
@@ -757,7 +739,7 @@ checkFunctionApplication' _ fnTy args ret = throwError $ "Cannot apply function 
 
 subsumes :: Type -> Type -> Subst Check ()
 subsumes (ForAll ident ty1) ty2 = do
-  replaced <- replaceVarsWithUnknowns [ident] ty1
+  replaced <- replaceVarWithUnknown ident ty1
   replaced `subsumes` ty2
 subsumes (Function args1 ret1) (Function args2 ret2) = do
   zipWithM subsumes args2 args1
