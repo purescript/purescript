@@ -15,6 +15,11 @@ A small strongly, statically typed compile-to-JS language with basic extensible 
 - Functions with multiple arguments
 - Pattern matching
 - Simple FFI
+ 
+## Experimental Features
+
+- Modules
+- Rank N Types
 
 ## Try It!
 
@@ -317,6 +322,29 @@ addProps { foo: 1 }
 since the `bar` property is missing.
 
 Again, a type annotation can be provided if necessary.
+
+## Rank N Types (Experimental Feature)
+
+It is also possible for the `forall` quantifier to appear on the left of a function arrow, inside types record fields and data constructors, and in type synonyms.
+
+In most cases, a type annotation is necessary when using this feature.
+
+As an example, we can pass a polymorphic function as an argument to another function:
+
+```haskell
+poly :: (forall a. a -> a) -> Boolean
+poly = \f -> (f 0 < 1) == f true
+```
+
+Notice that the polymorphic function's type argument is instantiated to both `Number` and `Boolean`.
+
+An argument to `poly` must indeed be polymorphic. For example, the following fails:
+
+```haskell
+test = poly (\n -> n + 1)
+```
+
+since the skolemized type variable `a` does not unify with `Number`.
 
 ## Type Inference
 
