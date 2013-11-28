@@ -1,3 +1,3 @@
 all:
-	../../dist/build/psc/psc prelude.ps -o all.js
+	../../dist/build/psc/psc prelude.purs -o all.js
 	cat prelude.js >> all.js

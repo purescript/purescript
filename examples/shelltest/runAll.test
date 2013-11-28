@@ -1,5 +1,5 @@
 # Maybe
-mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Maybe.ps -o tests/Maybe.js && cat tests/Maybe.js Maybe.js | node
+mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Maybe.purs -o tests/Maybe.js && cat tests/Maybe.js Maybe.js | nodejs
 <<<
 >>>
 { ctor: 'Just', value: 'ab' }
@@ -7,7 +7,7 @@ mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Maybe.ps -o tests/Maybe.j
 >>>= 0
 
 # List
-mkdir -p tests &&  ../../dist/build/psc/psc ../passing/List.ps -o tests/List.js && cat tests/List.js List.js | node
+mkdir -p tests &&  ../../dist/build/psc/psc ../passing/List.purs -o tests/List.js && cat tests/List.js List.js | nodejs
 <<<
 >>>
 [ 1, 2 ]
@@ -15,7 +15,7 @@ mkdir -p tests &&  ../../dist/build/psc/psc ../passing/List.ps -o tests/List.js 
 >>>= 0
 
 # Foreach
-mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Foreach.ps -o tests/Foreach.js && cat tests/Foreach.js Foreach.js | node
+mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Foreach.purs -o tests/Foreach.js && cat tests/Foreach.js Foreach.js | nodejs
 <<<
 >>>
 15
