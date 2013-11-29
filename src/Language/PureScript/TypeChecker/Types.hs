@@ -325,11 +325,8 @@ infer' app@(App _ _) = do
   checkFunctionApplications ft argss ret
   return ret
 infer' (Var var@(Qualified mp name)) = do
-  env <- getEnv
-  modulePath <- checkModulePath `fmap` get
-  case M.lookup (qualify modulePath var) (names env) of
-    Nothing -> throwError $ show var ++ " is undefined"
-    Just (ty, _) -> replaceAllTypeSynonyms ty
+  ty <- lookupVariable var
+  replaceAllTypeSynonyms ty
 infer' (Block ss) = do
   ret <- fresh
   (allCodePathsReturn, _) <- checkBlock M.empty ret ss
@@ -613,13 +610,9 @@ check' app@(App _ _) ret = do
   ft <- infer f
   checkFunctionApplications ft argss ret
 check' v@(Var var@(Qualified mp name)) ty = do
-  env <- getEnv
-  modulePath <- checkModulePath <$> get
-  case M.lookup (qualify modulePath var) (names env) of
-    Nothing -> throwError $ show var ++ " is undefined"
-    Just (ty1, _) -> do
-      repl <- replaceAllTypeSynonyms ty1
-      repl `subsumes` ty
+  ty1 <- lookupVariable var
+  repl <- replaceAllTypeSynonyms ty1
+  repl `subsumes` ty
 check' (TypedValue val ty1) ty2 = do
   kind <- liftCheck $ kindOf ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star

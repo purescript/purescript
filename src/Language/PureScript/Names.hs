@@ -17,7 +17,7 @@
 module Language.PureScript.Names where
 
 import Data.Data
-import Data.List (intercalate)
+import Data.List (inits, intercalate)
 
 data Ident = Ident String | Op String deriving (Eq, Ord, Data, Typeable)
 
@@ -49,3 +49,7 @@ instance (Show a) => Show (Qualified a) where
 qualify :: ModulePath -> Qualified a -> (ModulePath, a)
 qualify mp (Qualified (ModulePath []) a) = (mp, a)
 qualify _ (Qualified mp a) = (mp, a)
+
+nameResolution :: ModulePath -> Qualified a -> [(ModulePath, a)]
+nameResolution (ModulePath mp) (Qualified (ModulePath []) a) = [ (ModulePath mp', a) | mp' <- reverse $ inits mp ]
+nameResolution _ (Qualified mp a) = [(mp, a)]

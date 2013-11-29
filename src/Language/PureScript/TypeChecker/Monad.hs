@@ -62,6 +62,15 @@ bindLocalVariables bindings action = do
   modulePath <- checkModulePath `fmap` get
   bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((modulePath, name), (ty, LocalVariable))) action
 
+lookupVariable :: (Functor m, MonadState CheckState m, MonadError String m) => Qualified Ident -> m Type
+lookupVariable var = do
+  env <- getEnv
+  modulePath <- checkModulePath <$> get
+  let tries = map (First . flip M.lookup (names env)) (nameResolution modulePath var)
+  case getFirst (mconcat tries) of
+    Nothing -> throwError $ show var ++ " is undefined"
+    Just (ty, _) -> return ty
+
 data AnyUnifiable where
   AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
 
