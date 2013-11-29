@@ -58,13 +58,14 @@ assertDoesNotCompile inputFile = do
 main :: IO ()
 main = do
   cd <- getCurrentDirectory
+  putStrLn $ cd
   let examples = cd ++ pathSeparator : "examples"
   let passing = examples ++ pathSeparator : "passing"
   passingTestCases <- getDirectoryContents passing
-  forM_ passingTestCases $ \inputFile -> when (".ps" `isSuffixOf` inputFile) $
+  forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
     assertCompiles (passing ++ pathSeparator : inputFile)
   let failing = examples ++ pathSeparator : "failing"
   failingTestCases <- getDirectoryContents failing
-  forM_ failingTestCases $ \inputFile -> when (".ps" `isSuffixOf` inputFile) $
+  forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
     assertDoesNotCompile (failing ++ pathSeparator : inputFile)
   exitSuccess

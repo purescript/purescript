@@ -34,7 +34,7 @@ import Control.Arrow ((***), first, second)
 
 import qualified Data.Map as M
 
-data NameKind = Value | Extern | Alias ModulePath Ident deriving Show
+data NameKind = Value | Extern | Alias ModulePath Ident | LocalVariable deriving Show
 
 data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
 
@@ -49,6 +49,19 @@ data Environment = Environment
 emptyEnvironment :: Environment
 emptyEnvironment = Environment M.empty M.empty M.empty M.empty M.empty
 
+bindNames :: (MonadState CheckState m) => M.Map (ModulePath, Ident) (Type, NameKind) -> m a -> m a
+bindNames newNames action = do
+  orig <-  get
+  modify $ \st -> st { checkEnv = (checkEnv st) { names = newNames `M.union` (names . checkEnv $ st) } }
+  a <- action
+  modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
+  return a
+
+bindLocalVariables :: (Functor m, MonadState CheckState m) => [(Ident, Type)] -> m a -> m a
+bindLocalVariables bindings action = do
+  modulePath <- checkModulePath `fmap` get
+  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((modulePath, name), (ty, LocalVariable))) action
+
 data AnyUnifiable where
   AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
 
@@ -60,13 +73,13 @@ data CheckState = CheckState { checkEnv :: Environment
 newtype Check a = Check { unCheck :: StateT CheckState (Either String) a }
   deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError String)
 
-getEnv :: Check Environment
-getEnv = fmap checkEnv get
+getEnv :: (Functor m, MonadState CheckState m) => m Environment
+getEnv = checkEnv <$> get
 
-putEnv :: Environment -> Check ()
+putEnv :: (MonadState CheckState m) => Environment -> m ()
 putEnv env = modify (\s -> s { checkEnv = env })
 
-modifyEnv :: (Environment -> Environment) -> Check ()
+modifyEnv :: (MonadState CheckState m) => (Environment -> Environment) -> m ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 runCheck :: Check a -> Either String (a, Environment)
@@ -98,12 +111,19 @@ instance Monoid Substitution where
 data SubstState = SubstState { substSubst :: Substitution
                              , substFutureEscapeChecks :: [AnyUnifiable] }
 
-newtype Subst m a = Subst { unSubst :: StateT SubstState m a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadTrans)
+newtype Subst a = Subst { unSubst :: StateT SubstState Check a }
+  deriving (Functor, Monad, Applicative, MonadPlus)
 
-deriving instance (MonadError String m) => MonadError String (Subst m)
+instance MonadState CheckState Subst where
+  get = Subst . lift $ get
+  put = Subst . lift . put
 
-runSubst :: (Unifiable a, Monad m) => Subst m a -> m (a, Substitution, [AnyUnifiable])
+deriving instance MonadError String Subst
+
+liftCheck :: Check a -> Subst a
+liftCheck = Subst . lift
+
+runSubst :: (Unifiable a) => Subst a -> Check (a, Substitution, [AnyUnifiable])
 runSubst subst = do
   (a, s) <- flip runStateT (SubstState mempty []) . unSubst $ subst
   return (apply (substSubst s) a, substSubst s, substFutureEscapeChecks s)
@@ -119,7 +139,7 @@ substituteOne u t = substituteWith $ \u1 ->
     u2 | u2 == u -> t
        | otherwise -> unknown u2
 
-replace :: (Unifiable t) => Unknown t -> t -> Subst Check ()
+replace :: (Unifiable t) => Unknown t -> t -> Subst ()
 replace u t' = do
   sub <- substSubst <$> Subst get
   let t = apply sub t'
@@ -132,25 +152,25 @@ replace u t' = do
 
 class (Typeable t, Data t, Show t) => Unifiable t where
   unknown :: Unknown t -> t
-  (~~) :: t -> t -> Subst Check ()
+  (~~) :: t -> t -> Subst ()
   isUnknown :: t -> Maybe (Unknown t)
   apply :: Substitution -> t -> t
   unknowns :: t -> [Int]
 
-occursCheck :: (Unifiable t) => Unknown s -> t -> Subst Check ()
+occursCheck :: (Unifiable t) => Unknown s -> t -> Subst ()
 occursCheck (Unknown u) t =
   case isUnknown t of
     Nothing -> guardWith "Occurs check fails" (u `notElem` unknowns t)
     _ -> return ()
 
-fresh' :: Subst Check Int
+fresh' :: Subst Int
 fresh' = do
-  n <- lift $ checkNextVar <$> get
-  lift . modify $ \s -> s { checkNextVar = succ (checkNextVar s) }
+  n <- checkNextVar <$> get
+  modify $ \s -> s { checkNextVar = succ (checkNextVar s) }
   return n
 
-fresh :: (Unifiable t) => Subst Check t
+fresh :: (Unifiable t) => Subst t
 fresh = unknown . Unknown <$> fresh'
 
-escapeCheckLater :: (Unifiable t) => t -> Subst Check ()
+escapeCheckLater :: (Unifiable t) => t -> Subst ()
 escapeCheckLater t = Subst . modify $ \s -> s { substFutureEscapeChecks = AnyUnifiable t : substFutureEscapeChecks s  }

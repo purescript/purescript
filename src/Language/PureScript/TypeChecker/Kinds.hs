@@ -78,10 +78,10 @@ starIfUnknown (KUnknown _) = Star
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
-inferAll :: Maybe (ProperName, Kind) -> M.Map String Kind -> [Type] -> Subst Check [Kind]
+inferAll :: Maybe (ProperName, Kind) -> M.Map String Kind -> [Type] -> Subst [Kind]
 inferAll name m = mapM (infer name m)
 
-infer :: Maybe (ProperName, Kind) -> M.Map String Kind -> Type -> Subst Check Kind
+infer :: Maybe (ProperName, Kind) -> M.Map String Kind -> Type -> Subst Kind
 infer name m (Array t) = do
   k <- infer name m t
   k ~~ Star
@@ -102,8 +102,8 @@ infer _ m (TypeVar v) =
     Nothing -> throwError $ "Unbound type variable " ++ v
 infer (Just (name, k)) m c@(TypeConstructor v@(Qualified (ModulePath []) pn)) | name == pn = return k
 infer name m (TypeConstructor v) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+  env <- liftCheck getEnv
+  modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath v) (types env) of
     Nothing -> throwError $ "Unknown type constructor '" ++ show v ++ "'"
     Just (kind, _) -> return kind
@@ -118,7 +118,7 @@ infer name m (ForAll ident ty) = do
   infer name (M.insert ident k m) ty
 infer _ m t = return Star
 
-inferRow :: Maybe (ProperName, Kind) -> M.Map String Kind -> Row -> Subst Check Kind
+inferRow :: Maybe (ProperName, Kind) -> M.Map String Kind -> Row -> Subst Kind
 inferRow _ m (RowVar v) = do
   case M.lookup v m of
     Just k -> return k

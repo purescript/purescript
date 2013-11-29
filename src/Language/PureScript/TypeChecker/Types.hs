@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 
 module Language.PureScript.TypeChecker.Types (
     typeOf
@@ -82,7 +82,7 @@ instance Unifiable Row where
         forM_ int (uncurry (~~))
         unifyRows sd1 r1' sd2 r2'
       where
-      unifyRows :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Subst Check ()
+      unifyRows :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Subst ()
       unifyRows [] (RUnknown u) sd r = replace u (rowFromList (sd, r))
       unifyRows sd r [] (RUnknown u) = replace u (rowFromList (sd, r))
       unifyRows ns@((name, ty):row) r others u@(RUnknown un) = do
@@ -102,7 +102,7 @@ instance Unifiable Row where
   unknowns (RCons _ ty r) = unknowns ty ++ unknowns r
   unknowns _ = []
 
-unifyTypes :: Type -> Type -> Subst Check ()
+unifyTypes :: Type -> Type -> Subst ()
 unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $ do
   unifyTypes' t1 t2
   where
@@ -134,7 +134,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     ret1 `unifyTypes` ret2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
-    modulePath <- checkModulePath `fmap` lift get
+    modulePath <- checkModulePath `fmap` get
     guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
   unifyTypes' (TypeApp t1 t2) (TypeApp t3 t4) = do
     t1 `unifyTypes` t3
@@ -153,17 +153,19 @@ typeOf name val = do
         Just ident | isFunction val ->
           case val of
             TypedValue val ty -> do
-              kind <- lift $ kindOf ty
+              kind <- liftCheck $ kindOf ty
               guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-              ty' <- lift $ replaceAllTypeSynonyms ty
-              check (M.singleton ident ty) val ty'
+              ty' <- replaceAllTypeSynonyms ty
+              modulePath <- checkModulePath <$> get
+              bindNames (M.singleton (modulePath, ident) (ty, LocalVariable)) $ check val ty'
               return ty'
             _ -> do
               me <- fresh
-              ty <- infer (M.singleton ident me) val
+              modulePath <- checkModulePath <$> get
+              ty <- bindNames (M.singleton (modulePath, ident) (me, LocalVariable)) $ infer val
               ty ~~ me
               return ty
-        _ -> infer M.empty val
+        _ -> infer val
   escapeCheck checks ty sub
   skolemEscapeCheck ty
   return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
@@ -225,17 +227,17 @@ replaceRowVars name r = everywhere (mkT replace)
   replace (RowVar v) | v == name = r
   replace t = t
 
-replaceAllVarsWithUnknowns :: Type -> Subst Check Type
+replaceAllVarsWithUnknowns :: Type -> Subst Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
-replaceVarWithUnknown :: String -> Type -> Subst Check Type
+replaceVarWithUnknown :: String -> Type -> Subst Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   ru <- fresh
   return $ replaceRowVars ident ru . replaceTypeVars ident tu $ ty
 
-replaceAllTypeSynonyms :: (D.Data d) => d -> Check d
+replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
   let syns = map (\((path, name), (args, _)) -> (Qualified path name, length args)) . M.toList $ typeSynonyms env
@@ -247,61 +249,62 @@ desaturateAllTypeSynonyms = everywhere (mkT replace)
   replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replace t = t
 
-expandAllTypeSynonyms :: Type -> Subst Check Type
+expandAllTypeSynonyms :: Type -> Subst Type
 expandAllTypeSynonyms (SaturatedTypeSynonym name args) = expandTypeSynonym name args >>= expandAllTypeSynonyms
 expandAllTypeSynonyms ty = return ty
 
-expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Check Type
+expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Type
 expandTypeSynonym name args = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+  env <- getEnv
+  modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath name) (typeSynonyms env) of
     Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
     Nothing -> error "Type synonym was not defined"
 
-ensureNoDuplicateProperties :: [(String, Value)] -> Check ()
+ensureNoDuplicateProperties :: (MonadError String m) => [(String, Value)] -> m ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
-infer :: M.Map Ident Type -> Value -> Subst Check Type
-infer m val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ do
-  ty <- infer' m val
+infer :: Value -> Subst Type
+infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ do
+  ty <- infer' val
   escapeCheckLater ty
   return ty
 
-infer' _ (NumericLiteral _) = return Number
-infer' _ (StringLiteral _) = return String
-infer' _ (BooleanLiteral _) = return Boolean
-infer' m (ArrayLiteral vals) = do
-  ts <- mapM (infer m) vals
+infer' :: Value -> Subst Type
+infer' (NumericLiteral _) = return Number
+infer' (StringLiteral _) = return String
+infer' (BooleanLiteral _) = return Boolean
+infer' (ArrayLiteral vals) = do
+  ts <- mapM (infer) vals
   arr <- fresh
   forM_ ts $ \t -> arr ~~ Array t
   return arr
-infer' m (Unary op val) = do
-  t <- infer m val
+infer' (Unary op val) = do
+  t <- infer val
   inferUnary op t
-infer' m (Binary op left right) = do
-  t1 <- infer m left
-  t2 <- infer m right
+infer' (Binary op left right) = do
+  t1 <- infer left
+  t2 <- infer right
   inferBinary op t1 t2
-infer' m (ObjectLiteral ps) = do
-  lift $ ensureNoDuplicateProperties ps
-  ts <- mapM (infer m . snd) ps
+infer' (ObjectLiteral ps) = do
+  ensureNoDuplicateProperties ps
+  ts <- mapM (infer . snd) ps
   let fields = zipWith (\(name, _) t -> (name, t)) ps ts
   return $ Object $ rowFromList (fields, REmpty)
-infer' m (ObjectUpdate o ps) = do
-  lift $ ensureNoDuplicateProperties ps
+infer' (ObjectUpdate o ps) = do
+  ensureNoDuplicateProperties ps
   row <- fresh
-  newTys <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer m . snd) ps
+  newTys <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
-  check m o $ Object $ rowFromList (oldTys, row)
+  check o $ Object $ rowFromList (oldTys, row)
   return $ Object $ rowFromList (newTys, row)
-infer' m (Indexer index val) = do
+infer' (Indexer index val) = do
   el <- fresh
-  check m index Number
-  check m val (Array el)
+  check index Number
+  check val (Array el)
   return el
-infer' m (Accessor prop val) = do
-  obj <- infer m val
+infer' (Accessor prop val) = do
+  obj <- infer val
   propTy <- inferProperty obj prop
   case propTy of
     Nothing -> do
@@ -310,61 +313,53 @@ infer' m (Accessor prop val) = do
       obj `subsumes` Object (RCons prop field rest)
       return field
     Just ty -> return ty
-infer' m (Abs args ret) = do
+infer' (Abs args ret) = do
   ts <- replicateM (length args) fresh
-  let m' = m `M.union` M.fromList (zip args ts)
-  body <- infer m' ret
-  return $ Function ts body
-infer' m app@(App _ _) = do
+  bindLocalVariables (zip args ts) $ do
+    body <- infer' ret
+    return $ Function ts body
+infer' app@(App _ _) = do
   let (f, argss) = unfoldApplication app
-  ft <- infer m f
+  ft <- infer f
   ret <- fresh
-  checkFunctionApplications m ft argss ret
+  checkFunctionApplications ft argss ret
   return ret
-infer' m (Var var@(Qualified mp name)) = do
-  case mp of
-    ModulePath [] ->
-      case M.lookup name m of
-        Just ty -> lift $ replaceAllTypeSynonyms ty
-        Nothing -> lookupGlobal
-    _ -> lookupGlobal
-  where
-  lookupGlobal = do
-    env <- lift getEnv
-    modulePath <- checkModulePath `fmap` lift get
-    case M.lookup (qualify modulePath var) (names env) of
-      Nothing -> throwError $ show var ++ " is undefined"
-      Just (ty, _) -> lift $ replaceAllTypeSynonyms ty
-infer' m (Block ss) = do
+infer' (Var var@(Qualified mp name)) = do
+  env <- getEnv
+  modulePath <- checkModulePath `fmap` get
+  case M.lookup (qualify modulePath var) (names env) of
+    Nothing -> throwError $ show var ++ " is undefined"
+    Just (ty, _) -> replaceAllTypeSynonyms ty
+infer' (Block ss) = do
   ret <- fresh
-  (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
+  (allCodePathsReturn, _) <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
   return ret
-infer' m (Constructor c) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+infer' (Constructor c) = do
+  env <- getEnv
+  modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just ty -> lift $ replaceAllTypeSynonyms ty
-infer' m (Case val binders) = do
-  t1 <- infer m val
+    Just ty -> replaceAllTypeSynonyms ty
+infer' (Case val binders) = do
+  t1 <- infer val
   ret <- fresh
-  checkBinders m t1 ret binders
+  checkBinders t1 ret binders
   return ret
-infer' m (IfThenElse cond th el) = do
-  check m cond Boolean
-  t2 <- infer m th
-  t3 <- infer m el
+infer' (IfThenElse cond th el) = do
+  check cond Boolean
+  t2 <- infer th
+  t3 <- infer el
   t2 ~~ t3
   return t2
-infer' m (TypedValue val ty) = do
-  kind <- lift $ kindOf ty
+infer' (TypedValue val ty) = do
+  kind <- liftCheck $ kindOf ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  ty' <- lift $ replaceAllTypeSynonyms ty
-  check m val ty'
+  ty' <- replaceAllTypeSynonyms ty
+  check val ty'
   return ty'
 
-inferProperty :: Type -> String -> Subst Check (Maybe Type)
+inferProperty :: Type -> String -> Subst (Maybe Type)
 inferProperty (Object row) prop = do
   let (props, _) = rowToList row
   return $ lookup prop props
@@ -376,19 +371,19 @@ inferProperty (ForAll ident ty) prop = do
   inferProperty replaced prop
 inferProperty _ prop = return Nothing
 
-inferUnary :: UnaryOperator -> Type -> Subst Check Type
+inferUnary :: UnaryOperator -> Type -> Subst Type
 inferUnary op val =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
     (valTy, resTy) -> do
       val ~~ valTy
       return resTy
 
-checkUnary :: M.Map Ident Type -> UnaryOperator -> Value -> Type -> Subst Check ()
-checkUnary m op val res =
+checkUnary :: UnaryOperator -> Value -> Type -> Subst ()
+checkUnary op val res =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
     (valTy, resTy) -> do
       res ~~ resTy
-      check m val valTy
+      check val valTy
 
 unaryOps :: [(UnaryOperator, (Type, Type))]
 unaryOps = [ (Negate, (Number, Number))
@@ -396,7 +391,7 @@ unaryOps = [ (Negate, (Number, Number))
            , (BitwiseNot, (Number, Number))
            ]
 
-inferBinary :: BinaryOperator -> Type -> Type -> Subst Check Type
+inferBinary :: BinaryOperator -> Type -> Type -> Subst Type
 inferBinary op left right | isEqualityTest op = do
   left ~~ right
   return Boolean
@@ -407,18 +402,18 @@ inferBinary op left right =
       right ~~ valTy
       return resTy
 
-checkBinary :: M.Map Ident Type -> BinaryOperator -> Value -> Value -> Type -> Subst Check ()
-checkBinary m op left right res | isEqualityTest op = do
+checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst ()
+checkBinary op left right res | isEqualityTest op = do
   res ~~ Boolean
-  t1 <- infer m left
-  t2 <- infer m right
+  t1 <- infer left
+  t2 <- infer right
   t1 ~~ t2
-checkBinary m op left right res =
+checkBinary op left right res =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
       res ~~ resTy
-      check m left valTy
-      check m right valTy
+      check left valTy
+      check right valTy
 
 isEqualityTest :: BinaryOperator -> Bool
 isEqualityTest EqualTo = True
@@ -446,23 +441,23 @@ binaryOps = [ (Add, (Number, Number))
             , (GreaterThanOrEqualTo, (Number, Boolean))
             ]
 
-inferBinder :: Type -> Binder -> Subst Check (M.Map Ident Type)
+inferBinder :: Type -> Binder -> Subst (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
 inferBinder val (StringBinder _) = val ~~ String >> return M.empty
 inferBinder val (NumberBinder _) = val ~~ Number >> return M.empty
 inferBinder val (BooleanBinder _) = val ~~ Boolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (NullaryBinder ctor) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+  env <- getEnv
+  modulePath <- checkModulePath <$> get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just ty -> do
       ty `subsumes` val
       return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (UnaryBinder ctor binder) = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+  env <- getEnv
+  modulePath <- checkModulePath <$> get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just ty -> do
       Function [obj] ret <- replaceAllVarsWithUnknowns ty
@@ -476,7 +471,7 @@ inferBinder val (ObjectBinder props) = do
   val ~~ Object row
   return m1
   where
-  inferRowProperties :: Row -> Row -> [(String, Binder)] -> Subst Check (M.Map Ident Type)
+  inferRowProperties :: Row -> Row -> [(String, Binder)] -> Subst (M.Map Ident Type)
   inferRowProperties nrow row [] = nrow ~~ row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- fresh
@@ -496,97 +491,95 @@ inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
 
-inferGuardedBinder :: M.Map Ident Type -> Type -> Binder -> Subst Check (M.Map Ident Type)
-inferGuardedBinder m val (GuardedBinder cond binder) = do
+inferGuardedBinder :: Type -> Binder -> Subst (M.Map Ident Type)
+inferGuardedBinder val (GuardedBinder cond binder) = do
   m1 <- inferBinder val binder
-  check (m1 `M.union` m) cond Boolean
+  bindLocalVariables (M.toList m1) $ check cond Boolean
   return m1
-inferGuardedBinder m val b = inferBinder val b
+inferGuardedBinder val b = inferBinder val b
 
-checkBinders :: M.Map Ident Type -> Type -> Type -> [(Binder, Value)] -> Subst Check ()
-checkBinders _ _ _ [] = return ()
-checkBinders m nval ret ((binder, val):bs) = do
-  m1 <- inferGuardedBinder m nval binder
-  check (m1 `M.union` m) val ret
-  checkBinders m nval ret bs
+checkBinders :: Type -> Type -> [(Binder, Value)] -> Subst ()
+checkBinders _ _ [] = return ()
+checkBinders nval ret ((binder, val):bs) = do
+  m1 <- inferGuardedBinder nval binder
+  bindLocalVariables (M.toList m1) $ check val ret
+  checkBinders nval ret bs
 
-assignVariable :: Ident -> M.Map Ident Type -> Subst Check ()
-assignVariable name m =
-  case M.lookup name m of
-    Nothing -> return ()
-    Just _ -> throwError $ "Variable with name " ++ show name ++ " already exists."
+assignVariable :: Ident -> Subst ()
+assignVariable name = do
+  env <- checkEnv <$> get
+  modulePath <- checkModulePath <$> get
+  case M.lookup (modulePath, name) (names env) of
+    Just (_, LocalVariable) -> throwError $ "Variable with name " ++ show name ++ " already exists."
+    _ -> return ()
 
-checkStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> Statement -> Subst Check (Bool, M.Map Ident Type)
-checkStatement m mass ret (VariableIntroduction name val) = do
-  assignVariable name (m `M.union` mass)
-  t <- infer m val
+checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type)
+checkStatement mass ret (VariableIntroduction name val) = do
+  assignVariable name
+  t <- infer val
   return (False, M.insert name t mass)
-checkStatement m mass ret (Assignment ident val) = do
-  t <- infer m val
+checkStatement mass ret (Assignment ident val) = do
+  t <- infer val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
     Just ty -> do t ~~ ty
                   return (False, mass)
-checkStatement m mass ret (While val inner) = do
-  check m val Boolean
-  (allCodePathsReturn, _) <- checkBlock m mass ret inner
+checkStatement mass ret (While val inner) = do
+  check val Boolean
+  (allCodePathsReturn, _) <- checkBlock mass ret inner
   return (allCodePathsReturn, mass)
-checkStatement m mass ret (If ifst) = do
-  allCodePathsReturn <- checkIfStatement m mass ret ifst
+checkStatement mass ret (If ifst) = do
+  allCodePathsReturn <- checkIfStatement mass ret ifst
   return (allCodePathsReturn, mass)
-checkStatement m mass ret (For ident start end inner) = do
-  assignVariable ident (m `M.union` mass)
-  check (m `M.union` mass) start Number
-  check (m `M.union` mass) end Number
-  let mass1 = M.insert ident Number mass
-  (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
+checkStatement mass ret (For ident start end inner) = do
+  assignVariable ident
+  check start Number
+  check end Number
+  (allCodePathsReturn, _) <- bindLocalVariables [(ident, Number)] $ checkBlock mass ret inner
   return (allCodePathsReturn, mass)
-checkStatement m mass ret (ForEach ident vals inner) = do
-  assignVariable ident (m `M.union` mass)
+checkStatement mass ret (ForEach ident vals inner) = do
+  assignVariable ident
   val <- fresh
-  check (m `M.union` mass) vals (Array val)
-  let mass1 = M.insert ident val mass
-  (allCodePathsReturn, _) <- checkBlock (m `M.union` mass1) mass1 ret inner
+  check vals (Array val)
+  (allCodePathsReturn, _) <- bindLocalVariables [(ident, val)] $ checkBlock mass ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
   return (False, mass)
-checkStatement m mass ret (Return val) = do
-  check (m `M.union` mass) val ret
+checkStatement mass ret (Return val) = do
+  check val ret
   return (True, mass)
 
-checkIfStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> IfStatement -> Subst Check Bool
-checkIfStatement m mass ret (IfStatement val thens Nothing) = do
-  check m val Boolean
-  _ <- checkBlock m mass ret thens
+checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> Subst Bool
+checkIfStatement mass ret (IfStatement val thens Nothing) = do
+  check val Boolean
+  _ <- checkBlock mass ret thens
   return False
-checkIfStatement m mass ret (IfStatement val thens (Just elses)) = do
-  check m val Boolean
-  (allCodePathsReturn1, _) <- checkBlock m mass ret thens
-  allCodePathsReturn2 <- checkElseStatement m mass ret elses
+checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
+  check val Boolean
+  (allCodePathsReturn1, _) <- checkBlock mass ret thens
+  allCodePathsReturn2 <- checkElseStatement mass ret elses
   return $ allCodePathsReturn1 && allCodePathsReturn2
 
-checkElseStatement :: M.Map Ident Type -> M.Map Ident Type -> Type -> ElseStatement -> Subst Check Bool
-checkElseStatement m mass ret (Else elses) = fst <$> checkBlock m mass ret elses
-checkElseStatement m mass ret (ElseIf ifst) = checkIfStatement m mass ret ifst
+checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> Subst Bool
+checkElseStatement mass ret (Else elses) = fst <$> checkBlock mass ret elses
+checkElseStatement mass ret (ElseIf ifst) = checkIfStatement mass ret ifst
 
-checkBlock :: M.Map Ident Type -> M.Map Ident Type -> Type -> [Statement] -> Subst Check (Bool, M.Map Ident Type)
-checkBlock _ mass _ [] = return (False, mass)
-checkBlock m mass ret (s:ss) = do
-  (b1, mass1) <- checkStatement (m `M.union` mass) mass ret s
-  case (b1, ss) of
+checkBlock :: M.Map Ident Type -> Type -> [Statement] -> Subst (Bool, M.Map Ident Type)
+checkBlock mass _ [] = return (False, mass)
+checkBlock mass ret (s:ss) = do
+  (b1, mass1) <- checkStatement mass ret s
+  bindLocalVariables (M.toList mass1) $ case (b1, ss) of
     (True, []) -> return (True, mass1)
     (True, _) -> throwError "Unreachable code"
-    (False, ss) -> do
-      (b2, mass2) <- checkBlock m mass1 ret ss
-      return (b2, mass2)
+    (False, ss) -> checkBlock mass1 ret ss
 
-skolemize :: String -> Type -> Subst Check Type
+skolemize :: String -> Type -> Subst Type
 skolemize ident ty = do
   tsk <- Skolem <$> fresh'
   rsk <- RSkolem <$> fresh'
   return $ replaceRowVars ident rsk $ replaceTypeVars ident tsk ty
 
-check :: M.Map Ident Type -> Value -> Type -> Subst Check ()
-check m val ty = rethrow errorMessage $ check' m val ty
+check :: Value -> Type -> Subst ()
+check val ty = rethrow errorMessage $ check' val ty
   where
   errorMessage msg =
     "Error checking type of term " ++
@@ -596,92 +589,81 @@ check m val ty = rethrow errorMessage $ check' m val ty
     ":\n" ++
     msg
 
-check' :: M.Map Ident Type -> Value -> Type -> Subst Check ()
-check' m val (ForAll idents ty) = do
+check' :: Value -> Type -> Subst ()
+check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
-  check m val sk
-check' m val u@(TUnknown _) = do
-  ty <- infer m val
+  check val sk
+check' val u@(TUnknown _) = do
+  ty <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ~~ u
-check' m (NumericLiteral _) Number = return ()
-check' m (StringLiteral _) String = return ()
-check' m (BooleanLiteral _) Boolean = return ()
-check' m (Unary op val) ty = checkUnary m op val ty
-check' m (Binary op left right) ty = checkBinary m op left right ty
-check' m (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check m val ty)
-check' m (Indexer index vals) ty = check m index Number >> check m vals (Array ty)
-check' m (Abs args ret) (Function argTys retTy) = do
+check' (NumericLiteral _) Number = return ()
+check' (StringLiteral _) String = return ()
+check' (BooleanLiteral _) Boolean = return ()
+check' (Unary op val) ty = checkUnary op val ty
+check' (Binary op left right) ty = checkBinary op left right ty
+check' (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check val ty)
+check' (Indexer index vals) ty = check index Number >> check vals (Array ty)
+check' (Abs args ret) (Function argTys retTy) = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
-  let bindings = M.fromList (zip args argTys)
-  check (bindings `M.union` m) ret retTy
-check' m app@(App _ _) ret = do
+  bindLocalVariables (zip args argTys) $ check ret retTy
+check' app@(App _ _) ret = do
   let (f, argss) = unfoldApplication app
-  ft <- infer m f
-  checkFunctionApplications m ft argss ret
-check' m v@(Var var@(Qualified mp name)) ty = do
-  case mp of
-    ModulePath [] ->
-      case M.lookup name m of
-        Just ty1 -> do
-          repl <- lift $ replaceAllTypeSynonyms ty1
-          repl `subsumes` ty
-        Nothing -> lookupGlobal
-    _ -> lookupGlobal
-  where
-  lookupGlobal = do
-    env <- lift getEnv
-    modulePath <- checkModulePath `fmap` lift get
-    case M.lookup (qualify modulePath var) (names env) of
-      Nothing -> throwError $ show var ++ " is undefined"
-      Just (ty1, _) -> do
-        repl <- lift $ replaceAllTypeSynonyms ty1
-        repl `subsumes` ty
-check' m (TypedValue val ty1) ty2 = do
-  kind <- lift $ kindOf ty1
+  ft <- infer f
+  checkFunctionApplications ft argss ret
+check' v@(Var var@(Qualified mp name)) ty = do
+  env <- getEnv
+  modulePath <- checkModulePath <$> get
+  case M.lookup (qualify modulePath var) (names env) of
+    Nothing -> throwError $ show var ++ " is undefined"
+    Just (ty1, _) -> do
+      repl <- replaceAllTypeSynonyms ty1
+      repl `subsumes` ty
+check' (TypedValue val ty1) ty2 = do
+  kind <- liftCheck $ kindOf ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
-  check m val ty1
-check' m (Case val binders) ret = do
-  t1 <- infer m val
-  checkBinders m t1 ret binders
-check' m (IfThenElse cond th el) ty = do
-  check m cond Boolean
-  check m th ty
-  check m el ty
-check' m (ObjectLiteral ps) (Object row) = do
-  lift $ ensureNoDuplicateProperties ps
-  checkProperties m ps row False
-check' m (ObjectUpdate obj ps) (Object row) = do
-  lift $ ensureNoDuplicateProperties ps
+  check val ty1
+check' (Case val binders) ret = do
+  t1 <- infer val
+  checkBinders t1 ret binders
+check' (IfThenElse cond th el) ty = do
+  check cond Boolean
+  check th ty
+  check el ty
+check' (ObjectLiteral ps) (Object row) = do
+  ensureNoDuplicateProperties ps
+  checkProperties ps row False
+check' (ObjectUpdate obj ps) (Object row) = do
+  ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh
   let (propsToCheck, rest) = rowToList row
       propsToRemove = map fst ps
       remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
-  check m obj (Object (rowFromList (us ++ remainingProps, rest)))
-  checkProperties m ps row True
-check' m (Accessor prop val) ty = do
+  check obj (Object (rowFromList (us ++ remainingProps, rest)))
+  checkProperties ps row True
+check' (Accessor prop val) ty = do
   rest <- fresh
-  check m val (Object (RCons prop ty rest))
-check' m (Block ss) ret = do
-  (allCodePathsReturn, _) <- checkBlock m M.empty ret ss
+  check val (Object (RCons prop ty rest))
+check' (Block ss) ret = do
+  (allCodePathsReturn, _) <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-check' m (Constructor c) ty = do
-  env <- lift getEnv
-  modulePath <- checkModulePath `fmap` lift get
+check' (Constructor c) ty = do
+  env <- getEnv
+  modulePath <- checkModulePath <$> get
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty1 -> do
-      repl <- lift $ replaceAllTypeSynonyms ty1
+      repl <- replaceAllTypeSynonyms ty1
       repl `subsumes` ty
-check' m val (SaturatedTypeSynonym name args) = do
+check' val (SaturatedTypeSynonym name args) = do
   ty <- expandTypeSynonym name args
-  check m val ty
-check' _ val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
+  check val ty
+check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
-checkProperties :: M.Map Ident Type -> [(String, Value)] -> Row -> Bool -> Subst Check ()
-checkProperties m ps row lax = let (ts, r') = rowToList row in go ps ts r' where
+checkProperties :: [(String, Value)] -> Row -> Bool -> Subst ()
+checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return ()
   go [] [] u@(RUnknown _) = u ~~ REmpty
   go [] [] (RSkolem _) | lax = return ()
@@ -689,19 +671,19 @@ checkProperties m ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
   go ((p,v):ps) [] u@(RUnknown _) = do
-    ty <- infer m v
+    ty <- infer v
     rest <- fresh
     u ~~ RCons p ty rest
     go ps [] rest
   go ((p,v):ps) ts r =
     case lookup p ts of
       Nothing -> do
-        ty <- infer m v
+        ty <- infer v
         rest <- fresh
         r ~~ RCons p ty rest
         go ps ts rest
       Just ty -> do
-        check m v ty
+        check v ty
         go ps (delete (p, ty) ts) r
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
@@ -711,16 +693,16 @@ unfoldApplication = go []
   go argss (App f args) = go (args:argss) f
   go argss f = (f, argss)
 
-checkFunctionApplications :: M.Map Ident Type -> Type -> [[Value]] -> Type -> Subst Check ()
-checkFunctionApplications _ _ [] _ = error "Nullary function application"
-checkFunctionApplications m fnTy [args] ret = checkFunctionApplication m fnTy args ret
-checkFunctionApplications m fnTy (args:argss) ret = do
-  argTys <- mapM (infer m) args
-  f <- inferFunctionApplication m fnTy argTys
-  checkFunctionApplications m f argss ret
+checkFunctionApplications :: Type -> [[Value]] -> Type -> Subst ()
+checkFunctionApplications _ [] _ = error "Nullary function application"
+checkFunctionApplications fnTy [args] ret = checkFunctionApplication fnTy args ret
+checkFunctionApplications fnTy (args:argss) ret = do
+  argTys <- mapM (infer) args
+  f <- inferFunctionApplication fnTy argTys
+  checkFunctionApplications f argss ret
 
-checkFunctionApplication :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
-checkFunctionApplication m fnTy args ret = rethrow errorMessage $ checkFunctionApplication' m fnTy args ret
+checkFunctionApplication :: Type -> [Value] -> Type -> Subst ()
+checkFunctionApplication fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fnTy args ret
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
@@ -728,46 +710,46 @@ checkFunctionApplication m fnTy args ret = rethrow errorMessage $ checkFunctionA
     ++ ", expecting value of type "
     ++ prettyPrintType ret ++ ":\n" ++ msg
 
-inferFunctionApplication :: M.Map Ident Type -> Type -> [Type] -> Subst Check Type
-inferFunctionApplication m (Function argTys retTy) args = do
+inferFunctionApplication :: Type -> [Type] -> Subst Type
+inferFunctionApplication (Function argTys retTy) args = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   zipWithM subsumes args argTys
   return retTy
-inferFunctionApplication m (ForAll ident ty) args = do
+inferFunctionApplication (ForAll ident ty) args = do
   replaced <- replaceVarWithUnknown ident ty
-  inferFunctionApplication m replaced args
-inferFunctionApplication m u@(TUnknown _) args = do
+  inferFunctionApplication replaced args
+inferFunctionApplication u@(TUnknown _) args = do
   ret <- fresh
   args' <- mapM replaceAllVarsWithUnknowns args
   u ~~ Function args' ret
   return ret
-inferFunctionApplication m (SaturatedTypeSynonym name tyArgs) args  = do
+inferFunctionApplication (SaturatedTypeSynonym name tyArgs) args  = do
   ty <- expandTypeSynonym name tyArgs
-  inferFunctionApplication m ty args
-inferFunctionApplication _ fnTy args = throwError $ "Cannot apply function of type "
+  inferFunctionApplication ty args
+inferFunctionApplication fnTy args = throwError $ "Cannot apply function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) of type(s) " ++ intercalate ", " (map prettyPrintType args)
 
-checkFunctionApplication' :: M.Map Ident Type -> Type -> [Value] -> Type -> Subst Check ()
-checkFunctionApplication' m (Function argTys retTy) args ret = do
+checkFunctionApplication' :: Type -> [Value] -> Type -> Subst ()
+checkFunctionApplication' (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
-  zipWithM (check m) args argTys
+  zipWithM (check) args argTys
   retTy `subsumes` ret
-checkFunctionApplication' m (ForAll ident ty) args ret = do
+checkFunctionApplication' (ForAll ident ty) args ret = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication m replaced args ret
-checkFunctionApplication' m u@(TUnknown _) args ret = do
-  tyArgs <- mapM (\arg -> infer m arg >>= replaceAllVarsWithUnknowns) args
+  checkFunctionApplication replaced args ret
+checkFunctionApplication' u@(TUnknown _) args ret = do
+  tyArgs <- mapM (\arg -> infer arg >>= replaceAllVarsWithUnknowns) args
   u ~~ Function tyArgs ret
-checkFunctionApplication' m (SaturatedTypeSynonym name tyArgs) args ret = do
+checkFunctionApplication' (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
-  checkFunctionApplication' m ty args ret
-checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
+  checkFunctionApplication' ty args ret
+checkFunctionApplication' fnTy args ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
   ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
 
-subsumes :: Type -> Type -> Subst Check ()
+subsumes :: Type -> Type -> Subst ()
 subsumes (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   replaced `subsumes` ty2
