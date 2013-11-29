@@ -34,13 +34,14 @@ import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
 import Language.PureScript.CodeGen.JS.AST as AST
+import Language.PureScript.TypeChecker.Monad (NameKind(..))
 
 declToJs :: Maybe Ident -> ModulePath -> Declaration -> Environment -> Maybe [JS]
-declToJs mod mp (ValueDeclaration ident (Abs args ret)) _ =
-  Just $ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp ret)]) :
+declToJs mod mp (ValueDeclaration ident (Abs args ret)) e =
+  Just $ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp e ret)]) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
-declToJs mod mp (ValueDeclaration ident val) _ =
-  Just $ JSVariableIntroduction ident (Just (valueToJs mp val)) :
+declToJs mod mp (ValueDeclaration ident val) e =
+  Just $ JSVariableIntroduction ident (Just (valueToJs mp e val)) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) mod
 declToJs mod _ (ExternMemberDeclaration member ident _) _ =
   Just $ JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))]) :
@@ -63,37 +64,32 @@ declToJs mod mp (ModuleDeclaration pn@(ProperName name) decls) env =
                  [JSAssignment (JSAssignVariable (Ident name))
                                (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]] ++
          maybe [] (return . setProperty name (JSVar (Ident name))) mod
-declToJs mod omp (ImportDeclaration mp idents) env =
-  Just $ case idents of
-    Nothing ->
-      let idents = map snd  . filter ((== mp) . fst) . M.keys $ names env
-      in map mkLocal idents
-    Just idents -> map mkLocal idents
- where mkLocal ident = JSVariableIntroduction ident (Just (qualifiedToJS identToJs (Qualified mp ident)))
 declToJs _ _ _ _ = Nothing
 
 setProperty :: String -> JS -> Ident -> JS
 setProperty prop val mod = JSAssignment (JSAssignProperty prop (JSAssignVariable mod)) val
 
-valueToJs :: ModulePath -> Value -> JS
-valueToJs _ (NumericLiteral n) = JSNumericLiteral n
-valueToJs _ (StringLiteral s) = JSStringLiteral s
-valueToJs _ (BooleanLiteral b) = JSBooleanLiteral b
-valueToJs m (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs m) xs)
-valueToJs m (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs m)) ps)
-valueToJs m (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs m o, JSObjectLiteral (map (second (valueToJs m)) ps)]
-valueToJs m (Constructor name) = qualifiedToJS runProperName name
-valueToJs m (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs m) sts))) []
-valueToJs m (Case value binders) = runGen (bindersToJs m binders (valueToJs m value))
-valueToJs m (IfThenElse cond th el) = JSConditional (valueToJs m cond) (valueToJs m th) (valueToJs m el)
-valueToJs m (Accessor prop val) = JSAccessor prop (valueToJs m val)
-valueToJs m (Indexer index val) = JSIndexer (valueToJs m index) (valueToJs m val)
-valueToJs m (App val args) = JSApp (valueToJs m val) (map (valueToJs m) args)
-valueToJs m (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs m val)])
-valueToJs m (Unary op val) = JSUnary op (valueToJs m val)
-valueToJs m (Binary op v1 v2) = JSBinary op (valueToJs m v1) (valueToJs m v2)
-valueToJs m (Var ident) = qualifiedToJS identToJs ident
-valueToJs m (TypedValue val _) = valueToJs m val
+valueToJs :: ModulePath -> Environment -> Value -> JS
+valueToJs _ _ (NumericLiteral n) = JSNumericLiteral n
+valueToJs _ _ (StringLiteral s) = JSStringLiteral s
+valueToJs _ _ (BooleanLiteral b) = JSBooleanLiteral b
+valueToJs m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs m e) xs)
+valueToJs m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs m e)) ps)
+valueToJs m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs m e o, JSObjectLiteral (map (second (valueToJs m e)) ps)]
+valueToJs m e (Constructor name) = qualifiedToJS runProperName name
+valueToJs m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs m e) sts))) []
+valueToJs m e (Case value binders) = runGen (bindersToJs m e binders (valueToJs m e value))
+valueToJs m e (IfThenElse cond th el) = JSConditional (valueToJs m e cond) (valueToJs m e th) (valueToJs m e el)
+valueToJs m e (Accessor prop val) = JSAccessor prop (valueToJs m e val)
+valueToJs m e (Indexer index val) = JSIndexer (valueToJs m e index) (valueToJs m e val)
+valueToJs m e (App val args) = JSApp (valueToJs m e val) (map (valueToJs m e) args)
+valueToJs m e (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs m e val)])
+valueToJs m e (Unary op val) = JSUnary op (valueToJs m e val)
+valueToJs m e (Binary op v1 v2) = JSBinary op (valueToJs m e v1) (valueToJs m e v2)
+valueToJs m e (Var ident) = case M.lookup (qualify m ident) (names e) of
+  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified aliasModule aliasIdent)
+  _ -> qualifiedToJS identToJs ident
+valueToJs m e (TypedValue val _) = valueToJs m e val
 
 qualifiedToJS :: (a -> String) -> Qualified a -> JS
 qualifiedToJS f (Qualified (ModulePath parts) a) =
@@ -101,41 +97,41 @@ qualifiedToJS f (Qualified (ModulePath parts) a) =
  where delimited [part]       = JSVar (Ident (part))
        delimited (part:parts) = JSAccessor part (delimited parts)
 
-bindersToJs :: ModulePath -> [(Binder, Value)] -> JS -> Gen JS
-bindersToJs m binders val = do
+bindersToJs :: ModulePath -> Environment -> [(Binder, Value)] -> JS -> Gen JS
+bindersToJs m e binders val = do
   valName <- fresh
-  jss <- forM binders $ \(binder, result) -> binderToJs m valName [JSReturn (valueToJs m result)] binder
+  jss <- forM binders $ \(binder, result) -> binderToJs m e valName [JSReturn (valueToJs m e result)] binder
   return $ JSApp (JSFunction Nothing [Ident valName] (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  [val]
 
-binderToJs :: ModulePath -> String -> [JS] -> Binder -> Gen [JS]
-binderToJs _ varName done NullBinder = return done
-binderToJs _ varName done (StringBinder str) =
+binderToJs :: ModulePath -> Environment -> String -> [JS] -> Binder -> Gen [JS]
+binderToJs _ _ varName done NullBinder = return done
+binderToJs _ _ varName done (StringBinder str) =
   return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSStringLiteral str)) (JSBlock done) Nothing]
-binderToJs _ varName done (NumberBinder num) =
+binderToJs _ _ varName done (NumberBinder num) =
   return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSNumericLiteral num)) (JSBlock done) Nothing]
-binderToJs _ varName done (BooleanBinder True) =
+binderToJs _ _ varName done (BooleanBinder True) =
   return [JSIfElse (JSVar (Ident varName)) (JSBlock done) Nothing]
-binderToJs _ varName done (BooleanBinder False) =
+binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar (Ident varName))) (JSBlock done) Nothing]
-binderToJs _ varName done (VarBinder ident) =
+binderToJs _ e varName done (VarBinder ident) =
   return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : done)
-binderToJs m varName done (NullaryBinder ctor) =
+binderToJs m e varName done (NullaryBinder ctor) =
   return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral (show (uncurry Qualified $ qualify m ctor)))) (JSBlock done) Nothing]
-binderToJs m varName done (UnaryBinder ctor b) = do
+binderToJs m e varName done (UnaryBinder ctor b) = do
   value <- fresh
-  js <- binderToJs m value done b
+  js <- binderToJs m e value done b
   return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral (show (uncurry Qualified $ qualify m ctor)))) (JSBlock (JSVariableIntroduction (Ident value) (Just (JSAccessor "value" (JSVar (Ident varName)))) : js)) Nothing]
-binderToJs m varName done (ObjectBinder bs) = go done bs
+binderToJs m e varName done (ObjectBinder bs) = go done bs
   where
   go :: [JS] -> [(String, Binder)] -> Gen [JS]
   go done [] = return done
   go done ((prop, binder):bs) = do
     propVar <- fresh
     done' <- go done bs
-    js <- binderToJs m propVar done' binder
+    js <- binderToJs m e propVar done' binder
     return (JSVariableIntroduction (Ident propVar) (Just (JSAccessor prop (JSVar (Ident varName)))) : js)
-binderToJs m varName done (ArrayBinder bs rest) = do
+binderToJs m e varName done (ArrayBinder bs rest) = do
   js <- go done rest 0 bs
   return [JSIfElse (JSBinary cmp (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
   where
@@ -145,31 +141,31 @@ binderToJs m varName done (ArrayBinder bs rest) = do
   go done Nothing _ [] = return done
   go done (Just binder) index [] = do
     restVar <- fresh
-    js <- binderToJs m restVar done binder
+    js <- binderToJs m e restVar done binder
     return (JSVariableIntroduction (Ident restVar) (Just (JSApp (JSAccessor "slice" (JSVar (Ident varName))) [JSNumericLiteral (Left index)])) : js)
   go done rest index (binder:bs) = do
     elVar <- fresh
     done' <- go done rest (index + 1) bs
-    js <- binderToJs m elVar done' binder
+    js <- binderToJs m e elVar done' binder
     return (JSVariableIntroduction (Ident elVar) (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar (Ident varName)))) : js)
-binderToJs m varName done (NamedBinder ident binder) = do
-  js <- binderToJs m varName done binder
+binderToJs m e varName done (NamedBinder ident binder) = do
+  js <- binderToJs m e varName done binder
   return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : js)
-binderToJs m varName done (GuardedBinder cond binder) = binderToJs m varName done' binder
+binderToJs m e varName done (GuardedBinder cond binder) = binderToJs m e varName done' binder
   where
-  done' = [JSIfElse (valueToJs m cond) (JSBlock done) Nothing]
+  done' = [JSIfElse (valueToJs m e cond) (JSBlock done) Nothing]
 
-statementToJs :: ModulePath -> Statement -> JS
-statementToJs m (VariableIntroduction ident value) = JSVariableIntroduction ident (Just (valueToJs m value))
-statementToJs m (Assignment target value) = JSAssignment (JSAssignVariable target) (valueToJs m value)
-statementToJs m (While cond sts) = JSWhile (valueToJs m cond) (JSBlock (map (statementToJs m) sts))
-statementToJs m (For ident start end sts) = JSFor ident (valueToJs m start) (valueToJs m end) (JSBlock (map (statementToJs m) sts))
-statementToJs m (ForEach ident arr sts) = JSApp (JSAccessor "forEach" (valueToJs m arr)) [JSFunction Nothing [ident] (JSBlock (map (statementToJs m) sts))]
-statementToJs m (If ifst) = ifToJs ifst
+statementToJs :: ModulePath -> Environment -> Statement -> JS
+statementToJs m e (VariableIntroduction ident value) = JSVariableIntroduction ident (Just (valueToJs m e value))
+statementToJs m e (Assignment target value) = JSAssignment (JSAssignVariable target) (valueToJs m e value)
+statementToJs m e (While cond sts) = JSWhile (valueToJs m e cond) (JSBlock (map (statementToJs m e) sts))
+statementToJs m e (For ident start end sts) = JSFor ident (valueToJs m e start) (valueToJs m e end) (JSBlock (map (statementToJs m e) sts))
+statementToJs m e (ForEach ident arr sts) = JSApp (JSAccessor "forEach" (valueToJs m e arr)) [JSFunction Nothing [ident] (JSBlock (map (statementToJs m e) sts))]
+statementToJs m e (If ifst) = ifToJs ifst
   where
   ifToJs :: IfStatement -> JS
-  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs m cond) (JSBlock (map (statementToJs m) thens)) (fmap elseToJs elses)
+  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs m e cond) (JSBlock (map (statementToJs m e) thens)) (fmap elseToJs elses)
   elseToJs :: ElseStatement -> JS
-  elseToJs (Else sts) = JSBlock (map (statementToJs m) sts)
+  elseToJs (Else sts) = JSBlock (map (statementToJs m e) sts)
   elseToJs (ElseIf ifst) = ifToJs ifst
-statementToJs m (Return value) = JSReturn (valueToJs m value)
+statementToJs m e (Return value) = JSReturn (valueToJs m e value)
