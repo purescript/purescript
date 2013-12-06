@@ -46,7 +46,8 @@ data BinaryOperator
   | ShiftLeft
   | ShiftRight
   | ZeroFillShiftRight
-  | Concat deriving (Show, Eq, Data, Typeable)
+  | Concat
+  | Cons deriving (Show, Eq, Data, Typeable)
 
 data Value
   = NumericLiteral (Either Integer Double)

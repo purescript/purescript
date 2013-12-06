@@ -133,6 +133,7 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
                   , [ binary    Divide               "/" ]
                   , [ binary    Modulus              "%" ]
                   , [ binary    Concat               "++" ]
+                  , [ binary    Cons                 ":" ]
                   , [ binary    Add                  "+" ]
                   , [ binary    Subtract             "-" ]
                   , [ binary    ShiftLeft            "<<" ]

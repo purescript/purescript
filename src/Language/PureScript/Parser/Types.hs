@@ -24,7 +24,6 @@ import Language.PureScript.Parser.Common
 import Control.Applicative
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
-import Control.Arrow (Arrow(..))
 import Control.Monad (unless)
 
 parseNumber :: P.Parsec String ParseState Type

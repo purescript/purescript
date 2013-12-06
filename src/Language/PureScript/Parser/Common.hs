@@ -16,14 +16,11 @@
 
 module Language.PureScript.Parser.Common where
 
-import Data.Char (isSpace)
+import Data.Functor.Identity
 import Control.Applicative
 import Control.Monad
-import Control.Monad.State
 import Language.PureScript.Parser.State
-import qualified Data.Map as M
 import qualified Text.Parsec as P
-import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Token as PT
 
 import Language.PureScript.Names
@@ -77,7 +74,7 @@ reservedNames = [ "case"
 
 builtInOperators :: [String]
 builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
+                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!", ":" ]
 
 reservedOpNames :: [String]
 reservedOpNames = builtInOperators ++ [ "->" ]
@@ -92,11 +89,12 @@ identLetter :: P.Parsec String u Char
 identLetter = P.alphaNum <|> P.oneOf "_'"
 
 opStart :: P.Parsec String u Char
-opStart = P.oneOf "!#$%&*+/<=>?@^|~"
+opStart = P.oneOf "!#$%&*+/<=>?@^|~:"
 
 opLetter :: P.Parsec String u Char
 opLetter = P.oneOf ":#$%&*+./<=>?@^|"
 
+langDef :: PT.GenLanguageDef String u Identity
 langDef = PT.LanguageDef
   { PT.reservedNames   = reservedNames
   , PT.reservedOpNames = reservedOpNames
@@ -111,36 +109,80 @@ langDef = PT.LanguageDef
   , PT.caseSensitive   = True
   }
 
+tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
-lexeme           = PT.lexeme            tokenParser
-identifier       = PT.identifier        tokenParser
-reserved         = PT.reserved          tokenParser
-reservedOp       = PT.reservedOp        tokenParser
-operator         = PT.operator          tokenParser
-stringLiteral    = PT.stringLiteral     tokenParser
-whiteSpace       = PT.whiteSpace        tokenParser
-squares          = PT.squares           tokenParser
-semi             = PT.semi              tokenParser
-comma            = PT.comma             tokenParser
-colon            = PT.colon             tokenParser
-dot              = PT.dot               tokenParser
-natural          = PT.natural           tokenParser
+lexeme :: P.Parsec String u a -> P.Parsec String u a
+lexeme = PT.lexeme tokenParser
 
+identifier :: P.Parsec String u String
+identifier = PT.identifier tokenParser
+
+reserved :: String -> P.Parsec String u ()
+reserved = PT.reserved tokenParser
+
+reservedOp :: String -> P.Parsec String u ()
+reservedOp = PT.reservedOp tokenParser
+
+operator :: P.Parsec String u String
+operator = PT.operator tokenParser
+
+stringLiteral :: P.Parsec String u String
+stringLiteral = PT.stringLiteral tokenParser
+
+whiteSpace :: P.Parsec String u ()
+whiteSpace = PT.whiteSpace tokenParser
+
+semi :: P.Parsec String u String
+semi = PT.semi tokenParser
+
+colon :: P.Parsec String u String
+colon = PT.colon tokenParser
+
+dot :: P.Parsec String u String
+dot = PT.dot tokenParser
+
+comma :: P.Parsec String u String
+comma = PT.comma tokenParser
+
+tick :: P.Parsec String u Char
+tick = lexeme $ P.char '`'
+
+pipe :: P.Parsec String u Char
+pipe = lexeme $ P.char '|'
+
+natural :: P.Parsec String u Integer
+natural = PT.natural tokenParser
+
+squares :: P.Parsec String ParseState a -> P.Parsec String ParseState a
+squares = P.between (lexeme $ P.char '[') (lexeme $ indented *> P.char ']') . (indented *>)
+
+parens :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 parens = P.between (lexeme $ P.char '(') (lexeme $ indented *> P.char ')') . (indented *>)
+
+braces :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 braces = P.between (lexeme $ P.char '{') (lexeme $ indented *> P.char '}') . (indented *>)
+
+angles :: P.Parsec String ParseState a -> P.Parsec String ParseState a
 angles = P.between (lexeme $ P.char '<') (lexeme $ indented *> P.char '>') . (indented *>)
 
+sepBy :: P.Parsec String ParseState a -> P.Parsec String ParseState sep -> P.Parsec String ParseState [a]
 sepBy p s = P.sepBy (indented *> p) (indented *> s)
+
+sepBy1 :: P.Parsec String ParseState a -> P.Parsec String ParseState sep -> P.Parsec String ParseState [a]
 sepBy1 p s = P.sepBy1 (indented *> p) (indented *> s)
 
-semiSep          = flip sepBy semi
-semiSep1         = flip sepBy1 semi
-commaSep         = flip sepBy comma
-commaSep1        = flip sepBy1 comma
+semiSep :: P.Parsec String ParseState a -> P.Parsec String ParseState [a]
+semiSep = flip sepBy semi
 
-tick = lexeme $ P.char '`'
-pipe = lexeme $ P.char '|'
+semiSep1 :: P.Parsec String ParseState a -> P.Parsec String ParseState [a]
+semiSep1 = flip sepBy1 semi
+
+commaSep :: P.Parsec String ParseState a -> P.Parsec String ParseState [a]
+commaSep = flip sepBy comma
+
+commaSep1 :: P.Parsec String ParseState a -> P.Parsec String ParseState [a]
+commaSep1 = flip sepBy1 comma
 
 properName :: P.Parsec String u ProperName
 properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")

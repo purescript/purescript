@@ -15,19 +15,15 @@
 module Main where
 
 import qualified Language.PureScript as P
-import Data.Maybe (mapMaybe)
-import Data.List (intercalate)
 import System.Console.CmdTheLine
 import Control.Applicative
 import Control.Monad (forM)
 import System.Exit (exitSuccess, exitFailure)
-import qualified Text.Parsec as P
 import qualified System.IO.UTF8 as U
-import qualified Data.Map as M
 
 compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile inputFiles outputFile externsFile = do
-  asts <- fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
+compile input output externs = do
+  asts <- fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
     text <- U.readFile inputFile
     return $ P.runIndentParser P.parseDeclarations text
   case asts of
@@ -36,14 +32,14 @@ compile inputFiles outputFile externsFile = do
       exitFailure
     Right decls ->
       case P.compile decls of
-        Left error -> do
-          U.putStrLn error
+        Left err -> do
+          U.putStrLn err
           exitFailure
         Right (js, exts, _) -> do
-          case outputFile of
+          case output of
             Just path -> U.writeFile path js
             Nothing -> U.putStrLn js
-          case externsFile of
+          case externs of
             Nothing -> return ()
             Just filePath -> U.writeFile filePath exts
           exitSuccess
@@ -70,4 +66,5 @@ termInfo = defTI
   , termDoc  = "Compiles PureScript to Javascript"
   }
 
+main :: IO ()
 main = run (term, termInfo)
