@@ -63,7 +63,7 @@ isPolyType (Object ps) = all isPolyType (map snd . fst $ rowToList ps)
 isPolyType (Function args ret) = all isPolyType args && isPolyType ret
 isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
 isPolyType (SaturatedTypeSynonym _ args) = all isPolyType args
-isPolyType (ForAll idents ty) = isPolyType ty
+isPolyType (ForAll _ ty) = isPolyType ty
 isPolyType _ = True
 
 mkForAll :: [String] -> Type -> Type

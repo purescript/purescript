@@ -18,21 +18,12 @@ module Language.PureScript.Parser.Values (
 ) where
 
 import Language.PureScript.Values
-import Language.PureScript.Names
-import Language.PureScript.Declarations
 import Language.PureScript.Parser.State
-import Data.Function (on)
-import Data.List
-import Data.Functor.Identity
-import qualified Data.Map as M
 import qualified Language.PureScript.Parser.Common as C
 import Control.Applicative
 import qualified Text.Parsec as P
 import Text.Parsec.Expr
-import Control.Monad
-import Control.Arrow (Arrow(..))
 import Language.PureScript.Parser.Types
-import Language.PureScript.Types
 
 booleanLiteral :: P.Parsec String ParseState Bool
 booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
@@ -73,10 +64,6 @@ parseAbs = do
   toFunction :: [Value -> Value] -> Value -> Value
   toFunction [] value = Abs [] value
   toFunction args value = foldr (($)) value args
-
-parseApp :: P.Parsec String ParseState Value
-parseApp = App <$> parseValue
-               <*> (C.indented *> C.parens (C.commaSep parseValue))
 
 parseVar :: P.Parsec String ParseState Value
 parseVar = Var <$> C.parseQualified C.parseIdent
@@ -172,12 +159,12 @@ parseWhile = While <$> (C.reserved "while" *> C.indented *> parseValue <* C.inde
 parseFor :: P.Parsec String ParseState Statement
 parseFor = For <$> (C.reserved "for" *> C.indented *> C.parseIdent)
                <*> (C.indented *> C.lexeme (P.string "<-") *> parseValue)
-               <*> (C.indented *> C.reserved "until" *> parseValue <* C.colon)
+               <*> (C.indented *> C.reserved "until" *> parseValue <* C.indented <* C.colon)
                <*> parseManyStatements
 
 parseForEach :: P.Parsec String ParseState Statement
 parseForEach = ForEach <$> (C.reserved "foreach" *> C.indented *> C.parseIdent)
-                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.colon)
+                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.indented <* C.colon)
                        <*> parseManyStatements
 
 parseIf :: P.Parsec String ParseState Statement

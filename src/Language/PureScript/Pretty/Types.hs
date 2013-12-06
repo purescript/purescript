@@ -18,17 +18,10 @@ module Language.PureScript.Pretty.Types (
 ) where
 
 import Data.Maybe (fromMaybe)
-import Data.List (intersperse, intercalate)
-import qualified Control.Arrow as A
+import Data.List (intercalate)
 import Control.Arrow ((<+>))
-import qualified Data.Map as M
-import Control.Applicative
 
-import Language.PureScript.Values
 import Language.PureScript.Types
-import Language.PureScript.Names
-import Language.PureScript.Declarations
-import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Unknown
 
@@ -49,7 +42,7 @@ typeLiterals = mkPattern match
   match _ = Nothing
 
 prettyPrintRow :: Row -> String
-prettyPrintRow = (\(tys, tail) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs tail) . toList []
+prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs rest) . toList []
   where
   nameAndTypeToPs :: String -> Type -> String
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
@@ -58,6 +51,7 @@ prettyPrintRow = (\(tys, tail) -> intercalate ", " (map (uncurry nameAndTypeToPs
   tailToPs (RUnknown (Unknown u)) = " | u" ++ show u
   tailToPs (RowVar var) = " | " ++ var
   tailToPs (RSkolem s) = " | s" ++ show s
+  tailToPs _ = error "Invalid row tail"
   toList :: [(String, Type)] -> Row -> ([(String, Type)], Row)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)

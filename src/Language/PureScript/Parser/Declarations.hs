@@ -17,20 +17,10 @@ module Language.PureScript.Parser.Declarations (
     parseDeclarations
 ) where
 
-import Data.Char
-import Data.List
-import Data.Maybe
-import Data.Function
 import Control.Applicative
-import Control.Arrow (Arrow(..))
-import Control.Monad.State
-import qualified Data.Map as M
 import qualified Text.Parsec as P
-import qualified Text.Parsec.Pos as P
 
 import Language.PureScript.Names
-import Language.PureScript.Values
-import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
 import Language.PureScript.Declarations

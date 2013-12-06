@@ -17,15 +17,11 @@ module Language.PureScript.Pretty.Kinds (
 ) where
 
 import Data.Maybe (fromMaybe)
-import Data.List (intersperse, intercalate)
-import qualified Control.Arrow as A
-import Control.Arrow ((<+>))
-import qualified Data.Map as M
-import Control.Applicative
 
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Unknown
+import Control.Arrow (ArrowPlus(..))
 
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match

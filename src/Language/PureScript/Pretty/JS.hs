@@ -24,7 +24,7 @@ import Language.PureScript.CodeGen.JS.AST
 import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Control.Arrow as A
-import Control.Arrow ((***), (<+>), first, second)
+import Control.Arrow ((<+>))
 import Control.Applicative
 import Control.Monad.State
 
@@ -34,11 +34,10 @@ blockIndent :: Int
 blockIndent = 4
 
 withIndent :: StateT PrinterState Maybe String -> StateT PrinterState Maybe String
-withIndent s = do
-  current <- get
-  modify $ \s -> s { indent = indent s + blockIndent }
-  result <- s
-  modify $ \s -> s { indent = indent s - blockIndent }
+withIndent action = do
+  modify $ \st -> st { indent = indent st + blockIndent }
+  result <- action
+  modify $ \st -> st { indent = indent st - blockIndent }
   return result
 
 currentIndent :: StateT PrinterState Maybe String
@@ -158,22 +157,22 @@ app = mkPattern' match
   match _ = mzero
 
 unary :: UnaryOperator -> String -> Operator PrinterState JS String
-unary op str = Wrap pattern (++)
+unary op str = Wrap match (++)
   where
-  pattern :: Pattern PrinterState JS (String, JS)
-  pattern = mkPattern match
+  match :: Pattern PrinterState JS (String, JS)
+  match = mkPattern match'
     where
-    match (JSUnary op' val) | op' == op = Just (str, val)
-    match _ = Nothing
+    match' (JSUnary op' val) | op' == op = Just (str, val)
+    match' _ = Nothing
 
 binary :: BinaryOperator -> String -> Operator PrinterState JS String
-binary op str = AssocR pattern (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
+binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
-  pattern :: Pattern PrinterState JS (JS, JS)
-  pattern = mkPattern match
+  match :: Pattern PrinterState JS (JS, JS)
+  match = mkPattern match'
     where
-    match (JSBinary op' v1 v2) | op' == op = Just (v1, v2)
-    match _ = Nothing
+    match' (JSBinary op' v1 v2) | op' == op = Just (v1, v2)
+    match' _ = Nothing
 
 prettyPrintJS1 :: JS -> String
 prettyPrintJS1 = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'

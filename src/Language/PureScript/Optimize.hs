@@ -29,7 +29,7 @@ replaceIdent :: (Data d) => Ident -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
   where
   replace (JSVar var2) | var1 == var2 = js
-  replace js = js
+  replace other = other
 
 isReassigned :: (Data d) => Ident -> d -> Bool
 isReassigned var1 = everything (||) (mkQ False check)

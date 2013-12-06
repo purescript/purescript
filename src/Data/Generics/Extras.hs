@@ -18,7 +18,7 @@ module Data.Generics.Extras where
 
 import Data.Data
 
-everywhereM' :: (Monad m, Data d) => (forall d. (Data d) => d -> m d) -> d -> m d
+everywhereM' :: (Monad m, Data d) => (forall d1. (Data d1) => d1 -> m d1) -> d -> m d
 everywhereM' f x = do
   y <- f x
   gmapM (everywhereM' f) y

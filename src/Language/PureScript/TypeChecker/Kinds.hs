@@ -19,15 +19,9 @@ module Language.PureScript.TypeChecker.Kinds (
     kindOf
 ) where
 
-import Data.List
-import Data.Maybe (fromMaybe)
-import Data.Function
-import Data.Data
-
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 import Language.PureScript.Unknown
@@ -36,8 +30,6 @@ import Control.Monad.State
 import Control.Monad.Error
 
 import Control.Applicative
-import Control.Arrow (Kleisli(..), (***))
-import qualified Control.Category as C
 
 import qualified Data.Map as M
 
@@ -94,14 +86,14 @@ infer name m (Function args ret) = do
   ks <- inferAll name m args
   k <- infer name m ret
   k ~~ Star
-  forM ks $ \k -> k ~~ Star
+  forM ks (~~ Star)
   return Star
 infer _ m (TypeVar v) =
   case M.lookup v m of
     Just k -> return k
     Nothing -> throwError $ "Unbound type variable " ++ v
-infer (Just (name, k)) m c@(TypeConstructor v@(Qualified (ModulePath []) pn)) | name == pn = return k
-infer name m (TypeConstructor v) = do
+infer (Just (name, k)) _ (TypeConstructor (Qualified (ModulePath []) pn)) | name == pn = return k
+infer _ _ (TypeConstructor v) = do
   env <- liftCheck getEnv
   modulePath <- checkModulePath `fmap` get
   case M.lookup (qualify modulePath v) (types env) of
@@ -116,17 +108,18 @@ infer name m (TypeApp t1 t2) = do
 infer name m (ForAll ident ty) = do
   k <- fresh
   infer name (M.insert ident k m) ty
-infer _ m t = return Star
+infer _ _ _ = return Star
 
 inferRow :: Maybe (ProperName, Kind) -> M.Map String Kind -> Row -> Subst Kind
 inferRow _ m (RowVar v) = do
   case M.lookup v m of
     Just k -> return k
     Nothing -> throwError $ "Unbound row variable " ++ v
-inferRow _ m r@REmpty = return Row
-inferRow name m r@(RCons _ ty row) = do
+inferRow _ _ REmpty = return Row
+inferRow name m (RCons _ ty row) = do
   k1 <- infer name m ty
   k2 <- inferRow name m row
   k1 ~~ Star
   k2 ~~ Row
   return Row
+inferRow _ _ _ = error "Invalid row in inferRow"

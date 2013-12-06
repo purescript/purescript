@@ -19,12 +19,10 @@ module Language.PureScript.TypeChecker.Types (
 ) where
 
 import Data.List
-import Data.Maybe (isJust, fromMaybe)
-import Data.Function
+import Data.Maybe (fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
-       (extT, something, everywhere, everywhereM, everything,
-        everywhereBut, mkT, mkM, mkQ, extM, extQ)
+       (mkT, something, everywhere, everywhereBut, mkQ, extQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -40,8 +38,7 @@ import Control.Monad.State
 import Control.Monad.Error
 
 import Control.Applicative
-import Control.Arrow (Arrow(..), Kleisli(..), (***), (&&&), second)
-import qualified Control.Category as C
+import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 
@@ -60,7 +57,7 @@ instance Unifiable Type where
   apply _ t = t
   unknowns (TUnknown (Unknown u)) = [u]
   unknowns (SaturatedTypeSynonym _ tys) = concatMap unknowns tys
-  unknowns (ForAll idents ty) = unknowns ty
+  unknowns (ForAll _ ty) = unknowns ty
   unknowns (Array t) = unknowns t
   unknowns (Object r) = unknowns r
   unknowns (Function args ret) = concatMap unknowns args ++ unknowns ret
@@ -85,16 +82,16 @@ instance Unifiable Row where
       unifyRows :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Subst ()
       unifyRows [] (RUnknown u) sd r = replace u (rowFromList (sd, r))
       unifyRows sd r [] (RUnknown u) = replace u (rowFromList (sd, r))
-      unifyRows ns@((name, ty):row) r others u@(RUnknown un) = do
+      unifyRows ((name, ty):row) r others u@(RUnknown un) = do
         occursCheck un ty
-        forM row $ \(_, ty) -> occursCheck un ty
+        forM row $ \(_, t) -> occursCheck un t
         u' <- fresh
         u ~~ RCons name ty u'
         unifyRows row r others u'
       unifyRows [] REmpty [] REmpty = return ()
       unifyRows [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return ()
       unifyRows [] (RSkolem s1) [] (RSkolem s2) | s1 == s2 = return ()
-      unifyRows sd1 r1 sd2 r2 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd1, r1)) ++ " with " ++ prettyPrintRow (rowFromList (sd2, r2)) ++ "."
+      unifyRows sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
   apply s (RUnknown u) = runSubstitution s u
   apply s (RCons name ty r) = RCons name (apply s ty) (apply s r)
   apply _ r = r
@@ -136,11 +133,11 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
     modulePath <- checkModulePath `fmap` get
     guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
-  unifyTypes' (TypeApp t1 t2) (TypeApp t3 t4) = do
-    t1 `unifyTypes` t3
-    t2 `unifyTypes` t4
+  unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
+    t3 `unifyTypes` t5
+    t4 `unifyTypes` t6
   unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
-  unifyTypes' t1 t2 = throwError $ "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2 ++ "."
+  unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
 
 isFunction :: Value -> Bool
 isFunction (Abs _ _) = True
@@ -152,12 +149,12 @@ typeOf name val = do
   (ty, sub, checks) <- runSubst $ case name of
         Just ident | isFunction val ->
           case val of
-            TypedValue val ty -> do
+            TypedValue value ty -> do
               kind <- liftCheck $ kindOf ty
               guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
               ty' <- replaceAllTypeSynonyms ty
               modulePath <- checkModulePath <$> get
-              bindNames (M.singleton (modulePath, ident) (ty, LocalVariable)) $ check val ty'
+              bindNames (M.singleton (modulePath, ident) (ty, LocalVariable)) $ check value ty'
               return ty'
             _ -> do
               me <- fresh
@@ -175,7 +172,7 @@ escapeCheck checks ty sub =
   let
     visibleUnknowns = nub $ unknowns ty
   in
-    forM_ checks $ \check -> case check of
+    forM_ checks $ \c -> case c of
       AnyUnifiable t -> do
         let unsolvedUnknowns = nub . unknowns $ apply sub t
         guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
@@ -214,18 +211,18 @@ replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 replaceTypeVars :: (D.Data d) => String -> Type -> d -> d
-replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replace)
+replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVar)
   where
-  replace (TypeVar v) | v == name = t
-  replace t = t
+  replaceTypeVar (TypeVar v) | v == name = t
+  replaceTypeVar other = other
   isShadowed (ForAll v _) | v == name = True
   isShadowed _ = False
 
 replaceRowVars :: (D.Data d) => String -> Row -> d -> d
-replaceRowVars name r = everywhere (mkT replace)
+replaceRowVars name r = everywhere (mkT replaceRowVar)
   where
-  replace (RowVar v) | v == name = r
-  replace t = t
+  replaceRowVar (RowVar v) | v == name = r
+  replaceRowVar other = other
 
 replaceAllVarsWithUnknowns :: Type -> Subst Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
@@ -244,14 +241,10 @@ replaceAllTypeSynonyms d = do
   either throwError return $ saturateAllTypeSynonyms syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
-desaturateAllTypeSynonyms = everywhere (mkT replace)
+desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
   where
-  replace (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
-  replace t = t
-
-expandAllTypeSynonyms :: Type -> Subst Type
-expandAllTypeSynonyms (SaturatedTypeSynonym name args) = expandTypeSynonym name args >>= expandAllTypeSynonyms
-expandAllTypeSynonyms ty = return ty
+  replaceSaturatedTypeSynonym (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
+  replaceSaturatedTypeSynonym t = t
 
 expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Type
 expandTypeSynonym name args = do
@@ -276,9 +269,9 @@ infer' (StringLiteral _) = return String
 infer' (BooleanLiteral _) = return Boolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM (infer) vals
-  arr <- fresh
-  forM_ ts $ \t -> arr ~~ Array t
-  return arr
+  els <- fresh
+  forM_ ts $ \t -> els ~~ Array t
+  return els
 infer' (Unary op val) = do
   t <- infer val
   inferUnary op t
@@ -324,7 +317,7 @@ infer' app@(App _ _) = do
   ret <- fresh
   checkFunctionApplications ft argss ret
   return ret
-infer' (Var var@(Qualified mp name)) = do
+infer' (Var var) = do
   ty <- lookupVariable var
   replaceAllTypeSynonyms ty
 infer' (Block ss) = do
@@ -355,6 +348,7 @@ infer' (TypedValue val ty) = do
   ty' <- replaceAllTypeSynonyms ty
   check val ty'
   return ty'
+infer' _ = error "Invalid argument to infer"
 
 inferProperty :: Type -> String -> Subst (Maybe Type)
 inferProperty (Object row) prop = do
@@ -366,7 +360,7 @@ inferProperty (SaturatedTypeSynonym name args) prop = do
 inferProperty (ForAll ident ty) prop = do
   replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
-inferProperty _ prop = return Nothing
+inferProperty _ _ = return Nothing
 
 inferUnary :: UnaryOperator -> Type -> Subst Type
 inferUnary op val =
@@ -487,6 +481,7 @@ inferBinder val (ArrayBinder binders rest) = do
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
+inferBinder _ _ = error "Invalid argument to inferBinder"
 
 inferGuardedBinder :: Type -> Binder -> Subst (M.Map Ident Type)
 inferGuardedBinder val (GuardedBinder cond binder) = do
@@ -511,11 +506,11 @@ assignVariable name = do
     _ -> return ()
 
 checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type)
-checkStatement mass ret (VariableIntroduction name val) = do
+checkStatement mass _ (VariableIntroduction name val) = do
   assignVariable name
   t <- infer val
   return (False, M.insert name t mass)
-checkStatement mass ret (Assignment ident val) = do
+checkStatement mass _ (Assignment ident val) = do
   t <- infer val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
@@ -567,7 +562,7 @@ checkBlock mass ret (s:ss) = do
   bindLocalVariables (M.toList mass1) $ case (b1, ss) of
     (True, []) -> return (True, mass1)
     (True, _) -> throwError "Unreachable code"
-    (False, ss) -> checkBlock mass1 ret ss
+    (False, ss') -> checkBlock mass1 ret ss'
 
 skolemize :: String -> Type -> Subst Type
 skolemize ident ty = do
@@ -609,7 +604,7 @@ check' app@(App _ _) ret = do
   let (f, argss) = unfoldApplication app
   ft <- infer f
   checkFunctionApplications ft argss ret
-check' v@(Var var@(Qualified mp name)) ty = do
+check' (Var var) ty = do
   ty1 <- lookupVariable var
   repl <- replaceAllTypeSynonyms ty1
   repl `subsumes` ty
@@ -663,21 +658,21 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] ((p, _): _) _ | lax = return ()
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
-  go ((p,v):ps) [] u@(RUnknown _) = do
+  go ((p,v):ps') [] u@(RUnknown _) = do
     ty <- infer v
     rest <- fresh
     u ~~ RCons p ty rest
-    go ps [] rest
-  go ((p,v):ps) ts r =
+    go ps' [] rest
+  go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
         ty <- infer v
         rest <- fresh
         r ~~ RCons p ty rest
-        go ps ts rest
+        go ps' ts rest
       Just ty -> do
         check v ty
-        go ps (delete (p, ty) ts) r
+        go ps' (delete (p, ty) ts) r
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
 unfoldApplication :: Value -> (Value, [[Value]])

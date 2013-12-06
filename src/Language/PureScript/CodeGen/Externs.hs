@@ -16,7 +16,6 @@ module Language.PureScript.CodeGen.Externs (
     externToPs
 ) where
 
-import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import Language.PureScript.Declarations
@@ -31,11 +30,11 @@ externToPs indent path env (ValueDeclaration name _) = do
 externToPs indent path env (DataDeclaration name _ _) = do
   (kind, _) <- M.lookup (path, name) $ types env
   return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
-externToPs indent path env (ExternMemberDeclaration member name ty) =
+externToPs indent _ _ (ExternMemberDeclaration member name ty) =
   return $ replicate indent ' ' ++ "foreign import member " ++ show member ++ " " ++ show name ++ " :: " ++ prettyPrintType ty
-externToPs indent path env (ExternDataDeclaration name kind) =
+externToPs indent _ _ (ExternDataDeclaration name kind) =
   return $ replicate indent ' ' ++ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
-externToPs indent path env (TypeSynonymDeclaration name args ty) =
+externToPs indent _ _ (TypeSynonymDeclaration name args ty) =
   return $ replicate indent ' ' ++ "type " ++ show name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
 externToPs indent path env (ModuleDeclaration name decls) =
   return $ replicate indent ' ' ++ "module " ++ show name ++ " where\n" ++ unlines (mapMaybe (externToPs (indent + 2) (subModule path name) env) decls)

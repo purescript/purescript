@@ -17,20 +17,13 @@
 module Language.PureScript.Pretty.Common where
 
 import Data.Char
-import Data.Maybe (fromMaybe)
-import Data.List (nub, intersperse, intercalate)
-import Data.Function (fix)
 import Control.Monad.State
-import Control.Applicative (Applicative(..), Alternative(..))
 import qualified Control.Category as C
 import Control.Category ((>>>))
 import qualified Control.Arrow as A
 import Control.Arrow ((***), (<+>))
 
 import Language.PureScript.Names
-import Language.PureScript.Values
-import Language.PureScript.Types
-import Language.PureScript.Declarations
 
 identToJs :: Ident -> String
 identToJs (Ident name) = name
@@ -57,16 +50,16 @@ parens :: String -> String
 parens s = ('(':s) ++ ")"
 
 chainl :: Pattern u a (a, a) -> (r -> r -> r) -> Pattern u a r -> Pattern u a r
-chainl split f p = fix $ \c -> split >>> ((c <+> p) *** p) >>> A.arr (uncurry f)
+chainl g f p = fix $ \c -> g >>> ((c <+> p) *** p) >>> A.arr (uncurry f)
 
 chainr :: Pattern u a (a, a) -> (r -> r -> r) -> Pattern u a r -> Pattern u a r
-chainr split f p = fix $ \c -> split >>> (p *** (c <+> p)) >>> A.arr (uncurry f)
+chainr g f p = fix $ \c -> g >>> (p *** (c <+> p)) >>> A.arr (uncurry f)
 
 wrap :: Pattern u a (s, a) -> (s -> r -> r) -> Pattern u a r -> Pattern u a r
-wrap split f p = fix $ \c -> split >>> (C.id *** (c <+> p)) >>> A.arr (uncurry f)
+wrap g f p = fix $ \c -> g >>> (C.id *** (c <+> p)) >>> A.arr (uncurry f)
 
-split :: Pattern u a (s, t) -> (s -> t -> r) -> Pattern u a r -> Pattern u a r
-split s f p = s >>> A.arr (uncurry f)
+split :: Pattern u a (s, t) -> (s -> t -> r) -> Pattern u a r
+split s f = s >>> A.arr (uncurry f)
 
 data OperatorTable u a r = OperatorTable { runOperatorTable :: [ [Operator u a r] ] }
 
@@ -82,5 +75,5 @@ buildPrettyPrinter table p = foldl (\p' ops -> foldl1 (<+>) (flip map ops $ \op 
     AssocL pat g -> chainl pat g p'
     AssocR pat g -> chainr pat g p'
     Wrap pat g -> wrap pat g p'
-    Split pat g -> split pat g p'
+    Split pat g -> split pat g
   ) <+> p') p $ runOperatorTable table

@@ -17,7 +17,6 @@
 module Language.PureScript.Unknown where
 
 import Data.Data
-import Data.Typeable
 
 newtype Unknown t = Unknown { runUnknown :: Int } deriving (Show, Eq, Ord, Data, Typeable)
 

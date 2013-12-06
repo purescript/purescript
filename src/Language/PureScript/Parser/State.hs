@@ -14,11 +14,7 @@
 
 module Language.PureScript.Parser.State where
 
-import Language.PureScript.Names
-import Language.PureScript.Declarations
-
 import qualified Text.Parsec as P
-import qualified Data.Map as M
 
 data ParseState = ParseState
   { indentationLevel :: P.Column } deriving Show

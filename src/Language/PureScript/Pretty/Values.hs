@@ -17,16 +17,12 @@ module Language.PureScript.Pretty.Values (
     prettyPrintBinder
 ) where
 
-import Data.Char
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
-import qualified Control.Arrow as A
 import Control.Arrow ((<+>))
-import Control.Applicative
 
 import Language.PureScript.Types
 import Language.PureScript.Values
-import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types
 
@@ -91,22 +87,22 @@ typed = mkPattern match
   match _ = Nothing
 
 unary :: UnaryOperator -> String -> Operator () Value String
-unary op str = Wrap pattern (++)
+unary op str = Wrap match (++)
   where
-  pattern :: Pattern () Value (String, Value)
-  pattern = mkPattern match
+  match :: Pattern () Value (String, Value)
+  match = mkPattern match'
     where
-    match (Unary op' val) | op' == op = Just (str, val)
-    match _ = Nothing
+    match' (Unary op' val) | op' == op = Just (str, val)
+    match' _ = Nothing
 
 binary :: BinaryOperator -> String -> Operator () Value String
-binary op str = AssocR pattern (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
+binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
-  pattern :: Pattern () Value (Value, Value)
-  pattern = mkPattern match
+  match :: Pattern () Value (Value, Value)
+  match = mkPattern match'
     where
-    match (Binary op' v1 v2) | op' == op = Just (v1, v2)
-    match _ = Nothing
+    match' (Binary op' v1 v2) | op' == op = Just (v1, v2)
+    match' _ = Nothing
 
 prettyPrintValue :: Value -> String
 prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue ()
@@ -133,7 +129,6 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
                   , [ binary    Divide               "/" ]
                   , [ binary    Modulus              "%" ]
                   , [ binary    Concat               "++" ]
-                  , [ binary    Cons                 ":" ]
                   , [ binary    Add                  "+" ]
                   , [ binary    Subtract             "-" ]
                   , [ binary    ShiftLeft            "<<" ]

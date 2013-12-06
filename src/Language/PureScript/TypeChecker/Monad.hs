@@ -25,12 +25,9 @@ import Language.PureScript.Unknown
 import Data.Data
 import Data.Maybe
 import Data.Monoid
-import Data.Typeable
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
-
-import Control.Arrow ((***), first, second)
 
 import qualified Data.Map as M
 

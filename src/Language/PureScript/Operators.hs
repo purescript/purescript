@@ -22,7 +22,6 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.Values
 
-import qualified Data.Data as D
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
 import qualified Data.Map as M
@@ -62,10 +61,10 @@ matchOperators ops val = G.everywhereM' (G.mkM parseChains) val
   where
   parseChains :: Value -> Either String Value
   parseChains b@(BinaryNoParens _ _ _) = bracketChain (extendChain b)
-  parseChains val = return val
+  parseChains other = return other
   extendChain :: Value -> Chain
   extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
-  extendChain val = [Left val]
+  extendChain other = [Left other]
   bracketChain :: Chain -> Either String Value
   bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
@@ -113,7 +112,6 @@ builtIns = [ (globalOp "<", Binary LessThan, 3, Infixl)
            , (globalOp "/", Binary Divide, 5, Infixl)
            , (globalOp "%", Binary Modulus, 5, Infixl)
            , (globalOp "++", Binary Concat, 6, Infixr)
-           , (globalOp ":", Binary Cons, 6, Infixr)
            , (globalOp "+", Binary Add, 7, Infixl)
            , (globalOp "-", Binary Subtract, 7, Infixl)
            , (globalOp "<<", Binary ShiftLeft, 8, Infixl)

@@ -74,7 +74,7 @@ reservedNames = [ "case"
 
 builtInOperators :: [String]
 builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!", ":" ]
+                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
 
 reservedOpNames :: [String]
 reservedOpNames = builtInOperators ++ [ "->" ]
@@ -89,7 +89,7 @@ identLetter :: P.Parsec String u Char
 identLetter = P.alphaNum <|> P.oneOf "_'"
 
 opStart :: P.Parsec String u Char
-opStart = P.oneOf "!#$%&*+/<=>?@^|~:"
+opStart = P.oneOf "!#$%&*+/<=>?@^|~"
 
 opLetter :: P.Parsec String u Char
 opLetter = P.oneOf ":#$%&*+./<=>?@^|"
