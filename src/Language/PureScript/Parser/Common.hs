@@ -151,7 +151,7 @@ parseQualified parser = part global
   part path = (do name <- P.try (properName <* delimiter)
                   part (subModule path name))
               <|> (Qualified path <$> P.try parser)
-  delimiter = indented *> colon <* P.notFollowedBy colon
+  delimiter = indented *> dot
 
 integerOrFloat :: P.Parsec String u (Either Integer Double)
 integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
@@ -166,8 +166,16 @@ fold first more combine = do
   bs <- P.many more
   return $ foldl combine a bs
 
-buildPostfixParser :: P.Stream s m t => [P.ParsecT s u m (a -> a)] -> P.ParsecT s u m a -> P.ParsecT s u m a
-buildPostfixParser f x = fold x (P.choice f) (flip ($))
+buildPostfixParser :: P.Stream s m t => [a -> P.ParsecT s u m a] -> P.ParsecT s u m a -> P.ParsecT s u m a
+buildPostfixParser fs first = do
+  a <- first
+  go a
+  where
+  go a = do
+    maybeA <- P.optionMaybe $ P.choice (map ($ a) fs)
+    case maybeA of
+      Nothing -> return a
+      Just a' -> go a'
 
 operatorOrBuiltIn :: P.Parsec String u String
 operatorOrBuiltIn = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) builtInOperators)

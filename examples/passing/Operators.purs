@@ -32,6 +32,6 @@ module Ops where
 
   bar = \s1 s2 -> s1 ++ s2
 
-test9 = Ops:foo Ops:@@ "Hello World"
+test9 = Ops.foo Ops.@@ "Hello World"
 
-test10 = "Hello" `Ops:bar` "World"
+test10 = "Hello" `Ops.bar` "World"

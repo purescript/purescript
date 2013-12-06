@@ -44,7 +44,7 @@ global = ModulePath []
 data Qualified a = Qualified ModulePath a deriving (Eq, Ord, Data, Typeable)
 
 instance (Show a) => Show (Qualified a) where
-  show (Qualified (ModulePath names) a) = intercalate ":" (map show names ++ [show a])
+  show (Qualified (ModulePath names) a) = intercalate "." (map show names ++ [show a])
 
 qualify :: ModulePath -> Qualified a -> (ModulePath, a)
 qualify mp (Qualified (ModulePath []) a) = (mp, a)

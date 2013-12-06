@@ -75,8 +75,8 @@ parseTypeAtom = indented *> P.choice (map P.try
 parseAnyType :: P.Parsec String ParseState Type
 parseAnyType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"
   where
-  postfixTable :: [P.Parsec String ParseState (Type -> Type)]
-  postfixTable = [ flip TypeApp <$> P.try (indented *> parseTypeAtom) ]
+  postfixTable :: [Type -> P.Parsec String ParseState Type]
+  postfixTable = [ \x -> TypeApp x <$> P.try (indented *> parseTypeAtom) ]
   operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
 
 parseType :: P.Parsec String ParseState Type

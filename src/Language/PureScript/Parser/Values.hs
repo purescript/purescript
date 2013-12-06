@@ -126,6 +126,10 @@ parsePropertyUpdate = do
   value <- C.indented *> parseValue
   return (name, value)
 
+parseAccessor :: Value -> P.Parsec String ParseState Value
+parseAccessor (Constructor _) = P.unexpected "constructor"
+parseAccessor obj = Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier) <*> pure obj
+
 parseValue :: P.Parsec String ParseState Value
 parseValue =
   (buildExpressionParser operators
@@ -133,11 +137,11 @@ parseValue =
    $ indexersAndAccessors) P.<?> "expression"
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
-  postfixTable1 = [ Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier)
-                  , P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) ]
-  postfixTable2 = [ P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2]))
-                  , P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue))
-                  , flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) ]
+  postfixTable1 = [ parseAccessor
+                  , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
+  postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])) <*> pure v
+                  , \v -> P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue)) <*> pure v
+                  , \v -> flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)

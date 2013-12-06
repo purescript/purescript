@@ -12,4 +12,4 @@ module A where
 
     baz = foo
 
-    abc = A:B:abc
+    abc = A.B.abc
