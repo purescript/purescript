@@ -690,11 +690,11 @@ module A where
         bar = \y -> y
 ```
 
-Names may be qualified by using a colon:
+Names may be qualified by using a dot:
 
 ```
-foo = A:foo
-bar = A:B:bar
+foo = A.foo
+bar = A.B.bar
 ```
 
 All the names in a module can be aliased using the `import` declaration:
