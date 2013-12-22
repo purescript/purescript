@@ -97,7 +97,7 @@ parseManyStatements = (do
   return sts) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
-parseValueAtom = C.indented *> P.choice
+parseValueAtom = P.choice
             [ P.try parseNumericLiteral
             , P.try parseStringLiteral
             , P.try parseBooleanLiteral
@@ -153,8 +153,10 @@ parseVariableIntroduction = do
 
 parseAssignment :: P.Parsec String ParseState Statement
 parseAssignment = do
-  tgt <- C.parseIdent
-  C.lexeme $ C.indented *> P.char '='
+  tgt <- P.try $ do
+    tgt <- C.parseIdent
+    C.lexeme $ C.indented *> P.char '='
+    return tgt
   value <- parseValue
   C.indented *> C.semi
   return $ Assignment tgt value
@@ -187,18 +189,22 @@ parseElseStatement :: P.Parsec String ParseState ElseStatement
 parseElseStatement = C.reserved "else" >> (ElseIf <$> parseIfStatement
                                            <|> Else <$> parseManyStatements)
 
+parseValueStatement :: P.Parsec String ParseState Statement
+parseValueStatement = ValueStatement <$> (parseValue <* C.semi)
+
 parseReturn :: P.Parsec String ParseState Statement
 parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.semi)
 
 parseStatement :: P.Parsec String ParseState Statement
-parseStatement = P.choice (map P.try
+parseStatement = P.choice
                  [ parseVariableIntroduction
                  , parseAssignment
                  , parseWhile
                  , parseFor
                  , parseForEach
                  , parseIf
-                 , parseReturn ]) P.<?> "statement"
+                 , parseValueStatement
+                 , parseReturn ] P.<?> "statement"
 
 parseStringBinder :: P.Parsec String ParseState Binder
 parseStringBinder = StringBinder <$> C.stringLiteral

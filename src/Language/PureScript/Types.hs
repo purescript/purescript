@@ -68,3 +68,6 @@ isPolyType _ = True
 
 mkForAll :: [String] -> Type -> Type
 mkForAll = flip . foldl . flip $ ForAll
+
+unit :: Type
+unit = Object REmpty

@@ -536,6 +536,9 @@ checkStatement mass ret (ForEach ident vals inner) = do
   (allCodePathsReturn, _) <- bindLocalVariables [(ident, val)] $ checkBlock mass ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
   return (False, mass)
+checkStatement mass _ (ValueStatement val) = do
+  check val unit
+  return (False, mass)
 checkStatement mass ret (Return val) = do
   check val ret
   return (True, mass)

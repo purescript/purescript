@@ -175,6 +175,7 @@ prettyPrintStatement (ForEach ident arr sts) = "foreach " ++ show ident
   ++ " in " ++ prettyPrintValue arr ++ ": {"
   ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
 prettyPrintStatement (If ifst) = prettyPrintIfStatement ifst
+prettyPrintStatement (ValueStatement val) = prettyPrintValue val
 prettyPrintStatement (Return value) = "return " ++ prettyPrintValue value
 
 prettyPrintIfStatement :: IfStatement -> String

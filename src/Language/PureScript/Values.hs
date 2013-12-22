@@ -77,6 +77,7 @@ data Statement
   | For Ident Value Value [Statement]
   | ForEach Ident Value [Statement]
   | If IfStatement
+  | ValueStatement Value
   | Return Value deriving (Show, Data, Typeable)
 
 data IfStatement = IfStatement Value [Statement] (Maybe ElseStatement) deriving (Show, Data, Typeable)
