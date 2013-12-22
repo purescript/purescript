@@ -1,5 +1,5 @@
 name: purescript
-version: 0.1.16
+version: 0.1.17
 cabal-version: >=1.8
 build-type: Simple
 license: MIT

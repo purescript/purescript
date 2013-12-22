@@ -120,7 +120,7 @@ parsePropertyUpdate = do
 
 parseAccessor :: Value -> P.Parsec String ParseState Value
 parseAccessor (Constructor _) = P.unexpected "constructor"
-parseAccessor obj = Accessor <$> (C.indented *> C.dot *> C.indented *> C.identifier) <*> pure obj
+parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> C.identifier) <*> pure obj
 
 parseValue :: P.Parsec String ParseState Value
 parseValue =
@@ -161,7 +161,7 @@ parseAssignment = do
 
 parseWhile :: P.Parsec String ParseState Statement
 parseWhile = While <$> (C.reserved "while" *> C.indented *> C.parens parseValue)
-                   <*> (C.indented *>  parseManyStatements)
+                   <*> (C.indented *> parseManyStatements)
 
 parseFor :: P.Parsec String ParseState Statement
 parseFor = For <$> (C.reserved "for" *> C.indented *> C.lexeme (P.char '(') *> C.indented *> C.parseIdent)

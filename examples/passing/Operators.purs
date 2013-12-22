@@ -35,3 +35,8 @@ module Ops where
 test9 = Ops.foo Ops.@@ "Hello World"
 
 test10 = "Hello" `Ops.bar` "World"
+
+(...) :: forall a. [a] -> [a] -> [a]
+(...) = \as -> \bs -> as
+
+test11 = [1, 2, 3] ... [4, 5, 6]
