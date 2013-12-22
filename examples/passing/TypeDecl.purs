@@ -5,8 +5,10 @@ k :: String -> Number -> String
 k = \x -> \y -> x
 
 iterate :: forall a. Number -> (a -> a) -> a -> a
-iterate = \n -> \f -> \a -> do
-  var result = a
-  for i <- 0 until n:
-    result = f result
-  return result
+iterate = \n -> \f -> \a -> {
+    var result = a;
+    for (i <- 0 until n) {
+      result = f result;
+    }
+    return result;
+  }

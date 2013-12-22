@@ -6,10 +6,12 @@ type Lens a b =
 composeLenses :: forall a b c. Lens a b -> Lens b c -> Lens a c
 composeLenses = \l1 -> \l2 ->
   { get: \a -> l2.get (l1.get a)
-  , set: \a -> \c -> do
-      var b = l1.get a
-      var b1 = l2.set b c
-      return l1.set a b1
+  , set: \a -> \c -> 
+    {
+      var b = l1.get a;
+      var b1 = l2.set b c;
+      return l1.set a b1;
+    }
   }
 
 type Pair a b = { fst :: a, snd :: b }

@@ -86,10 +86,15 @@ parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parse
                              <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
 
 parseBlock :: P.Parsec String ParseState Value
-parseBlock = Block <$> (P.try (C.reserved "do") *> parseManyStatements)
+parseBlock = Block <$> parseManyStatements
 
 parseManyStatements :: P.Parsec String ParseState [Statement]
-parseManyStatements = C.indented *> C.mark (P.many (C.same *> C.mark parseStatement)) P.<?> "block"
+parseManyStatements = (do
+  C.lexeme $ P.char '{'
+  C.indented
+  sts <- C.mark (P.many (C.same *> C.mark parseStatement))
+  C.lexeme (P.char '}')
+  return sts) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
 parseValueAtom = C.indented *> P.choice
@@ -97,7 +102,7 @@ parseValueAtom = C.indented *> P.choice
             , P.try parseStringLiteral
             , P.try parseBooleanLiteral
             , parseArrayLiteral
-            , parseObjectLiteral
+            , P.try parseObjectLiteral
             , parseAbs
             , P.try parseConstructor
             , P.try parseVar
@@ -143,6 +148,7 @@ parseVariableIntroduction = do
   name <- C.indented *> C.parseIdent
   C.lexeme $ C.indented *> P.char '='
   value <- parseValue
+  C.indented *> C.semi
   return $ VariableIntroduction name value
 
 parseAssignment :: P.Parsec String ParseState Statement
@@ -150,21 +156,22 @@ parseAssignment = do
   tgt <- C.parseIdent
   C.lexeme $ C.indented *> P.char '='
   value <- parseValue
+  C.indented *> C.semi
   return $ Assignment tgt value
 
 parseWhile :: P.Parsec String ParseState Statement
-parseWhile = While <$> (C.reserved "while" *> C.indented *> parseValue <* C.indented <* C.colon)
-                   <*> parseManyStatements
+parseWhile = While <$> (C.reserved "while" *> C.indented *> C.parens parseValue)
+                   <*> (C.indented *>  parseManyStatements)
 
 parseFor :: P.Parsec String ParseState Statement
-parseFor = For <$> (C.reserved "for" *> C.indented *> C.parseIdent)
+parseFor = For <$> (C.reserved "for" *> C.indented *> C.lexeme (P.char '(') *> C.indented *> C.parseIdent)
                <*> (C.indented *> C.lexeme (P.string "<-") *> parseValue)
-               <*> (C.indented *> C.reserved "until" *> parseValue <* C.indented <* C.colon)
+               <*> (C.indented *> C.reserved "until" *> parseValue <* C.indented <* C.lexeme (P.char ')'))
                <*> parseManyStatements
 
 parseForEach :: P.Parsec String ParseState Statement
-parseForEach = ForEach <$> (C.reserved "foreach" *> C.indented *> C.parseIdent)
-                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.indented <* C.colon)
+parseForEach = ForEach <$> (C.reserved "foreach" *> C.indented *> C.lexeme (P.char '(') *> C.indented *> C.parseIdent)
+                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.lexeme (P.char ')'))
                        <*> parseManyStatements
 
 parseIf :: P.Parsec String ParseState Statement
@@ -172,16 +179,16 @@ parseIf = If <$> parseIfStatement
 
 parseIfStatement :: P.Parsec String ParseState IfStatement
 parseIfStatement =
-  IfStatement <$> (C.reserved "if" *> C.indented *> parseValue <* C.indented <* C.colon)
+  IfStatement <$> (C.reserved "if" *> C.indented *> C.parens parseValue)
               <*> parseManyStatements
-              <*> P.optionMaybe (C.same *> parseElseStatement)
+              <*> P.optionMaybe parseElseStatement
 
 parseElseStatement :: P.Parsec String ParseState ElseStatement
-parseElseStatement = C.reserved "else" >> (ElseIf <$> (C.indented *> parseIfStatement)
-                                           <|> Else <$> (C.indented *> C.colon *> parseManyStatements))
+parseElseStatement = C.reserved "else" >> (ElseIf <$> parseIfStatement
+                                           <|> Else <$> parseManyStatements)
 
 parseReturn :: P.Parsec String ParseState Statement
-parseReturn = Return <$> (C.reserved "return" *> parseValue)
+parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.semi)
 
 parseStatement :: P.Parsec String ParseState Statement
 parseStatement = P.choice (map P.try

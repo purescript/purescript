@@ -9,11 +9,15 @@ foreign import (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
 foreign import putStrLn :: String -> IO {}
 
 replicateM_ :: forall a. Number -> IO a -> IO {}
-replicateM_ = \n -> \x -> do
-  var io = ret {}
-  for i <- 0 until n:
-    io = x *> io
-  return io
+replicateM_ = \n -> \x -> 
+  { 
+    var io = ret {};
+    for (i <- 0 until n)
+    {
+      io = x *> io;
+    }
+    return io;
+  }
 
 main = replicateM_ 10 (putStrLn "Hello World!")
 

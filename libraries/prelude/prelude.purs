@@ -68,11 +68,13 @@ foldr = \f -> \a -> \bs -> case bs of
   [] -> a
 
 foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
-foldl = \f -> \b -> \as -> do
-  var result = b
-  foreach a in as:
-    result = f a result
-  return result
+foldl = \f -> \b -> \as -> {
+    var result = b;
+    foreach (a in as) {
+      result = f a result;
+    }
+    return result;
+  }
 
 foreign import member "length" length :: forall a. [a] -> Number
 
@@ -102,11 +104,13 @@ cons :: forall a. a -> [a] -> [a]
 cons = \a -> concat([a])
 
 concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
-concatMap = \as -> \f -> do
-  var result = []
-  foreach a in as:
-    result = result `concat` f a
-  return result
+concatMap = \as -> \f -> {
+    var result = [];
+    foreach (a in as) {
+      result = result `concat` f a;
+    }
+    return result;
+  }
 
 foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
 
@@ -116,11 +120,13 @@ empty = \as -> case as of
   _ -> false
 
 range :: Number -> Number -> [Number]
-range = \lo -> \hi -> do
-  var ns = []
-  for n <- lo until hi:
-    ns = push ns n
-  return ns
+range = \lo -> \hi -> {
+    var ns = [];
+    for (n <- lo until hi) {
+      ns = push ns n;
+    }
+    return ns;
+  }
 
 zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
 zipWith = \f -> \as -> \bs -> case { as: as, bs: bs } of
@@ -128,18 +134,24 @@ zipWith = \f -> \as -> \bs -> case { as: as, bs: bs } of
   _ -> []
 
 any :: forall a. (a -> Boolean) -> [a] -> Boolean
-any = \p -> \as -> do
-  for i <- 0 until length as:
-    if p (as !! i):
-      return true
-  return false
+any = \p -> \as -> {
+    for (i <- 0 until length as) {
+      if (p (as !! i)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 all :: forall a. (a -> Boolean) -> [a] -> Boolean
-all = \p -> \as -> do
-  for i <- 0 until length as:
-    if !(p (as !! i)):
-      return false
-  return true
+all = \p -> \as -> {
+    for (i <- 0 until length as) {
+      if (!(p (as !! i))) {
+        return false;
+      }
+    }
+    return true;
+  }
 
 -- Pairs
 
