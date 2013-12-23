@@ -1,31 +1,41 @@
 ## 0.2
 
-### Closed Issues
+### New Features
+
+- RankNTypes
+  This experimental feature enables the use of the `forall` quantifier in a 
+- Modules
+- Polymorphic Object Update
+  Records now support member update in which the type of the field changes during the update. For example:
+
+        data Wrap a = Wrap a
+        
+        update = \o -> o { prop = Wrap o.prop }
+
+### Enhancements
+
+- Allow method calls in blocks
+- Split code generation into AST -> JS AST and JS AST -> String
+- Syntactic sugar for introducing curried functions
+- Perform some basic optimization on the generated Javascript.
+- Generate formatted Javascript
+- Syntax for creating an array from a list of heads and a tail
+
+### Syntax Changes
 
 - Avoid 'do' keyword for blocks
-- Allow method calls in blocks
-- Polymorphic Object Update
-- Possibility of overlapping imports
-- Avoid reassigning vars when importing modules
-- Add basic module imports (#66)
-- Need to be able to access names in the global module
-- Generate formatted Javascript
-- Modules Documentation
-- Module imports
-- User-defined operators and modules don't work together
-- Optional parentheses in function declaration
-- Hello world example
-- Allow guards access to current scope
-- Array indexing syntax is ambiguous
-- Make FFI syntax match Haskell
 - Member extern syntax
-- Perform some basic optimization on the generated Javascript.
-- Syntactic sugar for introducing curried functions
-- Array pattern match syntax is confusing
+- Make FFI syntax match Haskell
 - Make record declaration syntax match Haskell
-- Split code generation into AST -> JS AST and JS AST -> String
-- Use a different file extension
+- Array pattern match syntax is confusing
+- Array indexing syntax is ambiguous
+- Optional parentheses in function declaration
+
+### Bug Fixes
+
+- Allow guards access to current scope
+
+### Libraries
+
 - Prelude
-- Syntax for creating an array from a list of heads and a tail
-- RankNTypes
-- Modules
+
