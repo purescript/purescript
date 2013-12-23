@@ -95,6 +95,7 @@ data Binder
   | NullaryBinder (Qualified ProperName)
   | UnaryBinder (Qualified ProperName) Binder
   | ObjectBinder [(String, Binder)]
-  | ArrayBinder [Binder] (Maybe Binder)
+  | ArrayBinder [Binder]
+  | ConsBinder Binder Binder
   | NamedBinder Ident Binder
   | GuardedBinder Value Binder deriving (Show, Data, Typeable)

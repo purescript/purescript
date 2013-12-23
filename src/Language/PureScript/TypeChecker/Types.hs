@@ -469,15 +469,17 @@ inferBinder val (ObjectBinder props) = do
     m1 <- inferBinder propTy binder
     m2 <- inferRowProperties nrow (RCons name propTy row) binders
     return $ m1 `M.union` m2
-inferBinder val (ArrayBinder binders rest) = do
+inferBinder val (ArrayBinder binders) = do
   el <- fresh
   m1 <- M.unions <$> mapM (inferBinder el) binders
   val ~~ Array el
-  case rest of
-    Nothing -> return m1
-    Just binder -> do
-      m2 <- inferBinder val binder
-      return $ m1 `M.union` m2
+  return m1
+inferBinder val (ConsBinder headBinder tailBinder) = do
+  el <- fresh
+  m1 <- inferBinder el headBinder
+  m2 <- inferBinder val tailBinder
+  val ~~ Array el
+  return $ m1 `M.union` m2
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m

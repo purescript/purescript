@@ -128,23 +128,27 @@ binderToJs m e varName done (ObjectBinder bs) = go done bs
     done'' <- go done' bs'
     js <- binderToJs m e propVar done'' binder
     return (JSVariableIntroduction (Ident propVar) (Just (JSAccessor prop (JSVar (Ident varName)))) : js)
-binderToJs m e varName done (ArrayBinder bs rest) = do
-  js <- go done rest 0 bs
-  return [JSIfElse (JSBinary cmp (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
+binderToJs m e varName done (ArrayBinder bs) = do
+  js <- go done 0 bs
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
   where
-  cmp :: BinaryOperator
-  cmp = maybe EqualTo (const GreaterThanOrEqualTo) rest
-  go :: [JS] -> Maybe Binder -> Integer -> [Binder] -> Gen [JS]
-  go done' Nothing _ [] = return done'
-  go done' (Just binder) index [] = do
-    restVar <- fresh
-    js <- binderToJs m e restVar done' binder
-    return (JSVariableIntroduction (Ident restVar) (Just (JSApp (JSAccessor "slice" (JSVar (Ident varName))) [JSNumericLiteral (Left index)])) : js)
-  go done' rest' index (binder:bs') = do
+  go :: [JS] -> Integer -> [Binder] -> Gen [JS]
+  go done' _ [] = return done'
+  go done' index (binder:bs') = do
     elVar <- fresh
-    done'' <- go done' rest' (index + 1) bs'
+    done'' <- go done' (index + 1) bs'
     js <- binderToJs m e elVar done'' binder
     return (JSVariableIntroduction (Ident elVar) (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar (Ident varName)))) : js)
+binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
+  headVar <- fresh
+  tailVar <- fresh
+  js1 <- binderToJs m e headVar done headBinder
+  js2 <- binderToJs m e tailVar js1 tailBinder
+  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left 0))) (JSBlock
+    ( JSVariableIntroduction (Ident headVar) (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar (Ident varName)))) :
+      JSVariableIntroduction (Ident tailVar) (Just (JSApp (JSAccessor "slice" (JSVar (Ident varName))) [JSNumericLiteral (Left 1)])) :
+      js2
+    )) Nothing]
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : js)

@@ -143,19 +143,38 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
                   , [ binary    Or                   "||" ]
                   ]
 
+prettyPrintBinderAtom :: Pattern () Binder String
+prettyPrintBinderAtom = mkPattern match
+  where
+  match :: Binder -> Maybe String
+  match NullBinder = Just "_"
+  match (StringBinder str) = Just $ show str
+  match (NumberBinder num) = Just $ either show show num
+  match (BooleanBinder True) = Just "true"
+  match (BooleanBinder False) = Just "false"
+  match (VarBinder ident) = Just $ show ident
+  match (NullaryBinder ctor) = Just $ show ctor
+  match (UnaryBinder ctor b) = Just $ show ctor ++ " " ++ prettyPrintBinder b
+  match (ObjectBinder bs) = Just $ "{ " ++ intercalate ", " (map (uncurry prettyPrintObjectPropertyBinder) bs) ++ " }"
+  match (ArrayBinder bs) = Just $ "[ " ++ intercalate ", " (map prettyPrintBinder bs) ++ " ]"
+  match (NamedBinder ident binder) = Just $ show ident ++ "@" ++ prettyPrintBinder binder
+  match (GuardedBinder cond binder) = Just $ prettyPrintBinder binder ++ " | " ++ prettyPrintValue cond
+  match _ = Nothing
+
 prettyPrintBinder :: Binder -> String
-prettyPrintBinder NullBinder = "_"
-prettyPrintBinder (StringBinder str) = show str
-prettyPrintBinder (NumberBinder num) = either show show num
-prettyPrintBinder (BooleanBinder True) = "true"
-prettyPrintBinder (BooleanBinder False) = "false"
-prettyPrintBinder (VarBinder ident) = show ident
-prettyPrintBinder (NullaryBinder ctor) = show ctor
-prettyPrintBinder (UnaryBinder ctor b) = show ctor ++ " " ++ prettyPrintBinder b
-prettyPrintBinder (ObjectBinder bs) = "{ " ++ intercalate ", " (map (uncurry prettyPrintObjectPropertyBinder) bs) ++ " }"
-prettyPrintBinder (ArrayBinder bs rest) = "[ " ++ intercalate ", " (map prettyPrintBinder bs) ++ maybe "" (("; " ++) . prettyPrintBinder) rest ++ " ]"
-prettyPrintBinder (NamedBinder ident binder) = show ident ++ "@" ++ prettyPrintBinder binder
-prettyPrintBinder (GuardedBinder cond binder) = prettyPrintBinder binder ++ " | " ++ prettyPrintValue cond
+prettyPrintBinder = fromMaybe (error "Incomplete pattern") . pattern matchBinder ()
+  where
+  matchBinder :: Pattern () Binder String
+  matchBinder = buildPrettyPrinter operators (prettyPrintBinderAtom <+> fmap parens matchBinder)
+  operators :: OperatorTable () Binder String
+  operators =
+    OperatorTable [ [ AssocR matchConsBinder (\b1 b2 -> b1 ++ " : " ++ b2) ] ]
+
+matchConsBinder :: Pattern () Binder (Binder, Binder)
+matchConsBinder = mkPattern match'
+  where
+  match' (ConsBinder b1 b2) = Just (b1, b2)
+  match' _ = Nothing
 
 prettyPrintObjectPropertyBinder :: String -> Binder -> String
 prettyPrintObjectPropertyBinder key binder = key ++ ": " ++ prettyPrintBinder binder

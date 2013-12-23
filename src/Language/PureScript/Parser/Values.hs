@@ -229,7 +229,6 @@ parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep (C.indented *> parseId
 
 parseArrayBinder :: P.Parsec String ParseState Binder
 parseArrayBinder = C.squares $ ArrayBinder <$> (C.commaSep (C.indented *> parseBinder))
-                                           <*> P.optionMaybe (C.indented *> C.colon *> C.indented *> parseBinder)
 
 parseNamedBinder :: P.Parsec String ParseState Binder
 parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* C.lexeme (P.char '@'))
@@ -245,8 +244,8 @@ parseIdentifierAndBinder = do
   binder <- C.indented *> parseBinder
   return (name, binder)
 
-parseBinder :: P.Parsec String ParseState Binder
-parseBinder = P.choice (map P.try
+parseBinderAtom :: P.Parsec String ParseState Binder
+parseBinderAtom = P.choice (map P.try
                   [ parseNullBinder
                   , parseStringBinder
                   , parseBooleanBinder
@@ -259,5 +258,11 @@ parseBinder = P.choice (map P.try
                   , parseArrayBinder
                   , C.parens parseBinder ]) P.<?> "binder"
 
+parseBinder :: P.Parsec String ParseState Binder
+parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expression"
+  where
+  operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
+
 parseGuardedBinder :: P.Parsec String ParseState Binder
 parseGuardedBinder = flip ($) <$> parseBinder <*> P.option id (GuardedBinder <$> (C.indented *> C.lexeme (P.char '|') *> C.indented *> parseValue))
+

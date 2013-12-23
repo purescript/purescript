@@ -44,27 +44,27 @@ bindEither = either (\e -> \_ -> Left e) (\a -> \f -> f a)
 
 head :: forall a. [a] -> a
 head = \xs -> case xs of
-  [x:_] -> x
+  x : _ -> x
 
 headSafe :: forall a. [a] -> Maybe a
 headSafe = \xs -> case xs of 
-  [x:_] -> Just x
+  x : _ -> Just x
   _ -> Nothing
 
 tail :: forall a. [a] -> [a]
 tail = \xs -> case xs of
-  [_:xs] -> xs
+  _ : xs -> xs
 
 tailSafe :: forall a. [a] -> Maybe [a]
 tailSafe = \xs -> case xs of
-  [_:xs] -> Just xs
+  _ : xs -> Just xs
   _ -> Nothing
 
 foreign import map :: forall a b. (a -> b) -> [a] -> [b]
 
 foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
 foldr = \f -> \a -> \bs -> case bs of
-  [b:bs] -> f (foldr f a bs) b
+  b : bs -> f (foldr f a bs) b
   [] -> a
 
 foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
@@ -130,7 +130,7 @@ range = \lo -> \hi -> {
 
 zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
 zipWith = \f -> \as -> \bs -> case { as: as, bs: bs } of
-  { as = [a:as1], bs = [b:bs1] } -> cons (f a b) (zipWith f as1 bs1)
+  { as = a : as1, bs = b : bs1 } -> cons (f a b) (zipWith f as1 bs1)
   _ -> []
 
 any :: forall a. (a -> Boolean) -> [a] -> Boolean
@@ -171,7 +171,7 @@ zip = zipWith tuple
 
 unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
 unzip = \ts -> case ts of
-  [t:ts1] -> case unzip ts1 of
+  t : ts1 -> case unzip ts1 of
     { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
   [] -> tuple [] []
 
