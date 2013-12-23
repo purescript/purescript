@@ -5,6 +5,8 @@ purescript
 
 A small strongly, statically typed compile-to-JS language with basic extensible records and type-safe blocks
 
+Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
+
 ## Current Features
 
 - Full Type Inference
