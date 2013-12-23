@@ -372,11 +372,9 @@ foo = bar(x) +
 baz(x)
 ```
 
-## Do Notation
+## Blocks
 
-There is a keyword `do`, which does not have the same purpose as the `do` keyword in Haskell.
-
-`do` introduces a block. Blocks consist of statements, and must return a value of the same type on every branch of execution.
+Blocks are collections of statements wrapped in braces `{ ... }`. Blocks must return a value of the same type on every branch of execution.
 
 The following types of statement are supported:
 
@@ -386,15 +384,18 @@ The following types of statement are supported:
 - For-each loops
 - While loops
 - If-Then-Else statements
+- Naked expressions
 
 Here is an example of a power function defined using a block:
 
 ```haskell
-pow = \n p -> do
-    var m = n
-	  for i <- 0 until p:
-	    m = m * n
-	  return m
+pow = \n p -> {
+    var m = n;
+    for (i <- 0 until p) {
+      m = m * n;
+    }
+    return m;
+  }
 ```
 
 Blocks enable local mutation of their variables, but mutation is not allowed in general. The type system prevents mutable variables from escaping their scope.
@@ -402,9 +403,10 @@ Blocks enable local mutation of their variables, but mutation is not allowed in 
 That is, while the example above is valid, the following does not compile:
 
 ```haskell
-incr = \n -> do
-  n = n + 1 
-  return n
+incr = \n -> {
+    n = n + 1;
+    return n;
+  }
 ```
 
 The variable `n` is not mutable, and so the assignment in the first line of the `do` block is not allowed.
@@ -412,10 +414,11 @@ The variable `n` is not mutable, and so the assignment in the first line of the 
 This function can be rewritten as follows:
 
 ```haskell
-incr = \n -> do
-  var m = n
-  m = m + 1 
-  return m
+incr = \n -> {
+    var m = n;
+    m = m + 1;
+    return m;
+  }
 ```
 
 ## For Loops
@@ -423,11 +426,13 @@ incr = \n -> do
 For loops look like this:
 
 ```haskell
-total = do
-  var n = 0
-  for i <- 0 until 10:
-  n = n + i
-  return n
+total = {
+    var n = 0;
+    for (i <- 0 until 10) {
+      n = n + i;
+    }
+    return n;
+  }
 ```
 
 The bounds `0` and `10` are inclusive and exclusive respectively.
@@ -437,11 +442,13 @@ The bounds `0` and `10` are inclusive and exclusive respectively.
 For each loops loop over the elements in an array using the `Object.forEach` method. A polyfill may be required for some browsers:
 
 ```haskell
-total = \arr -> do
-  var n = 0
-  foreach i in arr:
-    n = n + i
-  return n
+total = \arr -> {
+    var n = 0;
+    foreach (i in arr) {
+      n = n + i;
+    }
+    return n;
+  }
 ```
 
 ## While Loops
@@ -449,13 +456,15 @@ total = \arr -> do
 The syntax of a while loop is similar to a foreach loop:
 
 ```haskell
-log2 = \n -> do
-  var count = 0
-  var m = n
-  while m > 1:
-    m = m / 2
-    count = count + 1
-  return count
+log2 = \n -> {
+    var count = 0;
+    var m = n;
+    while (m > 1) {
+      m = m / 2;
+      count = count + 1;
+    }
+    return count;
+  }
 ```
 
 ## If-Then-Else Statements
@@ -463,16 +472,30 @@ log2 = \n -> do
 Else branches are optional, and may contain further `if` statements, just as in Javascript:
 
 ```haskell
-collatz = \n -> do
-  var count = 0
-  var m = n
-  while m > 1:
-    if m % 2 == 0:
-      m = m / 2
-    else:
-      m = m * 3 + 1
-    count = count + 1
-  return count
+collatz = \n -> {
+    var count = 0;
+    var m = n;
+    while (m > 1) {
+      if (m % 2 == 0) {
+        m = m / 2;
+      } else {
+        m = m * 3 + 1;
+      }
+      count = count + 1;
+    }
+    return count;
+  }
+```
+
+## Naked Expressions as Statements
+
+Any expression with the empty type `{ }` can be used as a statement in a block. For example, method calls which return `{ }`:
+
+```haskell
+example = \n m -> {
+    console.log "Adding two numbers"
+    return n + m;
+  }
 ```
       
 ## If-Then-Else Expressions
@@ -504,6 +527,7 @@ The following pattern types are supported:
 - Literal patterns
 - Variable pattern
 - Array patterns
+- Cons patterns
 - Record patterns
 - Named patterns
 - Guards
@@ -555,13 +579,31 @@ For example:
 ```haskell
 f = \arr -> case arr of
   [x] -> x
-  [x, y : xs] -> x * y + f(xs)
+  [x, y] -> x * y + f xs
   _ -> 0
 ```
 
 Here, the first pattern only matches arrays of length one, and brings the first element of the array into scope.
 
-The second pattern matches arrays with two or more elements, and brings the first and second elements into scope, along with the remainder of the array as the variable `xs`.
+The second pattern matches arrays with two elements, and brings the first and second elements into scope.
+
+## Cons Patterns
+
+The head and tail of a non-empty array can be matched by using a cons pattern:
+
+```haskell
+add = \arr -> case arr of
+  [] -> 0
+  x : xs -> x + add xs
+```
+
+`:` associates to the right:
+
+```haskell
+addPairs = \arr -> case arr of
+  x : y : xs -> x * y + addPairs xs
+  _ -> 0
+```
 
 ## Record Patterns
 
@@ -581,8 +623,8 @@ For example:
 
 ```haskell
 f = \o -> case o of
-  { arr = [x:_], take = "car" } -> x
-  { arr = [_,x:_], take = "cadr" } -> x
+  { arr = x : _, take = "car" } -> x
+  { arr = _ : x : _, take = "cadr" } -> x
   _ -> 0
 ```
 
@@ -592,8 +634,8 @@ Named patterns bring additional names into scope when using nested patterns. Any
 
 ```haskell
 f = \arr -> case arr of
-  a@[_,_:_] -> a
-  a -> a
+  a@(_ : _ : _) -> true
+  a -> false
 ```
      
 Here, in the first pattern, any array with two or more elements will be matched and bound to the variable `a`.
@@ -605,8 +647,8 @@ Guards are used to impose additional constraints inside a pattern using boolean-
 ```haskell
 evens = \arr -> case arr of 
   [] -> 0
-  [x:xs] | x % 2 == 0 -> 1 + evens xs
-  [_:xs] -> evens xs
+  x : xs | x % 2 == 0 -> 1 + evens xs
+  _ : xs -> evens xs
 ```
 
 ## Type Synonyms
