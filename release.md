@@ -1,7 +1,7 @@
 ## 0.2
 
-- Full language guide can be found [http://functorial.com/purescript](here).
-- Try out the latest features [http://tryps.functorial.com](here).
+- Full language guide can be found [here](http://functorial.com/purescript).
+- Try out the latest features [here](http://tryps.functorial.com).
 
 ### New Features
 
