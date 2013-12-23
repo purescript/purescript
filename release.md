@@ -3,9 +3,11 @@
 ### New Features
 
 - RankNTypes
+
   This experimental feature enables the use of the `forall` quantifier in a 
 - Modules
 - Polymorphic Object Update
+
   Records now support member update in which the type of the field changes during the update. For example:
 
         data Wrap a = Wrap a
