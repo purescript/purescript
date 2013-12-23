@@ -1,4 +1,6 @@
-## 0.2
+Purescript is a small strongly, statically typed compile-to-JS language with extensible records and type-safe blocks.
+
+## 0.2.0 Changes
 
 - Full language guide can be found [here](http://functorial.com/purescript).
 - Try out the latest features [here](http://tryps.functorial.com).
