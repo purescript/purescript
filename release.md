@@ -1,5 +1,8 @@
 ## 0.2
 
+- Full language guide can be found [http://functorial.com/purescript](here).
+- Try out the latest features [http://tryps.functorial.com](here).
+
 ### New Features
 
 - RankNTypes
