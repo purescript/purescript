@@ -116,7 +116,7 @@ var Person = function (value) {
 
 function showPerson(p) {
   if (p.ctor === "Person") {
-    return p.value.name + ", aged " + itoa(p.value.age)
+    return p.value.name + ", aged " + numberToString(p.value.age)
   };
   throw "Failed pattern match" 
 }
