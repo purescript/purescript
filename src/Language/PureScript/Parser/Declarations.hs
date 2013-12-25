@@ -56,9 +56,6 @@ parseValueDeclaration =
                    <*> P.optionMaybe parseGuard
                    <*> ((lexeme (indented *> P.char '=')) *> parseValue)
 
-parseGuard :: P.Parsec String ParseState Value
-parseGuard = indented *> pipe *> indented *> parseValue
-
 parseTopLevelBinder :: P.Parsec String ParseState [Binder]
 parseTopLevelBinder = return <$> P.try parseBinder <|> parens (commaSep parseBinder)
 

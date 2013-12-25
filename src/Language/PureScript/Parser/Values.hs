@@ -14,6 +14,7 @@
 
 module Language.PureScript.Parser.Values (
     parseValue,
+    parseGuard,
     parseBinder
 ) where
 
@@ -72,13 +73,14 @@ parseConstructor :: P.Parsec String ParseState Value
 parseConstructor = Constructor <$> C.parseQualified C.properName
 
 parseCase :: P.Parsec String ParseState Value
-parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") parseValue
+parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") (return <$> parseValue)
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
-parseCaseAlternative :: P.Parsec String ParseState (Binder, Value)
-parseCaseAlternative = (,) <$> (parseGuardedBinder <* C.lexeme (P.string "->"))
-                           <*> parseValue
-                           P.<?> "case alternative"
+parseCaseAlternative :: P.Parsec String ParseState ([Binder], Maybe Guard, Value)
+parseCaseAlternative = (,,) <$> (return <$> parseBinder)
+                            <*> P.optionMaybe parseGuard
+                            <*> (C.lexeme (P.string "->") *> parseValue)
+                            P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Value
 parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parseValue)
@@ -263,6 +265,6 @@ parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expressio
   where
   operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
 
-parseGuardedBinder :: P.Parsec String ParseState Binder
-parseGuardedBinder = flip ($) <$> parseBinder <*> P.option id (GuardedBinder <$> (C.indented *> C.lexeme (P.char '|') *> C.indented *> parseValue))
+parseGuard :: P.Parsec String ParseState Guard
+parseGuard = C.indented *> C.pipe *> C.indented *> parseValue
 

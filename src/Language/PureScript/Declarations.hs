@@ -29,8 +29,6 @@ data Associativity = Infixl | Infixr deriving (Show, D.Data, D.Typeable)
 
 data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
 
-type Guard = Value
-
 data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
   | TypeSynonymDeclaration ProperName [String] PolyType

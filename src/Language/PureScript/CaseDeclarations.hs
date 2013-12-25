@@ -48,15 +48,11 @@ makeCaseDeclaration ident alternatives =
   let
     argPattern = map length . fst . head $ alternatives
     args = map (map (('_' :) . show)) $ toArgs argPattern
-    obj = ObjectLiteral $ concatMap (map (\arg -> (arg, Var (Qualified global (Ident arg))))) args
-    objBinders = [ (applyGuard g $ ObjectBinder (join $ zipWith zip args bs), val) | (bs, (g, val)) <- alternatives ]
-    value = foldr (\args' ret -> Abs (map Ident args') ret) (Case obj objBinders) args
+    vars = concatMap (map (\arg -> Var (Qualified global (Ident arg)))) args
+    binders = [ (join bs, g, val) | (bs, (g, val)) <- alternatives ]
+    value = foldr (\args' ret -> Abs (map Ident args') ret) (Case vars binders) args
   in
     ValueDeclaration ident [] Nothing value
-
-applyGuard :: Maybe Guard -> Binder -> Binder
-applyGuard Nothing = id
-applyGuard (Just g) = GuardedBinder g
 
 toArgs :: [Int] -> [[Int]]
 toArgs = go 1

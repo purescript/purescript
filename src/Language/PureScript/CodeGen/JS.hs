@@ -20,7 +20,7 @@ module Language.PureScript.CodeGen.JS (
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import Control.Arrow (second)
-import Control.Monad (forM)
+import Control.Monad (replicateM, forM)
 
 import Language.PureScript.TypeChecker (Environment, names)
 import Language.PureScript.Values
@@ -73,7 +73,7 @@ valueToJs m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs m e))
 valueToJs m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs m e o, JSObjectLiteral (map (second (valueToJs m e)) ps)]
 valueToJs _ _ (Constructor name) = qualifiedToJS runProperName name
 valueToJs m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs m e) sts))) []
-valueToJs m e (Case value binders) = runGen (bindersToJs m e binders (valueToJs m e value))
+valueToJs m e (Case values binders) = runGen (bindersToJs m e binders (map (valueToJs m e) values))
 valueToJs m e (IfThenElse cond th el) = JSConditional (valueToJs m e cond) (valueToJs m e th) (valueToJs m e el)
 valueToJs m e (Accessor prop val) = JSAccessor prop (valueToJs m e val)
 valueToJs m e (Indexer index val) = JSIndexer (valueToJs m e index) (valueToJs m e val)
@@ -94,12 +94,20 @@ qualifiedToJS f (Qualified (ModulePath parts) a) =
        delimited (part:parts') = JSAccessor part (delimited parts')
        delimited _            = error "Invalid argument to delimited"
 
-bindersToJs :: ModulePath -> Environment -> [(Binder, Value)] -> JS -> Gen JS
-bindersToJs m e binders val = do
-  valName <- fresh
-  jss <- forM binders $ \(binder, result) -> binderToJs m e valName [JSReturn (valueToJs m e result)] binder
-  return $ JSApp (JSFunction Nothing [Ident valName] (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
-                 [val]
+bindersToJs :: ModulePath -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> Gen JS
+bindersToJs m e binders vals = do
+  valNames <- replicateM (length vals) fresh
+  jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs m e result)] bs grd
+  return $ JSApp (JSFunction Nothing (map Ident valNames) (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+                 vals
+  where
+    go :: [String] -> [JS] -> [Binder] -> Maybe Guard -> Gen [JS]
+    go _ done [] Nothing = return done
+    go _ done [] (Just cond) = return [JSIfElse (valueToJs m e cond) (JSBlock done) Nothing]
+    go (v:vs) done' (b:bs) grd = do
+      done'' <- go vs done' bs grd
+      binderToJs m e v done'' b
+    go _ _ _ _ = error "Invalid arguments to bindersToJs"
 
 binderToJs :: ModulePath -> Environment -> String -> [JS] -> Binder -> Gen [JS]
 binderToJs _ _ _ done NullBinder = return done
@@ -152,9 +160,6 @@ binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : js)
-binderToJs m e varName done (GuardedBinder cond binder) = binderToJs m e varName done' binder
-  where
-  done' = [JSIfElse (valueToJs m e cond) (JSBlock done) Nothing]
 
 statementToJs :: ModulePath -> Environment -> Statement -> JS
 statementToJs m e (VariableIntroduction ident value) = JSVariableIntroduction ident (Just (valueToJs m e value))

@@ -331,10 +331,10 @@ infer' (Constructor c) = do
   case M.lookup (qualify modulePath c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty -> replaceAllTypeSynonyms ty
-infer' (Case val binders) = do
-  t1 <- infer val
+infer' (Case vals binders) = do
+  ts <- mapM infer vals
   ret <- fresh
-  checkBinders t1 ret binders
+  checkBinders ts ret binders
   return ret
 infer' (IfThenElse cond th el) = do
   check cond Boolean
@@ -483,21 +483,17 @@ inferBinder val (ConsBinder headBinder tailBinder) = do
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
-inferBinder _ _ = error "Invalid argument to inferBinder"
 
-inferGuardedBinder :: Type -> Binder -> Subst (M.Map Ident Type)
-inferGuardedBinder val (GuardedBinder cond binder) = do
-  m1 <- inferBinder val binder
-  bindLocalVariables (M.toList m1) $ check cond Boolean
-  return m1
-inferGuardedBinder val b = inferBinder val b
-
-checkBinders :: Type -> Type -> [(Binder, Value)] -> Subst ()
+checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> Subst ()
 checkBinders _ _ [] = return ()
-checkBinders nval ret ((binder, val):bs) = do
-  m1 <- inferGuardedBinder nval binder
-  bindLocalVariables (M.toList m1) $ check val ret
-  checkBinders nval ret bs
+checkBinders nvals ret ((binders, grd, val):bs) = do
+  m1 <- M.unions <$> zipWithM inferBinder nvals binders
+  bindLocalVariables (M.toList m1) $ do
+    check val ret
+    case grd of
+      Nothing -> return ()
+      Just g -> check g Boolean
+  checkBinders nvals ret bs
 
 assignVariable :: Ident -> Subst ()
 assignVariable name = do
@@ -618,9 +614,9 @@ check' (TypedValue val ty1) ty2 = do
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
   check val ty1
-check' (Case val binders) ret = do
-  t1 <- infer val
-  checkBinders t1 ret binders
+check' (Case vals binders) ret = do
+  ts <- mapM infer vals
+  checkBinders ts ret binders
 check' (IfThenElse cond th el) ty = do
   check cond Boolean
   check th ty
@@ -712,6 +708,7 @@ inferFunctionApplication (ForAll ident ty) args = do
   replaced <- replaceVarWithUnknown ident ty
   inferFunctionApplication replaced args
 inferFunctionApplication u@(TUnknown _) args = do
+
   ret <- fresh
   args' <- mapM replaceAllVarsWithUnknowns args
   u ~~ Function args' ret

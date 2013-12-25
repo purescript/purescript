@@ -21,6 +21,8 @@ import Language.PureScript.Names
 
 import Data.Data
 
+type Guard = Value
+
 data UnaryOperator
   = Negate
   | Not
@@ -67,7 +69,7 @@ data Value
   | IfThenElse Value Value Value
   | Block [Statement]
   | Constructor (Qualified ProperName)
-  | Case Value [(Binder, Value)]
+  | Case [Value] [([Binder], Maybe Guard, Value)]
   | TypedValue Value PolyType deriving (Show, Data, Typeable)
 
 data Statement
@@ -97,5 +99,4 @@ data Binder
   | ObjectBinder [(String, Binder)]
   | ArrayBinder [Binder]
   | ConsBinder Binder Binder
-  | NamedBinder Ident Binder
-  | GuardedBinder Value Binder deriving (Show, Data, Typeable)
+  | NamedBinder Ident Binder deriving (Show, Data, Typeable)
