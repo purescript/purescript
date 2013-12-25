@@ -27,6 +27,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
+import Language.PureScript.Values
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
@@ -51,8 +52,15 @@ parseTypeSynonymDeclaration =
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
   ValueDeclaration <$> parseIdent
-                   <*> P.many parseBinder
+                   <*> P.many parseTopLevelBinder
+                   <*> P.optionMaybe parseGuard
                    <*> ((lexeme (indented *> P.char '=')) *> parseValue)
+
+parseGuard :: P.Parsec String ParseState Value
+parseGuard = indented *> pipe *> indented *> parseValue
+
+parseTopLevelBinder :: P.Parsec String ParseState [Binder]
+parseTopLevelBinder = return <$> P.try parseBinder <|> parens (commaSep parseBinder)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>

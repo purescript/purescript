@@ -27,30 +27,40 @@ desugarCases :: [Declaration] -> Either String [Declaration]
 desugarCases = fmap join . mapM toDecls . groupBy inSameGroup
 
 inSameGroup :: Declaration -> Declaration -> Bool
-inSameGroup (ValueDeclaration ident1 _ _) (ValueDeclaration ident2 _ _) = ident1 == ident2
+inSameGroup (ValueDeclaration ident1 _ _ _) (ValueDeclaration ident2 _ _ _) = ident1 == ident2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> Either String [Declaration]
-toDecls d@[ValueDeclaration _ [] _] = return d
-toDecls ds@(ValueDeclaration ident bs _ : _) = do
-  let pairs = map toPair ds
-  unless (all ((== length bs) . length . fst) pairs) $
-      throwError $ "Argument list lengths differ in declaration " ++ show pairs
-  return [makeCaseDeclaration ident pairs]
+toDecls d@[ValueDeclaration _ [] Nothing _] = return d
+toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
+  let tuples = map toTuple ds
+  unless (all ((== map length bs) . map length . fst) tuples) $
+      throwError $ "Argument list lengths differ in declaration " ++ show ident
+  return [makeCaseDeclaration ident tuples]
 toDecls ds = return ds
 
-toPair :: Declaration -> ([Binder], Value)
-toPair (ValueDeclaration _ bs val) = (bs, val)
-toPair _ = error "Not a value declaration"
+toTuple :: Declaration -> ([[Binder]], (Maybe Guard, Value))
+toTuple (ValueDeclaration _ bs g val) = (bs, (g, val))
+toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: Ident -> [([Binder], Value)] -> Declaration
+makeCaseDeclaration :: Ident -> [([[Binder]], (Maybe Guard, Value))] -> Declaration
 makeCaseDeclaration ident alternatives =
   let
-    numArgs = length (fst . head $ alternatives)
-    args = map (('_' :) . show) [1..numArgs]
-    obj = ObjectLiteral $ map (\arg -> (arg, Var (Qualified global (Ident arg)))) args
-    objBinders = [ (ObjectBinder (zip args bs), val) | (bs, val) <- alternatives ]
-    value = foldr (\arg ret -> Abs [Ident arg] ret) (Case obj objBinders) args
+    argPattern = map length . fst . head $ alternatives
+    args = map (map (('_' :) . show)) $ toArgs argPattern
+    obj = ObjectLiteral $ concatMap (map (\arg -> (arg, Var (Qualified global (Ident arg))))) args
+    objBinders = [ (applyGuard g $ ObjectBinder (join $ zipWith zip args bs), val) | (bs, (g, val)) <- alternatives ]
+    value = foldr (\args' ret -> Abs (map Ident args') ret) (Case obj objBinders) args
   in
-    ValueDeclaration ident [] value
+    ValueDeclaration ident [] Nothing value
+
+applyGuard :: Maybe Guard -> Binder -> Binder
+applyGuard Nothing = id
+applyGuard (Just g) = GuardedBinder g
+
+toArgs :: [Int] -> [[Int]]
+toArgs = go 1
+  where
+  go _ [] = []
+  go start (n:ns) = [start..start + n - 1] : go (start + n) ns
 

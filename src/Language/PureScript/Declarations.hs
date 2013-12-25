@@ -29,11 +29,13 @@ data Associativity = Infixl | Infixr deriving (Show, D.Data, D.Typeable)
 
 data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
 
+type Guard = Value
+
 data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
   | TypeSynonymDeclaration ProperName [String] PolyType
   | TypeDeclaration Ident PolyType
-  | ValueDeclaration Ident [Binder] Value
+  | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
   | ExternDeclaration Ident PolyType
   | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration ProperName Kind

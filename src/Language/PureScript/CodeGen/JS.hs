@@ -32,10 +32,10 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.TypeChecker.Monad (NameKind(..))
 
 declToJs :: Maybe Ident -> ModulePath -> Declaration -> Environment -> Maybe [JS]
-declToJs curMod mp (ValueDeclaration ident _ (Abs args ret)) e =
+declToJs curMod mp (ValueDeclaration ident _ _ (Abs args ret)) e =
   Just $ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp e ret)]) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) curMod
-declToJs curMod mp (ValueDeclaration ident _ val) e =
+declToJs curMod mp (ValueDeclaration ident _ _ val) e =
   Just $ JSVariableIntroduction ident (Just (valueToJs mp e val)) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) curMod
 declToJs curMod _ (ExternMemberDeclaration member ident _) _ =

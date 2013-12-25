@@ -63,10 +63,10 @@ typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
     putEnv $ env { types = M.insert (modulePath, name) (kind, TypeSynonym) (types env)
                  , typeSynonyms = M.insert (modulePath, name) (args, ty) (typeSynonyms env) }
   typeCheckAll rest
-typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' [] val : rest) | name == name' =
-  typeCheckAll (ValueDeclaration name [] (TypedValue val ty) : rest)
+typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' [] Nothing val : rest) | name == name' =
+  typeCheckAll (ValueDeclaration name [] Nothing (TypedValue val ty) : rest)
 typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
-typeCheckAll (ValueDeclaration name [] val : rest) = do
+typeCheckAll (ValueDeclaration name [] Nothing val : rest) = do
   rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     modulePath <- checkModulePath `fmap` get
@@ -76,7 +76,7 @@ typeCheckAll (ValueDeclaration name [] val : rest) = do
         ty <- typeOf (Just name) val
         putEnv (env { names = M.insert (modulePath, name) (ty, Value) (names env) })
   typeCheckAll rest
-typeCheckAll (ValueDeclaration _ _ _ : _) = error "Binders were not desugared"
+typeCheckAll (ValueDeclaration _ _ _ _ : _) = error "Binders were not desugared"
 typeCheckAll (ExternDataDeclaration name kind : rest) = do
   env <- getEnv
   modulePath <- checkModulePath `fmap` get
