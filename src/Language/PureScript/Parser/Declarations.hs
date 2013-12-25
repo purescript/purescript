@@ -50,8 +50,9 @@ parseTypeSynonymDeclaration =
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
-  ValueDeclaration <$> P.try (parseIdent <* lexeme (indented *> P.char '='))
-                   <*> parseValue
+  ValueDeclaration <$> parseIdent
+                   <*> P.many parseBinder
+                   <*> ((lexeme (indented *> P.char '=')) *> parseValue)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>

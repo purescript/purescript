@@ -33,7 +33,7 @@ data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
   | TypeSynonymDeclaration ProperName [String] PolyType
   | TypeDeclaration Ident PolyType
-  | ValueDeclaration Ident Value
+  | ValueDeclaration Ident [Binder] Value
   | ExternDeclaration Ident PolyType
   | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration ProperName Kind

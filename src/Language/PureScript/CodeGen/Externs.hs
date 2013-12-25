@@ -24,7 +24,7 @@ import Language.PureScript.Pretty
 import Language.PureScript.Names
 
 externToPs :: Int -> ModulePath -> Environment -> Declaration -> Maybe String
-externToPs indent path env (ValueDeclaration name _) = do
+externToPs indent path env (ValueDeclaration name _ _) = do
   (ty, _) <- M.lookup (path, name) $ names env
   return $ replicate indent ' ' ++ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
 externToPs indent path env (DataDeclaration name _ _) = do

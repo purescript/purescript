@@ -1,5 +1,5 @@
 name: purescript
-version: 0.2.0
+version: 0.2.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -15,11 +15,12 @@ data-dir: ""
 
 library
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
-                   directory -any, filepath -any, mtl -any, parsec -any,
-                   syb -any, transformers -any, utf8-string -any
-    exposed-modules: Data.Generics.Extras Language.PureScript
-                     Language.PureScript.CodeGen Language.PureScript.CodeGen.Externs
-                     Language.PureScript.CodeGen.JS Language.PureScript.CodeGen.JS.AST
+                   directory -any, filepath -any, mtl -any, parsec -any, syb -any,
+                   transformers -any, utf8-string -any
+    exposed-modules: Data.Generics.Extras
+                     Language.PureScript Language.PureScript.CodeGen
+                     Language.PureScript.CodeGen.Externs Language.PureScript.CodeGen.JS
+                     Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.Monad Language.PureScript.Declarations
                      Language.PureScript.Kinds Language.PureScript.Names
                      Language.PureScript.Operators Language.PureScript.Optimize
@@ -36,6 +37,7 @@ library
                      Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types Language.PureScript.Types
                      Language.PureScript.Unknown Language.PureScript.Values Main
+                     Language.PureScript.CaseDeclarations
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -47,6 +49,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: src
+--    other-modules:
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 test-suite tests

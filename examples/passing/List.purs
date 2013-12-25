@@ -5,18 +5,15 @@ data List a
     , tail :: List a
     }
 
-isNull = \l -> case l of
-  Nil -> true
-  _ -> false
+isNull Nil = true
+isNull _ = false
 
-concat = \l1 -> \l2 -> case l1 of 
-  Nil -> l2
-  Cons x -> Cons
-    { head: x.head
-    , tail: concat x.tail l2 
-    }
+concat (Nil) l2 = l2
+concat (Cons x) l2 = Cons
+  { head: x.head
+  , tail: concat x.tail l2 
+  }
 
-flatten = \xss -> case xss of 
-  Nil -> Nil
-  Cons cons -> concat cons.head (flatten cons.tail)
+flatten Nil = Nil
+flatten (Cons cons) = concat cons.head (flatten cons.tail)
 
