@@ -17,6 +17,7 @@ module Language.PureScript.Optimize (
 ) where
 
 import Data.Data
+import Data.Maybe (fromMaybe)
 import Data.Generics
 
 import Language.PureScript.Names
@@ -29,6 +30,12 @@ replaceIdent :: (Data d) => Ident -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
   where
   replace (JSVar var2) | var1 == var2 = js
+  replace other = other
+
+replaceIdents :: (Data d) => [(Ident, JS)] -> d -> d
+replaceIdents vars = everywhere (mkT replace)
+  where
+  replace v@(JSVar var) = fromMaybe v $ lookup var vars
   replace other = other
 
 isReassigned :: (Data d) => Ident -> d -> Bool
@@ -84,7 +91,8 @@ etaConvert :: JS -> JS
 etaConvert = everywhere (mkT convert)
   where
   convert :: JS -> JS
-  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing [ident] (JSBlock body)) [arg])]) | shouldInline arg = JSBlock (replaceIdent ident arg body)
+  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents (JSBlock body)) args)])
+    | all shouldInline args = JSBlock (replaceIdents (zip idents args) body)
   convert js = js
 
 unThunk :: JS -> JS

@@ -18,57 +18,50 @@ konst = \a -> \b -> a
 data Maybe a = Nothing | Just a
 
 maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
-maybe = \b -> \f -> \m -> case m of 
-  Nothing -> b
-  Just a -> f a
+maybe b _ Nothing = b
+maybe _ f (Just a) = f a
 
 fromMaybe :: forall a. a -> Maybe a -> a
-fromMaybe = \a -> maybe a id
+fromMaybe a = maybe a id
 
 bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
-bindMaybe = \m -> \f -> maybe Nothing f m
+bindMaybe m f = maybe Nothing f m
 
 -- Either
 
 data Either a b = Left a | Right b
 
 either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
-either = \f -> \g -> \e -> case e of
-  Left a -> f a
-  Right b -> g b 
+either f _ (Left a) = f a
+either _ g (Right b) = g b 
 
 bindEither :: forall e a b. Either e a -> (a -> Either e b) -> Either e b
-bindEither = either (\e -> \_ -> Left e) (\a -> \f -> f a) 
+bindEither = either (\e _ -> Left e) (\a f -> f a) 
 
 -- Arrays
 
 head :: forall a. [a] -> a
-head = \xs -> case xs of
-  x : _ -> x
+head (x : _) = x
 
 headSafe :: forall a. [a] -> Maybe a
-headSafe = \xs -> case xs of 
-  x : _ -> Just x
-  _ -> Nothing
+headSafe (x : _) = Just x
+headSafe _ = Nothing
 
 tail :: forall a. [a] -> [a]
-tail = \xs -> case xs of
-  _ : xs -> xs
+tail (_ : xs) = xs
 
 tailSafe :: forall a. [a] -> Maybe [a]
-tailSafe = \xs -> case xs of
-  _ : xs -> Just xs
-  _ -> Nothing
+tailSafe (_ : xs) = Just xs
+tailSafe _ = Nothing
 
 foreign import map :: forall a b. (a -> b) -> [a] -> [b]
 
 foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
-foldr = \f -> \a -> \bs -> case bs of
-  b : bs -> f (foldr f a bs) b
-  [] -> a
+foldr f a (b : bs) = f (foldr f a bs) b
+foldr _ a [] = a
 
 foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
-foldl = \f -> \b -> \as -> {
+foldl f b as = {
     var result = b;
     foreach (a in as) {
       result = f a result;
@@ -104,7 +97,7 @@ cons :: forall a. a -> [a] -> [a]
 cons = \a -> concat([a])
 
 concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
-concatMap = \as -> \f -> {
+concatMap as f = {
     var result = [];
     foreach (a in as) {
       result = result `concat` f a;
@@ -115,12 +108,11 @@ concatMap = \as -> \f -> {
 foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
 
 empty :: forall a. [a] -> Boolean
-empty = \as -> case as of
-  [] -> true
-  _ -> false
+empty [] = true
+empty _ = false 
 
 range :: Number -> Number -> [Number]
-range = \lo -> \hi -> {
+range lo hi = {
     var ns = [];
     for (n <- lo until hi) {
       ns = push ns n;
@@ -129,12 +121,11 @@ range = \lo -> \hi -> {
   }
 
 zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
-zipWith = \f -> \as -> \bs -> case { as: as, bs: bs } of
-  { as = a : as1, bs = b : bs1 } -> cons (f a b) (zipWith f as1 bs1)
-  _ -> []
+zipWith f (a:as) (b:bs) = cons (f a b) (zipWith f as bs)
+zipWith _ _ _ = []
 
 any :: forall a. (a -> Boolean) -> [a] -> Boolean
-any = \p -> \as -> {
+any p as = {
     for (i <- 0 until length as) {
       if (p (as !! i)) {
         return true;
@@ -144,7 +135,7 @@ any = \p -> \as -> {
   }
 
 all :: forall a. (a -> Boolean) -> [a] -> Boolean
-all = \p -> \as -> {
+all p as = {
     for (i <- 0 until length as) {
       if (!(p (as !! i))) {
         return false;
@@ -158,10 +149,10 @@ all = \p -> \as -> {
 type Tuple a b = { fst :: a, snd :: b }
 
 curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
-curry = \f -> \a -> \b -> f { fst: a, snd: b }
+curry f a b = f { fst: a, snd: b }
 
 uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
-uncurry = \f -> \t -> f t.fst t.snd
+uncurry f t = f t.fst t.snd
 
 tuple :: forall a b. a -> b -> Tuple a b
 tuple = curry id
@@ -170,10 +161,9 @@ zip :: forall a b. [a] -> [b] -> [Tuple a b]
 zip = zipWith tuple
 
 unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
-unzip = \ts -> case ts of
-  t : ts1 -> case unzip ts1 of
+unzip (t:ts) = case unzip ts of
     { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
-  [] -> tuple [] []
+unzip [] = tuple [] []
 
 -- Strings
 

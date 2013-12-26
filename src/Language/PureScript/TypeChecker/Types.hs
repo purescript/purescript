@@ -451,9 +451,12 @@ inferBinder val (UnaryBinder ctor binder) = do
   modulePath <- checkModulePath <$> get
   case M.lookup (qualify modulePath ctor) (dataConstructors env) of
     Just ty -> do
-      Function [obj] ret <- replaceAllVarsWithUnknowns ty
-      val `subsumes` ret
-      inferBinder obj binder
+      fn <- replaceAllVarsWithUnknowns ty
+      case fn of
+        Function [obj] ret -> do
+          val `subsumes` ret
+          inferBinder obj binder
+        _ -> throwError $ "Constructor " ++ show ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (ObjectBinder props) = do
   row <- fresh
