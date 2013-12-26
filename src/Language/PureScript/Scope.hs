@@ -26,7 +26,6 @@ import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Data.Maybe (mapMaybe)
-import Text.Read (readMaybe)
 
 usedNames :: (Data d) => d -> [Ident]
 usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB `extQ` namesJS) val
@@ -69,3 +68,8 @@ firstUnusedName val =
   toUnknown :: Ident -> Maybe Int
   toUnknown (Ident ('_' : s)) = readMaybe s
   toUnknown _ = Nothing
+
+readMaybe :: String -> Maybe Int
+readMaybe s = case reads s of
+                [(n, "")] -> Just n
+                _ -> Nothing
