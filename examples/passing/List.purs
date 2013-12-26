@@ -8,7 +8,7 @@ data List a
 isNull Nil = true
 isNull _ = false
 
-concat (Nil) l2 = l2
+concat Nil l2 = l2
 concat (Cons x) l2 = Cons
   { head: x.head
   , tail: concat x.tail l2 

@@ -57,7 +57,7 @@ parseValueDeclaration =
                    <*> ((lexeme (indented *> P.char '=')) *> parseValue)
 
 parseTopLevelBinder :: P.Parsec String ParseState [Binder]
-parseTopLevelBinder = return <$> P.try parseBinder <|> parens (commaSep parseBinder)
+parseTopLevelBinder = return <$> P.try parseBinderNoParens <|> parens (commaSep parseBinder)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>

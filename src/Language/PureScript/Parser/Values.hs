@@ -15,7 +15,8 @@
 module Language.PureScript.Parser.Values (
     parseValue,
     parseGuard,
-    parseBinder
+    parseBinder,
+    parseBinderNoParens
 ) where
 
 import Language.PureScript.Values
@@ -264,6 +265,19 @@ parseBinder :: P.Parsec String ParseState Binder
 parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expression"
   where
   operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
+
+parseBinderNoParens :: P.Parsec String ParseState Binder
+parseBinderNoParens = P.choice (map P.try
+                  [ parseNullBinder
+                  , parseStringBinder
+                  , parseBooleanBinder
+                  , parseNumberBinder
+                  , parseNamedBinder
+                  , parseVarBinder
+                  , parseNullaryBinder
+                  , parseObjectBinder
+                  , parseArrayBinder
+                  , C.parens parseBinder ]) P.<?> "binder"
 
 parseGuard :: P.Parsec String ParseState Guard
 parseGuard = C.indented *> C.pipe *> C.indented *> parseValue
