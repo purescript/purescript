@@ -1,8 +1,8 @@
-gcd :: (Number, Number) -> Number
-gcd (0, x) = x
-gcd (x, 0) = x
-gcd (x, y) | x > y = gcd (x % y, y)
-gcd (x, y) = gcd (y % x, x)
+_1 :: (Number, Number) -> Number
+_1 (0, x) = x
+_1 (x, 0) = x
+_1 (x, y) | x > y = _1 (x % y, y)
+_1 (x, y) = _1 (y % x, x)
 
 guardsTest (x:xs) | x > 0 = guardsTest xs
 guardsTest xs = xs

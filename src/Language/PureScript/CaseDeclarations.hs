@@ -19,9 +19,11 @@ module Language.PureScript.CaseDeclarations (
 import Data.List (groupBy)
 import Control.Monad (join, unless)
 import Control.Monad.Error.Class
+
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Declarations
+import Language.PureScript.Scope
 
 desugarCases :: [Declaration] -> Either String [Declaration]
 desugarCases = fmap join . mapM toDecls . groupBy inSameGroup
@@ -47,16 +49,14 @@ makeCaseDeclaration :: Ident -> [([[Binder]], (Maybe Guard, Value))] -> Declarat
 makeCaseDeclaration ident alternatives =
   let
     argPattern = map length . fst . head $ alternatives
-    args = map (map (('_' :) . show)) $ toArgs argPattern
-    vars = concatMap (map (\arg -> Var (Qualified global (Ident arg)))) args
+    args = take (sum argPattern) $ unusedNames (ident, alternatives)
+    vars = map (\arg -> Var (Qualified global arg)) args
     binders = [ (join bs, g, val) | (bs, (g, val)) <- alternatives ]
-    value = foldr (\args' ret -> Abs (map Ident args') ret) (Case vars binders) args
+    value = foldr (\args' ret -> Abs args' ret) (Case vars binders) (rearrange argPattern args)
   in
     ValueDeclaration ident [] Nothing value
 
-toArgs :: [Int] -> [[Int]]
-toArgs = go 1
-  where
-  go _ [] = []
-  go start (n:ns) = [start..start + n - 1] : go (start + n) ns
+rearrange :: [Int] -> [a] -> [[a]]
+rearrange [] _ = []
+rearrange (n:ns) xs = take n xs : rearrange ns (drop n xs)
 

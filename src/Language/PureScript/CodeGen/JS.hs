@@ -25,6 +25,7 @@ import Control.Monad (replicateM, forM)
 import Language.PureScript.TypeChecker (Environment, names)
 import Language.PureScript.Values
 import Language.PureScript.Names
+import Language.PureScript.Scope
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
@@ -96,6 +97,7 @@ qualifiedToJS f (Qualified (ModulePath parts) a) =
 
 bindersToJs :: ModulePath -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> Gen JS
 bindersToJs m e binders vals = do
+  setNextName $ firstUnusedName (binders, vals)
   valNames <- replicateM (length vals) fresh
   jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs m e result)] bs grd
   return $ JSApp (JSFunction Nothing (map Ident valNames) (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))

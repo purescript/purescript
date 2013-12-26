@@ -19,7 +19,7 @@ module Language.PureScript.CodeGen.Monad where
 import Control.Monad.State
 import Control.Applicative
 
-newtype Gen a = Gen { unGen :: State Int a } deriving (Functor, Applicative, Monad, MonadState Int)
+newtype Gen a = Gen { unGen :: State Int a } deriving (Functor, Applicative, Monad, MonadState Int, MonadFix)
 
 runGen :: Gen a -> a
 runGen = flip evalState 0 . unGen
@@ -29,3 +29,9 @@ fresh = do
   n <- get
   modify (+ 1)
   return $ '_' : show n
+
+getNextName :: Gen Int
+getNextName = get
+
+setNextName :: Int -> Gen ()
+setNextName = put

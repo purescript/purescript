@@ -47,3 +47,5 @@ data JS
 data JSAssignment
   = JSAssignVariable Ident
   | JSAssignProperty String JSAssignment deriving (Show, Data, Typeable)
+
+
