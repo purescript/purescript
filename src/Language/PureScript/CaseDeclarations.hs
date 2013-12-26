@@ -39,6 +39,9 @@ toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
   unless (all ((== map length bs) . map length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
   return [makeCaseDeclaration ident tuples]
+toDecls [ModuleDeclaration name decls] = do
+  desugared <- desugarCases decls
+  return [ModuleDeclaration name desugared]
 toDecls ds = return ds
 
 toTuple :: Declaration -> ([[Binder]], (Maybe Guard, Value))

@@ -8,6 +8,9 @@ module Test where
   bar :: Foo -> String
   bar = foo
 
+  incr :: Number -> Number
+  incr x = x + 1
+
   module Inner where
 
     inner = "Inner"
