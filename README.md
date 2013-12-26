@@ -74,7 +74,7 @@ As an introductory example, here is the usual "Hello World" written in PureScrip
 ```haskell
 foreign import console :: { log :: String -> {} }
 
-main = \() -> console.log "Hello, World!"
+main = \ -> console.log "Hello, World!"
 ```
 
 which compiles to the following Javascript:
@@ -95,8 +95,7 @@ data Person = Person { name :: String, age :: Number }
 foreign import numberToString :: Number -> String
 
 showPerson :: Person -> String
-showPerson = \p -> case p of
-  Person o -> o.name ++ ", aged " ++ numberToString(o.age)
+showPerson (Person o) = o.name ++ ", aged " ++ numberToString(o.age)
 ```
 
 Line by line, this reads as follows:
@@ -105,21 +104,21 @@ Line by line, this reads as follows:
     - The `Person` constructor takes an object with two properties, `name` which is a `String`, and `age` which is a `Number`
 - The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
 - The `showPerson` function takes a `Person` and returns a `String`
-- `showPerson` works by case analysis on its argument `p`, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
+- `showPerson` works by case analysis on its argument, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
 
 The generated Javascript looks like this:
 
 ```javascript
 var Person = function (value) { 
-  return { ctor: 'Person', value: value }; 
+    return { ctor: 'Person', value: value }; 
 };
 
-function showPerson(p) {
-  if (p.ctor === "Person") {
-    return p.value.name + ", aged " + numberToString(p.value.age)
-  };
-  throw "Failed pattern match" 
-}
+function showPerson(_1) {
+    if (_1.ctor === "Person") {
+        return _1.value.name + ", aged " + numberToString(_1.value.age); 
+    }; 
+    throw "Failed pattern match"; 
+}; 
 
 ```
 
@@ -141,7 +140,7 @@ The type system defines the following types:
     - E.g. `Number -> String`
     - E.g. `(Number, Number) -> Number`
     - Functions can have zero or more arguments
-- Polymorphic types (for top level declarations only)
+- Polymorphic types
     - E.g. `forall a. a -> a` 
 
 ## Primitive Types
@@ -188,11 +187,10 @@ For example:
 ```haskell
 data Foo a = Foo | Bar String
 
-runFoo = \foo -> case foo of
-Foo -> "It's a Foo"
-Bar s -> "It's a Bar. The string is " ++ s
+runFoo Foo = "It's a Foo"
+runFoo (Bar s) = "It's a Bar. The string is " ++ s
 
-runFoo Foo ++ runFoo (Bar "Test")
+test = runFoo Foo ++ runFoo (Bar "Test")
 ```
 
 In the example, Foo is a tagged union type which has two constructors. It's first constructor `Foo` takes no argument, and it's second `Bar` takes one, which must be a String.
@@ -289,7 +287,7 @@ Expressions defined at the top level may have polymorphic types.
 Here is an example:
 
 ```haskell
-identity = \x -> x
+identity x = x
 ```
 
 `identity` is inferred to have (polymorphic) type `forall t0. t0 -> t0`. This means that for any type `t0`, `identity` can be given a value of type `t0` and will give back a value of the same type.
@@ -298,13 +296,13 @@ A type annotation can also be provided:
 
 ```haskell
 identity :: forall a. a -> a
-identity = \x -> x
+identity x = x
 ```
 
 Functions may also be polymorphic in row types or type variables with other kinds (see "Kind System"):
 
 ```haskell
-addProps = \o -> o.foo + o.bar
+addProps o = o.foo + o.bar
 ```
     
 Here, `addProps` is inferred to have type `forall r. { foo :: Number, bar :: Number | r } -> Number`. That is, it can take any type which has properties `Foo` and `Bar`, and *any other record properties*.
@@ -335,7 +333,7 @@ As an example, we can pass a polymorphic function as an argument to another func
 
 ```haskell
 poly :: (forall a. a -> a) -> Boolean
-poly = \f -> (f 0 < 1) == f true
+poly f = (f 0 < 1) == f true
 ```
 
 Notice that the polymorphic function's type argument is instantiated to both `Number` and `Boolean`.
@@ -391,7 +389,7 @@ The following types of statement are supported:
 Here is an example of a power function defined using a block:
 
 ```haskell
-pow = \n p -> {
+pow n p = {
     var m = n;
     for (i <- 0 until p) {
       m = m * n;
@@ -405,7 +403,7 @@ Blocks enable local mutation of their variables, but mutation is not allowed in 
 That is, while the example above is valid, the following does not compile:
 
 ```haskell
-incr = \n -> {
+incr n = {
     n = n + 1;
     return n;
   }
@@ -416,7 +414,7 @@ The variable `n` is not mutable, and so the assignment in the first line of the 
 This function can be rewritten as follows:
 
 ```haskell
-incr = \n -> {
+incr n = {
     var m = n;
     m = m + 1;
     return m;
@@ -444,7 +442,7 @@ The bounds `0` and `10` are inclusive and exclusive respectively.
 For each loops loop over the elements in an array using the `Object.forEach` method. A polyfill may be required for some browsers:
 
 ```haskell
-total = \arr -> {
+total arr = {
     var n = 0;
     foreach (i in arr) {
       n = n + i;
@@ -458,7 +456,7 @@ total = \arr -> {
 The syntax of a while loop is similar to a foreach loop:
 
 ```haskell
-log2 = \n -> {
+log2 n = {
     var count = 0;
     var m = n;
     while (m > 1) {
@@ -474,7 +472,7 @@ log2 = \n -> {
 Else branches are optional, and may contain further `if` statements, just as in Javascript:
 
 ```haskell
-collatz = \n -> {
+collatz n = {
     var count = 0;
     var m = n;
     while (m > 1) {
@@ -494,7 +492,7 @@ collatz = \n -> {
 Any expression with the empty type `{ }` can be used as a statement in a block. For example, method calls which return `{ }`:
 
 ```haskell
-example = \n m -> {
+example n m = {
     console.log "Adding two numbers"
     return n + m;
   }
@@ -521,6 +519,18 @@ case value of
   pattern -> result
   -- ...
   pattern -> result
+```
+
+Pattern matching can also be used in the declaration of functions, as we have already seen:
+
+```haskell
+fn pattern_1 ... pattern_n = result
+```
+
+Any of the above types of pattern are also valid when introducing functions. In addition, patterns can also be grouped in parentheses to introduce multiple-arugument functions. For example, 
+
+```haskell
+example x (y, z) w = x * y + z * w
 ```
 
 The following pattern types are supported:
@@ -651,6 +661,13 @@ evens = \arr -> case arr of
   [] -> 0
   x : xs | x % 2 == 0 -> 1 + evens xs
   _ : xs -> evens xs
+```
+
+When defining a function, guards appear after all patterns:
+
+```haskell
+greater x y | x > y = true
+greater _ _ = false
 ```
 
 ## Type Synonyms
