@@ -45,6 +45,9 @@ The `psc` executable takes a list of PureScript source files as arguments and by
 
 The following options are supported:
 
+    -s --stdin
+        Read input from standard input instead of from files
+    
     -o --output 
         Write the generated Javascript to the specified file
         
