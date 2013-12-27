@@ -20,12 +20,17 @@ import Control.Applicative
 import Control.Monad (forM)
 import System.Exit (exitSuccess, exitFailure)
 import qualified System.IO.UTF8 as U
+import Text.Parsec (ParseError)
 
-compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Declaration])
+readInput Nothing = getContents >>= return . P.runIndentParser P.parseDeclarations
+readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
+  text <- U.readFile inputFile
+  return $ P.runIndentParser P.parseDeclarations text
+
+compile :: Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile input output externs = do
-  asts <- fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
-    text <- U.readFile inputFile
-    return $ P.runIndentParser P.parseDeclarations text
+  asts <- readInput input
   case asts of
     Left err -> do
       U.print err
@@ -44,8 +49,12 @@ compile input output externs = do
             Just filePath -> U.writeFile filePath exts
           exitSuccess
 
+useStdIn :: Term Bool
+useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
+     { optDoc = "Read from standard input" }
+
 inputFiles :: Term [FilePath]
-inputFiles = nonEmpty $ posAny [] $ posInfo
+inputFiles = value $ posAny [] $ posInfo
      { posDoc = "The input .ps files" }
 
 outputFile :: Term (Maybe FilePath)
@@ -56,8 +65,14 @@ externsFile :: Term (Maybe FilePath)
 externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
      { optDoc = "The output .e.ps file" }
 
+stdInOrInputFiles :: Term (Maybe [FilePath])
+stdInOrInputFiles = combine <$> useStdIn <*> inputFiles
+  where
+  combine False input = Just input
+  combine True _ = Nothing
+
 term :: Term (IO ())
-term = compile <$> inputFiles <*> outputFile <*> externsFile
+term = compile <$> stdInOrInputFiles <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
