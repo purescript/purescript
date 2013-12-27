@@ -27,7 +27,6 @@ import Language.PureScript.TypeChecker.Synonyms as T
 import Data.Maybe
 import qualified Data.Map as M
 
-import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -63,9 +62,7 @@ typeCheckAll (TypeSynonymDeclaration name args ty : rest) = do
     putEnv $ env { types = M.insert (modulePath, name) (kind, TypeSynonym) (types env)
                  , typeSynonyms = M.insert (modulePath, name) (args, ty) (typeSynonyms env) }
   typeCheckAll rest
-typeCheckAll (TypeDeclaration name ty : ValueDeclaration name' [] Nothing val : rest) | name == name' =
-  typeCheckAll (ValueDeclaration name [] Nothing (TypedValue val ty) : rest)
-typeCheckAll (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
+typeCheckAll (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
 typeCheckAll (ValueDeclaration name [] Nothing val : rest) = do
   rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
