@@ -35,6 +35,8 @@ See the `LICENSE` file
 
 Contributions are always encouraged! Please see `CONTRIBUTING.md` for guidelines.
 
+Join the discussion on FreeNode at [irc://irc.freenode.net/purescript](irc://irc.freenode.net/purescript).
+
 ## Installation
 
 Install the Haskell Plaform, then `cabal install`
