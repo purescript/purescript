@@ -21,6 +21,7 @@ import Data.List (intersect)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
+import Language.PureScript.Values
 import Language.PureScript.Scope (usedNames)
 
 createBindingGroups :: [Declaration] -> [Declaration]
@@ -33,17 +34,25 @@ createBindingGroups ds =
     sorted = map toBindingGroup $ stronglyConnComp verts
   in
     map handleModuleDeclaration nonValues ++ sorted
-  where
-  isValueDecl :: Declaration -> Bool
-  isValueDecl (ValueDeclaration _ _ _ _) = True
-  isValueDecl _ = False
-  getIdent :: Declaration -> Ident
-  getIdent (ValueDeclaration ident _ _ _) = ident
-  getIdent _ = error "undefined"
-  toBindingGroup :: SCC Declaration -> Declaration
-  toBindingGroup (AcyclicSCC d) = d
-  toBindingGroup (CyclicSCC [d]) = d
-  toBindingGroup (CyclicSCC ds') = BindingGroupDeclaration ds'
-  handleModuleDeclaration :: Declaration -> Declaration
-  handleModuleDeclaration (ModuleDeclaration name ds') = ModuleDeclaration name $ createBindingGroups ds'
-  handleModuleDeclaration other = other
+
+isValueDecl :: Declaration -> Bool
+isValueDecl (ValueDeclaration _ _ _ _) = True
+isValueDecl _ = False
+
+getIdent :: Declaration -> Ident
+getIdent (ValueDeclaration ident _ _ _) = ident
+getIdent _ = error "Expected ValueDeclaration"
+
+toBindingGroup :: SCC Declaration -> Declaration
+toBindingGroup (AcyclicSCC d) = d
+toBindingGroup (CyclicSCC [d]) = d
+toBindingGroup (CyclicSCC ds') = BindingGroupDeclaration (map fromValueDecl ds')
+
+fromValueDecl :: Declaration -> (Ident, Value)
+fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
+fromValueDecl (ValueDeclaration _ _ _ _) = error "Binders should have been desugared"
+fromValueDecl _ = error "Expected ValueDeclaration"
+
+handleModuleDeclaration :: Declaration -> Declaration
+handleModuleDeclaration (ModuleDeclaration name ds') = ModuleDeclaration name $ createBindingGroups ds'
+handleModuleDeclaration other = other

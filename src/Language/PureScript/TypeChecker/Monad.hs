@@ -163,6 +163,13 @@ class (Typeable t, Data t, Show t) => Unifiable t where
   apply :: Substitution -> t -> t
   unknowns :: t -> [Int]
 
+instance (Unifiable a) => Unifiable [a] where
+  unknown _ = error "not supported"
+  (~~) = zipWithM_ (~~)
+  isUnknown _ = error "not supported"
+  apply s = map (apply s)
+  unknowns = concatMap unknowns
+
 occursCheck :: (Unifiable t) => Unknown s -> t -> Subst ()
 occursCheck (Unknown u) t =
   case isUnknown t of

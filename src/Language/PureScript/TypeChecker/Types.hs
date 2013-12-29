@@ -15,11 +15,12 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 
 module Language.PureScript.TypeChecker.Types (
-    typeOf
+    typesOf
 ) where
 
 import Data.List
 import Data.Maybe (fromMaybe)
+import Data.Either (lefts, rights)
 import qualified Data.Data as D
 import Data.Generics
        (mkT, something, everywhere, everywhereBut, mkQ, extQ)
@@ -139,33 +140,36 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
 
-isFunction :: Value -> Bool
-isFunction (Abs _ _) = True
-isFunction (TypedValue untyped _) = isFunction untyped
-isFunction _ = False
+typesOf :: [(Ident, Value)] -> Check [Type]
+typesOf vals = do
+  (tys, sub, checks) <- runSubst $ do
+    modulePath <- checkModulePath <$> get
+    let es = map isTyped vals
+        typed = lefts es
+        untyped = rights es
+        typedDict = map (\(ident, ty, _) -> (ident, ty)) typed
+    untypedNames <- replicateM (length untyped) fresh
+    let untypedDict = zip (map fst untyped) untypedNames
+        dict = M.fromList (map (\(ident, ty) -> ((modulePath, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+    tys <- forM es $ \e -> case e of
+      Left (_, ty, val) -> do
+        kind <- liftCheck $ kindOf ty
+        guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+        ty' <- replaceAllTypeSynonyms ty
+        bindNames dict $ check val ty'
+        return ty'
+      Right (ident, val) -> do
+        ty <- bindNames dict $ infer val
+        ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+        return ty
+    return tys
+  forM tys $ flip (escapeCheck checks) sub
+  forM tys $ skolemEscapeCheck
+  return $ map (varIfUnknown . desaturateAllTypeSynonyms . setifyAll) tys
 
-typeOf :: Maybe Ident -> Value -> Check Type
-typeOf name val = do
-  (ty, sub, checks) <- runSubst $ case name of
-        Just ident | isFunction val ->
-          case val of
-            TypedValue value ty -> do
-              kind <- liftCheck $ kindOf ty
-              guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-              ty' <- replaceAllTypeSynonyms ty
-              modulePath <- checkModulePath <$> get
-              bindNames (M.singleton (modulePath, ident) (ty, LocalVariable)) $ check value ty'
-              return ty'
-            _ -> do
-              me <- fresh
-              modulePath <- checkModulePath <$> get
-              ty <- bindNames (M.singleton (modulePath, ident) (me, LocalVariable)) $ infer val
-              ty ~~ me
-              return ty
-        _ -> infer val
-  escapeCheck checks ty sub
-  skolemEscapeCheck ty
-  return $ varIfUnknown $ desaturateAllTypeSynonyms $ setifyAll ty
+isTyped :: (Ident, Value) -> Either (Ident, Type, Value) (Ident, Value)
+isTyped (name, TypedValue value ty) = Left (name, ty, value)
+isTyped (name, value) = Right (name, value)
 
 escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
 escapeCheck checks ty sub =

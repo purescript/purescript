@@ -31,6 +31,7 @@ import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.TypeChecker.Monad (NameKind(..))
+import Debug.Trace (trace)
 
 declToJs :: Maybe Ident -> ModulePath -> Declaration -> Environment -> Maybe [JS]
 declToJs curMod mp (ValueDeclaration ident _ _ (Abs args ret)) e =
@@ -39,6 +40,16 @@ declToJs curMod mp (ValueDeclaration ident _ _ (Abs args ret)) e =
 declToJs curMod mp (ValueDeclaration ident _ _ val) e =
   Just $ JSVariableIntroduction ident (Just (valueToJs mp e val)) :
          maybe [] (return . setProperty (identToJs ident) (JSVar ident)) curMod
+declToJs curMod mp (BindingGroupDeclaration vals) e = trace (show [ JSApp (JSFunction Nothing [] (JSBlock (concatMap (\(ident, val) ->
+           JSVariableIntroduction ident (Just (valueToJs mp e val)) :
+           maybe [] (return . setProperty (identToJs ident) (JSVar ident)) curMod
+         ) vals))) []
+       ]) $
+  Just [ JSApp (JSFunction Nothing [] (JSBlock (concatMap (\(ident, val) ->
+           JSVariableIntroduction ident (Just (valueToJs mp e val)) :
+           maybe [] (return . setProperty (identToJs ident) (JSVar ident)) curMod
+         ) vals))) []
+       ]
 declToJs curMod _ (ExternMemberDeclaration member ident _) _ =
   Just $ JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))]) :
          maybe [] (return . setProperty (show ident) (JSVar ident)) curMod

@@ -34,7 +34,7 @@ data Declaration
   | TypeSynonymDeclaration ProperName [String] PolyType
   | TypeDeclaration Ident PolyType
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
-  | BindingGroupDeclaration [Declaration]
+  | BindingGroupDeclaration [(Ident, Value)]
   | ExternDeclaration Ident PolyType
   | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration ProperName Kind

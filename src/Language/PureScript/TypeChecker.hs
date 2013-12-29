@@ -70,11 +70,22 @@ typeCheckAll (ValueDeclaration name [] Nothing val : rest) = do
     case M.lookup (modulePath, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
       Nothing -> do
-        ty <- typeOf (Just name) val
+        [ty] <- typesOf [(name, val)]
         putEnv (env { names = M.insert (modulePath, name) (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ValueDeclaration _ _ _ _ : _) = error "Binders were not desugared"
-typeCheckAll (BindingGroupDeclaration ds : rest) = error $ show ds
+typeCheckAll (BindingGroupDeclaration vals : rest) = do
+  rethrow (("Error in binding group " ++ show (map fst vals) ++ ":\n") ++) $ do
+    modulePath <- checkModulePath `fmap` get
+    forM_ (map fst vals) $ \name -> do
+      env <- getEnv
+      case M.lookup (modulePath, name) (names env) of
+        Just _ -> throwError $ show name ++ " is already defined"
+        Nothing -> return ()
+    tys <- typesOf vals
+    forM (zip (map fst vals) tys) $ \(name, ty) ->
+      modifyEnv $ \env -> env { names = M.insert (modulePath, name) (ty, Value) (names env) }
+  typeCheckAll rest
 typeCheckAll (ExternDataDeclaration name kind : rest) = do
   env <- getEnv
   modulePath <- checkModulePath `fmap` get
