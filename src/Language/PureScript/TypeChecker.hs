@@ -74,6 +74,7 @@ typeCheckAll (ValueDeclaration name [] Nothing val : rest) = do
         putEnv (env { names = M.insert (modulePath, name) (ty, Value) (names env) })
   typeCheckAll rest
 typeCheckAll (ValueDeclaration _ _ _ _ : _) = error "Binders were not desugared"
+typeCheckAll (BindingGroupDeclaration ds : rest) = error $ show ds
 typeCheckAll (ExternDataDeclaration name kind : rest) = do
   env <- getEnv
   modulePath <- checkModulePath `fmap` get
