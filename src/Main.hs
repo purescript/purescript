@@ -23,15 +23,15 @@ import qualified System.IO.UTF8 as U
 
 compile :: [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile input output externs = do
-  asts <- fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
+  modules <- fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
     text <- U.readFile inputFile
-    return $ P.runIndentParser P.parseDeclarations text
-  case asts of
+    return $ P.runIndentParser P.parseModules text
+  case modules of
     Left err -> do
       U.print err
       exitFailure
-    Right decls ->
-      case P.compile decls of
+    Right ms ->
+      case P.compile ms of
         Left err -> do
           U.putStrLn err
           exitFailure

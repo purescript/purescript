@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.BindingGroups (
-    createBindingGroups
+    createBindingGroups,
+    createBindingGroupsModule
 ) where
 
 import Data.Graph
@@ -24,6 +25,9 @@ import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Scope (usedNames)
 
+createBindingGroupsModule :: [Module] -> [Module]
+createBindingGroupsModule = map $ \(Module name ds) -> Module name (createBindingGroups ds)
+
 createBindingGroups :: [Declaration] -> [Declaration]
 createBindingGroups ds =
   let
@@ -33,7 +37,7 @@ createBindingGroups ds =
     verts = map (\d -> (d, getIdent d, usedNames d `intersect` allIdents)) values
     sorted = map toBindingGroup $ stronglyConnComp verts
   in
-    map handleModuleDeclaration nonValues ++ sorted
+    nonValues ++ sorted
 
 isValueDecl :: Declaration -> Bool
 isValueDecl (ValueDeclaration _ _ _ _) = True
@@ -52,7 +56,3 @@ fromValueDecl :: Declaration -> (Ident, Value)
 fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
 fromValueDecl (ValueDeclaration _ _ _ _) = error "Binders should have been desugared"
 fromValueDecl _ = error "Expected ValueDeclaration"
-
-handleModuleDeclaration :: Declaration -> Declaration
-handleModuleDeclaration (ModuleDeclaration name ds') = ModuleDeclaration name $ createBindingGroups ds'
-handleModuleDeclaration other = other

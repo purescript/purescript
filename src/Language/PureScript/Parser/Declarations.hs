@@ -14,7 +14,8 @@
 
 module Language.PureScript.Parser.Declarations (
     parseDeclaration,
-    parseDeclarations
+    parseModule,
+    parseModules
 ) where
 
 import Control.Applicative
@@ -84,25 +85,13 @@ parseFixityDeclaration = do
   name <- operator
   return $ FixityDeclaration fixity name
 
-parseModuleDeclaration :: P.Parsec String ParseState Declaration
-parseModuleDeclaration = do
-  reserved "module"
-  indented
-  name <- properName
-  lexeme $ P.string "where"
-  decls <- mark (P.many (same *> parseDeclaration))
-  return $ ModuleDeclaration name decls
-
-parseModulePath :: P.Parsec String ParseState ModulePath
-parseModulePath = ModulePath <$> properName `sepBy1` dot
-
 parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  modulePath <- parseModulePath
+  moduleName <- ModuleName <$> properName
   idents <- P.optionMaybe $ parens $ commaSep1 parseIdent
-  return $ ImportDeclaration modulePath idents
+  return $ ImportDeclaration moduleName idents
 
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
@@ -112,8 +101,16 @@ parseDeclaration = P.choice
                    , parseValueDeclaration
                    , parseExternDeclaration
                    , parseFixityDeclaration
-                   , parseModuleDeclaration
                    , parseImportDeclaration ] P.<?> "declaration"
 
-parseDeclarations :: P.Parsec String ParseState [Declaration]
-parseDeclarations = whiteSpace *> mark (P.many (same *> parseDeclaration)) <* P.eof
+parseModule :: P.Parsec String ParseState Module
+parseModule = do
+  reserved "module"
+  indented
+  name <- properName
+  lexeme $ P.string "where"
+  decls <- mark (P.many (same *> parseDeclaration))
+  return $ Module name decls
+
+parseModules :: P.Parsec String ParseState [Module]
+parseModules = whiteSpace *> mark (P.many (same *> parseModule)) <* P.eof

@@ -1,4 +1,6 @@
-f 0 = 0
-f x = g x + 1
+module MutRec where 
 
-g x = f (x / 2)
+  f 0 = 0
+  f x = g x + 1
+
+  g x = f (x / 2)

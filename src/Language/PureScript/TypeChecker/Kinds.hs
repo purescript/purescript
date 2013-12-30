@@ -28,6 +28,7 @@ import Language.PureScript.Unknown
 
 import Control.Monad.State
 import Control.Monad.Error
+import Control.Monad.Reader
 
 import Control.Applicative
 
@@ -53,11 +54,11 @@ instance Unifiable Kind where
   unknowns (FunKind k1 k2) = unknowns k1 ++ unknowns k2
   unknowns _ = []
 
-kindOf :: Type -> Check Kind
-kindOf ty = fmap (\(k, _, _) -> k) . runSubst $ starIfUnknown <$> infer Nothing M.empty ty
+kindOf :: ModuleName -> Type -> Check Kind
+kindOf moduleName ty = fmap (\(k, _, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer Nothing M.empty ty
 
-kindsOf :: Maybe ProperName -> [String] -> [Type] -> Check Kind
-kindsOf name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst $ do
+kindsOf :: ModuleName -> Maybe ProperName -> [String] -> [Type] -> Check Kind
+kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst (SubstContext moduleName) $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   ks <- inferAll (fmap (\pn -> (pn, tyCon)) name) (M.fromList (zip args kargs)) ts
@@ -92,11 +93,11 @@ infer _ m (TypeVar v) =
   case M.lookup v m of
     Just k -> return k
     Nothing -> throwError $ "Unbound type variable " ++ v
-infer (Just (name, k)) _ (TypeConstructor (Qualified (ModulePath []) pn)) | name == pn = return k
+infer (Just (name, k)) _ (TypeConstructor (Qualified Nothing pn)) | name == pn = return k
 infer _ _ (TypeConstructor v) = do
   env <- liftCheck getEnv
-  modulePath <- checkModulePath `fmap` get
-  case M.lookup (qualify modulePath v) (types env) of
+  moduleName <- substCurrentModule `fmap` ask
+  case M.lookup (qualify moduleName v) (types env) of
     Nothing -> throwError $ "Unknown type constructor '" ++ show v ++ "'"
     Just (kind, _) -> return kind
 infer name m (TypeApp t1 t2) = do

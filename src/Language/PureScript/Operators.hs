@@ -33,12 +33,12 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
-rebracket :: [Declaration] -> Either String [Declaration]
-rebracket ds = do
-  m <- collectFixities ds
+rebracket :: [Module] -> Either String [Module]
+rebracket ms = forM ms $ \(Module name ds) -> do
+  m <- collectFixities (ModuleName name) ds
   let opTable = customOperatorTable m
   ds' <- G.everywhereM' (G.mkM (matchOperators opTable)) ds
-  return $ G.everywhere (G.mkT removeParens) ds'
+  return $ Module name $ G.everywhere (G.mkT removeParens) ds'
 
 removeParens :: Value -> Value
 removeParens (Parens val) = val
@@ -85,22 +85,19 @@ matchOp op = do
   ident <- parseOp
   guard (ident == op)
 
-collectFixities :: [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-collectFixities = go M.empty global
+collectFixities :: ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
+collectFixities = go M.empty
   where
-  go :: M.Map (Qualified Ident) Fixity -> ModulePath -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
+  go :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
   go m _ [] = return m
-  go m p (FixityDeclaration fixity name : rest) = do
-    let qual = Qualified p (Op name)
+  go m moduleName (FixityDeclaration fixity name : rest) = do
+    let qual = Qualified (Just moduleName) (Op name)
     when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
-    go (M.insert qual fixity m) p rest
-  go m p (ModuleDeclaration name decls : rest) = do
-    m' <- go m (subModule p name) decls
-    go m' p rest
-  go m p (_:ds) = go m p ds
+    go (M.insert qual fixity m) moduleName rest
+  go m moduleName (_:ds) = go m moduleName ds
 
 globalOp :: String -> Qualified Ident
-globalOp = Qualified global . Op
+globalOp = Qualified Nothing . Op
 
 builtIns :: [(Qualified Ident, Value -> Value -> Value, Precedence, Associativity)]
 builtIns = [ (globalOp "<", Binary LessThan, 3, Infixl)

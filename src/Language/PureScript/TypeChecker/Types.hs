@@ -37,6 +37,7 @@ import Language.PureScript.Unknown
 
 import Control.Monad.State
 import Control.Monad.Error
+import Control.Monad.Reader
 
 import Control.Applicative
 import Control.Arrow (Arrow(..))
@@ -132,28 +133,27 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     ret1 `unifyTypes` ret2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
-    modulePath <- checkModulePath `fmap` get
-    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify modulePath c1 == qualify modulePath c2)
+    moduleName <- substCurrentModule `fmap` ask
+    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify moduleName c1 == qualify moduleName c2)
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
 
-typesOf :: [(Ident, Value)] -> Check [Type]
-typesOf vals = do
-  (tys, sub, checks) <- runSubst $ do
-    modulePath <- checkModulePath <$> get
+typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
+typesOf moduleName vals = do
+  (tys, sub, checks) <- runSubst (SubstContext moduleName) $ do
     let es = map isTyped vals
         typed = lefts es
         untyped = rights es
         typedDict = map (\(ident, ty, _) -> (ident, ty)) typed
     untypedNames <- replicateM (length untyped) fresh
     let untypedDict = zip (map fst untyped) untypedNames
-        dict = M.fromList (map (\(ident, ty) -> ((modulePath, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+        dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
     tys <- forM es $ \e -> case e of
       Left (_, ty, val) -> do
-        kind <- liftCheck $ kindOf ty
+        kind <- liftCheck $ kindOf moduleName ty
         guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
         ty' <- replaceAllTypeSynonyms ty
         bindNames dict $ check val ty'
@@ -241,7 +241,7 @@ replaceVarWithUnknown ident ty = do
 replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  let syns = map (\((path, name), (args, _)) -> (Qualified path name, length args)) . M.toList $ typeSynonyms env
+  let syns = map (\((path, name), (args, _)) -> (Qualified (Just path) name, length args)) . M.toList $ typeSynonyms env
   either throwError return $ saturateAllTypeSynonyms syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
@@ -253,8 +253,8 @@ desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
 expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Type
 expandTypeSynonym name args = do
   env <- getEnv
-  modulePath <- checkModulePath `fmap` get
-  case M.lookup (qualify modulePath name) (typeSynonyms env) of
+  moduleName <- substCurrentModule `fmap` ask
+  case M.lookup (qualify moduleName name) (typeSynonyms env) of
     Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
     Nothing -> error "Type synonym was not defined"
 
@@ -312,7 +312,8 @@ infer' (Accessor prop val) = do
     Just ty -> return ty
 infer' (Abs args ret) = do
   ts <- replicateM (length args) fresh
-  bindLocalVariables (zip args ts) $ do
+  moduleName <- substCurrentModule <$> ask
+  bindLocalVariables moduleName (zip args ts) $ do
     body <- infer' ret
     return $ Function ts body
 infer' app@(App _ _) = do
@@ -322,7 +323,8 @@ infer' app@(App _ _) = do
   checkFunctionApplications ft argss ret
   return ret
 infer' (Var var) = do
-  ty <- lookupVariable var
+  moduleName <- substCurrentModule <$> ask
+  ty <- lookupVariable moduleName var
   replaceAllTypeSynonyms ty
 infer' (Block ss) = do
   ret <- fresh
@@ -331,8 +333,8 @@ infer' (Block ss) = do
   return ret
 infer' (Constructor c) = do
   env <- getEnv
-  modulePath <- checkModulePath `fmap` get
-  case M.lookup (qualify modulePath c) (dataConstructors env) of
+  moduleName <- substCurrentModule `fmap` ask
+  case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty -> replaceAllTypeSynonyms ty
 infer' (Case vals binders) = do
@@ -347,7 +349,8 @@ infer' (IfThenElse cond th el) = do
   t2 ~~ t3
   return t2
 infer' (TypedValue val ty) = do
-  kind <- liftCheck $ kindOf ty
+  moduleName <- substCurrentModule <$> ask
+  kind <- liftCheck $ kindOf moduleName ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- replaceAllTypeSynonyms ty
   check val ty'
@@ -444,16 +447,16 @@ inferBinder val (BooleanBinder _) = val ~~ Boolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (NullaryBinder ctor) = do
   env <- getEnv
-  modulePath <- checkModulePath <$> get
-  case M.lookup (qualify modulePath ctor) (dataConstructors env) of
+  moduleName <- substCurrentModule <$> ask
+  case M.lookup (qualify moduleName ctor) (dataConstructors env) of
     Just ty -> do
       ty `subsumes` val
       return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (UnaryBinder ctor binder) = do
   env <- getEnv
-  modulePath <- checkModulePath <$> get
-  case M.lookup (qualify modulePath ctor) (dataConstructors env) of
+  moduleName <- substCurrentModule <$> ask
+  case M.lookup (qualify moduleName ctor) (dataConstructors env) of
     Just ty -> do
       fn <- replaceAllVarsWithUnknowns ty
       case fn of
@@ -494,8 +497,9 @@ inferBinder val (NamedBinder name binder) = do
 checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> Subst ()
 checkBinders _ _ [] = return ()
 checkBinders nvals ret ((binders, grd, val):bs) = do
+  moduleName <- substCurrentModule <$> ask
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  bindLocalVariables (M.toList m1) $ do
+  bindLocalVariables moduleName (M.toList m1) $ do
     check val ret
     case grd of
       Nothing -> return ()
@@ -505,8 +509,8 @@ checkBinders nvals ret ((binders, grd, val):bs) = do
 assignVariable :: Ident -> Subst ()
 assignVariable name = do
   env <- checkEnv <$> get
-  modulePath <- checkModulePath <$> get
-  case M.lookup (modulePath, name) (names env) of
+  moduleName <- substCurrentModule <$> ask
+  case M.lookup (moduleName, name) (names env) of
     Just (_, LocalVariable) -> throwError $ "Variable with name " ++ show name ++ " already exists."
     _ -> return ()
 
@@ -529,16 +533,18 @@ checkStatement mass ret (If ifst) = do
   allCodePathsReturn <- checkIfStatement mass ret ifst
   return (allCodePathsReturn, mass)
 checkStatement mass ret (For ident start end inner) = do
+  moduleName <- substCurrentModule <$> ask
   assignVariable ident
   check start Number
   check end Number
-  (allCodePathsReturn, _) <- bindLocalVariables [(ident, Number)] $ checkBlock mass ret inner
+  (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
   return (allCodePathsReturn, mass)
 checkStatement mass ret (ForEach ident vals inner) = do
+  moduleName <- substCurrentModule <$> ask
   assignVariable ident
   val <- fresh
   check vals (Array val)
-  (allCodePathsReturn, _) <- bindLocalVariables [(ident, val)] $ checkBlock mass ret inner
+  (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, val)] $ checkBlock mass ret inner
   guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
   return (False, mass)
 checkStatement mass _ (ValueStatement val) = do
@@ -566,8 +572,9 @@ checkElseStatement mass ret (ElseIf ifst) = checkIfStatement mass ret ifst
 checkBlock :: M.Map Ident Type -> Type -> [Statement] -> Subst (Bool, M.Map Ident Type)
 checkBlock mass _ [] = return (False, mass)
 checkBlock mass ret (s:ss) = do
+  moduleName <- substCurrentModule <$> ask
   (b1, mass1) <- checkStatement mass ret s
-  bindLocalVariables (M.toList mass1) $ case (b1, ss) of
+  bindLocalVariables moduleName (M.toList mass1) $ case (b1, ss) of
     (True, []) -> return (True, mass1)
     (True, _) -> throwError "Unreachable code"
     (False, ss') -> checkBlock mass1 ret ss'
@@ -606,18 +613,21 @@ check' (Binary op left right) ty = checkBinary op left right ty
 check' (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check val ty)
 check' (Indexer index vals) ty = check index Number >> check vals (Array ty)
 check' (Abs args ret) (Function argTys retTy) = do
+  moduleName <- substCurrentModule <$> ask
   guardWith "Incorrect number of function arguments" (length args == length argTys)
-  bindLocalVariables (zip args argTys) $ check ret retTy
+  bindLocalVariables moduleName (zip args argTys) $ check ret retTy
 check' app@(App _ _) ret = do
   let (f, argss) = unfoldApplication app
   ft <- infer f
   checkFunctionApplications ft argss ret
 check' (Var var) ty = do
-  ty1 <- lookupVariable var
+  moduleName <- substCurrentModule <$> ask
+  ty1 <- lookupVariable moduleName var
   repl <- replaceAllTypeSynonyms ty1
   repl `subsumes` ty
 check' (TypedValue val ty1) ty2 = do
-  kind <- liftCheck $ kindOf ty1
+  moduleName <- substCurrentModule <$> ask
+  kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
   check val ty1
@@ -647,8 +657,8 @@ check' (Block ss) ret = do
   guardWith "Block is missing a return statement" allCodePathsReturn
 check' (Constructor c) ty = do
   env <- getEnv
-  modulePath <- checkModulePath <$> get
-  case M.lookup (qualify modulePath c) (dataConstructors env) of
+  moduleName <- substCurrentModule <$> ask
+  case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty1 -> do
       repl <- replaceAllTypeSynonyms ty1

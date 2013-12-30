@@ -188,11 +188,10 @@ properName :: P.Parsec String u ProperName
 properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
 
 parseQualified :: P.Parsec String ParseState a -> P.Parsec String ParseState (Qualified a)
-parseQualified parser = part global
+parseQualified parser = qual
   where
-  part path = (do name <- P.try (properName <* delimiter)
-                  part (subModule path name))
-              <|> (Qualified path <$> P.try parser)
+  qual = (Qualified <$> (Just . ModuleName <$> P.try (properName <* delimiter)) <*> parser)
+     <|> (Qualified Nothing <$> P.try parser)
   delimiter = indented *> dot
 
 integerOrFloat :: P.Parsec String u (Either Integer Double)
