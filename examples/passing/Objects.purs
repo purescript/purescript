@@ -1,12 +1,14 @@
-test = \x -> x.foo + x.bar
+module Objects where
 
-append = \o -> { foo: o.foo, bar: 1 }
+  test = \x -> x.foo + x.bar
 
-apTest = append({foo : "Foo", baz: "Baz"})
+  append = \o -> { foo: o.foo, bar: 1 }
 
-f = (\a -> a.b.c) { b: { c: 1, d: "Hello" }, e: "World" }
+  apTest = append({foo : "Foo", baz: "Baz"})
 
-g = (\a -> a.f { x: 1, y: "y" }) { f: \o -> o.x + 1 }
+  f = (\a -> a.b.c) { b: { c: 1, d: "Hello" }, e: "World" }
 
-typed :: { foo :: Number }
-typed = { foo: 0 }
+  g = (\a -> a.f { x: 1, y: "y" }) { f: \o -> o.x + 1 }
+
+  typed :: { foo :: Number }
+  typed = { foo: 0 }

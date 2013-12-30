@@ -1,12 +1,14 @@
-type List a = forall r. r -> (a -> r -> r) -> r
+module Church where
 
-empty :: forall a. List a
-empty = \r f -> r
+  type List a = forall r. r -> (a -> r -> r) -> r
 
-cons :: forall a. a -> List a -> List a
-cons = \a l r f -> f a (l r f)
+  empty :: forall a. List a
+  empty = \r f -> r
 
-append :: forall a. List a -> List a -> List a
-append = \l1 l2 r f -> l2 (l1 r f) f
+  cons :: forall a. a -> List a -> List a
+  cons = \a l r f -> f a (l r f)
 
-test = append (cons 1 empty) (cons 2 empty)
+  append :: forall a. List a -> List a -> List a
+  append = \l1 l2 r f -> l2 (l1 r f) f
+
+  test = append (cons 1 empty) (cons 2 empty)

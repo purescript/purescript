@@ -1,7 +1,9 @@
-infixr 6 :
+module Cons where
 
-foreign import (:) :: forall a. a -> [a] -> [a]
+  infixr 6 :
 
-test1 = \xs -> 1 : xs
+  foreign import (:) :: forall a. a -> [a] -> [a]
 
-test2 = 1 : 2 : 3 : []
+  test1 = \xs -> 1 : xs
+
+  test2 = 1 : 2 : 3 : []

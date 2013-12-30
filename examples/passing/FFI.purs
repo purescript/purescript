@@ -1,5 +1,7 @@
-foreign import foo :: String -> String
+module FFI where
 
-bar :: String -> String
+  foreign import foo :: String -> String
 
-bar = \x -> foo (x ++ "bar")
+  bar :: String -> String
+
+  bar = \x -> foo (x ++ "bar")

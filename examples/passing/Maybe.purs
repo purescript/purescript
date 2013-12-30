@@ -1,9 +1,11 @@
-data Maybe a = Nothing | Just a
+module Maybe where
 
-maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
-maybe b _ Nothing = b
-maybe _ f (Just a) = f a
+  data Maybe a = Nothing | Just a
 
-fmap m f = maybe Nothing (\a -> Just (f a)) m
+  maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
+  maybe b _ Nothing = b
+  maybe _ f (Just a) = f a
 
-bind m f = maybe Nothing f m
+  fmap m f = maybe Nothing (\a -> Just (f a)) m
+
+  bind m f = maybe Nothing f m

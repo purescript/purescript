@@ -1,17 +1,19 @@
-test1 :: (forall a. (a -> a)) -> Number
-test1 = \f -> f 0
+module Rank2Types where
 
-foreign import data ST :: * -> * -> *
+  test1 :: (forall a. (a -> a)) -> Number
+  test1 = \f -> f 0
 
-foreign import runST :: forall a. (forall s. ST s a) -> a
+  foreign import data ST :: * -> * -> *
 
-foreign import exampleST :: forall s. ST s Number
+  foreign import runST :: forall a. (forall s. ST s a) -> a
 
-testST = runST exampleST
+  foreign import exampleST :: forall s. ST s Number
 
-foreign import push :: forall el. el -> [el] -> [el]
+  testST = runST exampleST
 
-replicateM :: forall m a. (forall a. a -> m a) -> (forall a b. m a -> (a -> m b) -> m b) -> Number -> m a -> m [a]
-replicateM = \ret bind n m -> case n of
-  0 -> ret []
-  n -> bind m (\x -> bind (replicateM ret bind (n - 1) m) (\xs -> ret (push x xs)))
+  foreign import push :: forall el. el -> [el] -> [el]
+
+  replicateM :: forall m a. (forall a. a -> m a) -> (forall a b. m a -> (a -> m b) -> m b) -> Number -> m a -> m [a]
+  replicateM = \ret bind n m -> case n of
+    0 -> ret []
+    n -> bind m (\x -> bind (replicateM ret bind (n - 1) m) (\xs -> ret (push x xs)))

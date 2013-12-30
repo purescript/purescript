@@ -1,23 +1,25 @@
-foreign import data IO :: * -> *
+module Console where
 
-foreign import ret :: forall a. a -> IO a
+  foreign import data IO :: * -> *
 
-foreign import (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
+  foreign import ret :: forall a. a -> IO a
 
-(*>) = \a -> \b -> a >>= \x -> b
+  foreign import (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
 
-foreign import putStrLn :: String -> IO {}
+  (*>) = \a -> \b -> a >>= \x -> b
 
-replicateM_ :: forall a. Number -> IO a -> IO {}
-replicateM_ = \n -> \x -> 
-  { 
-    var io = ret {};
-    for (i <- 0 until n)
-    {
-      io = x *> io;
+  foreign import putStrLn :: String -> IO {}
+
+  replicateM_ :: forall a. Number -> IO a -> IO {}
+  replicateM_ = \n -> \x -> 
+    { 
+      var io = ret {};
+      for (i <- 0 until n)
+      {
+	io = x *> io;
+      }
+      return io;
     }
-    return io;
-  }
 
-main = replicateM_ 10 (putStrLn "Hello World!")
+  main = replicateM_ 10 (putStrLn "Hello World!")
 

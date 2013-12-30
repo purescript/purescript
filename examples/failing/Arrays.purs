@@ -1,1 +1,3 @@
-test = \arr -> arr !! (0 !! 0)
+module Arrays where
+
+  test = \arr -> arr !! (0 !! 0)

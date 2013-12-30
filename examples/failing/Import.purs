@@ -1,1 +1,3 @@
-import UndefinedModule
+module Module where
+
+  import UndefinedModule

@@ -1,3 +1,5 @@
-data Foo a = Foo
+module Match where
 
-foo = \f -> case f of Foo -> "foo"
+  data Foo a = Foo
+
+  foo = \f -> case f of Foo -> "foo"

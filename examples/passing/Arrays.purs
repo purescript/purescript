@@ -1,20 +1,22 @@
-test1 = \arr -> arr !! 0 + arr !! 1
+module Arrays where
 
-test2 = \arr -> case arr of 
-  [x, y] -> x + y
-  [x] -> x
-  [] -> 0
-  (x : y : _) -> x + y
+  test1 = \arr -> arr !! 0 + arr !! 1
 
-data Tree = One Number | Some [Tree]
+  test2 = \arr -> case arr of 
+    [x, y] -> x + y
+    [x] -> x
+    [] -> 0
+    (x : y : _) -> x + y
 
-test3 = \(tree, sum) -> case tree of
-  One n -> n
-  Some (n1 : n2 : rest) -> test3(n1, sum) * 10 + test3(n2, sum) * 5 + sum(rest)
+  data Tree = One Number | Some [Tree]
 
-test4 = \arr -> case arr of 
-  [] -> 0
-  [_] -> 0
-  x : y : xs -> x * y + test4 xs
-  
+  test3 = \(tree, sum) -> case tree of
+    One n -> n
+    Some (n1 : n2 : rest) -> test3(n1, sum) * 10 + test3(n2, sum) * 5 + sum(rest)
+
+  test4 = \arr -> case arr of 
+    [] -> 0
+    [_] -> 0
+    x : y : xs -> x * y + test4 xs
+    
 
