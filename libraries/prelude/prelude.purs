@@ -15,7 +15,7 @@ module Prelude where
   (<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
   (<|) = flip (|>)
 
-  -- Maybe
+module Maybe where
 
   data Maybe a = Nothing | Just a
 
@@ -24,12 +24,12 @@ module Prelude where
   maybe _ f (Just a) = f a
 
   fromMaybe :: forall a. a -> Maybe a -> a
-  fromMaybe a = maybe a id
+  fromMaybe a = maybe a Prelude.id
 
   bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
   bindMaybe m f = maybe Nothing f m
 
-  -- Either
+module Either where
 
   data Either a b = Left a | Right b
 
@@ -40,7 +40,9 @@ module Prelude where
   bindEither :: forall e a b. Either e a -> (a -> Either e b) -> Either e b
   bindEither = either (\e _ -> Left e) (\a f -> f a) 
 
-  -- Arrays
+module Arrays where
+
+  import Maybe
 
   head :: forall a. [a] -> a
   head (x : _) = x
@@ -96,7 +98,7 @@ module Prelude where
   foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
 
   cons :: forall a. a -> [a] -> [a]
-  cons = \a -> concat([a])
+  cons a = concat [a]
 
   concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
   concatMap as f = {
@@ -146,7 +148,9 @@ module Prelude where
       return true;
     }
 
-  -- Pairs
+module Tuple where
+
+  import Arrays
 
   type Tuple a b = { fst :: a, snd :: b }
 
@@ -157,7 +161,7 @@ module Prelude where
   uncurry f t = f t.fst t.snd
 
   tuple :: forall a b. a -> b -> Tuple a b
-  tuple = curry id
+  tuple = curry Prelude.id
 
   zip :: forall a b. [a] -> [b] -> [Tuple a b]
   zip = zipWith tuple
@@ -167,7 +171,7 @@ module Prelude where
       { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
   unzip [] = tuple [] []
 
-  -- Strings
+module String where
 
   foreign import member "length" lengthS :: String -> Number
 
@@ -195,7 +199,7 @@ module Prelude where
 
   foreign import trim :: String -> String
 
-  -- Regex
+module Regex where
 
   foreign import data Regex :: *
 
@@ -209,7 +213,7 @@ module Prelude where
 
   foreign import search :: Regex -> String -> Number
 
-  -- Globals
+module Global where
 
   foreign import nan :: Number
 
@@ -239,7 +243,7 @@ module Prelude where
 
   foreign import decodeURI :: String -> String
 
-  -- Math
+module Math where
 
   type Math = 
     { abs :: Number -> Number

@@ -238,11 +238,12 @@ replaceVarWithUnknown ident ty = do
   ru <- fresh
   return $ replaceRowVars ident ru . replaceTypeVars ident tu $ ty
 
-replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
+replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadReader SubstContext m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
+  moduleName <- substCurrentModule <$> ask
   let syns = map (\((path, name), (args, _)) -> (Qualified (Just path) name, length args)) . M.toList $ typeSynonyms env
-  either throwError return $ saturateAllTypeSynonyms syns d
+  either throwError return $ saturateAllTypeSynonyms moduleName syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
 desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)

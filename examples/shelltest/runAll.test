@@ -2,7 +2,7 @@
 mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Maybe.purs -o tests/Maybe.js && cat tests/Maybe.js Maybe.js | nodejs
 <<<
 >>>
-{ ctor: 'Just', value: 'ab' }
+{ ctor: 'Maybe.Just', value: 'ab' }
 >>>2
 >>>= 0
 
