@@ -90,11 +90,21 @@ valueToJs m e (App val args) = JSApp (valueToJs m e val) (map (valueToJs m e) ar
 valueToJs m e (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs m e val)])
 valueToJs m e (Unary op val) = JSUnary op (valueToJs m e val)
 valueToJs m e (Binary op v1 v2) = JSBinary op (valueToJs m e v1) (valueToJs m e v2)
-valueToJs m e (Var ident) = case M.lookup (qualify m ident) (names e) of
-  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
-  _ -> qualifiedToJS identToJs ident
+valueToJs m e (Var ident) = varToJs m e ident
 valueToJs m e (TypedValue val _) = valueToJs m e val
 valueToJs _ _ _ = error "Invalid argument to valueToJs"
+
+varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
+varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) of
+  Just (_, ty) | isExtern ty -> JSVar ident
+  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
+  _ -> qualifiedToJS identToJs qual
+  where
+  isExtern Extern = True
+  isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
+    Just (_, ty') -> isExtern ty'
+    Nothing -> error "Undefined alias in varToJs"
+  isExtern _ = False
 
 qualifiedToJS :: (a -> String) -> Qualified a -> JS
 qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = JSAccessor (f a) (JSVar (Ident m))
