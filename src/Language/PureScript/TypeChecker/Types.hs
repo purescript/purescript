@@ -133,13 +133,27 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     ret1 `unifyTypes` ret2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
+    env <- getEnv
     moduleName <- substCurrentModule `fmap` ask
-    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (qualify moduleName c1 == qualify moduleName c2)
+    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (typeConstructorsAreEqual env moduleName c1 c2)
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
+
+typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
+typeConstructorsAreEqual env moduleName c1 c2 =
+  let
+    c1' = qualify moduleName c1
+    c2' = qualify moduleName c2
+  in
+    canonicalize env c1' == canonicalize env c2'
+  where
+  canonicalize :: Environment -> (ModuleName, ProperName) -> (ModuleName, ProperName)
+  canonicalize _ key = case key `M.lookup` types env of
+    Just (_, DataAlias mn' pn') -> (mn', pn')
+    _ -> key
 
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
 typesOf moduleName vals = do

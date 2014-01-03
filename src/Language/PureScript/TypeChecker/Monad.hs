@@ -34,7 +34,7 @@ import qualified Data.Map as M
 
 data NameKind = Value | Extern | Alias ModuleName Ident | LocalVariable deriving Show
 
-data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
+data TypeDeclarationKind = Data | ExternData | TypeSynonym | DataAlias ModuleName ProperName deriving Show
 
 data Environment = Environment
   { names :: M.Map (ModuleName, Ident) (Type, NameKind)

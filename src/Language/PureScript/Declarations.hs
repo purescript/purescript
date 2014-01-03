@@ -29,7 +29,7 @@ data Associativity = Infixl | Infixr deriving (Show, D.Data, D.Typeable)
 
 data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
 
-data Module = Module ProperName [Declaration]
+data Module = Module ProperName [Declaration] deriving (Show, D.Data, D.Typeable)
 
 data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
@@ -41,5 +41,5 @@ data Declaration
   | ExternMemberDeclaration String Ident PolyType
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
-  | ImportDeclaration ModuleName (Maybe [Ident])
+  | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
   deriving (Show, D.Data, D.Typeable)

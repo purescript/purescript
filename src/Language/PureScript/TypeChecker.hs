@@ -26,14 +26,14 @@ import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
 import qualified Data.Map as M
+import Control.Monad.State
+import Control.Monad.Error
+import Data.Either (rights, lefts)
 
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
-
-import Control.Monad.State
-import Control.Monad.Error
 
 typeCheckAll :: ModuleName -> [Declaration] -> Check ()
 typeCheckAll _ [] = return ()
@@ -122,15 +122,39 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
   rethrow errorMessage $ do
     guardWith ("Module " ++ show moduleName ++ " does not exist") $ moduleExists env
     case idents of
-      Nothing -> bindIdents (map snd $ filterModule env) env
-      Just idents' -> bindIdents idents' env
-  typeCheckAll moduleName rest
+      Nothing -> do
+        bindIdents (map snd $ filterModule (names env)) env
+        bindTypes (map snd $ filterModule (types env)) env
+      Just idents' -> do
+        bindIdents (lefts idents') env
+        bindTypes (rights idents') env
+  typeCheckAll currentModule rest
  where errorMessage = (("Error in import declaration " ++ show moduleName ++ ":\n") ++)
-       filterModule = filter ((== moduleName) . fst) . M.keys . names
-       moduleExists env = not $ null $ filterModule env
+       filterModule = filter ((== moduleName) . fst) . M.keys
+       moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
        bindIdents idents' env =
          forM_ idents' $ \ident -> do
            guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
            case (moduleName, ident) `M.lookup` names env of
              Just (pt, _) -> modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
              Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
+       bindTypes pns env =
+         forM_ pns $ \pn -> do
+           guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
+           case (moduleName, pn) `M.lookup` types env of
+             Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
+             Just (k, _) -> do
+               modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
+               let keys = map (snd . fst) . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
+               forM_ keys $ \dctor -> do
+                 guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
+                 case (moduleName, dctor) `M.lookup` dataConstructors env of
+                   Just ctorTy -> modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) ctorTy (dataConstructors e) })
+                   Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
+       constructs (TypeConstructor (Qualified (Just mn) pn')) pn
+         = mn == moduleName && pn' == pn
+       constructs (ForAll _ ty) pn = ty `constructs` pn
+       constructs (Function _ ty) pn = ty `constructs` pn
+       constructs (TypeApp ty _) pn = ty `constructs` pn
+       constructs fn _ = error $ "Invalid arguments to construct" ++ show fn
+
