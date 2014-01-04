@@ -17,9 +17,6 @@ Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
 - Functions with multiple arguments
 - Pattern matching
 - Simple FFI
- 
-## Experimental Features
-
 - Modules
 - Rank N Types
 
