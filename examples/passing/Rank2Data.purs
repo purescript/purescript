@@ -1,23 +1,25 @@
-data Id = Id forall a. a -> a
+module Rank2Data where
 
-runId = \id a -> case id of
-  Id f -> f a
+  data Id = Id forall a. a -> a
 
-data Nat = Nat forall r. r -> (r -> r) -> r
+  runId = \id a -> case id of
+    Id f -> f a
 
-runNat = \nat -> case nat of
-  Nat f -> f 0 (\n -> n + 1)
+  data Nat = Nat forall r. r -> (r -> r) -> r
 
-zero = Nat (\zero _ -> zero)
+  runNat = \nat -> case nat of
+    Nat f -> f 0 (\n -> n + 1)
 
-succ = \n -> case n of
-  Nat f -> Nat (\zero succ -> succ (f zero succ))
+  zero = Nat (\zero _ -> zero)
 
-add = \n m -> case n of
-  Nat f -> case m of
-    Nat g -> Nat (\zero succ -> g (f zero succ) succ)
+  succ = \n -> case n of
+    Nat f -> Nat (\zero succ -> succ (f zero succ))
 
-one = succ zero
-two = succ zero
-four = add two two
-fourNumber = runNat four
+  add = \n m -> case n of
+    Nat f -> case m of
+      Nat g -> Nat (\zero succ -> g (f zero succ) succ)
+
+  one = succ zero
+  two = succ zero
+  four = add two two
+  fourNumber = runNat four

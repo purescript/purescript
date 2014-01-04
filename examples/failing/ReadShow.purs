@@ -1,5 +1,7 @@
-foreign import read :: forall a. String -> a
+module ReadShow where
 
-foreign import show :: forall a. a -> String
+  foreign import read :: forall a. String -> a
 
-test = \x -> show (read x)
+  foreign import show :: forall a. a -> String
+
+  test = \x -> show (read x)

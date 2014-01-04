@@ -17,7 +17,6 @@
 module Language.PureScript.Names where
 
 import Data.Data
-import Data.List (inits, intercalate)
 
 data Ident = Ident String | Op String deriving (Eq, Ord, Data, Typeable)
 
@@ -30,26 +29,17 @@ newtype ProperName = ProperName { runProperName :: String } deriving (Eq, Ord, D
 instance Show ProperName where
   show = runProperName
 
-data ModulePath = ModulePath [ProperName] deriving (Eq, Ord, Data, Typeable)
+data ModuleName = ModuleName ProperName deriving (Eq, Ord, Data, Typeable)
 
-instance Show ModulePath where
-  show (ModulePath segments) = intercalate "." $ map show segments
+instance Show ModuleName where
+  show (ModuleName name) = show name
 
-subModule :: ModulePath -> ProperName -> ModulePath
-subModule (ModulePath mp) name = ModulePath (mp ++ [name])
-
-global :: ModulePath
-global = ModulePath []
-
-data Qualified a = Qualified ModulePath a deriving (Eq, Ord, Data, Typeable)
+data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typeable)
 
 instance (Show a) => Show (Qualified a) where
-  show (Qualified (ModulePath names) a) = intercalate "." (map show names ++ [show a])
+  show (Qualified Nothing a) = show a
+  show (Qualified (Just (ModuleName name)) a) = show name ++ "." ++ show a
 
-qualify :: ModulePath -> Qualified a -> (ModulePath, a)
-qualify mp (Qualified (ModulePath []) a) = (mp, a)
-qualify _ (Qualified mp a) = (mp, a)
-
-nameResolution :: ModulePath -> Qualified a -> [(ModulePath, a)]
-nameResolution (ModulePath mp) (Qualified (ModulePath []) a) = [ (ModulePath mp', a) | mp' <- reverse $ inits mp ]
-nameResolution _ (Qualified mp a) = [(mp, a)]
+qualify :: ModuleName -> Qualified a -> (ModuleName, a)
+qualify m (Qualified Nothing a) = (m, a)
+qualify _ (Qualified (Just m) a) = (m, a)

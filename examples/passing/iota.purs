@@ -1,5 +1,7 @@
-s = \x -> \y -> \z -> x z (y z)
+module Iota where
 
-k = \x -> \y -> x
+  s = \x -> \y -> \z -> x z (y z)
 
-iota = \x -> x s k
+  k = \x -> \y -> x
+
+  iota = \x -> x s k

@@ -1,8 +1,8 @@
-module Test where
+module M1 where
 
   data Foo = Foo String
 
-  foo :: Test.Foo -> String
+  foo :: M1.Foo -> String
   foo = \f -> case f of Foo s -> s ++ "foo"
 
   bar :: Foo -> String
@@ -11,15 +11,10 @@ module Test where
   incr :: Number -> Number
   incr x = x + 1
 
-  module Inner where
+module M2 where
 
-    inner = "Inner"
+  baz :: M1.Foo -> String
+  baz = M1.foo
 
-baz :: Test.Foo -> String
-baz = Test.foo
-
-innerCopy :: String
-innerCopy = Test.Inner.inner
-
-match :: Test.Foo -> String
-match = \f -> case f of Test.Foo s -> s ++ "foo"
+  match :: M1.Foo -> String
+  match = \f -> case f of M1.Foo s -> s ++ "foo"

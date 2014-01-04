@@ -1,3 +1,5 @@
-data Extend r a = Extend { prev :: r a, next :: a }
+module Nested where
 
-data Matrix r a = Square (r (r a)) | Bigger (Matrix (Extend r) a)
+  data Extend r a = Extend { prev :: r a, next :: a }
+
+  data Matrix r a = Square (r (r a)) | Bigger (Matrix (Extend r) a)

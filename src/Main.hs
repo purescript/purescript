@@ -22,21 +22,21 @@ import System.Exit (exitSuccess, exitFailure)
 import qualified System.IO.UTF8 as U
 import Text.Parsec (ParseError)
 
-readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Declaration])
-readInput Nothing = getContents >>= return . P.runIndentParser P.parseDeclarations
+readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
+readInput Nothing = getContents >>= return . P.runIndentParser P.parseModules
 readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
   text <- U.readFile inputFile
-  return $ P.runIndentParser P.parseDeclarations text
+  return $ P.runIndentParser P.parseModules text
 
 compile :: Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile input output externs = do
-  asts <- readInput input
-  case asts of
+  modules <- readInput input
+  case modules of
     Left err -> do
       U.print err
       exitFailure
-    Right decls ->
-      case P.compile decls of
+    Right ms ->
+      case P.compile ms of
         Left err -> do
           U.putStrLn err
           exitFailure

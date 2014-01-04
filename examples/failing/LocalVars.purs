@@ -1,3 +1,6 @@
-bad = \x -> do
-  x = x + 1
-  return x
+module LocalVars where
+
+  bad = \x -> {
+      x = x + 1;
+      return x;
+    }

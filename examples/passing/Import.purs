@@ -1,12 +1,12 @@
-module Hello where
+module M1 where
+
   id :: forall a. a -> a
   id = \x -> x
 
-  module Nested where
-    import Hello (id)
+  foo = id
 
-    foo = id
+module M2 where
 
-import Hello.Nested
+  import M1
 
-main = \() -> foo 42
+  main = \() -> foo 42

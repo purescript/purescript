@@ -33,12 +33,12 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
-rebracket :: [Declaration] -> Either String [Declaration]
-rebracket ds = do
-  m <- collectFixities ds
+rebracket :: [Module] -> Either String [Module]
+rebracket ms = forM ms $ \(Module name ds) -> do
+  m <- collectFixities (ModuleName name) ds
   let opTable = customOperatorTable m
-  ds' <- G.everywhereM' (G.mkM (matchOperators opTable)) ds
-  return $ G.everywhere (G.mkT removeParens) ds'
+  ds' <- G.everywhereM' (G.mkM (matchOperators (ModuleName name) opTable)) ds
+  return $ Module name $ G.everywhere (G.mkT removeParens) ds'
 
 removeParens :: Value -> Value
 removeParens (Parens val) = val
@@ -56,8 +56,8 @@ customOperatorTable fixities =
 
 type Chain = [Either Value (Qualified Ident)]
 
-matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
-matchOperators ops val = G.everywhereM' (G.mkM parseChains) val
+matchOperators :: ModuleName -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
+matchOperators moduleName ops val = G.everywhereM' (G.mkM parseChains) val
   where
   parseChains :: Value -> Either String Value
   parseChains b@(BinaryNoParens _ _ _) = bracketChain (extendChain b)
@@ -67,7 +67,7 @@ matchOperators ops val = G.everywhereM' (G.mkM parseChains) val
   extendChain other = [Left other]
   bracketChain :: Chain -> Either String Value
   bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
-  opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
+  opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
     ++ [[P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) [t1]) [t2]))) P.AssocLeft]]
 
 toAssoc :: Associativity -> P.Assoc
@@ -80,27 +80,24 @@ parseValue = P.token show (const (P.initialPos "")) (either Just (const Nothing)
 parseOp :: P.Parsec Chain () (Qualified Ident)
 parseOp = P.token show (const (P.initialPos "")) (either (const Nothing) Just) P.<?> "operator"
 
-matchOp :: Qualified Ident -> P.Parsec Chain () ()
-matchOp op = do
+matchOp :: ModuleName -> Qualified Ident -> P.Parsec Chain () ()
+matchOp moduleName op = do
   ident <- parseOp
-  guard (ident == op)
+  guard (qualify moduleName ident == qualify moduleName op)
 
-collectFixities :: [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-collectFixities = go M.empty global
+collectFixities :: ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
+collectFixities = go M.empty
   where
-  go :: M.Map (Qualified Ident) Fixity -> ModulePath -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
+  go :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
   go m _ [] = return m
-  go m p (FixityDeclaration fixity name : rest) = do
-    let qual = Qualified p (Op name)
+  go m moduleName (FixityDeclaration fixity name : rest) = do
+    let qual = Qualified (Just moduleName) (Op name)
     when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
-    go (M.insert qual fixity m) p rest
-  go m p (ModuleDeclaration name decls : rest) = do
-    m' <- go m (subModule p name) decls
-    go m' p rest
-  go m p (_:ds) = go m p ds
+    go (M.insert qual fixity m) moduleName rest
+  go m moduleName (_:ds) = go m moduleName ds
 
 globalOp :: String -> Qualified Ident
-globalOp = Qualified global . Op
+globalOp = Qualified Nothing . Op
 
 builtIns :: [(Qualified Ident, Value -> Value -> Value, Precedence, Associativity)]
 builtIns = [ (globalOp "<", Binary LessThan, 3, Infixl)

@@ -1,3 +1,5 @@
-foreign import foo :: (forall a. a -> a) -> Number
+module SkolemEscape where
 
-test = \x -> foo x
+  foreign import foo :: (forall a. a -> a) -> Number
+
+  test = \x -> foo x

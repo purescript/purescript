@@ -1,3 +1,5 @@
-foreign import test :: (forall a. a -> a) -> Number
+module Rank2Types where
 
-test1 = test (\n -> n + 1)
+  foreign import test :: (forall a. a -> a) -> Number
+
+  test1 = test (\n -> n + 1)

@@ -1,5 +1,7 @@
-fns = \f -> if f true then f else \x -> x 
+module Conditional where
 
-bin = \x -> if x && !x then x else x
+  fns = \f -> if f true then f else \x -> x 
 
-not = \x -> if x then false else true
+  bin = \x -> if x && !x then x else x
+
+  not = \x -> if x then false else true

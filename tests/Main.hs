@@ -27,12 +27,12 @@ import qualified Data.Map as M
 
 compile :: FilePath -> IO (Either String P.Environment)
 compile inputFile = do
-  ast <- P.runIndentParser P.parseDeclarations <$> U.readFile inputFile
-  case ast of
+  modules <- P.runIndentParser P.parseModules <$> U.readFile inputFile
+  case modules of
     Left parseError -> do
       return (Left $ show parseError)
-    Right decls -> do
-      case P.compile decls of
+    Right ms -> do
+      case P.compile ms of
         Left typeError -> do
           return (Left typeError)
         Right (_, _, env) -> do

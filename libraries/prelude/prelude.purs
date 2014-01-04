@@ -1,263 +1,269 @@
-id :: forall a. a -> a
-id = \x -> x
+module Prelude where
 
-flip :: forall a b c. (a -> b -> c) -> b -> a -> c
-flip = \f -> \b -> \a -> f a b
+  id :: forall a. a -> a
+  id = \x -> x
 
-konst :: forall a b. a -> b -> a
-konst = \a -> \b -> a
+  flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+  flip = \f -> \b -> \a -> f a b
 
-(|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
-(|>) = \f -> \g -> \a -> g (f a)
+  konst :: forall a b. a -> b -> a
+  konst = \a -> \b -> a
 
-(<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
-(<|) = flip (|>)
+  (|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
+  (|>) = \f -> \g -> \a -> g (f a)
 
--- Maybe
+  (<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
+  (<|) = flip (|>)
 
-data Maybe a = Nothing | Just a
+module Maybe where
 
-maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
-maybe b _ Nothing = b
-maybe _ f (Just a) = f a
+  data Maybe a = Nothing | Just a
 
-fromMaybe :: forall a. a -> Maybe a -> a
-fromMaybe a = maybe a id
+  maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
+  maybe b _ Nothing = b
+  maybe _ f (Just a) = f a
 
-bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
-bindMaybe m f = maybe Nothing f m
+  fromMaybe :: forall a. a -> Maybe a -> a
+  fromMaybe a = maybe a Prelude.id
 
--- Either
+  bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
+  bindMaybe m f = maybe Nothing f m
 
-data Either a b = Left a | Right b
+module Either where
 
-either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
-either f _ (Left a) = f a
-either _ g (Right b) = g b 
+  data Either a b = Left a | Right b
 
-bindEither :: forall e a b. Either e a -> (a -> Either e b) -> Either e b
-bindEither = either (\e _ -> Left e) (\a f -> f a) 
+  either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
+  either f _ (Left a) = f a
+  either _ g (Right b) = g b 
 
--- Arrays
+  bindEither :: forall e a b. Either e a -> (a -> Either e b) -> Either e b
+  bindEither = either (\e _ -> Left e) (\a f -> f a) 
 
-head :: forall a. [a] -> a
-head (x : _) = x
+module Arrays where
 
-headSafe :: forall a. [a] -> Maybe a
-headSafe (x : _) = Just x
-headSafe _ = Nothing
+  import Maybe
 
-tail :: forall a. [a] -> [a]
-tail (_ : xs) = xs
+  head :: forall a. [a] -> a
+  head (x : _) = x
 
-tailSafe :: forall a. [a] -> Maybe [a]
-tailSafe (_ : xs) = Just xs
-tailSafe _ = Nothing
+  headSafe :: forall a. [a] -> Maybe a
+  headSafe (x : _) = Just x
+  headSafe _ = Nothing
 
-foreign import map :: forall a b. (a -> b) -> [a] -> [b]
+  tail :: forall a. [a] -> [a]
+  tail (_ : xs) = xs
 
-foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
-foldr f a (b : bs) = f (foldr f a bs) b
-foldr _ a [] = a
+  tailSafe :: forall a. [a] -> Maybe [a]
+  tailSafe (_ : xs) = Just xs
+  tailSafe _ = Nothing
 
-foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
-foldl f b as = {
-    var result = b;
-    foreach (a in as) {
-      result = f a result;
-    }
-    return result;
-  }
+  foreign import map :: forall a b. (a -> b) -> [a] -> [b]
 
-foreign import member "length" length :: forall a. [a] -> Number
+  foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
+  foldr f a (b : bs) = f (foldr f a bs) b
+  foldr _ a [] = a
 
-foreign import indexOf :: forall a. [a] -> a -> Number
-
-foreign import lastIndexOf :: forall a. [a] -> a -> Number
-
-foreign import concat :: forall a. [a] -> [a] -> [a]
-
-foreign import join :: [String] -> String
-
-foreign import joinWith :: [String] -> String -> String
-
-foreign import push :: forall a. [a] -> a -> [a]
-
-foreign import reverse :: forall a. [a] -> [a]
-
-foreign import shift :: forall a. [a] -> [a]
-
-foreign import slice :: forall a. Number -> Number -> [a] -> [a]
-
-foreign import sort :: forall a. [a] -> [a]
-
-foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
-
-cons :: forall a. a -> [a] -> [a]
-cons = \a -> concat([a])
-
-concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
-concatMap as f = {
-    var result = [];
-    foreach (a in as) {
-      result = result `concat` f a;
-    }
-    return result;
-  }
-
-foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
-
-empty :: forall a. [a] -> Boolean
-empty [] = true
-empty _ = false 
-
-range :: Number -> Number -> [Number]
-range lo hi = {
-    var ns = [];
-    for (n <- lo until hi) {
-      ns = push ns n;
-    }
-    return ns;
-  }
-
-zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
-zipWith f (a:as) (b:bs) = cons (f a b) (zipWith f as bs)
-zipWith _ _ _ = []
-
-any :: forall a. (a -> Boolean) -> [a] -> Boolean
-any p as = {
-    for (i <- 0 until length as) {
-      if (p (as !! i)) {
-        return true;
+  foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
+  foldl f b as = {
+      var result = b;
+      foreach (a in as) {
+	result = f a result;
       }
+      return result;
     }
-    return false;
-  }
 
-all :: forall a. (a -> Boolean) -> [a] -> Boolean
-all p as = {
-    for (i <- 0 until length as) {
-      if (!(p (as !! i))) {
-        return false;
+  foreign import member "length" length :: forall a. [a] -> Number
+
+  foreign import indexOf :: forall a. [a] -> a -> Number
+
+  foreign import lastIndexOf :: forall a. [a] -> a -> Number
+
+  foreign import concat :: forall a. [a] -> [a] -> [a]
+
+  foreign import join :: [String] -> String
+
+  foreign import joinWith :: [String] -> String -> String
+
+  foreign import push :: forall a. [a] -> a -> [a]
+
+  foreign import reverse :: forall a. [a] -> [a]
+
+  foreign import shift :: forall a. [a] -> [a]
+
+  foreign import slice :: forall a. Number -> Number -> [a] -> [a]
+
+  foreign import sort :: forall a. [a] -> [a]
+
+  foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
+
+  cons :: forall a. a -> [a] -> [a]
+  cons a = concat [a]
+
+  concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
+  concatMap as f = {
+      var result = [];
+      foreach (a in as) {
+	result = result `concat` f a;
       }
+      return result;
     }
-    return true;
-  }
 
--- Pairs
+  foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
 
-type Tuple a b = { fst :: a, snd :: b }
+  empty :: forall a. [a] -> Boolean
+  empty [] = true
+  empty _ = false 
 
-curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
-curry f a b = f { fst: a, snd: b }
+  range :: Number -> Number -> [Number]
+  range lo hi = {
+      var ns = [];
+      for (n <- lo until hi) {
+	ns = push ns n;
+      }
+      return ns;
+    }
 
-uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
-uncurry f t = f t.fst t.snd
+  zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+  zipWith f (a:as) (b:bs) = cons (f a b) (zipWith f as bs)
+  zipWith _ _ _ = []
 
-tuple :: forall a b. a -> b -> Tuple a b
-tuple = curry id
+  any :: forall a. (a -> Boolean) -> [a] -> Boolean
+  any p as = {
+      for (i <- 0 until length as) {
+	if (p (as !! i)) {
+	  return true;
+	}
+      }
+      return false;
+    }
 
-zip :: forall a b. [a] -> [b] -> [Tuple a b]
-zip = zipWith tuple
+  all :: forall a. (a -> Boolean) -> [a] -> Boolean
+  all p as = {
+      for (i <- 0 until length as) {
+	if (!(p (as !! i))) {
+	  return false;
+	}
+      }
+      return true;
+    }
 
-unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
-unzip (t:ts) = case unzip ts of
-    { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
-unzip [] = tuple [] []
+module Tuple where
 
--- Strings
+  import Arrays
 
-foreign import member "length" lengthS :: String -> Number
+  type Tuple a b = { fst :: a, snd :: b }
 
-foreign import charAt :: Number -> String -> String
+  curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
+  curry f a b = f { fst: a, snd: b }
 
-foreign import indexOfS :: String -> String -> Number
+  uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
+  uncurry f t = f t.fst t.snd
 
-foreign import lastIndexOfS :: String -> String -> Number
+  tuple :: forall a b. a -> b -> Tuple a b
+  tuple = curry Prelude.id
 
-foreign import localeCompare :: String -> String -> Number
+  zip :: forall a b. [a] -> [b] -> [Tuple a b]
+  zip = zipWith tuple
 
-foreign import replace :: String -> String -> String -> String
+  unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
+  unzip (t:ts) = case unzip ts of
+      { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
+  unzip [] = tuple [] []
 
-foreign import sliceS :: Number -> Number -> String -> String
+module String where
 
-foreign import split :: String -> String -> [String]
+  foreign import member "length" lengthS :: String -> Number
 
-foreign import substr :: Number -> Number -> String -> String
+  foreign import charAt :: Number -> String -> String
 
-foreign import substring :: Number -> Number -> String -> String
+  foreign import indexOfS :: String -> String -> Number
 
-foreign import toLower :: String -> String
+  foreign import lastIndexOfS :: String -> String -> Number
 
-foreign import toUpper :: String -> String
+  foreign import localeCompare :: String -> String -> Number
 
-foreign import trim :: String -> String
+  foreign import replace :: String -> String -> String -> String
 
--- Regex
+  foreign import sliceS :: Number -> Number -> String -> String
 
-foreign import data Regex :: *
+  foreign import split :: String -> String -> [String]
 
-foreign import regex :: String -> String -> Regex
+  foreign import substr :: Number -> Number -> String -> String
 
-foreign import test :: Regex -> String -> Boolean
+  foreign import substring :: Number -> Number -> String -> String
 
-foreign import match :: Regex -> String -> [String]
+  foreign import toLower :: String -> String
 
-foreign import replaceR :: Regex -> String -> String -> String
+  foreign import toUpper :: String -> String
 
-foreign import search :: Regex -> String -> Number
+  foreign import trim :: String -> String
 
--- Globals
+module Regex where
 
-foreign import nan :: Number
+  foreign import data Regex :: *
 
-foreign import infinity :: Number
+  foreign import regex :: String -> String -> Regex
 
-foreign import toExponential :: Number -> String
+  foreign import test :: Regex -> String -> Boolean
 
-foreign import toFixed :: Number -> Number -> String
+  foreign import match :: Regex -> String -> [String]
 
-foreign import toPrecision :: Number -> Number -> String
+  foreign import replaceR :: Regex -> String -> String -> String
 
-foreign import numberToString :: Number -> String
+  foreign import search :: Regex -> String -> Number
 
-foreign import isNaN :: Number -> Boolean
+module Global where
 
-foreign import isFinite :: Number -> Boolean
+  foreign import nan :: Number
 
-foreign import parseFloat :: String -> Number
+  foreign import infinity :: Number
 
-foreign import parseInt :: String -> Number
+  foreign import toExponential :: Number -> String
 
-foreign import encodeURIComponent :: String -> String
+  foreign import toFixed :: Number -> Number -> String
 
-foreign import decodeURIComponent :: String -> String
+  foreign import toPrecision :: Number -> Number -> String
 
-foreign import encodeURI :: String -> String
+  foreign import numberToString :: Number -> String
 
-foreign import decodeURI :: String -> String
+  foreign import isNaN :: Number -> Boolean
 
--- Math
+  foreign import isFinite :: Number -> Boolean
 
-type Math = 
-  { abs :: Number -> Number
-  , acos :: Number -> Number
-  , asin :: Number -> Number
-  , atan :: Number -> Number
-  , atan2 :: (Number, Number) -> Number
-  , aceil :: Number -> Number
-  , cos :: Number -> Number
-  , exp :: Number -> Number
-  , floor :: Number -> Number
-  , log :: Number -> Number
-  , max :: (Number, Number) -> Number
-  , pow :: (Number, Number) -> Number
-  , random :: () -> Number
-  , round :: Number -> Number
-  , sin :: Number -> Number
-  , sqrt :: Number -> Number
-  , tan :: Number -> Number
-  }
+  foreign import parseFloat :: String -> Number
 
-foreign import math :: Math
+  foreign import parseInt :: String -> Number
+
+  foreign import encodeURIComponent :: String -> String
+
+  foreign import decodeURIComponent :: String -> String
+
+  foreign import encodeURI :: String -> String
+
+  foreign import decodeURI :: String -> String
+
+module Math where
+
+  type Math = 
+    { abs :: Number -> Number
+    , acos :: Number -> Number
+    , asin :: Number -> Number
+    , atan :: Number -> Number
+    , atan2 :: (Number, Number) -> Number
+    , aceil :: Number -> Number
+    , cos :: Number -> Number
+    , exp :: Number -> Number
+    , floor :: Number -> Number
+    , log :: Number -> Number
+    , max :: (Number, Number) -> Number
+    , pow :: (Number, Number) -> Number
+    , random :: () -> Number
+    , round :: Number -> Number
+    , sin :: Number -> Number
+    , sqrt :: Number -> Number
+    , tan :: Number -> Number
+    }
+
+  foreign import math :: Math
 

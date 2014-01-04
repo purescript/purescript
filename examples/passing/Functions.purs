@@ -1,11 +1,13 @@
-test1 = \ -> 0
+module Functions where
 
-test2 = \() -> 0
+  test1 = \ -> 0
 
-test3 = \a (b, c) d -> a + b + c + d
+  test2 = \() -> 0
 
-test4 = \(a) -> a
+  test3 = \a (b, c) d -> a + b + c + d
 
-test5 = \(%%) -> 1 %% 2
+  test4 = \(a) -> a
 
-test6 = \((+++), (***)) -> 1 +++ 2 *** 3
+  test5 = \(%%) -> 1 %% 2
+
+  test6 = \((+++), (***)) -> 1 +++ 2 *** 3

@@ -1,14 +1,16 @@
-update1 = \o -> o { foo = "Foo" }
+module ObjectUpdate where
 
-update2 :: forall r. { foo :: String | r } -> { foo :: String | r }
-update2 = \o -> o { foo = "Foo" }
+  update1 = \o -> o { foo = "Foo" }
 
-replace = \o -> case o of
-  { foo = "Foo" } -> o { foo = "Bar" }
-  { foo = "Bar" } -> o { bar = "Baz" }
-  o -> o
+  update2 :: forall r. { foo :: String | r } -> { foo :: String | r }
+  update2 = \o -> o { foo = "Foo" }
 
-polyUpdate :: forall a r. { foo :: a | r } -> { foo :: String | r }
-polyUpdate = \o -> o { foo = "Foo" }
+  replace = \o -> case o of
+    { foo = "Foo" } -> o { foo = "Bar" }
+    { foo = "Bar" } -> o { bar = "Baz" }
+    o -> o
 
-inferPolyUpdate = \o -> o { foo = "Foo" }
+  polyUpdate :: forall a r. { foo :: a | r } -> { foo :: String | r }
+  polyUpdate = \o -> o { foo = "Foo" }
+
+  inferPolyUpdate = \o -> o { foo = "Foo" }

@@ -1,14 +1,16 @@
-id :: forall a. (a) -> a
-id = \x -> x
+module TypeDecl where
 
-k :: String -> Number -> String
-k = \x -> \y -> x
+  id :: forall a. (a) -> a
+  id = \x -> x
 
-iterate :: forall a. Number -> (a -> a) -> a -> a
-iterate = \n -> \f -> \a -> {
-    var result = a;
-    for (i <- 0 until n) {
-      result = f result;
+  k :: String -> Number -> String
+  k = \x -> \y -> x
+
+  iterate :: forall a. Number -> (a -> a) -> a -> a
+  iterate = \n -> \f -> \a -> {
+      var result = a;
+      for (i <- 0 until n) {
+	result = f result;
+      }
+      return result;
     }
-    return result;
-  }

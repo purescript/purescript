@@ -1,3 +1,5 @@
+module Arrays where
+
 test1 = \arr -> arr !! 0 + arr !! 1
 
 test2 = \arr -> case arr of 
@@ -16,5 +18,5 @@ test4 = \arr -> case arr of
   [] -> 0
   [_] -> 0
   x : y : xs -> x * y + test4 xs
-  
+
 

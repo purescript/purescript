@@ -13,17 +13,22 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.CaseDeclarations (
-    desugarCases
+    desugarCases,
+    desugarCasesModule
 ) where
 
 import Data.List (groupBy)
-import Control.Monad (join, unless)
+import Control.Applicative ((<$>))
+import Control.Monad (forM, join, unless)
 import Control.Monad.Error.Class
 
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Declarations
 import Language.PureScript.Scope
+
+desugarCasesModule :: [Module] -> Either String [Module]
+desugarCasesModule ms = forM ms $ \(Module name ds) -> Module name <$> desugarCases ds
 
 desugarCases :: [Declaration] -> Either String [Declaration]
 desugarCases = fmap join . mapM toDecls . groupBy inSameGroup
@@ -39,9 +44,6 @@ toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
   unless (all ((== map length bs) . map length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
   return [makeCaseDeclaration ident tuples]
-toDecls [ModuleDeclaration name decls] = do
-  desugared <- desugarCases decls
-  return [ModuleDeclaration name desugared]
 toDecls ds = return ds
 
 toTuple :: Declaration -> ([[Binder]], (Maybe Guard, Value))
@@ -53,7 +55,7 @@ makeCaseDeclaration ident alternatives =
   let
     argPattern = map length . fst . head $ alternatives
     args = take (sum argPattern) $ unusedNames (ident, alternatives)
-    vars = map (\arg -> Var (Qualified global arg)) args
+    vars = map (\arg -> Var (Qualified Nothing arg)) args
     binders = [ (join bs, g, val) | (bs, (g, val)) <- alternatives ]
     value = foldr (\args' ret -> Abs args' ret) (Case vars binders) (rearrange argPattern args)
   in

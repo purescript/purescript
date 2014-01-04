@@ -28,52 +28,77 @@ import Data.Monoid
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
+import Control.Monad.Reader
 
 import qualified Data.Map as M
 
-data NameKind = Value | Extern | Alias ModulePath Ident | LocalVariable deriving Show
+data NameKind
+  = Value
+  | Extern
+  | Alias ModuleName Ident
+  | LocalVariable deriving Show
 
-data TypeDeclarationKind = Data | ExternData | TypeSynonym deriving Show
+data TypeDeclarationKind
+  = Data
+  | ExternData
+  | TypeSynonym
+  | DataAlias ModuleName ProperName
+  | LocalTypeVariable deriving Show
 
 data Environment = Environment
-  { names :: M.Map (ModulePath, Ident) (Type, NameKind)
-  , types :: M.Map (ModulePath, ProperName) (Kind, TypeDeclarationKind)
-  , dataConstructors :: M.Map (ModulePath, ProperName) Type
-  , typeSynonyms :: M.Map (ModulePath, ProperName) ([String], Type)
-  , members :: M.Map (ModulePath, Ident) String
+  { names :: M.Map (ModuleName, Ident) (Type, NameKind)
+  , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
+  , dataConstructors :: M.Map (ModuleName, ProperName) Type
+  , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
+  , members :: M.Map (ModuleName, Ident) String
   } deriving (Show)
 
 emptyEnvironment :: Environment
 emptyEnvironment = Environment M.empty M.empty M.empty M.empty M.empty
 
-bindNames :: (MonadState CheckState m) => M.Map (ModulePath, Ident) (Type, NameKind) -> m a -> m a
+bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind) -> m a -> m a
 bindNames newNames action = do
-  orig <-  get
+  orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { names = newNames `M.union` (names . checkEnv $ st) } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
   return a
 
-bindLocalVariables :: (Functor m, MonadState CheckState m) => [(Ident, Type)] -> m a -> m a
-bindLocalVariables bindings action = do
-  modulePath <- checkModulePath `fmap` get
-  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((modulePath, name), (ty, LocalVariable))) action
+bindTypes :: (MonadState CheckState m) => M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind) -> m a -> m a
+bindTypes newNames action = do
+  orig <- get
+  modify $ \st -> st { checkEnv = (checkEnv st) { types = newNames `M.union` (types . checkEnv $ st) } }
+  a <- action
+  modify $ \st -> st { checkEnv = (checkEnv st) { types = types . checkEnv $ orig } }
+  return a
 
-lookupVariable :: (Functor m, MonadState CheckState m, MonadError String m) => Qualified Ident -> m Type
-lookupVariable var = do
+bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a
+bindLocalVariables moduleName bindings action =
+  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((moduleName, name), (ty, LocalVariable))) action
+
+bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
+bindLocalTypeVariables moduleName bindings action =
+  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> ((moduleName, name), (k, LocalTypeVariable))) action
+
+lookupVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified Ident -> m Type
+lookupVariable currentModule (Qualified moduleName var) = do
   env <- getEnv
-  modulePath <- checkModulePath <$> get
-  let tries = map (First . flip M.lookup (names env)) (nameResolution modulePath var)
-  case getFirst (mconcat tries) of
+  case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
     Nothing -> throwError $ show var ++ " is undefined"
     Just (ty, _) -> return ty
+
+lookupTypeVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified ProperName -> m Kind
+lookupTypeVariable currentModule (Qualified moduleName name) = do
+  env <- getEnv
+  case M.lookup (fromMaybe currentModule moduleName, name) (types env) of
+    Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
+    Just (k, _) -> return k
 
 data AnyUnifiable where
   AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
 
 data CheckState = CheckState { checkEnv :: Environment
                              , checkNextVar :: Int
-                             , checkModulePath :: ModulePath
                              }
 
 newtype Check a = Check { unCheck :: StateT CheckState (Either String) a }
@@ -90,7 +115,7 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 runCheck :: Check a -> Either String (a, Environment)
 runCheck c = do
-  (a, s) <- flip runStateT (CheckState emptyEnvironment 0 global) $ unCheck c
+  (a, s) <- flip runStateT (CheckState emptyEnvironment 0) $ unCheck c
   return (a, checkEnv s)
 
 guardWith :: (MonadError e m) => e -> Bool -> m ()
@@ -99,14 +124,6 @@ guardWith e False = throwError e
 
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
-
-withModule :: ProperName -> Check a -> Check a
-withModule name act = do
-  original <- checkModulePath `fmap` get
-  modify $ \s -> s { checkModulePath = subModule (checkModulePath s) name }
-  a <- act
-  modify $ \s -> s { checkModulePath = original }
-  return a
 
 newtype Substitution = Substitution { runSubstitution :: forall t. (Unifiable t) => Unknown t -> t }
 
@@ -117,21 +134,23 @@ instance Monoid Substitution where
 data SubstState = SubstState { substSubst :: Substitution
                              , substFutureEscapeChecks :: [AnyUnifiable] }
 
-newtype Subst a = Subst { unSubst :: StateT SubstState Check a }
-  deriving (Functor, Monad, Applicative, MonadPlus)
+newtype SubstContext = SubstContext { substCurrentModule :: ModuleName } deriving (Show)
+
+newtype Subst a = Subst { unSubst :: ReaderT SubstContext (StateT SubstState Check) a }
+  deriving (Functor, Monad, Applicative, MonadPlus, MonadReader SubstContext)
 
 instance MonadState CheckState Subst where
-  get = Subst . lift $ get
-  put = Subst . lift . put
+  get = Subst . lift . lift $ get
+  put = Subst . lift . lift . put
 
 deriving instance MonadError String Subst
 
 liftCheck :: Check a -> Subst a
-liftCheck = Subst . lift
+liftCheck = Subst . lift . lift
 
-runSubst :: (Unifiable a) => Subst a -> Check (a, Substitution, [AnyUnifiable])
-runSubst subst = do
-  (a, s) <- flip runStateT (SubstState mempty []) . unSubst $ subst
+runSubst :: (Unifiable a) => SubstContext -> Subst a -> Check (a, Substitution, [AnyUnifiable])
+runSubst context subst = do
+  (a, s) <- flip runStateT (SubstState mempty []) . flip runReaderT context . unSubst $ subst
   return (apply (substSubst s) a, substSubst s, substFutureEscapeChecks s)
 
 substituteWith :: (Typeable t) => (Unknown t -> t) -> Substitution
@@ -162,6 +181,13 @@ class (Typeable t, Data t, Show t) => Unifiable t where
   isUnknown :: t -> Maybe (Unknown t)
   apply :: Substitution -> t -> t
   unknowns :: t -> [Int]
+
+instance (Unifiable a) => Unifiable [a] where
+  unknown _ = error "not supported"
+  (~~) = zipWithM_ (~~)
+  isUnknown _ = error "not supported"
+  apply s = map (apply s)
+  unknowns = concatMap unknowns
 
 occursCheck :: (Unifiable t) => Unknown s -> t -> Subst ()
 occursCheck (Unknown u) t =

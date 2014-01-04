@@ -1,27 +1,5 @@
-test1 = \(x, y, z) -> x * y + z(x)(y)
+module Operators1 where
 
-test2 = (\x -> x.foo false) { foo : \_ -> 1 }
-
-test3 = (\(x, y) -> x)(1 + 2 * (1 + 2), true && (false || false))
-
-k = \x -> \y -> x
-
-test4 = 1 `k` 2
-
-infixl 5 %%
-
-(%%) = \x -> \y -> x * y + y
-
-test5 = 1 %% 2 %% 3
-
-test6 = ((\x -> x) `k` 2) 3
-
-(<>) = \s1 -> \s2 -> s1 ++ s2
-
-test7 = "Hello" <> "World!"
-
-module Ops where
-  
   (@@) :: forall a b. (a -> b) -> a -> b
   (@@) = \f x -> f x
 
@@ -32,11 +10,35 @@ module Ops where
 
   bar = \s1 s2 -> s1 ++ s2
 
-test9 = Ops.foo Ops.@@ "Hello World"
+module Operators2 where
 
-test10 = "Hello" `Ops.bar` "World"
+  test1 = \(x, y, z) -> x * y + z(x)(y)
 
-(...) :: forall a. [a] -> [a] -> [a]
-(...) = \as -> \bs -> as
+  test2 = (\x -> x.foo false) { foo : \_ -> 1 }
 
-test11 = [1, 2, 3] ... [4, 5, 6]
+  test3 = (\(x, y) -> x)(1 + 2 * (1 + 2), true && (false || false))
+
+  k = \x -> \y -> x
+
+  test4 = 1 `k` 2
+
+  infixl 5 %%
+
+  (%%) = \x -> \y -> x * y + y
+
+  test5 = 1 %% 2 %% 3
+
+  test6 = ((\x -> x) `k` 2) 3
+
+  (<>) = \s1 -> \s2 -> s1 ++ s2
+
+  test7 = "Hello" <> "World!"
+
+  test9 = Operators1.foo Operators1.@@ "Hello World"
+
+  test10 = "Hello" `Operators1.bar` "World"
+
+  (...) :: forall a. [a] -> [a] -> [a]
+  (...) = \as -> \bs -> as
+
+  test11 = [1, 2, 3] ... [4, 5, 6]

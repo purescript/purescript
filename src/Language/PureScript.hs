@@ -26,15 +26,17 @@ import Language.PureScript.Pretty as P
 import Language.PureScript.Optimize as P
 import Language.PureScript.Operators as P
 import Language.PureScript.CaseDeclarations as P
+import Language.PureScript.TypeDeclarations as P
+import Language.PureScript.BindingGroups as P
 
 import Data.List (intercalate)
-import Data.Maybe (mapMaybe)
+import Control.Monad (forM_, (>=>))
 
-compile :: [Declaration] -> Either String (String, String, Environment)
-compile decls = do
-  bracketted <- rebracket decls
-  desugared <- desugarCases bracketted
-  (_, env) <- runCheck (typeCheckAll desugared)
-  let js = prettyPrintJS . map optimize . concat . mapMaybe (\decl -> declToJs Nothing global decl env) $ desugared
-  let exts = intercalate "\n" . mapMaybe (externToPs 0 global env) $ desugared
+compile :: [Module] -> Either String (String, String, Environment)
+compile ms = do
+  bracketted <- rebracket ms
+  desugared <- desugarCasesModule >=> desugarTypeDeclarationsModule >=> (return . createBindingGroupsModule) $ bracketted
+  (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
+  let js = prettyPrintJS . map optimize . concatMap (flip moduleToJs env) $ desugared
+  let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared
   return (js, exts, env)

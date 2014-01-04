@@ -1,6 +1,8 @@
-foreign import foo :: () -> {} 
+module MethodCall where
 
-test = {
-    foo();
-    return 0;
-  }
+  foreign import foo :: () -> {} 
+
+  test = {
+      foo();
+      return 0;
+    }

@@ -32,7 +32,7 @@ usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB
   where
   namesV :: Value -> [Ident]
   namesV (Abs args _) = args
-  namesV (Var (Qualified (ModulePath []) name)) = [name]
+  namesV (Var (Qualified Nothing name)) = [name]
   namesV _ = []
   namesS :: Statement -> [Ident]
   namesS (VariableIntroduction name _) = [name]
