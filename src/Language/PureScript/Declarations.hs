@@ -33,6 +33,7 @@ data Module = Module ProperName [Declaration] deriving (Show, D.Data, D.Typeable
 
 data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
+  | DataBindingGroupDeclaration [(ProperName, [String], [(ProperName, Maybe PolyType)])]
   | TypeSynonymDeclaration ProperName [String] PolyType
   | TypeDeclaration Ident PolyType
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value

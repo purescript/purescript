@@ -52,6 +52,7 @@ typeCheckAll moduleName (DataDeclaration name args dctors : rest) = do
         let polyType = mkForAll args dctorTy
         putEnv $ env' { dataConstructors = M.insert (moduleName, dctor) polyType (dataConstructors env') }
   typeCheckAll moduleName rest
+typeCheckAll moduleName (DataBindingGroupDeclaration tys : rest) = error (show tys)
 typeCheckAll moduleName (TypeSynonymDeclaration name args ty : rest) = do
   rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
