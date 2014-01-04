@@ -77,6 +77,8 @@ PureScript can also be seen as a trade-off between a theoretically ideal languag
 As an introductory example, here is the usual "Hello World" written in PureScript:
 
 ```haskell
+module Main where
+
 foreign import console :: { log :: String -> {} }
 
 main = \ -> console.log "Hello, World!"
@@ -85,9 +87,13 @@ main = \ -> console.log "Hello, World!"
 which compiles to the following Javascript:
 
 ```javascript
-function main() {
-    console.log("Hello, World!");
-}
+var Main; 
+(function (Main) {
+    function main() {
+        return console.log("Hello, World!"); 
+    }; 
+    Main.main = main; 
+})(Main = Main || {});
 ```
 
 ## Another Example
@@ -734,26 +740,14 @@ infixr 7 %%
 
 ## Modules
 
-Simple modules are supported by the `module` keyword.
+Modules are introduced using the `module` keyword. All code must be placed in a module.
 
-Introduce a module as follows, with a list of indented declarations:
-
-```haskell
-module A where
-
-    foo = \x -> x
-```
-
-Modules may be nested:
+Introduce a module as follows, with a list of declarations:
 
 ```haskell
 module A where
 
-    foo = \x -> x
-    
-    module B where
-    
-        bar = \y -> y
+id x = x
 ```
 
 Names may be qualified by using a dot:
