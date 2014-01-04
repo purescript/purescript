@@ -9,9 +9,7 @@ module MutRec where
 
   data Odd = Odd Even
 
-  evenToNumber :: Even -> Number
   evenToNumber Zero = 0
   evenToNumber (Even n) = oddToNumber n + 1
 
-  oddToNumber :: Odd -> Number
   oddToNumber (Odd n) = evenToNumber n + 1

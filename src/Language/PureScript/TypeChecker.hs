@@ -35,53 +35,90 @@ import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 
+addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, Maybe Type)] -> Kind -> Check ()
+addDataType moduleName name args dctors ctorKind = do
+  env <- getEnv
+  putEnv $ env { types = M.insert (moduleName, name) (ctorKind, Data) (types env) }
+  forM_ dctors $ \(dctor, maybeTy) ->
+    rethrow (("Error in data constructor " ++ show name ++ ":\n") ++) $
+      addDataConstructor moduleName name args dctor maybeTy
+
+addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> Maybe Type -> Check ()
+addDataConstructor moduleName name args dctor maybeTy = do
+  env <- getEnv
+  dataConstructorIsNotDefined moduleName dctor
+  let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
+  let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
+  let polyType = mkForAll args dctorTy
+  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) polyType (dataConstructors env) }
+
+addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
+addTypeSynonym moduleName name args ty kind = do
+  env <- getEnv
+  putEnv $ env { types = M.insert (moduleName, name) (kind, TypeSynonym) (types env)
+               , typeSynonyms = M.insert (moduleName, name) (args, ty) (typeSynonyms env) }
+
+typeIsNotDefined :: ModuleName -> ProperName -> Check ()
+typeIsNotDefined moduleName name = do
+  env <- getEnv
+  guardWith (show name ++ " is already defined") $
+    not $ M.member (moduleName, name) (types env)
+
+dataConstructorIsNotDefined :: ModuleName -> ProperName -> Check ()
+dataConstructorIsNotDefined moduleName dctor = do
+  env <- getEnv
+  guardWith (show dctor ++ " is already defined") $
+    not $ M.member (moduleName, dctor) (dataConstructors env)
+
+valueIsNotDefined :: ModuleName -> Ident -> Check ()
+valueIsNotDefined moduleName name = do
+  env <- getEnv
+  case M.lookup (moduleName, name) (names env) of
+    Just _ -> throwError $ show name ++ " is already defined"
+    Nothing -> return ()
+
+addValue :: ModuleName -> Ident -> Type -> Check ()
+addValue moduleName name ty = do
+  env <- getEnv
+  putEnv (env { names = M.insert (moduleName, name) (ty, Value) (names env) })
+
 typeCheckAll :: ModuleName -> [Declaration] -> Check ()
 typeCheckAll _ [] = return ()
 typeCheckAll moduleName (DataDeclaration name args dctors : rest) = do
   rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do
-    env <- getEnv
-    guardWith (show name ++ " is already defined") $ not $ M.member (moduleName, name) (types env)
-    ctorKind <- kindsOf moduleName (Just name) args (mapMaybe snd dctors)
-    putEnv $ env { types = M.insert (moduleName, name) (ctorKind, Data) (types env) }
-    forM_ dctors $ \(dctor, maybeTy) ->
-      rethrow (("Error in data constructor " ++ show name ++ ":\n") ++) $ do
-        env' <- getEnv
-        guardWith (show dctor ++ " is already defined") $ not $ M.member (moduleName, dctor) (dataConstructors env')
-        let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
-        let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
-        let polyType = mkForAll args dctorTy
-        putEnv $ env' { dataConstructors = M.insert (moduleName, dctor) polyType (dataConstructors env') }
+    typeIsNotDefined moduleName name
+    ctorKind <- kindsOf moduleName name args (mapMaybe snd dctors)
+    addDataType moduleName name args dctors ctorKind
   typeCheckAll moduleName rest
-typeCheckAll moduleName (DataBindingGroupDeclaration tys : rest) = error (show tys)
+typeCheckAll moduleName (DataBindingGroupDeclaration tys : rest) = do
+  rethrow (("Error in data binding group " ++ show (map (\(name, _, _) -> name) tys) ++ ":\n") ++) $ do
+    forM_ tys $ \(name, _, _) ->
+      typeIsNotDefined moduleName name
+    ks <- kindsOfAll moduleName (map (\(name, args, dctors) -> (name, args, mapMaybe snd dctors)) tys)
+    forM (zip tys ks) $ \((name, args, dctors), ctorKind) ->
+      addDataType moduleName name args dctors ctorKind
+  typeCheckAll moduleName rest
 typeCheckAll moduleName (TypeSynonymDeclaration name args ty : rest) = do
   rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
-    env <- getEnv
-    guardWith (show name ++ " is already defined") $ not $ M.member (moduleName, name) (types env)
-    kind <- kindsOf moduleName (Just name) args [ty]
-    putEnv $ env { types = M.insert (moduleName, name) (kind, TypeSynonym) (types env)
-                 , typeSynonyms = M.insert (moduleName, name) (args, ty) (typeSynonyms env) }
+    typeIsNotDefined moduleName name
+    kind <- kindsOf moduleName name args [ty]
+    addTypeSynonym moduleName name args ty kind
   typeCheckAll moduleName rest
 typeCheckAll _ (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
 typeCheckAll moduleName (ValueDeclaration name [] Nothing val : rest) = do
   rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
-    env <- getEnv
-    case M.lookup (moduleName, name) (names env) of
-      Just _ -> throwError $ show name ++ " is already defined"
-      Nothing -> do
-        [ty] <- typesOf moduleName [(name, val)]
-        putEnv (env { names = M.insert (moduleName, name) (ty, Value) (names env) })
+    valueIsNotDefined moduleName name
+    [ty] <- typesOf moduleName [(name, val)]
+    addValue moduleName name ty
   typeCheckAll moduleName rest
 typeCheckAll _ (ValueDeclaration _ _ _ _ : _) = error "Binders were not desugared"
 typeCheckAll moduleName (BindingGroupDeclaration vals : rest) = do
   rethrow (("Error in binding group " ++ show (map fst vals) ++ ":\n") ++) $ do
-    forM_ (map fst vals) $ \name -> do
-      env <- getEnv
-      case M.lookup (moduleName, name) (names env) of
-        Just _ -> throwError $ show name ++ " is already defined"
-        Nothing -> return ()
+    forM_ (map fst vals) $ \name ->
+      valueIsNotDefined moduleName name
     tys <- typesOf moduleName vals
     forM (zip (map fst vals) tys) $ \(name, ty) ->
-      modifyEnv $ \env -> env { names = M.insert (moduleName, name) (ty, Value) (names env) }
+      addValue moduleName name ty
   typeCheckAll moduleName rest
 typeCheckAll moduleName (ExternDataDeclaration name kind : rest) = do
   env <- getEnv
@@ -124,22 +161,22 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
     guardWith ("Module " ++ show moduleName ++ " does not exist") $ moduleExists env
     case idents of
       Nothing -> do
-        bindIdents (map snd $ filterModule (names env)) env
-        bindTypes (map snd $ filterModule (types env)) env
+        shadowIdents (map snd $ filterModule (names env)) env
+        shadowTypes (map snd $ filterModule (types env)) env
       Just idents' -> do
-        bindIdents (lefts idents') env
-        bindTypes (rights idents') env
+        shadowIdents (lefts idents') env
+        shadowTypes (rights idents') env
   typeCheckAll currentModule rest
  where errorMessage = (("Error in import declaration " ++ show moduleName ++ ":\n") ++)
        filterModule = filter ((== moduleName) . fst) . M.keys
        moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
-       bindIdents idents' env =
+       shadowIdents idents' env =
          forM_ idents' $ \ident -> do
            guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
            case (moduleName, ident) `M.lookup` names env of
              Just (pt, _) -> modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
              Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
-       bindTypes pns env =
+       shadowTypes pns env =
          forM_ pns $ \pn -> do
            guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
            case (moduleName, pn) `M.lookup` types env of

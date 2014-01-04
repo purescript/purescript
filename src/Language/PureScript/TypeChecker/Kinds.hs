@@ -15,8 +15,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Language.PureScript.TypeChecker.Kinds (
+    kindOf,
     kindsOf,
-    kindOf
+    kindsOfAll
 ) where
 
 import Language.PureScript.Types
@@ -55,13 +56,30 @@ instance Unifiable Kind where
   unknowns _ = []
 
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf moduleName ty = fmap (\(k, _, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer Nothing M.empty ty
+kindOf moduleName ty = fmap (\(k, _, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer ty
 
-kindsOf :: ModuleName -> Maybe ProperName -> [String] -> [Type] -> Check Kind
+kindsOf :: ModuleName -> ProperName -> [String] -> [PolyType] -> Check Kind
 kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst (SubstContext moduleName) $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
-  ks <- inferAll (fmap (\pn -> (pn, tyCon)) name) (M.fromList (zip args kargs)) ts
+  let dict = (name, tyCon) : zip (map ProperName args) kargs
+  bindLocalTypeVariables moduleName dict $
+    solveTypes ts kargs tyCon
+
+kindsOfAll :: ModuleName -> [(ProperName, [String], [PolyType])] -> Check [Kind]
+kindsOfAll moduleName tys = fmap (map starIfUnknown . (\(ks, _, _) -> ks)) . runSubst (SubstContext moduleName) $ do
+  tyCons <- replicateM (length tys) fresh
+  let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
+  bindLocalTypeVariables moduleName dict $
+    zipWithM (\tyCon (_, args, ts) -> do
+      kargs <- replicateM (length args) fresh
+      let argDict = zip (map ProperName args) kargs
+      bindLocalTypeVariables moduleName argDict $
+        solveTypes ts kargs tyCon) tyCons tys
+
+solveTypes :: [Type] -> [Kind] -> Kind -> Subst Kind
+solveTypes ts kargs tyCon = do
+  ks <- mapM infer ts
   tyCon ~~ foldr FunKind Star kargs
   forM_ ks $ \k -> k ~~ Star
   return tyCon
@@ -71,56 +89,51 @@ starIfUnknown (KUnknown _) = Star
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
-inferAll :: Maybe (ProperName, Kind) -> M.Map String Kind -> [Type] -> Subst [Kind]
-inferAll name m = mapM (infer name m)
-
-infer :: Maybe (ProperName, Kind) -> M.Map String Kind -> Type -> Subst Kind
-infer name m (Array t) = do
-  k <- infer name m t
+infer :: Type -> Subst Kind
+infer (Array t) = do
+  k <- infer t
   k ~~ Star
   return Star
-infer name m (Object row) = do
-  k <- inferRow name m row
+infer (Object row) = do
+  k <- inferRow row
   k ~~ Row
   return Star
-infer name m (Function args ret) = do
-  ks <- inferAll name m args
-  k <- infer name m ret
+infer (Function args ret) = do
+  ks <- mapM infer args
+  k <- infer ret
   k ~~ Star
   forM ks (~~ Star)
   return Star
-infer _ m (TypeVar v) =
-  case M.lookup v m of
-    Just k -> return k
-    Nothing -> throwError $ "Unbound type variable " ++ v
-infer (Just (name, k)) _ (TypeConstructor (Qualified Nothing pn)) | name == pn = return k
-infer _ _ (TypeConstructor v) = do
+infer (TypeVar v) = do
+  moduleName <- substCurrentModule <$> ask
+  lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+infer (TypeConstructor v) = do
   env <- liftCheck getEnv
   moduleName <- substCurrentModule `fmap` ask
   case M.lookup (qualify moduleName v) (types env) of
     Nothing -> throwError $ "Unknown type constructor '" ++ show v ++ "'"
     Just (kind, _) -> return kind
-infer name m (TypeApp t1 t2) = do
+infer (TypeApp t1 t2) = do
   k0 <- fresh
-  k1 <- infer name m t1
-  k2 <- infer name m t2
+  k1 <- infer t1
+  k2 <- infer t2
   k1 ~~ FunKind k2 k0
   return k0
-infer name m (ForAll ident ty) = do
+infer (ForAll ident ty) = do
   k <- fresh
-  infer name (M.insert ident k m) ty
-infer _ _ _ = return Star
+  moduleName <- substCurrentModule <$> ask
+  bindLocalTypeVariables moduleName [(ProperName ident, k)] $ infer ty
+infer _ = return Star
 
-inferRow :: Maybe (ProperName, Kind) -> M.Map String Kind -> Row -> Subst Kind
-inferRow _ m (RowVar v) = do
-  case M.lookup v m of
-    Just k -> return k
-    Nothing -> throwError $ "Unbound row variable " ++ v
-inferRow _ _ REmpty = return Row
-inferRow name m (RCons _ ty row) = do
-  k1 <- infer name m ty
-  k2 <- inferRow name m row
+inferRow :: Row -> Subst Kind
+inferRow (RowVar v) = do
+  moduleName <- substCurrentModule <$> ask
+  lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+inferRow REmpty = return Row
+inferRow (RCons _ ty row) = do
+  k1 <- infer ty
+  k2 <- inferRow row
   k1 ~~ Star
   k2 ~~ Row
   return Row
-inferRow _ _ _ = error "Invalid row in inferRow"
+inferRow _ = error "Invalid row in inferRow"

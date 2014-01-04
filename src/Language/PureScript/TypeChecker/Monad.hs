@@ -32,9 +32,18 @@ import Control.Monad.Reader
 
 import qualified Data.Map as M
 
-data NameKind = Value | Extern | Alias ModuleName Ident | LocalVariable deriving Show
+data NameKind
+  = Value
+  | Extern
+  | Alias ModuleName Ident
+  | LocalVariable deriving Show
 
-data TypeDeclarationKind = Data | ExternData | TypeSynonym | DataAlias ModuleName ProperName deriving Show
+data TypeDeclarationKind
+  = Data
+  | ExternData
+  | TypeSynonym
+  | DataAlias ModuleName ProperName
+  | LocalTypeVariable deriving Show
 
 data Environment = Environment
   { names :: M.Map (ModuleName, Ident) (Type, NameKind)
@@ -49,15 +58,27 @@ emptyEnvironment = Environment M.empty M.empty M.empty M.empty M.empty
 
 bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind) -> m a -> m a
 bindNames newNames action = do
-  orig <-  get
+  orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { names = newNames `M.union` (names . checkEnv $ st) } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
   return a
 
+bindTypes :: (MonadState CheckState m) => M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind) -> m a -> m a
+bindTypes newNames action = do
+  orig <- get
+  modify $ \st -> st { checkEnv = (checkEnv st) { types = newNames `M.union` (types . checkEnv $ st) } }
+  a <- action
+  modify $ \st -> st { checkEnv = (checkEnv st) { types = types . checkEnv $ orig } }
+  return a
+
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a
 bindLocalVariables moduleName bindings action =
   bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((moduleName, name), (ty, LocalVariable))) action
+
+bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
+bindLocalTypeVariables moduleName bindings action =
+  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> ((moduleName, name), (k, LocalTypeVariable))) action
 
 lookupVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified Ident -> m Type
 lookupVariable currentModule (Qualified moduleName var) = do
@@ -65,6 +86,13 @@ lookupVariable currentModule (Qualified moduleName var) = do
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
     Nothing -> throwError $ show var ++ " is undefined"
     Just (ty, _) -> return ty
+
+lookupTypeVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified ProperName -> m Kind
+lookupTypeVariable currentModule (Qualified moduleName name) = do
+  env <- getEnv
+  case M.lookup (fromMaybe currentModule moduleName, name) (types env) of
+    Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
+    Just (k, _) -> return k
 
 data AnyUnifiable where
   AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
