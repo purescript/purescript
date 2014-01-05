@@ -12,6 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 
 module Language.PureScript.TypeChecker.Types (
