@@ -97,8 +97,10 @@ module Arrays where
 
   foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
 
-  cons :: forall a. a -> [a] -> [a]
-  cons a = concat [a]
+  infixr 6 :
+
+  (:) :: forall a. a -> [a] -> [a]
+  (:) a = concat [a]
 
   concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
   concatMap as f = {
@@ -125,7 +127,7 @@ module Arrays where
     }
 
   zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
-  zipWith f (a:as) (b:bs) = cons (f a b) (zipWith f as bs)
+  zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
   zipWith _ _ _ = []
 
   any :: forall a. (a -> Boolean) -> [a] -> Boolean
@@ -168,7 +170,7 @@ module Tuple where
 
   unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
   unzip (t:ts) = case unzip ts of
-      { fst = as, snd = bs } -> tuple (cons t.fst as) (cons t.snd bs)
+      { fst = as, snd = bs } -> tuple (t.fst : as) (t.snd : bs)
   unzip [] = tuple [] []
 
 module String where
