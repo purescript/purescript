@@ -43,9 +43,6 @@ moduleToJs (Module pname@(ProperName name) decls) env =
   ]
 
 declToJs :: ModuleName -> Declaration -> Environment -> Maybe [JS]
-declToJs mp (ValueDeclaration ident _ _ (Abs args ret)) e =
-  Just [ JSFunction (Just ident) args (JSBlock [JSReturn (valueToJs mp e ret)]),
-         setProperty (identToJs ident) (JSVar ident) mp ]
 declToJs mp (ValueDeclaration ident _ _ val) e =
   Just [ JSVariableIntroduction ident (Just (valueToJs mp e val)),
          setProperty (identToJs ident) (JSVar ident) mp ]
