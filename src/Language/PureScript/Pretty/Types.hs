@@ -32,13 +32,15 @@ typeLiterals = mkPattern match
   match String = Just "String"
   match Boolean = Just "Boolean"
   match (Array ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
-  match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
+  match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
   match (ForAll ident ty) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
+  match REmpty = Just $ prettyPrintRow REmpty
+  match row@(RCons _ _ _) = Just $ prettyPrintRow row
   match _ = Nothing
 
 prettyPrintRow :: Type -> String

@@ -27,8 +27,14 @@ typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
   match Star = Just "*"
-  match Row = Just "#"
+  match Bang = Just "!"
   match (KUnknown (Unknown u)) = Just $ 'u' : show u
+  match _ = Nothing
+
+matchRow :: Pattern () Kind ((), Kind)
+matchRow = mkPattern match
+  where
+  match (Row k) = Just ((), k)
   match _ = Nothing
 
 funKind :: Pattern () Kind (Kind, Kind)
@@ -44,4 +50,5 @@ prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
   operators :: OperatorTable () Kind String
   operators =
-    OperatorTable [ [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]
+    OperatorTable [ [ Wrap matchRow $ \_ k -> "# " ++ k]
+                  , [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]

@@ -69,6 +69,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeVariable
             , parseTypeConstructor
             , parseForAll
+            , parens parseRow
             , parens parseType ])
 
 parseAnyType :: P.Parsec String ParseState Type
@@ -90,14 +91,14 @@ parsePolyType = do
   unless (isPolyType ty) $ P.unexpected "polymorphic type"
   return ty
 
-parseNameAndType :: P.Parsec String ParseState (String, Type)
-parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parsePolyType
+parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
+parseNameAndType p = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> p
 
 parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
 parseRow :: P.Parsec String ParseState Type
-parseRow = (fromList <$> (commaSep parseNameAndType) <*> parseRowEnding) P.<?> "row"
+parseRow = (fromList <$> (commaSep $ parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
   where
   fromList :: [(String, Type)] -> Type -> Type
   fromList [] r = r

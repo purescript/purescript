@@ -26,16 +26,17 @@ import qualified Text.Parsec.Expr as P
 parseStar :: P.Parsec String ParseState Kind
 parseStar = const Star <$> lexeme (P.char '*')
 
-parseRow :: P.Parsec String ParseState Kind
-parseRow = const Row <$> lexeme (P.char '#')
+parseBang :: P.Parsec String ParseState Kind
+parseBang = const Bang <$> lexeme (P.char '!')
 
 parseTypeAtom :: P.Parsec String ParseState Kind
 parseTypeAtom = indented *> P.choice (map P.try
             [ parseStar
-            , parseRow
+            , parseBang
             , parens parseKind ])
 
 parseKind :: P.Parsec String ParseState Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
-  operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return FunKind) P.AssocRight ] ]
+  operators = [ [ P.Prefix (lexeme (P.char '#') >> return Row) ]
+              , [ P.Infix (lexeme (P.try (P.string "->")) >> return FunKind) P.AssocRight ] ]

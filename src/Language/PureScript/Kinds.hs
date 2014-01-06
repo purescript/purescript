@@ -22,5 +22,6 @@ import Language.PureScript.Unknown
 data Kind
   = KUnknown (Unknown Kind)
   | Star
-  | Row
+  | Bang
+  | Row Kind
   | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)

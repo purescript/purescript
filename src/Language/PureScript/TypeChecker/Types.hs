@@ -24,7 +24,7 @@ import Data.Maybe (fromMaybe)
 import Data.Either (lefts, rights)
 import qualified Data.Data as D
 import Data.Generics
-       (mkT, something, everywhere, everywhereBut, mkQ, extQ)
+       (mkT, something, everywhere, everywhereBut, mkQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types

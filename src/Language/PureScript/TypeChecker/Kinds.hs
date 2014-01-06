@@ -44,7 +44,8 @@ instance Unifiable Kind where
   KUnknown u ~~ k = replace u k
   k ~~ KUnknown u = replace u k
   Star ~~ Star = return ()
-  Row ~~ Row = return ()
+  Bang ~~ Bang = return ()
+  Row k1 ~~ Row k2 = k1 ~~ k2
   FunKind k1 k2 ~~ FunKind k3 k4 = do
     k1 ~~ k3
     k2 ~~ k4
@@ -100,7 +101,7 @@ infer (Array t) = do
   return Star
 infer (Object row) = do
   k <- infer row
-  k ~~ Row
+  k ~~ Row Star
   return Star
 infer (Function args ret) = do
   ks <- mapM infer args
@@ -127,11 +128,12 @@ infer (ForAll ident ty) = do
   k <- fresh
   moduleName <- substCurrentModule <$> ask
   bindLocalTypeVariables moduleName [(ProperName ident, k)] $ infer ty
-infer REmpty = return Row
+infer REmpty = do
+  k <- fresh
+  return $ Row k
 infer (RCons _ ty row) = do
   k1 <- infer ty
   k2 <- infer row
-  k1 ~~ Star
-  k2 ~~ Row
-  return Row
+  k2 ~~ Row k1
+  return $ Row k1
 infer _ = error "Invalid argument to infer"
