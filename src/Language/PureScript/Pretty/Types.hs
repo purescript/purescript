@@ -41,18 +41,18 @@ typeLiterals = mkPattern match
   match (ForAll ident ty) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
   match _ = Nothing
 
-prettyPrintRow :: Row -> String
+prettyPrintRow :: Type -> String
 prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs rest) . toList []
   where
   nameAndTypeToPs :: String -> Type -> String
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
-  tailToPs :: Row -> String
+  tailToPs :: Type -> String
   tailToPs REmpty = ""
-  tailToPs (RUnknown (Unknown u)) = " | u" ++ show u
-  tailToPs (RowVar var) = " | " ++ var
-  tailToPs (RSkolem s) = " | s" ++ show s
+  tailToPs (TUnknown (Unknown u)) = " | u" ++ show u
+  tailToPs (TypeVar var) = " | " ++ var
+  tailToPs (Skolem s) = " | s" ++ show s
   tailToPs _ = error "Invalid row tail"
-  toList :: [(String, Type)] -> Row -> ([(String, Type)], Row)
+  toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)
 

@@ -59,7 +59,7 @@ instance Unifiable Kind where
 kindOf :: ModuleName -> Type -> Check Kind
 kindOf moduleName ty = fmap (\(k, _, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer ty
 
-kindsOf :: ModuleName -> ProperName -> [String] -> [PolyType] -> Check Kind
+kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
 kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst (SubstContext moduleName) $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
@@ -67,7 +67,7 @@ kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . run
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
 
-kindsOfAll :: ModuleName -> [(ProperName, [String], [PolyType])] -> Check [Kind]
+kindsOfAll :: ModuleName -> [(ProperName, [String], [Type])] -> Check [Kind]
 kindsOfAll moduleName tys = fmap (map starIfUnknown . (\(ks, _, _) -> ks)) . runSubst (SubstContext moduleName) $ do
   tyCons <- replicateM (length tys) fresh
   let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
@@ -91,12 +91,15 @@ starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
 infer :: Type -> Subst Kind
+infer Number = return Star
+infer String = return Star
+infer Boolean = return Star
 infer (Array t) = do
   k <- infer t
   k ~~ Star
   return Star
 infer (Object row) = do
-  k <- inferRow row
+  k <- infer row
   k ~~ Row
   return Star
 infer (Function args ret) = do
@@ -124,17 +127,11 @@ infer (ForAll ident ty) = do
   k <- fresh
   moduleName <- substCurrentModule <$> ask
   bindLocalTypeVariables moduleName [(ProperName ident, k)] $ infer ty
-infer _ = return Star
-
-inferRow :: Row -> Subst Kind
-inferRow (RowVar v) = do
-  moduleName <- substCurrentModule <$> ask
-  lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-inferRow REmpty = return Row
-inferRow (RCons _ ty row) = do
+infer REmpty = return Row
+infer (RCons _ ty row) = do
   k1 <- infer ty
-  k2 <- inferRow row
+  k2 <- infer row
   k1 ~~ Star
   k2 ~~ Row
   return Row
-inferRow _ = error "Invalid row in inferRow"
+infer _ = error "Invalid argument to infer"

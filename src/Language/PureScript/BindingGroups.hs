@@ -93,6 +93,6 @@ fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
 fromValueDecl (ValueDeclaration _ _ _ _) = error "Binders should have been desugared"
 fromValueDecl _ = error "Expected ValueDeclaration"
 
-fromDataDecl :: Declaration -> (ProperName, [String], [(ProperName, Maybe PolyType)])
+fromDataDecl :: Declaration -> (ProperName, [String], [(ProperName, Maybe Type)])
 fromDataDecl (DataDeclaration pn args ctors) = (pn, args, ctors)
 fromDataDecl _ = error "Expected DataDeclaration"

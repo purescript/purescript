@@ -32,14 +32,14 @@ data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable
 data Module = Module ProperName [Declaration] deriving (Show, D.Data, D.Typeable)
 
 data Declaration
-  = DataDeclaration ProperName [String] [(ProperName, Maybe PolyType)]
-  | DataBindingGroupDeclaration [(ProperName, [String], [(ProperName, Maybe PolyType)])]
-  | TypeSynonymDeclaration ProperName [String] PolyType
-  | TypeDeclaration Ident PolyType
+  = DataDeclaration ProperName [String] [(ProperName, Maybe Type)]
+  | DataBindingGroupDeclaration [(ProperName, [String], [(ProperName, Maybe Type)])]
+  | TypeSynonymDeclaration ProperName [String] Type
+  | TypeDeclaration Ident Type
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
   | BindingGroupDeclaration [(Ident, Value)]
-  | ExternDeclaration Ident PolyType
-  | ExternMemberDeclaration String Ident PolyType
+  | ExternDeclaration Ident Type
+  | ExternMemberDeclaration String Ident Type
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])

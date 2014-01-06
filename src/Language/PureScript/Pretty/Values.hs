@@ -82,7 +82,7 @@ lam = mkPattern match
   match (Abs args val) = Just (map show args, val)
   match _ = Nothing
 
-typed :: Pattern () Value (PolyType, Value)
+typed :: Pattern () Value (Type, Value)
 typed = mkPattern match
   where
   match (TypedValue val ty) = Just (ty, val)

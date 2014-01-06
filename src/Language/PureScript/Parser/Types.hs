@@ -84,7 +84,7 @@ parseType = do
   unless (isMonoType ty) $ P.unexpected "polymorphic type"
   return ty
 
-parsePolyType :: P.Parsec String ParseState PolyType
+parsePolyType :: P.Parsec String ParseState Type
 parsePolyType = do
   ty <- parseAnyType
   unless (isPolyType ty) $ P.unexpected "polymorphic type"
@@ -93,12 +93,12 @@ parsePolyType = do
 parseNameAndType :: P.Parsec String ParseState (String, Type)
 parseNameAndType = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> parsePolyType
 
-parseRowEnding :: P.Parsec String ParseState Row
-parseRowEnding = P.option REmpty (RowVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
+parseRowEnding :: P.Parsec String ParseState Type
+parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
-parseRow :: P.Parsec String ParseState Row
+parseRow :: P.Parsec String ParseState Type
 parseRow = (fromList <$> (commaSep parseNameAndType) <*> parseRowEnding) P.<?> "row"
   where
-  fromList :: [(String, Type)] -> Row -> Row
+  fromList :: [(String, Type)] -> Type -> Type
   fromList [] r = r
   fromList ((name, t):ts) r = RCons name t (fromList ts r)

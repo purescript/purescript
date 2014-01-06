@@ -26,30 +26,23 @@ data Type
   | String
   | Boolean
   | Array Type
-  | Object Row
-  | Function [PolyType] Type
+  | Object Type
+  | Function [Type] Type
   | TypeVar String
   | TypeConstructor (Qualified ProperName)
   | TypeApp Type Type
   | SaturatedTypeSynonym (Qualified ProperName) [Type]
   | ForAll String Type
-  | Skolem Int deriving (Show, Eq, Data, Typeable)
-
-type PolyType = Type
-
-data Row
-  = RUnknown (Unknown Row)
-  | RowVar String
+  | Skolem Int
   | REmpty
-  | RCons String Type Row
-  | RSkolem Int deriving (Show, Eq, Data, Typeable)
+  | RCons String Type Type deriving (Show, Eq, Data, Typeable)
 
-rowToList :: Row -> ([(String, Type)], Row)
+rowToList :: Type -> ([(String, Type)], Type)
 rowToList (RCons name ty row) = let (tys, rest) = rowToList row
-                               in ((name, ty):tys, rest)
+                                in ((name, ty):tys, rest)
 rowToList r = ([], r)
 
-rowFromList :: ([(String, Type)], Row) -> Row
+rowFromList :: ([(String, Type)], Type) -> Type
 rowFromList ([], r) = r
 rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 

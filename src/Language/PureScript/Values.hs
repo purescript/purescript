@@ -70,7 +70,7 @@ data Value
   | Block [Statement]
   | Constructor (Qualified ProperName)
   | Case [Value] [([Binder], Maybe Guard, Value)]
-  | TypedValue Value PolyType deriving (Show, Data, Typeable)
+  | TypedValue Value Type deriving (Show, Data, Typeable)
 
 data Statement
   = VariableIntroduction Ident Value

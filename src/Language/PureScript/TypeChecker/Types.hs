@@ -57,6 +57,7 @@ instance Unifiable Type where
   apply s (Object r) = Object (apply s r)
   apply s (Function args ret) = Function (map (apply s) args) (apply s ret)
   apply s (TypeApp t1 t2) = TypeApp (apply s t1) (apply s t2)
+  apply s (RCons name ty r) = RCons name (apply s ty) (apply s r)
   apply _ t = t
   unknowns (TUnknown (Unknown u)) = [u]
   unknowns (SaturatedTypeSynonym _ tys) = concatMap unknowns tys
@@ -65,40 +66,6 @@ instance Unifiable Type where
   unknowns (Object r) = unknowns r
   unknowns (Function args ret) = concatMap unknowns args ++ unknowns ret
   unknowns (TypeApp t1 t2) = unknowns t1 ++ unknowns t2
-  unknowns _ = []
-
-instance Unifiable Row where
-  unknown = RUnknown
-  isUnknown (RUnknown u) = Just u
-  isUnknown _ = Nothing
-  r1 ~~ r2 =
-      let
-        (s1, r1') = rowToList r1
-        (s2, r2') = rowToList r2
-        int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-        sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-        sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-      in do
-        forM_ int (uncurry (~~))
-        unifyRows sd1 r1' sd2 r2'
-      where
-      unifyRows :: [(String, Type)] -> Row -> [(String, Type)] -> Row -> Subst ()
-      unifyRows [] (RUnknown u) sd r = replace u (rowFromList (sd, r))
-      unifyRows sd r [] (RUnknown u) = replace u (rowFromList (sd, r))
-      unifyRows ((name, ty):row) r others u@(RUnknown un) = do
-        occursCheck un ty
-        forM row $ \(_, t) -> occursCheck un t
-        u' <- fresh
-        u ~~ RCons name ty u'
-        unifyRows row r others u'
-      unifyRows [] REmpty [] REmpty = return ()
-      unifyRows [] (RowVar v1) [] (RowVar v2) | v1 == v2 = return ()
-      unifyRows [] (RSkolem s1) [] (RSkolem s2) | s1 == s2 = return ()
-      unifyRows sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
-  apply s (RUnknown u) = runSubstitution s u
-  apply s (RCons name ty r) = RCons name (apply s ty) (apply s r)
-  apply _ r = r
-  unknowns (RUnknown (Unknown u)) = [u]
   unknowns (RCons _ ty r) = unknowns ty ++ unknowns r
   unknowns _ = []
 
@@ -141,7 +108,37 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
+  unifyTypes' r1@(RCons _ _ _) r2 = unifyRows r1 r2
+  unifyTypes' r1 r2@(RCons _ _ _) = unifyRows r1 r2
+  unifyTypes' r1@REmpty r2 = unifyRows r1 r2
+  unifyTypes' r1 r2@REmpty = unifyRows r1 r2
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
+
+unifyRows :: Type -> Type -> Subst ()
+unifyRows r1 r2 =
+  let
+    (s1, r1') = rowToList r1
+    (s2, r2') = rowToList r2
+    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+  in do
+    forM_ int (uncurry (~~))
+    unifyRows' sd1 r1' sd2 r2'
+  where
+  unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Subst ()
+  unifyRows' [] (TUnknown u) sd r = replace u (rowFromList (sd, r))
+  unifyRows' sd r [] (TUnknown u) = replace u (rowFromList (sd, r))
+  unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
+    occursCheck un ty
+    forM row $ \(_, t) -> occursCheck un t
+    u' <- fresh
+    u ~~ RCons name ty u'
+    unifyRows' row r others u'
+  unifyRows' [] REmpty [] REmpty = return ()
+  unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
+  unifyRows' [] (Skolem s1) [] (Skolem s2) | s1 == s2 = return ()
+  unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
 
 typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
 typeConstructorsAreEqual env moduleName c1 c2 =
@@ -198,16 +195,14 @@ escapeCheck checks ty sub =
 
 skolemEscapeCheck :: Type -> Check ()
 skolemEscapeCheck ty =
-  case something (extQ (mkQ Nothing findSkolems) findRSkolems) ty of
+  case something (mkQ Nothing findSkolems) ty of
     Nothing -> return ()
     Just _ -> throwError "Skolem variables cannot escape. Consider adding a type signature."
   where
     findSkolems (Skolem _) = return ()
     findSkolems _ = mzero
-    findRSkolems (RSkolem _) = return ()
-    findRSkolems _ = mzero
 
-setify :: Row -> Row
+setify :: Type -> Type
 setify = rowFromList . first (M.toList . M.fromList) . rowToList
 
 setifyAll :: (D.Data d) => d -> d
@@ -217,13 +212,10 @@ varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let unks = nub $ unknowns ty
       toName = (:) 't' . show
-      ty' = everywhere (mkT rowToVar) . everywhere (mkT typeToVar) $ ty
+      ty' = everywhere (mkT typeToVar) $ ty
       typeToVar :: Type -> Type
       typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
       typeToVar t = t
-      rowToVar :: Row -> Row
-      rowToVar (RUnknown (Unknown u)) = RowVar (toName u)
-      rowToVar t = t
   in mkForAll (sort . map toName $ unks) ty'
 
 replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
@@ -237,12 +229,6 @@ replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVa
   isShadowed (ForAll v _) | v == name = True
   isShadowed _ = False
 
-replaceRowVars :: (D.Data d) => String -> Row -> d -> d
-replaceRowVars name r = everywhere (mkT replaceRowVar)
-  where
-  replaceRowVar (RowVar v) | v == name = r
-  replaceRowVar other = other
-
 replaceAllVarsWithUnknowns :: Type -> Subst Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
@@ -250,8 +236,7 @@ replaceAllVarsWithUnknowns ty = return ty
 replaceVarWithUnknown :: String -> Type -> Subst Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
-  ru <- fresh
-  return $ replaceRowVars ident ru . replaceTypeVars ident tu $ ty
+  return $ replaceTypeVars ident tu $ ty
 
 replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadReader SubstContext m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
@@ -488,7 +473,7 @@ inferBinder val (ObjectBinder props) = do
   val ~~ Object row
   return m1
   where
-  inferRowProperties :: Row -> Row -> [(String, Binder)] -> Subst (M.Map Ident Type)
+  inferRowProperties :: Type -> Type -> [(String, Binder)] -> Subst (M.Map Ident Type)
   inferRowProperties nrow row [] = nrow ~~ row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- fresh
@@ -598,8 +583,7 @@ checkBlock mass ret (s:ss) = do
 skolemize :: String -> Type -> Subst Type
 skolemize ident ty = do
   tsk <- Skolem <$> fresh'
-  rsk <- RSkolem <$> fresh'
-  return $ replaceRowVars ident rsk $ replaceTypeVars ident tsk ty
+  return $ replaceTypeVars ident tsk ty
 
 check :: Value -> Type -> Subst ()
 check val ty = rethrow errorMessage $ check' val ty
@@ -684,15 +668,15 @@ check' val (SaturatedTypeSynonym name args) = do
   check val ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
-checkProperties :: [(String, Value)] -> Row -> Bool -> Subst ()
+checkProperties :: [(String, Value)] -> Type -> Bool -> Subst ()
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return ()
-  go [] [] u@(RUnknown _) = u ~~ REmpty
-  go [] [] (RSkolem _) | lax = return ()
+  go [] [] u@(TUnknown _) = u ~~ REmpty
+  go [] [] (Skolem _) | lax = return ()
   go [] ((p, _): _) _ | lax = return ()
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
-  go ((p,v):ps') [] u@(RUnknown _) = do
+  go ((p,v):ps') [] u@(TUnknown _) = do
     ty <- infer v
     rest <- fresh
     u ~~ RCons p ty rest
