@@ -40,26 +40,3 @@ function numberToString(n) { return n.toString(); }
 
 var math = Math;
 
-function map(f) { 
-  return function(xs) {
-    var ys = [];
-    for (var i = 0; i < xs.length; i++) {
-      ys[i] = f(xs[i]);
-    }
-    return ys;
-  };
-}
-
-function filter(xs) {
-  return function (p) {
-    var ys = [];
-    var j = 0;
-    for (var i = 0; i < xs.length; i++) {
-      var x = xs[i];
-      if (p(x)) {
-        ys[j++] = x;
-      }
-    }
-    return ys;
-  };
-}

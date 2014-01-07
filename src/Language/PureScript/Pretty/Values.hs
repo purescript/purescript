@@ -191,9 +191,6 @@ prettyPrintStatement (For ident start end sts) = "for " ++ show ident
   ++ " <- " ++ prettyPrintValue start
   ++ " until " ++ prettyPrintValue end ++ ": {"
   ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
-prettyPrintStatement (ForEach ident arr sts) = "foreach " ++ show ident
-  ++ " in " ++ prettyPrintValue arr ++ ": {"
-  ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
 prettyPrintStatement (If ifst) = prettyPrintIfStatement ifst
 prettyPrintStatement (ValueStatement val) = prettyPrintValue val
 prettyPrintStatement (Return value) = "return " ++ prettyPrintValue value

@@ -180,7 +180,6 @@ statementToJs m e (VariableIntroduction ident value) = JSVariableIntroduction id
 statementToJs m e (Assignment target value) = JSAssignment (JSAssignVariable target) (valueToJs m e value)
 statementToJs m e (While cond sts) = JSWhile (valueToJs m e cond) (JSBlock (map (statementToJs m e) sts))
 statementToJs m e (For ident start end sts) = JSFor ident (valueToJs m e start) (valueToJs m e end) (JSBlock (map (statementToJs m e) sts))
-statementToJs m e (ForEach ident arr sts) = JSApp (JSAccessor "forEach" (valueToJs m e arr)) [JSFunction Nothing [ident] (JSBlock (map (statementToJs m e) sts))]
 statementToJs m e (If ifst) = ifToJs ifst
   where
   ifToJs :: IfStatement -> JS

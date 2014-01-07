@@ -77,7 +77,6 @@ data Statement
   | Assignment Ident Value
   | While Value [Statement]
   | For Ident Value Value [Statement]
-  | ForEach Ident Value [Statement]
   | If IfStatement
   | ValueStatement Value
   | Return Value deriving (Show, Data, Typeable)

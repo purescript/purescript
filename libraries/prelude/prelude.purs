@@ -67,20 +67,17 @@ module Arrays where
   tailSafe (_ : xs) = Just xs
   tailSafe _ = Nothing
 
-  foreign import map :: forall a b. (a -> b) -> [a] -> [b]
+  map :: forall a b. (a -> b) -> [a] -> [b]
+  map _ [] = []
+  map f (x:xs) = f x : map f xs  
 
   foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
   foldr f a (b : bs) = f (foldr f a bs) b
   foldr _ a [] = a
 
   foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
-  foldl f b as = {
-      var result = b;
-      foreach (a in as) {
-	result = f a result;
-      }
-      return result;
-    }
+  foldl _ b [] = b
+  foldl f b (a:as) = foldl f (f a b) as
 
   foreign import member "length" length :: forall a. [a] -> Number
 
@@ -112,15 +109,13 @@ module Arrays where
   (:) a = concat [a]
 
   concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
-  concatMap as f = {
-      var result = [];
-      foreach (a in as) {
-	result = result `concat` f a;
-      }
-      return result;
-    }
+  concatMap [] f = []
+  concatMap (a:as) f = f a `concat` concatMap as f
 
-  foreign import filter :: forall a. [a] -> (a -> Boolean) -> [a]
+  filter :: forall a. (a -> Boolean) -> [a] -> [a]
+  filter _ [] = []
+  filter p (x:xs) | p x = x : filter p xs
+  filter p (_:xs) = filter p xs
 
   empty :: forall a. [a] -> Boolean
   empty [] = true
@@ -140,24 +135,12 @@ module Arrays where
   zipWith _ _ _ = []
 
   any :: forall a. (a -> Boolean) -> [a] -> Boolean
-  any p as = {
-      for (i <- 0 until length as) {
-	if (p (as !! i)) {
-	  return true;
-	}
-      }
-      return false;
-    }
+  any _ [] = false
+  any p (a:as) = p a || any p as
 
   all :: forall a. (a -> Boolean) -> [a] -> Boolean
-  all p as = {
-      for (i <- 0 until length as) {
-	if (!(p (as !! i))) {
-	  return false;
-	}
-      }
-      return true;
-    }
+  all _ [] = true
+  all p (a:as) = p a && all p as
 
 module Tuple where
 

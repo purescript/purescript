@@ -540,14 +540,6 @@ checkStatement mass ret (For ident start end inner) = do
   check end Number
   (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
   return (allCodePathsReturn, mass)
-checkStatement mass ret (ForEach ident vals inner) = do
-  moduleName <- substCurrentModule <$> ask
-  assignVariable ident
-  val <- fresh
-  check vals (Array val)
-  (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, val)] $ checkBlock mass ret inner
-  guardWith "Cannot return from within a foreach block" $ not allCodePathsReturn
-  return (False, mass)
 checkStatement mass _ (ValueStatement val) = do
   check val unit
   return (False, mass)

@@ -174,11 +174,6 @@ parseFor = For <$> (C.reserved "for" *> C.indented *> C.lexeme (P.char '(') *> C
                <*> (C.indented *> C.reserved "until" *> parseValue <* C.indented <* C.lexeme (P.char ')'))
                <*> parseManyStatements
 
-parseForEach :: P.Parsec String ParseState Statement
-parseForEach = ForEach <$> (C.reserved "foreach" *> C.indented *> C.lexeme (P.char '(') *> C.indented *> C.parseIdent)
-                       <*> (C.indented *> C.reserved "in" *> parseValue <* C.lexeme (P.char ')'))
-                       <*> parseManyStatements
-
 parseIf :: P.Parsec String ParseState Statement
 parseIf = If <$> parseIfStatement
 
@@ -204,7 +199,6 @@ parseStatement = P.choice
                  , parseAssignment
                  , parseWhile
                  , parseFor
-                 , parseForEach
                  , parseIf
                  , parseValueStatement
                  , parseReturn ] P.<?> "statement"
