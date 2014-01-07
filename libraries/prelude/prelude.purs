@@ -12,8 +12,17 @@ module Prelude where
   (|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
   (|>) = \f -> \g -> \a -> g (f a)
 
+  infixr 5 |>
+
   (<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
   (<|) = flip (|>)
+
+  infixr 5 <|
+
+  ($) :: forall a b. (a -> b) -> a -> b
+  ($) f x = f x
+
+  infixr 1000 $
 
 module Maybe where
 

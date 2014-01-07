@@ -77,10 +77,10 @@ builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "
                   , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
 
 reservedOpNames :: [String]
-reservedOpNames = builtInOperators ++ [ "->", "=", "." ]
+reservedOpNames = builtInOperators ++ [ "->", "=", ".", "\\" ]
 
 identStart :: P.Parsec String u Char
-identStart = P.lower <|> P.oneOf "_$"
+identStart = P.lower <|> P.oneOf "_"
 
 properNameStart :: P.Parsec String u Char
 properNameStart = P.upper
@@ -89,10 +89,10 @@ identLetter :: P.Parsec String u Char
 identLetter = P.alphaNum <|> P.oneOf "_'"
 
 opStart :: P.Parsec String u Char
-opStart = P.oneOf ":.!#%&*+/<=>?@^|~"
+opStart = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
 
 opLetter :: P.Parsec String u Char
-opLetter = P.oneOf ":.#$%&*+./<=>?@^|"
+opLetter = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
 
 langDef :: PT.GenLanguageDef String u Identity
 langDef = PT.LanguageDef

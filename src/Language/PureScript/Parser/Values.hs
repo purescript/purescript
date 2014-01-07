@@ -51,9 +51,9 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
-  C.lexeme $ P.char '\\'
+  C.reservedOp "\\"
   args <- P.many (C.indented *> (P.try singleArg <|> manyArgs))
-  C.lexeme $ C.indented *> P.string "->"
+  C.indented *> C.reservedOp "->"
   value <- parseValue
   return $ toFunction args value
   where
@@ -80,7 +80,7 @@ parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.rese
 parseCaseAlternative :: P.Parsec String ParseState ([Binder], Maybe Guard, Value)
 parseCaseAlternative = (,,) <$> (return <$> parseBinder)
                             <*> P.optionMaybe parseGuard
-                            <*> (C.lexeme (P.string "->") *> parseValue)
+                            <*> (C.indented *> C.reservedOp "->" *> parseValue)
                             P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Value
