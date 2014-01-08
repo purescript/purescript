@@ -22,9 +22,10 @@ import Data.Generics
 
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.Options
 
-optimize :: JS -> JS
-optimize = removeUnusedVariables . unThunk . etaConvert . inlineVariables
+optimize :: Options -> JS -> JS
+optimize opts = tco opts . removeUnusedVariables . unThunk . etaConvert . inlineVariables
 
 replaceIdent :: (Data d) => Ident -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
@@ -101,3 +102,19 @@ unThunk = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) [])]) = JSBlock body
   convert js = js
+
+tco :: Options -> JS -> JS
+tco opts | optionsTco opts = tco'
+         | otherwise = id
+
+tco' :: JS -> JS
+tco' = everywhere (mkT convert)
+  where
+  convert :: JS -> JS
+  convert (JSVariableIntroduction name (Just (JSFunction Nothing args body)))
+    | isTailCall name body = (JSVariableIntroduction name (Just (JSFunction Nothing args (toLoop name args body))))
+  convert js = js
+  isTailCall :: Ident -> JS -> Bool
+  isTailCall _ _ = False
+  toLoop :: Ident -> [Ident] -> JS -> JS
+  toLoop = undefined

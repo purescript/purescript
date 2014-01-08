@@ -42,7 +42,8 @@ data JS
   | JSFor Ident JS JS JS
   | JSIfElse JS JS (Maybe JS)
   | JSReturn JS
-  | JSThrow JS deriving (Show, Data, Typeable)
+  | JSThrow JS
+  | JSTypeOf JS deriving (Show, Data, Typeable)
 
 data JSAssignment
   = JSAssignVariable Ident

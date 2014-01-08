@@ -32,7 +32,7 @@ compile inputFile = do
     Left parseError -> do
       return (Left $ show parseError)
     Right ms -> do
-      case P.compile ms of
+      case P.compile P.defaultOptions ms of
         Left typeError -> do
           return (Left typeError)
         Right (_, _, env) -> do

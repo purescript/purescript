@@ -156,6 +156,12 @@ app = mkPattern' match
     return (intercalate ", " jss, val)
   match _ = mzero
 
+typeOf :: Pattern PrinterState JS ((), JS)
+typeOf = mkPattern match
+  where
+  match (JSTypeOf val) = Just ((), val)
+  match _ = Nothing
+
 unary :: UnaryOperator -> String -> Operator PrinterState JS String
 unary op str = Wrap match (++)
   where
@@ -202,6 +208,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ binary    LessThanOrEqualTo    "<=" ]
                   , [ binary    GreaterThan          ">" ]
                   , [ binary    GreaterThanOrEqualTo ">=" ]
+                  , [ Wrap typeOf $ \_ s -> "typeof " ++ s ]
                   , [ unary     Not                  "!" ]
                   , [ unary     BitwiseNot           "~" ]
                   , [ unary     Negate               "-" ]

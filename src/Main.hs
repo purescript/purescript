@@ -28,15 +28,15 @@ readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile
   text <- U.readFile inputFile
   return $ P.runIndentParser P.parseModules text
 
-compile :: Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile input output externs = do
+compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+compile opts input output externs = do
   modules <- readInput input
   case modules of
     Left err -> do
       U.print err
       exitFailure
     Right ms ->
-      case P.compile ms of
+      case P.compile opts ms of
         Left err -> do
           U.putStrLn err
           exitFailure
@@ -65,6 +65,17 @@ externsFile :: Term (Maybe FilePath)
 externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
      { optDoc = "The output .e.ps file" }
 
+tco :: Term Bool
+tco = value $ flag $ (optInfo [ "tco" ])
+     { optDoc = "Perform tail call optimizations" }
+
+performRuntimeTypeChecks :: Term Bool
+performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
+     { optDoc = "Generate runtime type checks" }
+
+options :: Term P.Options
+options = P.Options <$> tco <*> performRuntimeTypeChecks
+
 stdInOrInputFiles :: Term (Maybe [FilePath])
 stdInOrInputFiles = combine <$> useStdIn <*> inputFiles
   where
@@ -72,7 +83,7 @@ stdInOrInputFiles = combine <$> useStdIn <*> inputFiles
   combine True _ = Nothing
 
 term :: Term (IO ())
-term = compile <$> stdInOrInputFiles <*> outputFile <*> externsFile
+term = compile <$> options <*> stdInOrInputFiles <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
