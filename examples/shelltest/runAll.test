@@ -14,10 +14,3 @@ mkdir -p tests &&  ../../dist/build/psc/psc ../passing/List.purs -o tests/List.j
 >>>2
 >>>= 0
 
-# Foreach
-mkdir -p tests &&  ../../dist/build/psc/psc ../passing/Foreach.purs -o tests/Foreach.js && cat tests/Foreach.js Foreach.js | nodejs
-<<<
->>>
-15
->>>2
->>>= 0

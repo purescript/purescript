@@ -70,7 +70,8 @@ reservedNames = [ "case"
                 , "Boolean"
                 , "infixl"
                 , "infixr"
-                , "module" ]
+                , "module"
+                , "let" ]
 
 builtInOperators :: [String]
 builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"

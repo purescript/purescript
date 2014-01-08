@@ -125,6 +125,28 @@ parseAccessor :: Value -> P.Parsec String ParseState Value
 parseAccessor (Constructor _) = P.unexpected "constructor"
 parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> C.identifier) <*> pure obj
 
+parseDoNotationLet :: P.Parsec String ParseState DoNotationElement
+parseDoNotationLet = DoNotationLet <$> (C.reserved "let" *> C.indented *> parseBinder)
+                                   <*> (C.indented *> C.reservedOp "=" *> parseValue)
+
+parseDoNotationBind :: P.Parsec String ParseState DoNotationElement
+parseDoNotationBind = DoNotationBind <$> parseBinder <*> (C.indented *> C.reservedOp "<-" *> parseValue)
+
+parseDoNotationReturn :: P.Parsec String ParseState DoNotationElement
+parseDoNotationReturn = DoNotationReturn <$> (C.reserved "return" *> C.indented *> parseValue)
+
+parseDoNotationElement :: P.Parsec String ParseState DoNotationElement
+parseDoNotationElement = P.choice
+            [ P.try parseDoNotationBind
+            , parseDoNotationLet
+            , parseDoNotationReturn
+            , P.try (DoNotationValue <$> parseValue) ]
+
+parseManyDoNotationElements :: P.Parsec String ParseState [DoNotationElement]
+parseManyDoNotationElements = do
+  C.indented
+  C.mark (P.many (C.same *> C.mark parseDoNotationElement))
+
 parseValue :: P.Parsec String ParseState Value
 parseValue =
   (buildExpressionParser operators
@@ -136,7 +158,9 @@ parseValue =
                   , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
   postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])) <*> pure v
                   , \v -> P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue)) <*> pure v
-                  , \v -> flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v ]
+                  , \v -> flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
+                  , \v -> P.try $ Do v <$> (C.indented *> C.reserved "do" *> parseManyDoNotationElements)
+                  ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
                 , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)

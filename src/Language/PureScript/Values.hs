@@ -70,7 +70,14 @@ data Value
   | Block [Statement]
   | Constructor (Qualified ProperName)
   | Case [Value] [([Binder], Maybe Guard, Value)]
-  | TypedValue Value Type deriving (Show, Data, Typeable)
+  | TypedValue Value Type
+  | Do Value [DoNotationElement] deriving (Show, Data, Typeable)
+
+data DoNotationElement
+  = DoNotationValue Value
+  | DoNotationBind Binder Value
+  | DoNotationLet Binder Value
+  | DoNotationReturn Value deriving (Show, Data, Typeable)
 
 data Statement
   = VariableIntroduction Ident Value

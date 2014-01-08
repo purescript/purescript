@@ -106,6 +106,18 @@ binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
     match' (Binary op' v1 v2) | op' == op = Just (v1, v2)
     match' _ = Nothing
 
+_do :: Pattern () Value ([DoNotationElement], Value)
+_do = mkPattern match
+  where
+  match (Do val els) = Just (els, val)
+  match _ = Nothing
+
+prettyPrintDoNotationElement :: DoNotationElement -> String
+prettyPrintDoNotationElement (DoNotationValue val) = prettyPrintValue val
+prettyPrintDoNotationElement (DoNotationBind binder val) = prettyPrintBinder binder ++ " <- " ++ prettyPrintValue val
+prettyPrintDoNotationElement (DoNotationLet binder val) = "let " ++ prettyPrintBinder binder ++ " = " ++ prettyPrintValue val
+prettyPrintDoNotationElement (DoNotationReturn val) = "return " ++ prettyPrintValue val
+
 prettyPrintValue :: Value -> String
 prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue ()
   where
@@ -116,6 +128,7 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
+                  , [ Wrap _do $ \els val -> val ++ " do { " ++ intercalate "; " (map prettyPrintDoNotationElement els) ++ " }" ]
                   , [ Split lam $ \args val -> "\\" ++ intercalate ", " args ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
                   , [ Wrap typed $ \ty val -> val ++ " :: " ++ prettyPrintType ty ]

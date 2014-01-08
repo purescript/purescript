@@ -28,6 +28,7 @@ import Language.PureScript.Operators as P
 import Language.PureScript.CaseDeclarations as P
 import Language.PureScript.TypeDeclarations as P
 import Language.PureScript.BindingGroups as P
+import Language.PureScript.DoNotation as P
 
 import Data.List (intercalate)
 import Control.Monad (forM_, (>=>))
@@ -35,7 +36,11 @@ import Control.Monad (forM_, (>=>))
 compile :: [Module] -> Either String (String, String, Environment)
 compile ms = do
   bracketted <- rebracket ms
-  desugared <- desugarCasesModule >=> desugarTypeDeclarationsModule >=> (return . createBindingGroupsModule) $ bracketted
+  desugared <- desugarDo
+               >=> desugarCasesModule
+               >=> desugarTypeDeclarationsModule
+               >=> (return . createBindingGroupsModule)
+               $ bracketted
   (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
   let js = prettyPrintJS . map optimize . concatMap (flip moduleToJs env) $ desugared
   let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared

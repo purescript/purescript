@@ -1,4 +1,4 @@
-module Kinds where
+module Eff where
 
 -- Eff Monad
 
@@ -11,6 +11,8 @@ foreign import (>>=) :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 type Pure a = forall e. Eff e a
 
 foreign import runPure :: forall a. Pure a -> a
+
+eff = { ret: ret, bind: (>>=) }
 
 -- Errors
 
@@ -47,13 +49,14 @@ foreign import runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r 
 -- Tests
 
 test1 = runPure (runState 0 (catchError (\s -> ret 0) 
-  (get >>= \s -> 
-    throwError "Error!" >>= \_ -> 
-      set (s + 1) >>= \_ -> 
-        ret s)))
+  (eff do 
+     s <- get 
+     throwError "Error!" 
+     set (s + 1) 
+     return s)))
 
-test2 = runPure (runST (
-  newSTRef 0 >>= \ref -> 
-    modifySTRef (\n -> n + 1) ref >>= \_ -> 
-      readSTRef ref))
+test2 = runPure (runST (eff do
+  ref <- newSTRef 0
+  modifySTRef (\n -> n + 1) ref 
+  readSTRef ref))
 
