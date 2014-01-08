@@ -19,6 +19,7 @@ Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
 - Simple FFI
 - Modules
 - Rank N Types
+- Do Notation
 
 ## Try It!
 
@@ -331,7 +332,7 @@ since the `bar` property is missing.
 
 Again, a type annotation can be provided if necessary.
 
-## Rank N Types (Experimental Feature)
+## Rank N Types
 
 It is also possible for the `forall` quantifier to appear on the left of a function arrow, inside types record fields and data constructors, and in type synonyms.
 
@@ -360,7 +361,11 @@ All types can be inferred, but annotations can optionally be provided.
 
 ## Kind System
 
-There are two primitive kinds, the kind `*` of types and the kind `#` of rows. Higher kinded types are also supported. That is, a type variable can refer to not only a type or a row, but a type constructor, or row constructor etc.
+There are two primitive kinds, the kind `*` of types and the kind `!` of effects. 
+
+For each kind `k` there is also a kind `# k` of rows, with types of kind `k`. For example `# *` is the kind of rows of types, as used to define records, and `# !` is the kind of rows of effects, used to define the monad `Eff` of extensible effects.
+
+Higher kinded types are also supported. That is, a type variable can refer to not only a type or a row, but a type constructor, or row constructor etc.
 
 ## Whitespace
 
@@ -392,7 +397,6 @@ The following types of statement are supported:
 - For-each loops
 - While loops
 - If-Then-Else statements
-- Naked expressions
 
 Here is an example of a power function defined using a block:
 
@@ -494,17 +498,6 @@ collatz n = {
     return count;
   }
 ```
-
-## Naked Expressions as Statements
-
-Any expression with the empty type `{ }` can be used as a statement in a block. For example, method calls which return `{ }`:
-
-```haskell
-example n m = {
-    console.log "Adding two numbers"
-    return n + m;
-  }
-```
       
 ## If-Then-Else Expressions
 
@@ -515,6 +508,52 @@ For example,
 ```haskell
 conditional = if 2 > 1 then "ok" else "oops"
 ```
+
+## Do Notation
+
+The `do` keyword introduces simple syntactic sugar for monadic expressions.
+
+Here is an example, using the maybe monad:
+
+```haskell
+data Maybe a = Nothing | Just a
+
+bindMaybe Nothing _ = Nothing
+bindMaybe (Just a) f = f a
+
+maybe = { ret: Just, bind: bindMaybe }
+
+isEven n | n % 2 == 0 = Just {}
+isEven _ = Nothing
+
+evenSum a b = maybe do
+  n <- a
+  m <- b
+  let sum = n + m
+  isEven sum
+  return sum
+```
+
+`isEven` adds two values of type `Maybe Number` and returns their sum, if the sum is even. If the sum is odd, `evenSum` returns `Nothing`.
+
+This example illustrates the following aspects of `do` notation:
+
+- The `do` keyword is preceded by a value `m` which is a record. The record must contain fields `ret` and `bind` which determine the monad which will be used in the computation.
+- Statements can have the following form:
+    - `a <- x` which desugars to `m.bind x (\a -> ...)` 
+    - `let a = x` which desugars to `(\a -> ...)(x)` 
+    - `return a` which desugars to `m.ret a`
+    - `x` which desugars to `m.bind x (\_ -> ...)` or just `x` if this is the last statement.
+
+Not illustrated here, but equally valid is the use of a binder on the left hand side of `<-` or `=`. For example:
+
+```haskell
+test arr = do
+  (x:y:_) <- arr
+  return x + y
+```
+
+A pattern match failure will generate a runtime exception, just as in the case of a regular `case` statement.
 
 ## Pattern Matching
 
