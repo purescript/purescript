@@ -53,6 +53,9 @@ The following options are supported:
         
     -e --foreign imports
         Write a list of foreign imports declarations to the specified file in addition to generating Javascript output
+        
+    --runtime-type-checks
+        Generate simple runtime type checks for function arguments with simple types.
 
 ## Motivation
 
