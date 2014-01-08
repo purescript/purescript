@@ -211,9 +211,6 @@ parseElseStatement :: P.Parsec String ParseState ElseStatement
 parseElseStatement = C.reserved "else" >> (ElseIf <$> parseIfStatement
                                            <|> Else <$> parseManyStatements)
 
-parseValueStatement :: P.Parsec String ParseState Statement
-parseValueStatement = ValueStatement <$> (parseValue <* C.semi)
-
 parseReturn :: P.Parsec String ParseState Statement
 parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.semi)
 
@@ -224,7 +221,6 @@ parseStatement = P.choice
                  , parseWhile
                  , parseFor
                  , parseIf
-                 , parseValueStatement
                  , parseReturn ] P.<?> "statement"
 
 parseStringBinder :: P.Parsec String ParseState Binder

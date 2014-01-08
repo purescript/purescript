@@ -540,9 +540,6 @@ checkStatement mass ret (For ident start end inner) = do
   check end Number
   (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
   return (allCodePathsReturn, mass)
-checkStatement mass _ (ValueStatement val) = do
-  check val unit
-  return (False, mass)
 checkStatement mass ret (Return val) = do
   check val ret
   return (True, mass)

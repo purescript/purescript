@@ -85,7 +85,6 @@ data Statement
   | While Value [Statement]
   | For Ident Value Value [Statement]
   | If IfStatement
-  | ValueStatement Value
   | Return Value deriving (Show, Data, Typeable)
 
 data IfStatement = IfStatement Value [Statement] (Maybe ElseStatement) deriving (Show, Data, Typeable)

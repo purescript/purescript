@@ -187,5 +187,4 @@ statementToJs m e (If ifst) = ifToJs ifst
   elseToJs :: ElseStatement -> JS
   elseToJs (Else sts) = JSBlock (map (statementToJs m e) sts)
   elseToJs (ElseIf elif) = ifToJs elif
-statementToJs m e (ValueStatement val) = valueToJs m e val
 statementToJs m e (Return value) = JSReturn (valueToJs m e value)

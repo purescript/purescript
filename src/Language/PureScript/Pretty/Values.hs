@@ -205,7 +205,6 @@ prettyPrintStatement (For ident start end sts) = "for " ++ show ident
   ++ " until " ++ prettyPrintValue end ++ ": {"
   ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
 prettyPrintStatement (If ifst) = prettyPrintIfStatement ifst
-prettyPrintStatement (ValueStatement val) = prettyPrintValue val
 prettyPrintStatement (Return value) = "return " ++ prettyPrintValue value
 
 prettyPrintIfStatement :: IfStatement -> String
