@@ -548,7 +548,7 @@ This example illustrates the following aspects of `do` notation:
 Not illustrated here, but equally valid is the use of a binder on the left hand side of `<-` or `=`. For example:
 
 ```haskell
-test arr = do
+test arr = maybe do
   (x:y:_) <- arr
   return x + y
 ```
