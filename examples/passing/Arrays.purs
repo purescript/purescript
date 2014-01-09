@@ -19,4 +19,3 @@ test4 = \arr -> case arr of
   [_] -> 0
   x : y : xs -> x * y + test4 xs
 
-
