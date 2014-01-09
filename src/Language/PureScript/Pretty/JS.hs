@@ -118,6 +118,12 @@ literals = mkPattern' match
     [ return "throw "
     , prettyPrintJS' value
     ]
+  match (JSBreak lbl) = return $ "break " ++ lbl
+  match (JSContinue lbl) = return $ "continue " ++ lbl
+  match (JSLabel lbl js) = fmap concat $ sequence
+    [ return $ lbl ++ ": "
+    , prettyPrintJS' js
+    ]
   match _ = mzero
 
 targetToJs :: JSAssignment -> String
