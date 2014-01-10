@@ -20,6 +20,7 @@ Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
 - Modules
 - Rank N Types
 - Do Notation
+- Optional tail-call elimination
 
 ## Try It!
 
@@ -56,6 +57,9 @@ The following options are supported:
         
     --runtime-type-checks
         Generate simple runtime type checks for function arguments with simple types.
+        
+    --tco
+        Perform tail-call elimination on the generated Javascript.
 
 ## Motivation
 
