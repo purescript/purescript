@@ -1,5 +1,5 @@
 name: purescript
-version: 0.2.10.2
+version: 0.2.11
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -12,6 +12,7 @@ description: A small compile-to-JS language with extensible records and type-saf
 category: Language
 author: Phil Freeman <paf31@cantab.net>
 data-dir: ""
+data-files: libraries/prelude/prelude.purs
 
 library
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,

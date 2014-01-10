@@ -21,6 +21,11 @@ import Control.Monad (forM)
 import System.Exit (exitSuccess, exitFailure)
 import qualified System.IO.UTF8 as U
 import Text.Parsec (ParseError)
+import qualified Paths_purescript as Paths
+import Data.Version (showVersion)
+
+preludeFilename :: IO FilePath
+preludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
 
 readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
 readInput Nothing = getContents >>= return . P.runIndentParser P.parseModules
@@ -73,24 +78,31 @@ performRuntimeTypeChecks :: Term Bool
 performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
      { optDoc = "Generate runtime type checks" }
 
+noPrelude :: Term Bool
+noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
+     { optDoc = "Omit the Prelude" }
+
 options :: Term P.Options
 options = P.Options <$> tco <*> performRuntimeTypeChecks
 
-stdInOrInputFiles :: Term (Maybe [FilePath])
-stdInOrInputFiles = combine <$> useStdIn <*> inputFiles
+stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
+stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
   where
-  combine False input = Just input
-  combine True _ = Nothing
+  combine False True input = Just (prelude : input)
+  combine False False input = Just input
+  combine True _ _ = Nothing
 
-term :: Term (IO ())
-term = compile <$> options <*> stdInOrInputFiles <*> outputFile <*> externsFile
+term :: FilePath -> Term (IO ())
+term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
   { termName = "psc"
-  , version  = "1.0"
+  , version  = showVersion $ Paths.version
   , termDoc  = "Compiles PureScript to Javascript"
   }
 
 main :: IO ()
-main = run (term, termInfo)
+main = do
+  prelude <- preludeFilename
+  run (term prelude, termInfo)
