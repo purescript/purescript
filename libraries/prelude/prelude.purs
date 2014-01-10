@@ -79,7 +79,9 @@ module Arrays where
   foldl _ b [] = b
   foldl f b (a:as) = foldl f (f a b) as
 
-  foreign import member "length" length :: forall a. [a] -> Number
+  foreign import length "function length(xs) { \
+                        \  return xs.length; \
+                        \}" :: forall a. [a] -> Number
 
   foreign import indexOf :: forall a. [a] -> a -> Number
 
@@ -167,7 +169,9 @@ module Tuple where
 
 module String where
 
-  foreign import member "length" lengthS :: String -> Number
+  foreign import lengthS "function lengthS(s) {\
+                         \  return s.length;\
+                         \}" :: String -> Number
 
   foreign import charAt :: Number -> String -> String
 

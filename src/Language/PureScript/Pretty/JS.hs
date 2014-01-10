@@ -124,6 +124,7 @@ literals = mkPattern' match
     [ return $ lbl ++ ": "
     , prettyPrintJS' js
     ]
+  match (JSRaw js) = return js
   match _ = mzero
 
 targetToJs :: JSAssignment -> String

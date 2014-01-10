@@ -36,12 +36,19 @@ import Language.PureScript.Types
 
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
+  let
+    rawDecls = mapMaybe filterRawDecls decls
+  in
+  map JSRaw rawDecls ++
   [ JSVariableIntroduction (Ident name) Nothing
   , JSApp (JSFunction Nothing [Ident name]
                       (JSBlock (concat $ mapMaybe (\decl -> declToJs opts (ModuleName pname) decl env) decls)))
           [JSAssignment (JSAssignVariable (Ident name))
                          (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]
   ]
+  where
+  filterRawDecls (ExternDeclaration _ (Just js) _) = Just js
+  filterRawDecls _ = Nothing
 
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
@@ -52,24 +59,6 @@ declToJs opts mp (BindingGroupDeclaration vals) e =
            [ JSVariableIntroduction ident (Just (valueToJs opts mp e val)),
              setProperty (identToJs ident) (JSVar ident) mp ]
          ) vals
-declToJs _ mp (ExternMemberDeclaration member ident ty) _
-  | returnsFunction ty =
-    Just [ JSFunction (Just ident) [Ident "value"] (JSBlock
-            [ JSReturn $ JSApp (JSAccessor "bind" (JSAccessor member (JSVar (Ident "value")))) [JSVar (Ident "value")]
-            ]),
-           setProperty (show ident) (JSVar ident) mp ]
-  | otherwise =
-    Just [ JSFunction (Just ident) [Ident "value"] (JSBlock
-            [ JSReturn $ JSAccessor member (JSVar (Ident "value"))
-            ]),
-           setProperty (show ident) (JSVar ident) mp ]
-  where
-  returnsFunction (Function _ ret) = isFunction ret
-  returnsFunction (ForAll _ ty') = returnsFunction ty'
-  returnsFunction _ = error "Expected function type in declToJs"
-  isFunction (Function _ _) = True
-  isFunction (ForAll _ ty') = isFunction ty'
-  isFunction _ = False
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
     let

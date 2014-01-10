@@ -125,24 +125,7 @@ typeCheckAll moduleName (ExternDataDeclaration name kind : rest) = do
   guardWith (show name ++ " is already defined") $ not $ M.member (moduleName, name) (types env)
   putEnv $ env { types = M.insert (moduleName, name) (kind, TypeSynonym) (types env) }
   typeCheckAll moduleName rest
-typeCheckAll moduleName (ExternMemberDeclaration member name ty : rest) = do
-  rethrow (("Error in foreign import member declaration " ++ show name ++ ":\n") ++) $ do
-    env <- getEnv
-    kind <- kindOf moduleName ty
-    guardWith "Expected kind *" $ kind == Star
-    case M.lookup (moduleName, name) (names env) of
-      Just _ -> throwError $ show name ++ " is already defined"
-      Nothing -> case ty of
-        _ | isSingleArgumentFunction ty -> do
-          putEnv (env { names = M.insert (moduleName, name) (ty, Extern) (names env)
-                      , members = M.insert (moduleName, name) member (members env) })
-          | otherwise -> throwError "Foreign member declarations must have function types, with an single argument."
-  typeCheckAll moduleName rest
-  where
-    isSingleArgumentFunction (Function [_] _) = True
-    isSingleArgumentFunction (ForAll _ t) = isSingleArgumentFunction t
-    isSingleArgumentFunction _ = False
-typeCheckAll moduleName (ExternDeclaration name ty : rest) = do
+typeCheckAll moduleName (ExternDeclaration name _ ty : rest) = do
   rethrow (("Error in foreign import declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     kind <- kindOf moduleName ty

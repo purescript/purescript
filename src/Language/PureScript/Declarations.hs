@@ -38,8 +38,7 @@ data Declaration
   | TypeDeclaration Ident Type
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
   | BindingGroupDeclaration [(Ident, Value)]
-  | ExternDeclaration Ident Type
-  | ExternMemberDeclaration String Ident Type
+  | ExternDeclaration Ident (Maybe String) Type
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])

@@ -46,7 +46,8 @@ data JS
   | JSTypeOf JS
   | JSLabel String JS
   | JSBreak String
-  | JSContinue String deriving (Show, Data, Typeable)
+  | JSContinue String
+  | JSRaw String deriving (Show, Data, Typeable)
 
 data JSAssignment
   = JSAssignVariable Ident
