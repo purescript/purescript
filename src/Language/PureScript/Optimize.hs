@@ -121,6 +121,9 @@ tco' = everywhere (mkT convert)
   tcoVar :: Ident -> Ident
   tcoVar (Ident arg) = Ident $ "__tco_" ++ arg
   tcoVar _ = error "Invalid name in tcoVar"
+  copyVar :: Ident -> Ident
+  copyVar (Ident arg) = Ident $ "__copy_" ++ arg
+  copyVar _ = error "Invalid name in copyVar"
   convert :: JS -> JS
   convert js@(JSVariableIntroduction name (Just fn@(JSFunction Nothing _ _))) =
     let
@@ -135,11 +138,11 @@ tco' = everywhere (mkT convert)
   convert js = js
   collectAllFunctionArgs :: [[Ident]] -> (JS -> JS) -> JS -> ([[Ident]], JS, JS -> JS)
   collectAllFunctionArgs allArgs f (JSFunction Nothing args (JSBlock (body@(JSReturn _):_))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction Nothing args (JSBlock [b]))) body
+    collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction Nothing (map copyVar args) (JSBlock [b]))) body
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args (JSBlock [body]))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction Nothing args (JSBlock [b])))) body
+    collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction Nothing (map copyVar args) (JSBlock [b])))) body
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args body@(JSBlock _))) =
-    (args : allArgs, body, \b -> f (JSReturn (JSFunction Nothing args b)))
+    (args : allArgs, body, \b -> f (JSReturn (JSFunction Nothing (map copyVar args) b)))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
   isTailCall :: Ident -> JS -> Bool
   isTailCall ident js =
@@ -161,7 +164,8 @@ tco' = everywhere (mkT convert)
     countSelfCallsUnderFunctions (JSFunction _ _ js') = everything (+) (mkQ 0 countSelfCalls) js'
     countSelfCallsUnderFunctions _ = 0
   toLoop :: Ident -> [Ident] -> JS -> JS
-  toLoop ident allArgs js = JSBlock
+  toLoop ident allArgs js = JSBlock $
+        map (\arg -> JSVariableIntroduction arg (Just (JSVar (copyVar arg)))) allArgs ++
         [ JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhere (mkT loopify) js ]) ]
     where
     loopify :: JS -> JS
