@@ -53,9 +53,24 @@ declToJs opts mp (BindingGroupDeclaration vals) e =
            [ JSVariableIntroduction ident (Just (valueToJs opts mp e val)),
              setProperty (identToJs ident) (JSVar ident) mp ]
          ) vals
-declToJs _ mp (ExternMemberDeclaration member ident _) _ =
-  Just [ JSFunction (Just ident) [Ident "value"] (JSBlock [JSReturn (JSAccessor member (JSVar (Ident "value")))]),
-         setProperty (show ident) (JSVar ident) mp ]
+declToJs _ mp (ExternMemberDeclaration member ident ty) _
+  | returnsFunction ty =
+    Just [ JSFunction (Just ident) [Ident "value"] (JSBlock
+            [ JSReturn $ JSApp (JSAccessor "bind" (JSAccessor member (JSVar (Ident "value")))) [JSVar (Ident "value")]
+            ]),
+           setProperty (show ident) (JSVar ident) mp ]
+  | otherwise =
+    Just [ JSFunction (Just ident) [Ident "value"] (JSBlock
+            [ JSReturn $ JSAccessor member (JSVar (Ident "value"))
+            ]),
+           setProperty (show ident) (JSVar ident) mp ]
+  where
+  returnsFunction (Function _ ret) = isFunction ret
+  returnsFunction (ForAll _ ty') = returnsFunction ty'
+  returnsFunction _ = error "Expected function type in declToJs"
+  isFunction (Function _ _) = True
+  isFunction (ForAll _ ty') = isFunction ty'
+  isFunction _ = False
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
     let
