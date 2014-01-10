@@ -26,7 +26,8 @@ type Guard = Value
 data UnaryOperator
   = Negate
   | Not
-  | BitwiseNot deriving (Show, Eq, Data, Typeable)
+  | BitwiseNot
+  | Positive deriving (Show, Eq, Data, Typeable)
 
 data BinaryOperator
   = Add

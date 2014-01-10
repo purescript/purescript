@@ -20,6 +20,7 @@ import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import Language.PureScript.CodeGen.JS.AST
 
 import qualified Data.Data as D
 
@@ -38,7 +39,7 @@ data Declaration
   | TypeDeclaration Ident Type
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
   | BindingGroupDeclaration [(Ident, Value)]
-  | ExternDeclaration Ident (Maybe String) Type
+  | ExternDeclaration Ident (Maybe JS) Type
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])

@@ -36,10 +36,7 @@ import Language.PureScript.Types
 
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
-  let
-    rawDecls = mapMaybe filterRawDecls decls
-  in
-  map JSRaw rawDecls ++
+  mapMaybe filterRawDecls decls ++
   [ JSVariableIntroduction (Ident name) Nothing
   , JSApp (JSFunction Nothing [Ident name]
                       (JSBlock (concat $ mapMaybe (\decl -> declToJs opts (ModuleName pname) decl env) decls)))

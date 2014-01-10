@@ -28,6 +28,8 @@ import Language.PureScript.Declarations
 import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
+import Language.PureScript.Parser.JS
+import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Values
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
@@ -65,8 +67,11 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "im
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> ExternDeclaration <$> parseIdent
-                         <*> P.optionMaybe stringLiteral
+                         <*> P.optionMaybe (parseJSLiteral <$> stringLiteral)
                          <*> (lexeme (indented *> P.string "::") *> parsePolyType))
+
+parseJSLiteral :: String -> JS
+parseJSLiteral s = either (const $ JSRaw s) id $ P.runParser parseJS () "Javascript" s
 
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =
