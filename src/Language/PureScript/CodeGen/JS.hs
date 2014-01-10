@@ -33,13 +33,14 @@ import Language.PureScript.CodeGen.Monad
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
+import Language.PureScript.CodeGen.Optimize
 
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
   mapMaybe filterRawDecls decls ++
   [ JSVariableIntroduction (Ident name) Nothing
   , JSApp (JSFunction Nothing [Ident name]
-                      (JSBlock (concat $ mapMaybe (\decl -> declToJs opts (ModuleName pname) decl env) decls)))
+                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) decls)))
           [JSAssignment (JSAssignVariable (Ident name))
                          (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]
   ]

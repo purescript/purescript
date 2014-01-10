@@ -33,6 +33,6 @@ compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   desugared <- desugar ms
   (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
-  let js = prettyPrintJS . map (optimize opts) . concatMap (flip (moduleToJs opts) env) $ desugared
+  let js = prettyPrintJS . concatMap (flip (moduleToJs opts) env) $ desugared
   let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared
   return (js, exts, env)
