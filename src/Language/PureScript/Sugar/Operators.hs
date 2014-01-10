@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Operators
+-- Module      :  Language.PureScript.Sugar.Operators
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -14,7 +14,7 @@
 
 {-# LANGUAGE Rank2Types #-}
 
-module Language.PureScript.Operators (
+module Language.PureScript.Sugar.Operators (
   rebracket
 ) where
 

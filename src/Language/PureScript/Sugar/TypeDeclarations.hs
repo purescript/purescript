@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeDeclarations
+-- Module      :  Language.PureScript.Sugar.TypeDeclarations
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.TypeDeclarations (
+module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarations,
     desugarTypeDeclarationsModule
 ) where

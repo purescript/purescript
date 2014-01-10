@@ -23,24 +23,15 @@ import Language.PureScript.Parser as P
 import Language.PureScript.CodeGen as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
-import Language.PureScript.Operators as P
-import Language.PureScript.CaseDeclarations as P
-import Language.PureScript.TypeDeclarations as P
-import Language.PureScript.BindingGroups as P
-import Language.PureScript.DoNotation as P
+import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 
 import Data.List (intercalate)
-import Control.Monad (forM_, (>=>))
+import Control.Monad (forM_)
 
 compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
-  bracketted <- rebracket ms
-  desugared <- desugarDo
-               >=> desugarCasesModule
-               >=> desugarTypeDeclarationsModule
-               >=> (return . createBindingGroupsModule)
-               $ bracketted
+  desugared <- desugar ms
   (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
   let js = prettyPrintJS . map (optimize opts) . concatMap (flip (moduleToJs opts) env) $ desugared
   let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared

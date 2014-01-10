@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.DoNotation
+-- Module      :  Language.PureScript.Sugar.DoNotation
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.DoNotation (
+module Language.PureScript.Sugar.DoNotation (
     desugarDo
 ) where
 

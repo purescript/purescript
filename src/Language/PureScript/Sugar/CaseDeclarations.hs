@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CaseDeclarations (
+module Language.PureScript.Sugar.CaseDeclarations (
     desugarCases,
     desugarCasesModule
 ) where

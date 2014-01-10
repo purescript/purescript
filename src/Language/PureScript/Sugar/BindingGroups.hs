@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.BindingGroups (
+module Language.PureScript.Sugar.BindingGroups (
     createBindingGroups,
     createBindingGroupsModule
 ) where

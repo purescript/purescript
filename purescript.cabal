@@ -1,5 +1,5 @@
 name: purescript
-version: 0.2.9.3
+version: 0.2.10
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -18,18 +18,27 @@ library
                    directory -any, filepath -any, mtl -any, parsec -any, syb -any,
                    transformers -any, utf8-string -any
     exposed-modules: Data.Generics.Extras
-                     Language.PureScript.Options
                      Language.PureScript
+                     Language.PureScript.Options
+                     Language.PureScript.Declarations
+                     Language.PureScript.Kinds
+                     Language.PureScript.Names
+                     Language.PureScript.Types
+                     Language.PureScript.Unknown
+                     Language.PureScript.Values
+                     Language.PureScript.Scope
+                     Language.PureScript.Sugar
+                     Language.PureScript.Sugar.CaseDeclarations
+                     Language.PureScript.Sugar.DoNotation
+                     Language.PureScript.Sugar.TypeDeclarations
+                     Language.PureScript.Sugar.BindingGroups
+                     Language.PureScript.Sugar.Operators
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.Monad
                      Language.PureScript.CodeGen.Optimize
-                     Language.PureScript.Declarations
-                     Language.PureScript.Kinds
-                     Language.PureScript.Names
-                     Language.PureScript.Operators
                      Language.PureScript.Parser
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
@@ -48,14 +57,6 @@ library
                      Language.PureScript.TypeChecker.Monad
                      Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types
-                     Language.PureScript.Types
-                     Language.PureScript.Unknown
-                     Language.PureScript.Values
-                     Language.PureScript.CaseDeclarations
-                     Language.PureScript.DoNotation
-                     Language.PureScript.TypeDeclarations
-                     Language.PureScript.BindingGroups
-                     Language.PureScript.Scope
     exposed: True
     buildable: True
     hs-source-dirs: src
