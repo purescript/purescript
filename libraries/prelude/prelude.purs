@@ -264,4 +264,66 @@ module Math where
     }
 
   foreign import math :: Math
+  
+module Eff where
+
+  foreign import data Eff :: # ! -> * -> *
+
+  foreign import retEff "function retEff(a) { return function() { return a; }; }" :: forall e a. a -> Eff e a
+
+  foreign import bindEff "function bindEff(a) { return function(f) { return function() { return f(a())(); }; }; }" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b 
+
+  type Pure a = forall e. Eff e a
+
+  foreign import runPure :: forall a. Pure a -> a
+
+  eff = { ret: retEff, bind: bindEff }
+
+module Errors where
+
+  import Eff
+
+  foreign import data Error :: * -> !
+
+  foreign import throwError "function throwError(e) { return function() { throw e; }; }" :: forall e r. e -> Eff (err :: Error e | r) {}
+
+  foreign import catchError "function catchError(c) { return function(t) { return function() { try { return t(); } catch(e) { return c(e)(); } }; }; }" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
+
+module IORef where
+
+  import Eff
+  
+  foreign import data Ref :: !
+  
+  foreign import data IORef :: * -> *
+  
+  foreign import newIORef :: forall s r. a -> Eff (ref :: Ref | r) (IORef s)
+
+  foreign import readIORef :: forall s r. IORef s -> Eff (ref :: Ref | r) s
+
+  foreign import writeIORef :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {}
+
+module Trace where
+
+  import Eff
+  
+  foreign import data Trace :: !
+  
+  foreign import trace "function trace(s) { return function() { console.log(s); return {}; }; }" :: forall r. String -> Eff (trace :: Trace | r) {}
+
+module ST where
+
+  import Eff
+
+  foreign import data ST :: * -> !
+
+  foreign import data STRef :: * -> * -> *
+
+  foreign import newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
+
+  foreign import readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
+
+  foreign import modifySTRef :: forall a h r. (a -> a) -> STRef h a -> Eff (st :: ST h | r) {}
+
+  foreign import runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 
