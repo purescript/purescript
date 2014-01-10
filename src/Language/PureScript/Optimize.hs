@@ -25,7 +25,13 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
 
 optimize :: Options -> JS -> JS
-optimize opts = removeUnusedVariables . unThunk . etaConvert . inlineVariables . tco opts
+optimize opts =
+  collapseNestedBlocks
+  . tco opts
+  . removeUnusedVariables
+  . unThunk
+  . etaConvert
+  . inlineVariables
 
 replaceIdent :: (Data d) => Ident -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
@@ -112,32 +118,39 @@ tco' = everywhere (mkT convert)
   where
   tcoLabel :: String
   tcoLabel = "tco"
-  tcoRet :: Ident
-  tcoRet = Ident "__tco_ret"
   tcoVar :: Ident -> Ident
   tcoVar (Ident arg) = Ident $ "__tco_" ++ arg
   tcoVar _ = error "Invalid name in tcoVar"
   convert :: JS -> JS
-  convert (JSVariableIntroduction name (Just fn@(JSFunction Nothing _ body))) | isTailCall name body =
+  convert js@(JSVariableIntroduction name (Just fn@(JSFunction Nothing _ _))) =
     let
       (argss, body', replace) = collectAllFunctionArgs [] id fn
-      allArgs = reverse $ concat argss
-    in
-      JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
+    in case () of
+      _ | isTailCall name body' ->
+            let
+              allArgs = reverse $ concat argss
+            in
+              JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
+        | otherwise -> js
   convert js = js
   collectAllFunctionArgs :: [[Ident]] -> (JS -> JS) -> JS -> ([[Ident]], JS, JS -> JS)
-  collectAllFunctionArgs allArgs f (JSFunction Nothing args (JSBlock [body])) =
+  collectAllFunctionArgs allArgs f (JSFunction Nothing args (JSBlock (body@(JSReturn _):_))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction Nothing args (JSBlock [b]))) body
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args (JSBlock [body]))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction Nothing args (JSBlock [b])))) body
+  collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args body@(JSBlock _))) =
+    (args : allArgs, body, \b -> f (JSReturn (JSFunction Nothing args b)))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
   isTailCall :: Ident -> JS -> Bool
   isTailCall ident js =
     let
       numSelfCalls = everything (+) (mkQ 0 countSelfCalls) js
       numSelfCallsInTailPosition = everything (+) (mkQ 0 countSelfCallsInTailPosition) js
+      numSelfCallsUnderFunctions = everything (+) (mkQ 0 countSelfCallsUnderFunctions) js
     in
-      numSelfCalls > 0 && numSelfCalls == numSelfCallsInTailPosition
+      numSelfCalls > 0
+      && numSelfCalls == numSelfCallsInTailPosition
+      && numSelfCallsUnderFunctions == 0
     where
     countSelfCalls :: JS -> Int
     countSelfCalls (JSApp (JSVar ident') _) | ident == ident' = 1
@@ -145,10 +158,11 @@ tco' = everywhere (mkT convert)
     countSelfCallsInTailPosition :: JS -> Int
     countSelfCallsInTailPosition (JSReturn ret) | isSelfCall ident ret = 1
     countSelfCallsInTailPosition _ = 0
+    countSelfCallsUnderFunctions (JSFunction _ _ js') = everything (+) (mkQ 0 countSelfCalls) js'
+    countSelfCallsUnderFunctions _ = 0
   toLoop :: Ident -> [Ident] -> JS -> JS
   toLoop ident allArgs js = JSBlock
-        [ JSVariableIntroduction tcoRet Nothing
-        , JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhere (mkT loopify) js ]) ]
+        [ JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhere (mkT loopify) js ]) ]
     where
     loopify :: JS -> JS
     loopify (JSReturn ret) | isSelfCall ident ret =
@@ -168,3 +182,13 @@ tco' = everywhere (mkT convert)
   isSelfCall ident (JSApp (JSVar ident') _) | ident == ident' = True
   isSelfCall ident (JSApp fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
+
+collapseNestedBlocks :: JS -> JS
+collapseNestedBlocks = everywhere (mkT collapse)
+  where
+  collapse :: JS -> JS
+  collapse (JSBlock sts) = JSBlock (concatMap go sts)
+  collapse js = js
+  go :: JS -> [JS]
+  go (JSBlock sts) = sts
+  go s = [s]
