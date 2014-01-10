@@ -8,3 +8,5 @@ import M1
 
 test :: Test -> M1.Test
 test t = t
+
+testCtor = Test

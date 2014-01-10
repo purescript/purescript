@@ -23,7 +23,7 @@ import qualified Data.Map as M
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
 
-import Language.PureScript.TypeChecker (Environment, names)
+import Language.PureScript.TypeChecker (Environment(..), NameKind(..))
 import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
@@ -32,7 +32,6 @@ import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.Monad
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
-import Language.PureScript.TypeChecker.Monad (NameKind(..))
 import Language.PureScript.Types
 
 moduleToJs :: Options -> Module -> Environment -> [JS]
@@ -94,6 +93,10 @@ valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
+valueToJs _ m e (Constructor (Qualified Nothing name)) =
+  case M.lookup (m, name) (dataConstructors e) of
+    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
+    _ -> JSVar . Ident . runProperName $ name
 valueToJs _ _ _ (Constructor name) = qualifiedToJS runProperName name
 valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
 valueToJs opts m e (Case values binders) = runGen (bindersToJs opts m e binders (map (valueToJs opts m e) values))

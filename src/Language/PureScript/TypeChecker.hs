@@ -50,7 +50,7 @@ addDataConstructor moduleName name args dctor maybeTy = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) polyType (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (polyType, DataConstructor) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -183,16 +183,16 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
              Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
              Just (k, _) -> do
                modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
-               let keys = map (snd . fst) . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
+               let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
                forM_ keys $ \dctor -> do
                  guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
                  case (moduleName, dctor) `M.lookup` dataConstructors env of
-                   Just ctorTy -> modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) ctorTy (dataConstructors e) })
+                   Just (ctorTy, _) -> modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
                    Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
        constructs (TypeConstructor (Qualified (Just mn) pn')) pn
          = mn == moduleName && pn' == pn
        constructs (ForAll _ ty) pn = ty `constructs` pn
        constructs (Function _ ty) pn = ty `constructs` pn
        constructs (TypeApp ty _) pn = ty `constructs` pn
-       constructs fn _ = error $ "Invalid arguments to construct" ++ show fn
+       constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 

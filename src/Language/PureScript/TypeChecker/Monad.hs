@@ -36,7 +36,8 @@ data NameKind
   = Value
   | Extern
   | Alias ModuleName Ident
-  | LocalVariable deriving Show
+  | LocalVariable
+  | DataConstructor deriving Show
 
 data TypeDeclarationKind
   = Data
@@ -48,7 +49,7 @@ data TypeDeclarationKind
 data Environment = Environment
   { names :: M.Map (ModuleName, Ident) (Type, NameKind)
   , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
-  , dataConstructors :: M.Map (ModuleName, ProperName) Type
+  , dataConstructors :: M.Map (ModuleName, ProperName) (Type, NameKind)
   , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
   , members :: M.Map (ModuleName, Ident) String
   } deriving (Show)

@@ -337,7 +337,7 @@ infer' (Constructor c) = do
   moduleName <- substCurrentModule `fmap` ask
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just ty -> replaceAllTypeSynonyms ty
+    Just (ty, _) -> replaceAllTypeSynonyms ty
 infer' (Case vals binders) = do
   ts <- mapM infer vals
   ret <- fresh
@@ -450,7 +450,7 @@ inferBinder val (NullaryBinder ctor) = do
   env <- getEnv
   moduleName <- substCurrentModule <$> ask
   case M.lookup (qualify moduleName ctor) (dataConstructors env) of
-    Just ty -> do
+    Just (ty, _) -> do
       ty `subsumes` val
       return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
@@ -458,7 +458,7 @@ inferBinder val (UnaryBinder ctor binder) = do
   env <- getEnv
   moduleName <- substCurrentModule <$> ask
   case M.lookup (qualify moduleName ctor) (dataConstructors env) of
-    Just ty -> do
+    Just (ty, _) -> do
       fn <- replaceAllVarsWithUnknowns ty
       case fn of
         Function [obj] ret -> do
@@ -649,7 +649,7 @@ check' (Constructor c) ty = do
   moduleName <- substCurrentModule <$> ask
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just ty1 -> do
+    Just (ty1, _) -> do
       repl <- replaceAllTypeSynonyms ty1
       repl `subsumes` ty
 check' val (SaturatedTypeSynonym name args) = do
