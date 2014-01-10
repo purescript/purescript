@@ -23,7 +23,6 @@ import Language.PureScript.Parser as P
 import Language.PureScript.CodeGen as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
-import Language.PureScript.Optimize as P
 import Language.PureScript.Operators as P
 import Language.PureScript.CaseDeclarations as P
 import Language.PureScript.TypeDeclarations as P

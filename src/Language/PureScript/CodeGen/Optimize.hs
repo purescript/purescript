@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimize (
+module Language.PureScript.CodeGen.Optimize (
     optimize
 ) where
 
