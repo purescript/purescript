@@ -18,7 +18,8 @@ data Options = Options
   { optionsTco :: Bool
   , optionsPerformRuntimeTypeChecks :: Bool
   , optionsMagicDo :: Bool
+  , optionsRunMain :: Bool
   } deriving Show
 
 defaultOptions :: Options
-defaultOptions = Options False False False
+defaultOptions = Options False False False False

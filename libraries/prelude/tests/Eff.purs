@@ -29,3 +29,13 @@ test4 = eff do
 test5 = eff do
   trace "Hello World!"
   test5
+
+test6 s = eff do
+  trace s
+  test6 (s ++ " test")
+
+module Main where
+
+import Tests
+
+main = test6 ""

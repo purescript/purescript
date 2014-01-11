@@ -1,9 +1,9 @@
-module Tests where
+module Main where
 
 import Eff
 import JQuery
 
-test = eff do
+main = eff do
   b <- body
   div <- create "<div>"
   { color: "red" } `css` div

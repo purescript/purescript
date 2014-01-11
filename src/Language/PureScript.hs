@@ -27,12 +27,19 @@ import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 
 import Data.List (intercalate)
-import Control.Monad (forM_)
+import Control.Monad (when, forM_)
+import qualified Data.Map as M
 
 compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   desugared <- desugar ms
   (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
-  let js = prettyPrintJS . concatMap (flip (moduleToJs opts) env) $ desugared
+  let js = concatMap (flip (moduleToJs opts) env) $ desugared
   let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared
-  return (js, exts, env)
+  js' <- case () of
+              _ | optionsRunMain opts -> do
+                    when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
+                      Left "Main.main is undefined"
+                    return $ js ++ [JSApp (JSAccessor "main" (JSVar (Ident "Main"))) []]
+                | otherwise -> return js
+  return (prettyPrintJS js', exts, env)

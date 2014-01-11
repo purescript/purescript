@@ -86,8 +86,12 @@ magicDo :: Term Bool
 magicDo = value $ flag $ (optInfo [ "magic-do" ])
      { optDoc = "Overload the do keyword to generate efficient code specifically for the Eff monad." }
 
+runMain :: Term Bool
+runMain = value $ flag $ (optInfo [ "run-main" ])
+     { optDoc = "Generate code to run the main method in the Main module." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
