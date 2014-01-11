@@ -63,6 +63,9 @@ The following options are supported:
         
     --no-prelude
         Do not include the Prelude in the generated Javascript.
+        
+    --magic-do
+        Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
 
 ## Motivation
 
