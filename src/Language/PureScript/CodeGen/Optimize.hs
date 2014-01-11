@@ -27,6 +27,7 @@ import Language.PureScript.Options
 optimize :: Options -> JS -> JS
 optimize opts =
   collapseNestedBlocks
+  . magicDo opts
   . tco opts
   . removeUnusedVariables
   . unThunk
@@ -194,6 +195,26 @@ tco' = everywhere (mkT convert)
   isSelfCall ident (JSApp (JSVar ident') _) | ident == ident' = True
   isSelfCall ident (JSApp fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
+
+magicDo :: Options -> JS -> JS
+magicDo opts | optionsMagicDo opts = magicDo'
+             | otherwise = id
+
+magicDo' :: JS -> JS
+magicDo' = everywhere (mkT undo) . everywhere (mkT convert)
+  where
+  fnName = Ident "__do"
+  convert :: JS -> JS
+  convert (JSApp (JSApp (bind) [m]) [JSFunction Nothing [Ident "_"] (JSBlock [JSReturn ret])]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSApp ret [] ]
+  convert (JSApp (JSApp (bind) [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSApp ret [] ]
+  convert other = other
+  isBind (JSAccessor "bind" (JSAccessor "eff" (JSVar (Ident "Eff")))) = True
+  isBind _ = False
+  undo :: JS -> JS
+  undo (JSApp (JSFunction (Just ident) [] body) []) | ident == fnName = body
+  undo other = other
 
 collapseNestedBlocks :: JS -> JS
 collapseNestedBlocks = everywhere (mkT collapse)

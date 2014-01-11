@@ -17,7 +17,8 @@ module Language.PureScript.Options where
 data Options = Options
   { optionsTco :: Bool
   , optionsPerformRuntimeTypeChecks :: Bool
+  , optionsMagicDo :: Bool
   } deriving Show
 
 defaultOptions :: Options
-defaultOptions = Options False False
+defaultOptions = Options False False False

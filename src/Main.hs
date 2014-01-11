@@ -82,8 +82,12 @@ noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
 
+magicDo :: Term Bool
+magicDo = value $ flag $ (optInfo [ "magic-do" ])
+     { optDoc = "Overload the do keyword to generate efficient code specifically for the Eff monad." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
