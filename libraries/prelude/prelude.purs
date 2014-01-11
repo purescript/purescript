@@ -22,7 +22,7 @@ module Prelude where
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
-  infixr 1000 $
+  infixl 1000 $
 
 module Maybe where
 
@@ -275,7 +275,7 @@ module Eff where
 
   type Pure a = forall e. Eff e a
 
-  foreign import runPure :: forall a. Pure a -> a
+  foreign import runPure "function runPure(f) { return f(); }" :: forall a. Pure a -> a
 
   eff = { ret: retEff, bind: bindEff }
 

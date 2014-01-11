@@ -95,6 +95,18 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
     Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
     Just (k, _) -> return k
 
+canonicalize :: ModuleName -> Environment -> Qualified Ident -> (ModuleName, Ident)
+canonicalize _ _ (Qualified (Just mn) i) = (mn, i)
+canonicalize mn env (Qualified Nothing i) = case (mn, i) `M.lookup` names env of
+  Just (_, Alias mn' i') -> (mn', i')
+  _ -> (mn, i)
+
+canonicalizeType :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, ProperName)
+canonicalizeType _ _ (Qualified (Just mn) nm) = (mn, nm)
+canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types env of
+  Just (_, DataAlias mn' pn') -> (mn', pn')
+  _ -> (mn, nm)
+
 data AnyUnifiable where
   AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
 

@@ -44,6 +44,7 @@ import Control.Applicative
 import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
+import Data.Function (on)
 
 instance Unifiable Type where
   unknown = TUnknown
@@ -139,17 +140,7 @@ unifyRows r1 r2 =
   unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
 
 typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
-typeConstructorsAreEqual env moduleName c1 c2 =
-  let
-    c1' = qualify moduleName c1
-    c2' = qualify moduleName c2
-  in
-    canonicalize env c1' == canonicalize env c2'
-  where
-  canonicalize :: Environment -> (ModuleName, ProperName) -> (ModuleName, ProperName)
-  canonicalize _ key = case key `M.lookup` types env of
-    Just (_, DataAlias mn' pn') -> (mn', pn')
-    _ -> key
+typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName env
 
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
 typesOf moduleName vals = do
@@ -240,8 +231,8 @@ replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadReader Subst
 replaceAllTypeSynonyms d = do
   env <- getEnv
   moduleName <- substCurrentModule <$> ask
-  let syns = map (\((path, name), (args, _)) -> (Qualified (Just path) name, length args)) . M.toList $ typeSynonyms env
-  either throwError return $ saturateAllTypeSynonyms moduleName syns d
+  let syns = map (\((path, name), (args, _)) -> ((path, name), length args)) . M.toList $ typeSynonyms env
+  either throwError return $ saturateAllTypeSynonyms env moduleName syns d
 
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
 desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
@@ -253,7 +244,7 @@ expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Type
 expandTypeSynonym name args = do
   env <- getEnv
   moduleName <- substCurrentModule `fmap` ask
-  case M.lookup (qualify moduleName name) (typeSynonyms env) of
+  case M.lookup (canonicalizeType moduleName env name) (typeSynonyms env) of
     Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
     Nothing -> error "Type synonym was not defined"
 
