@@ -67,6 +67,9 @@ The following options are supported:
     --magic-do
         Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
 
+    --run-main
+        Generate a call to `Main.main` after all other generated Javascript.
+
 ## Motivation
 
 I was looking for a simple functional language which would compile to JavaScript and have the following characteristics:
