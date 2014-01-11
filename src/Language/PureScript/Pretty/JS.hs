@@ -73,7 +73,7 @@ literals = mkPattern' match
     , withIndent $ do
         jss <- forM sts prettyPrintJS'
         indentString <- currentIndent
-        return $ intercalate "\n" $ map (++ "; ") $ map (indentString ++) jss
+        return $ intercalate "\n" $ map (++ ";") $ map (indentString ++) jss
     , return "\n"
     , currentIndent
     , return "}"
@@ -194,7 +194,7 @@ prettyPrintJS :: [JS] -> String
 prettyPrintJS sts = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) $ do
   jss <- forM sts prettyPrintJS'
   indentString <- currentIndent
-  return $ intercalate "\n" $ map (++ "; ") $ map (indentString ++) jss
+  return $ intercalate "\n" $ map (++ ";") $ map (indentString ++) jss
 
 prettyPrintJS' :: JS -> StateT PrinterState Maybe String
 prettyPrintJS' = A.runKleisli $ runPattern matchValue
