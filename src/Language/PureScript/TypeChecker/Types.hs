@@ -76,8 +76,6 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = replace u t
   unifyTypes' t (TUnknown u) = replace u t
-  unifyTypes' (SaturatedTypeSynonym name1 args1) (SaturatedTypeSynonym name2 args2)
-    | name1 == name2 = zipWithM_ unifyTypes args1 args2
   unifyTypes' (SaturatedTypeSynonym name args) ty = do
     ty1 <- expandTypeSynonym name args
     ty1 `unifyTypes` ty
