@@ -27,8 +27,8 @@ import Language.PureScript.Options
 optimize :: Options -> JS -> JS
 optimize opts =
   collapseNestedBlocks
-  . magicDo opts
   . tco opts
+  . magicDo opts
   . removeUnusedVariables
   . unThunk
   . etaConvert
@@ -134,7 +134,7 @@ tco' = everywhere (mkT convert)
   copyVar (Ident arg) = Ident $ "__copy_" ++ arg
   copyVar _ = error "Invalid name in copyVar"
   convert :: JS -> JS
-  convert js@(JSVariableIntroduction name (Just fn@(JSFunction Nothing _ _))) =
+  convert js@(JSVariableIntroduction name (Just fn@(JSFunction _ _ _))) =
     let
       (argss, body', replace) = collectAllFunctionArgs [] id fn
     in case () of
@@ -146,12 +146,14 @@ tco' = everywhere (mkT convert)
         | otherwise -> js
   convert js = js
   collectAllFunctionArgs :: [[Ident]] -> (JS -> JS) -> JS -> ([[Ident]], JS, JS -> JS)
-  collectAllFunctionArgs allArgs f (JSFunction Nothing args (JSBlock (body@(JSReturn _):_))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction Nothing (map copyVar args) (JSBlock [b]))) body
-  collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args (JSBlock [body]))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction Nothing (map copyVar args) (JSBlock [b])))) body
-  collectAllFunctionArgs allArgs f (JSReturn (JSFunction Nothing args body@(JSBlock _))) =
-    (args : allArgs, body, \b -> f (JSReturn (JSFunction Nothing (map copyVar args) b)))
+  collectAllFunctionArgs allArgs f (JSFunction ident args (JSBlock (body@(JSReturn _):_))) =
+    collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction ident (map copyVar args) (JSBlock [b]))) body
+  collectAllFunctionArgs allArgs f (JSFunction ident args body@(JSBlock _)) =
+    (args : allArgs, body, \b -> f (JSFunction ident (map copyVar args) b))
+  collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args (JSBlock [body]))) =
+    collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction ident (map copyVar args) (JSBlock [b])))) body
+  collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args body@(JSBlock _))) =
+    (args : allArgs, body, \b -> f (JSReturn (JSFunction ident (map copyVar args) b)))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
   isTailCall :: Ident -> JS -> Bool
   isTailCall ident js =
@@ -201,19 +203,22 @@ magicDo opts | optionsMagicDo opts = magicDo'
              | otherwise = id
 
 magicDo' :: JS -> JS
-magicDo' = everywhere (mkT undo) . everywhere (mkT convert)
+magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   where
   fnName = Ident "__do"
   convert :: JS -> JS
-  convert (JSApp (JSApp (bind) [m]) [JSFunction Nothing [Ident "_"] (JSBlock [JSReturn ret])]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSApp ret [] ]
-  convert (JSApp (JSApp (bind) [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSApp ret [] ]
+  convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [Ident "_"] (JSBlock [JSReturn ret])]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSReturn (JSApp ret []) ]
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   convert other = other
   isBind (JSAccessor "bind" (JSAccessor "eff" (JSVar (Ident "Eff")))) = True
   isBind _ = False
+  isReturn (JSAccessor "ret" (JSAccessor "eff" (JSVar (Ident "Eff")))) = True
+  isReturn _ = False
   undo :: JS -> JS
-  undo (JSApp (JSFunction (Just ident) [] body) []) | ident == fnName = body
+  undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
 
 collapseNestedBlocks :: JS -> JS

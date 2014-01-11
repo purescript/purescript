@@ -21,3 +21,11 @@ test3 n = catchError (\s -> eff do return 0) $ eff do
       trace "n > 10"
       throwError "Error!" 
     _ -> eff do return n
+
+test4 = eff do
+  trace "Hello World!"
+  return 0
+
+test5 = eff do
+  trace "Hello World!"
+  test5
