@@ -155,22 +155,27 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
        moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
        shadowIdents idents' env =
          forM_ idents' $ \ident -> do
-           guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
            case (moduleName, ident) `M.lookup` names env of
-             Just (pt, _) -> modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
+             Just (_, Alias _ _) -> return ()
+             Just (pt, _) -> do
+               guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
+               modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
              Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
        shadowTypes pns env =
          forM_ pns $ \pn -> do
-           guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
            case (moduleName, pn) `M.lookup` types env of
              Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
+             Just (_, DataAlias _ _) -> return ()
              Just (k, _) -> do
+               guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
                modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
                let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
                forM_ keys $ \dctor -> do
-                 guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
                  case (moduleName, dctor) `M.lookup` dataConstructors env of
-                   Just (ctorTy, _) -> modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
+                   Just (_, Alias _ _) -> return ()
+                   Just (ctorTy, _) -> do
+                     guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
+                     modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
                    Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
        constructs (TypeConstructor (Qualified (Just mn) pn')) pn
          = mn == moduleName && pn' == pn
