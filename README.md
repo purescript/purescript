@@ -60,6 +60,9 @@ The following options are supported:
         
     --tco
         Perform tail-call elimination on the generated Javascript.
+        
+    --no-prelude
+        Do not include the Prelude in the generated Javascript.
 
 ## Motivation
 
