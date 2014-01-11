@@ -8,4 +8,4 @@ test = eff do
   div <- create "<div>"
   { color: "red" } `css` div
   appendText "Hello World" div
-  b `append` div
+  div `append` b
