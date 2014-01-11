@@ -285,7 +285,7 @@ module Errors where
 
   foreign import data Error :: * -> !
 
-  foreign import throwError "function throwError(e) { return function() { throw e; }; }" :: forall e r. e -> Eff (err :: Error e | r) {}
+  foreign import throwError "function throwError(e) { return function() { throw e; }; }" :: forall a e r. e -> Eff (err :: Error e | r) a
 
   foreign import catchError "function catchError(c) { return function(t) { return function() { try { return t(); } catch(e) { return c(e)(); } }; }; }" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
@@ -297,7 +297,7 @@ module IORef where
   
   foreign import data IORef :: * -> *
   
-  foreign import newIORef :: forall s r. a -> Eff (ref :: Ref | r) (IORef s)
+  foreign import newIORef :: forall s r. s -> Eff (ref :: Ref | r) (IORef s)
 
   foreign import readIORef :: forall s r. IORef s -> Eff (ref :: Ref | r) s
 
