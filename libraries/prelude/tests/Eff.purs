@@ -5,7 +5,7 @@ import Eff
 import Errors
 import Trace
 
-test = \n -> catchError (\s -> eff do return 0) $ eff do 
+test n = catchError (\s -> eff do return 0) $ eff do 
   case {} of 
     _ | n > 10 -> eff do
       trace "n > 10"

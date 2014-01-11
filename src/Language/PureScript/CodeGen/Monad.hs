@@ -18,20 +18,15 @@ module Language.PureScript.CodeGen.Monad where
 
 import Control.Monad.State
 import Control.Applicative
+import Language.PureScript.Names
 
-newtype Gen a = Gen { unGen :: State Int a } deriving (Functor, Applicative, Monad, MonadState Int, MonadFix)
+newtype Gen a = Gen { unGen :: State [Ident] a } deriving (Functor, Applicative, Monad, MonadState [Ident])
 
-runGen :: Gen a -> a
-runGen = flip evalState 0 . unGen
+runGen :: [Ident] -> Gen a -> a
+runGen names = flip evalState names . unGen
 
-fresh :: Gen String
+fresh :: Gen Ident
 fresh = do
-  n <- get
-  modify (+ 1)
-  return $ '_' : show n
-
-getNextName :: Gen Int
-getNextName = get
-
-setNextName :: Int -> Gen ()
-setNextName = put
+  (s:ss) <- get
+  put ss
+  return s

@@ -86,7 +86,7 @@ valueToJs _ m e (Constructor (Qualified Nothing name)) =
     _ -> JSVar . Ident . runProperName $ name
 valueToJs _ _ _ (Constructor name) = qualifiedToJS runProperName name
 valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
-valueToJs opts m e (Case values binders) = runGen (bindersToJs opts m e binders (map (valueToJs opts m e) values))
+valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
 valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
 valueToJs opts m e (Indexer index val) = JSIndexer (valueToJs opts m e index) (valueToJs opts m e val)
@@ -144,15 +144,14 @@ qualifiedToJS :: (a -> String) -> Qualified a -> JS
 qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = JSAccessor (f a) (JSVar (Ident m))
 qualifiedToJS f (Qualified Nothing a) = JSVar (Ident (f a))
 
-bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> Gen JS
-bindersToJs opts m e binders vals = do
-  setNextName $ firstUnusedName (binders, vals)
+bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
+bindersToJs opts m e binders vals = runGen (unusedNames (binders, vals)) $ do
   valNames <- replicateM (length vals) fresh
   jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs opts m e result)] bs grd
-  return $ JSApp (JSFunction Nothing (map Ident valNames) (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  vals
   where
-    go :: [String] -> [JS] -> [Binder] -> Maybe Guard -> Gen [JS]
+    go :: [Ident] -> [JS] -> [Binder] -> Maybe Guard -> Gen [JS]
     go _ done [] Nothing = return done
     go _ done [] (Just cond) = return [JSIfElse (valueToJs opts m e cond) (JSBlock done) Nothing]
     go (v:vs) done' (b:bs) grd = do
@@ -160,24 +159,24 @@ bindersToJs opts m e binders vals = do
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
 
-binderToJs :: ModuleName -> Environment -> String -> [JS] -> Binder -> Gen [JS]
+binderToJs :: ModuleName -> Environment -> Ident -> [JS] -> Binder -> Gen [JS]
 binderToJs _ _ _ done NullBinder = return done
 binderToJs _ _ varName done (StringBinder str) =
-  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSStringLiteral str)) (JSBlock done) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral str)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (NumberBinder num) =
-  return [JSIfElse (JSBinary EqualTo (JSVar (Ident varName)) (JSNumericLiteral num)) (JSBlock done) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSNumericLiteral num)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (BooleanBinder True) =
-  return [JSIfElse (JSVar (Ident varName)) (JSBlock done) Nothing]
+  return [JSIfElse (JSVar varName) (JSBlock done) Nothing]
 binderToJs _ _ varName done (BooleanBinder False) =
-  return [JSIfElse (JSUnary Not (JSVar (Ident varName))) (JSBlock done) Nothing]
+  return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
-  return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : done)
+  return (JSVariableIntroduction ident (Just (JSVar varName)) : done)
 binderToJs m _ varName done (NullaryBinder ctor) =
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock done) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock done) Nothing]
 binderToJs m e varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs m e value done b
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar (Ident varName))) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock (JSVariableIntroduction (Ident value) (Just (JSAccessor "value" (JSVar (Ident varName)))) : js)) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock (JSVariableIntroduction value (Just (JSAccessor "value" (JSVar varName))) : js)) Nothing]
 binderToJs m e varName done (ObjectBinder bs) = go done bs
   where
   go :: [JS] -> [(String, Binder)] -> Gen [JS]
@@ -186,10 +185,10 @@ binderToJs m e varName done (ObjectBinder bs) = go done bs
     propVar <- fresh
     done'' <- go done' bs'
     js <- binderToJs m e propVar done'' binder
-    return (JSVariableIntroduction (Ident propVar) (Just (JSAccessor prop (JSVar (Ident varName)))) : js)
+    return (JSVariableIntroduction propVar (Just (JSAccessor prop (JSVar varName))) : js)
 binderToJs m e varName done (ArrayBinder bs) = do
   js <- go done 0 bs
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
   where
   go :: [JS] -> Integer -> [Binder] -> Gen [JS]
   go done' _ [] = return done'
@@ -197,20 +196,20 @@ binderToJs m e varName done (ArrayBinder bs) = do
     elVar <- fresh
     done'' <- go done' (index + 1) bs'
     js <- binderToJs m e elVar done'' binder
-    return (JSVariableIntroduction (Ident elVar) (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar (Ident varName)))) : js)
+    return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
 binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
   headVar <- fresh
   tailVar <- fresh
   js1 <- binderToJs m e headVar done headBinder
   js2 <- binderToJs m e tailVar js1 tailBinder
-  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar (Ident varName))) (JSNumericLiteral (Left 0))) (JSBlock
-    ( JSVariableIntroduction (Ident headVar) (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar (Ident varName)))) :
-      JSVariableIntroduction (Ident tailVar) (Just (JSApp (JSAccessor "slice" (JSVar (Ident varName))) [JSNumericLiteral (Left 1)])) :
+  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left 0))) (JSBlock
+    ( JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar varName))) :
+      JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left 1)])) :
       js2
     )) Nothing]
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
-  return (JSVariableIntroduction ident (Just (JSVar (Ident varName))) : js)
+  return (JSVariableIntroduction ident (Just (JSVar varName)) : js)
 
 statementToJs :: Options -> ModuleName -> Environment -> Statement -> JS
 statementToJs opts m e (VariableIntroduction ident value) = JSVariableIntroduction ident (Just (valueToJs opts m e value))

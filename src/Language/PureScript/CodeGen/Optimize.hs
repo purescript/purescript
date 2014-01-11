@@ -49,8 +49,16 @@ isReassigned :: (Data d) => Ident -> d -> Bool
 isReassigned var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
-  check (JSAssignment (JSAssignVariable var2) _) | var1 == var2 = True
+  check (JSFunction _ args _) | var1 `elem` args = True
   check _ = False
+
+isRebound :: (Data d) => JS -> d -> Bool
+isRebound (JSVar var1) = everything (||) (mkQ False check)
+  where
+  check :: JS -> Bool
+  check (JSFunction _ args _) | var1 `elem` args = True
+  check _ = False
+isRebound _ = const False
 
 isUsed :: (Data d) => Ident -> d -> Bool
 isUsed var1 = everything (||) (mkQ False check)
@@ -80,7 +88,7 @@ inlineVariables = everywhere (mkT removeFromBlock)
   removeFromBlock js = js
   go :: [JS] -> [JS]
   go [] = []
-  go (JSVariableIntroduction var (Just js) : sts) | shouldInline js && not (isReassigned var sts) = go (replaceIdent var js sts)
+  go (JSVariableIntroduction var (Just js) : sts) | shouldInline js && not (isReassigned var sts) && not (isRebound js sts) = go (replaceIdent var js sts)
   go (s:sts) = s : go sts
 
 removeUnusedVariables :: JS -> JS
@@ -98,8 +106,8 @@ etaConvert :: JS -> JS
 etaConvert = everywhere (mkT convert)
   where
   convert :: JS -> JS
-  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents (JSBlock body)) args)])
-    | all shouldInline args = JSBlock (replaceIdents (zip idents args) body)
+  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents block@(JSBlock body)) args)])
+    | all shouldInline args && not (or (map (flip isRebound block) args)) = JSBlock (replaceIdents (zip idents args) body)
   convert js = js
 
 unThunk :: JS -> JS

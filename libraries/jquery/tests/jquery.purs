@@ -1,5 +1,6 @@
 module Tests where
 
+import Eff
 import JQuery
 
 test = eff do
