@@ -22,7 +22,7 @@ module Prelude where
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
-  infixl 1000 $
+  infixr 1000 $
 
 module Maybe where
 

@@ -34,11 +34,14 @@ import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
 rebracket :: [Module] -> Either String [Module]
-rebracket ms = forM ms $ \(Module name ds) -> do
-  m <- collectFixities (ModuleName name) ds
-  let opTable = customOperatorTable m
-  ds' <- G.everywhereM' (G.mkM (matchOperators (ModuleName name) opTable)) ds
-  return $ Module name $ G.everywhere (G.mkT removeParens) ds'
+rebracket = go M.empty []
+  where
+  go _ rb [] = return . reverse $ rb
+  go m rb (Module name ds : ms) = do
+    m' <- M.union m <$> collectFixities m (ModuleName name) ds
+    let opTable = customOperatorTable m'
+    ds' <- G.everywhereM' (G.mkM (matchOperators (ModuleName name) opTable)) ds
+    go m' (Module name (G.everywhere (G.mkT removeParens) ds') : rb) ms
 
 removeParens :: Value -> Value
 removeParens (Parens val) = val
@@ -85,16 +88,20 @@ matchOp moduleName op = do
   ident <- parseOp
   guard (qualify moduleName ident == qualify moduleName op)
 
-collectFixities :: ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-collectFixities = go M.empty
-  where
-  go :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-  go m _ [] = return m
-  go m moduleName (FixityDeclaration fixity name : rest) = do
-    let qual = Qualified (Just moduleName) (Op name)
+collectFixities :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
+collectFixities m _ [] = return m
+collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
+  let qual = Qualified (Just moduleName) (Op name)
+  when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
+  collectFixities (M.insert qual fixity m) moduleName rest
+collectFixities m moduleName (ImportDeclaration importedModule _ : rest) = do
+  let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule ]
+  forM_ fs $ \(name, _) -> do
+    let qual = Qualified (Just moduleName) name
     when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
-    go (M.insert qual fixity m) moduleName rest
-  go m moduleName (_:ds) = go m moduleName ds
+  let m' = M.fromList (map (\(i, fixity) -> (Qualified (Just moduleName) i, fixity)) fs)
+  collectFixities (M.union m' m) moduleName rest
+collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
 
 globalOp :: String -> Qualified Ident
 globalOp = Qualified Nothing . Op
