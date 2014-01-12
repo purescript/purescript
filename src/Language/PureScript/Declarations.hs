@@ -43,4 +43,6 @@ data Declaration
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
+  | TypeClassDeclaration ProperName Ident [Declaration]
+  | TypeInstanceDeclaration ProperName Type [Declaration]
   deriving (Show, D.Data, D.Typeable)

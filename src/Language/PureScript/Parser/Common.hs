@@ -71,7 +71,10 @@ reservedNames = [ "case"
                 , "infixl"
                 , "infixr"
                 , "module"
-                , "let" ]
+                , "let"
+                , "class"
+                , "instance"
+                , "where" ]
 
 builtInOperators :: [String]
 builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"

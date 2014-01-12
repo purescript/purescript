@@ -96,6 +96,24 @@ parseImportDeclaration = do
   idents <- P.optionMaybe $ parens $ commaSep1 (Left <$> parseIdent <|> Right <$> properName)
   return $ ImportDeclaration moduleName idents
 
+parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
+parseTypeClassDeclaration = do
+  reserved "class"
+  className <- indented *> properName
+  ident <- indented *> parseIdent
+  indented *> reserved "where"
+  members <- mark (P.many (same *> parseTypeDeclaration))
+  return $ TypeClassDeclaration className ident members
+
+parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
+parseTypeInstanceDeclaration = do
+  reserved "instance"
+  className <- indented *> properName
+  ty <- indented *> parseType
+  indented *> reserved "where"
+  members <- mark (P.many (same *> parseValueDeclaration))
+  return $ TypeInstanceDeclaration className ty members
+
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
                    [ parseDataDeclaration
@@ -104,7 +122,9 @@ parseDeclaration = P.choice
                    , parseValueDeclaration
                    , parseExternDeclaration
                    , parseFixityDeclaration
-                   , parseImportDeclaration ] P.<?> "declaration"
+                   , parseImportDeclaration
+                   , parseTypeClassDeclaration
+                   , parseTypeInstanceDeclaration ] P.<?> "declaration"
 
 parseModule :: P.Parsec String ParseState Module
 parseModule = do
