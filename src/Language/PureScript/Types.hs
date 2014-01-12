@@ -33,6 +33,7 @@ data Type
   | TypeApp Type Type
   | SaturatedTypeSynonym (Qualified ProperName) [Type]
   | ForAll String Type
+  | ConstrainedType [(Qualified ProperName, Type)] Type
   | Skolem Int
   | REmpty
   | RCons String Type Type deriving (Show, Eq, Data, Typeable)

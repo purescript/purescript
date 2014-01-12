@@ -100,7 +100,7 @@ parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
   reserved "class"
   className <- indented *> properName
-  ident <- indented *> parseIdent
+  ident <- indented *> identifier
   indented *> reserved "where"
   members <- mark (P.many (same *> parseTypeDeclaration))
   return $ TypeClassDeclaration className ident members
@@ -108,7 +108,7 @@ parseTypeClassDeclaration = do
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
   reserved "instance"
-  className <- indented *> properName
+  className <- indented *> parseQualified properName
   ty <- indented *> parseType
   indented *> reserved "where"
   members <- mark (P.many (same *> parseValueDeclaration))
