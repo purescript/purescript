@@ -51,11 +51,10 @@ data Environment = Environment
   , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
   , dataConstructors :: M.Map (ModuleName, ProperName) (Type, NameKind)
   , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
-  , members :: M.Map (ModuleName, Ident) String
   } deriving (Show)
 
 emptyEnvironment :: Environment
-emptyEnvironment = Environment M.empty M.empty M.empty M.empty M.empty
+emptyEnvironment = Environment M.empty M.empty M.empty M.empty
 
 bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind) -> m a -> m a
 bindNames newNames action = do

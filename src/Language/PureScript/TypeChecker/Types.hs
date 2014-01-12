@@ -20,8 +20,7 @@ module Language.PureScript.TypeChecker.Types (
 ) where
 
 import Data.List
-import Data.Maybe (fromMaybe)
-import Data.Either (lefts, rights)
+import Data.Maybe (isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
        (mkT, something, everywhere, everywhereBut, mkQ)
@@ -146,31 +145,36 @@ typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
 typesOf moduleName vals = do
   (tys, sub, checks) <- runSubst (SubstContext moduleName) $ do
     let es = map isTyped vals
-        typed = lefts es
-        untyped = rights es
-        typedDict = map (\(ident, ty, _) -> (ident, ty)) typed
+        typed = filter (isJust . snd . snd) es
+        untyped = filter (isNothing . snd . snd) es
+        typedDict = map (\(ident, (_, Just ty)) -> (ident, ty)) typed
     untypedNames <- replicateM (length untyped) fresh
     let untypedDict = zip (map fst untyped) untypedNames
         dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
-    tys <- forM es $ \e -> case e of
-      Left (_, ty, val) -> do
-        kind <- liftCheck $ kindOf moduleName ty
-        guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-        ty' <- replaceAllTypeSynonyms ty
-        bindNames dict $ check val ty'
-        return ty'
-      Right (ident, val) -> do
-        ty <- bindNames dict $ infer val
-        ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-        return ty
+    tys <- forM es $ \e -> do
+      ty <- case e of
+        (_, (val, Just ty)) -> do
+          kind <- liftCheck $ kindOf moduleName ty
+          guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+          ty' <- replaceAllTypeSynonyms ty
+          bindNames dict $ check val ty'
+          return ty'
+        (ident, (val, Nothing)) -> do
+          ty <- bindNames dict $ infer val
+          ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+          return ty
+      when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
+        [eff, a] <- replicateM 2 fresh
+        ty ~~ TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
+      return ty
     return tys
   forM tys $ flip (escapeCheck checks) sub
   forM tys $ skolemEscapeCheck
   return $ map (varIfUnknown . desaturateAllTypeSynonyms . setifyAll) tys
 
-isTyped :: (Ident, Value) -> Either (Ident, Type, Value) (Ident, Value)
-isTyped (name, TypedValue value ty) = Left (name, ty, value)
-isTyped (name, value) = Right (name, value)
+isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
+isTyped (name, TypedValue value ty) = (name, (value, Just ty))
+isTyped (name, value) = (name, (value, Nothing))
 
 escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
 escapeCheck checks ty sub =

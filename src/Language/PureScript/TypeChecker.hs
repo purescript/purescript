@@ -24,6 +24,8 @@ import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
+import Data.Data
+import Data.Generics (mkT, everywhere)
 import Data.Maybe
 import qualified Data.Map as M
 import Control.Monad.State
@@ -50,13 +52,13 @@ addDataConstructor moduleName name args dctor maybeTy = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (polyType, DataConstructor) (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType, DataConstructor) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   putEnv $ env { types = M.insert (moduleName, name) (kind, TypeSynonym) (types env)
-               , typeSynonyms = M.insert (moduleName, name) (args, ty) (typeSynonyms env) }
+               , typeSynonyms = M.insert (moduleName, name) (args, qualifyAllUnqualifiedNames moduleName env ty) (typeSynonyms env) }
 
 typeIsNotDefined :: ModuleName -> ProperName -> Check ()
 typeIsNotDefined moduleName name = do
@@ -80,7 +82,7 @@ valueIsNotDefined moduleName name = do
 addValue :: ModuleName -> Ident -> Type -> Check ()
 addValue moduleName name ty = do
   env <- getEnv
-  putEnv (env { names = M.insert (moduleName, name) (ty, Value) (names env) })
+  putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Value) (names env) })
 
 typeCheckAll :: ModuleName -> [Declaration] -> Check ()
 typeCheckAll _ [] = return ()
@@ -132,7 +134,7 @@ typeCheckAll moduleName (ExternDeclaration name _ ty : rest) = do
     guardWith "Expected kind *" $ kind == Star
     case M.lookup (moduleName, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern) (names env) })
+      Nothing -> putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Extern) (names env) })
   typeCheckAll moduleName rest
 typeCheckAll moduleName (FixityDeclaration _ name : rest) = do
   typeCheckAll moduleName rest
@@ -183,4 +185,11 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
        constructs (Function _ ty) pn = ty `constructs` pn
        constructs (TypeApp ty _) pn = ty `constructs` pn
        constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
+
+qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
+qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
+  where
+  go :: Qualified ProperName -> Qualified ProperName
+  go qual = let (mn', pn') = canonicalizeType mn env qual
+            in Qualified (Just mn') pn'
 
