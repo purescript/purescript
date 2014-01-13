@@ -106,9 +106,6 @@ canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types 
   Just (_, DataAlias mn' pn') -> (mn', pn')
   _ -> (mn, nm)
 
-data AnyUnifiable where
-  AnyUnifiable :: forall t. (Unifiable t) => t -> AnyUnifiable
-
 data CheckState = CheckState { checkEnv :: Environment
                              , checkNextVar :: Int
                              }
@@ -143,8 +140,7 @@ instance Monoid Substitution where
   mempty = Substitution unknown
   s1 `mappend` s2 = Substitution $ \u -> apply s1 (apply s2 (unknown u))
 
-data SubstState = SubstState { substSubst :: Substitution
-                             , substFutureEscapeChecks :: [AnyUnifiable] }
+data SubstState = SubstState { substSubst :: Substitution }
 
 newtype SubstContext = SubstContext { substCurrentModule :: ModuleName } deriving (Show)
 
@@ -160,10 +156,10 @@ deriving instance MonadError String Subst
 liftCheck :: Check a -> Subst a
 liftCheck = Subst . lift . lift
 
-runSubst :: (Unifiable a) => SubstContext -> Subst a -> Check (a, Substitution, [AnyUnifiable])
+runSubst :: (Unifiable a) => SubstContext -> Subst a -> Check (a, Substitution)
 runSubst context subst = do
-  (a, s) <- flip runStateT (SubstState mempty []) . flip runReaderT context . unSubst $ subst
-  return (apply (substSubst s) a, substSubst s, substFutureEscapeChecks s)
+  (a, s) <- flip runStateT (SubstState mempty) . flip runReaderT context . unSubst $ subst
+  return (apply (substSubst s) a, substSubst s)
 
 substituteWith :: (Typeable t) => (Unknown t -> t) -> Substitution
 substituteWith f = Substitution $ \u -> fromMaybe (unknown u) $ do
@@ -215,6 +211,3 @@ fresh' = do
 
 fresh :: (Unifiable t) => Subst t
 fresh = unknown . Unknown <$> fresh'
-
-escapeCheckLater :: (Unifiable t) => t -> Subst ()
-escapeCheckLater t = Subst . modify $ \s -> s { substFutureEscapeChecks = AnyUnifiable t : substFutureEscapeChecks s  }

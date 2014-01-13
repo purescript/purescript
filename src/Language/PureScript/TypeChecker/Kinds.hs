@@ -58,10 +58,10 @@ instance Unifiable Kind where
   unknowns _ = []
 
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf moduleName ty = fmap (\(k, _, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer ty
+kindOf moduleName ty = fmap (\(k, _) -> k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer ty
 
 kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
-kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . runSubst (SubstContext moduleName) $ do
+kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _) -> k)) . runSubst (SubstContext moduleName) $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   let dict = (name, tyCon) : zip (map ProperName args) kargs
@@ -69,7 +69,7 @@ kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, _, _) -> k)) . run
     solveTypes ts kargs tyCon
 
 kindsOfAll :: ModuleName -> [(ProperName, [String], [Type])] -> Check [Kind]
-kindsOfAll moduleName tys = fmap (map starIfUnknown . (\(ks, _, _) -> ks)) . runSubst (SubstContext moduleName) $ do
+kindsOfAll moduleName tys = fmap (map starIfUnknown . (\(ks, _) -> ks)) . runSubst (SubstContext moduleName) $ do
   tyCons <- replicateM (length tys) fresh
   let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
   bindLocalTypeVariables moduleName dict $

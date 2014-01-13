@@ -143,7 +143,7 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
 typesOf moduleName vals = do
-  (tys, sub, checks) <- runSubst (SubstContext moduleName) $ do
+  (tys, sub) <- runSubst (SubstContext moduleName) $ do
     let es = map isTyped vals
         typed = filter (isJust . snd . snd) es
         untyped = filter (isNothing . snd . snd) es
@@ -160,7 +160,7 @@ typesOf moduleName vals = do
           bindNames dict $ check val ty'
           return ty'
         (ident, (val, Nothing)) -> do
-          ty <- bindNames dict $ infer val
+          TypedValue _ ty <- bindNames dict $ infer val
           ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return ty
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
@@ -168,7 +168,7 @@ typesOf moduleName vals = do
         ty ~~ TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       return ty
     return tys
-  forM tys $ flip (escapeCheck checks) sub
+  --forM tys $ flip (escapeCheck checks) sub
   forM tys $ skolemEscapeCheck
   return $ map (varIfUnknown . desaturateAllTypeSynonyms . setifyAll) tys
 
@@ -176,7 +176,7 @@ isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
 isTyped (name, TypedValue value ty) = (name, (value, Just ty))
 isTyped (name, value) = (name, (value, Nothing))
 
-escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
+{-escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
 escapeCheck checks ty sub =
   let
     visibleUnknowns = nub $ unknowns ty
@@ -185,6 +185,7 @@ escapeCheck checks ty sub =
       AnyUnifiable t -> do
         let unsolvedUnknowns = nub . unknowns $ apply sub t
         guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
+-}
 
 skolemEscapeCheck :: Type -> Check ()
 skolemEscapeCheck ty =
@@ -247,100 +248,99 @@ expandTypeSynonym name args = do
 ensureNoDuplicateProperties :: (MonadError String m) => [(String, Value)] -> m ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
-infer :: Value -> Subst Type
-infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ do
-  ty <- infer' val
-  escapeCheckLater ty
-  return ty
+infer :: Value -> Subst Value
+infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' val
 
-infer' :: Value -> Subst Type
-infer' (NumericLiteral _) = return Number
-infer' (StringLiteral _) = return String
-infer' (BooleanLiteral _) = return Boolean
+infer' :: Value -> Subst Value
+infer' v@(NumericLiteral _) = return $ TypedValue v Number
+infer' v@(StringLiteral _) = return $ TypedValue v String
+infer' v@(BooleanLiteral _) = return $ TypedValue v Boolean
 infer' (ArrayLiteral vals) = do
-  ts <- mapM (infer) vals
+  ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \t -> els ~~ Array t
-  return els
+  forM_ ts $ \(TypedValue _ t) -> els ~~ Array t
+  return $ TypedValue (ArrayLiteral ts) els
 infer' (Unary op val) = do
-  t <- infer val
-  inferUnary op t
+  v <- infer val
+  inferUnary op v
 infer' (Binary op left right) = do
-  t1 <- infer left
-  t2 <- infer right
-  inferBinary op t1 t2
+  v1 <- infer left
+  v2 <- infer right
+  inferBinary op v1 v2
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   ts <- mapM (infer . snd) ps
-  let fields = zipWith (\(name, _) t -> (name, t)) ps ts
-  return $ Object $ rowFromList (fields, REmpty)
+  let fields = zipWith (\name (TypedValue _ t) -> (name, t)) (map fst ps) ts
+      ty = Object $ rowFromList (fields, REmpty)
+  return $ TypedValue (ObjectLiteral (zip (map fst ps) ts)) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- fresh
-  newTys <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
+  newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
+  let newTys = map (\(name, TypedValue _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
-  check o $ Object $ rowFromList (oldTys, row)
-  return $ Object $ rowFromList (newTys, row)
+  o' <- check o $ Object $ rowFromList (oldTys, row)
+  return $ TypedValue (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
 infer' (Indexer index val) = do
   el <- fresh
   check index Number
   check val (Array el)
-  return el
+  return $ TypedValue (Indexer (TypedValue index Number) (TypedValue val (Array el))) el
 infer' (Accessor prop val) = do
-  obj <- infer val
-  propTy <- inferProperty obj prop
+  typed@(TypedValue _ objTy) <- infer val
+  propTy <- inferProperty objTy prop
   case propTy of
     Nothing -> do
       field <- fresh
       rest <- fresh
-      obj `subsumes` Object (RCons prop field rest)
-      return field
-    Just ty -> return ty
+      objTy `subsumes` Object (RCons prop field rest)
+      return $ TypedValue (Accessor prop typed) field
+    Just ty -> return $ TypedValue (Accessor prop typed) ty
 infer' (Abs args ret) = do
   ts <- replicateM (length args) fresh
   moduleName <- substCurrentModule <$> ask
   bindLocalVariables moduleName (zip args ts) $ do
-    body <- infer' ret
-    return $ Function ts body
-infer' app@(App _ _) = do
-  let (f, argss) = unfoldApplication app
-  ft <- infer f
+    (TypedValue body bodyTy) <- infer' ret
+    return $ TypedValue (Abs args body) $ Function ts bodyTy
+infer' (App f args) = do
+  (TypedValue f' ft) <- infer f
   ret <- fresh
-  checkFunctionApplications ft argss ret
-  return ret
+  args' <- checkFunctionApplication ft args ret
+  return $ TypedValue (App f' args') ret
 infer' (Var var) = do
   moduleName <- substCurrentModule <$> ask
   ty <- lookupVariable moduleName var
-  replaceAllTypeSynonyms ty
+  ty' <- replaceAllTypeSynonyms ty
+  return $ TypedValue (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
-  (allCodePathsReturn, _) <- checkBlock M.empty ret ss
+  (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return ret
-infer' (Constructor c) = do
+  return $ TypedValue (Block ss') ret
+infer' v@(Constructor c) = do
   env <- getEnv
   moduleName <- substCurrentModule `fmap` ask
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (ty, _) -> replaceAllTypeSynonyms ty
+    Just (ty, _) -> do ty' <- replaceAllTypeSynonyms ty
+                       return $ TypedValue v ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
   ret <- fresh
-  checkBinders ts ret binders
-  return ret
+  binders' <- checkBinders (map (\(TypedValue _ t) -> t) ts) ret binders
+  return $ TypedValue (Case ts binders') ret
 infer' (IfThenElse cond th el) = do
   check cond Boolean
-  t2 <- infer th
-  t3 <- infer el
+  TypedValue v2 t2 <- infer th
+  TypedValue v3 t3 <- infer el
   t2 ~~ t3
-  return t2
+  return $ TypedValue (IfThenElse cond v2 v3) t2
 infer' (TypedValue val ty) = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- replaceAllTypeSynonyms ty
   check val ty'
-  return ty'
 infer' _ = error "Invalid argument to infer"
 
 inferProperty :: Type -> String -> Subst (Maybe Type)
@@ -355,14 +355,15 @@ inferProperty (ForAll ident ty) prop = do
   inferProperty replaced prop
 inferProperty _ _ = return Nothing
 
-inferUnary :: UnaryOperator -> Type -> Subst Type
-inferUnary op val =
+inferUnary :: UnaryOperator -> Value -> Subst Value
+inferUnary op (TypedValue val valTy) =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
-    (valTy, resTy) -> do
-      val ~~ valTy
-      return resTy
+    (valTy', resTy) -> do
+      valTy' ~~ valTy
+      return $ TypedValue (Unary op val) resTy
+inferUnary _ _ = error "Invalid arguments to inferUnary"
 
-checkUnary :: UnaryOperator -> Value -> Type -> Subst ()
+checkUnary :: UnaryOperator -> Value -> Type -> Subst Value
 checkUnary op val res =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
     (valTy, resTy) -> do
@@ -375,29 +376,32 @@ unaryOps = [ (Negate, (Number, Number))
            , (BitwiseNot, (Number, Number))
            ]
 
-inferBinary :: BinaryOperator -> Type -> Type -> Subst Type
-inferBinary op left right | isEqualityTest op = do
-  left ~~ right
-  return Boolean
-inferBinary op left right =
+inferBinary :: BinaryOperator -> Value -> Value -> Subst Value
+inferBinary op left@(TypedValue _ leftTy) right@(TypedValue _ rightTy) | isEqualityTest op = do
+  leftTy ~~ rightTy
+  return $ TypedValue (Binary op left right) Boolean
+inferBinary op left@(TypedValue _ leftTy) right@(TypedValue _ rightTy) =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
-      left ~~ valTy
-      right ~~ valTy
-      return resTy
+      leftTy ~~ valTy
+      rightTy ~~ valTy
+      return $ TypedValue (Binary op left right) resTy
+inferBinary _ _ _ = error "Invalid arguments to inferBinary"
 
-checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst ()
+checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst Value
 checkBinary op left right res | isEqualityTest op = do
   res ~~ Boolean
-  t1 <- infer left
-  t2 <- infer right
+  TypedValue v1 t1 <- infer left
+  TypedValue v2 t2 <- infer right
   t1 ~~ t2
+  return $ TypedValue (Binary op v1 v2) $ res
 checkBinary op left right res =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
       res ~~ resTy
-      check left valTy
-      check right valTy
+      v1 <- check left valTy
+      v2 <- check right valTy
+      return $ TypedValue (Binary op v1 v2) $ res
 
 isEqualityTest :: BinaryOperator -> Bool
 isEqualityTest EqualTo = True
@@ -480,17 +484,20 @@ inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
 
-checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> Subst ()
-checkBinders _ _ [] = return ()
+checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> Subst [([Binder], Maybe Guard, Value)]
+checkBinders _ _ [] = return []
 checkBinders nvals ret ((binders, grd, val):bs) = do
   moduleName <- substCurrentModule <$> ask
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  bindLocalVariables moduleName (M.toList m1) $ do
-    check val ret
+  r <- bindLocalVariables moduleName (M.toList m1) $ do
+    val' <- check val ret
     case grd of
-      Nothing -> return ()
-      Just g -> check g Boolean
-  checkBinders nvals ret bs
+      Nothing -> return (binders, Nothing, val')
+      Just g -> do
+        g' <- check g Boolean
+        return (binders, Just g', val')
+  rs <- checkBinders nvals ret bs
+  return $ r : rs
 
 assignVariable :: Ident -> Subst ()
 assignVariable name = do
@@ -500,66 +507,70 @@ assignVariable name = do
     Just (_, LocalVariable) -> throwError $ "Variable with name " ++ show name ++ " already exists."
     _ -> return ()
 
-checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type)
+checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type, Statement)
 checkStatement mass _ (VariableIntroduction name val) = do
   assignVariable name
-  t <- infer val
-  return (False, M.insert name t mass)
+  val'@(TypedValue _ t) <- infer val
+  return (False, M.insert name t mass, VariableIntroduction name val')
 checkStatement mass _ (Assignment ident val) = do
-  t <- infer val
+  val'@(TypedValue _ t) <- infer val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
     Just ty -> do t ~~ ty
-                  return (False, mass)
+                  return (False, mass, Assignment ident val')
 checkStatement mass ret (While val inner) = do
-  check val Boolean
-  (allCodePathsReturn, _) <- checkBlock mass ret inner
-  return (allCodePathsReturn, mass)
+  val' <- check val Boolean
+  (allCodePathsReturn, _, inner') <- checkBlock mass ret inner
+  return (allCodePathsReturn, mass, While val' inner')
 checkStatement mass ret (If ifst) = do
-  allCodePathsReturn <- checkIfStatement mass ret ifst
-  return (allCodePathsReturn, mass)
+  (allCodePathsReturn, ifst') <- checkIfStatement mass ret ifst
+  return (allCodePathsReturn, mass, If ifst')
 checkStatement mass ret (For ident start end inner) = do
   moduleName <- substCurrentModule <$> ask
   assignVariable ident
-  check start Number
-  check end Number
-  (allCodePathsReturn, _) <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
-  return (allCodePathsReturn, mass)
+  start' <- check start Number
+  end' <- check end Number
+  (allCodePathsReturn, _, inner') <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
+  return (allCodePathsReturn, mass, For ident start' end' inner')
 checkStatement mass ret (Return val) = do
-  check val ret
-  return (True, mass)
+  val' <- check val ret
+  return (True, mass, Return val')
 
-checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> Subst Bool
+checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> Subst (Bool, IfStatement)
 checkIfStatement mass ret (IfStatement val thens Nothing) = do
-  check val Boolean
-  _ <- checkBlock mass ret thens
-  return False
+  val' <- check val Boolean
+  (_, _, thens') <- checkBlock mass ret thens
+  return (False, IfStatement val' thens' Nothing)
 checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
-  check val Boolean
-  (allCodePathsReturn1, _) <- checkBlock mass ret thens
-  allCodePathsReturn2 <- checkElseStatement mass ret elses
-  return $ allCodePathsReturn1 && allCodePathsReturn2
+  val' <- check val Boolean
+  (allCodePathsReturn1, _, thens') <- checkBlock mass ret thens
+  (allCodePathsReturn2, elses') <- checkElseStatement mass ret elses
+  return (allCodePathsReturn1 && allCodePathsReturn2, IfStatement val' thens' (Just elses'))
 
-checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> Subst Bool
-checkElseStatement mass ret (Else elses) = fst <$> checkBlock mass ret elses
-checkElseStatement mass ret (ElseIf ifst) = checkIfStatement mass ret ifst
+checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> Subst (Bool, ElseStatement)
+checkElseStatement mass ret (Else elses) = do
+  (allCodePathsReturn, _, elses') <- checkBlock mass ret elses
+  return (allCodePathsReturn, Else elses')
+checkElseStatement mass ret (ElseIf ifst) = (id *** ElseIf) <$> checkIfStatement mass ret ifst
 
-checkBlock :: M.Map Ident Type -> Type -> [Statement] -> Subst (Bool, M.Map Ident Type)
-checkBlock mass _ [] = return (False, mass)
+checkBlock :: M.Map Ident Type -> Type -> [Statement] -> Subst (Bool, M.Map Ident Type, [Statement])
+checkBlock mass _ [] = return (False, mass, [])
 checkBlock mass ret (s:ss) = do
   moduleName <- substCurrentModule <$> ask
-  (b1, mass1) <- checkStatement mass ret s
+  (b1, mass1, s') <- checkStatement mass ret s
   bindLocalVariables moduleName (M.toList mass1) $ case (b1, ss) of
-    (True, []) -> return (True, mass1)
+    (True, []) -> return (True, mass1, [s'])
     (True, _) -> throwError "Unreachable code"
-    (False, ss') -> checkBlock mass1 ret ss'
+    (False, ss') -> do
+      (b, m, ss'') <- checkBlock mass1 ret ss'
+      return (b, m, s':ss'')
 
 skolemize :: String -> Type -> Subst Type
 skolemize ident ty = do
   tsk <- Skolem <$> fresh'
   return $ replaceTypeVars ident tsk ty
 
-check :: Value -> Type -> Subst ()
+check :: Value -> Type -> Subst Value
 check val ty = rethrow errorMessage $ check' val ty
   where
   errorMessage msg =
@@ -570,65 +581,73 @@ check val ty = rethrow errorMessage $ check' val ty
     ":\n" ++
     msg
 
-check' :: Value -> Type -> Subst ()
+check' :: Value -> Type -> Subst Value
 check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
 check' val u@(TUnknown _) = do
-  ty <- infer val
+  val'@(TypedValue _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ~~ u
-check' (NumericLiteral _) Number = return ()
-check' (StringLiteral _) String = return ()
-check' (BooleanLiteral _) Boolean = return ()
+  return val'
+check' v@(NumericLiteral _) Number = return $ TypedValue v Number
+check' v@(StringLiteral _) String = return $ TypedValue v String
+check' v@(BooleanLiteral _) Boolean = return $ TypedValue v Boolean
 check' (Unary op val) ty = checkUnary op val ty
 check' (Binary op left right) ty = checkBinary op left right ty
-check' (ArrayLiteral vals) (Array ty) = forM_ vals (\val -> check val ty)
+check' (ArrayLiteral vals) (Array ty) = TypedValue <$> (ArrayLiteral <$> forM vals (\val -> check val ty)) <*> pure (Array ty)
 check' (Indexer index vals) ty = check index Number >> check vals (Array ty)
 check' (Abs args ret) (Function argTys retTy) = do
   moduleName <- substCurrentModule <$> ask
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   bindLocalVariables moduleName (zip args argTys) $ check ret retTy
-check' app@(App _ _) ret = do
-  let (f, argss) = unfoldApplication app
-  ft <- infer f
-  checkFunctionApplications ft argss ret
+check' (App f args) ret = do
+  f'@(TypedValue _ ft) <- infer f
+  args' <- checkFunctionApplication ft args ret
+  return $ TypedValue (App f' args') ret
 check' (Var var) ty = do
   moduleName <- substCurrentModule <$> ask
   ty1 <- lookupVariable moduleName var
   repl <- replaceAllTypeSynonyms ty1
   repl `subsumes` ty
-check' (TypedValue val ty1) ty2 = do
+  return $ TypedValue (Var var) ty
+check' v@(TypedValue val ty1) ty2 = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
   check val ty1
+  return v
 check' (Case vals binders) ret = do
-  ts <- mapM infer vals
-  checkBinders ts ret binders
+  vals' <- mapM infer vals
+  let ts = map (\(TypedValue _ t) -> t) vals'
+  binders' <- checkBinders ts ret binders
+  return $ TypedValue (Case vals' binders') ret
 check' (IfThenElse cond th el) ty = do
   check cond Boolean
   check th ty
   check el ty
-check' (ObjectLiteral ps) (Object row) = do
+check' (ObjectLiteral ps) t@(Object row) = do
   ensureNoDuplicateProperties ps
-  checkProperties ps row False
-check' (ObjectUpdate obj ps) (Object row) = do
+  ps' <- checkProperties ps row False
+  return $ TypedValue (ObjectLiteral ps') t
+check' (ObjectUpdate obj ps) t@(Object row) = do
   ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh
   let (propsToCheck, rest) = rowToList row
       propsToRemove = map fst ps
       remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
-  check obj (Object (rowFromList (us ++ remainingProps, rest)))
-  checkProperties ps row True
+  obj' <- check obj (Object (rowFromList (us ++ remainingProps, rest)))
+  ps' <- checkProperties ps row True
+  return $ TypedValue (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = do
   rest <- fresh
   check val (Object (RCons prop ty rest))
 check' (Block ss) ret = do
-  (allCodePathsReturn, _) <- checkBlock M.empty ret ss
+  (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
+  return $ TypedValue (Block ss') ret
 check' (Constructor c) ty = do
   env <- getEnv
   moduleName <- substCurrentModule <$> ask
@@ -637,51 +656,42 @@ check' (Constructor c) ty = do
     Just (ty1, _) -> do
       repl <- replaceAllTypeSynonyms ty1
       repl `subsumes` ty
+      return $ TypedValue (Constructor c) ty
 check' val (SaturatedTypeSynonym name args) = do
   ty <- expandTypeSynonym name args
   check val ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
-checkProperties :: [(String, Value)] -> Type -> Bool -> Subst ()
+checkProperties :: [(String, Value)] -> Type -> Bool -> Subst [(String, Value)]
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
-  go [] [] REmpty = return ()
-  go [] [] u@(TUnknown _) = u ~~ REmpty
-  go [] [] (Skolem _) | lax = return ()
-  go [] ((p, _): _) _ | lax = return ()
+  go [] [] REmpty = return []
+  go [] [] u@(TUnknown _) = do u ~~ REmpty
+                               return []
+  go [] [] (Skolem _) | lax = return []
+  go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
   go ((p,v):ps') [] u@(TUnknown _) = do
-    ty <- infer v
+    v'@(TypedValue _ ty) <- infer v
     rest <- fresh
     u ~~ RCons p ty rest
-    go ps' [] rest
+    ps'' <- go ps' [] rest
+    return $ (p, v') : ps''
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
-        ty <- infer v
+        v'@(TypedValue _ ty) <- infer v
         rest <- fresh
         r ~~ RCons p ty rest
-        go ps' ts rest
+        ps'' <- go ps' ts rest
+        return $ (p, v') : ps''
       Just ty -> do
-        check v ty
-        go ps' (delete (p, ty) ts) r
+        v' <- check v ty
+        ps'' <- go ps' (delete (p, ty) ts) r
+        return $ (p, v') : ps''
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
-unfoldApplication :: Value -> (Value, [[Value]])
-unfoldApplication = go []
-  where
-  go argss (App f args) = go (args:argss) f
-  go argss f = (f, argss)
-
-checkFunctionApplications :: Type -> [[Value]] -> Type -> Subst ()
-checkFunctionApplications _ [] _ = error "Nullary function application"
-checkFunctionApplications fnTy [args] ret = checkFunctionApplication fnTy args ret
-checkFunctionApplications fnTy (args:argss) ret = do
-  argTys <- mapM (infer) args
-  f <- inferFunctionApplication fnTy argTys
-  checkFunctionApplications f argss ret
-
-checkFunctionApplication :: Type -> [Value] -> Type -> Subst ()
+checkFunctionApplication :: Type -> [Value] -> Type -> Subst [Value]
 checkFunctionApplication fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fnTy args ret
   where
   errorMessage msg = "Error applying function of type "
@@ -699,7 +709,6 @@ inferFunctionApplication (ForAll ident ty) args = do
   replaced <- replaceVarWithUnknown ident ty
   inferFunctionApplication replaced args
 inferFunctionApplication u@(TUnknown _) args = do
-
   ret <- fresh
   args' <- mapM replaceAllVarsWithUnknowns args
   u ~~ Function args' ret
@@ -711,17 +720,20 @@ inferFunctionApplication fnTy args = throwError $ "Cannot apply function of type
   ++ prettyPrintType fnTy
   ++ " to argument(s) of type(s) " ++ intercalate ", " (map prettyPrintType args)
 
-checkFunctionApplication' :: Type -> [Value] -> Type -> Subst ()
+checkFunctionApplication' :: Type -> [Value] -> Type -> Subst [Value]
 checkFunctionApplication' (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
-  zipWithM (check) args argTys
+  args' <- zipWithM check args argTys
   retTy `subsumes` ret
+  return args'
 checkFunctionApplication' (ForAll ident ty) args ret = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication replaced args ret
 checkFunctionApplication' u@(TUnknown _) args ret = do
-  tyArgs <- mapM (\arg -> infer arg >>= replaceAllVarsWithUnknowns) args
-  u ~~ Function tyArgs ret
+  args' <- mapM (\arg -> infer arg >>= \(TypedValue v t) -> TypedValue v <$> replaceAllVarsWithUnknowns t) args
+  let tys = map (\(TypedValue _ t) -> t) args'
+  u ~~ Function tys ret
+  return args'
 checkFunctionApplication' (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
   checkFunctionApplication' ty args ret
