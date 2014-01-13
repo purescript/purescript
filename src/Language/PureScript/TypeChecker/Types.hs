@@ -23,7 +23,7 @@ import Data.List
 import Data.Maybe (isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
-       (mkT, something, everywhere, everywhereBut, mkQ)
+       (mkT, something, everywhere, mkQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -213,14 +213,6 @@ varIfUnknown ty =
 
 replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
-
-replaceTypeVars :: (D.Data d) => String -> Type -> d -> d
-replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVar)
-  where
-  replaceTypeVar (TypeVar v) | v == name = t
-  replaceTypeVar other = other
-  isShadowed (ForAll v _) | v == name = True
-  isShadowed _ = False
 
 replaceAllVarsWithUnknowns :: Type -> Subst Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns

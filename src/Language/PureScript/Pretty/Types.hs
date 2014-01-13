@@ -37,6 +37,7 @@ typeLiterals = mkPattern match
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s
+  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
   match (ForAll ident ty) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
   match REmpty = Just $ prettyPrintRow REmpty

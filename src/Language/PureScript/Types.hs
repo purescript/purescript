@@ -17,6 +17,8 @@
 module Language.PureScript.Types where
 
 import Data.Data
+import Data.Generics (mkT, mkQ, everywhereBut)
+
 import Language.PureScript.Names
 import Language.PureScript.Unknown (Unknown(..))
 
@@ -65,3 +67,11 @@ mkForAll = flip . foldl . flip $ ForAll
 
 unit :: Type
 unit = Object REmpty
+
+replaceTypeVars :: (Data d) => String -> Type -> d -> d
+replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVar)
+  where
+  replaceTypeVar (TypeVar v) | v == name = t
+  replaceTypeVar other = other
+  isShadowed (ForAll v _) | v == name = True
+  isShadowed _ = False

@@ -136,4 +136,9 @@ infer (RCons _ ty row) = do
   k2 <- infer row
   k2 ~~ Row k1
   return $ Row k1
+infer (ConstrainedType deps ty) = do
+  mapM_ (infer . snd) deps
+  k <- infer ty
+  k ~~ Star
+  return Star
 infer _ = error "Invalid argument to infer"

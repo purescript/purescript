@@ -5,3 +5,5 @@ class Show a where
 
 instance TypeClasses.Show String where
   show s = s
+
+test = show "testing"

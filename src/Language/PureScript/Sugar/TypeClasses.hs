@@ -28,7 +28,7 @@ import Control.Applicative
 import Control.Monad.State
 import Data.Maybe (fromMaybe)
 
-type MemberMap = M.Map (ModuleName, ProperName) [(String, Type)]
+type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
 
 desugarTypeClasses :: [Module] -> [Module]
 desugarTypeClasses = flip evalState M.empty . mapM desugarModule
@@ -39,7 +39,7 @@ desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl
 desugarDecl :: ModuleName -> Declaration -> State MemberMap [Declaration]
 desugarDecl mn (TypeClassDeclaration name arg members) = do
   let tys = map memberToNameAndType members
-  modify (M.insert (mn, name) tys)
+  modify (M.insert (mn, name) (arg, tys))
   return $ typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
 desugarDecl mn (TypeInstanceDeclaration deps name ty members) = do
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) members
@@ -57,29 +57,34 @@ typeClassDictionaryDeclaration name arg members =
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
     ExternDeclaration ident
-        (Just (JSFunction (Just (Ident arg)) [Ident "dict"] (JSReturn (JSAccessor arg (JSVar (Ident "dict"))))))
+        (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor arg (JSVar (Ident "dict")))])))
         (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclaration :: [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Declaration
 typeInstanceDictionaryDeclaration deps name ty decls =
   ExternDeclaration (mkDictionaryValueName name ty)
-    (Just (JSObjectLiteral $ map memberToNameAndValue decls))
+    (Just (JSFunction (Just (mkDictionaryValueName name ty))
+        (map (\n -> Ident ('_' : show n)) [1..length deps])
+        (JSBlock [JSReturn (JSObjectLiteral $ map memberToNameAndValue decls)])))
     (Function (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps) (TypeApp (TypeConstructor name) ty))
   where
   memberToNameAndValue :: Declaration -> (String, JS)
   memberToNameAndValue (ValueDeclaration ident _ _ _) =
-    (identToString ident, JSVar $ mkDictionaryEntryName name ty ident)
+    (identToString ident, let dict = JSVar $ mkDictionaryEntryName name ty ident
+                          in if null deps then dict
+                             else JSApp dict (map (\n -> JSVar (Ident ('_' : show n))) [1..length deps]))
   memberToNameAndValue _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> State MemberMap Declaration
 typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident binders grd val) = do
   m <- get
-  let valTy = fromMaybe (error "Type class instance dictionary member is missing in typeInstanceDictionaryEntryDeclaration") $ do
-                members <- M.lookup (qualify mn name) m
-                lookup (identToString ident) members
+  let valTy = fromMaybe (error "Type class instance dictionary member is missing in typeInstanceDictionaryEntryDeclaration") $
+                do (arg, members) <- M.lookup (qualify mn name) m
+                   ty' <- lookup (identToString ident) members
+                   return $ replaceTypeVars arg ty ty'
   return $ ValueDeclaration (mkDictionaryEntryName name ty ident) binders grd
-    (TypedValue val (ConstrainedType deps valTy))
+    (TypedValue val (if null deps then valTy else ConstrainedType deps valTy))
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
 identToString :: Ident -> String
