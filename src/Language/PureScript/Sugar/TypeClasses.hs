@@ -20,6 +20,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
+import Language.PureScript.CodeGen.JS.AST
 
 desugarTypeClasses :: [Module] -> [Module]
 desugarTypeClasses = map desugarModule
@@ -40,7 +41,10 @@ typeClassDictionaryDeclaration name arg members = TypeSynonymDeclaration name [a
   memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
-typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) = ExternDeclaration ident Nothing (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
+typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
+    ExternDeclaration ident
+        (Just (JSFunction (Just (Ident arg)) [Ident "dict"] (JSReturn (JSAccessor arg (JSVar (Ident "dict"))))))
+        (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
 {-
