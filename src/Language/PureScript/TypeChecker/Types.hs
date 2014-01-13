@@ -591,9 +591,6 @@ check' val u@(TUnknown _) = do
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ~~ u
   return val'
-check' val (SaturatedTypeSynonym name args) = do
-  ty <- expandTypeSynonym name args
-  check val ty
 check' v@(NumericLiteral _) Number = return $ TypedValue v Number
 check' v@(StringLiteral _) String = return $ TypedValue v String
 check' v@(BooleanLiteral _) Boolean = return $ TypedValue v Boolean
@@ -660,6 +657,9 @@ check' (Constructor c) ty = do
       repl <- replaceAllTypeSynonyms ty1
       repl `subsumes` ty
       return $ TypedValue (Constructor c) ty
+check' val (SaturatedTypeSynonym name args) = do
+  ty <- expandTypeSynonym name args
+  check val ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 checkProperties :: [(String, Value)] -> Type -> Bool -> Subst [(String, Value)]
