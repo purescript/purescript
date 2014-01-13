@@ -109,8 +109,8 @@ parseTypeClassDeclaration = do
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
   reserved "instance"
-  deps <- do
-    deps <- P.optionMaybe (parens (commaSep1 ((,) <$> parseQualified properName <*> parseType)))
+  deps <- P.optionMaybe $ do
+    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> parseType))
     indented
     reservedOp "=>"
     return deps
