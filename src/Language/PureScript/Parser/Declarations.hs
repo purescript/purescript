@@ -18,6 +18,7 @@ module Language.PureScript.Parser.Declarations (
     parseModules
 ) where
 
+import Data.Maybe (fromMaybe)
 import Control.Applicative
 import qualified Text.Parsec as P
 
@@ -108,11 +109,16 @@ parseTypeClassDeclaration = do
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
   reserved "instance"
+  deps <- do
+    deps <- P.optionMaybe (parens (commaSep1 ((,) <$> parseQualified properName <*> parseType)))
+    indented
+    reservedOp "=>"
+    return deps
   className <- indented *> parseQualified properName
   ty <- indented *> parseType
   indented *> reserved "where"
   members <- mark (P.many (same *> parseValueDeclaration))
-  return $ TypeInstanceDeclaration className ty members
+  return $ TypeInstanceDeclaration (fromMaybe [] deps) className ty members
 
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice

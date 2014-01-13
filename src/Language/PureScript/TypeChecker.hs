@@ -187,7 +187,7 @@ typeCheckAll currentModule (ImportDeclaration moduleName idents : rest) = do
        constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll moduleName (TypeClassDeclaration name arg decls : rest) = do
   typeCheckAll moduleName rest
-typeCheckAll moduleName (TypeInstanceDeclaration name ty decls : rest) = do
+typeCheckAll moduleName (TypeInstanceDeclaration deps name ty decls : rest) = do
   typeCheckAll moduleName rest
 
 qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d

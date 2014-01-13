@@ -29,7 +29,7 @@ desugarModule (Module name decls) = Module name $ concatMap desugarDecl decls
 
 desugarDecl :: Declaration -> [Declaration]
 desugarDecl (TypeClassDeclaration name arg members) = typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
-desugarDecl (TypeInstanceDeclaration name ty members) = []
+desugarDecl (TypeInstanceDeclaration deps name ty members) = []
 desugarDecl other = [other]
 
 typeClassDictionaryDeclaration :: ProperName -> String -> [Declaration] -> Declaration

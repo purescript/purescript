@@ -44,5 +44,5 @@ data Declaration
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
   | TypeClassDeclaration ProperName String [Declaration]
-  | TypeInstanceDeclaration (Qualified ProperName) Type [Declaration]
+  | TypeInstanceDeclaration [(Qualified ProperName, Type)] (Qualified ProperName) Type [Declaration]
   deriving (Show, D.Data, D.Typeable)

@@ -81,7 +81,7 @@ builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "
                   , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
 
 reservedOpNames :: [String]
-reservedOpNames = builtInOperators ++ [ "->", "=", ".", "\\" ]
+reservedOpNames = builtInOperators ++ [ "=>", "->", "=", ".", "\\" ]
 
 identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_"
