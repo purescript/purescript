@@ -32,7 +32,7 @@ desugarDecl :: Declaration -> [Declaration]
 desugarDecl (TypeClassDeclaration name arg members) =
   typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
 desugarDecl (TypeInstanceDeclaration deps name ty members) =
-  typeInstanceDictionaryDeclaration deps name ty members : map (typeInstanceDictionaryEntryDeclaration name ty) members
+  typeInstanceDictionaryDeclaration deps name ty members : map (typeInstanceDictionaryEntryDeclaration deps name ty) members
 desugarDecl other = [other]
 
 typeClassDictionaryDeclaration :: ProperName -> String -> [Declaration] -> Declaration
@@ -40,7 +40,7 @@ typeClassDictionaryDeclaration name arg members =
   TypeSynonymDeclaration name [arg] (Object $ rowFromList (map memberToNameAndType members, REmpty))
   where
   memberToNameAndType :: Declaration -> (String, Type)
-  memberToNameAndType (TypeDeclaration ident ty) = (show ident, ty)
+  memberToNameAndType (TypeDeclaration ident ty) = (identToString ident, ty)
   memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
@@ -52,24 +52,28 @@ typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type c
 
 typeInstanceDictionaryDeclaration :: [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Declaration
 typeInstanceDictionaryDeclaration deps name ty decls =
-  ValueDeclaration (mkDictionaryValueName name ty) [] Nothing
-    (TypedValue (ObjectLiteral $ map memberToNameAndValue decls) instanceFunctionType)
+  ExternDeclaration (mkDictionaryValueName name ty)
+    (Just (JSObjectLiteral $ map memberToNameAndValue decls))
+    (Function (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps) (TypeApp (TypeConstructor name) ty))
   where
-  memberToNameAndValue :: Declaration -> (String, Value)
-  memberToNameAndValue (ValueDeclaration ident binders guard val) =
-    (show ident, Var $ Qualified Nothing $ mkDictionaryEntryName name ty ident)
-  memberToNameAndValue _ = error "Invalid declaration in type class definition"
-  instanceFunctionType :: Type
-  instanceFunctionType = foldl (\ty (pn, ty') -> Function [TypeApp (TypeConstructor pn) ty'] ty) (TypeApp (TypeConstructor name) ty) deps
+  memberToNameAndValue :: Declaration -> (String, JS)
+  memberToNameAndValue (ValueDeclaration ident _ _ _) =
+    (identToString ident, JSVar $ mkDictionaryEntryName name ty ident)
+  memberToNameAndValue _ = error "Invalid declaration in type instance definition"
 
-typeInstanceDictionaryEntryDeclaration :: Qualified ProperName -> Type -> Declaration -> Declaration
-typeInstanceDictionaryEntryDeclaration name ty (ValueDeclaration ident binders guard val) =
-  ValueDeclaration (mkDictionaryEntryName name ty ident) binders guard val
-typeInstanceDictionaryEntryDeclaration _ _ _ = error "Invalid declaration in type class definition"
+typeInstanceDictionaryEntryDeclaration :: [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Declaration
+typeInstanceDictionaryEntryDeclaration deps name ty (ValueDeclaration ident binders guard val) =
+  ValueDeclaration (mkDictionaryEntryName name ty ident) binders guard
+    (TypedValue val (ConstrainedType deps undefined))
+typeInstanceDictionaryEntryDeclaration _ _ _ _ = error "Invalid declaration in type instance definition"
+
+identToString :: Ident -> String
+identToString (Ident s) = s
+identToString (Op _) = error "Unsupported type class instance name"
 
 mkDictionaryValueName :: Qualified ProperName -> Type -> Ident
 mkDictionaryValueName _ _ = Ident "__dict"
 
 mkDictionaryEntryName :: Qualified ProperName -> Type -> Ident -> Ident
 mkDictionaryEntryName name ty ident = let Ident dictName = mkDictionaryValueName name ty
-                                      in Ident $ dictName ++ "_" ++ show ident
+                                      in Ident $ dictName ++ "_" ++ identToString ident
