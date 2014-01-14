@@ -311,6 +311,8 @@ module Trace where
   
   foreign import trace "function trace(s) { return function() { console.log(s); return {}; }; }" :: forall r. String -> Eff (trace :: Trace | r) {}
 
+  foreign import print "function print(o) { return function() { console.log(JSON.stringify(o)); return {}; }; }" :: forall a r. a -> Eff (trace :: Trace | r) {}
+
 module ST where
 
   import Eff

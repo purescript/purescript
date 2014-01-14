@@ -18,10 +18,12 @@ module Main where
 
 import Control.Monad (forever)
 import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 import Data.Generics
 import Data.List (isPrefixOf)
 
+import System.Process
 import System.Console.Haskeline
 
 import qualified Language.PureScript as P
@@ -33,7 +35,7 @@ getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
 
 options :: P.Options
-options = P.Options True False True False
+options = P.Options True False True True
 
 data InterpreterState = InterpreterState { interpEnv :: [P.DoNotationElement] } deriving (Show)
 
@@ -46,30 +48,50 @@ completion = completeWord Nothing " \t\n\r" findCompletions
   findCompletions :: (S.MonadState InterpreterState m) => String -> m [Completion]
   findCompletions str = do
     st <- S.get
-    let names = map show . concatMap toNames . interpEnv $ st
+    let names = map show . concatMap findAllNames . interpEnv $ st
     let matches = filter (isPrefixOf str) names
     return $ map simpleCompletion matches
-  toNames :: P.DoNotationElement -> [P.Ident]
-  toNames (P.DoNotationLet binder _) = binderToNames binder
-  toNames (P.DoNotationBind binder _) = binderToNames binder
-  toNames _ = []
-  binderToNames :: P.Binder -> [P.Ident]
-  binderToNames = everything (++) (mkQ [] find)
-    where
-    find (P.VarBinder ident) = [ident]
-    find _ = []
 
-createTemporaryModule :: [P.DoNotationElement] -> P.Module
-createTemporaryModule decls =
+findAllNames :: P.DoNotationElement -> [P.Ident]
+findAllNames (P.DoNotationLet binder _) = binderToNames binder
+findAllNames (P.DoNotationBind binder _) = binderToNames binder
+findAllNames _ = []
+
+binderToNames :: P.Binder -> [P.Ident]
+binderToNames = everything (++) (mkQ [] find)
+  where
+  find (P.VarBinder ident) = [ident]
+  find _ = []
+
+createTemporaryModule :: [P.DoNotationElement] -> P.DoNotationElement -> P.Module
+createTemporaryModule decls decl =
   let
-    moduleName = P.ProperName "Temp"
+    moduleName = P.ProperName "Main"
     importDecl m = P.ImportDeclaration m Nothing
     prelude = P.ModuleName (P.ProperName "Prelude")
     effModule = P.ModuleName (P.ProperName "Eff")
+    traceModule = P.ModuleName (P.ProperName "Trace")
     effMonad = P.Var (P.Qualified (Just effModule) (P.Ident "eff"))
-    itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing (P.Do effMonad decls)
+    trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
+    varsIntroduced = findAllNames decl
+    traceVars | null varsIntroduced = [P.DoNotationValue (P.App trace [P.StringLiteral "Done"])]
+              | otherwise = map (\ident -> P.DoNotationValue (P.App trace [P.Var (P.Qualified Nothing ident)])) varsIntroduced
+    itDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.Do effMonad (decls ++ decl : traceVars))
   in
     P.Module moduleName [importDecl prelude, itDecl]
+
+handleDeclaration :: (S.MonadState InterpreterState m, S.MonadIO m) => [P.Module] -> P.DoNotationElement -> InputT m ()
+handleDeclaration _ (P.DoNotationReturn _) = outputStrLn "return statements are not supported in interactive mode"
+handleDeclaration prelude (P.DoNotationValue val) = handleDeclaration prelude (P.DoNotationBind (P.VarBinder (P.Ident "it")) val)
+handleDeclaration prelude decl = do
+  st <- lift S.get
+  let m = createTemporaryModule (interpEnv st) decl
+  case P.compile options (prelude ++ [m]) of
+    Left err -> outputStrLn err
+    Right (js, _, _) -> do
+      output <- liftIO $ readProcess "nodejs" [] js
+      outputStrLn output
+      lift . S.put $ st { interpEnv = interpEnv st ++ [decl] }
 
 main :: IO ()
 main = do
@@ -85,12 +107,5 @@ main = do
         Just line' ->
           case P.runIndentParser P.parseDoNotationElement line' of
             Left err -> outputStrLn (show err)
-            Right decl -> do
-              st <- lift S.get
-              let m = createTemporaryModule (interpEnv st ++ [decl])
-              case P.compile options (prelude ++ [m]) of
-                Left err -> outputStrLn err
-                Right (js, _, _) -> do
-                  outputStrLn js
-                  lift . S.put $ st { interpEnv = interpEnv st ++ [decl] }
+            Right decl -> handleDeclaration prelude decl
 
