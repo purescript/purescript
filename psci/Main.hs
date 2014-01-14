@@ -16,20 +16,20 @@
 
 module Main where
 
-import Control.Monad (forever)
-import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
+import Control.Applicative
+import Control.Monad.Trans.Class
 
-import Data.Generics
-import Data.List (isPrefixOf)
+import Data.List (nub, isPrefixOf)
+import Data.Maybe (mapMaybe)
 
 import System.Process
 import System.Console.Haskeline
 
 import qualified Language.PureScript as P
-import qualified Control.Monad.State.Strict as S
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
+import qualified Text.Parsec as Parsec (eof)
 
 getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
@@ -37,75 +37,112 @@ getPreludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
 options :: P.Options
 options = P.Options True False True True
 
-data InterpreterState = InterpreterState { interpEnv :: [P.DoNotationElement] } deriving (Show)
-
-defaultState :: InterpreterState
-defaultState = InterpreterState []
-
-completion :: (S.MonadState InterpreterState m) => CompletionFunc m
-completion = completeWord Nothing " \t\n\r" findCompletions
+completion :: [P.Module] -> CompletionFunc IO
+completion ms = completeWord Nothing " \t\n\r" findCompletions
   where
-  findCompletions :: (S.MonadState InterpreterState m) => String -> m [Completion]
+  findCompletions :: String -> IO [Completion]
   findCompletions str = do
-    st <- S.get
-    let names = map show . concatMap findAllNames . interpEnv $ st
+    files <- listFiles str
+    let names = nub $ [ show qual
+                      | P.Module moduleName ds <- ms
+                      , ident <- mapMaybe getDeclName ds
+                      , qual <- [ P.Qualified Nothing ident
+                                , P.Qualified (Just (P.ModuleName moduleName)) ident]
+                      ]
     let matches = filter (isPrefixOf str) names
-    return $ map simpleCompletion matches
+    return $ map simpleCompletion matches ++ files
+  getDeclName :: P.Declaration -> Maybe P.Ident
+  getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
+  getDeclName _ = Nothing
 
-findAllNames :: P.DoNotationElement -> [P.Ident]
-findAllNames (P.DoNotationLet binder _) = binderToNames binder
-findAllNames (P.DoNotationBind binder _) = binderToNames binder
-findAllNames _ = []
-
-binderToNames :: P.Binder -> [P.Ident]
-binderToNames = everything (++) (mkQ [] find)
-  where
-  find (P.VarBinder ident) = [ident]
-  find _ = []
-
-createTemporaryModule :: [P.DoNotationElement] -> P.DoNotationElement -> P.Module
-createTemporaryModule decls decl =
+createTemporaryModule :: [P.ProperName] -> P.Value -> P.Module
+createTemporaryModule imports value =
   let
     moduleName = P.ProperName "Main"
     importDecl m = P.ImportDeclaration m Nothing
-    prelude = P.ModuleName (P.ProperName "Prelude")
     effModule = P.ModuleName (P.ProperName "Eff")
     traceModule = P.ModuleName (P.ProperName "Trace")
     effMonad = P.Var (P.Qualified (Just effModule) (P.Ident "eff"))
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    varsIntroduced = findAllNames decl
-    traceVars | null varsIntroduced = [P.DoNotationValue (P.App trace [P.StringLiteral "Done"])]
-              | otherwise = map (\ident -> P.DoNotationValue (P.App trace [P.Var (P.Qualified Nothing ident)])) varsIntroduced
-    itDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.Do effMonad (decls ++ decl : traceVars))
+    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
+        (P.Do effMonad [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
+                       , P.DoNotationValue (P.App trace [ P.Var (P.Qualified Nothing (P.Ident "it")) ] )
+                       ])
   in
-    P.Module moduleName [importDecl prelude, itDecl]
+    P.Module moduleName $ map (importDecl . P.ModuleName) imports ++ [mainDecl]
 
-handleDeclaration :: (S.MonadState InterpreterState m, S.MonadIO m) => [P.Module] -> P.DoNotationElement -> InputT m ()
-handleDeclaration _ (P.DoNotationReturn _) = outputStrLn "return statements are not supported in interactive mode"
-handleDeclaration prelude (P.DoNotationValue val) = handleDeclaration prelude (P.DoNotationBind (P.VarBinder (P.Ident "it")) val)
-handleDeclaration prelude decl = do
-  st <- lift S.get
-  let m = createTemporaryModule (interpEnv st) decl
-  case P.compile options (prelude ++ [m]) of
+handleDeclaration :: [P.Module] -> [P.ProperName] -> P.Value -> InputT IO ()
+handleDeclaration loadedModules imports value = do
+  let m = createTemporaryModule imports value
+  case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
       output <- liftIO $ readProcess "nodejs" [] js
       outputStrLn output
-      lift . S.put $ st { interpEnv = interpEnv st ++ [decl] }
+
+data Command
+  = Empty
+  | Expression [String]
+  | Import String
+  | LoadModule FilePath
+  | Reload deriving (Show, Eq)
+
+getCommand :: InputT IO Command
+getCommand = do
+  firstLine <- getInputLine  "> "
+  case firstLine of
+    Nothing -> return Empty
+    Just (':':'i':' ':moduleName) -> return $ Import moduleName
+    Just (':':'m':' ':modulePath) -> return $ LoadModule modulePath
+    Just ":r" -> return Reload
+    Just (':':_) -> outputStrLn "Unknown command" >> getCommand
+    Just other -> Expression <$> go [other]
+  where
+  go ls = do
+    l <- getInputLine "  "
+    case l of
+      Nothing -> return $ reverse ls
+      Just l' -> go (l' : ls)
+
+loadModule :: FilePath -> IO (Either String [P.Module])
+loadModule moduleFile = do
+  print moduleFile
+  moduleText <- U.readFile moduleFile
+  return . either (Left . show) Right $ P.runIndentParser P.parseModules moduleText
 
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
-  preludeText <- U.readFile preludeFilename
-  let (Right prelude) = P.runIndentParser P.parseModules preludeText
-  flip S.evalStateT defaultState . runInputT (setComplete completion defaultSettings) $ do
-    outputStrLn "PureScript Compiler (Interactive Mode)"
-    forever $ do
-      line <- getInputLine "> "
-      case line of
-        Nothing -> return ()
-        Just line' ->
-          case P.runIndentParser P.parseDoNotationElement line' of
-            Left err -> outputStrLn (show err)
-            Right decl -> handleDeclaration prelude decl
+  (Right prelude) <- loadModule preludeFilename
+  runInputT (setComplete (completion prelude) defaultSettings) $ do
+    outputStrLn " ____                 ____            _       _   "
+    outputStrLn "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
+    outputStrLn "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
+    outputStrLn "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
+    outputStrLn "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
+    outputStrLn "                                       |_|        "
+    outputStrLn ""
+    outputStrLn "Expressions are terminated using Ctrl+D"
+    go [P.ProperName "Prelude"] prelude
+  where
+  go imports loadedModules = do
+    cmd <- getCommand
+    case cmd of
+      Empty -> go imports loadedModules
+      Expression ls -> do
+        case P.runIndentParser (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
+          Left err -> outputStrLn (show err)
+          Right decl -> handleDeclaration loadedModules imports decl
+        go imports loadedModules
+      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules
+      LoadModule moduleFile -> do
+        ms <- lift $ loadModule moduleFile
+        case ms of
+          Left err -> outputStrLn err
+          Right ms' -> go imports (loadedModules ++ ms')
+      Reload -> do
+        preludeFilename <- lift getPreludeFilename
+        (Right prelude) <- lift $ loadModule preludeFilename
+        go [P.ProperName "Prelude"] prelude
+
 
