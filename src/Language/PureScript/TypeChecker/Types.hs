@@ -22,7 +22,8 @@ module Language.PureScript.TypeChecker.Types (
 import Data.List
 import Data.Maybe (isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
-import Data.Generics (everything, mkT, something, everywhere, mkQ)
+import Data.Generics
+       (mkM, everywhereM, everything, mkT, something, everywhere, mkQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -169,8 +170,10 @@ typesOf moduleName vals = do
       escapeCheck val ty
       return triple
   forM_ tys $ skolemEscapeCheck . snd . snd
-  return $ map (\(ident, (val, ty)) -> ( ident, ( overTypes (desaturateAllTypeSynonyms . setifyAll) val
-                                                , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))) tys
+  forM tys $ \(ident, (val, ty)) -> do
+    val' <- replaceTypeClassDictionaries val
+    return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
+                   , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
 
 isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
 isTyped (name, TypedValue value ty) = (name, (value, Just ty))
@@ -178,6 +181,15 @@ isTyped (name, value) = (name, (value, Nothing))
 
 overTypes :: (Type -> Type) -> Value -> Value
 overTypes f = everywhere (mkT f)
+
+replaceTypeClassDictionaries :: Value -> Check Value
+replaceTypeClassDictionaries = everywhereM (mkM go)
+  where
+  go (TypeClassDictionary constraint dicts) = entails dicts constraint
+  go other = return other
+
+entails :: [(Ident, Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
+entails _ _ = return $ Var $ Qualified Nothing $ Ident "placeholder" -- TODO
 
 escapeCheck :: Value -> Type -> Subst ()
 escapeCheck value ty = do
@@ -319,7 +331,9 @@ infer' (Var var) = do
   ty <- lookupVariable moduleName var
   ty' <- replaceAllTypeSynonyms ty
   case ty' of
-    ConstrainedType constraints _ -> return $ TypedValue (App (Var var) [TypeClassDictionary constraints]) ty'
+    ConstrainedType constraints _ -> do
+      dicts <- getTypeClassDictionaries
+      return $ TypedValue (App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
     _ -> return $ TypedValue (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
@@ -597,8 +611,9 @@ check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
 check' val (ConstrainedType constraints ty) = do
-  val' <- check val ty
-  return $ Abs (map (\_ -> Ident "__dict") constraints) val'
+  let dictName = Ident "__dict" -- TODO
+  val' <- withTypeClassDictionaries (map (\(className, instanceTy) -> (dictName, className, instanceTy)) constraints) $ check val ty
+  return $ Abs (map (\_ -> dictName) constraints) val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -737,7 +752,8 @@ checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
   checkFunctionApplication fn ty args ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) args ret = do
-  checkFunctionApplication' (App fn [TypeClassDictionary constraints]) fnTy args ret
+  dicts <- getTypeClassDictionaries
+  checkFunctionApplication' (App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy args ret
 checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)

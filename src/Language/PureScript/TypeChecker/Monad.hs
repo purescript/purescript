@@ -51,10 +51,11 @@ data Environment = Environment
   , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
   , dataConstructors :: M.Map (ModuleName, ProperName) (Type, NameKind)
   , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
+  , typeClassDictionaries :: [(Ident, Qualified ProperName, Type)]
   } deriving (Show)
 
 emptyEnvironment :: Environment
-emptyEnvironment = Environment M.empty M.empty M.empty M.empty
+emptyEnvironment = Environment M.empty M.empty M.empty M.empty []
 
 bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind) -> m a -> m a
 bindNames newNames action = do
@@ -71,6 +72,17 @@ bindTypes newNames action = do
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { types = types . checkEnv $ orig } }
   return a
+
+withTypeClassDictionaries :: (MonadState CheckState m) => [(Ident, Qualified ProperName, Type)] -> m a -> m a
+withTypeClassDictionaries entries action = do
+  orig <- get
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
+  a <- action
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
+  return a
+
+getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [(Ident, Qualified ProperName, Type)]
+getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a
 bindLocalVariables moduleName bindings action =
