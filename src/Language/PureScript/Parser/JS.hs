@@ -87,9 +87,9 @@ parseIndexer js = P.try $ flip JSIndexer js <$> (P.squares C.tokenParser parseJS
 
 parseConditional :: JS -> P.Parsec String u JS
 parseConditional js = P.try $ do
-  C.lexeme $ P.char '?'
+  _ <- C.lexeme $ P.char '?'
   tr <- parseJS
-  C.lexeme $ P.char ':'
+  _ <- C.lexeme $ P.char ':'
   fa <- parseJS
   return $ JSConditional js tr fa
 
@@ -139,18 +139,18 @@ parseVariableIntroduction = do
   C.reserved "var"
   name <- Ident <$> P.identifier C.tokenParser
   value <- P.optionMaybe $ do
-    C.lexeme $ P.char '='
+    _ <- C.lexeme $ P.char '='
     value <- parseJS
-    C.semi
+    _ <- C.semi
     return value
   return $ JSVariableIntroduction name value
 
 parseAssignment :: P.Parsec String u JS
 parseAssignment = do
   tgt <- parseAssignmentTarget
-  C.lexeme $ P.char '='
+  _ <- C.lexeme $ P.char '='
   value <- parseJS
-  C.semi
+  _ <- C.semi
   return $ JSAssignment tgt value
 
 parseAssignmentTarget :: P.Parsec String u JSAssignment

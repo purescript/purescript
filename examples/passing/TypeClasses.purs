@@ -6,4 +6,9 @@ class Show a where
 instance TypeClasses.Show String where
   show s = s
 
-test = show "testing"
+test1 = show "testing"
+
+f :: forall a. (Show a) => a -> String
+f x = show x
+
+test2 = f "testing"

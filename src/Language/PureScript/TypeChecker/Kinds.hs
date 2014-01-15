@@ -107,7 +107,7 @@ infer (Function args ret) = do
   ks <- mapM infer args
   k <- infer ret
   k ~~ Star
-  forM ks (~~ Star)
+  forM_ ks (~~ Star)
   return Star
 infer (TypeVar v) = do
   moduleName <- substCurrentModule <$> ask

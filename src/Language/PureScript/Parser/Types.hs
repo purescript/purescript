@@ -44,7 +44,7 @@ parseObject = braces $ Object <$> parseRow
 parseFunction :: P.Parsec String ParseState Type
 parseFunction = do
   args <- lexeme $ parens $ commaSep parsePolyType
-  lexeme $ P.string "->"
+  _ <- lexeme $ P.string "->"
   resultType <- parseType
   return $ Function args resultType
 
@@ -56,7 +56,7 @@ parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: P.Parsec String ParseState Type
 parseForAll = (mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
-                        <*> parseType)
+                        <*> parseConstrainedType)
 
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try
@@ -71,6 +71,20 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseForAll
             , parens parseRow
             , parens parseType ])
+
+parseConstrainedType :: P.Parsec String ParseState Type
+parseConstrainedType = do
+  constraints <- P.optionMaybe . P.try $ do
+    constraints <- parens . commaSep1 $ do
+      className <- parseQualified properName
+      indented
+      ty <- parseType
+      return (className, ty)
+    _ <- lexeme $ P.string "=>"
+    return constraints
+  indented
+  ty <- parseType
+  return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
 parseAnyType = (P.buildExpressionParser operators . buildPostfixParser postfixTable $ parseTypeAtom) P.<?> "type"

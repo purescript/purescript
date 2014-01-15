@@ -40,6 +40,7 @@ literals = mkPattern match
   match (Case values binders) = Just $ "case " ++ intercalate " " (map prettyPrintValue values) ++
     " of { " ++ intercalate " ; " (map prettyPrintCaseAlternative binders) ++ " }"
   match (Var ident) = Just $ show ident
+  match (TypeClassDictionary _) = error "Type class dictionary was not replaced"
   match _ = Nothing
 
 prettyPrintCaseAlternative :: ([Binder], Maybe Guard, Value) -> String

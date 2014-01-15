@@ -38,7 +38,7 @@ parseDataDeclaration = do
   reserved "data"
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
-  lexeme $ indented *> P.char '='
+  _ <- lexeme $ indented *> P.char '='
   ctors <- sepBy1 ((,) <$> properName <*> P.optionMaybe (indented *> parsePolyType)) pipe
   return $ DataDeclaration name tyArgs ctors
 
@@ -137,7 +137,7 @@ parseModule = do
   reserved "module"
   indented
   name <- properName
-  lexeme $ P.string "where"
+  _ <- lexeme $ P.string "where"
   decls <- mark (P.many (same *> parseDeclaration))
   return $ Module name decls
 

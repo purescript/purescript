@@ -303,18 +303,20 @@ infer' (Abs args ret) = do
   ts <- replicateM (length args) fresh
   moduleName <- substCurrentModule <$> ask
   bindLocalVariables moduleName (zip args ts) $ do
-    (TypedValue body bodyTy) <- infer' ret
+    body@(TypedValue _ bodyTy) <- infer' ret
     return $ TypedValue (Abs args body) $ Function ts bodyTy
 infer' (App f args) = do
-  (TypedValue f' ft) <- infer f
+  f'@(TypedValue _ ft) <- infer f
   ret <- fresh
-  args' <- checkFunctionApplication ft args ret
-  return $ TypedValue (App f' args') ret
+  app <- checkFunctionApplication f' ft args ret
+  return $ TypedValue app ret
 infer' (Var var) = do
   moduleName <- substCurrentModule <$> ask
   ty <- lookupVariable moduleName var
   ty' <- replaceAllTypeSynonyms ty
-  return $ TypedValue (Var var) ty'
+  case ty' of
+    ConstrainedType constraints _ -> return $ TypedValue (App (Var var) [TypeClassDictionary constraints]) ty'
+    _ -> return $ TypedValue (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
   (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
@@ -343,7 +345,8 @@ infer' (TypedValue val ty) = do
   kind <- liftCheck $ kindOf moduleName ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- replaceAllTypeSynonyms ty
-  check val ty'
+  val' <- check val ty'
+  return $ TypedValue val' ty
 infer' _ = error "Invalid argument to infer"
 
 inferProperty :: Type -> String -> Subst (Maybe Type)
@@ -589,6 +592,9 @@ check' :: Value -> Type -> Subst Value
 check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
+check' val (ConstrainedType constraints ty) = do
+  val' <- check val ty
+  return $ Abs [Ident "__dict"] val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -612,8 +618,8 @@ check' (Abs args ret) (Function argTys retTy) = do
   return $ Abs args ret'
 check' (App f args) ret = do
   f'@(TypedValue _ ft) <- infer f
-  args' <- checkFunctionApplication ft args ret
-  return $ App f' args'
+  app <- checkFunctionApplication f' ft args ret
+  return $ app
 check' (Var var) ty = do
   moduleName <- substCurrentModule <$> ask
   ty1 <- lookupVariable moduleName var
@@ -701,33 +707,34 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         return $ (p, v') : ps''
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
-checkFunctionApplication :: Type -> [Value] -> Type -> Subst [Value]
-checkFunctionApplication fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fnTy args ret
+checkFunctionApplication :: Value -> Type -> [Value] -> Type -> Subst Value
+checkFunctionApplication fn fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy args ret
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
     ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
-    ++ ", expecting value of type "
-    ++ prettyPrintType ret ++ ":\n" ++ msg
+    ++ ":\n" ++ msg
 
-checkFunctionApplication' :: Type -> [Value] -> Type -> Subst [Value]
-checkFunctionApplication' (Function argTys retTy) args ret = do
+checkFunctionApplication' :: Value -> Type -> [Value] -> Type -> Subst Value
+checkFunctionApplication' fn (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   args' <- zipWithM check args argTys
   retTy `subsumes` ret
-  return args'
-checkFunctionApplication' (ForAll ident ty) args ret = do
+  return $ App fn args'
+checkFunctionApplication' fn (ForAll ident ty) args ret = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication replaced args ret
-checkFunctionApplication' u@(TUnknown _) args ret = do
+  checkFunctionApplication fn replaced args ret
+checkFunctionApplication' fn u@(TUnknown _) args ret = do
   args' <- mapM (\arg -> infer arg >>= \(TypedValue v t) -> TypedValue v <$> replaceAllVarsWithUnknowns t) args
   let tys = map (\(TypedValue _ t) -> t) args'
   u ~~ Function tys ret
-  return args'
-checkFunctionApplication' (SaturatedTypeSynonym name tyArgs) args ret = do
+  return $ App fn args'
+checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
-  checkFunctionApplication' ty args ret
-checkFunctionApplication' fnTy args ret = throwError $ "Applying a function of type "
+  checkFunctionApplication fn ty args ret
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) args ret = do
+  checkFunctionApplication' (App fn [TypeClassDictionary constraints]) fnTy args ret
+checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
   ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."

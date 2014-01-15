@@ -93,10 +93,10 @@ parseBlock = Block <$> parseManyStatements
 
 parseManyStatements :: P.Parsec String ParseState [Statement]
 parseManyStatements = (do
-  C.lexeme $ P.char '{'
+  _ <- C.lexeme $ P.char '{'
   C.indented
   sts <- C.mark (P.many (C.same *> C.mark parseStatement))
-  C.lexeme (P.char '}')
+  _ <- C.lexeme (P.char '}')
   return sts) P.<?> "block"
 
 parseValueAtom :: P.Parsec String ParseState Value
@@ -117,7 +117,7 @@ parseValueAtom = P.choice
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
 parsePropertyUpdate = do
   name <- C.lexeme C.identifier
-  C.lexeme $ C.indented *> P.char '='
+  _ <- C.lexeme $ C.indented *> P.char '='
   value <- C.indented *> parseValue
   return (name, value)
 
@@ -173,19 +173,19 @@ parseVariableIntroduction :: P.Parsec String ParseState Statement
 parseVariableIntroduction = do
   C.reserved "var"
   name <- C.indented *> C.parseIdent
-  C.lexeme $ C.indented *> P.char '='
+  _ <- C.lexeme $ C.indented *> P.char '='
   value <- parseValue
-  C.indented *> C.semi
+  _ <- C.indented *> C.semi
   return $ VariableIntroduction name value
 
 parseAssignment :: P.Parsec String ParseState Statement
 parseAssignment = do
   tgt <- P.try $ do
     tgt <- C.parseIdent
-    C.lexeme $ C.indented *> P.char '='
+    _ <- C.lexeme $ C.indented *> P.char '='
     return tgt
   value <- parseValue
-  C.indented *> C.semi
+  _ <- C.indented *> C.semi
   return $ Assignment tgt value
 
 parseWhile :: P.Parsec String ParseState Statement
@@ -257,7 +257,7 @@ parseNullBinder = C.lexeme (P.char '_') *> P.notFollowedBy C.identLetter *> retu
 parseIdentifierAndBinder :: P.Parsec String ParseState (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme C.identifier
-  C.lexeme $ C.indented *> P.char '='
+  _ <- C.lexeme $ C.indented *> P.char '='
   binder <- C.indented *> parseBinder
   return (name, binder)
 
