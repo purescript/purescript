@@ -159,10 +159,10 @@ liftCheck = Subst . lift . lift
 getSubstState :: Subst SubstState
 getSubstState = Subst . lift $ get
 
-runSubst :: (Unifiable a) => SubstContext -> Subst a -> Check (a, Substitution)
+runSubst :: SubstContext -> Subst a -> Check (a, Substitution)
 runSubst context subst = do
   (a, s) <- flip runStateT (SubstState mempty) . flip runReaderT context . unSubst $ subst
-  return (apply (substSubst s) a, substSubst s)
+  return (a, substSubst s)
 
 substituteWith :: (Typeable t) => (Unknown t -> t) -> Substitution
 substituteWith f = Substitution $ \u -> fromMaybe (unknown u) $ do

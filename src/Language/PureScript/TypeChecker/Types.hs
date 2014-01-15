@@ -140,9 +140,10 @@ unifyRows r1 r2 =
 typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
 typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName env
 
-typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
+typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
 typesOf moduleName vals = do
-  (tys, _) <- runSubst (SubstContext moduleName) $ do
+  tys <- fmap (\(tys, s) -> map (\(ident, (val, ty)) -> (ident, (overTypes (apply s) val, apply s ty))) tys)
+         . runSubst (SubstContext moduleName) $ do
     let es = map isTyped vals
         typed = filter (isJust . snd . snd) es
         untyped = filter (isNothing . snd . snd) es
@@ -150,30 +151,33 @@ typesOf moduleName vals = do
     untypedNames <- replicateM (length untyped) fresh
     let untypedDict = zip (map fst untyped) untypedNames
         dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
-    tys <- forM es $ \e -> do
-      (val, ty) <- case e of
-        (_, (val, Just ty)) -> do
+    forM es $ \e -> do
+      triple@(_, (val, ty)) <- case e of
+        (ident, (val, Just ty)) -> do
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
           ty' <- replaceAllTypeSynonyms ty
           val' <- bindNames dict $ check val ty'
-          return (val', ty')
+          return (ident, (val', ty'))
         (ident, (val, Nothing)) -> do
           TypedValue val' ty <- bindNames dict $ infer val
           ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-          return (val', ty)
+          return (ident, (val', ty))
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty ~~ TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       escapeCheck val ty
-      return ty
-    return tys
-  forM_ tys $ skolemEscapeCheck
-  return $ map (varIfUnknown . desaturateAllTypeSynonyms . setifyAll) tys
+      return triple
+  forM_ tys $ skolemEscapeCheck . snd . snd
+  return $ map (\(ident, (val, ty)) -> ( ident, ( overTypes (desaturateAllTypeSynonyms . setifyAll) val
+                                                , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))) tys
 
 isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
 isTyped (name, TypedValue value ty) = (name, (value, Just ty))
 isTyped (name, value) = (name, (value, Nothing))
+
+overTypes :: (Type -> Type) -> Value -> Value
+overTypes f = everywhere (mkT f)
 
 escapeCheck :: Value -> Type -> Subst ()
 escapeCheck value ty = do
@@ -594,7 +598,7 @@ check' val (ForAll idents ty) = do
   check val sk
 check' val (ConstrainedType constraints ty) = do
   val' <- check val ty
-  return $ Abs [Ident "__dict"] val'
+  return $ Abs (map (\_ -> Ident "__dict") constraints) val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype

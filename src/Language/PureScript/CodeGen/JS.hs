@@ -97,6 +97,7 @@ valueToJs opts m e (Unary op val) = JSUnary op (valueToJs opts m e val)
 valueToJs opts m e (Binary op v1 v2) = JSBinary op (valueToJs opts m e v1) (valueToJs opts m e v2)
 valueToJs _ m e (Var ident) = varToJs m e ident
 valueToJs opts m e (TypedValue val _) = valueToJs opts m e val
+valueToJs _ _ _ (TypeClassDictionary _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 
 runtimeTypeChecks :: [Ident] -> Type -> [JS]

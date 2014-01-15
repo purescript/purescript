@@ -27,15 +27,16 @@ import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 
 import Data.List (intercalate)
-import Control.Monad (when, forM_)
+import Control.Monad (when, forM)
+import Control.Applicative ((<$>))
 import qualified Data.Map as M
 
 compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   desugared <- desugar ms
-  (_, env) <- runCheck $ forM_ desugared $ \(Module moduleName decls) -> typeCheckAll (ModuleName moduleName) decls
-  let js = concatMap (flip (moduleToJs opts) env) $ desugared
-  let exts = intercalate "\n" . map (flip moduleToPs env) $ desugared
+  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
+  let js = concatMap (flip (moduleToJs opts) env) $ elaborated
+  let exts = intercalate "\n" . map (flip moduleToPs env) $ elaborated
   js' <- case () of
               _ | optionsRunMain opts -> do
                     when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
