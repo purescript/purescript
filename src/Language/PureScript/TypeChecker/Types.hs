@@ -22,8 +22,7 @@ module Language.PureScript.TypeChecker.Types (
 import Data.List
 import Data.Maybe (isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
-import Data.Generics
-       (mkT, something, everywhere, mkQ)
+import Data.Generics (everything, mkT, something, everywhere, mkQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -129,7 +128,7 @@ unifyRows r1 r2 =
   unifyRows' sd r [] (TUnknown u) = replace u (rowFromList (sd, r))
   unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
     occursCheck un ty
-    forM row $ \(_, t) -> occursCheck un t
+    forM_ row $ \(_, t) -> occursCheck un t
     u' <- fresh
     u ~~ RCons name ty u'
     unifyRows' row r others u'
@@ -143,7 +142,7 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [Type]
 typesOf moduleName vals = do
-  (tys, sub) <- runSubst (SubstContext moduleName) $ do
+  (tys, _) <- runSubst (SubstContext moduleName) $ do
     let es = map isTyped vals
         typed = filter (isJust . snd . snd) es
         untyped = filter (isNothing . snd . snd) es
@@ -152,46 +151,50 @@ typesOf moduleName vals = do
     let untypedDict = zip (map fst untyped) untypedNames
         dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
     tys <- forM es $ \e -> do
-      ty <- case e of
+      (val, ty) <- case e of
         (_, (val, Just ty)) -> do
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
           ty' <- replaceAllTypeSynonyms ty
-          bindNames dict $ check val ty'
-          return ty'
+          val' <- bindNames dict $ check val ty'
+          return (val', ty')
         (ident, (val, Nothing)) -> do
-          TypedValue _ ty <- bindNames dict $ infer val
+          TypedValue val' ty <- bindNames dict $ infer val
           ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-          return ty
+          return (val', ty)
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty ~~ TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
+      escapeCheck val ty
       return ty
     return tys
-  --forM tys $ flip (escapeCheck checks) sub
-  forM tys $ skolemEscapeCheck
+  forM_ tys $ skolemEscapeCheck
   return $ map (varIfUnknown . desaturateAllTypeSynonyms . setifyAll) tys
 
 isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
 isTyped (name, TypedValue value ty) = (name, (value, Just ty))
 isTyped (name, value) = (name, (value, Nothing))
 
-{-escapeCheck :: [AnyUnifiable] -> Type -> Substitution -> Check ()
-escapeCheck checks ty sub =
-  let
-    visibleUnknowns = nub $ unknowns ty
-  in
-    forM_ checks $ \c -> case c of
-      AnyUnifiable t -> do
-        let unsolvedUnknowns = nub . unknowns $ apply sub t
-        guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
--}
+escapeCheck :: Value -> Type -> Subst ()
+escapeCheck value ty = do
+  subst <- substSubst <$> getSubstState
+  let visibleUnknowns = nub $ unknowns $ apply subst ty
+  let allUnknowns = findAllTypes value
+  forM_ allUnknowns $ \t -> do
+    let unsolvedUnknowns = nub . unknowns $ apply subst t
+    guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
+
+findAllTypes :: Value -> [Type]
+findAllTypes = everything (++) (mkQ [] go)
+  where
+  go (TypedValue _ ty) = [ty]
+  go _ = []
 
 skolemEscapeCheck :: Type -> Check ()
 skolemEscapeCheck ty =
   case something (mkQ Nothing findSkolems) ty of
     Nothing -> return ()
-    Just _ -> throwError "Skolem variables cannot escape. Consider adding a type signature."
+    Just _ -> throwError $ "Skolem variables cannot escape. Consider adding a type signature." ++ show ty
   where
     findSkolems (Skolem _) = return ()
     findSkolems _ = mzero
@@ -283,9 +286,9 @@ infer' (ObjectUpdate o ps) = do
   return $ TypedValue (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
 infer' (Indexer index val) = do
   el <- fresh
-  check index Number
-  check val (Array el)
-  return $ TypedValue (Indexer (TypedValue index Number) (TypedValue val (Array el))) el
+  index' <- check index Number
+  val' <- check val (Array el)
+  return $ TypedValue (Indexer (TypedValue index' Number) (TypedValue val' (Array el))) el
 infer' (Accessor prop val) = do
   typed@(TypedValue _ objTy) <- infer val
   propTy <- inferProperty objTy prop
@@ -330,11 +333,11 @@ infer' (Case vals binders) = do
   binders' <- checkBinders (map (\(TypedValue _ t) -> t) ts) ret binders
   return $ TypedValue (Case ts binders') ret
 infer' (IfThenElse cond th el) = do
-  check cond Boolean
-  TypedValue v2 t2 <- infer th
-  TypedValue v3 t3 <- infer el
+  cond' <- check cond Boolean
+  v2@(TypedValue _ t2) <- infer th
+  v3@(TypedValue _ t3) <- infer el
   t2 ~~ t3
-  return $ TypedValue (IfThenElse cond v2 v3) t2
+  return $ TypedValue (IfThenElse cond' v2 v3) t2
 infer' (TypedValue val ty) = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty
@@ -368,7 +371,8 @@ checkUnary op val res =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
     (valTy, resTy) -> do
       res ~~ resTy
-      check val valTy
+      val' <- check val valTy
+      return $ Unary op val'
 
 unaryOps :: [(UnaryOperator, (Type, Type))]
 unaryOps = [ (Negate, (Number, Number))
@@ -391,17 +395,17 @@ inferBinary _ _ _ = error "Invalid arguments to inferBinary"
 checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst Value
 checkBinary op left right res | isEqualityTest op = do
   res ~~ Boolean
-  TypedValue v1 t1 <- infer left
-  TypedValue v2 t2 <- infer right
+  left'@(TypedValue _ t1) <- infer left
+  right'@(TypedValue _ t2) <- infer right
   t1 ~~ t2
-  return $ TypedValue (Binary op v1 v2) $ res
+  return $ Binary op left' right'
 checkBinary op left right res =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
       res ~~ resTy
-      v1 <- check left valTy
-      v2 <- check right valTy
-      return $ TypedValue (Binary op v1 v2) $ res
+      left' <- check left valTy
+      right' <- check right valTy
+      return $ Binary op left' right'
 
 isEqualityTest :: BinaryOperator -> Bool
 isEqualityTest EqualTo = True
@@ -591,48 +595,53 @@ check' val u@(TUnknown _) = do
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ~~ u
   return val'
-check' v@(NumericLiteral _) Number = return $ TypedValue v Number
-check' v@(StringLiteral _) String = return $ TypedValue v String
-check' v@(BooleanLiteral _) Boolean = return $ TypedValue v Boolean
+check' v@(NumericLiteral _) Number = return v
+check' v@(StringLiteral _) String = return v
+check' v@(BooleanLiteral _) Boolean = return v
 check' (Unary op val) ty = checkUnary op val ty
 check' (Binary op left right) ty = checkBinary op left right ty
-check' (ArrayLiteral vals) (Array ty) = TypedValue <$> (ArrayLiteral <$> forM vals (\val -> check val ty)) <*> pure (Array ty)
-check' (Indexer index vals) ty = check index Number >> check vals (Array ty)
+check' (ArrayLiteral vals) (Array ty) = ArrayLiteral <$> forM vals (\val -> check val ty)
+check' (Indexer index vals) ty = do
+  index' <- check index Number
+  vals' <- check vals (Array ty)
+  return $ Indexer index' vals'
 check' (Abs args ret) (Function argTys retTy) = do
   moduleName <- substCurrentModule <$> ask
   guardWith "Incorrect number of function arguments" (length args == length argTys)
-  bindLocalVariables moduleName (zip args argTys) $ check ret retTy
+  ret' <- bindLocalVariables moduleName (zip args argTys) $ check ret retTy
+  return $ Abs args ret'
 check' (App f args) ret = do
   f'@(TypedValue _ ft) <- infer f
   args' <- checkFunctionApplication ft args ret
-  return $ TypedValue (App f' args') ret
+  return $ App f' args'
 check' (Var var) ty = do
   moduleName <- substCurrentModule <$> ask
   ty1 <- lookupVariable moduleName var
   repl <- replaceAllTypeSynonyms ty1
   repl `subsumes` ty
-  return $ TypedValue (Var var) ty
-check' v@(TypedValue val ty1) ty2 = do
+  return $ Var var
+check' (TypedValue val ty1) ty2 = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
-  check val ty1
-  return v
+  val' <- check val ty1
+  return $ TypedValue val' ty1
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
   let ts = map (\(TypedValue _ t) -> t) vals'
   binders' <- checkBinders ts ret binders
-  return $ TypedValue (Case vals' binders') ret
+  return $ Case vals' binders'
 check' (IfThenElse cond th el) ty = do
-  check cond Boolean
-  check th ty
-  check el ty
-check' (ObjectLiteral ps) t@(Object row) = do
+  cond' <- check cond Boolean
+  th' <- check th ty
+  el' <- check el ty
+  return $ IfThenElse cond' th' el'
+check' (ObjectLiteral ps) (Object row) = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
-  return $ TypedValue (ObjectLiteral ps') t
-check' (ObjectUpdate obj ps) t@(Object row) = do
+  return $ ObjectLiteral ps'
+check' (ObjectUpdate obj ps) (Object row) = do
   ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh
   let (propsToCheck, rest) = rowToList row
@@ -640,14 +649,15 @@ check' (ObjectUpdate obj ps) t@(Object row) = do
       remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
   obj' <- check obj (Object (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties ps row True
-  return $ TypedValue (ObjectUpdate obj' ps') t
+  return $ ObjectUpdate obj' ps'
 check' (Accessor prop val) ty = do
   rest <- fresh
-  check val (Object (RCons prop ty rest))
+  val' <- check val (Object (RCons prop ty rest))
+  return $ Accessor prop val'
 check' (Block ss) ret = do
   (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return $ TypedValue (Block ss') ret
+  return $ Block ss'
 check' (Constructor c) ty = do
   env <- getEnv
   moduleName <- substCurrentModule <$> ask
@@ -656,7 +666,7 @@ check' (Constructor c) ty = do
     Just (ty1, _) -> do
       repl <- replaceAllTypeSynonyms ty1
       repl `subsumes` ty
-      return $ TypedValue (Constructor c) ty
+      return $ Constructor c
 check' val (SaturatedTypeSynonym name args) = do
   ty <- expandTypeSynonym name args
   check val ty
@@ -700,26 +710,6 @@ checkFunctionApplication fnTy args ret = rethrow errorMessage $ checkFunctionApp
     ++ ", expecting value of type "
     ++ prettyPrintType ret ++ ":\n" ++ msg
 
-inferFunctionApplication :: Type -> [Type] -> Subst Type
-inferFunctionApplication (Function argTys retTy) args = do
-  guardWith "Incorrect number of function arguments" (length args == length argTys)
-  zipWithM subsumes args argTys
-  return retTy
-inferFunctionApplication (ForAll ident ty) args = do
-  replaced <- replaceVarWithUnknown ident ty
-  inferFunctionApplication replaced args
-inferFunctionApplication u@(TUnknown _) args = do
-  ret <- fresh
-  args' <- mapM replaceAllVarsWithUnknowns args
-  u ~~ Function args' ret
-  return ret
-inferFunctionApplication (SaturatedTypeSynonym name tyArgs) args  = do
-  ty <- expandTypeSynonym name tyArgs
-  inferFunctionApplication ty args
-inferFunctionApplication fnTy args = throwError $ "Cannot apply function of type "
-  ++ prettyPrintType fnTy
-  ++ " to argument(s) of type(s) " ++ intercalate ", " (map prettyPrintType args)
-
 checkFunctionApplication' :: Type -> [Value] -> Type -> Subst [Value]
 checkFunctionApplication' (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
@@ -747,7 +737,7 @@ subsumes (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   replaced `subsumes` ty2
 subsumes (Function args1 ret1) (Function args2 ret2) = do
-  zipWithM subsumes args2 args1
+  zipWithM_ subsumes args2 args1
   ret1 `subsumes` ret2
 subsumes ty1 ty2 = ty1 ~~ ty2
 

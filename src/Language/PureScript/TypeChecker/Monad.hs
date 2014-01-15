@@ -156,6 +156,9 @@ deriving instance MonadError String Subst
 liftCheck :: Check a -> Subst a
 liftCheck = Subst . lift . lift
 
+getSubstState :: Subst SubstState
+getSubstState = Subst . lift $ get
+
 runSubst :: (Unifiable a) => SubstContext -> Subst a -> Check (a, Substitution)
 runSubst context subst = do
   (a, s) <- flip runStateT (SubstState mempty) . flip runReaderT context . unSubst $ subst

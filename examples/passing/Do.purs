@@ -19,7 +19,7 @@ test3 = maybe do
 
 test4 = maybe do
   Just 1
-  Nothing
+  Nothing :: Maybe Number
   return 2
 
 test5 mx my = maybe do

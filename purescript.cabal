@@ -72,7 +72,7 @@ executable psc
     buildable: True
     hs-source-dirs: src
     other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2
 
 test-suite tests
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,

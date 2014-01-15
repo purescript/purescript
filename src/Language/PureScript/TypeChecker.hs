@@ -97,7 +97,7 @@ typeCheckAll moduleName (DataBindingGroupDeclaration tys : rest) = do
     forM_ tys $ \(name, _, _) ->
       typeIsNotDefined moduleName name
     ks <- kindsOfAll moduleName (map (\(name, args, dctors) -> (name, args, mapMaybe snd dctors)) tys)
-    forM (zip tys ks) $ \((name, args, dctors), ctorKind) ->
+    forM_ (zip tys ks) $ \((name, args, dctors), ctorKind) ->
       addDataType moduleName name args dctors ctorKind
   typeCheckAll moduleName rest
 typeCheckAll moduleName (TypeSynonymDeclaration name args ty : rest) = do
@@ -119,7 +119,7 @@ typeCheckAll moduleName (BindingGroupDeclaration vals : rest) = do
     forM_ (map fst vals) $ \name ->
       valueIsNotDefined moduleName name
     tys <- typesOf moduleName vals
-    forM (zip (map fst vals) tys) $ \(name, ty) ->
+    forM_ (zip (map fst vals) tys) $ \(name, ty) ->
       addValue moduleName name ty
   typeCheckAll moduleName rest
 typeCheckAll moduleName (ExternDataDeclaration name kind : rest) = do
