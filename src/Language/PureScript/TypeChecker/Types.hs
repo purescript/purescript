@@ -20,7 +20,7 @@ module Language.PureScript.TypeChecker.Types (
 ) where
 
 import Data.List
-import Data.Maybe (isNothing, isJust, fromMaybe)
+import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
        (mkM, everywhereM, everything, mkT, something, everywhere, mkQ)
@@ -188,8 +188,29 @@ replaceTypeClassDictionaries = everywhereM (mkM go)
   go (TypeClassDictionary constraint dicts) = entails dicts constraint
   go other = return other
 
-entails :: [(Ident, Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
-entails _ _ = return $ Var $ Qualified Nothing $ Ident "placeholder" -- TODO
+entails :: [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
+entails context goal =
+  case go goal of
+    [] -> throwError $ "No type class instance for " ++ show goal ++ " in context " ++ show context
+    (dict : _) -> return dict
+  where
+  go (className, ty) = [ App (Var (Qualified Nothing fnName)) args
+                       | (fnName, subgoals, className', ty') <- context
+                       , className == className'
+                       , subst <- maybeToList $ typeHeadsAreEqual ty ty'
+                       , args <- forM (replaceAllTypeVars subst subgoals) go ]
+  typeHeadsAreEqual :: Type -> Type -> Maybe [(String, Type)]
+  typeHeadsAreEqual String String = Just []
+  typeHeadsAreEqual Number Number = Just []
+  typeHeadsAreEqual Boolean Boolean = Just []
+  typeHeadsAreEqual (Skolem s1) (Skolem s2) | s1 == s2 = Just []
+  typeHeadsAreEqual (Array ty1) (Array ty2) = typeHeadsAreEqual ty1 ty2
+  typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+  typeHeadsAreEqual (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = do
+    m <- typeHeadsAreEqual h1 h2
+    return $ (v, arg) : m
+  typeHeadsAreEqual t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual t2 t1
+  typeHeadsAreEqual _ _ = Nothing
 
 escapeCheck :: Value -> Type -> Subst ()
 escapeCheck value ty = do
@@ -612,7 +633,7 @@ check' val (ForAll idents ty) = do
   check val sk
 check' val (ConstrainedType constraints ty) = do
   let dictName = Ident "__dict" -- TODO
-  val' <- withTypeClassDictionaries (map (\(className, instanceTy) -> (dictName, className, instanceTy)) constraints) $ check val ty
+  val' <- withTypeClassDictionaries (map (\(className, instanceTy) -> (dictName, [], className, instanceTy)) constraints) $ check val ty
   return $ Abs (map (\_ -> dictName) constraints) val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val

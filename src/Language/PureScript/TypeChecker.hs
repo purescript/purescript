@@ -200,8 +200,9 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
 typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
   ds <- typeCheckAll moduleName rest
   return $ d : ds
-typeCheckAll moduleName (d@(TypeInstanceDeclaration _ _ _ _) : rest) = do
-  ds <- typeCheckAll moduleName rest
+typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
+  ds <- withTypeClassDictionaries [(Ident "__TODO", deps, className, ty)] $
+          typeCheckAll moduleName rest
   return $ d : ds
 
 qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d

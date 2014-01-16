@@ -73,7 +73,7 @@ data Value
   | Case [Value] [([Binder], Maybe Guard, Value)]
   | TypedValue Value Type
   | Do Value [DoNotationElement]
-  | TypeClassDictionary (Qualified ProperName, Type) [(Ident, Qualified ProperName, Type)] deriving (Show, Data, Typeable)
+  | TypeClassDictionary (Qualified ProperName, Type) [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] deriving (Show, Data, Typeable)
 
 data DoNotationElement
   = DoNotationValue Value

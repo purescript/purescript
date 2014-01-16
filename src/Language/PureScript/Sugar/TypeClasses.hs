@@ -37,13 +37,13 @@ desugarModule :: Module -> State MemberMap Module
 desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl (ModuleName name)) decls
 
 desugarDecl :: ModuleName -> Declaration -> State MemberMap [Declaration]
-desugarDecl mn (TypeClassDeclaration name arg members) = do
+desugarDecl mn d@(TypeClassDeclaration name arg members) = do
   let tys = map memberToNameAndType members
   modify (M.insert (mn, name) (arg, tys))
-  return $ typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
-desugarDecl mn (TypeInstanceDeclaration deps name ty members) = do
+  return $ d : typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
+desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) members
-  return $ typeInstanceDictionaryDeclaration deps name ty members : entries
+  return $ d : typeInstanceDictionaryDeclaration deps name ty members : entries
 desugarDecl _ other = return [other]
 
 memberToNameAndType :: Declaration -> (String, Type)
