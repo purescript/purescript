@@ -26,7 +26,7 @@ import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
 
 desugar :: [Module] -> Either String [Module]
-desugar = return . desugarTypeClasses
+desugar = desugarTypeClasses
           >=> rebracket
           >=> desugarDo
           >=> desugarCasesModule

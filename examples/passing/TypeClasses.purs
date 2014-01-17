@@ -12,3 +12,10 @@ f :: forall a. (TypeClasses.Show a) => a -> String
 f x = show x
 
 test2 = f "testing"
+
+data Data a = Data a
+
+instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
+  show (Data a) = "Data (" ++ show a ++ ")"
+
+test3 = show (Data "testing")

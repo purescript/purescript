@@ -171,7 +171,7 @@ typesOf moduleName vals = do
       return triple
   forM_ tys $ skolemEscapeCheck . snd . snd
   forM tys $ \(ident, (val, ty)) -> do
-    val' <- replaceTypeClassDictionaries val
+    val' <- replaceTypeClassDictionaries moduleName val
     return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
 
@@ -182,35 +182,36 @@ isTyped (name, value) = (name, (value, Nothing))
 overTypes :: (Type -> Type) -> Value -> Value
 overTypes f = everywhere (mkT f)
 
-replaceTypeClassDictionaries :: Value -> Check Value
-replaceTypeClassDictionaries = everywhereM (mkM go)
+replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
+replaceTypeClassDictionaries mn = everywhereM (mkM go)
   where
-  go (TypeClassDictionary constraint dicts) = entails dicts constraint
+  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
 
-entails :: [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
-entails context goal =
-  case go goal of
+entails :: ModuleName -> [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
+entails moduleName context goal = do
+  env <- getEnv
+  case go env goal of
     [] -> throwError $ "No type class instance for " ++ show goal ++ " in context " ++ show context
     (dict : _) -> return dict
   where
-  go (className, ty) = [ App (Var (Qualified Nothing fnName)) args
-                       | (fnName, subgoals, className', ty') <- context
-                       , className == className'
-                       , subst <- maybeToList $ typeHeadsAreEqual ty ty'
-                       , args <- forM (replaceAllTypeVars subst subgoals) go ]
-  typeHeadsAreEqual :: Type -> Type -> Maybe [(String, Type)]
-  typeHeadsAreEqual String String = Just []
-  typeHeadsAreEqual Number Number = Just []
-  typeHeadsAreEqual Boolean Boolean = Just []
-  typeHeadsAreEqual (Skolem s1) (Skolem s2) | s1 == s2 = Just []
-  typeHeadsAreEqual (Array ty1) (Array ty2) = typeHeadsAreEqual ty1 ty2
-  typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-  typeHeadsAreEqual (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = do
-    m <- typeHeadsAreEqual h1 h2
-    return $ (v, arg) : m
-  typeHeadsAreEqual t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual t2 t1
-  typeHeadsAreEqual _ _ = Nothing
+  go env (className, ty) =
+    [ App (Var (Qualified Nothing fnName)) args
+    | (fnName, subgoals, className', ty') <- context
+    , className == className'
+    , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty ty'
+    , args <- forM (replaceAllTypeVars subst subgoals) (go env) ]
+
+typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
+typeHeadsAreEqual _ _ String String = Just []
+typeHeadsAreEqual _ _ Number Number = Just []
+typeHeadsAreEqual _ _ Boolean Boolean = Just []
+typeHeadsAreEqual _ _ (Skolem s1) (Skolem s2) | s1 == s2 = Just []
+typeHeadsAreEqual m e (Array ty1) (Array ty2) = typeHeadsAreEqual m e ty1 ty2
+typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
+typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
+typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
+typeHeadsAreEqual _ _ _ _ = Nothing
 
 escapeCheck :: Value -> Type -> Subst ()
 escapeCheck value ty = do
