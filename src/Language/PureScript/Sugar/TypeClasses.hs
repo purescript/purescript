@@ -93,7 +93,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
 typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [] _ val) = do
   m <- get
-  let valTy = fromMaybe (error "Type class instance dictionary member is missing in typeInstanceDictionaryEntryDeclaration") $
+  valTy <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right $
                 do (arg, members) <- M.lookup (qualify mn name) m
                    ty' <- lookup (identToJs ident) members
                    return $ replaceTypeVars arg ty ty'
