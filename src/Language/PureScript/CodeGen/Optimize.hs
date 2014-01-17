@@ -23,6 +23,10 @@ import Data.Generics
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
+import Language.PureScript.Pretty.Common (identToJs)
+import Language.PureScript.Sugar.TypeClasses
+       (mkDictionaryValueName)
+import Language.PureScript.Types (Type(..))
 
 optimize :: Options -> JS -> JS
 optimize opts =
@@ -213,10 +217,25 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   convert other = other
-  isBind (JSAccessor "bind" (JSAccessor "eff" (JSVar (Ident "Eff")))) = True
+  isBind (JSApp bindPoly [JSApp effDict []]) | isBindPoly bindPoly && isEffDict effDict = True
   isBind _ = False
-  isReturn (JSAccessor "ret" (JSAccessor "eff" (JSVar (Ident "Eff")))) = True
+  isReturn (JSApp retPoly [JSApp effDict []]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
+  isBindPoly (JSVar (Op ">>=")) = True
+  isBindPoly (JSAccessor prop (JSVar (Ident "Prelude"))) | prop == identToJs (Op ">>=") = True
+  isBindPoly _ = False
+  isRetPoly (JSVar (Ident "ret")) = True
+  isRetPoly (JSAccessor "ret" (JSVar (Ident "Prelude"))) = True
+  isRetPoly _ = False
+  prelude = ModuleName (ProperName "Prelude")
+  effModule = ModuleName (ProperName "Eff")
+  Right (Ident effDictName) = mkDictionaryValueName
+    effModule
+    (Qualified (Just prelude) (ProperName "Monad"))
+    (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
+  isEffDict (JSVar (Ident ident)) | ident == effDictName = True
+  isEffDict (JSAccessor prop (JSVar (Ident "Eff"))) | prop == effDictName = True
+  isEffDict _ = False
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
