@@ -48,7 +48,8 @@ desugarDecl mn d@(TypeClassDeclaration name arg members) = do
   return $ d : typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
 desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) members
-  return $ d : typeInstanceDictionaryDeclaration mn deps name ty members : entries
+  dictDecl <- typeInstanceDictionaryDeclaration mn deps name ty members
+  return $ d : dictDecl : entries
 desugarDecl _ other = return [other]
 
 memberToNameAndType :: Declaration -> (String, Type)
@@ -66,19 +67,20 @@ typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
         (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
-typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Declaration
-typeInstanceDictionaryDeclaration mn deps name ty decls =
-  ExternDeclaration (mkDictionaryValueName mn name ty)
-    (Just (JSFunction (Just (mkDictionaryValueName mn name ty))
+typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar Declaration
+typeInstanceDictionaryDeclaration mn deps name ty decls = do
+  entryName <- mkDictionaryValueName mn name ty
+  memberNames <- mapM memberToNameAndValue decls
+  return $ ExternDeclaration entryName
+    (Just (JSFunction (Just entryName)
         (map (\n -> Ident ('_' : show n)) [1..length deps])
-        (JSBlock [JSReturn (JSObjectLiteral $ map memberToNameAndValue decls)])))
+        (JSBlock [JSReturn (JSObjectLiteral memberNames)])))
     (quantify (Function (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps) (TypeApp (TypeConstructor name) ty)))
   where
-  memberToNameAndValue :: Declaration -> (String, JS)
-  memberToNameAndValue (ValueDeclaration ident _ _ _) =
-    (identToString ident, let dict = JSVar $ mkDictionaryEntryName mn name ty ident
-                          in if null deps then dict
-                             else JSApp dict (map (\n -> JSVar (Ident ('_' : show n))) [1..length deps]))
+  memberToNameAndValue :: Declaration -> Desugar (String, JS)
+  memberToNameAndValue (ValueDeclaration ident _ _ _) = do
+    memberName <- mkDictionaryEntryName mn name ty ident
+    return (identToString ident, JSApp (JSVar memberName) (map (\n -> JSVar (Ident ('_' : show n))) [1..length deps]))
   memberToNameAndValue _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
@@ -88,7 +90,7 @@ typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident b
                 do (arg, members) <- M.lookup (qualify mn name) m
                    ty' <- lookup (identToString ident) members
                    return $ replaceTypeVars arg ty ty'
-      entryName = mkDictionaryEntryName mn name ty ident
+  entryName <- mkDictionaryEntryName mn name ty ident
   [ValueDeclaration _ _ _ val'] <- lift $ desugarCases [ValueDeclaration entryName binders grd val]
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue val' (quantify (if null deps then valTy else ConstrainedType deps valTy)))
@@ -109,18 +111,21 @@ quantify ty' = foldr ForAll ty' tyVars
   collect (TypeVar v) = [v]
   collect _ = []
 
-mkDictionaryValueName :: ModuleName -> Qualified ProperName -> Type -> Ident
-mkDictionaryValueName mn cl ty = Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ typeToString ty
+mkDictionaryValueName :: ModuleName -> Qualified ProperName -> Type -> Desugar Ident
+mkDictionaryValueName mn cl ty = do
+  tyStr <- lift $ typeToString ty
+  return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ tyStr
   where
-  typeToString :: Type -> String
-  typeToString String = "string"
-  typeToString Number = "number"
-  typeToString Boolean = "boolean"
-  typeToString (Array (TypeVar _)) = "array"
-  typeToString (TypeConstructor ty') = qualifiedToString mn ty'
+  typeToString :: Type -> Either String String
+  typeToString String = return "string"
+  typeToString Number = return "number"
+  typeToString Boolean = return "boolean"
+  typeToString (Array (TypeVar _)) = return "array"
+  typeToString (TypeConstructor ty') = return $ qualifiedToString mn ty'
   typeToString (TypeApp ty' (TypeVar _)) = typeToString ty'
-  typeToString _ = error "TODO: Type class instance must be of the form T a1 ... an"
+  typeToString _ = Left "Type class instance must be of the form T a1 ... an"
 
-mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Ident
-mkDictionaryEntryName mn name ty ident = let Ident dictName = mkDictionaryValueName mn name ty
-                                         in Ident $ dictName ++ "_" ++ identToString ident
+mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
+mkDictionaryEntryName mn name ty ident = do
+  Ident dictName <- mkDictionaryValueName mn name ty
+  return $ Ident $ dictName ++ "_" ++ identToString ident
