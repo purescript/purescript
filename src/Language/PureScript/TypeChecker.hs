@@ -36,6 +36,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
+import Language.PureScript.Sugar.TypeClasses
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, Maybe Type)] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do
@@ -201,8 +202,9 @@ typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
   ds <- typeCheckAll moduleName rest
   return $ d : ds
 typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
-  ds <- withTypeClassDictionaries [(Ident "__TODO", deps, className, ty)] $
-          typeCheckAll moduleName rest
+  dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
+  ds <- withTypeClassDictionaries [(dictName, deps, className, ty)] $
+      typeCheckAll moduleName rest
   return $ d : ds
 
 qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
