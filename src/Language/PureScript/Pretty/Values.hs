@@ -86,7 +86,7 @@ lam = mkPattern match
 typed :: Pattern () Value (Type, Value)
 typed = mkPattern match
   where
-  match (TypedValue val ty) = Just (ty, val)
+  match (TypedValue _ val ty) = Just (ty, val)
   match _ = Nothing
 
 unary :: UnaryOperator -> String -> Operator () Value String

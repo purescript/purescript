@@ -71,7 +71,7 @@ data Value
   | Block [Statement]
   | Constructor (Qualified ProperName)
   | Case [Value] [([Binder], Maybe Guard, Value)]
-  | TypedValue Value Type
+  | TypedValue Bool Value Type
   | Do Value [DoNotationElement]
   | TypeClassDictionary (Qualified ProperName, Type) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 

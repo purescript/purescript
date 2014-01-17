@@ -151,17 +151,17 @@ typesOf moduleName vals = do
         typedDict = map (\(ident, (_, Just ty)) -> (ident, ty)) typed
     untypedNames <- replicateM (length untyped) fresh
     let untypedDict = zip (map fst untyped) untypedNames
-        dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+        dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ (map (id *** fst) typedDict) ++ untypedDict)
     forM es $ \e -> do
       triple@(_, (val, ty)) <- case e of
-        (ident, (val, Just ty)) -> do
+        (ident, (val, Just (ty, checkType))) -> do
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
           ty' <- replaceAllTypeSynonyms ty
-          val' <- bindNames dict $ check val ty'
+          val' <- bindNames dict $ if checkType then check val ty' else return val
           return (ident, (val', ty'))
         (ident, (val, Nothing)) -> do
-          TypedValue val' ty <- bindNames dict $ infer val
+          TypedValue _ val' ty <- bindNames dict $ infer val
           ty ~~ fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (val', ty))
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
@@ -175,8 +175,8 @@ typesOf moduleName vals = do
     return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
 
-isTyped :: (Ident, Value) -> (Ident, (Value, Maybe Type))
-isTyped (name, TypedValue value ty) = (name, (value, Just ty))
+isTyped :: (Ident, Value) -> (Ident, (Value, Maybe (Type, Bool)))
+isTyped (name, TypedValue checkType value ty) = (name, (value, Just (ty, checkType)))
 isTyped (name, value) = (name, (value, Nothing))
 
 overTypes :: (Type -> Type) -> Value -> Value
@@ -231,7 +231,7 @@ escapeCheck value ty = do
 findAllTypes :: Value -> [Type]
 findAllTypes = everything (++) (mkQ [] go)
   where
-  go (TypedValue _ ty) = [ty]
+  go (TypedValue _ _ ty) = [ty]
   go _ = []
 
 skolemEscapeCheck :: Type -> Check ()
@@ -299,14 +299,14 @@ infer :: Value -> Subst Value
 infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' val
 
 infer' :: Value -> Subst Value
-infer' v@(NumericLiteral _) = return $ TypedValue v Number
-infer' v@(StringLiteral _) = return $ TypedValue v String
-infer' v@(BooleanLiteral _) = return $ TypedValue v Boolean
+infer' v@(NumericLiteral _) = return $ TypedValue True v Number
+infer' v@(StringLiteral _) = return $ TypedValue True v String
+infer' v@(BooleanLiteral _) = return $ TypedValue True v Boolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \(TypedValue _ t) -> els ~~ Array t
-  return $ TypedValue (ArrayLiteral ts) els
+  forM_ ts $ \(TypedValue _ _ t) -> els ~~ Array t
+  return $ TypedValue True (ArrayLiteral ts) els
 infer' (Unary op val) = do
   v <- infer val
   inferUnary op v
@@ -317,43 +317,43 @@ infer' (Binary op left right) = do
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   ts <- mapM (infer . snd) ps
-  let fields = zipWith (\name (TypedValue _ t) -> (name, t)) (map fst ps) ts
+  let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
       ty = Object $ rowFromList (fields, REmpty)
-  return $ TypedValue (ObjectLiteral (zip (map fst ps) ts)) ty
+  return $ TypedValue True (ObjectLiteral (zip (map fst ps) ts)) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- fresh
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
-  let newTys = map (\(name, TypedValue _ ty) -> (name, ty)) newVals
+  let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
   o' <- check o $ Object $ rowFromList (oldTys, row)
-  return $ TypedValue (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
+  return $ TypedValue True (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
 infer' (Indexer index val) = do
   el <- fresh
   index' <- check index Number
   val' <- check val (Array el)
-  return $ TypedValue (Indexer (TypedValue index' Number) (TypedValue val' (Array el))) el
+  return $ TypedValue True (Indexer (TypedValue True index' Number) (TypedValue True val' (Array el))) el
 infer' (Accessor prop val) = do
-  typed@(TypedValue _ objTy) <- infer val
+  typed@(TypedValue _ _ objTy) <- infer val
   propTy <- inferProperty objTy prop
   case propTy of
     Nothing -> do
       field <- fresh
       rest <- fresh
       objTy `subsumes` Object (RCons prop field rest)
-      return $ TypedValue (Accessor prop typed) field
-    Just ty -> return $ TypedValue (Accessor prop typed) ty
+      return $ TypedValue True (Accessor prop typed) field
+    Just ty -> return $ TypedValue True (Accessor prop typed) ty
 infer' (Abs args ret) = do
   ts <- replicateM (length args) fresh
   moduleName <- substCurrentModule <$> ask
   bindLocalVariables moduleName (zip args ts) $ do
-    body@(TypedValue _ bodyTy) <- infer' ret
-    return $ TypedValue (Abs args body) $ Function ts bodyTy
+    body@(TypedValue _ _ bodyTy) <- infer' ret
+    return $ TypedValue True (Abs args body) $ Function ts bodyTy
 infer' (App f args) = do
-  f'@(TypedValue _ ft) <- infer f
+  f'@(TypedValue _ _ ft) <- infer f
   ret <- fresh
   app <- checkFunctionApplication f' ft args ret
-  return $ TypedValue app ret
+  return $ TypedValue True app ret
 infer' (Var var) = do
   moduleName <- substCurrentModule <$> ask
   ty <- lookupVariable moduleName var
@@ -362,38 +362,38 @@ infer' (Var var) = do
     ConstrainedType constraints _ -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue (App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
-    _ -> return $ TypedValue (Var var) ty'
+      return $ TypedValue True (App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
+    _ -> return $ TypedValue True (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
   (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return $ TypedValue (Block ss') ret
+  return $ TypedValue True (Block ss') ret
 infer' v@(Constructor c) = do
   env <- getEnv
   moduleName <- substCurrentModule `fmap` ask
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just (ty, _) -> do ty' <- replaceAllTypeSynonyms ty
-                       return $ TypedValue v ty'
+                       return $ TypedValue True v ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
   ret <- fresh
-  binders' <- checkBinders (map (\(TypedValue _ t) -> t) ts) ret binders
-  return $ TypedValue (Case ts binders') ret
+  binders' <- checkBinders (map (\(TypedValue _ _ t) -> t) ts) ret binders
+  return $ TypedValue True (Case ts binders') ret
 infer' (IfThenElse cond th el) = do
   cond' <- check cond Boolean
-  v2@(TypedValue _ t2) <- infer th
-  v3@(TypedValue _ t3) <- infer el
+  v2@(TypedValue _ _ t2) <- infer th
+  v3@(TypedValue _ _ t3) <- infer el
   t2 ~~ t3
-  return $ TypedValue (IfThenElse cond' v2 v3) t2
-infer' (TypedValue val ty) = do
+  return $ TypedValue True (IfThenElse cond' v2 v3) t2
+infer' (TypedValue checkType val ty) = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty' <- replaceAllTypeSynonyms ty
-  val' <- check val ty'
-  return $ TypedValue val' ty
+  val' <- if checkType then check val ty' else return val
+  return $ TypedValue True val' ty
 infer' _ = error "Invalid argument to infer"
 
 inferProperty :: Type -> String -> Subst (Maybe Type)
@@ -409,11 +409,11 @@ inferProperty (ForAll ident ty) prop = do
 inferProperty _ _ = return Nothing
 
 inferUnary :: UnaryOperator -> Value -> Subst Value
-inferUnary op (TypedValue val valTy) =
+inferUnary op (TypedValue _ val valTy) =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
     (valTy', resTy) -> do
       valTy' ~~ valTy
-      return $ TypedValue (Unary op val) resTy
+      return $ TypedValue True (Unary op val) resTy
 inferUnary _ _ = error "Invalid arguments to inferUnary"
 
 checkUnary :: UnaryOperator -> Value -> Type -> Subst Value
@@ -431,22 +431,22 @@ unaryOps = [ (Negate, (Number, Number))
            ]
 
 inferBinary :: BinaryOperator -> Value -> Value -> Subst Value
-inferBinary op left@(TypedValue _ leftTy) right@(TypedValue _ rightTy) | isEqualityTest op = do
+inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) | isEqualityTest op = do
   leftTy ~~ rightTy
-  return $ TypedValue (Binary op left right) Boolean
-inferBinary op left@(TypedValue _ leftTy) right@(TypedValue _ rightTy) =
+  return $ TypedValue True (Binary op left right) Boolean
+inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
       leftTy ~~ valTy
       rightTy ~~ valTy
-      return $ TypedValue (Binary op left right) resTy
+      return $ TypedValue True (Binary op left right) resTy
 inferBinary _ _ _ = error "Invalid arguments to inferBinary"
 
 checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst Value
 checkBinary op left right res | isEqualityTest op = do
   res ~~ Boolean
-  left'@(TypedValue _ t1) <- infer left
-  right'@(TypedValue _ t2) <- infer right
+  left'@(TypedValue _ _ t1) <- infer left
+  right'@(TypedValue _ _ t2) <- infer right
   t1 ~~ t2
   return $ Binary op left' right'
 checkBinary op left right res =
@@ -564,10 +564,10 @@ assignVariable name = do
 checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type, Statement)
 checkStatement mass _ (VariableIntroduction name val) = do
   assignVariable name
-  val'@(TypedValue _ t) <- infer val
+  val'@(TypedValue _ _ t) <- infer val
   return (False, M.insert name t mass, VariableIntroduction name val')
 checkStatement mass _ (Assignment ident val) = do
-  val'@(TypedValue _ t) <- infer val
+  val'@(TypedValue _ _ t) <- infer val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
     Just ty -> do t ~~ ty
@@ -648,7 +648,7 @@ check' val (ConstrainedType constraints ty) = do
   val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) -> TypeClassDictionaryInScope name className instanceTy Nothing) dictNames (qualifyAllUnqualifiedNames moduleName env constraints)) $ check val ty
   return $ Abs dictNames val'
 check' val u@(TUnknown _) = do
-  val'@(TypedValue _ ty) <- infer val
+  val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ~~ u
@@ -669,7 +669,7 @@ check' (Abs args ret) (Function argTys retTy) = do
   ret' <- bindLocalVariables moduleName (zip args argTys) $ check ret retTy
   return $ Abs args ret'
 check' (App f args) ret = do
-  f'@(TypedValue _ ft) <- infer f
+  f'@(TypedValue _ _ ft) <- infer f
   app <- checkFunctionApplication f' ft args ret
   return $ app
 check' (Var var) ty = do
@@ -678,16 +678,16 @@ check' (Var var) ty = do
   repl <- replaceAllTypeSynonyms ty1
   repl `subsumes` ty
   return $ Var var
-check' (TypedValue val ty1) ty2 = do
+check' (TypedValue checkType val ty1) ty2 = do
   moduleName <- substCurrentModule <$> ask
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1 `subsumes` ty2
-  val' <- check val ty1
-  return $ TypedValue val' ty1
+  val' <- if checkType then check val ty1 else return val
+  return $ TypedValue True val' ty1
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
-  let ts = map (\(TypedValue _ t) -> t) vals'
+  let ts = map (\(TypedValue _ _ t) -> t) vals'
   binders' <- checkBinders ts ret binders
   return $ Case vals' binders'
 check' (IfThenElse cond th el) ty = do
@@ -740,7 +740,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
   go ((p,v):ps') [] u@(TUnknown _) = do
-    v'@(TypedValue _ ty) <- infer v
+    v'@(TypedValue _ _ ty) <- infer v
     rest <- fresh
     u ~~ RCons p ty rest
     ps'' <- go ps' [] rest
@@ -748,7 +748,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
-        v'@(TypedValue _ ty) <- infer v
+        v'@(TypedValue _ _ ty) <- infer v
         rest <- fresh
         r ~~ RCons p ty rest
         ps'' <- go ps' ts rest
@@ -777,8 +777,8 @@ checkFunctionApplication' fn (ForAll ident ty) args ret = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication fn replaced args ret
 checkFunctionApplication' fn u@(TUnknown _) args ret = do
-  args' <- mapM (\arg -> infer arg >>= \(TypedValue v t) -> TypedValue v <$> replaceAllVarsWithUnknowns t) args
-  let tys = map (\(TypedValue _ t) -> t) args'
+  args' <- mapM (\arg -> infer arg >>= \(TypedValue _ v t) -> TypedValue True v <$> replaceAllVarsWithUnknowns t) args
+  let tys = map (\(TypedValue _ _ t) -> t) args'
   u ~~ Function tys ret
   return $ App fn args'
 checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do

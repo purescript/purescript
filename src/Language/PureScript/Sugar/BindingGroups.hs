@@ -14,7 +14,9 @@
 
 module Language.PureScript.Sugar.BindingGroups (
     createBindingGroups,
-    createBindingGroupsModule
+    createBindingGroupsModule,
+    collapseBindingGroups,
+    collapseBindingGroupsModule
 ) where
 
 import Data.Data
@@ -30,6 +32,9 @@ import Language.PureScript.Types
 createBindingGroupsModule :: [Module] -> [Module]
 createBindingGroupsModule = map $ \(Module name ds) -> Module name (createBindingGroups ds)
 
+collapseBindingGroupsModule :: [Module] -> [Module]
+collapseBindingGroupsModule = map $ \(Module name ds) -> Module name (collapseBindingGroups ds)
+
 createBindingGroups :: [Declaration] -> [Declaration]
 createBindingGroups ds =
   let
@@ -44,6 +49,13 @@ createBindingGroups ds =
     bindingGroupDecls = map toBindingGroup $ stronglyConnComp valueVerts
   in
     dataBindingGroupDecls ++ nonValues ++ bindingGroupDecls
+
+collapseBindingGroups :: [Declaration] -> [Declaration]
+collapseBindingGroups ds = concatMap go ds
+  where
+  go (DataBindingGroupDeclaration ds) = map (\(name, args, dctors) -> DataDeclaration name args dctors) ds
+  go (BindingGroupDeclaration ds) = map (\(ident, val) -> ValueDeclaration ident [] Nothing val) ds
+  go other = [other]
 
 usedIdents :: (Data d) => d -> [Ident]
 usedIdents = nub . everything (++) (mkQ [] namesV `extQ` namesS)

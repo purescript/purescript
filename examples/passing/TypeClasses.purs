@@ -1,8 +1,5 @@
 module TypeClasses where
 
-import Eff
-import Trace
-
 class Show a where
   show :: a -> String
 
@@ -43,7 +40,3 @@ test4 = ret 1
 
 test5 = Just 1 >>= \n -> ret (n + 1)
 
-module Main where
-
-main = eff do
-  print TypeClasses.test5

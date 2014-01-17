@@ -102,11 +102,11 @@ valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val
 valueToJs opts m e (Indexer index val) = JSIndexer (valueToJs opts m e index) (valueToJs opts m e val)
 valueToJs opts m e (App val args) = JSApp (valueToJs opts m e val) (map (valueToJs opts m e) args)
 valueToJs opts m e (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs opts m e val)])
-valueToJs opts m e (TypedValue (Abs args val) ty) | optionsPerformRuntimeTypeChecks opts = JSFunction Nothing args (JSBlock $ runtimeTypeChecks args ty ++ [JSReturn (valueToJs opts m e val)])
+valueToJs opts m e (TypedValue _ (Abs args val) ty) | optionsPerformRuntimeTypeChecks opts = JSFunction Nothing args (JSBlock $ runtimeTypeChecks args ty ++ [JSReturn (valueToJs opts m e val)])
 valueToJs opts m e (Unary op val) = JSUnary op (valueToJs opts m e val)
 valueToJs opts m e (Binary op v1 v2) = JSBinary op (valueToJs opts m e v1) (valueToJs opts m e v2)
 valueToJs _ m e (Var ident) = varToJs m e ident
-valueToJs opts m e (TypedValue val _) = valueToJs opts m e val
+valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 

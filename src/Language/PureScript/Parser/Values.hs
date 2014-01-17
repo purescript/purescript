@@ -159,7 +159,7 @@ parseValue =
                   , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
   postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])) <*> pure v
                   , \v -> P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue)) <*> pure v
-                  , \v -> flip TypedValue <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
+                  , \v -> flip (TypedValue True) <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
                   , \v -> P.try $ Do v <$> (C.indented *> C.reserved "do" *> parseManyDoNotationElements)
                   ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
