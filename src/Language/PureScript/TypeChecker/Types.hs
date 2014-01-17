@@ -198,7 +198,7 @@ entails moduleName context goal@(className, ty) = do
   go env (className', ty') =
     [ App (Var (Qualified Nothing fnName)) args
     | (fnName, subgoals, className'', ty'') <- context
-    , className' == className''
+    , qualify moduleName className' == qualify moduleName className''
     , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' ty''
     , args <- forM (replaceAllTypeVars subst subgoals) (go env) ]
 
