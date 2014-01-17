@@ -871,4 +871,6 @@ showArray :: forall a. (Show a) => [a] -> String
 showArray [] = ""
 showArray [x] = show x
 showArray (x:xs) = show x ++ ", " ++ showArray xs
+
+example = show [true, false]
 ```
