@@ -72,7 +72,7 @@ data Value
   | Constructor (Qualified ProperName)
   | Case [Value] [([Binder], Maybe Guard, Value)]
   | TypedValue Bool Value Type
-  | Do Value [DoNotationElement]
+  | Do [DoNotationElement]
   | TypeClassDictionary (Qualified ProperName, Type) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 
 data TypeClassDictionaryInScope
@@ -85,8 +85,7 @@ data TypeClassDictionaryInScope
 data DoNotationElement
   = DoNotationValue Value
   | DoNotationBind Binder Value
-  | DoNotationLet Binder Value
-  | DoNotationReturn Value deriving (Show, Data, Typeable)
+  | DoNotationLet Binder Value deriving (Show, Data, Typeable)
 
 data Statement
   = VariableIntroduction Ident Value

@@ -26,27 +26,31 @@ import Language.PureScript.Scope
 desugarDo :: (Data d) => d -> Either String d
 desugarDo = everywhereM (mkM replace)
   where
+  prelude :: ModuleName
+  prelude = ModuleName (ProperName "Prelude")
+  ret :: Value
+  ret = Var (Qualified (Just prelude) (Ident "ret"))
+  bind :: Value
+  bind = Var (Qualified (Just prelude) (Op ">>="))
   replace :: Value -> Either String Value
-  replace (Do monad els) = go monad els
+  replace (Do els) = go els
   replace other = return other
-  go :: Value -> [DoNotationElement] -> Either String Value
-  go _ [] = error "The impossible happened in desugarDo"
-  go monad [DoNotationReturn val] = return $ App (Accessor "ret" monad) [val]
-  go _ (DoNotationReturn _ : _) = Left "Return statement must be the last statement in a do block"
-  go _ [DoNotationValue val] = return val
-  go monad (DoNotationValue val : rest) = do
-    rest' <- go monad rest
-    return $ App (App (Accessor "bind" monad) [val]) [Abs [Ident "_"] rest']
-  go _ [DoNotationBind _ _] = Left "Bind statement cannot be the last statement in a do block"
-  go monad (DoNotationBind NullBinder val : rest) = go monad (DoNotationValue val : rest)
-  go monad (DoNotationBind (VarBinder ident) val : rest) = do
-    rest' <- go monad rest
-    return $ App (App (Accessor "bind" monad) [val]) [Abs [ident] rest']
-  go monad (DoNotationBind binder val : rest) = do
-    rest' <- go monad rest
+  go :: [DoNotationElement] -> Either String Value
+  go [] = error "The impossible happened in desugarDo"
+  go [DoNotationValue val] = return val
+  go (DoNotationValue val : rest) = do
+    rest' <- go rest
+    return $ App (App bind [val]) [Abs [Ident "_"] rest']
+  go [DoNotationBind _ _] = Left "Bind statement cannot be the last statement in a do block"
+  go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
+  go (DoNotationBind (VarBinder ident) val : rest) = do
+    rest' <- go rest
+    return $ App (App bind [val]) [Abs [ident] rest']
+  go (DoNotationBind binder val : rest) = do
+    rest' <- go rest
     let ident = head $ unusedNames rest'
-    return $ App (App (Accessor "bind" monad) [val]) [Abs [ident] (Case [Var (Qualified Nothing ident)] [([binder], Nothing, rest')])]
-  go _ [DoNotationLet _ _] = Left "Let statement cannot be the last statement in a do block"
-  go monad (DoNotationLet binder val : rest) = do
-    rest' <- go monad rest
+    return $ App (App bind [val]) [Abs [ident] (Case [Var (Qualified Nothing ident)] [([binder], Nothing, rest')])]
+  go [DoNotationLet _ _] = Left "Let statement cannot be the last statement in a do block"
+  go (DoNotationLet binder val : rest) = do
+    rest' <- go rest
     return $ Case [val] [([binder], Nothing, rest')]

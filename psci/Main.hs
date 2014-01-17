@@ -60,14 +60,12 @@ createTemporaryModule imports value =
   let
     moduleName = P.ProperName "Main"
     importDecl m = P.ImportDeclaration m Nothing
-    effModule = P.ModuleName (P.ProperName "Eff")
     traceModule = P.ModuleName (P.ProperName "Trace")
-    effMonad = P.Var (P.Qualified (Just effModule) (P.Ident "eff"))
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do effMonad [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
-                       , P.DoNotationValue (P.App trace [ P.Var (P.Qualified Nothing (P.Ident "it")) ] )
-                       ])
+        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
+              , P.DoNotationValue (P.App trace [ P.Var (P.Qualified Nothing (P.Ident "it")) ] )
+              ])
   in
     P.Module moduleName $ map (importDecl . P.ModuleName) imports ++ [mainDecl]
 

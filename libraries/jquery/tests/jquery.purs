@@ -5,7 +5,7 @@ import Eff
 import Trace
 import JQuery
 
-main = eff do
+main = do
   -- Get the document body
   b <- body
 
@@ -22,7 +22,7 @@ main = eff do
   greeting `append` b
 
   -- Listen for change events on the text box
-  flip (on "change") input $ eff do
+  flip (on "change") input $ do
     name <- getValue input
     trace $ "Name changed to " ++ name
     setText ("Hello, " ++ name) greeting

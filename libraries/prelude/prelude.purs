@@ -24,6 +24,20 @@ module Prelude where
 
   infixr 1000 $
 
+  class Show a where
+    show :: a -> String
+
+  instance Show String where
+    show s = s
+
+  instance Show Boolean where
+    show true = "true"
+    show false = "false"
+
+  class Monad m where
+    ret :: forall a. a -> m a
+    (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
 module Maybe where
 
   data Maybe a = Nothing | Just a
@@ -277,7 +291,9 @@ module Eff where
 
   foreign import runPure "function runPure(f) { return f(); }" :: forall a. Pure a -> a
 
-  eff = { ret: retEff, bind: bindEff }
+  instance Prelude.Monad (Eff e) where
+    ret = retEff
+    (>>=) = bindEff
 
 module Errors where
 
@@ -311,7 +327,7 @@ module Trace where
   
   foreign import trace "function trace(s) { return function() { console.log(s); return {}; }; }" :: forall r. String -> Eff (trace :: Trace | r) {}
 
-  foreign import print "function print(o) { return function() { console.log(JSON.stringify(o)); return {}; }; }" :: forall a r. a -> Eff (trace :: Trace | r) {}
+  foreign import print "function print(dict) { return function (o) { return function() { console.log(Prelude.show(dict)(o)); return {}; }; }; }" :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
 
 module ST where
 

@@ -1,54 +1,59 @@
+module Prelude where
+
+class Monad m where
+  ret :: forall a. a -> m a
+  (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
 module Do where
+
+import Prelude
 
 data Maybe a = Nothing | Just a
 
-bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
-bindMaybe Nothing _ = Nothing
-bindMaybe (Just a) f = f a
+instance Prelude.Monad Maybe where
+  ret = Just
+  (>>=) Nothing _ = Nothing
+  (>>=) (Just a) f = f a
 
-maybe = { ret: Just, bind: bindMaybe }
+test1 = do Just "abc"
 
-test1 = maybe do Just "abc"
-
-test2 = maybe do return "xyz"
-
-test3 = maybe do
+test3 = do
   (x : _) <- Just [1, 2, 3]
   (y : _) <- Just [4, 5, 6]
-  return x + y
+  Just (x + y)
 
-test4 = maybe do
+test4 = do
   Just 1
   Nothing :: Maybe Number
-  return 2
+  Just 2
 
-test5 mx my = maybe do
+test5 mx my = do
   x <- mx
   y <- my
-  return x + y
+  Just (x + y)
 
-test6 mx my mz = maybe do
+test6 mx my mz = do
   x <- mx
   y <- my
   let sum = x + y
   z <- mz
-  return z + sum
+  Just (z + sum)
 
-test7 mx = maybe do let Just x = mx
-                    return x
+test7 mx = do let Just x = mx
+              Just x
 
-test8 = maybe do return (maybe do return 1)
+test8 = do Just (do Just 1)
 
 (<$>) :: forall a b. (a -> b) -> Maybe a -> Maybe b
-(<$>) f m = maybe do
+(<$>) f m = do
   a <- m
-  return f a
+  ret (f a)
 
 (<*>) :: forall a b. (Maybe (a -> b)) -> Maybe a -> Maybe b
-(<*>) f m = maybe do
+(<*>) f m = do
   g <- f
   a <- m
-  return g a
+  ret (g a)
 
 foo x y z = x + y + z
 
