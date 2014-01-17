@@ -35,7 +35,8 @@ See the `LICENSE` file
 
 Contributions are always encouraged! Please see `CONTRIBUTING.md` for guidelines.
 
-Join the discussion on FreeNode at <a href="irc://irc.freenode.net/#purescript">#purescript</a>.
+- Join the discussion on FreeNode at <a href="irc://irc.freenode.net/#purescript">#purescript</a>.
+- Follow @purescript on Twitter for development updates
 
 ## Installation
 
