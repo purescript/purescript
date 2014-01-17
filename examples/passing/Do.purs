@@ -57,4 +57,9 @@ test8 = do Just (do Just 1)
 
 foo x y z = x + y + z
 
+forever :: forall m a b. (Monad m) => m a -> m b
+forever a = do
+  a
+  forever a
+
 test9 = foo <$> Just 1 <*> Just 2 <*> Just 3
