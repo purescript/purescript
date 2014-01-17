@@ -16,7 +16,8 @@ module Language.PureScript.Parser.Values (
     parseValue,
     parseGuard,
     parseBinder,
-    parseBinderNoParens
+    parseBinderNoParens,
+    parseDoNotationElement
 ) where
 
 import Language.PureScript.Values

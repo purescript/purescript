@@ -28,3 +28,18 @@ module JQuery where
   
   -- Get the document body
   foreign import body "function body() { return jQuery(document.body); }" :: forall eff. Eff (dom :: DOM | eff) JQuery
+
+  -- Get the text content of an element
+  foreign import getText "function getText(ob) { return function() { return ob.text(); }; }" :: forall eff. JQuery -> Eff (dom :: DOM | eff) String
+
+  -- Set the text content of an element
+  foreign import setText "function setText(text) { return function(ob) { return function() { ob.text(text); }; }; }" :: forall eff. String -> JQuery -> Eff (dom :: DOM | eff) JQuery
+
+  -- Get the value of a text field
+  foreign import getValue "function getValue(ob) { return function() { return ob.val(); }; }" :: forall eff. JQuery -> Eff (dom :: DOM | eff) String
+
+  -- Set the value of a text field
+  foreign import setValue "function setValue(val) { return function(ob) { return function() { return ob.val(val); }; }; }" :: forall eff. String -> JQuery -> Eff (dom :: DOM | eff) JQuery
+
+  -- Register an event handler
+  foreign import on "function on(evt) { return function(act) { return function(ob) { return function() { return ob.on(evt, function() { act(); } ); }; }; }; }" :: forall eff a. String -> Eff eff a -> JQuery -> Eff (dom :: DOM | eff) JQuery
