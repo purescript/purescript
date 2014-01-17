@@ -120,6 +120,7 @@ canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types 
 
 data CheckState = CheckState { checkEnv :: Environment
                              , checkNextVar :: Int
+                             , checkNextDictName :: Int
                              }
 
 newtype Check a = Check { unCheck :: StateT CheckState (Either String) a }
@@ -136,7 +137,7 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 runCheck :: Check a -> Either String (a, Environment)
 runCheck c = do
-  (a, s) <- flip runStateT (CheckState emptyEnvironment 0) $ unCheck c
+  (a, s) <- flip runStateT (CheckState emptyEnvironment 0 0) $ unCheck c
   return (a, checkEnv s)
 
 guardWith :: (MonadError e m) => e -> Bool -> m ()
@@ -145,6 +146,12 @@ guardWith e False = throwError e
 
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
+
+freshDictionaryName :: Check Int
+freshDictionaryName = do
+  n <- checkNextDictName <$> get
+  modify $ \s -> s { checkNextDictName = succ (checkNextDictName s) }
+  return n
 
 newtype Substitution = Substitution { runSubstitution :: forall t. (Unifiable t) => Unknown t -> t }
 

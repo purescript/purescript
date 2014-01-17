@@ -633,9 +633,11 @@ check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
 check' val (ConstrainedType constraints ty) = do
-  let dictName = Ident "__dict" -- TODO
-  val' <- withTypeClassDictionaries (map (\(className, instanceTy) -> (dictName, [], className, instanceTy)) constraints) $ check val ty
-  return $ Abs (map (\_ -> dictName) constraints) val'
+  dictNames <- flip mapM constraints $ \(Qualified _ (ProperName className), _) -> do
+    n <- liftCheck freshDictionaryName
+    return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
+  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) -> (name, [], className, instanceTy)) dictNames constraints) $ check val ty
+  return $ Abs dictNames val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype

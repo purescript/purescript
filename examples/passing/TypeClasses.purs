@@ -27,3 +27,12 @@ class Monad m where
 instance TypeClasses.Monad Data where
   ret = Data
   bind (Data a) f = f a
+
+data Maybe a = Nothing | Just a
+
+instance TypeClasses.Monad Maybe where
+  ret = Just
+  bind Nothing _ = Nothing
+  bind (Just a) f = f a
+
+test4 = Just 1 `bind` (\n -> Just (n + 1))
