@@ -21,10 +21,13 @@ import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Unknown
+import Language.PureScript.Declarations
 
 import Data.Data
 import Data.Maybe
 import Data.Monoid
+import Data.Generics (mkT, everywhere)
+
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
@@ -34,7 +37,7 @@ import qualified Data.Map as M
 
 data NameKind
   = Value
-  | Extern
+  | Extern ForeignImportType
   | Alias ModuleName Ident
   | LocalVariable
   | DataConstructor deriving Show
@@ -233,3 +236,10 @@ fresh' = do
 
 fresh :: (Unifiable t) => Subst t
 fresh = unknown . Unknown <$> fresh'
+
+qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
+qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
+  where
+  go :: Qualified ProperName -> Qualified ProperName
+  go qual = let (mn', pn') = canonicalizeType mn env qual
+            in Qualified (Just mn') pn'

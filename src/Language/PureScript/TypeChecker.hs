@@ -24,8 +24,6 @@ import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
-import Data.Data
-import Data.Generics (mkT, everywhere)
 import Data.Maybe
 import qualified Data.Map as M
 import Control.Monad.State
@@ -137,14 +135,14 @@ typeCheckAll moduleName (d@(ExternDataDeclaration name kind) : rest) = do
   putEnv $ env { types = M.insert (moduleName, name) (kind, TypeSynonym) (types env) }
   ds <- typeCheckAll moduleName rest
   return $ d : ds
-typeCheckAll moduleName (d@(ExternDeclaration name _ ty) : rest) = do
+typeCheckAll moduleName (d@(ExternDeclaration importTy name _ ty) : rest) = do
   rethrow (("Error in foreign import declaration " ++ show name ++ ":\n") ++) $ do
     env <- getEnv
     kind <- kindOf moduleName ty
     guardWith "Expected kind *" $ kind == Star
     case M.lookup (moduleName, name) (names env) of
       Just _ -> throwError $ show name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Extern) (names env) })
+      Nothing -> putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Extern importTy) (names env) })
   ds <- typeCheckAll moduleName rest
   return $ d : ds
 typeCheckAll moduleName (d@(FixityDeclaration _ name) : rest) = do
@@ -206,11 +204,3 @@ typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest)
   ds <- withTypeClassDictionaries [(dictName, deps, className, ty)] $
       typeCheckAll moduleName rest
   return $ d : ds
-
-qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
-qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
-  where
-  go :: Qualified ProperName -> Qualified ProperName
-  go qual = let (mn', pn') = canonicalizeType mn env qual
-            in Qualified (Just mn') pn'
-

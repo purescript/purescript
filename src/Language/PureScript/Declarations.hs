@@ -32,6 +32,11 @@ data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable
 
 data Module = Module ProperName [Declaration] deriving (Show, D.Data, D.Typeable)
 
+data ForeignImportType
+  = ForeignImport
+  | TypeClassDictionaryImport
+  | TypeClassAccessorImport deriving (Show, Eq, D.Data, D.Typeable)
+
 data Declaration
   = DataDeclaration ProperName [String] [(ProperName, Maybe Type)]
   | DataBindingGroupDeclaration [(ProperName, [String], [(ProperName, Maybe Type)])]
@@ -39,7 +44,7 @@ data Declaration
   | TypeDeclaration Ident Type
   | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
   | BindingGroupDeclaration [(Ident, Value)]
-  | ExternDeclaration Ident (Maybe JS) Type
+  | ExternDeclaration ForeignImportType Ident (Maybe JS) Type
   | ExternDataDeclaration ProperName Kind
   | FixityDeclaration Fixity String
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])

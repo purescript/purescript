@@ -67,9 +67,9 @@ parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
-   <|> ExternDeclaration <$> parseIdent
-                         <*> P.optionMaybe (parseJSLiteral <$> stringLiteral)
-                         <*> (lexeme (indented *> P.string "::") *> parsePolyType))
+   <|> ExternDeclaration ForeignImport <$> parseIdent
+                                       <*> P.optionMaybe (parseJSLiteral <$> stringLiteral)
+                                       <*> (lexeme (indented *> P.string "::") *> parsePolyType))
 
 parseJSLiteral :: String -> JS
 parseJSLiteral s = either (const $ JSRaw s) id $ P.runParser parseJS () "Javascript" s

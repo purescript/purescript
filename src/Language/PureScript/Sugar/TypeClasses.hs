@@ -32,6 +32,7 @@ import Control.Monad.State
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import Data.Generics (mkQ, everything)
+import Language.PureScript.Pretty.Common (identToJs)
 
 type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
 
@@ -52,11 +53,11 @@ desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) desugared
   dictDecl <- typeInstanceDictionaryDeclaration mn deps name ty desugared
-  return $ d : dictDecl : entries
+  return $ d : entries ++ [dictDecl]
 desugarDecl _ other = return [other]
 
 memberToNameAndType :: Declaration -> (String, Type)
-memberToNameAndType (TypeDeclaration ident ty) = (identToString ident, ty)
+memberToNameAndType (TypeDeclaration ident ty) = (identToJs ident, ty)
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> String -> [Declaration] -> Declaration
@@ -65,16 +66,16 @@ typeClassDictionaryDeclaration name arg members =
 
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
-    ExternDeclaration ident
-        (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor arg (JSVar (Ident "dict")))])))
-        (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
+  ExternDeclaration TypeClassAccessorImport ident
+    (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar (Ident "dict")))])))
+    (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration mn deps name ty decls = do
   entryName <- lift $ mkDictionaryValueName mn name ty
   memberNames <- mapM memberToNameAndValue decls
-  return $ ExternDeclaration entryName
+  return $ ExternDeclaration TypeClassDictionaryImport entryName
     (Just (JSFunction (Just entryName)
         (map (\n -> Ident ('_' : show n)) [1..length deps])
         (JSBlock [JSReturn (JSObjectLiteral memberNames)])))
@@ -83,7 +84,8 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   memberToNameAndValue :: Declaration -> Desugar (String, JS)
   memberToNameAndValue (ValueDeclaration ident _ _ _) = do
     memberName <- mkDictionaryEntryName mn name ty ident
-    return (identToString ident, JSApp (JSVar memberName) (map (\n -> JSVar (Ident ('_' : show n))) [1..length deps]))
+    return (identToJs ident, if null deps then JSVar memberName
+                             else JSApp (JSVar memberName) (map (\n -> JSVar (Ident ('_' : show n))) [1..length deps]))
   memberToNameAndValue _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
@@ -91,16 +93,14 @@ typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [
   m <- get
   let valTy = fromMaybe (error "Type class instance dictionary member is missing in typeInstanceDictionaryEntryDeclaration") $
                 do (arg, members) <- M.lookup (qualify mn name) m
-                   ty' <- lookup (identToString ident) members
+                   ty' <- lookup (identToJs ident) members
                    return $ replaceTypeVars arg ty ty'
   entryName <- mkDictionaryEntryName mn name ty ident
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
-identToString :: Ident -> String
-identToString (Ident s) = s
-identToString (Op _) = error "TODO: Unsupported type class instance name"
+--TODO handle unqualified names
 
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
@@ -130,4 +130,4 @@ typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"
 mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
 mkDictionaryEntryName mn name ty ident = do
   Ident dictName <- lift $ mkDictionaryValueName mn name ty
-  return $ Ident $ dictName ++ "_" ++ identToString ident
+  return $ Ident $ dictName ++ "_" ++ identToJs ident

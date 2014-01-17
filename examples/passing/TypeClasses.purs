@@ -22,17 +22,18 @@ test3 = show (Data "testing")
 
 class Monad m where
   ret :: forall a. a -> m a
-  bind :: forall a b. m a -> (a -> m b) -> m b
+  (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
 instance TypeClasses.Monad Data where
   ret = Data
-  bind (Data a) f = f a
+  (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
 
 instance TypeClasses.Monad Maybe where
   ret = Just
-  bind Nothing _ = Nothing
-  bind (Just a) f = f a
+  (>>=) Nothing _ = Nothing
+  (>>=) (Just a) f = f a
 
-test4 = Just 1 `bind` (\n -> Just (n + 1))
+test4 :: forall m. (Monad m) => m Number
+test4 = ret 1--Just 1 >>= \n -> Just (n + 1)

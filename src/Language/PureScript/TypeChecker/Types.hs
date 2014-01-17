@@ -189,17 +189,17 @@ replaceTypeClassDictionaries mn = everywhereM (mkM go)
   go other = return other
 
 entails :: ModuleName -> [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] -> (Qualified ProperName, Type) -> Check Value
-entails moduleName context goal = do
+entails moduleName context goal@(className, ty) = do
   env <- getEnv
   case go env goal of
-    [] -> throwError $ "No type class instance for " ++ show goal ++ " in context " ++ show context
+    [] -> throwError $ "No " ++ show className ++ " instance found for " ++ prettyPrintType ty
     (dict : _) -> return dict
   where
-  go env (className, ty) =
+  go env (className', ty') =
     [ App (Var (Qualified Nothing fnName)) args
-    | (fnName, subgoals, className', ty') <- context
-    , className == className'
-    , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty ty'
+    | (fnName, subgoals, className'', ty'') <- context
+    , className' == className''
+    , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' ty''
     , args <- forM (replaceAllTypeVars subst subgoals) (go env) ]
 
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
@@ -354,8 +354,9 @@ infer' (Var var) = do
   ty' <- replaceAllTypeSynonyms ty
   case ty' of
     ConstrainedType constraints _ -> do
+      env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue (App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
+      return $ TypedValue (App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
@@ -633,10 +634,12 @@ check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
 check' val (ConstrainedType constraints ty) = do
+  env <- getEnv
+  moduleName <- substCurrentModule <$> ask
   dictNames <- flip mapM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
-  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) -> (name, [], className, instanceTy)) dictNames constraints) $ check val ty
+  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) -> (name, [], className, instanceTy)) dictNames (qualifyAllUnqualifiedNames moduleName env constraints)) $ check val ty
   return $ Abs dictNames val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ ty) <- infer val
@@ -776,8 +779,10 @@ checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do
   ty <- expandTypeSynonym name tyArgs
   checkFunctionApplication fn ty args ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) args ret = do
+  env <- getEnv
   dicts <- getTypeClassDictionaries
-  checkFunctionApplication' (App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy args ret
+  moduleName <- substCurrentModule <$> ask
+  checkFunctionApplication' (App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy args ret
 checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)

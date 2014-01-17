@@ -45,7 +45,7 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
                          (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]
   ]
   where
-  filterRawDecls (ExternDeclaration _ (Just js) _) = Just js
+  filterRawDecls (ExternDeclaration ForeignImport _ (Just js) _) = Just js
   filterRawDecls _ = Nothing
 
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
@@ -68,6 +68,9 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
                         (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn)))
                                          , ("value", JSVar (Ident "value")) ])])
     in [ ctorJs, setProperty ctor (JSVar (Ident ctor)) mp ]
+declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ | importTy /= ForeignImport =
+  Just [ js
+       , setProperty (identToJs ident) (JSVar ident) mp ]
 declToJs _ _ _ _ = Nothing
 
 setProperty :: String -> JS -> ModuleName -> JS
@@ -135,7 +138,7 @@ varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) 
   Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
   _ -> qualifiedToJS identToJs qual
   where
-  isExtern Extern = True
+  isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
     Just (_, ty') -> isExtern ty'
     Nothing -> error "Undefined alias in varToJs"
