@@ -21,6 +21,7 @@ Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
 - Rank N Types
 - Do Notation
 - Optional tail-call elimination
+- Type Classes
 
 ## Try It!
 
@@ -534,39 +535,38 @@ Here is an example, using the maybe monad:
 ```haskell
 data Maybe a = Nothing | Just a
 
-bindMaybe Nothing _ = Nothing
-bindMaybe (Just a) f = f a
-
-maybe = { ret: Just, bind: bindMaybe }
+instance Monad Maybe where
+  ret = Just
+  (>>=) Nothing _ = Nothing
+  (>>=) (Just a) f = f a
 
 isEven n | n % 2 == 0 = Just {}
 isEven _ = Nothing
 
-evenSum a b = maybe do
+evenSum a b = do
   n <- a
   m <- b
   let sum = n + m
   isEven sum
-  return sum
+  ret sum
 ```
 
 `isEven` adds two values of type `Maybe Number` and returns their sum, if the sum is even. If the sum is odd, `evenSum` returns `Nothing`.
 
 This example illustrates the following aspects of `do` notation:
 
-- The `do` keyword is preceded by a value `m` which is a record. The record must contain fields `ret` and `bind` which determine the monad which will be used in the computation.
+- The corresponding type constructor must be an instance of the `Prelude.Monad` type class, which defines the `ret` and `>>=` functions.
 - Statements can have the following form:
     - `a <- x` which desugars to `m.bind x (\a -> ...)` 
     - `let a = x` which desugars to `(\a -> ...)(x)` 
-    - `return a` which desugars to `m.ret a`
     - `x` which desugars to `m.bind x (\_ -> ...)` or just `x` if this is the last statement.
 
 Not illustrated here, but equally valid is the use of a binder on the left hand side of `<-` or `=`. For example:
 
 ```haskell
-test arr = maybe do
+test arr = do
   (x:y:_) <- arr
-  return x + y
+  ret (x + y)
 ```
 
 A pattern match failure will generate a runtime exception, just as in the case of a regular `case` statement.
@@ -845,4 +845,26 @@ To alias a name of a field defined on a Javascript type to a PureScript function
 foreign import member "length" length :: forall a. [a] -> Number
 ```
 
+## Type Classes
 
+PureScript has basic support for type classes via the `class` and `instance` keywords. 
+
+```haskell
+class Show a where
+  show :: a -> String
+
+instance Show String where
+  show s = s
+
+instance Show Boolean where
+  show true = "true"
+  show false = "false"
+
+instance (Show a) => Show [a] where
+  show arr = "[" ++ showArray arr ++ "]"
+
+showArray :: forall a. (Show a) => [a] -> String
+showArray [] = ""
+showArray [x] = show x
+showArray (x:xs) = show x ++ ", " ++ showArray xs
+```
