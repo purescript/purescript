@@ -32,6 +32,7 @@ import Data.Either (rights, lefts)
 
 import Language.PureScript.Types
 import Language.PureScript.Names
+import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 import Language.PureScript.Sugar.TypeClasses
@@ -201,6 +202,6 @@ typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
   return $ d : ds
 typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
   dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
-  ds <- withTypeClassDictionaries [(dictName, deps, className, ty)] $
+  ds <- withTypeClassDictionaries [TypeClassDictionaryInScope dictName className ty (Just deps)] $
       typeCheckAll moduleName rest
   return $ d : ds

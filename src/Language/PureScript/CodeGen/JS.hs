@@ -19,9 +19,12 @@ module Language.PureScript.CodeGen.JS (
 ) where
 
 import Data.Maybe (mapMaybe)
-import qualified Data.Map as M
+import Data.List (sortBy)
+
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
+
+import qualified Data.Map as M
 
 import Language.PureScript.TypeChecker (Environment(..), NameKind(..))
 import Language.PureScript.Values
@@ -40,13 +43,17 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
   mapMaybe filterRawDecls decls ++
   [ JSVariableIntroduction (Ident name) Nothing
   , JSApp (JSFunction Nothing [Ident name]
-                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) decls)))
+                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (sortBy typeClassesLast decls))))
           [JSAssignment (JSAssignVariable (Ident name))
                          (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]
   ]
   where
   filterRawDecls (ExternDeclaration ForeignImport _ (Just js) _) = Just js
   filterRawDecls _ = Nothing
+  typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) (ExternDeclaration TypeClassDictionaryImport _ _ _) = EQ
+  typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) _ = GT
+  typeClassesLast _ (ExternDeclaration TypeClassDictionaryImport _ _ _) = LT
+  typeClassesLast _ _ = EQ
 
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =

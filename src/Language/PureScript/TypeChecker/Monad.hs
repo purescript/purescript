@@ -19,6 +19,7 @@ module Language.PureScript.TypeChecker.Monad where
 
 import Language.PureScript.Types
 import Language.PureScript.Kinds
+import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Unknown
 import Language.PureScript.Declarations
@@ -54,7 +55,7 @@ data Environment = Environment
   , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
   , dataConstructors :: M.Map (ModuleName, ProperName) (Type, NameKind)
   , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
-  , typeClassDictionaries :: [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)]
+  , typeClassDictionaries :: [TypeClassDictionaryInScope]
   } deriving (Show)
 
 emptyEnvironment :: Environment
@@ -76,7 +77,7 @@ bindTypes newNames action = do
   modify $ \st -> st { checkEnv = (checkEnv st) { types = types . checkEnv $ orig } }
   return a
 
-withTypeClassDictionaries :: (MonadState CheckState m) => [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)] -> m a -> m a
+withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
@@ -84,7 +85,7 @@ withTypeClassDictionaries entries action = do
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
 
-getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [(Ident, [(Qualified ProperName, Type)], Qualified ProperName, Type)]
+getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [TypeClassDictionaryInScope]
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a

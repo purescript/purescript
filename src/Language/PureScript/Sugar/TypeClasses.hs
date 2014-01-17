@@ -100,8 +100,6 @@ typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [
     (TypedValue val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
---TODO handle unqualified names
-
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
 qualifiedToString _ (Qualified (Just (ModuleName mn)) pn) = runProperName mn ++ "_" ++ runProperName pn

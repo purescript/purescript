@@ -1,5 +1,8 @@
 module TypeClasses where
 
+import Eff
+import Trace
+
 class Show a where
   show :: a -> String
 
@@ -36,4 +39,11 @@ instance TypeClasses.Monad Maybe where
   (>>=) (Just a) f = f a
 
 test4 :: forall m. (Monad m) => m Number
-test4 = ret 1--Just 1 >>= \n -> Just (n + 1)
+test4 = ret 1
+
+test5 = Just 1 >>= \n -> ret (n + 1)
+
+module Main where
+
+main = eff do
+  print TypeClasses.test5
