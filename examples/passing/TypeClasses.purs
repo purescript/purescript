@@ -19,3 +19,11 @@ instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
   show (Data a) = "Data (" ++ show a ++ ")"
 
 test3 = show (Data "testing")
+
+class Monad m where
+  ret :: forall a. a -> m a
+  bind :: forall a b. m a -> (a -> m b) -> m b
+
+instance TypeClasses.Monad Data where
+  ret = Data
+  bind (Data a) f = f a
