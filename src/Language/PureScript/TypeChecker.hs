@@ -84,6 +84,10 @@ addValue moduleName name ty = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Value) (names env) })
 
+addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
+addTypeClassDictionaries entries = do
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
+
 typeCheckAll :: ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ [] = return []
 typeCheckAll moduleName (d@(DataDeclaration name args dctors) : rest) = do
@@ -198,10 +202,12 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
        constructs (TypeApp ty _) pn = ty `constructs` pn
        constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
+  env <- getEnv
   ds <- typeCheckAll moduleName rest
-  return $ d : ds
+  return $ qualifyAllUnqualifiedNames moduleName env d : ds
 typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
+  env <- getEnv
   dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
-  ds <- withTypeClassDictionaries [TypeClassDictionaryInScope dictName className ty (Just deps)] $
-      typeCheckAll moduleName rest
-  return $ d : ds
+  addTypeClassDictionaries (qualifyAllUnqualifiedNames moduleName env [TypeClassDictionaryInScope dictName className ty (Just deps)])
+  ds <- typeCheckAll moduleName rest
+  return $ qualifyAllUnqualifiedNames moduleName env d : ds

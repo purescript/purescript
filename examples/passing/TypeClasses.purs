@@ -45,3 +45,11 @@ module TypeClasses2 where
 instance (TypeClasses.Show a) => TypeClasses.Show [a] where
   show [] = "[]"
   show (x:xs) = TypeClasses.show x ++ ", " ++ TypeClasses.show xs
+
+module Main where
+
+import Trace
+import TypeClasses
+import TypeClasses2
+
+main = print (show ["a", "b", "c"])
