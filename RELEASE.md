@@ -66,6 +66,7 @@ Many thanks to the [contributors](https://github.com/paf31/purescript/graphs/con
 - Data constructors now get imported along with their type definitions.
 - The `-s` flag will now cause the compiler to use `stdin` for input.
 - There is a new executable `psci` which provides simple REPL-like functionality - it parses expressions, passes the generated Javascript to Node for execution, and prints the result. This is a work-in-progress.
+- The JQuery example (`libraries/jquery/test`) has been improved to use the new `Eff` monad and `do` notation.
 
 ## Regressions
 
