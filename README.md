@@ -95,21 +95,25 @@ As an introductory example, here is the usual "Hello World" written in PureScrip
 ```haskell
 module Main where
 
-foreign import console :: { log :: String -> {} }
+import Trace
 
-main = \ -> console.log "Hello, World!"
+main = trace "Hello, World!"
 ```
 
-which compiles to the following Javascript:
+which compiles to the following Javascript, ignoring the Prelude:
 
 ```javascript
-var Main; 
+var Main;
 (function (Main) {
-    function main() {
-        return console.log("Hello, World!"); 
-    }; 
-    Main.main = main; 
+    var main = trace("Hello, World!");
+    Main.main = main;
 })(Main = Main || {});
+```
+
+The following command will compile and execute the PureScript code above:
+
+```
+psc input.purs --run-main | nodejs
 ```
 
 ## Another Example
