@@ -166,41 +166,51 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
       Just idents' -> do
         shadowIdents (lefts idents') env
         shadowTypes (rights idents') env
+    shadowTypeClassInstances env
   ds <- typeCheckAll currentModule rest
   return $ d : ds
- where errorMessage = (("Error in import declaration " ++ show moduleName ++ ":\n") ++)
-       filterModule = filter ((== moduleName) . fst) . M.keys
-       moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
-       shadowIdents idents' env =
-         forM_ idents' $ \ident -> do
-           case (moduleName, ident) `M.lookup` names env of
-             Just (_, Alias _ _) -> return ()
-             Just (pt, _) -> do
-               guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
-               modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
-             Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
-       shadowTypes pns env =
-         forM_ pns $ \pn -> do
-           case (moduleName, pn) `M.lookup` types env of
-             Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
-             Just (_, DataAlias _ _) -> return ()
-             Just (k, _) -> do
-               guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
-               modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
-               let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
-               forM_ keys $ \dctor -> do
-                 case (moduleName, dctor) `M.lookup` dataConstructors env of
-                   Just (_, Alias _ _) -> return ()
-                   Just (ctorTy, _) -> do
-                     guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
-                     modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
-                   Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
-       constructs (TypeConstructor (Qualified (Just mn) pn')) pn
-         = mn == moduleName && pn' == pn
-       constructs (ForAll _ ty) pn = ty `constructs` pn
-       constructs (Function _ ty) pn = ty `constructs` pn
-       constructs (TypeApp ty _) pn = ty `constructs` pn
-       constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
+  where
+  errorMessage = (("Error in import declaration " ++ show moduleName ++ ":\n") ++)
+  filterModule = filter ((== moduleName) . fst) . M.keys
+  moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
+  shadowIdents idents' env =
+    forM_ idents' $ \ident -> do
+      case (moduleName, ident) `M.lookup` names env of
+        Just (_, Alias _ _) -> return ()
+        Just (pt, _) -> do
+          guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
+          modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
+        Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
+  shadowTypes pns env =
+    forM_ pns $ \pn -> do
+      case (moduleName, pn) `M.lookup` types env of
+        Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
+        Just (_, DataAlias _ _) -> return ()
+        Just (k, _) -> do
+          guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
+          modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
+          let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
+          forM_ keys $ \dctor -> do
+            case (moduleName, dctor) `M.lookup` dataConstructors env of
+              Just (_, Alias _ _) -> return ()
+              Just (ctorTy, _) -> do
+                guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
+                modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
+              Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
+  shadowTypeClassInstances env = do
+    let instances = filter (\tcd ->
+                      let Qualified (Just mn) _ = tcdName tcd in
+                      moduleName == mn && tcdType tcd == TCDRegular
+                    ) (typeClassDictionaries env)
+    forM_ instances $ \tcd -> do
+      let (Qualified _ ident) = tcdName tcd
+      addTypeClassDictionaries [tcd { tcdName = (Qualified (Just currentModule) ident), tcdType = TCDAlias (tcdName tcd) }]
+  constructs (TypeConstructor (Qualified (Just mn) pn')) pn
+    = mn == moduleName && pn' == pn
+  constructs (ForAll _ ty) pn = ty `constructs` pn
+  constructs (Function _ ty) pn = ty `constructs` pn
+  constructs (TypeApp ty _) pn = ty `constructs` pn
+  constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
   env <- getEnv
   ds <- typeCheckAll moduleName rest
@@ -208,6 +218,7 @@ typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
 typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
   env <- getEnv
   dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
-  addTypeClassDictionaries (qualifyAllUnqualifiedNames moduleName env [TypeClassDictionaryInScope dictName className ty (Just deps)])
+  addTypeClassDictionaries (qualifyAllUnqualifiedNames moduleName env
+    [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className ty (Just deps) TCDRegular])
   ds <- typeCheckAll moduleName rest
   return $ qualifyAllUnqualifiedNames moduleName env d : ds

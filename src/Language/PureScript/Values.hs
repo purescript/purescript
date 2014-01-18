@@ -75,11 +75,16 @@ data Value
   | Do [DoNotationElement]
   | TypeClassDictionary (Qualified ProperName, Type) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 
+data TypeClassDictionaryType
+  = TCDRegular
+  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+
 data TypeClassDictionaryInScope
-  = TypeClassDictionaryInScope { tcdName :: Ident
+  = TypeClassDictionaryInScope { tcdName :: Qualified Ident
                                , tcdClassName :: Qualified ProperName
                                , tcdInstanceType :: Type
                                , tcdDependencies :: Maybe [(Qualified ProperName, Type)]
+                               , tcdType :: TypeClassDictionaryType
                                } deriving (Show, Data, Typeable)
 
 data DoNotationElement

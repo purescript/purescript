@@ -42,7 +42,11 @@ test5 = Just 1 >>= \n -> ret (n + 1)
 
 module TypeClasses2 where
 
+import TypeClasses
+
 instance (TypeClasses.Show a) => TypeClasses.Show [a] where
   show [] = "[]"
   show (x:xs) = TypeClasses.show x ++ ", " ++ TypeClasses.show xs
+
+test6 = show ["testing"]
 

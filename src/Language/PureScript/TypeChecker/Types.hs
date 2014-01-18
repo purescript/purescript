@@ -196,17 +196,22 @@ entails moduleName context goal@(className, ty) = do
     (dict : _) -> return dict
   where
   go env (className', ty') =
-    [ mkDictionary (tcdName tcd) args
+    [ mkDictionary (canonicalizeDictionary tcd) args
     | tcd <- context
-    , qualify moduleName className' == qualify moduleName (tcdClassName tcd)
+    , filterModule tcd
+    , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
     , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' (tcdInstanceType tcd)
     , args <- solveSubgoals env subst (tcdDependencies tcd) ]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
     dict <- mapM (go env) (replaceAllTypeVars subst subgoals)
     return $ Just dict
-  mkDictionary fnName Nothing = Var (Qualified Nothing fnName)
-  mkDictionary fnName (Just args) = App (Var (Qualified Nothing fnName)) args
+  mkDictionary fnName args = maybe id (flip App) args $ (Var fnName)
+  filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
+  filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
+  filterModule _ = False
+  canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
+  canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
 
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ String String = Just []
@@ -647,7 +652,10 @@ check' val (ConstrainedType constraints ty) = do
   dictNames <- flip mapM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
-  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) -> TypeClassDictionaryInScope name className instanceTy Nothing) dictNames (qualifyAllUnqualifiedNames moduleName env constraints)) $ check val ty
+  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
+    TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
+      (qualifyAllUnqualifiedNames moduleName env constraints)) $
+        check val ty
   return $ Abs dictNames val'
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val

@@ -33,6 +33,7 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
 import Control.Monad.Reader
+import Control.Arrow ((***))
 
 import qualified Data.Map as M
 
@@ -241,6 +242,10 @@ fresh = unknown . Unknown <$> fresh'
 qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
 qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
   where
-  go :: Qualified ProperName -> Qualified ProperName
-  go qual = let (mn', pn') = canonicalizeType mn env qual
-            in Qualified (Just mn') pn'
+  go :: Type -> Type
+  go (TypeConstructor nm) = TypeConstructor $ qualify' nm
+  go (SaturatedTypeSynonym nm args) = SaturatedTypeSynonym (qualify' nm) args
+  go (ConstrainedType constraints ty) = ConstrainedType (map (qualify' *** id) constraints) ty
+  go other = other
+  qualify' qual = let (mn', pn') = canonicalizeType mn env qual
+                  in Qualified (Just mn') pn'
