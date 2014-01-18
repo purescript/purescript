@@ -321,13 +321,15 @@ module IORef where
 
 module Trace where
 
+  import Prelude
   import Eff
   
   foreign import data Trace :: !
   
   foreign import trace "function trace(s) { return function() { console.log(s); return {}; }; }" :: forall r. String -> Eff (trace :: Trace | r) {}
 
-  foreign import print "function print(dict) { return function (o) { return function() { console.log(Prelude.show(dict)(o)); return {}; }; }; }" :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
+  print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
+  print o = trace (show o) 
 
 module ST where
 
