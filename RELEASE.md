@@ -10,7 +10,7 @@ Many thanks to the [contributors](https://github.com/paf31/purescript/graphs/con
 - Mutually recursive functions and types are now allowed within a module.
 - Syntactic sugar for patterns in top-level declarations has been added. For example:
 
-        sum [] _ = []
+        sum [] = 0
         sum (x:xs) = x + sum xs
 
 - Basic support for type classes has been added. Polymorphic types of the form `forall a. (C a) => ...` will not be inferred but can be checked. Type inference still works if all type class instances can be determined. There is not yet support for functionality like GHC's `FlexibleInstances`, `FlexibleContexts` or `MultiParamTypesClasses`. For example:
