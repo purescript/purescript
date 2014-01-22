@@ -143,7 +143,9 @@ varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
 varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) of
   Just (_, ty) | isExtern ty -> JSVar ident
   Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
-  _ -> qualifiedToJS identToJs qual
+  _ -> case qual of
+         Qualified Nothing _ -> JSVar ident
+         _ -> qualifiedToJS identToJs qual
   where
   isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of

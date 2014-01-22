@@ -42,3 +42,5 @@ module Operators2 where
   (...) = \as -> \bs -> as
 
   test11 = [1, 2, 3] ... [4, 5, 6]
+
+  test12 (<%>) a b = a <%> b
