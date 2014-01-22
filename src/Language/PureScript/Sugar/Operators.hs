@@ -96,9 +96,6 @@ collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
   collectFixities (M.insert qual fixity m) moduleName rest
 collectFixities m moduleName (ImportDeclaration importedModule _ : rest) = do
   let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule ]
-  forM_ fs $ \(name, _) -> do
-    let qual = Qualified (Just moduleName) name
-    when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
   let m' = M.fromList (map (\(i, fixity) -> (Qualified (Just moduleName) i, fixity)) fs)
   collectFixities (M.union m' m) moduleName rest
 collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
