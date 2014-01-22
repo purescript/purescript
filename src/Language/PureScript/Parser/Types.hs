@@ -36,7 +36,10 @@ parseBoolean :: P.Parsec String ParseState Type
 parseBoolean = const Boolean <$> reserved "Boolean"
 
 parseArray :: P.Parsec String ParseState Type
-parseArray = squares $ Array <$> parseType
+parseArray = squares $ return Array
+
+parseArrayOf :: P.Parsec String ParseState Type
+parseArrayOf = squares $ TypeApp Array <$> parseType
 
 parseObject :: P.Parsec String ParseState Type
 parseObject = braces $ Object <$> parseRow
@@ -64,6 +67,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseString
             , parseBoolean
             , parseArray
+            , parseArrayOf
             , parseObject
             , parseFunction
             , parseTypeVariable

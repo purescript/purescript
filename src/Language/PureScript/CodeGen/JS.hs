@@ -125,7 +125,7 @@ runtimeTypeChecks args ty =
   argumentCheck val Number = [typeCheck val "number"]
   argumentCheck val String = [typeCheck val "string"]
   argumentCheck val Boolean = [typeCheck val "boolean"]
-  argumentCheck val (Array _) = [arrayCheck val]
+  argumentCheck val (TypeApp Array _) = [arrayCheck val]
   argumentCheck val (Object row) =
     let
       (pairs, _) = rowToList row

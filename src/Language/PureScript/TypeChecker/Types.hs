@@ -53,7 +53,6 @@ instance Unifiable Type where
   apply s (TUnknown u) = runSubstitution s u
   apply s (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym name $ map (apply s) tys
   apply s (ForAll idents ty) = ForAll idents $ apply s ty
-  apply s (Array t) = Array (apply s t)
   apply s (Object r) = Object (apply s r)
   apply s (Function args ret) = Function (map (apply s) args) (apply s ret)
   apply s (TypeApp t1 t2) = TypeApp (apply s t1) (apply s t2)
@@ -62,7 +61,6 @@ instance Unifiable Type where
   unknowns (TUnknown (Unknown u)) = [u]
   unknowns (SaturatedTypeSynonym _ tys) = concatMap unknowns tys
   unknowns (ForAll _ ty) = unknowns ty
-  unknowns (Array t) = unknowns t
   unknowns (Object r) = unknowns r
   unknowns (Function args ret) = concatMap unknowns args ++ unknowns ret
   unknowns (TypeApp t1 t2) = unknowns t1 ++ unknowns t2
@@ -91,7 +89,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' Number Number = return ()
   unifyTypes' String String = return ()
   unifyTypes' Boolean Boolean = return ()
-  unifyTypes' (Array s) (Array t) = s `unifyTypes` t
+  unifyTypes' Array Array = return ()
   unifyTypes' (Object row1) (Object row2) = row1 ~~ row2
   unifyTypes' (Function args1 ret1) (Function args2 ret2) = do
     guardWith "Function applied to incorrect number of args" $ length args1 == length args2
@@ -218,9 +216,7 @@ typeHeadsAreEqual _ _ String String = Just []
 typeHeadsAreEqual _ _ Number Number = Just []
 typeHeadsAreEqual _ _ Boolean Boolean = Just []
 typeHeadsAreEqual _ _ (Skolem s1) (Skolem s2) | s1 == s2 = Just []
-typeHeadsAreEqual _ _ (Array (TypeVar v)) (Array ty) = Just [(v, ty)]
-typeHeadsAreEqual _ _ (Array ty) (Array (TypeVar v)) = Just [(v, ty)]
-typeHeadsAreEqual m e (Array ty1) (Array ty2) = typeHeadsAreEqual m e ty1 ty2
+typeHeadsAreEqual _ _ Array Array = Just []
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
@@ -312,7 +308,7 @@ infer' v@(BooleanLiteral _) = return $ TypedValue True v Boolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \(TypedValue _ _ t) -> els ~~ Array t
+  forM_ ts $ \(TypedValue _ _ t) -> els ~~ TypeApp Array t
   return $ TypedValue True (ArrayLiteral ts) els
 infer' (Unary op val) = do
   v <- infer val
@@ -338,8 +334,8 @@ infer' (ObjectUpdate o ps) = do
 infer' (Indexer index val) = do
   el <- fresh
   index' <- check index Number
-  val' <- check val (Array el)
-  return $ TypedValue True (Indexer (TypedValue True index' Number) (TypedValue True val' (Array el))) el
+  val' <- check val (TypeApp Array el)
+  return $ TypedValue True (Indexer (TypedValue True index' Number) (TypedValue True val' (TypeApp Array el))) el
 infer' (Accessor prop val) = do
   typed@(TypedValue _ _ objTy) <- infer val
   propTy <- inferProperty objTy prop
@@ -533,13 +529,13 @@ inferBinder val (ObjectBinder props) = do
 inferBinder val (ArrayBinder binders) = do
   el <- fresh
   m1 <- M.unions <$> mapM (inferBinder el) binders
-  val ~~ Array el
+  val ~~ TypeApp Array el
   return m1
 inferBinder val (ConsBinder headBinder tailBinder) = do
   el <- fresh
   m1 <- inferBinder el headBinder
   m2 <- inferBinder val tailBinder
-  val ~~ Array el
+  val ~~ TypeApp Array el
   return $ m1 `M.union` m2
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
@@ -668,10 +664,10 @@ check' v@(StringLiteral _) String = return v
 check' v@(BooleanLiteral _) Boolean = return v
 check' (Unary op val) ty = checkUnary op val ty
 check' (Binary op left right) ty = checkBinary op left right ty
-check' (ArrayLiteral vals) (Array ty) = ArrayLiteral <$> forM vals (\val -> check val ty)
+check' (ArrayLiteral vals) (TypeApp Array ty) = ArrayLiteral <$> forM vals (\val -> check val ty)
 check' (Indexer index vals) ty = do
   index' <- check index Number
-  vals' <- check vals (Array ty)
+  vals' <- check vals (TypeApp Array ty)
   return $ Indexer index' vals'
 check' (Abs args ret) (Function argTys retTy) = do
   moduleName <- substCurrentModule <$> ask

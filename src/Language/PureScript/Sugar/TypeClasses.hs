@@ -122,7 +122,7 @@ typeToString :: ModuleName -> Type -> Either String String
 typeToString _ String = return "string"
 typeToString _ Number = return "number"
 typeToString _ Boolean = return "boolean"
-typeToString _ (Array (TypeVar _)) = return "array"
+typeToString _ Array = return "array"
 typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
 typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'
 typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"

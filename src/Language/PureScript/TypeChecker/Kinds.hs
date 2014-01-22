@@ -95,10 +95,7 @@ infer :: Type -> Subst Kind
 infer Number = return Star
 infer String = return Star
 infer Boolean = return Star
-infer (Array t) = do
-  k <- infer t
-  k ~~ Star
-  return Star
+infer Array = return $ FunKind Star Star
 infer (Object row) = do
   k <- infer row
   k ~~ Row Star

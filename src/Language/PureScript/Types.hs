@@ -27,7 +27,7 @@ data Type
   | Number
   | String
   | Boolean
-  | Array Type
+  | Array
   | Object Type
   | Function [Type] Type
   | TypeVar String
@@ -54,7 +54,6 @@ isMonoType (ForAll _ _) = False
 isMonoType ty = isPolyType ty
 
 isPolyType :: Type -> Bool
-isPolyType (Array ty) = isMonoType ty
 isPolyType (Object ps) = all isPolyType (map snd . fst $ rowToList ps)
 isPolyType (Function args ret) = all isPolyType args && isPolyType ret
 isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
