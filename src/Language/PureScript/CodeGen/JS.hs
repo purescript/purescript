@@ -12,14 +12,17 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DoAndIfThenElse #-}
+
 module Language.PureScript.CodeGen.JS (
     module AST,
     declToJs,
     moduleToJs
 ) where
 
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (sortBy)
+import Data.Function (on)
 
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
@@ -184,12 +187,23 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction ident (Just (JSVar varName)) : done)
-binderToJs m _ varName done (NullaryBinder ctor) =
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock done) Nothing]
+binderToJs m e varName done (NullaryBinder ctor) =
+  if isOnlyConstructor m e ctor
+  then
+    return done
+  else
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock done) Nothing]
 binderToJs m e varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs m e value done b
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock (JSVariableIntroduction value (Just (JSAccessor "value" (JSVar varName))) : js)) Nothing]
+  let success = JSBlock (JSVariableIntroduction value (Just (JSAccessor "value" (JSVar varName))) : js)
+  if isOnlyConstructor m e ctor
+  then
+    return [success]
+  else
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor))))
+                     success
+                     Nothing]
 binderToJs m e varName done (ObjectBinder bs) = go done bs
   where
   go :: [JS] -> [(String, Binder)] -> Gen [JS]
@@ -223,6 +237,18 @@ binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction ident (Just (JSVar varName)) : js)
+
+isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
+isOnlyConstructor m e ctor =
+  let (ty, _) = fromMaybe (error "Data constructor not found") $ qualify m ctor `M.lookup` dataConstructors e
+  in numConstructors ty == 1
+  where
+  numConstructors ty = length $ filter (\(ty1, _) -> ((==) `on` typeConstructor) ty ty1) $ M.elems $ dataConstructors e
+  typeConstructor (TypeConstructor qual) = qualify m qual
+  typeConstructor (ForAll _ ty) = typeConstructor ty
+  typeConstructor (Function _ ty) = typeConstructor ty
+  typeConstructor (TypeApp ty _) = typeConstructor ty
+  typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn
 
 statementToJs :: Options -> ModuleName -> Environment -> Statement -> JS
 statementToJs opts m e (VariableIntroduction ident value) = JSVariableIntroduction ident (Just (valueToJs opts m e value))
