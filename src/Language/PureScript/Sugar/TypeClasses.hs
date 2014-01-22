@@ -123,9 +123,10 @@ typeToString _ String = return "string"
 typeToString _ Number = return "number"
 typeToString _ Boolean = return "boolean"
 typeToString _ Array = return "array"
+typeToString _ (TypeVar _) = return "var"
 typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
 typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'
-typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"
+typeToString a b = Left $ "Type class instance must be of the form T a1 ... an " ++ show (a, b)
 
 mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
 mkDictionaryEntryName mn name ty ident = do
