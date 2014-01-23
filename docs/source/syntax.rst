@@ -211,3 +211,21 @@ Fixity declarations can associate a precedence level, which is a natural number,
 infixl 5 <>
 infixr 7 %%
 ```
+
+## Record Updates
+
+Properties on records can be updated using the following syntax: `o { key = value, ..., key = value }`
+
+For example, the following function increments the `foo` property on its argument:
+
+```haskell
+incr = \o -> o { foo = o.foo + 1 }
+```
+
+The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is
+
+```haskell
+Object.prototype.extend = function(o, p) {
+    return $.extend({}, o, p);
+};
+```
