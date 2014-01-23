@@ -13,6 +13,7 @@ Contents:
 
    intro
    syntax
+   blocks
    types
    typeclasses
    patterns
