@@ -22,41 +22,41 @@ Operators
 
 PureScript supports the following unary operators (in precedence order):
 
-=  =======================
-   Meaning
-=  =======================
--  Numeric negation
-!  Boolean negation
-~  Binary negation
-+  Unary plus (numeric)
-=  =======================
+==  =======================
+    Meaning
+==  =======================
+\-  Numeric negation
+!   Boolean negation
+~   Binary negation
+\+  Unary plus (numeric)
+==  =======================
 
 and the following binary operators (in precedence order):
 
-===  =====================
-     Meaning
-===  =====================
-+    Numeric addition
--    Numeric subtraction
-*    Numeric multiplication
-/    Numeric division
-%    Numeric modulus
-==   Equality check
-!=   Inequality check
-<    Less than
-<=   Less than or equal
->    Greater than
->=   Greater than or equal
-&&   Boolean AND
-||   Boolean OR
-&    Binary AND
-|    Binary OR
-^    Binary XOR
-<<   Shift Left
->>   Shift Right
->>>  Zero-Fill Shift Right
-++   String concatenation
-===  =====================
+====  =====================
+      Meaning
+====  =====================
+\+    Numeric addition
+\-    Numeric subtraction
+\*    Numeric multiplication
+/     Numeric division
+%     Numeric modulus
+==    Equality check
+!=    Inequality check
+<     Less than
+<=    Less than or equal
+>     Greater than
+>=    Greater than or equal
+&&    Boolean AND
+||    Boolean OR
+&     Binary AND
+\|    Binary OR
+^     Binary XOR
+<<    Shift Left
+>>    Shift Right
+\>>>  Zero-Fill Shift Right
+++    String concatenation
+====  =====================
 
 Literal Values
 --------------
@@ -172,6 +172,6 @@ For example, the following function increments the `foo` property on its argumen
 
 The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is::
 
-Object.prototype.extend = function(o, p) {
+  Object.prototype.extend = function(o, p) {
     return $.extend({}, o, p);
-};
+  };
