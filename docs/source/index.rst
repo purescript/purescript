@@ -12,9 +12,10 @@ Contents:
    :maxdepth: 2
 
    intro
+   types
+   kinds
    syntax
    blocks
-   types
    typeclasses
    patterns
    modules
