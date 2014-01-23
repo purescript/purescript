@@ -1,17 +1,31 @@
-## Foreign Function Interface
+Foreign Function Interface
+==========================
 
-The `foreign import` keyword declares a value which is defined in Javascript, and its type:
+Importing Values
+----------------
 
-```haskell
-foreign import pow :: (Number, Number) -> Number
-```
+The `foreign import` keyword declares a value which is defined in Javascript, and its type::
 
-To declare a new type with no constructors, use `foreign import data` and provide the kind:
+  foreign import pow :: Number -> Number -> Number
 
-```haskell
-foreign import data IO :: * -> *
-	
-foreign import console :: { 
-  log :: String -> IO {} 
-}
-```
+Inline Javascript
+-----------------
+
+A foreign import declaration may optionally contain its definition in Javascript as a string literal. If this is provided, the string will be inserted directly into the generated Javascript before the current module definition::
+
+  foreign import pow "function pow(n) {\
+                     \  return function(p) {\
+                     \    return Math.pow(n, p);\
+                     \  };\
+                     \}" :: Number -> Number -> Number
+
+Importing Types
+---------------
+
+To declare a new type with no constructors, use `foreign import data` and provide the kind::
+
+  foreign import data DOM :: *
+  	
+  foreign import document :: { 
+    createElement :: String -> DOM  
+  }
