@@ -12,7 +12,13 @@ Contents:
    :maxdepth: 2
 
    intro
-
+   syntax
+   types
+   typeclasses
+   patterns
+   modules
+   ffi
+   
 Indices and tables
 ==================
 
