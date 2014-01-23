@@ -119,3 +119,15 @@ The generated Javascript looks like this::
   function showPerson(_1) {
       return _1.value.name + ", aged " + numberToString(_1.value.age); 
   };
+
+Related Projects
+----------------
+
+PureScript might be compared to other AltJS projects such as Roy, Haste, Fay, Elm and GHCJS. Certainly, there is a lot of overlap in terms of syntax, but the goals of PureScript listed above separate it in one or more ways from each of these languages.
+
+Roy is probably the most similar language on the list, and was a large influence on the development of PureScript. There are however, key differences in the foreign function interface, the type system and the choice of development language (Haskell vs. Javascript)
+
+Projects such as Haste, Fay and GHCJS aim to use some combination of the GHC compiler itself and/or its intermediate representation, Core, to perform some of the tasks involved in compilation such as parsing and type checking. This usually gives the advantage that tools and libraries can be shared with Haskell, but often at the cost of the size of the generated Javascript. This is the main practical difference between PureScript and these projects.
+
+Elm also shares a lot in terms of functionality with PureScript. Elm is designed for functional reactive programming, and focusses on tools and language features suitable for that domain, while PureScript focusses on the development of purely functional core application logic. Another difference between PureScript and Elm is PureScript's lack of a runtime system.
+
