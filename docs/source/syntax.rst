@@ -15,6 +15,76 @@ But this is not::
 
   foo = bar(x) + 
   baz(x)
+  data UnaryOperator
+  
+Operators
+---------
+
+PureScript supports the following unary operators (in precedence order):
+
+==========================
+   Meaning
+==========================
+-  Numeric negation
+!  Boolean negation
+~  Binary negation
++  Unary plus (numeric)
+==========================
+
+and the following binary operators (in precedence order):
+
+==========================
+   Meaning
+==========================
++    Numeric addition
+-    Numeric subtraction
+*    Numeric multiplication
+/    Numeric division
+%    Numeric modulus
+==   Equality check
+!=   Inequality check
+<    Less than
+<=   Less than or equal
+>    Greater than
+>=   Greater than or equal
+&&   Boolean AND
+||   Boolean OR
+&    Binary AND
+|    Binary OR
+^    Binary XOR
+<<   Shift Left
+>>   Shift Right
+>>>  Zero-Fill Shift Right
+++   String concatenation
+==========================
+
+Literal Values
+--------------
+
+Numeric literals can be integers or floating point numbers. Numbers in hexadecimal notation should be preceded by the characters `0x`::
+
+  16
+  16.0
+  0xF0
+  
+String literals are enclosed in double-quotes and may extend over multiple lines. Line breaks should be surrounded by slashes as follows::
+
+  "Hello World"
+  
+  "Hello \
+  \World"
+  
+The two boolean literals are `true` and `false`.
+
+Array literals are surrounded by square brackets, as in Javascript::
+
+  []
+  [1, 2, 3]
+  
+Object literals are surrounded by braces, as in Javascript::
+
+  {}
+  { foo: "Foo", bar: 1 }
       
 If-Then-Else Expressions
 ------------------------
