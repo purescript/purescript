@@ -18,15 +18,21 @@ PureScript is a small strongly, statically typed compile-to-JS language with a n
 - Optional tail-call elimination
 - Type Classes
 
-Try It!
--------
-
-Try PureScript in the browser [here](http://tryps.functorial.com/).
-
 Installation
 ------------
 
-Install the Haskell Plaform, then `cabal install`
+If you have the Haskell Plaform installed, then you can install the latest released version from Hackage::
+
+  cabal update
+  cabal install purescript
+
+If you would like to build the latest version of the code, clone this repository and build:
+
+  git clone git://github.com:paf31/purescript.git
+  cabal configure --enable-tests
+  cabal build
+  cabal test
+  cabal install
 
 Usage
 -----
@@ -35,9 +41,9 @@ The `psc` executable takes a list of PureScript source files as arguments and by
 
 The following options are supported:
 
--s --stdin             Read input from standard input instead of from files
--o --output            Write the generated Javascript to the specified file
--e --foreign imports   Write a list of foreign imports declarations to the specified file in addition to generating Javascript output
+--stdin                Read input from standard input instead of from files
+--output               Write the generated Javascript to the specified file
+--externs              Write a list of foreign imports declarations to the specified file in addition to generating Javascript output
 --runtime-type-checks  Generate simple runtime type checks for function arguments with simple types.
 --tco                  Perform tail-call elimination on the generated Javascript.
 --no-prelude           Do not include the Prelude in the generated Javascript.
@@ -99,7 +105,7 @@ The following code defines a `Person` data type and a function to generate a str
 Line by line, this reads as follows:
 
 - `Person` is a data type with one constructor, also called `Person`
-    - The `Person` constructor takes an object with two properties, `name` which is a `String`, and `age` which is a `Number`
+- The `Person` constructor takes an object with two properties, `name` which is a `String`, and `age` which is a `Number`
 - The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
 - The `showPerson` function takes a `Person` and returns a `String`
 - `showPerson` works by case analysis on its argument, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
