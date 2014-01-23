@@ -222,6 +222,19 @@ test = poly (\n -> n + 1)
 
 since the skolemized type variable `a` does not unify with `Number`.
 
+## Type Synonyms
+
+For convenience, it is possible to declare a synonym for a type using the `type` keyword. Type synonyms can include type arguments.
+
+For example:
+
+```haskell
+type Foo = { foo :: Number, bar Number }
+
+addFoo :: Foo -> Number
+addFoo = \o -> o.foo + o.bar
+```
+
 ## Type Inference
 
 All types can be inferred, but annotations can optionally be provided.
