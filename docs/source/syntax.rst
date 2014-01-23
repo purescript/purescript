@@ -74,22 +74,107 @@ String literals are enclosed in double-quotes and may extend over multiple lines
   "Hello \
   \World"
   
-The two boolean literals are `true` and `false`.
+The two boolean literals are ``true`` and ``false``.
+
+Array Literals
+--------------
 
 Array literals are surrounded by square brackets, as in Javascript::
 
   []
   [1, 2, 3]
   
-Object literals are surrounded by braces, as in Javascript::
+Record Literals
+---------------
+  
+Record literals are surrounded by braces, as in Javascript::
 
   {}
   { foo: "Foo", bar: 1 }
+  
+Array Indexing
+--------------
+
+To retrieve the element of an array at an index, use the ``!!`` operator::
+
+  arr !! 0
+  
+This example corresponds to the Javascript ``arr[0]``.
+  
+Property Accessors
+------------------
+
+To access a property of a record, use a dot, followed by the property name, as in Javascript::
+
+  rec.propertyName
+  
+Functions
+---------
+
+Functions are introduced by using a backslash followed by a list of argument names::
+
+  example1 = \a b -> a + b
+
+which would correspond to the following Javascript::
+
+  function example1(a) {
+    return function (b) { 
+      return a + b;
+    }
+  }
+
+Multiple argument functions can be introduced by wrapping the arguments in parentheses, and separating them with commas::
+
+  example2 = \(a, b) -> a + b
+
+which generates::
+
+  function example2(a, b) { 
+    return a + b;
+  }
+    
+There is a special case for functions with no arguments, where the parentheses may be omitted, as follows::
+
+  example3 = \ -> 100
+
+which would correspond to the Javascript::
+
+  function example3() { 
+    return 100; 
+  }
+
+Multiple-argument and single-argument syntax can be mixed, as follows::
+
+  example4 = \a (b, c) d -> a + b + c + d
+
+which generates::
+
+  function example4(a) {
+      return function (b, c) {
+          return function (d) {
+              return a + b + c + d;
+          }
+      }
+  }
+
+Functions are applied by providing their arguments inside parentheses::
+
+  test1(1, 2, 3)
+  test2()
+
+A special case is made in the case of functions with one argument. These functions can be applied without parentheses, and function application associates to the left::
+
+  addThree :: Number -> Number -> Number -> Number
+  addThree a b c = a + b + c
+  
+  addThree 1     :: Number -> Number -> Number
+  addThree 1 2   :: Number -> Number
+  addThree 1 2 3 :: Number
       
 If-Then-Else Expressions
 ------------------------
 
-The `if`, `then` and `else` keywords can be used to create conditional expressions. In this case, the `else` block is always required.
+The ``if``, ``then`` and ``else`` keywords can be used to create conditional expressions. In this case, the ``else`` block is always required.
 
 For example::
 
