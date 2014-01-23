@@ -1,29 +1,29 @@
-## Modules
+Modules
+=======
 
-Modules are introduced using the `module` keyword. All code must be placed in a module.
+All code in PureScript is contained in a module. Modules are introduced using the `module` keyword::
 
-Introduce a module as follows, with a list of declarations:
+  module A where
+  
+  id x = x
 
-```haskell
-module A where
+When referencing values or data types in another module, names may be qualified by using a dot::
 
-id x = x
-```
+  module B where
+  
+  foo = A.id
 
-Names may be qualified by using a dot:
+Importing Modules
+-----------------
 
-```
-foo = A.id
-```
+A module can be imported using the `import` keyword. This will create aliases for all of the values and types in the imported module::
 
-All the names in a module can be aliased using the `import` declaration:
+  module B where
+  
+  import A
 
-```haskell
-import A
-```
+Alternatively, a list of names to import can be provided in parentheses::
 
-You can also limit which names are going to be aliased:
-
-```haskell
-import A (id)
-```
+  module B where
+  
+  import A (id)
