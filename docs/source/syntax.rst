@@ -22,20 +22,20 @@ Operators
 
 PureScript supports the following unary operators (in precedence order):
 
-==========================
+=  =======================
    Meaning
-==========================
+=  =======================
 -  Numeric negation
 !  Boolean negation
 ~  Binary negation
 +  Unary plus (numeric)
-==========================
+=  =======================
 
 and the following binary operators (in precedence order):
 
-==========================
-   Meaning
-==========================
+===  =====================
+     Meaning
+===  =====================
 +    Numeric addition
 -    Numeric subtraction
 *    Numeric multiplication
@@ -56,7 +56,7 @@ and the following binary operators (in precedence order):
 >>   Shift Right
 >>>  Zero-Fill Shift Right
 ++   String concatenation
-==========================
+===  =====================
 
 Literal Values
 --------------
