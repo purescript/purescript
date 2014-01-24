@@ -73,22 +73,29 @@ typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type c
 
 typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration mn deps name ty decls = do
+  m <- get
+  (arg, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right
+                        $ M.lookup (qualify mn name) m
+  let memberTypes = map (replaceTypeVars arg ty) instanceTys
   entryName <- lift $ mkDictionaryValueName mn name ty
-  memberNames <- mapM memberToNameAndValue decls
+  memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
-    (TypedValue False
+    (TypedValue True
       (Abs
         (map (\n -> Ident ('_' : show n)) [1..length deps])
         (ObjectLiteral memberNames))
       (quantify (Function (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps) (TypeApp (TypeConstructor name) ty)))
     )
   where
-  memberToNameAndValue :: Declaration -> Desugar (String, Value)
-  memberToNameAndValue (ValueDeclaration ident _ _ _) = do
+  memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
+  memberToNameAndValue tys (ValueDeclaration ident _ _ _) = do
+    memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys
     memberName <- mkDictionaryEntryName mn name ty ident
-    return (identToJs ident, if null deps then Var (Qualified Nothing memberName)
-                             else App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
-  memberToNameAndValue _ = error "Invalid declaration in type instance definition"
+    return (identToJs ident, TypedValue False
+                               (if null deps then Var (Qualified Nothing memberName)
+                                else App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
+                               (quantify memberType))
+  memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
 typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [] _ val) = do
