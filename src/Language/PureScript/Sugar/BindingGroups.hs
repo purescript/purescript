@@ -29,7 +29,6 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
-import Debug.Trace (trace)
 
 createBindingGroupsModule :: [Module] -> Either String [Module]
 createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups ds

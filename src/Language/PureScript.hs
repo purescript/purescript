@@ -25,6 +25,7 @@ import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
+import Language.PureScript.ModuleDependencies as P
 
 import Data.List (intercalate)
 import Control.Monad (when, forM)
@@ -33,7 +34,8 @@ import qualified Data.Map as M
 
 compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
-  desugared <- desugar ms
+  sorted <- sortModules ms
+  desugared <- desugar sorted
   (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let js = concatMap (flip (moduleToJs opts) env) $ regrouped
