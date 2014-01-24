@@ -31,4 +31,4 @@ desugar = desugarTypeClasses
           >=> desugarDo
           >=> desugarCasesModule
           >=> desugarTypeDeclarationsModule
-          >=> return . createBindingGroupsModule
+          >=> createBindingGroupsModule

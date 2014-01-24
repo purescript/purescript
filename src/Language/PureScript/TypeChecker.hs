@@ -98,14 +98,23 @@ typeCheckAll moduleName (d@(DataDeclaration name args dctors) : rest) = do
   ds <- typeCheckAll moduleName rest
   return $ d : ds
 typeCheckAll moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
-  rethrow (("Error in data binding group " ++ show (map (\(name, _, _) -> name) tys) ++ ":\n") ++) $ do
-    forM_ tys $ \(name, _, _) ->
+  rethrow ("Error in data binding group:\n" ++) $ do
+    let syns = mapMaybe toTypeSynonym tys
+    let dataDecls = mapMaybe toDataDecl tys
+    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, mapMaybe snd dctors)) dataDecls)
+    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) -> do
       typeIsNotDefined moduleName name
-    ks <- kindsOfAll moduleName (map (\(name, args, dctors) -> (name, args, mapMaybe snd dctors)) tys)
-    forM_ (zip tys ks) $ \((name, args, dctors), ctorKind) ->
       addDataType moduleName name args dctors ctorKind
+    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+      typeIsNotDefined moduleName name
+      addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll moduleName rest
   return $ d : ds
+  where
+  toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
+  toTypeSynonym _ = Nothing
+  toDataDecl (DataDeclaration nm args dctors) = Just (nm, args, dctors)
+  toDataDecl _ = Nothing
 typeCheckAll moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
   rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
     typeIsNotDefined moduleName name

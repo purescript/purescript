@@ -35,7 +35,7 @@ compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   desugared <- desugar ms
   (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
-  let regrouped = createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let js = concatMap (flip (moduleToJs opts) env) $ regrouped
   let exts = intercalate "\n" . map (flip moduleToPs env) $ regrouped
   js' <- case () of

@@ -68,16 +68,27 @@ kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, s) -> apply s k)) 
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
 
-kindsOfAll :: ModuleName -> [(ProperName, [String], [Type])] -> Check [Kind]
-kindsOfAll moduleName tys = fmap (map starIfUnknown . (\(ks, s) -> apply s ks)) . runSubst (SubstContext moduleName) $ do
-  tyCons <- replicateM (length tys) fresh
-  let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
-  bindLocalTypeVariables moduleName dict $
-    zipWithM (\tyCon (_, args, ts) -> do
-      kargs <- replicateM (length args) fresh
-      let argDict = zip (map ProperName args) kargs
-      bindLocalTypeVariables moduleName argDict $
-        solveTypes ts kargs tyCon) tyCons tys
+kindsOfAll :: ModuleName -> [(ProperName, [String], Type)] -> [(ProperName, [String], [Type])] -> Check ([Kind], [Kind])
+kindsOfAll moduleName syns tys = fmap tidyUp . runSubst (SubstContext moduleName) $ do
+  synVars <- replicateM (length syns) fresh
+  let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
+  bindLocalTypeVariables moduleName dict $ do
+    tyCons <- replicateM (length tys) fresh
+    let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
+    bindLocalTypeVariables moduleName dict $ do
+      data_ks <- zipWithM (\tyCon (_, args, ts) -> do
+        kargs <- replicateM (length args) fresh
+        let argDict = zip (map ProperName args) kargs
+        bindLocalTypeVariables moduleName argDict $
+          solveTypes ts kargs tyCon) tyCons tys
+      syn_ks <- zipWithM (\synVar (_, args, ty) -> do
+        kargs <- replicateM (length args) fresh
+        let argDict = zip (map ProperName args) kargs
+        bindLocalTypeVariables moduleName argDict $
+          solveTypes [ty] kargs synVar) synVars syns
+      return (syn_ks, data_ks)
+  where
+  tidyUp ((ks1, ks2), s) = (map starIfUnknown $ apply s ks1, map starIfUnknown $ apply s ks2)
 
 solveTypes :: [Type] -> [Kind] -> Kind -> Subst Kind
 solveTypes ts kargs tyCon = do
