@@ -10,3 +10,7 @@ test :: Test -> M1.Test
 test t = t
 
 testCtor = Test
+    
+module Main where
+
+main = Trace.trace "Done"

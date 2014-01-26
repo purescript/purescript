@@ -5,3 +5,7 @@ module Iota where
   k = \x -> \y -> x
 
   iota = \x -> x s k
+    
+module Main where
+
+main = Trace.trace "Done"

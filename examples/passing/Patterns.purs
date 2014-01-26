@@ -23,3 +23,6 @@ module Patterns where
     [x, y] | x > y -> true
     _ -> false
     
+module Main where
+
+main = Trace.trace "Done"

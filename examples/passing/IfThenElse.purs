@@ -34,3 +34,7 @@ module IfThenElse where
       }
       return y;
     }
+    
+module Main where
+
+main = Trace.trace "Done"

@@ -12,3 +12,7 @@ module TopLevelCase where
   data A = A
 
   parseTest A 0 = 0
+    
+module Main where
+
+main = Trace.trace "Done"

@@ -7,3 +7,7 @@ module Assign where
       }
       return x;
     }
+    
+module Main where
+
+main = Trace.trace "Done"

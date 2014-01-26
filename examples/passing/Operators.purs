@@ -44,3 +44,29 @@ module Operators2 where
   test11 = [1, 2, 3] ... [4, 5, 6]
 
   test12 (<%>) a b = a <%> b
+
+module Main where
+
+import Operators1
+import Operators2
+
+import Prelude
+import Eff
+import Trace
+import Global
+import Arrays
+
+main = do
+  print (test1 (1, 2, \x y -> x + y))
+  print test2
+  print test3
+  print test4
+  print test5
+  print test6
+  print test7
+  print test8
+  print test9
+  print test10
+  print test11
+  print (test12 k 1 2)
+

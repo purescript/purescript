@@ -1,11 +1,11 @@
-module Maybe where
+module Main where
 
-  data Maybe a = Nothing | Just a
+import Prelude
+import Maybe
 
-  maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
-  maybe b _ Nothing = b
-  maybe _ f (Just a) = f a
-
-  fmap m f = maybe Nothing (\a -> Just (f a)) m
-
-  bind m f = maybe Nothing f m
+main = do
+  let test1 = fromMaybe $ do
+    a <- Just 1
+    b <- Just 2
+    ret (a + b)
+  Trace.trace "Done"

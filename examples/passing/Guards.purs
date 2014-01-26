@@ -8,3 +8,7 @@ module Guards where
   collatz2 = \x y -> case x of
     z | y > 0 -> z / 2
     z -> z * 3 + 1
+    
+module Main where
+
+main = Trace.trace "Done"

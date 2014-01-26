@@ -14,3 +14,7 @@ module ObjectUpdate where
   polyUpdate = \o -> o { foo = "Foo" }
 
   inferPolyUpdate = \o -> o { foo = "Foo" }
+    
+module Main where
+
+main = Trace.trace "Done"

@@ -11,3 +11,7 @@ bar = M3.baz
 module M3 where
 
 baz = 1
+    
+module Main where
+
+main = Trace.trace "Done"

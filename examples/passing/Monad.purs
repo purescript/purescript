@@ -26,3 +26,7 @@ module Monad where
   test1 = test id
 
   test2 = test maybe
+    
+module Main where
+
+main = Trace.trace "Done"

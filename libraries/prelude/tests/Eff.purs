@@ -5,32 +5,32 @@ import Eff
 import Errors
 import Trace
  
-test1 n = runPure $ catchError (\s -> eff do return 0) $ eff do 
+test1 n = runPure $ catchError (\s -> ret 0) $ do 
   case {} of 
-    _ | n > 10 -> eff do
+    _ | n > 10 -> do
       throwError "Error!" 
-    _ -> eff do return n
+    _ -> ret n
 
-test2 = eff do
+test2 = do
   trace "Hello World"
   throwError "Error!"
 
-test3 n = catchError (\s -> eff do return 0) $ eff do 
+test3 n = catchError (\s -> ret 0) $ do 
   case {} of 
-    _ | n > 10 -> eff do
+    _ | n > 10 -> do
       trace "n > 10"
       throwError "Error!" 
-    _ -> eff do return n
+    _ -> ret n
 
-test4 = eff do
+test4 = do
   trace "Hello World!"
-  return 0
+  ret 0
 
-test5 = eff do
+test5 = do
   trace "Hello World!"
   test5
 
-test6 s = eff do
+test6 s = do
   trace s
   test6 (s ++ " test")
 

@@ -18,4 +18,7 @@ module List where
 
   flatten Nil = Nil
   flatten (Cons cons) = concat cons.head (flatten cons.tail)
+    
+module Main where
 
+main = Trace.trace "Done"

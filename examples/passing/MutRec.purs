@@ -13,3 +13,7 @@ module MutRec where
   evenToNumber (Even n) = oddToNumber n + 1
 
   oddToNumber (Odd n) = evenToNumber n + 1
+    
+module Main where
+
+main = Trace.trace "Done"

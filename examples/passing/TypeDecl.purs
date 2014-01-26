@@ -14,3 +14,7 @@ module TypeDecl where
       }
       return result;
     }
+    
+module Main where
+
+main = Trace.trace "Done"

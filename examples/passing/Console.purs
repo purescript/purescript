@@ -1,25 +1,13 @@
-module Console where
+module Main where
 
-  foreign import data IO :: * -> *
+import Prelude
+import Eff
+import Trace
 
-  foreign import ret :: forall a. a -> IO a
-
-  foreign import (>>=) :: forall a b. IO a -> (a -> IO b) -> IO b
-
-  (*>) = \a -> \b -> a >>= \x -> b
-
-  foreign import putStrLn :: String -> IO {}
-
-  replicateM_ :: forall a. Number -> IO a -> IO {}
-  replicateM_ = \n -> \x -> 
-    { 
-      var io = ret {};
-      for (i <- 0 until n)
-      {
-	io = x *> io;
-      }
-      return io;
-    }
-
-  main = replicateM_ 10 (putStrLn "Hello World!")
-
+replicateM_ :: forall m a. (Monad m) => Number -> m a -> m {}
+replicateM_ 0 _ = ret {}
+replicateM_ n act = do
+  act
+  replicateM_ (n - 1) act
+    
+main = replicateM_ 10 (trace "Hello World!")

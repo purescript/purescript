@@ -12,4 +12,8 @@ module ExternData where
 
   foreign import prompt :: IO String
 
-  main = prompt `bind` \s -> showMessage s
+  main = \ -> prompt `bind` \s -> showMessage s
+    
+module Main where
+
+main = Trace.trace "Done"

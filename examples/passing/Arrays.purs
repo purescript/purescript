@@ -1,4 +1,4 @@
-module Arrays where
+module ArraysTests where
 
 test1 = \arr -> arr !! 0 + arr !! 1
 
@@ -18,4 +18,8 @@ test4 = \arr -> case arr of
   [] -> 0
   [_] -> 0
   x : y : xs -> x * y + test4 xs
+    
+module Main where
+
+main = Trace.trace "Done"
 

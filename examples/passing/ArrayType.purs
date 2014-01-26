@@ -11,3 +11,7 @@ foreign import (:) :: forall a. a -> [a] -> [a]
 instance Functor [] where
   fmap _ [] = []
   fmap f (x:xs) = f x : fmap f xs
+    
+module Main where
+
+main = Trace.trace "Done"

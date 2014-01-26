@@ -11,3 +11,7 @@ foreign import concat "function concat(xs) { \
                       \    return xs.concat(ys); \
                       \  };\
                       \}" :: forall a. [a] -> [a] -> [a]
+    
+module Main where
+
+main = Trace.trace "Done"

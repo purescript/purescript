@@ -9,3 +9,7 @@ module Auto where
 
   run :: forall i o. SomeAuto i o -> i -> o
   run = \s i -> s (\a -> case a of Auto a -> a.step a.state i)
+    
+module Main where
+
+main = Trace.trace "Done"

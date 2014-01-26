@@ -12,3 +12,7 @@ module Objects where
 
   typed :: { foo :: Number }
   typed = { foo: 0 }
+    
+module Main where
+
+main = Trace.trace "Done"

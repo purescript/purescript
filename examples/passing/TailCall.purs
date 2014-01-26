@@ -7,4 +7,7 @@ loop x = loop (x + 1)
 
 notATailCall = \x -> 
   (\notATailCall -> notATailCall x) (\x -> x)
+    
+module Main where
 
+main = Trace.trace "Done"

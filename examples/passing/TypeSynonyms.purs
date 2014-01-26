@@ -27,7 +27,18 @@ module TypeSynonyms where
   test1 :: forall a b c. Lens (Pair (Pair a b) c) a
   test1 = composeLenses fst fst
 
-  foreign import head :: forall a. Lens [a] a
+  import Arrays
+
+  headLens :: forall a. Lens [a] a
+  headLens =
+    { get: \l -> head l
+    , set: \l a -> case l of
+        _:xs -> a : xs
+    }
 
   test2 :: forall a b c. Lens (Pair [Pair a b] c) a
-  test2 = composeLenses fst (composeLenses head fst)
+  test2 = composeLenses fst (composeLenses headLens fst)
+    
+module Main where
+
+main = Trace.trace "Done"

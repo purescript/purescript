@@ -10,3 +10,7 @@ id x = x
 test1 x = id $ id $ id $ id $ x
 
 test2 x = id id $ id x
+    
+module Main where
+
+main = Trace.trace "Done"

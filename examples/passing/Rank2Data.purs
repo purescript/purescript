@@ -23,3 +23,7 @@ module Rank2Data where
   two = succ zero
   four = add two two
   fourNumber = runNat four
+    
+module Main where
+
+main = Trace.trace "Done"

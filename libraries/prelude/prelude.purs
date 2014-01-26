@@ -49,8 +49,9 @@ module Maybe where
   fromMaybe :: forall a. a -> Maybe a -> a
   fromMaybe a = maybe a Prelude.id
 
-  bindMaybe :: forall a b. Maybe a -> (a -> Maybe b) -> Maybe b
-  bindMaybe m f = maybe Nothing f m
+  instance Prelude.Monad Maybe where
+    ret = Just
+    (>>=) m f = maybe Nothing f m
 
 module Either where
 
@@ -60,11 +61,13 @@ module Either where
   either f _ (Left a) = f a
   either _ g (Right b) = g b 
 
-  bindEither :: forall e a b. Either e a -> (a -> Either e b) -> Either e b
-  bindEither = either (\e _ -> Left e) (\a f -> f a) 
+  instance Prelude.Monad (Either e) where
+    ret = Right
+    (>>=) = either (\e _ -> Left e) (\a f -> f a) 
 
 module Arrays where
 
+  import Prelude
   import Maybe
 
   head :: forall a. [a] -> a
@@ -97,27 +100,77 @@ module Arrays where
                         \  return xs.length; \
                         \}" :: forall a. [a] -> Number
 
-  foreign import indexOf :: forall a. [a] -> a -> Number
+  foreign import indexOf "function indexOf(l) {\
+                         \  return function (e) {\
+                         \    return l.indexOf(e);\
+                         \  };\
+                         \}" :: forall a. [a] -> a -> Number
 
-  foreign import lastIndexOf :: forall a. [a] -> a -> Number
+  foreign import lastIndexOf "function lastIndexOf(l) {\
+                             \  return function (e) {\
+                             \    return l.lastIndexOf(e);\
+                             \  };\
+                             \}" :: forall a. [a] -> a -> Number
 
-  foreign import concat :: forall a. [a] -> [a] -> [a]
+  foreign import concat "function concat(l1) {\
+                        \  return function (l2) {\
+                        \    return l1.concat(l2);\
+                        \  };\
+                        \}" :: forall a. [a] -> [a] -> [a]
 
-  foreign import join :: [String] -> String
+  foreign import join "function join(l) {\
+                      \  return l.join();\
+                      \}" :: [String] -> String
 
-  foreign import joinWith :: [String] -> String -> String
+  foreign import joinWith "function joinWith(l) {\
+                          \  return function (s) {\
+                          \    return l.join(s);\
+                          \  };\
+                          \}" :: [String] -> String -> String
 
-  foreign import push :: forall a. [a] -> a -> [a]
+  foreign import push "function push(l) {\
+                      \  return function (e) {\
+                      \    var l1 = l.slice();\
+                      \    l1.push(e); \
+                      \    return l1;\
+                      \  };\
+                      \}" :: forall a. [a] -> a -> [a]
 
-  foreign import reverse :: forall a. [a] -> [a]
+  foreign import reverse "function reverse(l) {\
+                         \  var l1 = l.slice();\
+                         \  l1.reverse(); \
+                         \  return l1;\
+                         \}" :: forall a. [a] -> [a]
 
-  foreign import shift :: forall a. [a] -> [a]
+  foreign import shift "function shift(l) {\
+                       \  var l1 = l.slice();\
+                       \  l1.shift();\
+                       \  return l1;\
+                       \}" :: forall a. [a] -> [a]
 
-  foreign import slice :: forall a. Number -> Number -> [a] -> [a]
+  foreign import slice "function slice(s) {\
+                       \  return function(e) {\
+                       \    return function (l) {\
+                       \      return l.slice(s, e);\
+                       \    };\
+                       \  };\
+                       \}" :: forall a. Number -> Number -> [a] -> [a]
 
-  foreign import sort :: forall a. [a] -> [a]
+  foreign import sort "function sort(l) {\
+                      \  var l1 = l.slice();\
+                      \  l.sort();\
+                      \  return l1;\
+                      \}" :: forall a. [a] -> [a]
 
-  foreign import splice :: forall a. Number -> Number -> [a] -> [a] -> [a]
+  foreign import splice "function splice(s) {\
+                        \  return function(e) {\
+                        \    return function(l1) { \
+                        \      return function(l2) {\
+                        \        return l2.splice(s, e, l1);\
+                        \      }; \
+                        \    }; \
+                        \  };\
+                        \}":: forall a. Number -> Number -> [a] -> [a] -> [a]
 
   infixr 6 :
 
@@ -158,6 +211,10 @@ module Arrays where
   all _ [] = true
   all p (a:as) = p a && all p as
 
+  instance (Prelude.Show a) => Prelude.Show [a] where
+    show [] = "[]"
+    show (x:xs) = show x ++ " : " ++ show xs
+
 module Tuple where
 
   import Arrays
@@ -187,57 +244,141 @@ module String where
                          \  return s.length;\
                          \}" :: String -> Number
 
-  foreign import charAt :: Number -> String -> String
+  foreign import charAt "function charAt(i) {\
+                        \  return function(s) {\
+                        \    return s.charAt(i); \
+                        \  };\
+                        \}" :: Number -> String -> String
 
-  foreign import indexOfS :: String -> String -> Number
+  foreign import indexOfS "function indexOfS(s1) {\
+                          \  return function(s2) {\
+                          \    return s2.indexOf(s2);\
+                          \  }; \
+                          \}" :: String -> String -> Number
 
-  foreign import lastIndexOfS :: String -> String -> Number
+  foreign import lastIndexOfS "function lastIndexOfS(s1) {\
+                              \  return function(s2) {\
+                              \    return s2.lastIndexOf(s2);\
+                              \  };\
+                              \}" :: String -> String -> Number
 
-  foreign import localeCompare :: String -> String -> Number
+  foreign import localeCompare "function localeCompare(s1) {\
+                               \  return function(s2) { \
+                               \    return s1.localeCompare(s2);\
+                               \  };\
+                               \}" :: String -> String -> Number
 
-  foreign import replace :: String -> String -> String -> String
+  foreign import replace "function replace(s1) {\
+                         \  return function(s2) {\
+                         \    return function(s3) {\
+                         \      return s3.replace(s1, s2);\
+                         \    };\
+                         \  };\
+                         \}" :: String -> String -> String -> String
 
-  foreign import sliceS :: Number -> Number -> String -> String
+  foreign import sliceS "function sliceS(st) {\
+                        \  return function(e) {\
+                        \    return function(s) {\
+                        \      return s.slice(st, e);\
+                        \    };\
+                        \  };\
+                        \}" :: Number -> Number -> String -> String
 
-  foreign import split :: String -> String -> [String]
+  foreign import split "function split(sep) {\
+                       \  return function(s) {\
+                       \    return s.split(s);\
+                       \  };\
+                       \}" :: String -> String -> [String]
 
-  foreign import substr :: Number -> Number -> String -> String
+  foreign import substr "function substr(n1) {\
+                        \  return function(n2) {\
+                        \    return function(s) {\
+                        \      return s.substr(n1, n2);\
+                        \    };\
+                        \  };\
+                        \}" :: Number -> Number -> String -> String
 
-  foreign import substring :: Number -> Number -> String -> String
+  foreign import substring "function substring(n1) {\
+                           \  return function(n2) {\
+                           \    return function(s) {\
+                           \      return s.substring(n1, n2);\
+                           \    };\
+                           \  };\
+                           \}" :: Number -> Number -> String -> String
 
-  foreign import toLower :: String -> String
+  foreign import toLower "function toLower(s) {\
+                         \  return s.toLower();\
+                         \}" :: String -> String
 
-  foreign import toUpper :: String -> String
+  foreign import toUpper "function toUpper(s) {\
+                         \  return s.toUpper();\
+                         \}" :: String -> String
 
-  foreign import trim :: String -> String
+  foreign import trim "function trim(s) {\
+                      \  return s.trim();\
+                      \}" :: String -> String
 
 module Regex where
 
   foreign import data Regex :: *
 
-  foreign import regex :: String -> String -> Regex
+  foreign import regex "function regex(s1) {\
+                       \  return function(s2) {\
+                       \    return new Regex(s1, s2);\
+                       \  };\
+                       \}" :: String -> String -> Regex
 
-  foreign import test :: Regex -> String -> Boolean
+  foreign import test "function test(r) {\
+                      \  return function (s) { \
+                      \    return r.test(s);\
+                      \  };\
+                      \}" :: Regex -> String -> Boolean
 
-  foreign import match :: Regex -> String -> [String]
+  foreign import match "function match(r) {\
+                       \  return function (s) {\
+                       \    return s.match(r); \
+                       \  };\
+                       \}" :: Regex -> String -> [String]
 
-  foreign import replaceR :: Regex -> String -> String -> String
+  foreign import replaceR "function replaceR(r) {\
+                          \  return function(s1) {\
+                          \    return function(s2) { \
+                          \      return s2.replace(r, s1);\
+                          \    };\
+                          \  };\
+                          \}" :: Regex -> String -> String -> String
 
-  foreign import search :: Regex -> String -> Number
+  foreign import search "function search(r) {\
+                        \  return function (s) {\
+                        \    return s.search(r);\
+                        \  };\
+                        \}" :: Regex -> String -> Number
 
 module Global where
 
-  foreign import nan :: Number
+  foreign import nan "var nan = NaN;" :: Number
 
-  foreign import infinity :: Number
+  foreign import infinity "var infinity = Infinity;" :: Number
 
-  foreign import toExponential :: Number -> String
+  foreign import toExponential "function toExponential(n) {\
+                               \  return n.toExponential();\
+                               \}" :: Number -> String
 
-  foreign import toFixed :: Number -> Number -> String
+  foreign import toFixed "function toFixed(d) {\
+                         \  return function(n) {\
+                         \    return n.toFixed(d);\
+                         \  };\
+                         \}" :: Number -> Number -> String
 
-  foreign import toPrecision :: Number -> Number -> String
+  foreign import toPrecision "function toPrecision(d) {\
+                             \  return function(n) {\
+                             \    return n.toPrecision(d);\
+                             \  };\
+                             \}" :: Number -> Number -> String
 
-  foreign import numberToString :: Number -> String
+  foreign import numberToString "function numberToString(n) {\
+                                \  return n.toString();\
+                                \}" :: Number -> String
 
   foreign import isNaN :: Number -> Boolean
 
@@ -254,6 +395,9 @@ module Global where
   foreign import encodeURI :: String -> String
 
   foreign import decodeURI :: String -> String
+
+  instance Prelude.Show Number where
+    show = numberToString
 
 module Math where
 
@@ -277,19 +421,31 @@ module Math where
     , tan :: Number -> Number
     }
 
-  foreign import math :: Math
+  foreign import math "var math = Math;" :: Math
   
 module Eff where
 
   foreign import data Eff :: # ! -> * -> *
 
-  foreign import retEff "function retEff(a) { return function() { return a; }; }" :: forall e a. a -> Eff e a
+  foreign import retEff "function retEff(a) { \
+                        \  return function() { \
+                        \    return a; \
+                        \  }; \
+                        \}" :: forall e a. a -> Eff e a
 
-  foreign import bindEff "function bindEff(a) { return function(f) { return function() { return f(a())(); }; }; }" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b 
+  foreign import bindEff "function bindEff(a) { \
+                         \  return function(f) { \
+                         \    return function() { \
+                         \      return f(a())(); \
+                         \    }; \
+                         \  }; \
+                         \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b 
 
   type Pure a = forall e. Eff e a
 
-  foreign import runPure "function runPure(f) { return f(); }" :: forall a. Pure a -> a
+  foreign import runPure "function runPure(f) { \
+                         \  return f(); \
+                         \}" :: forall a. Pure a -> a
 
   instance Prelude.Monad (Eff e) where
     ret = retEff
@@ -301,9 +457,23 @@ module Errors where
 
   foreign import data Error :: * -> !
 
-  foreign import throwError "function throwError(e) { return function() { throw e; }; }" :: forall a e r. e -> Eff (err :: Error e | r) a
+  foreign import throwError "function throwError(e) { \
+                            \  return function() { \
+                            \    throw e; \
+                            \  }; \
+                            \}" :: forall a e r. e -> Eff (err :: Error e | r) a
 
-  foreign import catchError "function catchError(c) { return function(t) { return function() { try { return t(); } catch(e) { return c(e)(); } }; }; }" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
+  foreign import catchError "function catchError(c) { \
+                            \  return function(t) { \
+                            \    return function() { \
+                            \      try { \
+                            \        return t(); \
+                            \      } catch(e) { \
+                            \        return c(e)(); \
+                            \      }\
+                            \    }; \
+                            \  }; \
+                            \}" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
 module IORef where
 
@@ -313,11 +483,25 @@ module IORef where
   
   foreign import data IORef :: * -> *
   
-  foreign import newIORef :: forall s r. s -> Eff (ref :: Ref | r) (IORef s)
+  foreign import newIORef "function newIORef(val) {\
+                          \  return function () {\
+                          \    return { value: val };\
+                          \  };\
+                          \}" :: forall s r. s -> Eff (ref :: Ref | r) (IORef s)
 
-  foreign import readIORef :: forall s r. IORef s -> Eff (ref :: Ref | r) s
+  foreign import readIORef "function readIORef(ref) {\
+                           \  return function() {\
+                           \    return ref.value;\
+                           \  };\
+                           \}" :: forall s r. IORef s -> Eff (ref :: Ref | r) s
 
-  foreign import writeIORef :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {}
+  foreign import writeIORef "function writeIORef(ref) {\
+                            \  return function(val) {\
+                            \    return function() {\
+                            \      ref.value = val;\
+                            \    };\
+                            \  };\
+                            \}" :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {}
 
 module Trace where
 
@@ -326,7 +510,12 @@ module Trace where
   
   foreign import data Trace :: !
   
-  foreign import trace "function trace(s) { return function() { console.log(s); return {}; }; }" :: forall r. String -> Eff (trace :: Trace | r) {}
+  foreign import trace "function trace(s) { \
+                       \  return function() { \
+                       \    console.log(s); \
+                       \    return {}; \
+                       \  }; \
+                       \}" :: forall r. String -> Eff (trace :: Trace | r) {}
 
   print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
   print o = trace (show o) 
@@ -339,11 +528,27 @@ module ST where
 
   foreign import data STRef :: * -> * -> *
 
-  foreign import newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
+  foreign import newSTRef "function newSTRef(val) {\
+                          \  return function () {\
+                          \    return { value: val };\
+                          \  };\
+                          \}" :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
-  foreign import readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
+  foreign import readSTRef "function readSTRef(ref) {\
+                           \  return function() {\
+                           \    return ref.value;\
+                           \  };\
+                           \}" :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 
-  foreign import modifySTRef :: forall a h r. (a -> a) -> STRef h a -> Eff (st :: ST h | r) {}
+  foreign import modifySTRef "function modifySTRef(f) {\
+                             \  return function(ref) {\
+                             \    return function() {\
+                             \      ref.value = f(ref.value);\
+                             \    };\
+                             \  };\
+                             \}" :: forall a h r. (a -> a) -> STRef h a -> Eff (st :: ST h | r) {}
 
-  foreign import runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
+  foreign import runST "function runST(f) {\
+                       \  return f;\
+                       \}" :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 

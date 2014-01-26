@@ -7,3 +7,7 @@ module Person where
   showPerson :: Person -> String
   showPerson = \p -> case p of
     Person o -> o.name ++ ", aged " ++ itoa(o.age)
+    
+module Main where
+
+main = Trace.trace "Done"

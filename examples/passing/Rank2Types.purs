@@ -9,7 +9,7 @@ module Rank2Types where
 
   foreign import exampleST :: forall s. ST s Number
 
-  testST = runST exampleST
+  testST = \ -> runST exampleST
 
   foreign import push :: forall el. el -> [el] -> [el]
 
@@ -17,3 +17,7 @@ module Rank2Types where
   replicateM = \ret bind n m -> case n of
     0 -> ret []
     n -> bind m (\x -> bind (replicateM ret bind (n - 1) m) (\xs -> ret (push x xs)))
+    
+module Main where
+
+main = Trace.trace "Done"

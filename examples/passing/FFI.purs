@@ -9,4 +9,8 @@ module FFIModuleTest where
 
 import FFI
 
-baz = foo "test"
+baz = \ -> foo "test"
+    
+module Main where
+
+main = Trace.trace "Done"
