@@ -78,6 +78,8 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
                         (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn)))
                                          , ("value", JSVar (Ident "value")) ])])
     in [ ctorJs, setProperty ctor (JSVar (Ident ctor)) mp ]
+declToJs opts mp (DataBindingGroupDeclaration ds) e =
+  Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ | importTy /= ForeignImport =
   Just [ js
        , setProperty (identToJs ident) (JSVar ident) mp ]
