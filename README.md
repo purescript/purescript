@@ -1,4 +1,5 @@
 [![Build Status](https://secure.travis-ci.org/paf31/purescript.png?branch=master)](http://travis-ci.org/paf31/purescript)
+[![Hackage](https://budueba.com/hackage/purescript)](http://hackage.haskell.org/package/purescript)
 
 PureScript is a small strongly, statically typed programming language with expressive types, written in and inspired by Haskell, and compiling to Javascript.
 
