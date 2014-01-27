@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- This module implements the type checker
 --
 -----------------------------------------------------------------------------
 
@@ -67,6 +68,9 @@ instance Unifiable Type where
   unknowns (RCons _ ty r) = unknowns ty ++ unknowns r
   unknowns _ = []
 
+-- |
+-- Unify two types, updating the current substitution
+--
 unifyTypes :: Type -> Type -> Subst ()
 unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $ do
   unifyTypes' t1 t2
@@ -110,6 +114,13 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
 
+-- |
+-- Unify two rows, updating the current substitution
+--
+-- Common labels are first identified, and unified. Remaining labels and types are unified with a
+-- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
+-- error.
+--
 unifyRows :: Type -> Type -> Subst ()
 unifyRows r1 r2 =
   let
@@ -136,9 +147,16 @@ unifyRows r1 r2 =
   unifyRows' [] (Skolem s1) [] (Skolem s2) | s1 == s2 = return ()
   unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
 
+-- |
+-- Ensure type constructors are equal after canonicalization
+--
 typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
 typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName env
 
+-- |
+-- Infer the types of multiple mutually-recursive values, and return elaborated values including
+-- type class dictionaries and type annotations.
+--
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
 typesOf moduleName vals = do
   tys <- fmap (\(tys, s) -> map (\(ident, (val, ty)) -> (ident, (overTypes (apply s) val, apply s ty))) tys)
@@ -173,19 +191,32 @@ typesOf moduleName vals = do
     return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
 
+-- |
+-- Check if a value contains a type annotation
+--
 isTyped :: (Ident, Value) -> (Ident, (Value, Maybe (Type, Bool)))
 isTyped (name, TypedValue checkType value ty) = (name, (value, Just (ty, checkType)))
 isTyped (name, value) = (name, (value, Nothing))
 
+-- |
+-- Map a function over type annotations appearing inside a value
+--
 overTypes :: (Type -> Type) -> Value -> Value
 overTypes f = everywhere (mkT f)
 
+-- |
+-- Replace type class dictionary placeholders with inferred type class dictionaries
+--
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
 replaceTypeClassDictionaries mn = everywhereM (mkM go)
   where
   go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
 
+-- |
+-- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
+-- return a type class dictionary reference.
+--
 entails :: ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, Type) -> Check Value
 entails moduleName context goal@(className, ty) = do
   env <- getEnv
@@ -211,6 +242,10 @@ entails moduleName context goal@(className, ty) = do
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
 
+-- |
+-- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
+-- and return a substitution from type variables to types which makes the type heads unify.
+--
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ String String = Just []
 typeHeadsAreEqual _ _ Number Number = Just []
@@ -222,6 +257,9 @@ typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
 typeHeadsAreEqual _ _ _ _ = Nothing
 
+-- |
+-- Ensure unsolved unification variables do not escape
+--
 escapeCheck :: Value -> Type -> Subst ()
 escapeCheck value ty = do
   subst <- substSubst <$> getSubstState
@@ -231,12 +269,18 @@ escapeCheck value ty = do
     let unsolvedUnknowns = nub . unknowns $ apply subst t
     guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
 
+-- |
+-- Find all type annotations occuring inside a value
+--
 findAllTypes :: Value -> [Type]
 findAllTypes = everything (++) (mkQ [] go)
   where
   go (TypedValue _ _ ty) = [ty]
   go _ = []
 
+-- |
+-- Ensure skolem variables do not escape their scope
+--
 skolemEscapeCheck :: Type -> Check ()
 skolemEscapeCheck ty =
   case something (mkQ Nothing findSkolems) ty of
@@ -246,12 +290,21 @@ skolemEscapeCheck ty =
     findSkolems (Skolem _) = return ()
     findSkolems _ = mzero
 
+-- |
+-- Ensure a row contains no duplicate labels
+--
 setify :: Type -> Type
 setify = rowFromList . first (M.toList . M.fromList) . rowToList
 
+-- |
+-- \"Setify\" all rows occuring inside a value
+--
 setifyAll :: (D.Data d) => d -> d
 setifyAll = everywhere (mkT setify)
 
+-- |
+-- Replace outermost unsolved unification variables with named type variables
+--
 varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let unks = nub $ unknowns ty
@@ -262,18 +315,31 @@ varIfUnknown ty =
       typeToVar t = t
   in mkForAll (sort . map toName $ unks) ty'
 
+-- |
+-- Replace named type variables with types
+--
 replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
+-- |
+-- Replace named type variables with new unification variables
+--
 replaceAllVarsWithUnknowns :: Type -> Subst Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
+-- |
+-- Replace a single type variable with a new unification variable
+--
 replaceVarWithUnknown :: String -> Type -> Subst Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu $ ty
 
+-- |
+-- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
+-- better error messages during unification.
+--
 replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadReader SubstContext m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
@@ -281,12 +347,18 @@ replaceAllTypeSynonyms d = do
   let syns = map (\((path, name), (args, _)) -> ((path, name), length args)) . M.toList $ typeSynonyms env
   either throwError return $ saturateAllTypeSynonyms env moduleName syns d
 
+-- |
+-- \"Desaturate\" @SaturatedTypeSynonym@s
+--
 desaturateAllTypeSynonyms :: (D.Data d) => d -> d
 desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
   where
   replaceSaturatedTypeSynonym (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replaceSaturatedTypeSynonym t = t
 
+-- |
+-- Replace a type synonym and its arguments with the aliased type
+--
 expandTypeSynonym :: Qualified ProperName -> [Type] -> Subst Type
 expandTypeSynonym name args = do
   env <- getEnv
@@ -295,12 +367,21 @@ expandTypeSynonym name args = do
     Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
     Nothing -> error "Type synonym was not defined"
 
+-- |
+-- Ensure a set of property names and value does not contain duplicate labels
+--
 ensureNoDuplicateProperties :: (MonadError String m) => [(String, Value)] -> m ()
 ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
 
+-- |
+-- Infer a type for a value, rethrowing any error to provide a more useful error message
+--
 infer :: Value -> Subst Value
 infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' val
 
+-- |
+-- Infer a type for a value
+--
 infer' :: Value -> Subst Value
 infer' v@(NumericLiteral _) = return $ TypedValue True v Number
 infer' v@(StringLiteral _) = return $ TypedValue True v String
@@ -399,6 +480,9 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue True val' ty
 infer' _ = error "Invalid argument to infer"
 
+-- |
+-- Infer the type of a property inside a record with a given type
+--
 inferProperty :: Type -> String -> Subst (Maybe Type)
 inferProperty (Object row) prop = do
   let (props, _) = rowToList row
@@ -411,6 +495,9 @@ inferProperty (ForAll ident ty) prop = do
   inferProperty replaced prop
 inferProperty _ _ = return Nothing
 
+-- |
+-- Infer the type of a unary operator application
+--
 inferUnary :: UnaryOperator -> Value -> Subst Value
 inferUnary op (TypedValue _ val valTy) =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
@@ -419,6 +506,9 @@ inferUnary op (TypedValue _ val valTy) =
       return $ TypedValue True (Unary op val) resTy
 inferUnary _ _ = error "Invalid arguments to inferUnary"
 
+-- |
+-- Check the type of a unary operator application
+--
 checkUnary :: UnaryOperator -> Value -> Type -> Subst Value
 checkUnary op val res =
   case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
@@ -427,12 +517,18 @@ checkUnary op val res =
       val' <- check val valTy
       return $ Unary op val'
 
+-- |
+-- Built-in unary operators
+--
 unaryOps :: [(UnaryOperator, (Type, Type))]
 unaryOps = [ (Negate, (Number, Number))
            , (Not, (Boolean, Boolean))
            , (BitwiseNot, (Number, Number))
            ]
 
+-- |
+-- Infer the type of a binary operator application
+--
 inferBinary :: BinaryOperator -> Value -> Value -> Subst Value
 inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) | isEqualityTest op = do
   leftTy ~~ rightTy
@@ -445,6 +541,9 @@ inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) =
       return $ TypedValue True (Binary op left right) resTy
 inferBinary _ _ _ = error "Invalid arguments to inferBinary"
 
+-- |
+-- Check the type of a binary operator application
+--
 checkBinary :: BinaryOperator -> Value -> Value -> Type -> Subst Value
 checkBinary op left right res | isEqualityTest op = do
   res ~~ Boolean
@@ -460,11 +559,17 @@ checkBinary op left right res =
       right' <- check right valTy
       return $ Binary op left' right'
 
+-- |
+-- Check if a @BinaryOperator@ is an equality test
+--
 isEqualityTest :: BinaryOperator -> Bool
 isEqualityTest EqualTo = True
 isEqualityTest NotEqualTo = True
 isEqualityTest _ = False
 
+-- |
+-- Built-in binary operators
+--
 binaryOps :: [(BinaryOperator, (Type, Type))]
 binaryOps = [ (Add, (Number, Number))
             , (Subtract, (Number, Number))
@@ -486,6 +591,9 @@ binaryOps = [ (Add, (Number, Number))
             , (GreaterThanOrEqualTo, (Number, Boolean))
             ]
 
+-- |
+-- Infer the types of variables brought into scope by a binder
+--
 inferBinder :: Type -> Binder -> Subst (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
 inferBinder val (StringBinder _) = val ~~ String >> return M.empty
@@ -541,6 +649,9 @@ inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
 
+-- |
+-- Check the types of the return values in a set of binders in a case statement
+--
 checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> Subst [([Binder], Maybe Guard, Value)]
 checkBinders _ _ [] = return []
 checkBinders nvals ret ((binders, grd, val):bs) = do
@@ -556,6 +667,9 @@ checkBinders nvals ret ((binders, grd, val):bs) = do
   rs <- checkBinders nvals ret bs
   return $ r : rs
 
+-- |
+-- Check that a local variable name is not already used
+--
 assignVariable :: Ident -> Subst ()
 assignVariable name = do
   env <- checkEnv <$> get
@@ -564,6 +678,10 @@ assignVariable name = do
     Just (_, LocalVariable) -> throwError $ "Variable with name " ++ show name ++ " already exists."
     _ -> return ()
 
+-- |
+-- Check the type of the return values of a statement, returning whether or not the statement returns on
+-- all code paths
+--
 checkStatement :: M.Map Ident Type -> Type -> Statement -> Subst (Bool, M.Map Ident Type, Statement)
 checkStatement mass _ (VariableIntroduction name val) = do
   assignVariable name
@@ -593,6 +711,9 @@ checkStatement mass ret (Return val) = do
   val' <- check val ret
   return (True, mass, Return val')
 
+-- |
+-- Check the type of an if-then-else statement
+--
 checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> Subst (Bool, IfStatement)
 checkIfStatement mass ret (IfStatement val thens Nothing) = do
   val' <- check val Boolean
@@ -604,12 +725,18 @@ checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
   (allCodePathsReturn2, elses') <- checkElseStatement mass ret elses
   return (allCodePathsReturn1 && allCodePathsReturn2, IfStatement val' thens' (Just elses'))
 
+-- |
+-- Check the type of an else statement
+--
 checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> Subst (Bool, ElseStatement)
 checkElseStatement mass ret (Else elses) = do
   (allCodePathsReturn, _, elses') <- checkBlock mass ret elses
   return (allCodePathsReturn, Else elses')
 checkElseStatement mass ret (ElseIf ifst) = (id *** ElseIf) <$> checkIfStatement mass ret ifst
 
+-- |
+-- Check the type of the return value of a block of statements
+--
 checkBlock :: M.Map Ident Type -> Type -> [Statement] -> Subst (Bool, M.Map Ident Type, [Statement])
 checkBlock mass _ [] = return (False, mass, [])
 checkBlock mass ret (s:ss) = do
@@ -622,11 +749,17 @@ checkBlock mass ret (s:ss) = do
       (b, m, ss'') <- checkBlock mass1 ret ss'
       return (b, m, s':ss'')
 
+-- |
+-- Skolemize a type variable by replacing its instances with fresh skolem constants
+--
 skolemize :: String -> Type -> Subst Type
 skolemize ident ty = do
   tsk <- Skolem <$> fresh'
   return $ replaceTypeVars ident tsk ty
 
+-- |
+-- Check the type of a value, rethrowing errors to provide a better error message
+--
 check :: Value -> Type -> Subst Value
 check val ty = rethrow errorMessage $ check' val ty
   where
@@ -638,6 +771,9 @@ check val ty = rethrow errorMessage $ check' val ty
     ":\n" ++
     msg
 
+-- |
+-- Check the type of a value
+--
 check' :: Value -> Type -> Subst Value
 check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
@@ -736,6 +872,11 @@ check' val (SaturatedTypeSynonym name args) = do
   check val ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
+-- |
+-- Check the type of a collection of named record fields
+--
+-- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
+--
 checkProperties :: [(String, Value)] -> Type -> Bool -> Subst [(String, Value)]
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
@@ -765,6 +906,9 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         return $ (p, v') : ps''
   go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
 
+-- |
+-- Check the type of a function application, rethrowing errors to provide a better error message
+--
 checkFunctionApplication :: Value -> Type -> [Value] -> Type -> Subst Value
 checkFunctionApplication fn fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy args ret
   where
@@ -773,6 +917,9 @@ checkFunctionApplication fn fnTy args ret = rethrow errorMessage $ checkFunction
     ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
     ++ ":\n" ++ msg
 
+-- |
+-- Check the type of a function application
+--
 checkFunctionApplication' :: Value -> Type -> [Value] -> Type -> Subst Value
 checkFunctionApplication' fn (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
@@ -800,12 +947,27 @@ checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of
   ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
   ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
 
+-- |
+-- Check whether one type subsumes another, rethrowing errors to provide a better error message
+--
 subsumes :: Type -> Type -> Subst ()
-subsumes (ForAll ident ty1) ty2 = do
+subsumes ty1 ty2 = rethrow errorMessage $ subsumes' ty1 ty2
+  where
+  errorMessage msg = "Error checking that type "
+    ++ prettyPrintType ty1
+    ++ " subsumes type "
+    ++ prettyPrintType ty2
+    ++ ":\n" ++ msg
+
+-- |
+-- Check whether one type subsumes another
+--
+subsumes' :: Type -> Type -> Subst ()
+subsumes' (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   replaced `subsumes` ty2
-subsumes (Function args1 ret1) (Function args2 ret2) = do
+subsumes' (Function args1 ret1) (Function args2 ret2) = do
   zipWithM_ subsumes args2 args1
   ret1 `subsumes` ret2
-subsumes ty1 ty2 = ty1 ~~ ty2
+subsumes' ty1 ty2 = ty1 ~~ ty2
 

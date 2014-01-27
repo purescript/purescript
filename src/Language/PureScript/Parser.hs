@@ -9,6 +9,19 @@
 -- Portability :
 --
 -- |
+-- A collection of parsers for core data types:
+--
+--  [@Language.PureScript.Parser.Kinds@] Parser for kinds
+--
+--  [@Language.PureScript.Parser.Values@] Parser for values
+--
+--  [@Language.PureScript.Parser.Types@] Parser for types
+--
+--  [@Language.PureScript.Parser.Declaration@] Parsers for declarations and modules
+--
+--  [@Language.PureScript.Parser.State@] Parser state, including indentation
+--
+--  [@Language.PureScript.Parser.Common@] Common parsing utility functions
 --
 -----------------------------------------------------------------------------
 

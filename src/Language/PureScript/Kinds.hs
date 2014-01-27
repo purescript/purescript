@@ -19,9 +19,27 @@ module Language.PureScript.Kinds where
 import Data.Data
 import Language.PureScript.Unknown
 
+-- |
+-- The data type of kinds
+--
 data Kind
+  -- |
+  -- Unification variable of type Kind
+  --
   = KUnknown (Unknown Kind)
+  -- |
+  -- The kind of types
+  --
   | Star
+  -- |
+  -- The kind of effects
+  --
   | Bang
+  -- |
+  -- Kinds for labelled, unordered rows without duplicates
+  --
   | Row Kind
+  -- |
+  -- Function kinds
+  --
   | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)

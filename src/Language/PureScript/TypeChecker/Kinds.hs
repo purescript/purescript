@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- This module implements the kind checker
 --
 -----------------------------------------------------------------------------
 
@@ -57,9 +58,15 @@ instance Unifiable Kind where
   unknowns (FunKind k1 k2) = unknowns k1 ++ unknowns k2
   unknowns _ = []
 
+-- |
+-- Infer the kind of a single type
+--
 kindOf :: ModuleName -> Type -> Check Kind
 kindOf moduleName ty = fmap (\(k, s) -> apply s k) . runSubst (SubstContext moduleName) $ starIfUnknown <$> infer ty
 
+-- |
+-- Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
+--
 kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
 kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, s) -> apply s k)) . runSubst (SubstContext moduleName) $ do
   tyCon <- fresh
@@ -68,6 +75,9 @@ kindsOf moduleName name args ts = fmap (starIfUnknown . (\(k, s) -> apply s k)) 
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
 
+-- |
+-- Simultaneously infer the kinds of several mutually recursive type constructors
+--
 kindsOfAll :: ModuleName -> [(ProperName, [String], Type)] -> [(ProperName, [String], [Type])] -> Check ([Kind], [Kind])
 kindsOfAll moduleName syns tys = fmap tidyUp . runSubst (SubstContext moduleName) $ do
   synVars <- replicateM (length syns) fresh
@@ -90,6 +100,9 @@ kindsOfAll moduleName syns tys = fmap tidyUp . runSubst (SubstContext moduleName
   where
   tidyUp ((ks1, ks2), s) = (map starIfUnknown $ apply s ks1, map starIfUnknown $ apply s ks2)
 
+-- |
+-- Solve the set of kind constraints associated with the data constructors for a type constructor
+--
 solveTypes :: [Type] -> [Kind] -> Kind -> Subst Kind
 solveTypes ts kargs tyCon = do
   ks <- mapM infer ts
@@ -97,11 +110,17 @@ solveTypes ts kargs tyCon = do
   forM_ ks $ \k -> k ~~ Star
   return tyCon
 
+-- |
+-- Default all unknown kinds to the Star kind of types
+--
 starIfUnknown :: Kind -> Kind
 starIfUnknown (KUnknown _) = Star
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
+-- |
+-- Infer a kind for a type
+--
 infer :: Type -> Subst Kind
 infer Number = return Star
 infer String = return Star

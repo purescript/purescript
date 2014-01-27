@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Pretty printer for the Javascript AST
 --
 -----------------------------------------------------------------------------
 
@@ -30,9 +31,15 @@ import Control.Monad.State
 
 newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
 
+-- |
+-- Number of characters per identation level
+--
 blockIndent :: Int
 blockIndent = 4
 
+-- |
+-- Pretty print with a new indentation level
+--
 withIndent :: StateT PrinterState Maybe String -> StateT PrinterState Maybe String
 withIndent action = do
   modify $ \st -> st { indent = indent st + blockIndent }
@@ -40,6 +47,9 @@ withIndent action = do
   modify $ \st -> st { indent = indent st - blockIndent }
   return result
 
+-- |
+-- Get the current indentation level
+--
 currentIndent :: StateT PrinterState Maybe String
 currentIndent = do
   current <- get
@@ -187,15 +197,24 @@ binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
     match' (JSBinary op' v1 v2) | op' == op = Just (v1, v2)
     match' _ = Nothing
 
+-- |
+-- Generate a pretty-printed string representing a Javascript expression
+--
 prettyPrintJS1 :: JS -> String
 prettyPrintJS1 = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
 
+-- |
+-- Generate a pretty-printed string representing a collection of Javascript expressions at the same indentation level
+--
 prettyPrintJS :: [JS] -> String
 prettyPrintJS sts = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) $ do
   jss <- forM sts prettyPrintJS'
   indentString <- currentIndent
   return $ intercalate "\n" $ map (++ ";") $ map (indentString ++) jss
 
+-- |
+-- Generate an indented, pretty-printed string representing a Javascript expression
+--
 prettyPrintJS' :: JS -> StateT PrinterState Maybe String
 prettyPrintJS' = A.runKleisli $ runPattern matchValue
   where

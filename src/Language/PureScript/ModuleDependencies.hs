@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :
 --
--- |
+-- | Provides the ability to sort modules based on module dependencies
 --
 -----------------------------------------------------------------------------
 
@@ -27,18 +27,19 @@ import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
 
+-- |
+-- Sort a collection of modules based on module dependencies.
+--
+-- Reports an error if the module graph contains a cycle.
+--
 sortModules :: [Module] -> Either String [Module]
 sortModules ms = do
   let verts = map (\m -> (m, getModuleName m, usedModules m)) ms
   mapM toModule $ stronglyConnComp verts
 
-collapseBindingGroups :: [Declaration] -> [Declaration]
-collapseBindingGroups ds = concatMap go ds
-  where
-  go (DataBindingGroupDeclaration ds) = ds
-  go (BindingGroupDeclaration ds) = map (\(ident, val) -> ValueDeclaration ident [] Nothing val) ds
-  go other = [other]
-
+-- |
+-- Calculate a list of used modules based on explicit imports and qualified names
+--
 usedModules :: (Data d) => d -> [ProperName]
 usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProperNames `extQ` imports)
   where
@@ -55,6 +56,9 @@ usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProp
 getModuleName :: Module -> ProperName
 getModuleName (Module pn _) = pn
 
+-- |
+-- Convert a strongly connected component of the module graph to a module
+--
 toModule :: SCC Module -> Either String Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m

@@ -9,6 +9,13 @@
 -- Portability :
 --
 -- |
+-- A collection of modules related to code generation:
+--
+--  [@Language.PureScript.CodeGen.JS@] Code generator for Javascript
+--
+--  [@Language.PureScript.CodeGen.Externs@] Code generator for extern (foreign import) files
+--
+--  [@Language.PureScript.CodeGen.Optimize@] Optimization passes for generated Javascript
 --
 -----------------------------------------------------------------------------
 

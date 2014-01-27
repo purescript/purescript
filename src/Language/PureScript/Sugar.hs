@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Desugaring passes
 --
 -----------------------------------------------------------------------------
 
@@ -25,6 +26,21 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
 
+-- |
+-- The desugaring pipeline proceeds as follows:
+--
+--  * Introduce type synonyms for type class dictionaries
+--
+--  * Rebracket user-defined binary operators
+--
+--  * Desugar do-notation using the @Prelude.Monad@ type class
+--
+--  * Desugar top-level case declarations into explicit case expressions
+--
+--  * Desugar type declarations into value declarations with explicit type annotations
+--
+--  * Group mutually recursive value and data declarations into binding groups.
+--
 desugar :: [Module] -> Either String [Module]
 desugar = desugarTypeClasses
           >=> rebracket

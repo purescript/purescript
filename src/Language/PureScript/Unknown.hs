@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Data type for unification variables
 --
 -----------------------------------------------------------------------------
 
@@ -18,6 +19,9 @@ module Language.PureScript.Unknown where
 
 import Data.Data
 
+-- |
+-- The type of typed unification variables
+--
 newtype Unknown t = Unknown { runUnknown :: Int } deriving (Show, Eq, Ord, Data, Typeable)
 
 

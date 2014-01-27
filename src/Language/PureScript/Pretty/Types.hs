@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Pretty printer for Types
 --
 -----------------------------------------------------------------------------
 
@@ -44,6 +45,9 @@ typeLiterals = mkPattern match
   match row@(RCons _ _ _) = Just $ prettyPrintRow row
   match _ = Nothing
 
+-- |
+-- Generate a pretty-printed string representing a Row
+--
 prettyPrintRow :: Type -> String
 prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs rest) . toList []
   where
@@ -77,6 +81,9 @@ function = mkPattern match
   match (Function args ret) = Just (args, ret)
   match _ = Nothing
 
+-- |
+-- Generate a pretty-printed string representing a Type
+--
 prettyPrintType :: Type -> String
 prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
   where

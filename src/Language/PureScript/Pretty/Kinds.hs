@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Pretty printer for kinds
 --
 -----------------------------------------------------------------------------
 
@@ -43,6 +44,9 @@ funKind = mkPattern match
   match (FunKind arg ret) = Just (arg, ret)
   match _ = Nothing
 
+-- |
+-- Generate a pretty-printed string representing a Kind
+--
 prettyPrintKind :: Kind -> String
 prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
   where

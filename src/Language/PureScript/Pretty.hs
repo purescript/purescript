@@ -9,6 +9,15 @@
 -- Portability :
 --
 -- |
+-- A collection of pretty printers for core data types:
+--
+--  [@Language.PureScript.Pretty.Kinds@] Pretty printer for kinds
+--
+--  [@Language.PureScript.Pretty.Values@] Pretty printer for values
+--
+--  [@Language.PureScript.Pretty.Types@] Pretty printer for types
+--
+--  [@Language.PureScript.Pretty.JS@] Pretty printer for values, used for code generation
 --
 -----------------------------------------------------------------------------
 

@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Utility functions for working with names in scope
 --
 -----------------------------------------------------------------------------
 
@@ -25,6 +26,9 @@ import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 
+-- |
+-- Gather all used names appearing inside a value
+--
 usedNames :: (Data d) => d -> [Ident]
 usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB `extQ` namesJS) val
   where
@@ -47,6 +51,9 @@ usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB
   namesJS (JSFor name _ _ _) = [name]
   namesJS _ = []
 
+-- |
+-- Generate a set of names which are unused inside a value, of the form @_{n}@ for an integer @n@
+--
 unusedNames :: (Data d) => d -> [Ident]
 unusedNames val =
   let

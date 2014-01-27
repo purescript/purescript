@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- The main compiler module
 --
 -----------------------------------------------------------------------------
 
@@ -32,6 +33,23 @@ import Control.Monad (when, forM)
 import Control.Applicative ((<$>))
 import qualified Data.Map as M
 
+-- |
+-- Compile a collection of modules
+--
+-- The compilation pipeline proceeds as follows:
+--
+--  * Sort the modules based on module dependencies, checking for cyclic dependencies.
+--
+--  * Perform a set of desugaring passes.
+--
+--  * Type check, and elaborate values to include type annotations and type class dictionaries.
+--
+--  * Regroup values to take into account new value dependencies introduced by elaboration
+--
+--  * Generate Javascript, and perform optimization passes.
+--
+--  * Pretty-print the generated Javascript
+--
 compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   sorted <- sortModules ms

@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Pretty printer for values
 --
 -----------------------------------------------------------------------------
 
@@ -113,6 +114,9 @@ prettyPrintDoNotationElement (DoNotationValue val) = prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationBind binder val) = prettyPrintBinder binder ++ " <- " ++ prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationLet binder val) = "let " ++ prettyPrintBinder binder ++ " = " ++ prettyPrintValue val
 
+-- |
+-- Generate a pretty-printed string representing a Value
+--
 prettyPrintValue :: Value -> String
 prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue ()
   where
@@ -170,6 +174,9 @@ prettyPrintBinderAtom = mkPattern match
   match (NamedBinder ident binder) = Just $ show ident ++ "@" ++ prettyPrintBinder binder
   match _ = Nothing
 
+-- |
+-- Generate a pretty-printed string representing a Binder
+--
 prettyPrintBinder :: Binder -> String
 prettyPrintBinder = fromMaybe (error "Incomplete pattern") . pattern matchBinder ()
   where

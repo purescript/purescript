@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Additional SYB combinators
 --
 -----------------------------------------------------------------------------
 
@@ -18,6 +19,9 @@ module Data.Generics.Extras where
 
 import Data.Data
 
+-- |
+-- Apply a top-down monadic transformation everywhere
+--
 everywhereM' :: (Monad m, Data d) => (forall d1. (Data d1) => d1 -> m d1) -> d -> m d
 everywhereM' f x = do
   y <- f x
