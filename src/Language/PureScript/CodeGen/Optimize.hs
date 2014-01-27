@@ -58,12 +58,12 @@ isReassigned var1 = everything (||) (mkQ False check)
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
-isRebound (JSVar var1) = everything (||) (mkQ False check)
+isRebound js d = any (\var -> isReassigned var d) (variablesOf js)
   where
-  check :: JS -> Bool
-  check (JSFunction _ args _) | var1 `elem` args = True
-  check _ = False
-isRebound _ = const False
+  variablesOf (JSVar var) = [var]
+  variablesOf (JSAccessor _ val) = variablesOf val
+  variablesOf (JSIndexer index val) = variablesOf index ++ variablesOf val
+  variablesOf _ = []
 
 isUsed :: (Data d) => Ident -> d -> Bool
 isUsed var1 = everything (||) (mkQ False check)
@@ -72,9 +72,17 @@ isUsed var1 = everything (||) (mkQ False check)
   check (JSVar var2) | var1 == var2 = True
   check (JSAssignment target _) | var1 == targetVariable target = True
   check _ = False
-  targetVariable :: JSAssignment -> Ident
-  targetVariable (JSAssignVariable var) = var
-  targetVariable (JSAssignProperty _ tgt) = targetVariable tgt
+
+targetVariable :: JSAssignment -> Ident
+targetVariable (JSAssignVariable var) = var
+targetVariable (JSAssignProperty _ tgt) = targetVariable tgt
+
+isUpdated :: (Data d) => Ident -> d -> Bool
+isUpdated var1 = everything (||) (mkQ False check)
+  where
+  check :: JS -> Bool
+  check (JSAssignment target _) | var1 == targetVariable target = True
+  check _ = False
 
 shouldInline :: JS -> Bool
 shouldInline (JSVar _) = True
@@ -93,7 +101,9 @@ inlineVariables = everywhere (mkT removeFromBlock)
   removeFromBlock js = js
   go :: [JS] -> [JS]
   go [] = []
-  go (JSVariableIntroduction var (Just js) : sts) | shouldInline js && not (isReassigned var sts) && not (isRebound js sts) = go (replaceIdent var js sts)
+  go (s@(JSVariableIntroduction var (Just js)) : sts)
+    | shouldInline js && not (isReassigned var sts) && not (isRebound js sts) && not (isUpdated var sts) =
+      go (replaceIdent var js sts)
   go (s:sts) = s : go sts
 
 removeUnusedVariables :: JS -> JS
