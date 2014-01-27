@@ -3,8 +3,6 @@
 
 PureScript is a small strongly, statically typed programming language with expressive types, written in and inspired by Haskell, and compiling to Javascript.
 
-Bitcoin donations are gratefully accepted at 14ZhCym28WDuFhocP44tU1dBpCzjX1DvhF.
-
 ## Resources
 
 - [Documentation](http://purescript.readthedocs.org/)
