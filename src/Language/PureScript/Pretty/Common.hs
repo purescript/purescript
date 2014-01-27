@@ -26,11 +26,13 @@ import Control.Arrow ((***), (<+>))
 import Language.PureScript.Names
 
 identToJs :: Ident -> String
-identToJs (Ident name) = name
-identToJs (Op op) = concatMap opCharToString op
-  where
-  opCharToString :: Char -> String
-  opCharToString = (:) '$'. show . ord
+identToJs (Ident name) = concatMap identCharToString name
+identToJs (Op op) = concatMap identCharToString op
+
+identCharToString :: Char -> String
+identCharToString c | isAlphaNum c = [c]
+identCharToString '_' = "_"
+identCharToString c = '$' : show (ord c)
 
 newtype Pattern u a b = Pattern { runPattern :: A.Kleisli (StateT u Maybe) a b } deriving (C.Category, A.Arrow, A.ArrowZero, A.ArrowPlus)
 
