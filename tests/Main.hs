@@ -12,6 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DoAndIfThenElse #-}
+
 module Main (main) where
 
 import qualified Language.PureScript as P
@@ -23,6 +25,7 @@ import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getDirectoryContents)
+import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
@@ -62,10 +65,14 @@ assertCompiles inputFile = do
   putStrLn $ "assert " ++ inputFile ++ " compiles successfully"
   prelude <- preludeFilename
   assert (P.defaultOptions { P.optionsRunMain = True }) [prelude, inputFile] $ either (return . Just) $ \js -> do
-    (exitCode, out, err) <- readProcessWithExitCode "nodejs" [] js
-    case exitCode of
-      ExitSuccess -> putStrLn out >> return Nothing
-      ExitFailure code -> return $ Just err
+    args <- getArgs
+    if "--run-js" `elem` args
+    then do
+      (exitCode, out, err) <- readProcessWithExitCode "nodejs" [] js
+      case exitCode of
+        ExitSuccess -> putStrLn out >> return Nothing
+        ExitFailure code -> return $ Just err
+    else return Nothing
 
 assertDoesNotCompile :: FilePath -> IO ()
 assertDoesNotCompile inputFile = do
