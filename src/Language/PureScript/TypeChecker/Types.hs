@@ -675,7 +675,7 @@ assignVariable name = do
   env <- checkEnv <$> get
   moduleName <- substCurrentModule <$> ask
   case M.lookup (moduleName, name) (names env) of
-    Just (_, LocalVariable) -> throwError $ "Variable with name " ++ show name ++ " already exists."
+    Just _ -> throwError $ "Variable with name " ++ show name ++ " already exists."
     _ -> return ()
 
 -- |
