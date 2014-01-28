@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- A parser for kinds
 --
 -----------------------------------------------------------------------------
 
@@ -34,7 +35,9 @@ parseTypeAtom = indented *> P.choice (map P.try
             [ parseStar
             , parseBang
             , parens parseKind ])
-
+-- |
+-- Parse a kind
+--
 parseKind :: P.Parsec String ParseState Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where

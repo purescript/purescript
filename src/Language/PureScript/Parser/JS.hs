@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- A parser for a small fragment of Javascript
 --
 -----------------------------------------------------------------------------
 
@@ -99,6 +100,9 @@ binary op s f = P.Infix (P.try $ C.reservedOp s >> return (JSBinary op)) f
 unary :: UnaryOperator -> String -> P.Operator String u Identity JS
 unary op s = P.Prefix (P.try $ C.reservedOp s >> return (JSUnary op))
 
+-- |
+-- Parse a simplified Javascript expression
+--
 parseJS :: P.Parsec String u JS
 parseJS =
   (P.buildExpressionParser operators

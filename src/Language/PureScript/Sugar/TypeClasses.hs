@@ -9,6 +9,8 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which creates type synonyms for type class dictionaries
+-- and dictionary expressions for type class instances.
 --
 -----------------------------------------------------------------------------
 
@@ -38,6 +40,10 @@ type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
 
 type Desugar = StateT MemberMap (Either String)
 
+-- |
+-- Add type synonym declarations for type class dictionary types, and value declarations for type class
+-- instance dictionary expressions.
+--
 desugarTypeClasses :: [Module] -> Either String [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
@@ -120,6 +126,9 @@ quantify ty' = foldr ForAll ty' tyVars
   collect (TypeVar v) = [v]
   collect _ = []
 
+-- |
+-- Generate a name for a type class dictionary, based on the module name, class name and type name
+--
 mkDictionaryValueName :: ModuleName -> Qualified ProperName -> Type -> Either String Ident
 mkDictionaryValueName mn cl ty = do
   tyStr <- typeToString mn ty
@@ -135,6 +144,10 @@ typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
 typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'
 typeToString a b = Left $ "Type class instance must be of the form T a1 ... an " ++ show (a, b)
 
+-- |
+-- Generate a name for a type class dictionary member, based on the module name, class name, type name and
+-- member name
+--
 mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
 mkDictionaryEntryName mn name ty ident = do
   Ident dictName <- lift $ mkDictionaryValueName mn name ty

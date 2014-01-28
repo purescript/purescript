@@ -9,15 +9,16 @@
 -- Portability :
 --
 -- |
+-- Parsers for values, statements, binders and guards
 --
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Parser.Values (
     parseValue,
+    parseStatement,
     parseGuard,
     parseBinder,
     parseBinderNoParens,
-    parseDoNotationElement
 ) where
 
 import Language.PureScript.Values
@@ -146,6 +147,9 @@ parseDoNotationElement = P.choice
             , parseDoNotationLet
             , P.try (DoNotationValue <$> parseValue) ]
 
+-- |
+-- Parse a value
+--
 parseValue :: P.Parsec String ParseState Value
 parseValue =
   (buildExpressionParser operators
@@ -212,6 +216,9 @@ parseElseStatement = C.reserved "else" >> (ElseIf <$> parseIfStatement
 parseReturn :: P.Parsec String ParseState Statement
 parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.semi)
 
+-- |
+-- Parse a statement
+--
 parseStatement :: P.Parsec String ParseState Statement
 parseStatement = P.choice
                  [ parseVariableIntroduction
@@ -273,11 +280,17 @@ parseBinderAtom = P.choice (map P.try
                   , parseArrayBinder
                   , C.parens parseBinder ]) P.<?> "binder"
 
+-- |
+-- Parse a binder
+--
 parseBinder :: P.Parsec String ParseState Binder
 parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expression"
   where
   operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
 
+-- |
+-- Parse a binder as it would appear in a top level declaration
+--
 parseBinderNoParens :: P.Parsec String ParseState Binder
 parseBinderNoParens = P.choice (map P.try
                   [ parseNullBinder
@@ -290,7 +303,9 @@ parseBinderNoParens = P.choice (map P.try
                   , parseObjectBinder
                   , parseArrayBinder
                   , C.parens parseBinder ]) P.<?> "binder"
-
+-- |
+-- Parse a guard
+--
 parseGuard :: P.Parsec String ParseState Guard
 parseGuard = C.indented *> C.pipe *> C.indented *> parseValue
 

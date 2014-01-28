@@ -9,6 +9,8 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which replaces do-notation statements with
+-- appropriate calls to (>>=) from the Prelude.Monad type class.
 --
 -----------------------------------------------------------------------------
 
@@ -23,6 +25,10 @@ import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
 
+-- |
+-- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
+-- and all @DoNotationLet@ constructors with let expressions.
+--
 desugarDo :: (Data d) => d -> Either String d
 desugarDo = everywhereM (mkM replace)
   where

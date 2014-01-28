@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- The top-level type checker, which checks all declarations in a module.
 --
 -----------------------------------------------------------------------------
 
@@ -88,6 +89,19 @@ addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries = do
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
 
+-- |
+-- Type check all declarations in a module
+--
+-- At this point, many declarations will have been desugared, but it is still necessary to
+--
+--  * Kind-check all types and add them to the @Environment@
+--
+--  * Type-check all values and add them to the @Environment@
+--
+--  * Bring type class instances into scope
+--
+--  * Process module imports
+--
 typeCheckAll :: ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ [] = return []
 typeCheckAll moduleName (d@(DataDeclaration name args dctors) : rest) = do

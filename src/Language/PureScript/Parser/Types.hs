@@ -9,13 +9,13 @@
 -- Portability :
 --
 -- |
+-- Parsers for types
 --
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Parser.Types (
     parseType,
-    parsePolyType,
-    parseRow
+    parsePolyType
 ) where
 
 import Language.PureScript.Types
@@ -97,12 +97,18 @@ parseAnyType = (P.buildExpressionParser operators . buildPostfixParser postfixTa
   postfixTable = [ \x -> TypeApp x <$> P.try (indented *> parseTypeAtom) ]
   operators = [ [ P.Infix (lexeme (P.try (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
 
+-- |
+-- Parse a monotype
+--
 parseType :: P.Parsec String ParseState Type
 parseType = do
   ty <- parseAnyType
   unless (isMonoType ty) $ P.unexpected "polymorphic type"
   return ty
 
+-- |
+-- Parse a polytype
+--
 parsePolyType :: P.Parsec String ParseState Type
 parsePolyType = do
   ty <- parseAnyType

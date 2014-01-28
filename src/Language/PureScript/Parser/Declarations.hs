@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- Parsers for module definitions and declarations
 --
 -----------------------------------------------------------------------------
 
@@ -120,6 +121,9 @@ parseTypeInstanceDeclaration = do
   members <- mark (P.many (same *> parseValueDeclaration))
   return $ TypeInstanceDeclaration (fromMaybe [] deps) className ty members
 
+-- |
+-- Parse a single declaration
+--
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = P.choice
                    [ parseDataDeclaration
@@ -132,6 +136,9 @@ parseDeclaration = P.choice
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration ] P.<?> "declaration"
 
+-- |
+-- Parse a module header and a collection of declarations
+--
 parseModule :: P.Parsec String ParseState Module
 parseModule = do
   reserved "module"
@@ -141,5 +148,8 @@ parseModule = do
   decls <- mark (P.many (same *> parseDeclaration))
   return $ Module name decls
 
+-- |
+-- Parse a collection of modules
+--
 parseModules :: P.Parsec String ParseState [Module]
 parseModules = whiteSpace *> mark (P.many (same *> parseModule)) <* P.eof

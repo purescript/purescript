@@ -9,6 +9,11 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which reapplies binary operators based
+-- on their fixity data and removes explicit parentheses.
+--
+-- The value parser ignores fixity data when parsing binary operator applications, so
+-- it is necessary to reorder them here.
 --
 -----------------------------------------------------------------------------
 
@@ -33,6 +38,9 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
+-- |
+-- Remove explicit parentheses and reorder binary operator applications
+--
 rebracket :: [Module] -> Either String [Module]
 rebracket = go M.empty []
   where

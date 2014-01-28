@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- This module generates code in the simplified Javascript intermediate representation from Purescript code
 --
 -----------------------------------------------------------------------------
 
@@ -41,6 +42,9 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for all declarations in a module
+--
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
   mapMaybe filterRawDecls decls ++
@@ -58,6 +62,9 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
   typeClassesLast _ (ExternDeclaration TypeClassDictionaryImport _ _ _) = LT
   typeClassesLast _ _ = EQ
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a declaration
+--
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
   Just [ JSVariableIntroduction ident (Just (valueToJs opts mp e val)),

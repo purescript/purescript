@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- This module generates code for \"externs\" files, i.e. files containing only foreign import declarations.
 --
 -----------------------------------------------------------------------------
 
@@ -24,6 +25,9 @@ import Language.PureScript.Pretty
 import Language.PureScript.Names
 import Data.List (intercalate)
 
+-- |
+-- Generate foreign imports for all declarations in a module
+--
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module pname@(ProperName moduleName) decls) env =
   "module " ++ moduleName ++ " where\n" ++

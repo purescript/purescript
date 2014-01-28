@@ -20,6 +20,25 @@ module Language.PureScript.TypeChecker.Types (
     typesOf
 ) where
 
+{-
+  The following functions represent the corresponding type checking judgements:
+
+    infer
+      Synthesize a type for a value
+
+    check
+      Check a value has a given type
+
+    checkProperties
+      Check an object with a given type contains specified properties
+
+    checkFunctionApplication
+      Check a function of a given type returns a value of another type when applied to its arguments
+
+    subsumes
+      Check a type subsumes another type
+-}
+
 import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import qualified Data.Data as D

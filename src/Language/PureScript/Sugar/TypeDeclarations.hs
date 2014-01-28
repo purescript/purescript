@@ -9,6 +9,8 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which replaces top-level type declarations with
+-- type annotations on the corresponding expression.
 --
 -----------------------------------------------------------------------------
 
@@ -24,9 +26,15 @@ import Control.Monad (forM)
 import Language.PureScript.Declarations
 import Language.PureScript.Values
 
+-- |
+-- Replace all top level type declarations in a module with type annotations
+--
 desugarTypeDeclarationsModule :: [Module] -> Either String [Module]
 desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds) -> Module name <$> desugarTypeDeclarations ds
 
+-- |
+-- Replace all top level type declarations with type annotations
+--
 desugarTypeDeclarations :: [Declaration] -> Either String [Declaration]
 desugarTypeDeclarations (TypeDeclaration name ty : ValueDeclaration name' [] Nothing val : rest) | name == name' =
   desugarTypeDeclarations (ValueDeclaration name [] Nothing (TypedValue True val ty) : rest)

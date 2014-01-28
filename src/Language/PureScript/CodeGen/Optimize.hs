@@ -9,6 +9,23 @@
 -- Portability :
 --
 -- |
+-- This module optimizes code in the simplified-Javascript intermediate representation.
+--
+-- The following optimizations are supported:
+--
+--  * Collapsing nested blocks
+--
+--  * Tail call elimination
+--
+--  * Inlining of (>>=) and ret for the Eff monad
+--
+--  * Removal of unused variables
+--
+--  * Removal of unnecessary thunks
+--
+--  * Eta conversion
+--
+--  * Inlining variables
 --
 -----------------------------------------------------------------------------
 
@@ -28,6 +45,9 @@ import Language.PureScript.Sugar.TypeClasses
        (mkDictionaryValueName)
 import Language.PureScript.Types (Type(..))
 
+-- |
+-- Apply a series of optimizer passes to simplified Javascript code
+--
 optimize :: Options -> JS -> JS
 optimize opts =
   collapseNestedBlocks

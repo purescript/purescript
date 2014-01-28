@@ -9,6 +9,8 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which replaces top-level binders with
+-- case expressions.
 --
 -----------------------------------------------------------------------------
 
@@ -27,9 +29,14 @@ import Language.PureScript.Values
 import Language.PureScript.Declarations
 import Language.PureScript.Scope
 
+-- |
+-- Replace all top-level binders in a module with case expressions.
+--
 desugarCasesModule :: [Module] -> Either String [Module]
 desugarCasesModule ms = forM ms $ \(Module name ds) -> Module name <$> desugarCases ds
-
+-- |
+-- Replace all top-level binders with case expressions.
+--
 desugarCases :: [Declaration] -> Either String [Declaration]
 desugarCases = fmap join . mapM toDecls . groupBy inSameGroup
 

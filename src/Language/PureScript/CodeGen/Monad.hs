@@ -9,6 +9,9 @@
 -- Portability :
 --
 -- |
+-- Code generation monad
+--
+-- This monad provides a supply of fresh names which can be used to create variables.
 --
 -----------------------------------------------------------------------------
 
@@ -20,11 +23,20 @@ import Control.Monad.State
 import Control.Applicative
 import Language.PureScript.Names
 
+-- |
+-- Code generation monad data type
+--
 newtype Gen a = Gen { unGen :: State [Ident] a } deriving (Functor, Applicative, Monad, MonadState [Ident])
 
+-- |
+-- Run a computation in the code generation monad
+--
 runGen :: [Ident] -> Gen a -> a
 runGen names = flip evalState names . unGen
 
+-- |
+-- Generate a fresh name
+--
 fresh :: Gen Ident
 fresh = do
   (s:ss) <- get

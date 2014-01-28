@@ -9,6 +9,8 @@
 -- Portability :
 --
 -- |
+-- This module implements the desugaring pass which creates binding groups from sets of
+-- mutually-recursive value declarations and mutually-recursive type declarations.
 --
 -----------------------------------------------------------------------------
 
@@ -30,12 +32,21 @@ import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
 
+-- |
+-- Replace all sets of mutually-recursive declarations in a module with binding groups
+--
 createBindingGroupsModule :: [Module] -> Either String [Module]
 createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups ds
 
+-- |
+-- Collapse all binding groups in a module to individual declarations
+--
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule = map $ \(Module name ds) -> Module name (collapseBindingGroups ds)
 
+-- |
+-- Replace all sets of mutually-recursive declarations with binding groups
+--
 createBindingGroups :: [Declaration] -> Either String [Declaration]
 createBindingGroups ds = do
   let values = filter isValueDecl ds
@@ -54,6 +65,9 @@ createBindingGroups ds = do
            filter isExternDecl ds ++
            bindingGroupDecls
 
+-- |
+-- Collapse all binding groups to individual declarations
+--
 collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups ds = concatMap go ds
   where
