@@ -19,7 +19,7 @@ module Language.PureScript.Parser.Declarations (
     parseModules
 ) where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (isJust, fromMaybe)
 import Control.Applicative
 import qualified Text.Parsec as P
 
@@ -68,10 +68,10 @@ parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
-   <|> ExternDeclaration ForeignImport <$> parseIdent
-                                       <*> P.optionMaybe (parseJSLiteral <$> stringLiteral)
-                                       <*> (lexeme (indented *> P.string "::") *> parsePolyType))
-
+   <|> do ident <- parseIdent
+          js <- P.optionMaybe (parseJSLiteral <$> stringLiteral)
+          ty <- (lexeme (indented *> P.string "::") *> parsePolyType)
+          return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty)
 parseJSLiteral :: String -> JS
 parseJSLiteral s = either (const $ JSRaw s) id $ P.runParser parseJS () "Javascript" s
 

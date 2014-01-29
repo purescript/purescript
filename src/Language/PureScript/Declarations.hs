@@ -53,6 +53,10 @@ data ForeignImportType
   --
   = ForeignImport
   -- |
+  -- A foreign import which contains inline Javascript as a string literal
+  --
+  | InlineJavascript
+  -- |
   -- A type class dictionary import, generated during desugaring of type class declarations
   --
   | TypeClassDictionaryImport

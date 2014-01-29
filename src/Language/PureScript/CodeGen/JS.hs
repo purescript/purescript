@@ -47,7 +47,6 @@ import Language.PureScript.CodeGen.Optimize
 --
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
-  mapMaybe filterRawDecls decls ++
   [ JSVariableIntroduction (Ident name) Nothing
   , JSApp (JSFunction Nothing [Ident name]
                       (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (sortBy typeClassesLast decls))))
@@ -55,8 +54,6 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
                          (JSBinary Or (JSVar (Ident name)) (JSObjectLiteral []))]
   ]
   where
-  filterRawDecls (ExternDeclaration ForeignImport _ (Just js) _) = Just js
-  filterRawDecls _ = Nothing
   typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) (ExternDeclaration TypeClassDictionaryImport _ _ _) = EQ
   typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) _ = GT
   typeClassesLast _ (ExternDeclaration TypeClassDictionaryImport _ _ _) = LT
@@ -87,7 +84,7 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
     in [ ctorJs, setProperty ctor (JSVar (Ident ctor)) mp ]
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
-declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ | importTy /= ForeignImport =
+declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
   Just [ js
        , setProperty (identToJs ident) (JSVar ident) mp ]
 declToJs _ _ _ _ = Nothing
