@@ -27,6 +27,8 @@
 --
 --  * Inlining variables
 --
+--  * Inline Prelude.($)
+--
 -----------------------------------------------------------------------------
 
 module Language.PureScript.CodeGen.Optimize (
@@ -49,14 +51,24 @@ import Language.PureScript.Types (Type(..))
 -- Apply a series of optimizer passes to simplified Javascript code
 --
 optimize :: Options -> JS -> JS
-optimize opts =
-  collapseNestedBlocks
-  . tco opts
-  . magicDo opts
-  . removeUnusedVariables
-  . unThunk
-  . etaConvert
-  . inlineVariables
+optimize opts = untilFixedPoint $ applyAll
+  [ collapseNestedBlocks
+  , tco opts
+  , magicDo opts
+  , removeUnusedVariables
+  , unThunk
+  , etaConvert
+  , inlineVariables
+  , inlineDollar ]
+
+applyAll :: [a -> a] -> a -> a
+applyAll = foldl1 (.)
+
+untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
+untilFixedPoint f a = go a
+  where
+  go a' = let a'' = f a' in
+          if a'' == a' then a'' else go a''
 
 replaceIdent :: (Data d) => Ident -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
@@ -279,3 +291,12 @@ collapseNestedBlocks = everywhere (mkT collapse)
   go :: JS -> [JS]
   go (JSBlock sts) = sts
   go s = [s]
+
+inlineDollar :: JS -> JS
+inlineDollar = everywhere (mkT convert)
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSApp dollar [f]) [x]) | isDollar dollar = JSApp f [x]
+  convert other = other
+  isDollar (JSAccessor name (JSVar (Ident "Prelude"))) | name == identToJs (Op "$") = True
+  isDollar _ = False

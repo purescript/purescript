@@ -495,6 +495,15 @@ module IORef where
                            \  };\
                            \}" :: forall s r. IORef s -> Eff (ref :: Ref | r) s
 
+
+  foreign import modifyIORef "function modifyIORef(ref) {\
+                             \  return function(f) {\
+                             \    return function() {\
+                             \      ref.value = f(ref.value);\
+                             \    };\
+                             \  };\
+                             \}" :: forall s r. IORef s -> (s -> s) -> Eff (ref :: Ref | r) {}
+
   foreign import writeIORef "function writeIORef(ref) {\
                             \  return function(val) {\
                             \    return function() {\
@@ -540,14 +549,22 @@ module ST where
                            \  };\
                            \}" :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 
-  foreign import modifySTRef "function modifySTRef(f) {\
-                             \  return function(ref) {\
+  foreign import modifySTRef "function modifySTRef(ref) {\
+                             \  return function(f) {\
                              \    return function() {\
                              \      ref.value = f(ref.value);\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. (a -> a) -> STRef h a -> Eff (st :: ST h | r) {}
+                             \}" :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) {}
 
+  foreign import writeSTRef "function writeSTRef(ref) {\
+                            \  return function(a) {\
+                            \    return function() {\
+                            \      ref.value = a;\
+                            \    };\
+                            \  };\
+                            \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) {}
+  
   foreign import runST "function runST(f) {\
                        \  return f;\
                        \}" :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a

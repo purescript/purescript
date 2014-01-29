@@ -4,6 +4,7 @@ import Prelude
 import Eff
 import Errors
 import Trace
+import Global
  
 test1 n = runPure $ catchError (\s -> ret 0) $ do 
   case {} of 
@@ -34,8 +35,17 @@ test6 s = do
   trace s
   test6 (s ++ " test")
 
+import ST
+
+test7 = \ -> do
+  n <- runST $ do
+    r <- newSTRef 0
+    modifySTRef r $ \n -> n + 1
+    readSTRef r
+  print n
+
 module Main where
 
 import Tests
 
-main = test6 ""
+main = test7 ()
