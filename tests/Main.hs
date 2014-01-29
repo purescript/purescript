@@ -19,12 +19,14 @@ module Main (main) where
 import qualified Language.PureScript as P
 
 import Data.List (isSuffixOf)
+import Data.Traversable (traverse)
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
-import System.Directory (getCurrentDirectory, getDirectoryContents)
+import System.Directory (getCurrentDirectory, getDirectoryContents, findExecutable)
 import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 import qualified Paths_purescript as Paths
@@ -68,11 +70,17 @@ assertCompiles inputFile = do
     args <- getArgs
     if "--run-js" `elem` args
     then do
-      (exitCode, out, err) <- readProcessWithExitCode "nodejs" [] js
-      case exitCode of
-        ExitSuccess -> putStrLn out >> return Nothing
-        ExitFailure code -> return $ Just err
+      process <- findNodeProcess
+      result <- traverse (\node -> readProcessWithExitCode node [] js) process
+      case result of
+        Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
+        Just (ExitFailure _, _, err) -> return $ Just err
+        Nothing -> return $ Just "Couldn't find node.js executable"
     else return Nothing
+
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
 
 assertDoesNotCompile :: FilePath -> IO ()
 assertDoesNotCompile inputFile = do
