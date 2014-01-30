@@ -23,10 +23,10 @@ import Data.List (intercalate)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows
+import Control.Monad.Unify
 
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Unknown
 
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
@@ -38,7 +38,7 @@ typeLiterals = mkPattern match
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
-  match (TUnknown (Unknown u)) = Just $ 'u' : show u
+  match (TUnknown (TypedUnknown (Unknown u))) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
@@ -57,7 +57,7 @@ prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Type -> String
   tailToPs REmpty = ""
-  tailToPs (TUnknown (Unknown u)) = " | u" ++ show u
+  tailToPs (TUnknown (TypedUnknown (Unknown u))) = " | u" ++ show u
   tailToPs (TypeVar var) = " | " ++ var
   tailToPs (Skolem s) = " | s" ++ show s
   tailToPs _ = error "Invalid row tail"

@@ -30,6 +30,7 @@ import Language.PureScript.ModuleDependencies as P
 
 import Data.List (intercalate)
 import Control.Monad (when, forM)
+import Control.Monad.State.Lazy
 import Control.Applicative ((<$>))
 import qualified Data.Map as M
 
@@ -54,7 +55,9 @@ compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   sorted <- sortModules ms
   desugared <- desugar sorted
-  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
+  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> do
+    modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
+    Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let js = concatMap (flip (moduleToJs opts) env) $ regrouped
   let exts = intercalate "\n" . map (flip moduleToPs env) $ regrouped

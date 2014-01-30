@@ -20,8 +20,9 @@ module Language.PureScript.Types where
 import Data.Data
 import Data.Generics (mkT, mkQ, everywhereBut)
 
+import Control.Monad.Unify
+
 import Language.PureScript.Names
-import Language.PureScript.Unknown (Unknown(..))
 
 -- |
 -- The type of types
@@ -30,7 +31,7 @@ data Type
   -- |
   -- A unification variable of type Type
   --
-  = TUnknown (Unknown Type)
+  = TUnknown (TypedUnknown Type)
   -- |
   -- Javascript numbers
   --

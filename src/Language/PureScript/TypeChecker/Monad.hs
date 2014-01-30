@@ -22,7 +22,6 @@ import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Values
 import Language.PureScript.Names
-import Language.PureScript.Unknown
 import Language.PureScript.Declarations
 
 import Data.Data
@@ -34,6 +33,7 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
 import Control.Monad.Reader
+import Control.Monad.Unify
 import Control.Arrow ((***))
 
 import qualified Data.Map as M
@@ -227,6 +227,10 @@ data CheckState = CheckState {
   -- The next type class dictionary name
   --
   , checkNextDictName :: Int
+  -- |
+  -- The current module
+  --
+  , checkCurrentModule :: Maybe ModuleName
   }
 
 -- |
@@ -258,7 +262,7 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 --
 runCheck :: Check a -> Either String (a, Environment)
 runCheck c = do
-  (a, s) <- flip runStateT (CheckState emptyEnvironment 0 0) $ unCheck c
+  (a, s) <- flip runStateT (CheckState emptyEnvironment 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
 -- |
@@ -284,129 +288,23 @@ freshDictionaryName = do
   return n
 
 -- |
--- A substitution maintains a mapping from unification variables to their values, ensuring that
--- the type of a unification variable matches the type of its value.
---
-newtype Substitution = Substitution { runSubstitution :: forall t. (Unifiable t) => Unknown t -> t }
-
-instance Monoid Substitution where
-  mempty = Substitution unknown
-  s1 `mappend` s2 = Substitution $ \u -> apply s1 (apply s2 (unknown u))
-
--- |
--- State for the substitution monad, which contains the current substitution
---
-data SubstState = SubstState { substSubst :: Substitution }
-
--- |
--- Configuration for the substitution monad, constaining the current module
---
-newtype SubstContext = SubstContext { substCurrentModule :: ModuleName } deriving (Show)
-
--- |
--- The substitution monad, which provides the means to unify values to generate a substitution, in addition to
--- the actions supported by the type checking monad @Check@.
---
-newtype Subst a = Subst { unSubst :: ReaderT SubstContext (StateT SubstState Check) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadReader SubstContext)
-
-instance MonadState CheckState Subst where
-  get = Subst . lift . lift $ get
-  put = Subst . lift . lift . put
-
-deriving instance MonadError String Subst
-
--- |
 -- Lift a computation in the @Check@ monad into the substitution monad.
 --
-liftCheck :: Check a -> Subst a
-liftCheck = Subst . lift . lift
-
--- |
--- Get the current substitution monad state
---
-getSubstState :: Subst SubstState
-getSubstState = Subst . lift $ get
+liftCheck :: Check a -> UnifyT Check a
+liftCheck = UnifyT . lift . lift
 
 -- |
 -- Run a computation in the substitution monad, generating a return value and the final substitution.
 --
-runSubst :: SubstContext -> Subst a -> Check (a, Substitution)
-runSubst context subst = do
-  (a, s) <- flip runStateT (SubstState mempty) . flip runReaderT context . unSubst $ subst
-  return (a, substSubst s)
-
--- |
--- Generate a substitution from a substitution function for a single type
---
-substituteWith :: (Typeable t) => (Unknown t -> t) -> Substitution
-substituteWith f = Substitution $ \u -> fromMaybe (unknown u) $ do
-  u1 <- cast u
-  cast (f u1)
-
--- |
--- Substitute a single unification variable
---
-substituteOne :: (Unifiable t) => Unknown t -> t -> Substitution
-substituteOne u t = substituteWith $ \u1 ->
-  case u1 of
-    u2 | u2 == u -> t
-       | otherwise -> unknown u2
-
--- |
--- Replace a unification variable with the specified value in the current substitution
---
-replace :: (Unifiable t) => Unknown t -> t -> Subst ()
-replace u t' = do
-  sub <- substSubst <$> Subst get
-  let t = apply sub t'
-  occursCheck u t
-  let current = apply sub $ unknown u
-  case isUnknown current of
-    Just u1 | u1 == u -> return ()
-    _ -> current ~~ t
-  Subst . modify $ \s -> s { substSubst = substituteOne u t <> substSubst s }
-
--- |
--- Identifies types which support unification
---
-class (Typeable t, Data t, Show t) => Unifiable t where
-  unknown :: Unknown t -> t
-  (~~) :: t -> t -> Subst ()
-  isUnknown :: t -> Maybe (Unknown t)
-  apply :: Substitution -> t -> t
-  unknowns :: t -> [Int]
-
-instance (Unifiable a) => Unifiable [a] where
-  unknown _ = error "not supported"
-  (~~) = zipWithM_ (~~)
-  isUnknown _ = error "not supported"
-  apply s = map (apply s)
-  unknowns = concatMap unknowns
-
--- |
--- Perform the occurs check, to make sure a unification variable does not occur inside a value
---
-occursCheck :: (Unifiable t) => Unknown s -> t -> Subst ()
-occursCheck (Unknown u) t =
-  case isUnknown t of
-    Nothing -> guardWith "Occurs check fails" (u `notElem` unknowns t)
-    _ -> return ()
-
--- |
--- Generate a fresh untyped unification variable
---
-fresh' :: Subst Int
-fresh' = do
-  n <- checkNextVar <$> get
-  modify $ \s -> s { checkNextVar = succ (checkNextVar s) }
-  return n
-
--- |
--- Generate a fresh unification variable at a specific type
---
-fresh :: (Unifiable t) => Subst t
-fresh = unknown . Unknown <$> fresh'
+liftUnify :: (Data a) => UnifyT Check a -> Check a
+liftUnify unify = do
+  st <- get
+  e <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
+  case e of
+    Left err -> throwError err
+    Right (a, ust) -> do
+      modify $ \st -> st { checkNextVar = unifyNextVar ust }
+      return $ runSubstitution (unifyCurrentSubstitution ust) a
 
 -- |
 -- Replace any unqualified names in a type wit their qualified versionss

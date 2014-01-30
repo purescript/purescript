@@ -21,17 +21,17 @@ import Data.Maybe (fromMaybe)
 
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows
+import Control.Monad.Unify
 
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Unknown
 
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Bang = Just "!"
-  match (KUnknown (Unknown u)) = Just $ 'u' : show u
+  match (KUnknown (TypedUnknown (Unknown u))) = Just $ 'u' : show u
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)
