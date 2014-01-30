@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Declarations (
 ) where
 
 import Data.Maybe (isJust, fromMaybe)
+import Control.Monad (when)
 import Control.Applicative
 import qualified Text.Parsec as P
 
@@ -45,7 +46,7 @@ parseDataDeclaration = do
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
-  TypeDeclaration <$> P.try (parseIdent <* lexeme (indented *> P.string "::"))
+  TypeDeclaration <$> P.try (parseNonReservedIdent <* lexeme (indented *> P.string "::"))
                   <*> parsePolyType
 
 parseTypeSynonymDeclaration :: P.Parsec String ParseState Declaration
@@ -56,7 +57,7 @@ parseTypeSynonymDeclaration =
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
-  ValueDeclaration <$> parseIdent
+  ValueDeclaration <$> parseNonReservedIdent
                    <*> P.many parseTopLevelBinder
                    <*> P.optionMaybe parseGuard
                    <*> ((lexeme (indented *> P.char '=')) *> parseValue)
@@ -68,7 +69,7 @@ parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
-   <|> do ident <- parseIdent
+   <|> do ident <- parseNonReservedIdent
           js <- P.optionMaybe (parseJSLiteral <$> stringLiteral)
           ty <- (lexeme (indented *> P.string "::") *> parsePolyType)
           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty)

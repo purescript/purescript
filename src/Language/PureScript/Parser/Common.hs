@@ -78,7 +78,9 @@ reservedNames = [ "case"
                 , "let"
                 , "class"
                 , "instance"
-                , "where" ]
+                , "where"
+                , "null"
+                , "undefined" ]
 
 -- |
 -- A list of built-in operator names
@@ -265,6 +267,19 @@ operatorOrBuiltIn = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s)
 --
 parseIdent :: P.Parsec String ParseState Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrBuiltIn)
+
+
+-- |
+-- Parse an identifier or parenthesized operator that is not a reserved keyword or operator
+--
+parseNonReservedIdent :: P.Parsec String ParseState Ident
+parseNonReservedIdent = do
+  ident <- parseIdent
+  when (isReserved ident) $ P.unexpected $ "reserved identifier " ++ show ident
+  return ident
+  where
+  isReserved (Ident ident) = ident `elem` reservedNames
+  isReserved (Op op) = op `elem` reservedOpNames
 
 -- |
 -- Parse a token inside square brackets
