@@ -41,6 +41,7 @@ import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
+import Language.PureScript.TypeChecker.Monad (canonicalizeType)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a module
@@ -198,7 +199,7 @@ binderToJs m e varName done (NullaryBinder ctor) =
   then
     return done
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor)))) (JSBlock done) Nothing]
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeType m e ctor)))) (JSBlock done) Nothing]
 binderToJs m e varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs m e value done b
@@ -207,7 +208,7 @@ binderToJs m e varName done (UnaryBinder ctor b) = do
   then
     return [success]
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ qualify m ctor))))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeType m e ctor))))
                      success
                      Nothing]
 binderToJs m e varName done (ObjectBinder bs) = go done bs

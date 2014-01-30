@@ -1,16 +1,13 @@
 module M1 where
 
-data Test = Test    
+data Test = Test String
 
-module M2 where
+module Main where
 
 import M1
 
-test :: Test -> M1.Test
-test t = t
+unTest (Test s) = s
 
-testCtor = Test
-    
-module Main where
-
-main = Trace.trace "Done"
+main = do
+  let x = unTest (Test "Done")
+  Trace.trace x
