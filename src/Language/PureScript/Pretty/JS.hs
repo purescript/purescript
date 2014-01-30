@@ -26,6 +26,7 @@ import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Control.Arrow as A
 import Control.Arrow ((<+>))
+import Control.PatternArrows
 import Control.Applicative
 import Control.Monad.State
 

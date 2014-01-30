@@ -20,7 +20,9 @@ module Language.PureScript.Pretty.Types (
 
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
+
 import Control.Arrow ((<+>))
+import Control.PatternArrows
 
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Common

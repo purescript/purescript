@@ -19,10 +19,12 @@ module Language.PureScript.Pretty.Kinds (
 
 import Data.Maybe (fromMaybe)
 
+import Control.Arrow (ArrowPlus(..))
+import Control.PatternArrows
+
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Unknown
-import Control.Arrow (ArrowPlus(..))
 
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
