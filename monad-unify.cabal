@@ -1,0 +1,21 @@
+name:                monad-unify
+version:             0.1.0.0
+synopsis:            Generic first-order unification
+description:
+license:             MIT
+license-file:        LICENSE
+author:              Phil Freeman
+maintainer:          Phil Freeman <paf31@cantab.net>
+copyright:           (c) Phil Freeman 2013
+category:            Unification
+build-type:          Simple
+cabal-version:       >=1.8
+stability:           experimental
+
+library
+  exposed-modules:     Control.Monad.Unify
+  other-modules:
+  exposed:             True
+  buildable:           True
+  hs-source-dirs:      src
+  build-depends:       base ==4.6.*, mtl -any, syb -any
