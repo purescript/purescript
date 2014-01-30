@@ -210,6 +210,15 @@ canonicalizeType _ _ (Qualified (Just mn) nm) = (mn, nm)
 canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types env of
   Just (_, DataAlias mn' pn') -> (mn', pn')
   _ -> (mn, nm)
+  
+-- |
+-- Canonicalize a data constructor by resolving any aliases introduced by module imports
+--
+canonicalizeDataConstructor :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, Ident)
+canonicalizeDataConstructor _ _ (Qualified (Just mn) i) = (mn, Ident $ show i)
+canonicalizeDataConstructor mn env (Qualified Nothing i) = case (mn, i) `M.lookup` dataConstructors env of
+  Just (_, Alias mn' i') -> (mn', i')
+  _ -> (mn, Ident $ show i)
 
 -- |
 -- State required for type checking:

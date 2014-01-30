@@ -1,13 +1,13 @@
 module M1 where
 
-data Test = Test String
+data Test = MkTest String
 
 module Main where
 
 import M1
 
-unTest (Test s) = s
+unTest (MkTest s) = s
 
 main = do
-  let x = unTest (Test "Done")
+  let x = unTest (MkTest "Done")
   Trace.trace x
