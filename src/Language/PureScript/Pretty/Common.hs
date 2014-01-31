@@ -40,6 +40,7 @@ identToJs (Op op) = concatMap identCharToString op
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]
 identCharToString '_' = "_"
+identCharToString '$' = "$dollar"
 identCharToString '~' = "$tilde"
 identCharToString '=' = "$eq"
 identCharToString '<' = "$less"
