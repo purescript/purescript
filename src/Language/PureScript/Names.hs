@@ -30,11 +30,16 @@ data Ident
   -- |
   -- A symbolic name for an infix operator
   --
-  | Op String deriving (Eq, Ord, Data, Typeable)
+  | Op String
+  -- |
+  -- An escaped name
+  --
+  | Escaped String deriving (Eq, Ord, Data, Typeable)
 
 instance Show Ident where
   show (Ident s) = s
   show (Op op) = '(':op ++ ")"
+  show (Escaped s) = s
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.

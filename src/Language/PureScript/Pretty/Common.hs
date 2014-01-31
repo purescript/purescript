@@ -36,6 +36,7 @@ import Language.PureScript.Names
 identToJs :: Ident -> String
 identToJs (Ident name) = concatMap identCharToString name
 identToJs (Op op) = concatMap identCharToString op
+identToJs (Escaped name) = name
 
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]

@@ -151,4 +151,4 @@ typeToString a b = Left $ "Type class instance must be of the form T a1 ... an "
 mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
 mkDictionaryEntryName mn name ty ident = do
   Ident dictName <- lift $ mkDictionaryValueName mn name ty
-  return $ Ident $ dictName ++ "_" ++ identToJs ident
+  return $ Escaped $ dictName ++ "_" ++ identToJs ident
