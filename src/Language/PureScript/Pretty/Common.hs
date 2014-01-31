@@ -41,6 +41,7 @@ identToJs (Escaped name) = name
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]
 identCharToString '_' = "_"
+identCharToString '.' = "$dot"
 identCharToString '$' = "$dollar"
 identCharToString '~' = "$tilde"
 identCharToString '=' = "$eq"
