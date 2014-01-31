@@ -46,16 +46,16 @@ desugarDo = everywhereM (mkM replace)
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App bind [val]) [Abs [Ident "_"] rest']
+    return $ App (App bind val) (Abs (Ident "_") rest')
   go [DoNotationBind _ _] = Left "Bind statement cannot be the last statement in a do block"
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
-    return $ App (App bind [val]) [Abs [ident] rest']
+    return $ App (App bind val) (Abs ident rest')
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     let ident = head $ unusedNames rest'
-    return $ App (App bind [val]) [Abs [ident] (Case [Var (Qualified Nothing ident)] [([binder], Nothing, rest')])]
+    return $ App (App bind val) (Abs ident (Case [Var (Qualified Nothing ident)] [([binder], Nothing, rest')]))
   go [DoNotationLet _ _] = Left "Let statement cannot be the last statement in a do block"
   go (DoNotationLet binder val : rest) = do
     rest' <- go rest

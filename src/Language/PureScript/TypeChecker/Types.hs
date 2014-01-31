@@ -99,11 +99,8 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' String String = return ()
   unifyTypes' Boolean Boolean = return ()
   unifyTypes' Array Array = return ()
+  unifyTypes' Function Function = return ()
   unifyTypes' (Object row1) (Object row2) = row1 ?= row2
-  unifyTypes' (Function args1 ret1) (Function args2 ret2) = do
-    guardWith "Function applied to incorrect number of args" $ length args1 == length args2
-    zipWithM_ unifyTypes args1 args2
-    ret1 `unifyTypes` ret2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
     env <- getEnv
@@ -235,14 +232,19 @@ entails moduleName context goal@(className, ty) = do
     , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
     , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' (tcdInstanceType tcd)
     , args <- solveSubgoals env subst (tcdDependencies tcd) ]
+  solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, Type)] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
     dict <- mapM (go env) (replaceAllTypeVars subst subgoals)
     return $ Just dict
-  mkDictionary fnName args = maybe id (flip App) args $ (Var fnName)
+  mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
+  mkDictionary fnName Nothing = Var fnName
+  mkDictionary fnName (Just dicts) = foldr (flip App) (Var fnName) dicts
+  filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
   filterModule _ = False
+  canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
 
@@ -431,16 +433,16 @@ infer' (Accessor prop val) = do
       _ <- subsumes Nothing objTy (Object (RCons prop field rest))
       return $ TypedValue True (Accessor prop typed) field
     Just ty -> return $ TypedValue True (Accessor prop typed) ty
-infer' (Abs args ret) = do
-  ts <- replicateM (length args) fresh
+infer' (Abs arg ret) = do
+  ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  bindLocalVariables moduleName (zip args ts) $ do
+  bindLocalVariables moduleName [(arg, ty)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
-    return $ TypedValue True (Abs args body) $ Function ts bodyTy
-infer' (App f args) = do
+    return $ TypedValue True (Abs arg body) $ function ty bodyTy
+infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
   ret <- fresh
-  app <- checkFunctionApplication f' ft args ret
+  app <- checkFunctionApplication f' ft arg ret
   return $ TypedValue True app ret
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -450,7 +452,7 @@ infer' (Var var) = do
     ConstrainedType constraints _ -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
+      return $ TypedValue True (foldr App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue True (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
@@ -619,7 +621,7 @@ inferBinder val (UnaryBinder ctor binder) = do
     Just (ty, _) -> do
       fn <- replaceAllVarsWithUnknowns ty
       case fn of
-        Function [obj] ret -> do
+        TypeApp (TypeApp Function obj) ret -> do
           _ <- subsumes Nothing val ret
           inferBinder obj binder
         _ -> throwError $ "Constructor " ++ show ctor ++ " is not a unary constructor"
@@ -792,7 +794,7 @@ check' val (ConstrainedType constraints ty) = do
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
-  return $ Abs dictNames val'
+  return $ foldr Abs val' dictNames
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -809,14 +811,13 @@ check' (Indexer index vals) ty = do
   index' <- check index Number
   vals' <- check vals (TypeApp Array ty)
   return $ Indexer index' vals'
-check' (Abs args ret) (Function argTys retTy) = do
+check' (Abs arg ret) (TypeApp (TypeApp Function argTy) retTy) = do
   Just moduleName <- checkCurrentModule <$> get
-  guardWith "Incorrect number of function arguments" (length args == length argTys)
-  ret' <- bindLocalVariables moduleName (zip args argTys) $ check ret retTy
-  return $ Abs args ret'
-check' (App f args) ret = do
+  ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
+  return $ Abs arg ret'
+check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
-  app <- checkFunctionApplication f' ft args ret
+  app <- checkFunctionApplication f' ft arg ret
   return $ app
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
@@ -918,42 +919,43 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> [Value] -> Type -> UnifyT Check Value
-checkFunctionApplication fn fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy args ret
+checkFunctionApplication :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg ret
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
-    ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
+    ++ " to argument " ++ prettyPrintValue arg
     ++ ":\n" ++ msg
 
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> [Value] -> Type -> UnifyT Check Value
-checkFunctionApplication' fn (Function argTys retTy) args ret = do
-  guardWith "Incorrect number of function arguments" (length args == length argTys)
-  args' <- zipWithM check args argTys
+checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication' fn (TypeApp (TypeApp Function argTy) retTy) arg ret = do
+  arg' <- check arg argTy
   _ <- subsumes Nothing retTy ret
-  return $ App fn args'
-checkFunctionApplication' fn (ForAll ident ty) args ret = do
+  return $ App fn arg'
+checkFunctionApplication' fn (ForAll ident ty) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication fn replaced args ret
-checkFunctionApplication' fn u@(TUnknown _) args ret = do
-  args' <- mapM (\arg -> infer arg >>= \(TypedValue _ v t) -> TypedValue True v <$> replaceAllVarsWithUnknowns t) args
-  let tys = map (\(TypedValue _ _ t) -> t) args'
-  u ?= Function tys ret
-  return $ App fn args'
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do
+  checkFunctionApplication fn replaced arg ret
+checkFunctionApplication' fn u@(TUnknown _) arg ret = do
+  arg' <- do
+    TypedValue _ v t <- infer arg
+    TypedValue True v <$> replaceAllVarsWithUnknowns t
+  let ty = (\(TypedValue _ _ t) -> t) arg'
+  u ?= function ty ret
+  return $ App fn arg'
+checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- expandTypeSynonym name tyArgs
-  checkFunctionApplication fn ty args ret
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) args ret = do
+  checkFunctionApplication fn ty arg ret
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
-  checkFunctionApplication' (App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy args ret
-checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
+  checkFunctionApplication' (foldr App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg ret
+checkFunctionApplication' _ fnTy arg ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
-  ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
+  ++ " to argument(s) " ++ prettyPrintValue arg
   ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
 
 -- |
@@ -975,8 +977,8 @@ subsumes' :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
 subsumes' val (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2
-subsumes' val (Function args1 ret1) (Function args2 ret2) = do
-  zipWithM_ (subsumes Nothing) args2 args1
+subsumes' val (TypeApp (TypeApp Function arg1) ret1) (TypeApp (TypeApp Function arg2) ret2) = do
+  subsumes Nothing arg2 arg1
   subsumes Nothing ret1 ret2
   return val
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
@@ -984,7 +986,7 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
-  return . Just $ App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+  return . Just $ foldr App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
 subsumes' val ty1 ty2 = do
   ty1 ?= ty2
   return val

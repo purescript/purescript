@@ -10,9 +10,9 @@ test2 = \arr -> case arr of
 
 data Tree = One Number | Some [Tree]
 
-test3 = \(tree, sum) -> case tree of
+test3 = \tree sum -> case tree of
   One n -> n
-  Some (n1 : n2 : rest) -> test3(n1, sum) * 10 + test3(n2, sum) * 5 + sum(rest)
+  Some (n1 : n2 : rest) -> test3 n1 sum * 10 + test3 n2 sum * 5 + sum rest
 
 test4 = \arr -> case arr of 
   [] -> 0

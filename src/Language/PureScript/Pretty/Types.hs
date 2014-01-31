@@ -35,6 +35,7 @@ typeLiterals = mkPattern match
   match String = Just "String"
   match Boolean = Just "Boolean"
   match Array = Just $ "[]"
+  match Function = Just $ "(->)"
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
@@ -74,13 +75,7 @@ typeApp = mkPattern match
 singleArgumentFunction :: Pattern () Type (Type, Type)
 singleArgumentFunction = mkPattern match
   where
-  match (Function [arg] ret) = Just (arg, ret)
-  match _ = Nothing
-
-function :: Pattern () Type ([Type], Type)
-function = mkPattern match
-  where
-  match (Function args ret) = Just (args, ret)
+  match (TypeApp (TypeApp Function arg) ret) = Just (arg, ret)
   match _ = Nothing
 
 -- |
@@ -95,6 +90,5 @@ prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
                   , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
-                    , Wrap function $ \args ret -> "(" ++ intercalate ", " (map prettyPrintType args) ++ ") -> " ++ ret
                     ]
                   ]

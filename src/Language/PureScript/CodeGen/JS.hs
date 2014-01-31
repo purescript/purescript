@@ -110,9 +110,9 @@ valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (va
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
 valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
 valueToJs opts m e (Indexer index val) = JSIndexer (valueToJs opts m e index) (valueToJs opts m e val)
-valueToJs opts m e (App val args) = JSApp (valueToJs opts m e val) (map (valueToJs opts m e) args)
-valueToJs opts m e (Abs args val) = JSFunction Nothing args (JSBlock [JSReturn (valueToJs opts m e val)])
-valueToJs opts m e (TypedValue _ (Abs args val) ty) | optionsPerformRuntimeTypeChecks opts = JSFunction Nothing args (JSBlock $ runtimeTypeChecks args ty ++ [JSReturn (valueToJs opts m e val)])
+valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
+valueToJs opts m e (Abs arg val) = JSFunction Nothing [arg] (JSBlock [JSReturn (valueToJs opts m e val)])
+valueToJs opts m e (TypedValue _ (Abs arg val) ty) | optionsPerformRuntimeTypeChecks opts = JSFunction Nothing [arg] (JSBlock $ runtimeTypeChecks arg ty ++ [JSReturn (valueToJs opts m e val)])
 valueToJs opts m e (Unary op val) = JSUnary op (valueToJs opts m e val)
 valueToJs opts m e (Binary op v1 v2) = JSBinary op (valueToJs opts m e v1) (valueToJs opts m e v2)
 valueToJs _ m e (Var ident) = varToJs m e ident
@@ -120,17 +120,17 @@ valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 
-runtimeTypeChecks :: [Ident] -> Type -> [JS]
-runtimeTypeChecks args ty =
+runtimeTypeChecks :: Ident -> Type -> [JS]
+runtimeTypeChecks arg ty =
   let
-    argTys = getFunctionArgumentTypes ty
+    argTy = getFunctionArgumentType ty
   in
-    concat $ zipWith argumentCheck (map JSVar args) argTys
+    maybe [] (argumentCheck (JSVar arg)) argTy
   where
-  getFunctionArgumentTypes :: Type -> [Type]
-  getFunctionArgumentTypes (Function funArgs _) = funArgs
-  getFunctionArgumentTypes (ForAll _ ty') = getFunctionArgumentTypes ty'
-  getFunctionArgumentTypes _ = []
+  getFunctionArgumentType :: Type -> Maybe Type
+  getFunctionArgumentType (TypeApp (TypeApp Function funArg) _) = Just funArg
+  getFunctionArgumentType (ForAll _ ty') = getFunctionArgumentType ty'
+  getFunctionArgumentType _ = Nothing
   argumentCheck :: JS -> Type -> [JS]
   argumentCheck val Number = [typeCheck val "number"]
   argumentCheck val String = [typeCheck val "string"]
@@ -141,7 +141,7 @@ runtimeTypeChecks args ty =
       (pairs, _) = rowToList row
     in
       typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor prop val) ty') pairs
-  argumentCheck val (Function _ _) = [typeCheck val "function"]
+  argumentCheck val (TypeApp (TypeApp Function _) _) = [typeCheck val "function"]
   argumentCheck val (ForAll _ ty') = argumentCheck val ty'
   argumentCheck _ _ = []
   typeCheck :: JS -> String -> JS
@@ -253,7 +253,7 @@ isOnlyConstructor m e ctor =
   numConstructors ty = length $ filter (\(ty1, _) -> ((==) `on` typeConstructor) ty ty1) $ M.elems $ dataConstructors e
   typeConstructor (TypeConstructor qual) = qualify m qual
   typeConstructor (ForAll _ ty) = typeConstructor ty
-  typeConstructor (Function _ ty) = typeConstructor ty
+  typeConstructor (TypeApp (TypeApp Function _) ty) = typeConstructor ty
   typeConstructor (TypeApp ty _) = typeConstructor ty
   typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn
 

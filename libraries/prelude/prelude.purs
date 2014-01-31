@@ -406,15 +406,15 @@ module Math where
     , acos :: Number -> Number
     , asin :: Number -> Number
     , atan :: Number -> Number
-    , atan2 :: (Number, Number) -> Number
+    --, atan2 :: (Number, Number) -> Number
     , aceil :: Number -> Number
     , cos :: Number -> Number
     , exp :: Number -> Number
     , floor :: Number -> Number
     , log :: Number -> Number
-    , max :: (Number, Number) -> Number
-    , pow :: (Number, Number) -> Number
-    , random :: () -> Number
+    --, max :: (Number, Number) -> Number
+    --, pow :: (Number, Number) -> Number
+    --, random :: () -> Number
     , round :: Number -> Number
     , sin :: Number -> Number
     , sqrt :: Number -> Number

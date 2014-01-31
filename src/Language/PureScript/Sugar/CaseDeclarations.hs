@@ -48,27 +48,23 @@ toDecls :: [Declaration] -> Either String [Declaration]
 toDecls d@[ValueDeclaration _ [] Nothing _] = return d
 toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
   let tuples = map toTuple ds
-  unless (all ((== map length bs) . map length . fst) tuples) $
+  unless (all ((== length bs) . length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
   return [makeCaseDeclaration ident tuples]
 toDecls ds = return ds
 
-toTuple :: Declaration -> ([[Binder]], (Maybe Guard, Value))
+toTuple :: Declaration -> ([Binder], (Maybe Guard, Value))
 toTuple (ValueDeclaration _ bs g val) = (bs, (g, val))
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: Ident -> [([[Binder]], (Maybe Guard, Value))] -> Declaration
+makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Value))] -> Declaration
 makeCaseDeclaration ident alternatives =
   let
-    argPattern = map length . fst . head $ alternatives
-    args = take (sum argPattern) $ unusedNames (ident, alternatives)
+    argPattern = length . fst . head $ alternatives
+    args = take argPattern $ unusedNames (ident, alternatives)
     vars = map (\arg -> Var (Qualified Nothing arg)) args
-    binders = [ (join bs, g, val) | (bs, (g, val)) <- alternatives ]
-    value = foldr (\args' ret -> Abs args' ret) (Case vars binders) (rearrange argPattern args)
+    binders = [ (bs, g, val) | (bs, (g, val)) <- alternatives ]
+    value = foldr (\args' ret -> Abs args' ret) (Case vars binders) args
   in
     ValueDeclaration ident [] Nothing value
-
-rearrange :: [Int] -> [a] -> [[a]]
-rearrange [] _ = []
-rearrange (n:ns) xs = take n xs : rearrange ns (drop n xs)
 

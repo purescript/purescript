@@ -58,12 +58,9 @@ parseTypeSynonymDeclaration =
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
   ValueDeclaration <$> parseNonReservedIdent
-                   <*> P.many parseTopLevelBinder
+                   <*> P.many parseBinderNoParens
                    <*> P.optionMaybe parseGuard
                    <*> ((lexeme (indented *> P.char '=')) *> parseValue)
-
-parseTopLevelBinder :: P.Parsec String ParseState [Binder]
-parseTopLevelBinder = return <$> P.try parseBinderNoParens <|> parens (commaSep parseBinder)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>

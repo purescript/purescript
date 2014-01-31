@@ -88,7 +88,7 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident [[Binder]] (Maybe Guard) Value
+  | ValueDeclaration Ident [Binder] (Maybe Guard) Value
   -- |
   -- A minimal mutually recursive set of value declarations
   --

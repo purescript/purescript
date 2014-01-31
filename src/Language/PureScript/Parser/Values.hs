@@ -54,19 +54,12 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
   C.reservedOp "\\"
-  args <- P.many (C.indented *> (P.try singleArg <|> manyArgs))
+  args <- P.many (C.indented *> (Abs <$> C.parseIdent))
   C.indented *> C.reservedOp "->"
   value <- parseValue
   return $ toFunction args value
   where
-  manyArgs :: P.Parsec String ParseState (Value -> Value)
-  manyArgs = do
-    args <- C.parens (C.commaSep C.parseIdent)
-    return $ Abs args
-  singleArg :: P.Parsec String ParseState (Value -> Value)
-  singleArg = Abs . return <$> C.parseIdent
   toFunction :: [Value -> Value] -> Value -> Value
-  toFunction [] value = Abs [] value
   toFunction args value = foldr (($)) value args
 
 parseVar :: P.Parsec String ParseState Value
@@ -159,8 +152,7 @@ parseValue =
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
                   , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
-  postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= \t2 -> return (\t1 -> App t1 [t2])) <*> pure v
-                  , \v -> P.try $ flip App <$> (C.indented *> C.parens (C.commaSep parseValue)) <*> pure v
+  postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= return . flip App) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
                   ]
   operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)

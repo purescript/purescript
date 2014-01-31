@@ -125,12 +125,7 @@ infer (Object row) = do
   k <- infer row
   k ?= Row Star
   return Star
-infer (Function args ret) = do
-  ks <- mapM infer args
-  k <- infer ret
-  k ?= Star
-  forM_ ks (?= Star)
-  return Star
+infer Function = return $ FunKind Star $ FunKind Star Star
 infer (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get
   UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

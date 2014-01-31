@@ -12,11 +12,11 @@ module Operators1 where
 
 module Operators2 where
 
-  test1 = \(x, y, z) -> x * y + z(x)(y)
+  test1 = \x y z -> x * y + z(x)(y)
 
   test2 = (\x -> x.foo false) { foo : \_ -> 1 }
 
-  test3 = (\(x, y) -> x)(1 + 2 * (1 + 2), true && (false || false))
+  test3 = (\x y -> x)(1 + 2 * (1 + 2)) (true && (false || false))
 
   k = \x -> \y -> x
 
@@ -30,7 +30,7 @@ module Operators2 where
 
   test6 = ((\x -> x) `k` 2) 3
 
-  (<>) = \s1 -> \s2 -> s1 ++ s2
+  (<>) = \s1 s2 -> s1 ++ s2
 
   test7 = "Hello" <> "World!"
 
@@ -57,7 +57,7 @@ import Global
 import Arrays
 
 main = do
-  print (test1 (1, 2, \x y -> x + y))
+  print $ test1 1 2 $ \x y -> x + y
   print test2
   print test3
   print test4

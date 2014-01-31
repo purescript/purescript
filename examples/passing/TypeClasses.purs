@@ -8,24 +8,24 @@ class Show a where
 instance Show String where
   show s = s
 
-test1 = \ -> show "testing"
+test1 = \_ -> show "testing"
 
 f :: forall a. (TypeClasses.Show a) => a -> String
 f x = show x
 
-test2 = \ -> f "testing"
+test2 = \_ -> f "testing"
 
 test7 :: forall a. (Show a) => a -> String
 test7 = show
 
-test8 = \ -> show $ "testing"
+test8 = \_ -> show $ "testing"
 
 data Data a = Data a
 
 instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
   show (Data a) = "Data (" ++ show a ++ ")"
 
-test3 = \ -> show (Data "testing")
+test3 = \_ -> show (Data "testing")
 
 class Monad m where
   ret :: forall a. a -> m a
@@ -42,10 +42,10 @@ instance TypeClasses.Monad Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
-test4 :: forall m. (Monad m) => () -> m Number
-test4 = \ -> ret 1
+test4 :: forall a m. (Monad m) => a -> m Number
+test4 = \_ -> ret 1
 
-test5 = \ -> Just 1 >>= \n -> ret (n + 1)
+test5 = \_ -> Just 1 >>= \n -> ret (n + 1)
 
 module TypeClasses2 where
 
@@ -55,7 +55,11 @@ instance (TypeClasses.Show a) => TypeClasses.Show [a] where
   show [] = "[]"
   show (x:xs) = TypeClasses.show x ++ ", " ++ TypeClasses.show xs
 
-test6 = \ -> show ["testing"]
+test6 = \_ -> show ["testing"]
+
+instance TypeClasses.Monad (->) r where
+  ret a r = a
+  (>>=) f g r = g (f r) r
     
 module Main where
 

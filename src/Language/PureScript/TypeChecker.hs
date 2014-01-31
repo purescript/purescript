@@ -51,7 +51,7 @@ addDataConstructor moduleName name args dctor maybeTy = do
   env <- getEnv
   dataConstructorIsNotDefined moduleName dctor
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
-  let dctorTy = maybe retTy (\ty -> Function [ty] retTy) maybeTy
+  let dctorTy = maybe retTy (flip function retTy) maybeTy
   let polyType = mkForAll args dctorTy
   putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType, DataConstructor) (dataConstructors env) }
 
@@ -231,7 +231,7 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
   constructs (TypeConstructor (Qualified (Just mn) pn')) pn
     = mn == moduleName && pn' == pn
   constructs (ForAll _ ty) pn = ty `constructs` pn
-  constructs (Function _ ty) pn = ty `constructs` pn
+  constructs (TypeApp (TypeApp Function _) ty) pn = ty `constructs` pn
   constructs (TypeApp ty _) pn = ty `constructs` pn
   constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do

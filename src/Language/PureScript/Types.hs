@@ -55,7 +55,7 @@ data Type
   -- |
   -- A function, with zero or more arguments
   --
-  | Function [Type] Type
+  | Function
   -- |
   -- A named type variable
   --
@@ -94,6 +94,12 @@ data Type
   | RCons String Type Type deriving (Show, Eq, Data, Typeable)
 
 -- |
+-- Smart constructor for function types
+--
+function :: Type -> Type -> Type
+function t1 t2 = TypeApp (TypeApp Function t1) t2
+
+-- |
 -- Convert a row to a list of pairs of labels and types
 --
 rowToList :: Type -> ([(String, Type)], Type)
@@ -113,18 +119,7 @@ rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 --
 isMonoType :: Type -> Bool
 isMonoType (ForAll _ _) = False
-isMonoType ty = isPolyType ty
-
--- |
--- Check whather a type is a valid polytype
---
-isPolyType :: Type -> Bool
-isPolyType (Object ps) = all isPolyType (map snd . fst $ rowToList ps)
-isPolyType (Function args ret) = all isPolyType args && isPolyType ret
-isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
-isPolyType (SaturatedTypeSynonym _ args) = all isPolyType args
-isPolyType (ForAll _ ty) = isPolyType ty
-isPolyType _ = True
+isMonoType ty = True
 
 -- |
 -- Universally quantify a type

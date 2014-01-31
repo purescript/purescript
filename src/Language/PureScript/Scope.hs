@@ -33,7 +33,7 @@ usedNames :: (Data d) => d -> [Ident]
 usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB `extQ` namesJS) val
   where
   namesV :: Value -> [Ident]
-  namesV (Abs args _) = args
+  namesV (Abs arg _) = [arg]
   namesV (Var (Qualified Nothing name)) = [name]
   namesV _ = []
   namesS :: Statement -> [Ident]
