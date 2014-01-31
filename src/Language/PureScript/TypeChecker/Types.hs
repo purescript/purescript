@@ -428,7 +428,7 @@ infer' (Accessor prop val) = do
     Nothing -> do
       field <- fresh
       rest <- fresh
-      objTy `subsumes` Object (RCons prop field rest)
+      _ <- subsumes Nothing objTy (Object (RCons prop field rest))
       return $ TypedValue True (Accessor prop typed) field
     Just ty -> return $ TypedValue True (Accessor prop typed) ty
 infer' (Abs args ret) = do
@@ -609,7 +609,7 @@ inferBinder val (NullaryBinder ctor) = do
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup (qualify moduleName ctor) (dataConstructors env) of
     Just (ty, _) -> do
-      ty `subsumes` val
+      _ <- subsumes Nothing ty val
       return M.empty
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (UnaryBinder ctor binder) = do
@@ -620,7 +620,7 @@ inferBinder val (UnaryBinder ctor binder) = do
       fn <- replaceAllVarsWithUnknowns ty
       case fn of
         Function [obj] ret -> do
-          val `subsumes` ret
+          _ <- subsumes Nothing val ret
           inferBinder obj binder
         _ -> throwError $ "Constructor " ++ show ctor ++ " is not a unary constructor"
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
@@ -818,19 +818,24 @@ check' (App f args) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   app <- checkFunctionApplication f' ft args ret
   return $ app
-check' (Var var) ty = do
+check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
   ty1 <- lookupVariable moduleName var
   repl <- replaceAllTypeSynonyms ty1
-  repl `subsumes` ty
-  return $ Var var
+  v' <- subsumes (Just v) repl ty
+  case v' of
+    Nothing -> throwError "Unable to check type subsumption"
+    Just v'' -> return v''
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  ty1 `subsumes` ty2
-  val' <- if checkType then check val ty1 else return val
-  return $ TypedValue True val' ty1
+  val' <- subsumes (Just val) ty1 ty2
+  case val' of
+    Nothing -> throwError "Unable to check type subsumption"
+    Just val'' -> do
+      val''' <- if checkType then check val'' ty1 else return val''
+      return $ TypedValue True val''' ty1
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
   let ts = map (\(TypedValue _ _ t) -> t) vals'
@@ -869,7 +874,7 @@ check' (Constructor c) ty = do
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just (ty1, _) -> do
       repl <- replaceAllTypeSynonyms ty1
-      repl `subsumes` ty
+      _ <- subsumes Nothing repl ty
       return $ Constructor c
 check' val (SaturatedTypeSynonym name args) = do
   ty <- expandTypeSynonym name args
@@ -928,7 +933,7 @@ checkFunctionApplication' :: Value -> Type -> [Value] -> Type -> UnifyT Check Va
 checkFunctionApplication' fn (Function argTys retTy) args ret = do
   guardWith "Incorrect number of function arguments" (length args == length argTys)
   args' <- zipWithM check args argTys
-  retTy `subsumes` ret
+  _ <- subsumes Nothing retTy ret
   return $ App fn args'
 checkFunctionApplication' fn (ForAll ident ty) args ret = do
   replaced <- replaceVarWithUnknown ident ty
@@ -954,8 +959,8 @@ checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of
 -- |
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
-subsumes :: Type -> Type -> UnifyT Check ()
-subsumes ty1 ty2 = rethrow errorMessage $ subsumes' ty1 ty2
+subsumes :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
+subsumes val ty1 ty2 = rethrow errorMessage $ subsumes' val ty1 ty2
   where
   errorMessage msg = "Error checking that type "
     ++ prettyPrintType ty1
@@ -966,12 +971,21 @@ subsumes ty1 ty2 = rethrow errorMessage $ subsumes' ty1 ty2
 -- |
 -- Check whether one type subsumes another
 --
-subsumes' :: Type -> Type -> UnifyT Check ()
-subsumes' (ForAll ident ty1) ty2 = do
+subsumes' :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
+subsumes' val (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
-  replaced `subsumes` ty2
-subsumes' (Function args1 ret1) (Function args2 ret2) = do
-  zipWithM_ subsumes args2 args1
-  ret1 `subsumes` ret2
-subsumes' ty1 ty2 = ty1 ?= ty2
+  subsumes val replaced ty2
+subsumes' val (Function args1 ret1) (Function args2 ret2) = do
+  zipWithM_ (subsumes Nothing) args2 args1
+  subsumes Nothing ret1 ret2
+  return val
+subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
+  env <- getEnv
+  dicts <- getTypeClassDictionaries
+  Just moduleName <- checkCurrentModule <$> get
+  _ <- subsumes' Nothing ty1 ty2
+  return . Just $ App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+subsumes' val ty1 ty2 = do
+  ty1 ?= ty2
+  return val
 

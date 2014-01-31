@@ -13,6 +13,9 @@ f x = show x
 
 test2 = \ -> f "testing"
 
+test7 :: forall a. (Show a) => a -> String
+test7 = show
+
 data Data a = Data a
 
 instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
@@ -52,5 +55,7 @@ test6 = \ -> show ["testing"]
     
 module Main where
 
-main = Trace.trace "Done"
+import TypeClasses
+
+main = Trace.trace (test7 "Done")
 
