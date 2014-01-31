@@ -1,5 +1,7 @@
 module TypeClasses where
 
+import Prelude (($))
+
 class Show a where
   show :: a -> String
 
@@ -15,6 +17,8 @@ test2 = \ -> f "testing"
 
 test7 :: forall a. (Show a) => a -> String
 test7 = show
+
+test8 = \ -> show $ "testing"
 
 data Data a = Data a
 

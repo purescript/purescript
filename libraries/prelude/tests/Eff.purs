@@ -42,7 +42,7 @@ test7 = \ -> do
     r <- newSTRef 0
     modifySTRef r $ \n -> n + 1
     readSTRef r
-  print n
+  print $ n
 
 module Main where
 
