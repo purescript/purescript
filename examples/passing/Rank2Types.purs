@@ -9,7 +9,7 @@ module Rank2Types where
 
   foreign import exampleST :: forall s. ST s Number
 
-  testST = \ -> runST exampleST
+  testST = \_ -> runST exampleST
 
   foreign import push :: forall el. el -> [el] -> [el]
 

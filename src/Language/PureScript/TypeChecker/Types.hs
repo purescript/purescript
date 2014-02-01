@@ -452,7 +452,7 @@ infer' (Var var) = do
     ConstrainedType constraints _ -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldr App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue True (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
@@ -952,7 +952,7 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
-  checkFunctionApplication' (foldr App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg ret
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg ret
 checkFunctionApplication' _ fnTy arg ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument(s) " ++ prettyPrintValue arg
@@ -986,7 +986,7 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
-  return . Just $ foldr App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+  return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
 subsumes' val ty1 ty2 = do
   ty1 ?= ty2
   return val

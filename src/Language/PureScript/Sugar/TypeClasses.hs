@@ -97,7 +97,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
     memberName <- mkDictionaryEntryName mn name ty ident
     return (identToJs ident, TypedValue False
                                (if null deps then Var (Qualified Nothing memberName)
-                                else foldr App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
+                                else foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                                (quantify memberType))
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 

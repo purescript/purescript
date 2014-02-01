@@ -9,15 +9,15 @@ instance Prelude.Monad Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
-test1 = \ -> do 
+test1 = \_ -> do 
   Just "abc"
 
-test2 = \ -> do
+test2 = \_ -> do
   (x : _) <- Just [1, 2, 3]
   (y : _) <- Just [4, 5, 6]
   Just (x + y)
 
-test3 = \ -> do
+test3 = \_ -> do
   Just 1
   Nothing :: Maybe Number
   Just 2
@@ -34,11 +34,11 @@ test5 mx my mz = do
   z <- mz
   Just (z + sum)
 
-test6 mx = \ -> do 
+test6 mx = \_ -> do 
   let Just x = mx
   Just x
 
-test8 = \ -> do 
+test8 = \_ -> do 
   Just (do 
     Just 1)
 
@@ -60,7 +60,7 @@ forever a = do
   a
   forever a
 
-test9 = \ -> foo <$> Just 1 <*> Just 2 <*> Just 3
+test9 = \_ -> foo <$> Just 1 <*> Just 2 <*> Just 3
     
 module Main where
 
