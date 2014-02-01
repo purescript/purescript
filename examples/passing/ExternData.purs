@@ -12,7 +12,7 @@ module ExternData where
 
   foreign import prompt :: IO String
 
-  main = \ -> prompt `bind` \s -> showMessage s
+  main = \_ -> prompt `bind` \s -> showMessage s
     
 module Main where
 
