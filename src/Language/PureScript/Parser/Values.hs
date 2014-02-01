@@ -54,7 +54,7 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
   C.reservedOp "\\"
-  args <- P.many (C.indented *> (Abs <$> C.parseIdent))
+  args <- P.many1 (C.indented *> (Abs <$> C.parseIdent))
   C.indented *> C.reservedOp "->"
   value <- parseValue
   return $ toFunction args value
