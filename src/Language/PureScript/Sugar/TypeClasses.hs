@@ -106,13 +106,15 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
 typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
 typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [] _ val) = do
   m <- get
-  valTy <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right $
-                do (arg, members) <- M.lookup (qualify mn name) m
-                   ty' <- lookup (identToJs ident) members
-                   return $ replaceTypeVars arg ty ty'
+  valTy <- lift $ do (arg, members) <- lookupTypeClass m
+                     ty' <- lookupIdent members
+                     return $ replaceTypeVars arg ty ty'
   entryName <- mkDictionaryEntryName mn name ty ident
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
+  where
+  lookupTypeClass m = maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (qualify mn name) m
+  lookupIdent members = maybe (Left $ "Type class " ++ show name ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
