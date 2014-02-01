@@ -1,43 +1,33 @@
 module TypeClasses where
 
-import Prelude (($))
-
-class Show a where
-  show :: a -> String
-
-instance Show String where
-  show s = s
+import Prelude
 
 test1 = \_ -> show "testing"
 
-f :: forall a. (TypeClasses.Show a) => a -> String
+f :: forall a. (Prelude.Show a) => a -> String
 f x = show x
 
 test2 = \_ -> f "testing"
 
-test7 :: forall a. (Show a) => a -> String
+test7 :: forall a. (Prelude.Show a) => a -> String
 test7 = show
 
 test8 = \_ -> show $ "testing"
 
 data Data a = Data a
 
-instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
+instance (Prelude.Show a) => Prelude.Show (Data a) where
   show (Data a) = "Data (" ++ show a ++ ")"
 
 test3 = \_ -> show (Data "testing")
 
-class Monad m where
-  ret :: forall a. a -> m a
-  (>>=) :: forall a b. m a -> (a -> m b) -> m b
-
-instance TypeClasses.Monad Data where
+instance Prelude.Monad Data where
   ret = Data
   (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
 
-instance TypeClasses.Monad Maybe where
+instance Prelude.Monad Maybe where
   ret = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
@@ -49,20 +39,30 @@ test5 = \_ -> Just 1 >>= \n -> ret (n + 1)
 
 module TypeClasses2 where
 
+import Prelude
 import TypeClasses
 
-instance (TypeClasses.Show a) => TypeClasses.Show [a] where
+instance (Prelude.Show a) => Prelude.Show [a] where
   show [] = "[]"
-  show (x:xs) = TypeClasses.show x ++ ", " ++ TypeClasses.show xs
+  show (x:xs) = show x ++ ", " ++ show xs
 
 test6 = \_ -> show ["testing"]
 
-instance TypeClasses.Monad (->) r where
+instance Prelude.Monad (->) r where
   ret a r = a
   (>>=) f g r = g (f r) r
+
+ask r = r
+
+runReader r f = f r
+
+test9 _ = runReader 0 $ do
+  n <- ask
+  ret $ n + 1
     
 module Main where
 
+import Prelude
 import TypeClasses
 
 main = Trace.trace (test7 "Done")

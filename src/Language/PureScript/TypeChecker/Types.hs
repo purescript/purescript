@@ -258,6 +258,7 @@ typeHeadsAreEqual _ _ Number Number = Just []
 typeHeadsAreEqual _ _ Boolean Boolean = Just []
 typeHeadsAreEqual _ _ (Skolem s1) (Skolem s2) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ Array Array = Just []
+typeHeadsAreEqual _ _ Function Function = Just []
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
