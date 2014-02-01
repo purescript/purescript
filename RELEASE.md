@@ -1,6 +1,6 @@
 ## 0.3.0 Changes
 
-Many thanks to the [contributors](https://github.com/paf31/purescript/graphs/contributors) who helped with this release.
+Many thanks to the [contributors](https://github.com/purescript/purescript/graphs/contributors) who helped with this release.
 
 - Full language guide can be found [here](http://functorial.com/purescript).
 - Try out the latest features [here](http://tryps.functorial.com).
@@ -85,7 +85,7 @@ Many thanks to the [contributors](https://github.com/paf31/purescript/graphs/con
 
 ## 0.2.0 Changes
 
-Many thanks to the [contributors](https://github.com/paf31/purescript/graphs/contributors) who helped with this release.
+Many thanks to the [contributors](https://github.com/purescript/purescript/graphs/contributors) who helped with this release.
 
 - Full language guide can be found [here](http://functorial.com/purescript).
 - Try out the latest features [here](http://tryps.functorial.com).
