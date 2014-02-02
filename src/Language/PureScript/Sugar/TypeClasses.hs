@@ -88,7 +88,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
       (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..length deps]))
-      (quantify (foldr (\t1 t2 -> TypeApp (TypeApp Function t1) t2) (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
+      (quantify (foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
@@ -133,11 +133,6 @@ mkDictionaryValueName mn cl ty = do
   return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ tyStr
 
 typeToString :: ModuleName -> Type -> Either String String
-typeToString _ String = return "string"
-typeToString _ Number = return "number"
-typeToString _ Boolean = return "boolean"
-typeToString _ Array = return "array"
-typeToString _ Function = return "function"
 typeToString _ (TypeVar _) = return "var"
 typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
 typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'

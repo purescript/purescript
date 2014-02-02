@@ -1,5 +1,11 @@
 module Prelude where
 
+  foreign import data String :: *
+  foreign import data Number :: *
+  foreign import data Boolean :: *
+  foreign import data [] :: * -> *
+  foreign import data (->) :: * -> * -> *
+
   id :: forall a. a -> a
   id = \x -> x
 

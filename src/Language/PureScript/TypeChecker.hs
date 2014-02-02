@@ -231,7 +231,7 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
   constructs (TypeConstructor (Qualified (Just mn) pn')) pn
     = mn == moduleName && pn' == pn
   constructs (ForAll _ ty) pn = ty `constructs` pn
-  constructs (TypeApp (TypeApp Function _) ty) pn = ty `constructs` pn
+  constructs (TypeApp (TypeApp t _) ty) pn | t == tyFunction = ty `constructs` pn
   constructs (TypeApp ty _) pn = ty `constructs` pn
   constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do

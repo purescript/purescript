@@ -31,11 +31,6 @@ import Language.PureScript.Pretty.Common
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
-  match Number = Just "Number"
-  match String = Just "String"
-  match Boolean = Just "Boolean"
-  match Array = Just $ "[]"
-  match Function = Just $ "(->)"
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
   match (TypeConstructor ctor) = Just $ show ctor
@@ -75,7 +70,7 @@ typeApp = mkPattern match
 singleArgumentFunction :: Pattern () Type (Type, Type)
 singleArgumentFunction = mkPattern match
   where
-  match (TypeApp (TypeApp Function arg) ret) = Just (arg, ret)
+  match (TypeApp (TypeApp t arg) ret) | t == tyFunction = Just (arg, ret)
   match _ = Nothing
 
 -- |
