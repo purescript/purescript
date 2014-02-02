@@ -922,7 +922,8 @@ checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionA
 -- Check the type of a function application
 --
 checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Check Value
-checkFunctionApplication' fn (TypeApp (TypeApp t argTy) retTy) arg ret | t == tyFunction = do
+checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
+  tyFunction' ?= tyFunction
   arg' <- check arg argTy
   _ <- subsumes Nothing retTy ret
   return $ App fn arg'

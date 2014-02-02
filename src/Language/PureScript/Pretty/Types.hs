@@ -33,6 +33,7 @@ typeLiterals = mkPattern match
   where
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
+  match (TypeApp arr ty) | arr == tyArray = Just $ "[" ++ prettyPrintType ty ++ "]"
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (TypedUnknown (Unknown u))) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s

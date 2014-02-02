@@ -77,7 +77,7 @@ data Type
 -- Type constructor for functions
 --
 tyFunction :: Type
-tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "(->)")
+tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Function")
 
 -- |
 -- Type constructor for strings
@@ -101,7 +101,7 @@ tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelu
 -- Type constructor for arrays
 --
 tyArray :: Type
-tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "[]")
+tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Array")
 
 -- |
 -- Smart constructor for function types
