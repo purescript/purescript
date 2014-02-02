@@ -239,6 +239,9 @@ natural = PT.natural tokenParser
 properName :: P.Parsec String u ProperName
 properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
 
+properNameOrExternalType :: P.Parsec String u ProperName
+properNameOrExternalType = P.try properName <|> (ProperName <$> (P.try (lexeme $ P.string "[]") <|> (lexeme $ P.string "(->)")))
+
 -- |
 -- Parse a qualified name, i.e. M.name or just name
 --

@@ -64,7 +64,7 @@ parseValueDeclaration =
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
-   (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
+   (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properNameOrExternalType)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> do ident <- parseNonReservedIdent
           js <- P.optionMaybe (parseJSLiteral <$> stringLiteral)

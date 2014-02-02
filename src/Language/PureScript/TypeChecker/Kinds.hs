@@ -117,11 +117,6 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Check Kind
-infer t | t == tyNumber = return Star
-infer t | t == tyString = return Star
-infer t | t == tyBoolean = return Star
-infer t | t == tyArray = return $ FunKind Star Star
-infer t | t == tyFunction = return $ FunKind Star $ FunKind Star Star
 infer (Object row) = do
   k <- infer row
   k ?= Row Star
