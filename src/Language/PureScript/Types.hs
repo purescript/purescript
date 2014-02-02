@@ -35,27 +35,7 @@ data Type
   -- |
   -- Javascript numbers
   --
-  | Number
-  -- |
-  -- Javascript strings
-  --
-  | String
-  -- |
-  -- Javascript booleans
-  --
-  | Boolean
-  -- |
-  -- Javascript array type constructor
-  --
-  | Array
-  -- |
-  -- Records, parameterized by a row of types
-  --
   | Object Type
-  -- |
-  -- A function, with zero or more arguments
-  --
-  | Function
   -- |
   -- A named type variable
   --
@@ -94,10 +74,40 @@ data Type
   | RCons String Type Type deriving (Show, Eq, Data, Typeable)
 
 -- |
+-- Type constructor for functions
+--
+tyFunction :: Type
+tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "(->)")
+
+-- |
+-- Type constructor for strings
+--
+tyString :: Type
+tyString = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "String")
+
+-- |
+-- Type constructor for numbers
+--
+tyNumber :: Type
+tyNumber = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Number")
+
+-- |
+-- Type constructor for booleans
+--
+tyBoolean :: Type
+tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Boolean")
+
+-- |
+-- Type constructor for arrays
+--
+tyArray :: Type
+tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "[]")
+
+-- |
 -- Smart constructor for function types
 --
 function :: Type -> Type -> Type
-function t1 t2 = TypeApp (TypeApp Function t1) t2
+function t1 t2 = TypeApp (TypeApp tyFunction t1) t2
 
 -- |
 -- Convert a row to a list of pairs of labels and types

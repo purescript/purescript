@@ -27,22 +27,22 @@ import qualified Text.Parsec.Expr as P
 import Control.Monad (when, unless)
 
 parseNumber :: P.Parsec String ParseState Type
-parseNumber = const Number <$> reserved "Number"
+parseNumber = const tyNumber <$> reserved "Number"
 
 parseString :: P.Parsec String ParseState Type
-parseString = const String <$> reserved "String"
+parseString = const tyString <$> reserved "String"
 
 parseBoolean :: P.Parsec String ParseState Type
-parseBoolean = const Boolean <$> reserved "Boolean"
+parseBoolean = const tyBoolean <$> reserved "Boolean"
 
 parseArray :: P.Parsec String ParseState Type
-parseArray = squares $ return Array
+parseArray = squares $ return tyArray
 
 parseArrayOf :: P.Parsec String ParseState Type
-parseArrayOf = squares $ TypeApp Array <$> parseType
+parseArrayOf = squares $ TypeApp tyArray <$> parseType
 
 parseFunction :: P.Parsec String ParseState Type
-parseFunction = parens $ P.try (lexeme (P.string "->")) >> return Function
+parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
 parseObject = braces $ Object <$> parseRow False

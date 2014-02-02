@@ -117,15 +117,15 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Check Kind
-infer Number = return Star
-infer String = return Star
-infer Boolean = return Star
-infer Array = return $ FunKind Star Star
+infer t | t == tyNumber = return Star
+infer t | t == tyString = return Star
+infer t | t == tyBoolean = return Star
+infer t | t == tyArray = return $ FunKind Star Star
+infer t | t == tyFunction = return $ FunKind Star $ FunKind Star Star
 infer (Object row) = do
   k <- infer row
   k ?= Row Star
   return Star
-infer Function = return $ FunKind Star $ FunKind Star Star
 infer (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get
   UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
