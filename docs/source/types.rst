@@ -51,7 +51,7 @@ In the example, Foo is a tagged union type which has two constructors. It's firs
 Functions
 ---------
 
-Functions in PureScript can have zero or more arguments. A function with multiple arguments is not to be confused with a `curried function`, which takes a single argument, and returns another function.
+Functions in PureScript are like their Javascript counterparts, but always have exactly one argument.
 
 Polymorphic Types
 -----------------

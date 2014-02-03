@@ -1,7 +1,7 @@
 Blocks
 ======
 
-Blocks are collections of statements wrapped in braces `{ ... }`. Blocks must return a value of the same type on every branch of execution.
+Blocks are collections of statements wrapped in braces ``{ ... }``. Blocks must return a value of the same type on every branch of execution.
 
 The following types of statement are supported:
 
@@ -30,7 +30,7 @@ That is, while the example above is valid, the following does not compile::
       return n;
     }
 
-The variable `n` is not mutable, and so the assignment in the first line of the `do` block is not allowed.
+The variable ``n`` is not mutable, and so the assignment in the first line of the block is not allowed.
 
 This function can be rewritten as follows::
 
@@ -58,7 +58,7 @@ The bounds `0` and `10` are inclusive and exclusive respectively.
 While Loops
 ------------
 
-While loops repeat a set of statements while a boolean expression evaluates to `true`::
+While loops repeat a set of statements while a boolean expression evaluates to ``true``::
 
   log2 n = {
       var count = 0;
@@ -73,7 +73,7 @@ While loops repeat a set of statements while a boolean expression evaluates to `
 If-Then-Else Statements
 -----------------------
 
-Else branches are optional, and may contain further `if` statements, just as in Javascript:
+Else branches are optional, and may contain further ``if`` statements, just as in Javascript:
 
   collatz n = {
       var count = 0;

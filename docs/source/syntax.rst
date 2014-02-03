@@ -15,7 +15,6 @@ But this is not::
 
   foo = bar(x) + 
   baz(x)
-  data UnaryOperator
   
 Operators
 ---------
@@ -61,7 +60,7 @@ and the following binary operators (in precedence order):
 Literal Values
 --------------
 
-Numeric literals can be integers or floating point numbers. Numbers in hexadecimal notation should be preceded by the characters `0x`::
+Numeric literals can be integers or floating point numbers. Numbers in hexadecimal notation should be preceded by the characters ``0x``::
 
   16
   16.0
@@ -123,53 +122,14 @@ which would correspond to the following Javascript::
     }
   }
 
-Multiple argument functions can be introduced by wrapping the arguments in parentheses, and separating them with commas::
+Function application is indicated by just the juxtaposition of a function with its arugments::
 
-  example2 = \(a, b) -> a + b
+  example1 10 20
 
-which generates::
+Functions can also be defined at the top level by providing a list of patterns and an optional guard on the left hand side of the equals sign::
 
-  function example2(a, b) { 
-    return a + b;
-  }
-    
-There is a special case for functions with no arguments, where the parentheses may be omitted, as follows::
-
-  example3 = \ -> 100
-
-which would correspond to the Javascript::
-
-  function example3() { 
-    return 100; 
-  }
-
-Multiple-argument and single-argument syntax can be mixed, as follows::
-
-  example4 = \a (b, c) d -> a + b + c + d
-
-which generates::
-
-  function example4(a) {
-      return function (b, c) {
-          return function (d) {
-              return a + b + c + d;
-          }
-      }
-  }
-
-Functions are applied by providing their arguments inside parentheses::
-
-  test1(1, 2, 3)
-  test2()
-
-A special case is made in the case of functions with one argument. These functions can be applied without parentheses, and function application associates to the left::
-
-  addThree :: Number -> Number -> Number -> Number
-  addThree a b c = a + b + c
-  
-  addThree 1     :: Number -> Number -> Number
-  addThree 1 2   :: Number -> Number
-  addThree 1 2 3 :: Number
+  f [] [] = []
+  f (x:xs) (y:ys) = x + y : f xs ys
       
 If-Then-Else Expressions
 ------------------------
@@ -204,23 +164,23 @@ Here is an example, using the maybe monad::
     isEven sum
     ret sum
 
-`isEven` adds two values of type `Maybe Number` and returns their sum, if the sum is even. If the sum is odd, `evenSum` returns `Nothing`.
+``isEven`` adds two values of type ``Maybe Number`` and returns their sum, if the sum is even. If the sum is odd, ``evenSum`` returns ``Nothing``.
 
-When using `do` notation, the corresponding type constructor must be an instance of the `Prelude.Monad` type class, which defines the `ret` and `>>=` functions.
+When using `do` notation, the corresponding type constructor must be an instance of the `Prelude.Monad` type class, which defines the ``ret`` and ``>>=`` functions.
 
 Statements can have the following form:
 
-- `a <- x` which desugars to `m.bind x (\a -> ...)` 
-- `let a = x` which desugars to `(\a -> ...)(x)` 
-- `x` which desugars to `m.bind x (\_ -> ...)` or just `x` if this is the last statement.
+- ``a <- x`` which desugars to ``m.bind x (\a -> ...)` `
+- ``let a = x`` which desugars to ``(\a -> ...)(x)``
+- ``x`` which desugars to ``m.bind x (\_ -> ...)`` or just ``x`` if this is the last statement.
 
-Binders can be used on the left hand side of `<-` or `=`. For example::
+Binders can be used on the left hand side of ``<-`` or ``=``. For example::
 
   test arr = do
     (x:y:_) <- arr
     ret (x + y)
 
-A pattern match failure will generate a runtime exception, just as in the case of a regular `case` statement.
+A pattern match failure will generate a runtime exception, just as in the case of a regular ``case`` statement.
 
 Operators
 ---------
@@ -251,11 +211,11 @@ Properties on records can be updated using the following syntax::
 
   o { key = value, ..., key = value }
 
-For example, the following function increments the `foo` property on its argument::
+For example, the following function increments the ``foo`` property on its argument::
 
-  incr = \o -> o { foo = o.foo + 1 }
+  incr o = o { foo = o.foo + 1 }
 
-The generated Javascript assumes the existence of a method called `Object.extend` such that `Object.extend(o, p)` takes an object `o` and generates a shallow copy of `o` including the properties of `p`. A simple JQuery implementation of this specification is::
+The generated Javascript assumes the existence of a method called ``Object.extend`` such that ``Object.extend(o, p)`` takes an object ``o`` and generates a shallow copy of ``o`` including the properties of ``p``. A simple JQuery implementation of this specification is::
 
   Object.prototype.extend = function(o, p) {
     return $.extend({}, o, p);

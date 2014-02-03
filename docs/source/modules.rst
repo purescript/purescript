@@ -1,7 +1,7 @@
 Modules
 =======
 
-All code in PureScript is contained in a module. Modules are introduced using the `module` keyword::
+All code in PureScript is contained in a module. Modules are introduced using the ``module`` keyword::
 
   module A where
   
@@ -16,7 +16,7 @@ When referencing values or data types in another module, names may be qualified 
 Importing Modules
 -----------------
 
-A module can be imported using the `import` keyword. This will create aliases for all of the values and types in the imported module::
+A module can be imported using the ``import`` keyword. This will create aliases for all of the values and types in the imported module::
 
   module B where
   
