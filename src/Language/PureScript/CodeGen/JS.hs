@@ -66,11 +66,11 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
   Just [ JSVariableIntroduction ident (Just (valueToJs opts mp e val)),
-         setProperty (identToJs ident) (JSVar ident) mp ]
+         setProperty ident (JSVar ident) mp ]
 declToJs opts mp (BindingGroupDeclaration vals) e =
   Just $ concatMap (\(ident, val) ->
            [ JSVariableIntroduction ident (Just (valueToJs opts mp e val)),
-             setProperty (identToJs ident) (JSVar ident) mp ]
+             setProperty ident (JSVar ident) mp ]
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
@@ -82,15 +82,15 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
                       (JSBlock [JSReturn
                         (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn)))
                                          , ("value", JSVar (Ident "value")) ])])
-    in [ ctorJs, setProperty ctor (JSVar (Ident ctor)) mp ]
+    in [ ctorJs, setProperty (Ident ctor) (JSVar (Ident ctor)) mp ]
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
   Just [ js
-       , setProperty (identToJs ident) (JSVar ident) mp ]
+       , setProperty ident (JSVar ident) mp ]
 declToJs _ _ _ _ = Nothing
 
-setProperty :: String -> JS -> ModuleName -> JS
+setProperty :: Ident -> JS -> ModuleName -> JS
 setProperty prop val (ModuleName (ProperName moduleName)) = JSAssignment (JSAssignProperty prop (JSAssignVariable (Ident moduleName))) val
 
 valueToJs :: Options -> ModuleName -> Environment -> Value -> JS
@@ -99,16 +99,16 @@ valueToJs _ _ _ (StringLiteral s) = JSStringLiteral s
 valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
-valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar (Ident "Object"))) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
+valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor (Ident "extend") (JSVar (Ident "Object"))) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
 valueToJs _ m e (Constructor (Qualified Nothing name)) =
   case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
+    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS id (Qualified (Just aliasModule) aliasIdent)
     _ -> JSVar . Ident . runProperName $ name
-valueToJs _ _ _ (Constructor name) = qualifiedToJS runProperName name
+valueToJs _ _ _ (Constructor name) = qualifiedToJS (Ident . runProperName) name
 valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
-valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
+valueToJs opts m e (Accessor prop val) = JSAccessor (Ident prop) (valueToJs opts m e val)
 valueToJs opts m e (Indexer index val) = JSIndexer (valueToJs opts m e index) (valueToJs opts m e val)
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
 valueToJs opts m e (Abs arg val) = JSFunction Nothing [arg] (JSBlock [JSReturn (valueToJs opts m e val)])
@@ -140,22 +140,22 @@ runtimeTypeChecks arg ty =
     let
       (pairs, _) = rowToList row
     in
-      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor prop val) ty') pairs
+      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor (Ident prop) val) ty') pairs
   argumentCheck val (TypeApp (TypeApp t _) _) | t == tyFunction = [typeCheck val "function"]
   argumentCheck val (ForAll _ ty') = argumentCheck val ty'
   argumentCheck _ _ = []
   typeCheck :: JS -> String -> JS
   typeCheck js ty' = JSIfElse (JSBinary NotEqualTo (JSTypeOf js) (JSStringLiteral ty')) (JSBlock [JSThrow (JSStringLiteral $ ty' ++ " expected")]) Nothing
   arrayCheck :: JS -> JS
-  arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor "isArray" (JSVar (Ident "Array"))) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
+  arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor (Ident "isArray") (JSVar (Ident "Array"))) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
 
 varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
 varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) of
   Just (_, ty) | isExtern ty -> JSVar ident
-  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
+  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS id (Qualified (Just aliasModule) aliasIdent)
   _ -> case qual of
          Qualified Nothing _ -> JSVar ident
-         _ -> qualifiedToJS identToJs qual
+         _ -> qualifiedToJS id qual
   where
   isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
@@ -163,9 +163,9 @@ varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) 
     Nothing -> error "Undefined alias in varToJs"
   isExtern _ = False
 
-qualifiedToJS :: (a -> String) -> Qualified a -> JS
+qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
 qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = JSAccessor (f a) (JSVar (Ident m))
-qualifiedToJS f (Qualified Nothing a) = JSVar (Ident (f a))
+qualifiedToJS f (Qualified Nothing a) = JSVar (f a)
 
 bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (unusedNames (binders, vals)) $ do
@@ -199,16 +199,16 @@ binderToJs m e varName done (NullaryBinder ctor) =
   then
     return done
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor)))) (JSBlock done) Nothing]
+    return [JSIfElse (JSBinary EqualTo (JSAccessor (Ident "ctor") (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor)))) (JSBlock done) Nothing]
 binderToJs m e varName done (UnaryBinder ctor b) = do
   value <- fresh
   js <- binderToJs m e value done b
-  let success = JSBlock (JSVariableIntroduction value (Just (JSAccessor "value" (JSVar varName))) : js)
+  let success = JSBlock (JSVariableIntroduction value (Just (JSAccessor (Ident "value") (JSVar varName))) : js)
   if isOnlyConstructor m e ctor
   then
     return [success]
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor (Ident "ctor") (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
                      success
                      Nothing]
 binderToJs m e varName done (ObjectBinder bs) = go done bs
@@ -219,10 +219,10 @@ binderToJs m e varName done (ObjectBinder bs) = go done bs
     propVar <- fresh
     done'' <- go done' bs'
     js <- binderToJs m e propVar done'' binder
-    return (JSVariableIntroduction propVar (Just (JSAccessor prop (JSVar varName))) : js)
+    return (JSVariableIntroduction propVar (Just (JSAccessor (Ident prop) (JSVar varName))) : js)
 binderToJs m e varName done (ArrayBinder bs) = do
   js <- go done 0 bs
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
+  return [JSIfElse (JSBinary EqualTo (JSAccessor (Ident "length") (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
   where
   go :: [JS] -> Integer -> [Binder] -> Gen [JS]
   go done' _ [] = return done'
@@ -236,9 +236,9 @@ binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
   tailVar <- fresh
   js1 <- binderToJs m e headVar done headBinder
   js2 <- binderToJs m e tailVar js1 tailBinder
-  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left 0))) (JSBlock
+  return [JSIfElse (JSBinary GreaterThan (JSAccessor (Ident "length") (JSVar varName)) (JSNumericLiteral (Left 0))) (JSBlock
     ( JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar varName))) :
-      JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left 1)])) :
+      JSVariableIntroduction tailVar (Just (JSApp (JSAccessor (Ident "slice") (JSVar varName)) [JSNumericLiteral (Left 1)])) :
       js2
     )) Nothing]
 binderToJs m e varName done (NamedBinder ident binder) = do

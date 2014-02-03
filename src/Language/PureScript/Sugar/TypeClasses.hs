@@ -73,7 +73,7 @@ typeClassDictionaryDeclaration name arg members =
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
-    (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar (Ident "dict")))])))
+    (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor ident (JSVar (Ident "dict")))])))
     (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 

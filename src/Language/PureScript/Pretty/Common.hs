@@ -34,9 +34,12 @@ import Language.PureScript.Names
 --  * Symbols are encoded as a dollar symbol ($) followed by their ordinal value
 --
 identToJs :: Ident -> String
-identToJs (Ident name) = concatMap identCharToString name
-identToJs (Op op) = concatMap identCharToString op
+identToJs (Ident name) = stringToJsIdent name
+identToJs (Op op) = stringToJsIdent op
 identToJs (Escaped name) = name
+
+stringToJsIdent :: String -> String
+stringToJsIdent name = concatMap identCharToString name
 
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]
