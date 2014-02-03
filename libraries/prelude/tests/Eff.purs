@@ -37,7 +37,7 @@ test6 s = do
 
 import ST
 
-test7 = \ -> do
+test7 _ = do
   n <- runST $ do
     r <- newSTRef 0
     modifySTRef r $ \n -> n + 1
@@ -48,4 +48,4 @@ module Main where
 
 import Tests
 
-main = test7 ()
+main = test7 {}
