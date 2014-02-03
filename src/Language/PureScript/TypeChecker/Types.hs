@@ -814,7 +814,8 @@ check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
   ty1 <- lookupVariable moduleName var
   repl <- replaceAllTypeSynonyms ty1
-  v' <- subsumes (Just v) repl ty
+  ty' <- replaceAllTypeSynonyms ty
+  v' <- subsumes (Just v) repl ty'
   case v' of
     Nothing -> throwError "Unable to check type subsumption"
     Just v'' -> return v''
@@ -973,6 +974,12 @@ subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) 
   subsumes Nothing arg2 arg1
   subsumes Nothing ret1 ret2
   return val
+subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
+  ty1 <- expandTypeSynonym name tyArgs
+  subsumes val ty1 ty2
+subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
+  ty2 <- expandTypeSynonym name tyArgs
+  subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
