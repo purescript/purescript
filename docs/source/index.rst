@@ -20,6 +20,7 @@ Contents:
    patterns
    modules
    ffi
+   prelude
    
 Indices and tables
 ==================
