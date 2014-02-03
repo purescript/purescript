@@ -81,7 +81,7 @@ parseJSAtom = P.choice
             , P.parens C.tokenParser parseJS ]
 
 parseAccessor :: JS -> P.Parsec String u JS
-parseAccessor js = P.try $ flip JSAccessor js <$> (C.dot *> P.notFollowedBy C.opLetter *> (Ident <$> C.identifier))
+parseAccessor js = P.try $ flip JSAccessor js <$> (C.dot *> P.notFollowedBy C.opLetter *> C.identifier)
 
 parseIndexer :: JS -> P.Parsec String u JS
 parseIndexer js = P.try $ flip JSIndexer js <$> (P.squares C.tokenParser parseJS)

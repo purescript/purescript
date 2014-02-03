@@ -42,6 +42,7 @@ import Data.Generics
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
+import Language.PureScript.Pretty.Common (identToJs)
 import Language.PureScript.Sugar.TypeClasses
        (mkDictionaryValueName)
 import Language.PureScript.Types (Type(..))
@@ -263,18 +264,18 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isReturn (JSApp retPoly [JSApp effDict []]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
   isBindPoly (JSVar (Op ">>=")) = True
-  isBindPoly (JSAccessor prop (JSVar (Ident "Prelude"))) | prop == (Op ">>=") = True
+  isBindPoly (JSAccessor prop (JSVar (Ident "Prelude"))) | prop == identToJs (Op ">>=") = True
   isBindPoly _ = False
   isRetPoly (JSVar (Ident "ret")) = True
-  isRetPoly (JSAccessor (Ident "ret") (JSVar (Ident "Prelude"))) = True
+  isRetPoly (JSAccessor "ret" (JSVar (Ident "Prelude"))) = True
   isRetPoly _ = False
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")
-  Right effDictName@(Ident _) = mkDictionaryValueName
+  Right (Ident effDictName) = mkDictionaryValueName
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
-  isEffDict (JSVar ident@(Ident _)) | ident == effDictName = True
+  isEffDict (JSVar (Ident ident)) | ident == effDictName = True
   isEffDict (JSAccessor prop (JSVar (Ident "Eff"))) | prop == effDictName = True
   isEffDict _ = False
   undo :: JS -> JS
@@ -297,5 +298,5 @@ inlineDollar = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp dollar [f]) [x]) | isDollar dollar = JSApp f [x]
   convert other = other
-  isDollar (JSAccessor name (JSVar (Ident "Prelude"))) | name == (Op "$") = True
+  isDollar (JSAccessor name (JSVar (Ident "Prelude"))) | name == identToJs (Op "$") = True
   isDollar _ = False

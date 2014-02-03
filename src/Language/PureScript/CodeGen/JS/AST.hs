@@ -61,7 +61,7 @@ data JS
   -- |
   -- An object property accessor expression
   --
-  | JSAccessor Ident JS
+  | JSAccessor String JS
   -- |
   -- A function introduction (optional name, arguments, body)
   --
@@ -142,4 +142,4 @@ data JSAssignment
   -- |
   -- Assign an object property
   --
-  | JSAssignProperty Ident JSAssignment deriving (Show, Eq, Data, Typeable)
+  | JSAssignProperty String JSAssignment deriving (Show, Eq, Data, Typeable)

@@ -140,12 +140,7 @@ literals = mkPattern' match
 
 targetToJs :: JSAssignment -> String
 targetToJs (JSAssignVariable ident) = identToJs ident
-targetToJs (JSAssignProperty prop target) = targetToJs target ++ (propAccess prop)
-
-propAccess :: Ident -> String
-propAccess prop@(Ident id) | (identToJs prop) /= id = "[\"" ++ id ++ "\"]"
-propAccess (Op op) = "[\"" ++ op ++ "\"]"
-propAccess prop = "." ++ (identToJs prop)
+targetToJs (JSAssignProperty prop target) = targetToJs target ++ "." ++ prop
 
 conditional :: Pattern PrinterState JS ((JS, JS), JS)
 conditional = mkPattern match
@@ -153,7 +148,7 @@ conditional = mkPattern match
   match (JSConditional cond th el) = Just ((th, el), cond)
   match _ = Nothing
 
-accessor :: Pattern PrinterState JS (Ident, JS)
+accessor :: Pattern PrinterState JS (String, JS)
 accessor = mkPattern match
   where
   match (JSAccessor prop val) = Just (prop, val)
@@ -228,7 +223,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
   matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
   operators :: OperatorTable PrinterState JS String
   operators =
-    OperatorTable [ [ Wrap accessor $ \prop val -> val ++ (propAccess prop) ]
+    OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Wrap lam $ \(name, args) ret -> "function "

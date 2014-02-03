@@ -65,6 +65,6 @@ compile opts ms = do
               _ | optionsRunMain opts -> do
                     when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
                       Left "Main.main is undefined"
-                    return $ js ++ [JSApp (JSAccessor (Ident "main") (JSVar (Ident "Main"))) []]
+                    return $ js ++ [JSApp (JSAccessor "main" (JSVar (Ident "Main"))) []]
                 | otherwise -> return js
   return (prettyPrintJS js', exts, env)
