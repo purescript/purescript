@@ -1,64 +1,68 @@
 module TypeClasses where
 
-import Prelude (($))
+import Prelude
 
-class Show a where
-  show :: a -> String
+test1 = \_ -> show "testing"
 
-instance Show String where
-  show s = s
-
-test1 = \ -> show "testing"
-
-f :: forall a. (TypeClasses.Show a) => a -> String
+f :: forall a. (Prelude.Show a) => a -> String
 f x = show x
 
-test2 = \ -> f "testing"
+test2 = \_ -> f "testing"
 
-test7 :: forall a. (Show a) => a -> String
+test7 :: forall a. (Prelude.Show a) => a -> String
 test7 = show
 
-test8 = \ -> show $ "testing"
+test8 = \_ -> show $ "testing"
 
 data Data a = Data a
 
-instance (TypeClasses.Show a) => TypeClasses.Show (Data a) where
+instance (Prelude.Show a) => Prelude.Show (Data a) where
   show (Data a) = "Data (" ++ show a ++ ")"
 
-test3 = \ -> show (Data "testing")
+test3 = \_ -> show (Data "testing")
 
-class Monad m where
-  ret :: forall a. a -> m a
-  (>>=) :: forall a b. m a -> (a -> m b) -> m b
-
-instance TypeClasses.Monad Data where
+instance Prelude.Monad Data where
   ret = Data
   (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
 
-instance TypeClasses.Monad Maybe where
+instance Prelude.Monad Maybe where
   ret = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
-test4 :: forall m. (Monad m) => () -> m Number
-test4 = \ -> ret 1
+test4 :: forall a m. (Monad m) => a -> m Number
+test4 = \_ -> ret 1
 
-test5 = \ -> Just 1 >>= \n -> ret (n + 1)
+test5 = \_ -> Just 1 >>= \n -> ret (n + 1)
 
 module TypeClasses2 where
 
+import Prelude
 import TypeClasses
 
-instance (TypeClasses.Show a) => TypeClasses.Show [a] where
+instance (Prelude.Show a) => Prelude.Show [a] where
   show [] = "[]"
-  show (x:xs) = TypeClasses.show x ++ ", " ++ TypeClasses.show xs
+  show (x:xs) = show x ++ ", " ++ show xs
 
-test6 = \ -> show ["testing"]
+test6 = \_ -> show ["testing"]
+
+instance Prelude.Monad (->) r where
+  ret a r = a
+  (>>=) f g r = g (f r) r
+
+ask r = r
+
+runReader r f = f r
+
+test9 _ = runReader 0 $ do
+  n <- ask
+  ret $ n + 1
     
 module Main where
 
+import Prelude
 import TypeClasses
 
 main = Trace.trace (test7 "Done")

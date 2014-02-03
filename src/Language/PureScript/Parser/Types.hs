@@ -27,29 +27,25 @@ import qualified Text.Parsec.Expr as P
 import Control.Monad (when, unless)
 
 parseNumber :: P.Parsec String ParseState Type
-parseNumber = const Number <$> reserved "Number"
+parseNumber = const tyNumber <$> reserved "Number"
 
 parseString :: P.Parsec String ParseState Type
-parseString = const String <$> reserved "String"
+parseString = const tyString <$> reserved "String"
 
 parseBoolean :: P.Parsec String ParseState Type
-parseBoolean = const Boolean <$> reserved "Boolean"
+parseBoolean = const tyBoolean <$> reserved "Boolean"
 
 parseArray :: P.Parsec String ParseState Type
-parseArray = squares $ return Array
+parseArray = squares $ return tyArray
 
 parseArrayOf :: P.Parsec String ParseState Type
-parseArrayOf = squares $ TypeApp Array <$> parseType
+parseArrayOf = squares $ TypeApp tyArray <$> parseType
+
+parseFunction :: P.Parsec String ParseState Type
+parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
 parseObject = braces $ Object <$> parseRow False
-
-parseFunction :: P.Parsec String ParseState Type
-parseFunction = do
-  args <- lexeme $ parens $ commaSep parsePolyType
-  _ <- lexeme $ P.string "->"
-  resultType <- parseType
-  return $ Function args resultType
 
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = TypeVar <$> identifier
@@ -68,12 +64,13 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseBoolean
             , parseArray
             , parseArrayOf
+            , parseFunction
             , parseObject
             , parseTypeVariable
             , parseTypeConstructor
             , parseForAll
             , parens (parseRow True)
-            , parens parseType ])
+            , parens parsePolyType ])
 
 parseConstrainedType :: P.Parsec String ParseState Type
 parseConstrainedType = do
@@ -90,10 +87,10 @@ parseConstrainedType = do
   return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
-parseAnyType = (P.buildExpressionParser operators $ parseTypeAtom) <|> parseFunction P.<?> "type"
+parseAnyType = (P.buildExpressionParser operators $ parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
-              , [ P.Infix (P.try (lexeme (P.string "->")) >> return (\t1 t2 -> Function [t1] t2)) P.AssocRight ] ]
+              , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
 
 -- |
 -- Parse a monotype
@@ -110,7 +107,6 @@ parseType = do
 parsePolyType :: P.Parsec String ParseState Type
 parsePolyType = do
   ty <- parseAnyType
-  unless (isPolyType ty) $ P.unexpected "polymorphic type"
   return ty
 
 parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)

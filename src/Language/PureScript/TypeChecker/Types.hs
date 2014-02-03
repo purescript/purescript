@@ -95,15 +95,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     sk <- skolemize ident ty1
     sk `unifyTypes` ty2
   unifyTypes' ty f@(ForAll _ _) = f `unifyTypes` ty
-  unifyTypes' Number Number = return ()
-  unifyTypes' String String = return ()
-  unifyTypes' Boolean Boolean = return ()
-  unifyTypes' Array Array = return ()
   unifyTypes' (Object row1) (Object row2) = row1 ?= row2
-  unifyTypes' (Function args1 ret1) (Function args2 ret2) = do
-    guardWith "Function applied to incorrect number of args" $ length args1 == length args2
-    zipWithM_ unifyTypes args1 args2
-    ret1 `unifyTypes` ret2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
     env <- getEnv
@@ -235,14 +227,19 @@ entails moduleName context goal@(className, ty) = do
     , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
     , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' (tcdInstanceType tcd)
     , args <- solveSubgoals env subst (tcdDependencies tcd) ]
+  solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, Type)] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
     dict <- mapM (go env) (replaceAllTypeVars subst subgoals)
     return $ Just dict
-  mkDictionary fnName args = maybe id (flip App) args $ (Var fnName)
+  mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
+  mkDictionary fnName Nothing = Var fnName
+  mkDictionary fnName (Just dicts) = foldr (flip App) (Var fnName) dicts
+  filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
   filterModule _ = False
+  canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
 
@@ -251,11 +248,7 @@ entails moduleName context goal@(className, ty) = do
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ String String = Just []
-typeHeadsAreEqual _ _ Number Number = Just []
-typeHeadsAreEqual _ _ Boolean Boolean = Just []
 typeHeadsAreEqual _ _ (Skolem s1) (Skolem s2) | s1 == s2 = Just []
-typeHeadsAreEqual _ _ Array Array = Just []
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
@@ -387,13 +380,13 @@ infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue v
 -- Infer a type for a value
 --
 infer' :: Value -> UnifyT Check Value
-infer' v@(NumericLiteral _) = return $ TypedValue True v Number
-infer' v@(StringLiteral _) = return $ TypedValue True v String
-infer' v@(BooleanLiteral _) = return $ TypedValue True v Boolean
+infer' v@(NumericLiteral _) = return $ TypedValue True v tyNumber
+infer' v@(StringLiteral _) = return $ TypedValue True v tyString
+infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \(TypedValue _ _ t) -> els ?= TypeApp Array t
+  forM_ ts $ \(TypedValue _ _ t) -> els ?= TypeApp tyArray t
   return $ TypedValue True (ArrayLiteral ts) els
 infer' (Unary op val) = do
   v <- infer val
@@ -418,9 +411,9 @@ infer' (ObjectUpdate o ps) = do
   return $ TypedValue True (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
 infer' (Indexer index val) = do
   el <- fresh
-  index' <- check index Number
-  val' <- check val (TypeApp Array el)
-  return $ TypedValue True (Indexer (TypedValue True index' Number) (TypedValue True val' (TypeApp Array el))) el
+  index' <- check index tyNumber
+  val' <- check val (TypeApp tyArray el)
+  return $ TypedValue True (Indexer (TypedValue True index' tyNumber) (TypedValue True val' (TypeApp tyArray el))) el
 infer' (Accessor prop val) = do
   typed@(TypedValue _ _ objTy) <- infer val
   propTy <- inferProperty objTy prop
@@ -431,16 +424,16 @@ infer' (Accessor prop val) = do
       _ <- subsumes Nothing objTy (Object (RCons prop field rest))
       return $ TypedValue True (Accessor prop typed) field
     Just ty -> return $ TypedValue True (Accessor prop typed) ty
-infer' (Abs args ret) = do
-  ts <- replicateM (length args) fresh
+infer' (Abs arg ret) = do
+  ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  bindLocalVariables moduleName (zip args ts) $ do
+  bindLocalVariables moduleName [(arg, ty)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
-    return $ TypedValue True (Abs args body) $ Function ts bodyTy
-infer' (App f args) = do
+    return $ TypedValue True (Abs arg body) $ function ty bodyTy
+infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
   ret <- fresh
-  app <- checkFunctionApplication f' ft args ret
+  app <- checkFunctionApplication f' ft arg ret
   return $ TypedValue True app ret
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -450,7 +443,7 @@ infer' (Var var) = do
     ConstrainedType constraints _ -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue True (Var var) ty'
 infer' (Block ss) = do
   ret <- fresh
@@ -470,7 +463,7 @@ infer' (Case vals binders) = do
   binders' <- checkBinders (map (\(TypedValue _ _ t) -> t) ts) ret binders
   return $ TypedValue True (Case ts binders') ret
 infer' (IfThenElse cond th el) = do
-  cond' <- check cond Boolean
+  cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
   v3@(TypedValue _ _ t3) <- infer el
   t2 ?= t3
@@ -525,9 +518,9 @@ checkUnary op val res =
 -- Built-in unary operators
 --
 unaryOps :: [(UnaryOperator, (Type, Type))]
-unaryOps = [ (Negate, (Number, Number))
-           , (Not, (Boolean, Boolean))
-           , (BitwiseNot, (Number, Number))
+unaryOps = [ (Negate, (tyNumber, tyNumber))
+           , (Not, (tyBoolean, tyBoolean))
+           , (BitwiseNot, (tyNumber, tyNumber))
            ]
 
 -- |
@@ -536,7 +529,7 @@ unaryOps = [ (Negate, (Number, Number))
 inferBinary :: BinaryOperator -> Value -> Value -> UnifyT Check Value
 inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) | isEqualityTest op = do
   leftTy ?= rightTy
-  return $ TypedValue True (Binary op left right) Boolean
+  return $ TypedValue True (Binary op left right) tyBoolean
 inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) =
   case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
     (valTy, resTy) -> do
@@ -550,7 +543,7 @@ inferBinary _ _ _ = error "Invalid arguments to inferBinary"
 --
 checkBinary :: BinaryOperator -> Value -> Value -> Type -> UnifyT Check Value
 checkBinary op left right res | isEqualityTest op = do
-  res ?= Boolean
+  res ?= tyBoolean
   left'@(TypedValue _ _ t1) <- infer left
   right'@(TypedValue _ _ t2) <- infer right
   t1 ?= t2
@@ -575,24 +568,24 @@ isEqualityTest _ = False
 -- Built-in binary operators
 --
 binaryOps :: [(BinaryOperator, (Type, Type))]
-binaryOps = [ (Add, (Number, Number))
-            , (Subtract, (Number, Number))
-            , (Multiply, (Number, Number))
-            , (Divide, (Number, Number))
-            , (Modulus, (Number, Number))
-            , (BitwiseAnd, (Number, Number))
-            , (BitwiseOr, (Number, Number))
-            , (BitwiseXor, (Number, Number))
-            , (ShiftRight, (Number, Number))
-            , (ZeroFillShiftRight, (Number, Number))
-            , (And, (Boolean, Boolean))
-            , (Or, (Boolean, Boolean))
-            , (Concat, (String, String))
-            , (Modulus, (Number, Number))
-            , (LessThan, (Number, Boolean))
-            , (LessThanOrEqualTo, (Number, Boolean))
-            , (GreaterThan, (Number, Boolean))
-            , (GreaterThanOrEqualTo, (Number, Boolean))
+binaryOps = [ (Add, (tyNumber, tyNumber))
+            , (Subtract, (tyNumber, tyNumber))
+            , (Multiply, (tyNumber, tyNumber))
+            , (Divide, (tyNumber, tyNumber))
+            , (Modulus, (tyNumber, tyNumber))
+            , (BitwiseAnd, (tyNumber, tyNumber))
+            , (BitwiseOr, (tyNumber, tyNumber))
+            , (BitwiseXor, (tyNumber, tyNumber))
+            , (ShiftRight, (tyNumber, tyNumber))
+            , (ZeroFillShiftRight, (tyNumber, tyNumber))
+            , (And, (tyBoolean, tyBoolean))
+            , (Or, (tyBoolean, tyBoolean))
+            , (Concat, (tyString, tyString))
+            , (Modulus, (tyNumber, tyNumber))
+            , (LessThan, (tyNumber, tyBoolean))
+            , (LessThanOrEqualTo, (tyNumber, tyBoolean))
+            , (GreaterThan, (tyNumber, tyBoolean))
+            , (GreaterThanOrEqualTo, (tyNumber, tyBoolean))
             ]
 
 -- |
@@ -600,9 +593,9 @@ binaryOps = [ (Add, (Number, Number))
 --
 inferBinder :: Type -> Binder -> UnifyT Check (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
-inferBinder val (StringBinder _) = val ?= String >> return M.empty
-inferBinder val (NumberBinder _) = val ?= Number >> return M.empty
-inferBinder val (BooleanBinder _) = val ?= Boolean >> return M.empty
+inferBinder val (StringBinder _) = val ?= tyString >> return M.empty
+inferBinder val (NumberBinder _) = val ?= tyNumber >> return M.empty
+inferBinder val (BooleanBinder _) = val ?= tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (NullaryBinder ctor) = do
   env <- getEnv
@@ -619,7 +612,7 @@ inferBinder val (UnaryBinder ctor binder) = do
     Just (ty, _) -> do
       fn <- replaceAllVarsWithUnknowns ty
       case fn of
-        Function [obj] ret -> do
+        TypeApp (TypeApp t obj) ret | t == tyFunction -> do
           _ <- subsumes Nothing val ret
           inferBinder obj binder
         _ -> throwError $ "Constructor " ++ show ctor ++ " is not a unary constructor"
@@ -641,13 +634,13 @@ inferBinder val (ObjectBinder props) = do
 inferBinder val (ArrayBinder binders) = do
   el <- fresh
   m1 <- M.unions <$> mapM (inferBinder el) binders
-  val ?= TypeApp Array el
+  val ?= TypeApp tyArray el
   return m1
 inferBinder val (ConsBinder headBinder tailBinder) = do
   el <- fresh
   m1 <- inferBinder el headBinder
   m2 <- inferBinder val tailBinder
-  val ?= TypeApp Array el
+  val ?= TypeApp tyArray el
   return $ m1 `M.union` m2
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
@@ -666,7 +659,7 @@ checkBinders nvals ret ((binders, grd, val):bs) = do
     case grd of
       Nothing -> return (binders, Nothing, val')
       Just g -> do
-        g' <- check g Boolean
+        g' <- check g tyBoolean
         return (binders, Just g', val')
   rs <- checkBinders nvals ret bs
   return $ r : rs
@@ -698,7 +691,7 @@ checkStatement mass _ (Assignment ident val) = do
     Just ty -> do t ?= ty
                   return (False, mass, Assignment ident val')
 checkStatement mass ret (While val inner) = do
-  val' <- check val Boolean
+  val' <- check val tyBoolean
   (allCodePathsReturn, _, inner') <- checkBlock mass ret inner
   return (allCodePathsReturn, mass, While val' inner')
 checkStatement mass ret (If ifst) = do
@@ -707,9 +700,9 @@ checkStatement mass ret (If ifst) = do
 checkStatement mass ret (For ident start end inner) = do
   Just moduleName <- checkCurrentModule <$> get
   assignVariable ident
-  start' <- check start Number
-  end' <- check end Number
-  (allCodePathsReturn, _, inner') <- bindLocalVariables moduleName [(ident, Number)] $ checkBlock mass ret inner
+  start' <- check start tyNumber
+  end' <- check end tyNumber
+  (allCodePathsReturn, _, inner') <- bindLocalVariables moduleName [(ident, tyNumber)] $ checkBlock mass ret inner
   return (allCodePathsReturn, mass, For ident start' end' inner')
 checkStatement mass ret (Return val) = do
   val' <- check val ret
@@ -720,11 +713,11 @@ checkStatement mass ret (Return val) = do
 --
 checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> UnifyT Check (Bool, IfStatement)
 checkIfStatement mass ret (IfStatement val thens Nothing) = do
-  val' <- check val Boolean
+  val' <- check val tyBoolean
   (_, _, thens') <- checkBlock mass ret thens
   return (False, IfStatement val' thens' Nothing)
 checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
-  val' <- check val Boolean
+  val' <- check val tyBoolean
   (allCodePathsReturn1, _, thens') <- checkBlock mass ret thens
   (allCodePathsReturn2, elses') <- checkElseStatement mass ret elses
   return (allCodePathsReturn1 && allCodePathsReturn2, IfStatement val' thens' (Just elses'))
@@ -792,31 +785,30 @@ check' val (ConstrainedType constraints ty) = do
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
-  return $ Abs dictNames val'
+  return $ foldr Abs val' dictNames
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
   ty' ?= u
   return val'
-check' v@(NumericLiteral _) Number = return v
-check' v@(StringLiteral _) String = return v
-check' v@(BooleanLiteral _) Boolean = return v
+check' v@(NumericLiteral _) t | t == tyNumber = return v
+check' v@(StringLiteral _) t | t == tyString = return v
+check' v@(BooleanLiteral _) t | t == tyBoolean = return v
 check' (Unary op val) ty = checkUnary op val ty
 check' (Binary op left right) ty = checkBinary op left right ty
-check' (ArrayLiteral vals) (TypeApp Array ty) = ArrayLiteral <$> forM vals (\val -> check val ty)
+check' (ArrayLiteral vals) (TypeApp a ty) | a == tyArray = ArrayLiteral <$> forM vals (\val -> check val ty)
 check' (Indexer index vals) ty = do
-  index' <- check index Number
-  vals' <- check vals (TypeApp Array ty)
+  index' <- check index tyNumber
+  vals' <- check vals (TypeApp tyArray ty)
   return $ Indexer index' vals'
-check' (Abs args ret) (Function argTys retTy) = do
+check' (Abs arg ret) (TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
-  guardWith "Incorrect number of function arguments" (length args == length argTys)
-  ret' <- bindLocalVariables moduleName (zip args argTys) $ check ret retTy
-  return $ Abs args ret'
-check' (App f args) ret = do
+  ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
+  return $ Abs arg ret'
+check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
-  app <- checkFunctionApplication f' ft args ret
+  app <- checkFunctionApplication f' ft arg ret
   return $ app
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
@@ -842,7 +834,7 @@ check' (Case vals binders) ret = do
   binders' <- checkBinders ts ret binders
   return $ Case vals' binders'
 check' (IfThenElse cond th el) ty = do
-  cond' <- check cond Boolean
+  cond' <- check cond tyBoolean
   th' <- check th ty
   el' <- check el ty
   return $ IfThenElse cond' th' el'
@@ -918,42 +910,44 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> [Value] -> Type -> UnifyT Check Value
-checkFunctionApplication fn fnTy args ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy args ret
+checkFunctionApplication :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg ret
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
-    ++ " to arguments " ++ intercalate ", " (map prettyPrintValue args)
+    ++ " to argument " ++ prettyPrintValue arg
     ++ ":\n" ++ msg
 
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> [Value] -> Type -> UnifyT Check Value
-checkFunctionApplication' fn (Function argTys retTy) args ret = do
-  guardWith "Incorrect number of function arguments" (length args == length argTys)
-  args' <- zipWithM check args argTys
+checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
+  tyFunction' ?= tyFunction
+  arg' <- check arg argTy
   _ <- subsumes Nothing retTy ret
-  return $ App fn args'
-checkFunctionApplication' fn (ForAll ident ty) args ret = do
+  return $ App fn arg'
+checkFunctionApplication' fn (ForAll ident ty) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication fn replaced args ret
-checkFunctionApplication' fn u@(TUnknown _) args ret = do
-  args' <- mapM (\arg -> infer arg >>= \(TypedValue _ v t) -> TypedValue True v <$> replaceAllVarsWithUnknowns t) args
-  let tys = map (\(TypedValue _ _ t) -> t) args'
-  u ?= Function tys ret
-  return $ App fn args'
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) args ret = do
+  checkFunctionApplication fn replaced arg ret
+checkFunctionApplication' fn u@(TUnknown _) arg ret = do
+  arg' <- do
+    TypedValue _ v t <- infer arg
+    TypedValue True v <$> replaceAllVarsWithUnknowns t
+  let ty = (\(TypedValue _ _ t) -> t) arg'
+  u ?= function ty ret
+  return $ App fn arg'
+checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- expandTypeSynonym name tyArgs
-  checkFunctionApplication fn ty args ret
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) args ret = do
+  checkFunctionApplication fn ty arg ret
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
-  checkFunctionApplication' (App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy args ret
-checkFunctionApplication' _ fnTy args ret = throwError $ "Applying a function of type "
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg ret
+checkFunctionApplication' _ fnTy arg ret = throwError $ "Applying a function of type "
   ++ prettyPrintType fnTy
-  ++ " to argument(s) " ++ intercalate ", " (map prettyPrintValue args)
+  ++ " to argument(s) " ++ prettyPrintValue arg
   ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
 
 -- |
@@ -975,8 +969,8 @@ subsumes' :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
 subsumes' val (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2
-subsumes' val (Function args1 ret1) (Function args2 ret2) = do
-  zipWithM_ (subsumes Nothing) args2 args1
+subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
+  subsumes Nothing arg2 arg1
   subsumes Nothing ret1 ret2
   return val
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
@@ -984,7 +978,7 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
-  return . Just $ App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+  return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
 subsumes' val ty1 ty2 = do
   ty1 ?= ty2
   return val

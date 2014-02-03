@@ -1,5 +1,11 @@
 module Prelude where
 
+  foreign import data String :: *
+  foreign import data Number :: *
+  foreign import data Boolean :: *
+  foreign import data Array :: * -> *
+  foreign import data Function :: * -> * -> *
+
   id :: forall a. a -> a
   id = \x -> x
 
@@ -401,28 +407,76 @@ module Global where
 
 module Math where
 
-  type Math = 
-    { abs :: Number -> Number
-    , acos :: Number -> Number
-    , asin :: Number -> Number
-    , atan :: Number -> Number
-    , atan2 :: (Number, Number) -> Number
-    , aceil :: Number -> Number
-    , cos :: Number -> Number
-    , exp :: Number -> Number
-    , floor :: Number -> Number
-    , log :: Number -> Number
-    , max :: (Number, Number) -> Number
-    , pow :: (Number, Number) -> Number
-    , random :: () -> Number
-    , round :: Number -> Number
-    , sin :: Number -> Number
-    , sqrt :: Number -> Number
-    , tan :: Number -> Number
-    }
+  foreign import abs "function abs(n){\
+                     \  return Math.abs(n);\
+                     \}" :: Number -> Number
 
-  foreign import math "var math = Math;" :: Math
-  
+  foreign import acos "function acos(n){\
+                      \  return Math.acos(n);\
+                      \}" :: Number -> Number
+
+  foreign import asin "function asin(n){\
+                      \  return Math.asin(n);\
+                      \}" :: Number -> Number
+
+  foreign import atan "function atan(n){\
+                      \  return Math.atan(n);\
+                      \}" :: Number -> Number
+
+  foreign import atan2 "function atan2(y){\
+                       \  return function (x) {\
+                       \    return Math.atan2(y, x);\
+                       \  };\
+                       \}" :: Number -> Number -> Number
+
+  foreign import aceil "function aceil(n){\
+                       \  return Math.aceil(n);\
+                       \}" :: Number -> Number
+
+  foreign import cos "function cos(n){\
+                     \  return Math.cos(n);\
+                     \}" :: Number -> Number
+
+  foreign import exp "function exp(n){\
+                     \  return Math.exp(n);\
+                     \}" :: Number -> Number
+
+  foreign import floor "function floor(n){\
+                       \  return Math.floor(n);\
+                       \}" :: Number -> Number
+
+  foreign import log "function log(n){\
+                     \  return Math.log(n);\
+                     \}" :: Number -> Number
+
+  foreign import max "function max(n){\
+                     \  return Math.max(n);\
+                     \}" :: Number -> Number
+
+  foreign import min "function min(n){\
+                     \  return Math.min(n);\
+                     \}" :: Number -> Number
+
+  foreign import pow "function pow(n){\
+                     \  return Math.pow(n);\
+                     \}" :: Number -> Number
+
+  foreign import round "function round(n){\
+                       \  return Math.round(n);\
+                       \}" :: Number -> Number
+
+  foreign import sin "function sin(n){\
+                     \  return Math.sin(n);\
+                     \}" :: Number -> Number
+
+  foreign import sqrt "function sqrt(n){\
+                      \  return Math.sqrt(n);\
+                      \}" :: Number -> Number
+
+  foreign import tan "function tan(n){\
+                     \  return Math.tan(n);\
+                     \}" :: Number -> Number
+
 module Eff where
 
   foreign import data Eff :: # ! -> * -> *
@@ -450,6 +504,18 @@ module Eff where
   instance Prelude.Monad (Eff e) where
     ret = retEff
     (>>=) = bindEff
+
+module Random where
+
+  import Eff
+
+  foreign import data Random :: !
+
+  foreign import random "function random() {\
+                        \  return function() {\
+                        \    return Math.random();\
+                        \  };\
+                        \}" :: forall e. Eff (random :: Random | e) Number
 
 module Errors where
 

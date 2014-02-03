@@ -9,7 +9,7 @@ module M2 where
 
   import M1
 
-  main = \() -> foo 42
+  main = \_ -> foo 42
     
 module Main where
 

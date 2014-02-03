@@ -9,7 +9,7 @@ module FFIModuleTest where
 
 import FFI
 
-baz = \ -> foo "test"
+baz = \_ -> foo "test"
     
 module Main where
 

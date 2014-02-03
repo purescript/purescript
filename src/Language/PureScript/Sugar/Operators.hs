@@ -58,7 +58,7 @@ removeParens val = val
 customOperatorTable :: M.Map (Qualified Ident) Fixity -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
 customOperatorTable fixities =
   let
-    applyUserOp name t1 t2 = App (App (Var name) [t1]) [t2]
+    applyUserOp name t1 t2 = App (App (Var name) t1) t2
     userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
     sorted = sortBy (compare `on` (\(_, _, p, _) -> p)) (userOps ++ builtIns)
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
@@ -79,7 +79,7 @@ matchOperators moduleName ops val = G.everywhereM' (G.mkM parseChains) val
   bracketChain :: Chain -> Either String Value
   bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
-    ++ [[P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) [t1]) [t2]))) P.AssocLeft]]
+    ++ [[P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]]
 
 toAssoc :: Associativity -> P.Assoc
 toAssoc Infixl = P.AssocLeft

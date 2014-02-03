@@ -35,27 +35,7 @@ data Type
   -- |
   -- Javascript numbers
   --
-  | Number
-  -- |
-  -- Javascript strings
-  --
-  | String
-  -- |
-  -- Javascript booleans
-  --
-  | Boolean
-  -- |
-  -- Javascript array type constructor
-  --
-  | Array
-  -- |
-  -- Records, parameterized by a row of types
-  --
   | Object Type
-  -- |
-  -- A function, with zero or more arguments
-  --
-  | Function [Type] Type
   -- |
   -- A named type variable
   --
@@ -94,6 +74,42 @@ data Type
   | RCons String Type Type deriving (Show, Eq, Data, Typeable)
 
 -- |
+-- Type constructor for functions
+--
+tyFunction :: Type
+tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Function")
+
+-- |
+-- Type constructor for strings
+--
+tyString :: Type
+tyString = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "String")
+
+-- |
+-- Type constructor for numbers
+--
+tyNumber :: Type
+tyNumber = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Number")
+
+-- |
+-- Type constructor for booleans
+--
+tyBoolean :: Type
+tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Boolean")
+
+-- |
+-- Type constructor for arrays
+--
+tyArray :: Type
+tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Array")
+
+-- |
+-- Smart constructor for function types
+--
+function :: Type -> Type -> Type
+function t1 t2 = TypeApp (TypeApp tyFunction t1) t2
+
+-- |
 -- Convert a row to a list of pairs of labels and types
 --
 rowToList :: Type -> ([(String, Type)], Type)
@@ -113,18 +129,7 @@ rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 --
 isMonoType :: Type -> Bool
 isMonoType (ForAll _ _) = False
-isMonoType ty = isPolyType ty
-
--- |
--- Check whather a type is a valid polytype
---
-isPolyType :: Type -> Bool
-isPolyType (Object ps) = all isPolyType (map snd . fst $ rowToList ps)
-isPolyType (Function args ret) = all isPolyType args && isPolyType ret
-isPolyType (TypeApp t1 t2) = isMonoType t1 && isMonoType t2
-isPolyType (SaturatedTypeSynonym _ args) = all isPolyType args
-isPolyType (ForAll _ ty) = isPolyType ty
-isPolyType _ = True
+isMonoType ty = True
 
 -- |
 -- Universally quantify a type

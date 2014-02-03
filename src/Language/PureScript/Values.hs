@@ -190,11 +190,11 @@ data Value
   -- |
   -- Function introduction
   --
-  | Abs [Ident] Value
+  | Abs Ident Value
   -- |
   -- Function application
   --
-  | App Value [Value]
+  | App Value Value
   -- |
   -- Variable
   --

@@ -87,10 +87,8 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
-      (Abs
-        (map (\n -> Ident ('_' : show n)) [1..length deps])
-        (ObjectLiteral memberNames))
-      (quantify (Function (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps) (TypeApp (TypeConstructor name) ty)))
+      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..length deps]))
+      (quantify (foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
@@ -99,7 +97,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
     memberName <- mkDictionaryEntryName mn name ty ident
     return (identToJs ident, TypedValue False
                                (if null deps then Var (Qualified Nothing memberName)
-                                else App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
+                                else foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                                (quantify memberType))
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
@@ -137,14 +135,10 @@ mkDictionaryValueName mn cl ty = do
   return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ tyStr
 
 typeToString :: ModuleName -> Type -> Either String String
-typeToString _ String = return "string"
-typeToString _ Number = return "number"
-typeToString _ Boolean = return "boolean"
-typeToString _ Array = return "array"
 typeToString _ (TypeVar _) = return "var"
 typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
 typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'
-typeToString a b = Left $ "Type class instance must be of the form T a1 ... an " ++ show (a, b)
+typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"
 
 -- |
 -- Generate a name for a type class dictionary member, based on the module name, class name, type name and

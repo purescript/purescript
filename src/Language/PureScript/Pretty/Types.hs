@@ -31,12 +31,9 @@ import Language.PureScript.Pretty.Common
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
-  match Number = Just "Number"
-  match String = Just "String"
-  match Boolean = Just "Boolean"
-  match Array = Just $ "[]"
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
+  match (TypeApp arr ty) | arr == tyArray = Just $ "[" ++ prettyPrintType ty ++ "]"
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (TypedUnknown (Unknown u))) = Just $ 'u' : show u
   match (Skolem s) = Just $ 's' : show s
@@ -74,13 +71,7 @@ typeApp = mkPattern match
 singleArgumentFunction :: Pattern () Type (Type, Type)
 singleArgumentFunction = mkPattern match
   where
-  match (Function [arg] ret) = Just (arg, ret)
-  match _ = Nothing
-
-function :: Pattern () Type ([Type], Type)
-function = mkPattern match
-  where
-  match (Function args ret) = Just (args, ret)
+  match (TypeApp (TypeApp t arg) ret) | t == tyFunction = Just (arg, ret)
   match _ = Nothing
 
 -- |
@@ -95,6 +86,5 @@ prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
                   , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
-                    , Wrap function $ \args ret -> "(" ++ intercalate ", " (map prettyPrintType args) ++ ") -> " ++ ret
                     ]
                   ]

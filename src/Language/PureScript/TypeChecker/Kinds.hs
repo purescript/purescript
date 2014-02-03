@@ -117,19 +117,9 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Check Kind
-infer Number = return Star
-infer String = return Star
-infer Boolean = return Star
-infer Array = return $ FunKind Star Star
 infer (Object row) = do
   k <- infer row
   k ?= Row Star
-  return Star
-infer (Function args ret) = do
-  ks <- mapM infer args
-  k <- infer ret
-  k ?= Star
-  forM_ ks (?= Star)
   return Star
 infer (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get

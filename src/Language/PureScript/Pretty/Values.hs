@@ -77,13 +77,13 @@ objectUpdate = mkPattern match
 app :: Pattern () Value (String, Value)
 app = mkPattern match
   where
-  match (App val args) = Just (intercalate "," (map prettyPrintValue args), val)
+  match (App val arg) = Just (prettyPrintValue arg, val)
   match _ = Nothing
 
-lam :: Pattern () Value ([String], Value)
+lam :: Pattern () Value (String, Value)
 lam = mkPattern match
   where
-  match (Abs args val) = Just (map show args, val)
+  match (Abs arg val) = Just (show arg, val)
   match _ = Nothing
 
 typed :: Pattern () Value (Type, Value)
@@ -127,8 +127,8 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
-                  , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
-                  , [ Split lam $ \args val -> "\\" ++ intercalate ", " args ++ " -> " ++ prettyPrintValue val ]
+                  , [ Wrap app $ \arg val -> val ++ "(" ++ arg ++ ")" ]
+                  , [ Split lam $ \arg val -> "\\" ++ arg ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
                   , [ Wrap typed $ \ty val -> val ++ " :: " ++ prettyPrintType ty ]
                   , [ AssocR indexer (\index val -> val ++ " !! " ++ index) ]
