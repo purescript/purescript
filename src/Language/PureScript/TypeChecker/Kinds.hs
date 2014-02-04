@@ -38,37 +38,43 @@ import Control.Applicative
 
 import qualified Data.Map as M
 
-instance Unifiable Check Kind where
+instance Partial Kind where
   unknown = KUnknown
   isUnknown (KUnknown u) = Just u
   isUnknown _ = Nothing
-  KUnknown u1 ?= KUnknown u2 | u1 == u2 = return ()
-  KUnknown u ?= k = replace u k
-  k ?= KUnknown u = replace u k
-  Star ?= Star = return ()
-  Bang ?= Bang = return ()
-  Row k1 ?= Row k2 = k1 ?= k2
-  FunKind k1 k2 ?= FunKind k3 k4 = do
-    k1 ?= k3
-    k2 ?= k4
-  k1 ?= k2 = UnifyT . lift . throwError $ "Cannot unify " ++ prettyPrintKind k1 ++ " with " ++ prettyPrintKind k2 ++ "."
+
+instance Unifiable Check Kind where
+  KUnknown u1 =?= KUnknown u2 | u1 == u2 = return ()
+  KUnknown u =?= k = u =:= k
+  k =?= KUnknown u = u =:= k
+  Star =?= Star = return ()
+  Bang =?= Bang = return ()
+  Row k1 =?= Row k2 = k1 =?= k2
+  FunKind k1 k2 =?= FunKind k3 k4 = do
+    k1 =?= k3
+    k2 =?= k4
+  k1 =?= k2 = UnifyT . lift . throwError $ "Cannot unify " ++ prettyPrintKind k1 ++ " with " ++ prettyPrintKind k2 ++ "."
 
 -- |
 -- Infer the kind of a single type
 --
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf moduleName ty = liftUnify $ starIfUnknown <$> infer ty
+kindOf moduleName ty = fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
+  where
+  tidyUp (k, sub) = sub $? k
 
 -- |
 -- Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 --
 kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
-kindsOf moduleName name args ts = fmap starIfUnknown . liftUnify $ do
+kindsOf moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   let dict = (name, tyCon) : zip (map ProperName args) kargs
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
+  where
+  tidyUp (k, sub) = sub $? k
 
 -- |
 -- Simultaneously infer the kinds of several mutually recursive type constructors
@@ -93,16 +99,16 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
           solveTypes [ty] kargs synVar) synVars syns
       return (syn_ks, data_ks)
   where
-  tidyUp (ks1, ks2) = (map starIfUnknown ks1, map starIfUnknown ks2)
+  tidyUp ((ks1, ks2), sub) = (map (starIfUnknown . (sub $?)) ks1, map (starIfUnknown . (sub $?)) ks2)
 
 -- |
 -- Solve the set of kind constraints associated with the data constructors for a type constructor
 --
-solveTypes :: [Type] -> [Kind] -> Kind -> UnifyT Check Kind
+solveTypes :: [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
 solveTypes ts kargs tyCon = do
   ks <- mapM infer ts
-  tyCon ?= foldr FunKind Star kargs
-  forM_ ks $ \k -> k ?= Star
+  tyCon =?= foldr FunKind Star kargs
+  forM_ ks $ \k -> k =?= Star
   return tyCon
 
 -- |
@@ -116,10 +122,10 @@ starIfUnknown k = k
 -- |
 -- Infer a kind for a type
 --
-infer :: Type -> UnifyT Check Kind
+infer :: Type -> UnifyT Kind Check Kind
 infer (Object row) = do
   k <- infer row
-  k ?= Row Star
+  k =?= Row Star
   return Star
 infer (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -134,7 +140,7 @@ infer (TypeApp t1 t2) = do
   k0 <- fresh
   k1 <- infer t1
   k2 <- infer t2
-  k1 ?= FunKind k2 k0
+  k1 =?= FunKind k2 k0
   return k0
 infer (ForAll ident ty) = do
   k <- fresh
@@ -146,11 +152,11 @@ infer REmpty = do
 infer (RCons _ ty row) = do
   k1 <- infer ty
   k2 <- infer row
-  k2 ?= Row k1
+  k2 =?= Row k1
   return $ Row k1
 infer (ConstrainedType deps ty) = do
   mapM_ (infer . snd) deps
   k <- infer ty
-  k ?= Star
+  k =?= Star
   return Star
 infer _ = error "Invalid argument to infer"

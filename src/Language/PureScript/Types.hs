@@ -31,7 +31,7 @@ data Type
   -- |
   -- A unification variable of type Type
   --
-  = TUnknown (TypedUnknown Type)
+  = TUnknown Unknown
   -- |
   -- Javascript numbers
   --

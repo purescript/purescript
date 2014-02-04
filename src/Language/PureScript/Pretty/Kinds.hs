@@ -31,7 +31,7 @@ typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Bang = Just "!"
-  match (KUnknown (TypedUnknown (Unknown u))) = Just $ 'u' : show u
+  match (KUnknown (Unknown u)) = Just $ 'u' : show u
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)

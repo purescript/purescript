@@ -67,22 +67,24 @@ import Control.Arrow (Arrow(..))
 import qualified Data.Map as M
 import Data.Function (on)
 
-instance Unifiable Check Type where
+instance Partial Type where
   unknown = TUnknown
   isUnknown (TUnknown u) = Just u
   isUnknown _ = Nothing
-  (?=) = unifyTypes
+
+instance Unifiable Check Type where
+  (=?=) = unifyTypes
 
 -- |
 -- Unify two types, updating the current substitution
 --
-unifyTypes :: Type -> Type -> UnifyT Check ()
+unifyTypes :: Type -> Type -> UnifyT Type Check ()
 unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $ do
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
-  unifyTypes' (TUnknown u) t = replace u t
-  unifyTypes' t (TUnknown u) = replace u t
+  unifyTypes' (TUnknown u) t = u =:= t
+  unifyTypes' t (TUnknown u) = u =:= t
   unifyTypes' (SaturatedTypeSynonym name args) ty = do
     ty1 <- expandTypeSynonym name args
     ty1 `unifyTypes` ty
@@ -95,7 +97,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     sk <- skolemize ident ty1
     sk `unifyTypes` ty2
   unifyTypes' ty f@(ForAll _ _) = f `unifyTypes` ty
-  unifyTypes' (Object row1) (Object row2) = row1 ?= row2
+  unifyTypes' (Object row1) (Object row2) = row1 =?= row2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
     env <- getEnv
@@ -118,7 +120,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
 -- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
 -- error.
 --
-unifyRows :: Type -> Type -> UnifyT Check ()
+unifyRows :: Type -> Type -> UnifyT Type Check ()
 unifyRows r1 r2 =
   let
     (s1, r1') = rowToList r1
@@ -127,17 +129,17 @@ unifyRows r1 r2 =
     sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
     sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
   in do
-    forM_ int (uncurry (?=))
+    forM_ int (uncurry (=?=))
     unifyRows' sd1 r1' sd2 r2'
   where
-  unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> UnifyT Check ()
-  unifyRows' [] (TUnknown u) sd r = replace u (rowFromList (sd, r))
-  unifyRows' sd r [] (TUnknown u) = replace u (rowFromList (sd, r))
+  unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> UnifyT Type Check ()
+  unifyRows' [] (TUnknown u) sd r = u =:= rowFromList (sd, r)
+  unifyRows' sd r [] (TUnknown u) = u =:= rowFromList (sd, r)
   unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
     occursCheck un ty
     forM_ row $ \(_, t) -> occursCheck un t
     u' <- fresh
-    u ?= RCons name ty u'
+    u =?= RCons name ty u'
     unifyRows' row r others u'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
@@ -156,7 +158,7 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 --
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
 typesOf moduleName vals = do
-  tys <- liftUnify $ do
+  tys <- fmap tidyUp . liftUnify $ do
     let es = map isTyped vals
         typed = filter (isJust . snd . snd) es
         untyped = filter (isNothing . snd . snd) es
@@ -174,11 +176,11 @@ typesOf moduleName vals = do
           return (ident, (val', ty'))
         (ident, (val, Nothing)) -> do
           TypedValue _ val' ty <- bindNames dict $ infer val
-          ty ?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+          ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (val', ty))
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
-        ty ?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
+        ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       escapeCheck val ty
       return triple
   forM_ tys $ skolemEscapeCheck . snd . snd
@@ -186,6 +188,8 @@ typesOf moduleName vals = do
     val' <- replaceTypeClassDictionaries moduleName val
     return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
+  where
+  tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
 
 -- |
 -- Check if a value contains a type annotation
@@ -257,14 +261,14 @@ typeHeadsAreEqual _ _ _ _ = Nothing
 -- |
 -- Ensure unsolved unification variables do not escape
 --
-escapeCheck :: Value -> Type -> UnifyT Check ()
+escapeCheck :: Value -> Type -> UnifyT Type Check ()
 escapeCheck value ty = do
   subst <- unifyCurrentSubstitution <$> UnifyT get
-  let visibleUnknowns = nub $ unknowns $ runSubstitution subst ty
+  let visibleUnknowns = nub $ unknowns $ subst $? ty
   let allUnknowns = findAllTypes value
   forM_ allUnknowns $ \t -> do
-    let unsolvedUnknowns = nub . unknowns $ runSubstitution subst t
-    guardWith ("Escape check fails" ++ show ( runSubstitution subst ty, runSubstitution subst t)) $ null $ unsolvedUnknowns \\ visibleUnknowns
+    let unsolvedUnknowns = nub . unknowns $ subst $? t
+    guardWith ("Escape check fails" ++ show (subst $? ty, subst $? t)) $ null $ unsolvedUnknowns \\ visibleUnknowns
 
 -- |
 -- Find all type annotations occuring inside a value
@@ -308,7 +312,7 @@ varIfUnknown ty =
       toName = (:) 't' . show
       ty' = everywhere (mkT typeToVar) $ ty
       typeToVar :: Type -> Type
-      typeToVar (TUnknown (TypedUnknown (Unknown u))) = TypeVar (toName u)
+      typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
       typeToVar t = t
   in mkForAll (sort . map (toName . runUnknown) $ unks) ty'
 
@@ -321,14 +325,14 @@ replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 -- |
 -- Replace named type variables with new unification variables
 --
-replaceAllVarsWithUnknowns :: Type -> UnifyT Check Type
+replaceAllVarsWithUnknowns :: Type -> UnifyT Type Check Type
 replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
 -- |
 -- Replace a single type variable with a new unification variable
 --
-replaceVarWithUnknown :: String -> Type -> UnifyT Check Type
+replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu $ ty
@@ -356,7 +360,7 @@ desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
 -- |
 -- Replace a type synonym and its arguments with the aliased type
 --
-expandTypeSynonym :: Qualified ProperName -> [Type] -> UnifyT Check Type
+expandTypeSynonym :: Qualified ProperName -> [Type] -> UnifyT Type Check Type
 expandTypeSynonym name args = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
@@ -373,20 +377,20 @@ ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (
 -- |
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
-infer :: Value -> UnifyT Check Value
+infer :: Value -> UnifyT Type Check Value
 infer val = rethrow (\e -> "Error inferring type of term " ++ prettyPrintValue val ++ ":\n" ++ e) $ infer' val
 
 -- |
 -- Infer a type for a value
 --
-infer' :: Value -> UnifyT Check Value
+infer' :: Value -> UnifyT Type Check Value
 infer' v@(NumericLiteral _) = return $ TypedValue True v tyNumber
 infer' v@(StringLiteral _) = return $ TypedValue True v tyString
 infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \(TypedValue _ _ t) -> els ?= TypeApp tyArray t
+  forM_ ts $ \(TypedValue _ _ t) -> els =?= TypeApp tyArray t
   return $ TypedValue True (ArrayLiteral ts) els
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
@@ -454,7 +458,7 @@ infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
   v3@(TypedValue _ _ t3) <- infer el
-  t2 ?= t3
+  t2 =?= t3
   return $ TypedValue True (IfThenElse cond' v2 v3) t2
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -468,7 +472,7 @@ infer' _ = error "Invalid argument to infer"
 -- |
 -- Infer the type of a property inside a record with a given type
 --
-inferProperty :: Type -> String -> UnifyT Check (Maybe Type)
+inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
 inferProperty (Object row) prop = do
   let (props, _) = rowToList row
   return $ lookup prop props
@@ -483,11 +487,11 @@ inferProperty _ _ = return Nothing
 -- |
 -- Infer the types of variables brought into scope by a binder
 --
-inferBinder :: Type -> Binder -> UnifyT Check (M.Map Ident Type)
+inferBinder :: Type -> Binder -> UnifyT Type Check (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
-inferBinder val (StringBinder _) = val ?= tyString >> return M.empty
-inferBinder val (NumberBinder _) = val ?= tyNumber >> return M.empty
-inferBinder val (BooleanBinder _) = val ?= tyBoolean >> return M.empty
+inferBinder val (StringBinder _) = val =?= tyString >> return M.empty
+inferBinder val (NumberBinder _) = val =?= tyNumber >> return M.empty
+inferBinder val (BooleanBinder _) = val =?= tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (NullaryBinder ctor) = do
   env <- getEnv
@@ -513,11 +517,11 @@ inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
   m1 <- inferRowProperties row rest props
-  val ?= Object row
+  val =?= Object row
   return m1
   where
-  inferRowProperties :: Type -> Type -> [(String, Binder)] -> UnifyT Check (M.Map Ident Type)
-  inferRowProperties nrow row [] = nrow ?= row >> return M.empty
+  inferRowProperties :: Type -> Type -> [(String, Binder)] -> UnifyT Type Check (M.Map Ident Type)
+  inferRowProperties nrow row [] = nrow =?= row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- fresh
     m1 <- inferBinder propTy binder
@@ -526,13 +530,13 @@ inferBinder val (ObjectBinder props) = do
 inferBinder val (ArrayBinder binders) = do
   el <- fresh
   m1 <- M.unions <$> mapM (inferBinder el) binders
-  val ?= TypeApp tyArray el
+  val =?= TypeApp tyArray el
   return m1
 inferBinder val (ConsBinder headBinder tailBinder) = do
   el <- fresh
   m1 <- inferBinder el headBinder
   m2 <- inferBinder val tailBinder
-  val ?= TypeApp tyArray el
+  val =?= TypeApp tyArray el
   return $ m1 `M.union` m2
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
@@ -541,7 +545,7 @@ inferBinder val (NamedBinder name binder) = do
 -- |
 -- Check the types of the return values in a set of binders in a case statement
 --
-checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> UnifyT Check [([Binder], Maybe Guard, Value)]
+checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> UnifyT Type Check [([Binder], Maybe Guard, Value)]
 checkBinders _ _ [] = return []
 checkBinders nvals ret ((binders, grd, val):bs) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -559,7 +563,7 @@ checkBinders nvals ret ((binders, grd, val):bs) = do
 -- |
 -- Check that a local variable name is not already used
 --
-assignVariable :: Ident -> UnifyT Check ()
+assignVariable :: Ident -> UnifyT Type Check ()
 assignVariable name = do
   env <- checkEnv <$> get
   Just moduleName <- checkCurrentModule <$> get
@@ -571,7 +575,7 @@ assignVariable name = do
 -- Check the type of the return values of a statement, returning whether or not the statement returns on
 -- all code paths
 --
-checkStatement :: M.Map Ident Type -> Type -> Statement -> UnifyT Check (Bool, M.Map Ident Type, Statement)
+checkStatement :: M.Map Ident Type -> Type -> Statement -> UnifyT Type Check (Bool, M.Map Ident Type, Statement)
 checkStatement mass _ (VariableIntroduction name val) = do
   assignVariable name
   val'@(TypedValue _ _ t) <- infer val
@@ -580,7 +584,7 @@ checkStatement mass _ (Assignment ident val) = do
   val'@(TypedValue _ _ t) <- infer val
   case M.lookup ident mass of
     Nothing -> throwError $ "No local variable with name " ++ show ident
-    Just ty -> do t ?= ty
+    Just ty -> do t =?= ty
                   return (False, mass, Assignment ident val')
 checkStatement mass ret (While val inner) = do
   val' <- check val tyBoolean
@@ -603,7 +607,7 @@ checkStatement mass ret (Return val) = do
 -- |
 -- Check the type of an if-then-else statement
 --
-checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> UnifyT Check (Bool, IfStatement)
+checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> UnifyT Type Check (Bool, IfStatement)
 checkIfStatement mass ret (IfStatement val thens Nothing) = do
   val' <- check val tyBoolean
   (_, _, thens') <- checkBlock mass ret thens
@@ -617,7 +621,7 @@ checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
 -- |
 -- Check the type of an else statement
 --
-checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> UnifyT Check (Bool, ElseStatement)
+checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> UnifyT Type Check (Bool, ElseStatement)
 checkElseStatement mass ret (Else elses) = do
   (allCodePathsReturn, _, elses') <- checkBlock mass ret elses
   return (allCodePathsReturn, Else elses')
@@ -626,7 +630,7 @@ checkElseStatement mass ret (ElseIf ifst) = (id *** ElseIf) <$> checkIfStatement
 -- |
 -- Check the type of the return value of a block of statements
 --
-checkBlock :: M.Map Ident Type -> Type -> [Statement] -> UnifyT Check (Bool, M.Map Ident Type, [Statement])
+checkBlock :: M.Map Ident Type -> Type -> [Statement] -> UnifyT Type Check (Bool, M.Map Ident Type, [Statement])
 checkBlock mass _ [] = return (False, mass, [])
 checkBlock mass ret (s:ss) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -641,7 +645,7 @@ checkBlock mass ret (s:ss) = do
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
-skolemize :: String -> Type -> UnifyT Check Type
+skolemize :: String -> Type -> UnifyT Type Check Type
 skolemize ident ty = do
   tsk <- Skolem . runUnknown <$> fresh'
   return $ replaceTypeVars ident tsk ty
@@ -649,7 +653,7 @@ skolemize ident ty = do
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
-check :: Value -> Type -> UnifyT Check Value
+check :: Value -> Type -> UnifyT Type Check Value
 check val ty = rethrow errorMessage $ check' val ty
   where
   errorMessage msg =
@@ -663,7 +667,7 @@ check val ty = rethrow errorMessage $ check' val ty
 -- |
 -- Check the type of a value
 --
-check' :: Value -> Type -> UnifyT Check Value
+check' :: Value -> Type -> UnifyT Type Check Value
 check' val (ForAll idents ty) = do
   sk <- skolemize idents ty
   check val sk
@@ -682,7 +686,7 @@ check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
-  ty' ?= u
+  ty' =?= u
   return val'
 check' v@(NumericLiteral _) t | t == tyNumber = return v
 check' v@(StringLiteral _) t | t == tyString = return v
@@ -765,10 +769,10 @@ check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ p
 --
 -- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
 --
-checkProperties :: [(String, Value)] -> Type -> Bool -> UnifyT Check [(String, Value)]
+checkProperties :: [(String, Value)] -> Type -> Bool -> UnifyT Type Check [(String, Value)]
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
-  go [] [] u@(TUnknown _) = do u ?= REmpty
+  go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
   go [] [] (Skolem _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
@@ -777,7 +781,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go ((p,v):ps') [] u@(TUnknown _) = do
     v'@(TypedValue _ _ ty) <- infer v
     rest <- fresh
-    u ?= RCons p ty rest
+    u =?= RCons p ty rest
     ps'' <- go ps' [] rest
     return $ (p, v') : ps''
   go ((p,v):ps') ts r =
@@ -785,7 +789,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
       Nothing -> do
         v'@(TypedValue _ _ ty) <- infer v
         rest <- fresh
-        r ?= RCons p ty rest
+        r =?= RCons p ty rest
         ps'' <- go ps' ts rest
         return $ (p, v') : ps''
       Just ty -> do
@@ -797,7 +801,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication :: Value -> Type -> Value -> Type -> UnifyT Type Check Value
 checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg ret
   where
   errorMessage msg = "Error applying function of type "
@@ -808,9 +812,9 @@ checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionA
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Check Value
+checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Type Check Value
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
-  tyFunction' ?= tyFunction
+  tyFunction' =?= tyFunction
   arg' <- check arg argTy
   _ <- subsumes Nothing retTy ret
   return $ App fn arg'
@@ -822,7 +826,7 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
     TypedValue _ v t <- infer arg
     TypedValue True v <$> replaceAllVarsWithUnknowns t
   let ty = (\(TypedValue _ _ t) -> t) arg'
-  u ?= function ty ret
+  u =?= function ty ret
   return $ App fn arg'
 checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- expandTypeSynonym name tyArgs
@@ -840,7 +844,7 @@ checkFunctionApplication' _ fnTy arg ret = throwError $ "Applying a function of 
 -- |
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
-subsumes :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
+subsumes :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
 subsumes val ty1 ty2 = rethrow errorMessage $ subsumes' val ty1 ty2
   where
   errorMessage msg = "Error checking that type "
@@ -852,7 +856,7 @@ subsumes val ty1 ty2 = rethrow errorMessage $ subsumes' val ty1 ty2
 -- |
 -- Check whether one type subsumes another
 --
-subsumes' :: Maybe Value -> Type -> Type -> UnifyT Check (Maybe Value)
+subsumes' :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
 subsumes' val (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2
@@ -873,6 +877,6 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   _ <- subsumes' Nothing ty1 ty2
   return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
 subsumes' val ty1 ty2 = do
-  ty1 ?= ty2
+  ty1 =?= ty2
   return val
 

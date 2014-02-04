@@ -210,7 +210,7 @@ canonicalizeType _ _ (Qualified (Just mn) nm) = (mn, nm)
 canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types env of
   Just (_, DataAlias mn' pn') -> (mn', pn')
   _ -> (mn, nm)
-  
+
 -- |
 -- Canonicalize a data constructor by resolving any aliases introduced by module imports
 --
@@ -299,13 +299,13 @@ freshDictionaryName = do
 -- |
 -- Lift a computation in the @Check@ monad into the substitution monad.
 --
-liftCheck :: Check a -> UnifyT Check a
+liftCheck :: Check a -> UnifyT t Check a
 liftCheck = UnifyT . lift . lift
 
 -- |
 -- Run a computation in the substitution monad, generating a return value and the final substitution.
 --
-liftUnify :: (Data a) => UnifyT Check a -> Check a
+liftUnify :: (Partial t) => UnifyT t Check a -> Check (a, Substitution t)
 liftUnify unify = do
   st <- get
   e <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
@@ -313,7 +313,7 @@ liftUnify unify = do
     Left err -> throwError err
     Right (a, ust) -> do
       modify $ \st -> st { checkNextVar = unifyNextVar ust }
-      return $ runSubstitution (unifyCurrentSubstitution ust) a
+      return (a, unifyCurrentSubstitution ust)
 
 -- |
 -- Replace any unqualified names in a type wit their qualified versionss
