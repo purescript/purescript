@@ -66,7 +66,7 @@ assertCompiles :: FilePath -> IO ()
 assertCompiles inputFile = do
   putStrLn $ "assert " ++ inputFile ++ " compiles successfully"
   prelude <- preludeFilename
-  assert (P.defaultOptions { P.optionsRunMain = True }) [prelude, inputFile] $ either (return . Just) $ \js -> do
+  assert (P.defaultOptions { P.optionsRunMain = True, P.optionsNoOptimizations = True }) [prelude, inputFile] $ either (return . Just) $ \js -> do
     args <- getArgs
     if "--run-js" `elem` args
     then do

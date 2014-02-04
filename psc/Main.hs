@@ -90,8 +90,12 @@ runMain :: Term Bool
 runMain = value $ flag $ (optInfo [ "run-main" ])
      { optDoc = "Generate code to run the main method in the Main module." }
 
+noOpts :: Term Bool
+noOpts = value $ flag $ (optInfo [ "no-opts" ])
+     { optDoc = "Skip the optimization phase." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

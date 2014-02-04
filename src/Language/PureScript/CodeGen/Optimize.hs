@@ -27,7 +27,9 @@
 --
 --  * Inlining variables
 --
---  * Inline Prelude.($)
+--  * Inline Prelude.($), Prelude.(++), Prelude.(!!)
+--
+--  * Inlining primitive Javascript operators
 --
 -----------------------------------------------------------------------------
 
@@ -45,13 +47,14 @@ import Language.PureScript.Options
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Sugar.TypeClasses
        (mkDictionaryValueName)
-import Language.PureScript.Types (Type(..))
+import Language.PureScript.Types
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
 optimize :: Options -> JS -> JS
-optimize opts = untilFixedPoint $ applyAll
+optimize opts | optionsNoOptimizations opts = id
+              | otherwise = untilFixedPoint $ applyAll
   [ collapseNestedBlocks
   , tco opts
   , magicDo opts
@@ -59,7 +62,10 @@ optimize opts = untilFixedPoint $ applyAll
   , unThunk
   , etaConvert
   , inlineVariables
-  , inlineDollar ]
+  , inlineOperator "$" $ \f x -> JSApp f [x]
+  , inlineOperator "!!" $ flip JSIndexer
+  , inlineOperator "++" $ JSBinary Add
+  , inlineCommonOperators ]
 
 applyAll :: [a -> a] -> a -> a
 applyAll = foldl1 (.)
@@ -293,12 +299,71 @@ collapseNestedBlocks = everywhere (mkT collapse)
   go (JSBlock sts) = sts
   go s = [s]
 
-inlineDollar :: JS -> JS
-inlineDollar = everywhere (mkT convert)
+inlineOperator :: String -> (JS -> JS -> JS) -> JS -> JS
+inlineOperator op f = everywhere (mkT convert)
   where
   convert :: JS -> JS
-  convert (JSApp (JSApp dollar [f]) [x]) | isDollar dollar = JSApp f [x]
+  convert (JSApp (JSApp op [x]) [y]) | isOp op = f x y
   convert other = other
-  isDollar (JSAccessor "$dollar" (JSVar "Prelude")) = True
-  isDollar (JSIndexer (JSStringLiteral "$") (JSVar "Prelude")) = True
-  isDollar _ = False
+  isOp (JSAccessor longForm (JSVar "Prelude")) | longForm == identToJs (Op op) = True
+  isOp (JSIndexer (JSStringLiteral op') (JSVar "Prelude")) | op == op' = True
+  isOp _ = False
+
+inlineCommonOperators :: JS -> JS
+inlineCommonOperators = applyAll
+  [ binary "+" "Num" tyNumber Add
+  , binary "-" "Num" tyNumber Subtract
+  , binary "*" "Num" tyNumber Multiply
+  , binary "/" "Num" tyNumber Divide
+  , binary "%" "Num" tyNumber Modulus
+  , unary "negate" "Num" tyNumber Negate
+
+  , binary "<" "Ord" tyNumber LessThan
+  , binary ">" "Ord" tyNumber GreaterThan
+  , binary "<=" "Ord" tyNumber LessThanOrEqualTo
+  , binary ">=" "Ord" tyNumber GreaterThanOrEqualTo
+
+  , binary "==" "Eq" tyNumber EqualTo
+  , binary "/=" "Eq" tyNumber NotEqualTo
+  , binary "==" "Eq" tyString EqualTo
+  , binary "/=" "Eq" tyString NotEqualTo
+  , binary "==" "Eq" tyBoolean EqualTo
+  , binary "/=" "Eq" tyBoolean NotEqualTo
+
+  , binary "<<" "Bits" tyNumber ShiftLeft
+  , binary ">>" "Bits" tyNumber ShiftRight
+  , binary ">>>" "Bits" tyNumber ZeroFillShiftRight
+  , binary "&" "Bits" tyNumber BitwiseAnd
+  , binary "|" "Bits" tyNumber BitwiseOr
+  , binary "^" "Bits" tyNumber BitwiseXor
+  , unary "complement" "Bits" tyNumber BitwiseNot
+
+  , binary "&&" "BoolLike" tyBoolean And
+  , binary "||" "BoolLike" tyBoolean Or
+  , unary "not" "BoolLike" tyBoolean Not
+  ]
+  where
+  binary :: String -> String -> Type -> BinaryOperator -> JS -> JS
+  binary opString className classTy op = everywhere (mkT convert)
+    where
+    convert :: JS -> JS
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
+    convert other = other
+    isOp (JSAccessor longForm (JSVar "Prelude")) | longForm == identToJs (Op opString) = True
+    isOp (JSIndexer (JSStringLiteral op') (JSVar "Prelude")) | opString == op' = True
+    isOp _ = False
+  unary :: String -> String -> Type -> UnaryOperator -> JS -> JS
+  unary fnName className classTy op = everywhere (mkT convert)
+    where
+    convert :: JS -> JS
+    convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict className classTy dict = JSUnary op x
+    convert other = other
+    isOp (JSAccessor fnName' (JSVar "Prelude")) | fnName' == fnName = True
+    isOp _ = False
+  isOpDict className ty (JSAccessor prop (JSVar "Prelude")) | prop == dictName = True
+    where
+    Right (Ident dictName) = mkDictionaryValueName
+      (ModuleName (ProperName "Prelude"))
+      (Qualified (Just (ModuleName (ProperName "Prelude"))) (ProperName className))
+      ty
+  isOpDict _ _ _ = False

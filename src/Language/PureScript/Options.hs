@@ -35,10 +35,14 @@ data Options = Options {
     -- Check the type of Main.main and generate its code
     --
   , optionsRunMain :: Bool
+    -- |
+    -- Skip all optimizations
+    --
+  , optionsNoOptimizations :: Bool
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False
+defaultOptions = Options False False False False False
