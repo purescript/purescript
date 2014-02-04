@@ -1,5 +1,7 @@
 module Operators1 where
 
+  import Prelude ((++))
+
   (@@) :: forall a b. (a -> b) -> a -> b
   (@@) = \f x -> f x
 
@@ -12,7 +14,10 @@ module Operators1 where
 
 module Operators2 where
 
-  test1 = \x y z -> x * y + z(x)(y)
+  import Prelude
+
+  test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
+  test1 x y z = x * y + z x y
 
   test2 = (\x -> x.foo false) { foo : \_ -> 1 }
 
@@ -24,7 +29,8 @@ module Operators2 where
 
   infixl 5 %%
 
-  (%%) = \x -> \y -> x * y + y
+  (%%) :: Number -> Number -> Number
+  (%%) x y = x * y + y
 
   test5 = 1 %% 2 %% 3
 

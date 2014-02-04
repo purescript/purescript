@@ -40,7 +40,7 @@ module Prelude where
     show true = "true"
     show false = "false"
 
-  foreign import showNumber "function numberToString(n) {\
+  foreign import showNumber "function showNumber(n) {\
                             \  return n.toString();\
                             \}" :: Number -> String
 
@@ -61,6 +61,13 @@ module Prelude where
     ret :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
+  infixl 5 *
+  infixl 5 /
+  infixl 5 %
+
+  infixl 7 -
+  infixl 7 +
+
   class Num a where
     (+) :: a -> a -> a
     (-) :: a -> a -> a
@@ -69,25 +76,50 @@ module Prelude where
     (%) :: a -> a -> a
     negate :: a -> a
 
-  foreign import addNumber "" :: Number -> Number -> Number
+  foreign import numAdd "function numAdd(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 + n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import subNumber "" :: Number -> Number -> Number
+  foreign import numSub "function numSub(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 - n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import mulNumber "" :: Number -> Number -> Number
+  foreign import numMul "function numMul(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 * n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import divNumber "" :: Number -> Number -> Number
+  foreign import numDiv "function numDiv(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 / n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import modNumber "" :: Number -> Number -> Number
-  
-  foreign import negateNumber "" :: Number -> Number
+  foreign import numMod "function numMod(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 % n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
+
+  foreign import numNegate "function numNegate(n) {\
+                           \  return -n;\
+                           \}" :: Number -> Number
 
   instance Num Number where
-    (+) = addNumber
-    (-) = subNumber
-    (*) = mulNumber
-    (/) = divNumber
-    (%) = modNumber
-    negate = negateNumber
+    (+) = numAdd
+    (-) = numSub
+    (*) = numMul
+    (/) = numDiv
+    (%) = numMod
+    negate = numNegate
+
+  infixl 9 ==
+  infixl 9 /=
 
   class Eq a where
     (==) :: a -> a -> Boolean
@@ -96,13 +128,29 @@ module Prelude where
   -- Referential equality
   data Ref a = Ref a
 
-  foreign import refEq "" :: forall a. Ref a -> Ref a -> Boolean
-  
-  foreign import refIneq "" :: forall a. Ref a -> Ref a -> Boolean
+  foreign import refEq "function refEq(r1) {\
+                       \  return function(r2) {\
+                       \    return r1.value === r2.value;\
+                       \  };\
+                       \}" :: forall a. Ref a -> Ref a -> Boolean
 
-  foreign import unsafeRefEq "" :: forall a. a -> a -> Boolean
-  
-  foreign import unsafeRefIneq "" :: forall a. a -> a -> Boolean
+  foreign import refIneq "function refIneq(r1) {\
+                         \  return function(r2) {\
+                         \    return r1.value !== r2.value;\
+                         \  };\
+                         \}" :: forall a. Ref a -> Ref a -> Boolean
+
+  foreign import unsafeRefEq "function unsafeRefEq(r1) {\
+                             \  return function(r2) {\
+                             \    return r1 === r2;\
+                             \  };\
+                             \}" :: forall a. a -> a -> Boolean
+
+  foreign import unsafeRefIneq "function unsafeRefIneq(r1) {\
+                               \  return function(r2) {\
+                               \    return r1 !== r2;\
+                               \  };\
+                               \}" :: forall a. a -> a -> Boolean
 
   instance Eq (Ref a) where
     (==) = refEq
@@ -124,25 +172,54 @@ module Prelude where
     (==) = unsafeRefEq
     (/=) = unsafeRefIneq
 
+  infixl 3 <
+  infixl 3 >
+  infixl 3 <=
+  infixl 3 >=
+
   class Ord a where
     (<) :: a -> a -> Boolean
     (>) :: a -> a -> Boolean
     (<=) :: a -> a -> Boolean
     (>=) :: a -> a -> Boolean
 
-  foreign import numLess "" :: Number -> Number -> Boolean
+  foreign import numLess "function numLess(n1) {\
+                         \  return function(n2) {\
+                         \    return n1 < n2;\
+                         \  };\
+                         \}" :: Number -> Number -> Boolean
 
-  foreign import numLessEq "" :: Number -> Number -> Boolean
-  
-  foreign import numGreater "" :: Number -> Number -> Boolean
+  foreign import numLessEq "function numLessEq(n1) {\
+                           \  return function(n2) {\
+                           \    return n1 <= n2;\
+                           \  };\
+                           \}" :: Number -> Number -> Boolean
 
-  foreign import numGreaterEq "" :: Number -> Number -> Boolean
-  
+  foreign import numGreater "function numGreater(n1) {\
+                            \  return function(n2) {\
+                            \    return n1 > n2;\
+                            \  };\
+                            \}" :: Number -> Number -> Boolean
+
+  foreign import numGreaterEq "function numGreaterEq(n1) {\
+                              \  return function(n2) {\
+                              \    return n1 >= n2;\
+                              \  };\
+                              \}" :: Number -> Number -> Boolean
+
   instance Ord Number where
     (<) = numLess
     (>) = numGreater
     (<=) = numLessEq
     (>=) = numGreaterEq
+
+  infixl 8 <<
+  infixl 8 >>
+  infixl 8 >>>
+
+  infixl 10 &
+  infixl 10 |
+  infixl 10  ^
 
   class Bits b where
     (<<) :: b -> Number -> b
@@ -153,20 +230,46 @@ module Prelude where
     (^) :: b -> b -> b
     complement :: b -> b
 
-  foreign import numShl "" :: Number -> Number -> Number
-  
-  foreign import numShr "" :: Number -> Number -> Number
-  
-  foreign import numZfShr "" :: Number -> Number -> Number
+  foreign import numShl "function numShl(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 << n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import numAnd "" :: Number -> Number -> Number
+  foreign import numShr "function numShr(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 >> n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
 
-  foreign import numOr "" :: Number -> Number -> Number
+  foreign import numZfShr "function numZfShr(n1) {\
+                          \  return function(n2) {\
+                          \    return n1 >>> n2;\
+                          \  };\
+                          \}" :: Number -> Number -> Number
 
-  foreign import numXor "" :: Number -> Number -> Number
-  
-  foreign import numComplement "" :: Number -> Number
-  
+  foreign import numAnd "function numAnd(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 & n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
+
+  foreign import numOr "function numOr(n1) {\
+                       \  return function(n2) {\
+                       \    return n1 | n2;\
+                       \  };\
+                       \}" :: Number -> Number -> Number
+
+  foreign import numXor "function numXor(n1) {\
+                        \  return function(n2) {\
+                        \    return n1 ^ n2;\
+                        \  };\
+                        \}" :: Number -> Number -> Number
+
+  foreign import numComplement "function numComplement(n) {\
+                               \  return ~n;\
+                               \}" :: Number -> Number
+
   instance Bits Number where
     (<<) = numShl
     (>>) = numShr
@@ -176,27 +279,44 @@ module Prelude where
     (^) = numXor
     complement = numComplement
 
+  infixl 4 !!
+
   foreign import (!!) "function $bang$bang(xs) {\
                       \  return function(n) {\
                       \    return xs[n];\
                       \  };\
                       \}" :: forall a. [a] -> Number -> a
 
+  infixr 11 ||
+  infixr 11 &&
+
   class BoolLike b where
     (&&) :: b -> b -> b
     (||) :: b -> b -> b
     not :: b -> b
 
-  foreign import boolAnd "" :: Boolean -> Boolean -> Boolean
-  
-  foreign import boolOr "" :: Boolean -> Boolean -> Boolean
+  foreign import boolAnd "function boolAnd(b1) {\
+                         \  return function(b2) {\
+                         \    return b1 && b2;\
+                         \  };\
+                         \}"  :: Boolean -> Boolean -> Boolean
 
-  foreign import boolNot "" :: Boolean -> Boolean
-  
+  foreign import boolOr "function boolOr(b1) {\
+                        \  return function(b2) {\
+                        \    return b1 || b2;\
+                        \  };\
+                        \}" :: Boolean -> Boolean -> Boolean
+
+  foreign import boolNot "function boolNot(b) {\
+                         \  return !b;\
+                         \}" :: Boolean -> Boolean
+
   instance BoolLike Boolean where
     (&&) = boolAnd
     (||) = boolOr
     not = boolNot
+
+  infixr 6 ++
 
   foreign import (++) "function $plus$plus(s1) {\
                       \  return function(s2) {\

@@ -1,5 +1,7 @@
 module Recursion where
 
+  import Prelude
+
   fib = \n -> case n of
     0 -> 1
     1 -> 1

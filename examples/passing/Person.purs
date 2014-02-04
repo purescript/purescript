@@ -1,5 +1,7 @@
 module Person where
 
+  import Prelude ((++))
+
   data Person = Person { name :: String, age :: Number }
 
   foreign import itoa :: Number -> String

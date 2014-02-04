@@ -25,14 +25,14 @@ test3 = \_ -> do
 test4 mx my = do
   x <- mx
   y <- my
-  Just (x + y)
+  Just (x + y + 1)
 
 test5 mx my mz = do
   x <- mx
   y <- my
   let sum = x + y
   z <- mz
-  Just (z + sum)
+  Just (z + sum + 1)
 
 test6 mx = \_ -> do 
   let Just x = mx
@@ -53,14 +53,12 @@ test8 = \_ -> do
   a <- m
   ret (g a)
 
-foo x y z = x + y + z
-
 forever :: forall m a b. (Monad m) => m a -> m b
 forever a = do
   a
   forever a
 
-test9 = \_ -> foo <$> Just 1 <*> Just 2 <*> Just 3
+test9 = \_ -> (+) <$> Just 1 <*> Just 2
     
 module Main where
 

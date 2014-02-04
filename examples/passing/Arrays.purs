@@ -1,6 +1,8 @@
 module ArraysTests where
 
-test1 = \arr -> arr !! 0 + arr !! 1
+import Prelude
+
+test1 arr = arr !! 0 + arr !! 1 + 1
 
 test2 = \arr -> case arr of 
   [x, y] -> x + y

@@ -1,5 +1,7 @@
 module Rank2Data where
 
+  import Prelude
+
   data Id = Id forall a. a -> a
 
   runId = \id a -> case id of

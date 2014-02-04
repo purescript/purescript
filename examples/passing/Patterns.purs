@@ -1,5 +1,7 @@
 module Patterns where
 
+  import Prelude
+
   test = \x -> case x of 
     { str = "Foo", bool = true } -> true
     { str = "Bar", bool = b } -> b
@@ -19,9 +21,9 @@ module Patterns where
     a@[_,_,_] -> a
     _ -> []
 
-  isDesc = \o -> case o of
-    [x, y] | x > y -> true
-    _ -> false
+  isDesc :: [Number] -> Boolean
+  isDesc [x, y] | x > y = true
+  isDesc _ = false
     
 module Main where
 

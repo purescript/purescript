@@ -1,6 +1,8 @@
 module Objects where
 
-  test = \x -> x.foo + x.bar
+  import Prelude
+
+  test = \x -> x.foo + x.bar + 1
 
   append = \o -> { foo: o.foo, bar: 1 }
 

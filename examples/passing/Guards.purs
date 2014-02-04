@@ -1,5 +1,7 @@
 module Guards where
 
+  import Prelude
+
   collatz = \x -> case x of
     y | y % 2 == 0 -> y / 2
     y -> y * 3 + 1

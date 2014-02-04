@@ -1,8 +1,10 @@
 module Functions where
 
+  import Prelude
+
   test1 = \_ -> 0
 
-  test2 = \a b c d -> a + b + c + d
+  test2 = \a b -> a + b + 1
 
   test3 = \a -> a
 

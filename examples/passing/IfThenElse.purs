@@ -1,5 +1,7 @@
 module IfThenElse where
 
+  import Prelude
+
   testIf = 
     {
       var x = 0;

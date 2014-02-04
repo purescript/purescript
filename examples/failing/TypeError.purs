@@ -1,3 +1,5 @@
 module TypeError where
 
-  test = x ++ "A"
+  import Prelude
+
+  test = 1 ++ "A"

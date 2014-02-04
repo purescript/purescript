@@ -1,5 +1,7 @@
 module Shadowed where
 
+import Prelude
+
 a = [1, 2]
 
 foo = {

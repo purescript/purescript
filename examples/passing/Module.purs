@@ -1,5 +1,7 @@
 module M1 where
 
+  import Prelude
+
   data Foo = Foo String
 
   foo :: M1.Foo -> String
@@ -12,6 +14,8 @@ module M1 where
   incr x = x + 1
 
 module M2 where
+
+  import Prelude
 
   baz :: M1.Foo -> String
   baz = M1.foo

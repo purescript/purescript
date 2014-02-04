@@ -1,5 +1,7 @@
 module TopLevelCase where
 
+  import Prelude
+
   gcd :: Number -> Number -> Number
   gcd 0 x = x
   gcd x 0 = x

@@ -17,9 +17,9 @@ test2 = runPure $ runST $ do
 
 module Main where
 
+import Prelude
 import Eff
 import TestEff
-import Global
 
 main = do
   n <- test1

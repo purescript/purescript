@@ -1,5 +1,7 @@
 module PatternScope where
 
+  import Prelude
+
   -- Pattern scope doesn't leak
   foobar = \x -> {
       var y = case x of

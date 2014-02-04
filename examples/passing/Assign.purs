@@ -1,5 +1,7 @@
 module Assign where
 
+  import Prelude
+
   sum = \n -> {
       var x = 0;
       for (i <- 0 until n) {

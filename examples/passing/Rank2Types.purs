@@ -1,5 +1,7 @@
 module Rank2Types where
 
+  import Prelude
+
   test1 :: (forall a. (a -> a)) -> Number
   test1 = \f -> f 0
 

@@ -1,5 +1,7 @@
 module MutRec where 
 
+  import Prelude
+
   f 0 = 0
   f x = g x + 1
 
