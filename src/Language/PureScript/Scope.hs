@@ -44,11 +44,11 @@ usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB
   namesB (VarBinder name) = [name]
   namesB _ = []
   namesJS :: JS -> [Ident]
-  namesJS (JSVar name) = [name]
-  namesJS (JSFunction (Just name) args _) = name : args
-  namesJS (JSFunction Nothing args _) = args
-  namesJS (JSVariableIntroduction name _) = [name]
-  namesJS (JSFor name _ _ _) = [name]
+  namesJS (JSVar name) = [Ident name]
+  namesJS (JSFunction (Just name) args _) = (Ident name) : (Ident `map` args)
+  namesJS (JSFunction Nothing args _) = (Ident `map` args)
+  namesJS (JSVariableIntroduction name _) = [Ident name]
+  namesJS (JSFor name _ _ _) = [Ident name]
   namesJS _ = []
 
 -- |

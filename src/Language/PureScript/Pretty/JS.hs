@@ -89,10 +89,10 @@ literals = mkPattern' match
     , currentIndent
     , return "}"
     ]
-  match (JSVar ident) = return (identToJs ident)
+  match (JSVar ident) = return ident
   match (JSVariableIntroduction ident value) = fmap concat $ sequence
     [ return "var "
-    , return $ identToJs ident
+    , return ident
     , maybe (return "") (fmap (" = " ++) . prettyPrintJS') value
     ]
   match (JSAssignment target value) = fmap concat $ sequence
@@ -107,11 +107,11 @@ literals = mkPattern' match
     , prettyPrintJS' sts
     ]
   match (JSFor ident start end sts) = fmap concat $ sequence
-    [ return $ "for (" ++ identToJs ident ++ " = "
+    [ return $ "for (" ++ ident ++ " = "
     , prettyPrintJS' start
-    , return $ "; " ++ identToJs ident ++ " < "
+    , return $ "; " ++ ident ++ " < "
     , prettyPrintJS' end
-    , return $ "; " ++ identToJs ident ++ "++) "
+    , return $ "; " ++ ident ++ "++) "
     , prettyPrintJS' sts
     ]
   match (JSIfElse cond thens elses) = fmap concat $ sequence
@@ -139,7 +139,7 @@ literals = mkPattern' match
   match _ = mzero
 
 targetToJs :: JSAssignment -> String
-targetToJs (JSAssignVariable ident) = identToJs ident
+targetToJs (JSAssignVariable ident) = ident
 targetToJs (JSAssignProperty prop target) = targetToJs target ++ "." ++ prop
 
 conditional :: Pattern PrinterState JS ((JS, JS), JS)
@@ -160,7 +160,7 @@ indexer = mkPattern' match
   match (JSIndexer index val) = (,) <$> prettyPrintJS' index <*> pure val
   match _ = mzero
 
-lam :: Pattern PrinterState JS ((Maybe Ident, [Ident]), JS)
+lam :: Pattern PrinterState JS ((Maybe String, [String]), JS)
 lam = mkPattern match
   where
   match (JSFunction name args ret) = Just ((name, args), ret)
@@ -227,8 +227,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Wrap lam $ \(name, args) ret -> "function "
-                        ++ maybe "" identToJs name
-                        ++ "(" ++ intercalate ", " (map identToJs args) ++ ") "
+                        ++ maybe "" id name
+                        ++ "(" ++ (intercalate ", " args) ++ ") "
                         ++ ret ]
                   , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS1 th ++ " : " ++ prettyPrintJS1 el ]
                   , [ binary    LessThan             "<" ]
