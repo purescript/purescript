@@ -62,17 +62,17 @@ import Trace
 import Global
 import Arrays
 
-main = do
-  print $ test1 1 2 $ \x y -> x + y
-  print test2
-  print test3
-  print test4
-  print test5
-  print test6
-  print test7
-  print test8
-  print test9
-  print test10
-  print test11
-  print (test12 k 1 2)
-
+main = 
+  print [ show $ test1 1 2 $ \x y -> x + y
+        , show test2
+        , show test3
+        , show test4
+        , show test5
+        , show test6
+        , show test7
+        , show test8
+        , show test9
+        , show test10
+        , show test11
+        , show (test12 k 1 2)
+        ]
