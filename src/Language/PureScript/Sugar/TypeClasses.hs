@@ -34,7 +34,7 @@ import Control.Monad.State
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import Data.Generics (mkQ, everything)
-import Language.PureScript.Pretty.Common (identToJs)
+import Language.PureScript.CodeGen.Common (identToJs)
 
 type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
 
@@ -73,7 +73,7 @@ typeClassDictionaryDeclaration name arg members =
 typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
-    (Just (JSFunction (Just ident) [Ident "dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar (Ident "dict")))])))
+    (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
     (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 

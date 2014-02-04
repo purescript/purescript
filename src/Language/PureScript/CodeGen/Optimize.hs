@@ -42,7 +42,7 @@ import Data.Generics
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
-import Language.PureScript.Pretty.Common (identToJs)
+import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Sugar.TypeClasses
        (mkDictionaryValueName)
 import Language.PureScript.Types (Type(..))
@@ -70,19 +70,19 @@ untilFixedPoint f a = go a
   go a' = let a'' = f a' in
           if a'' == a' then a'' else go a''
 
-replaceIdent :: (Data d) => Ident -> JS -> d -> d
+replaceIdent :: (Data d) => String -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
   where
   replace (JSVar var2) | var1 == var2 = js
   replace other = other
 
-replaceIdents :: (Data d) => [(Ident, JS)] -> d -> d
+replaceIdents :: (Data d) => [(String, JS)] -> d -> d
 replaceIdents vars = everywhere (mkT replace)
   where
   replace v@(JSVar var) = fromMaybe v $ lookup var vars
   replace other = other
 
-isReassigned :: (Data d) => Ident -> d -> Bool
+isReassigned :: (Data d) => String -> d -> Bool
 isReassigned var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
@@ -97,7 +97,7 @@ isRebound js d = any (\var -> isReassigned var d) (variablesOf js)
   variablesOf (JSIndexer index val) = variablesOf index ++ variablesOf val
   variablesOf _ = []
 
-isUsed :: (Data d) => Ident -> d -> Bool
+isUsed :: (Data d) => String -> d -> Bool
 isUsed var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
@@ -105,11 +105,11 @@ isUsed var1 = everything (||) (mkQ False check)
   check (JSAssignment target _) | var1 == targetVariable target = True
   check _ = False
 
-targetVariable :: JSAssignment -> Ident
+targetVariable :: JSAssignment -> String
 targetVariable (JSAssignVariable var) = var
 targetVariable (JSAssignProperty _ tgt) = targetVariable tgt
 
-isUpdated :: (Data d) => Ident -> d -> Bool
+isUpdated :: (Data d) => String -> d -> Bool
 isUpdated var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
@@ -173,12 +173,10 @@ tco' = everywhere (mkT convert)
   where
   tcoLabel :: String
   tcoLabel = "tco"
-  tcoVar :: Ident -> Ident
-  tcoVar (Ident arg) = Ident $ "__tco_" ++ arg
-  tcoVar _ = error "Invalid name in tcoVar"
-  copyVar :: Ident -> Ident
-  copyVar (Ident arg) = Ident $ "__copy_" ++ arg
-  copyVar _ = error "Invalid name in copyVar"
+  tcoVar :: String -> String
+  tcoVar arg = "__tco_" ++ arg
+  copyVar :: String -> String
+  copyVar arg = "__copy_" ++ arg
   convert :: JS -> JS
   convert js@(JSVariableIntroduction name (Just fn@(JSFunction _ _ _))) =
     let
@@ -191,7 +189,7 @@ tco' = everywhere (mkT convert)
               JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
         | otherwise -> js
   convert js = js
-  collectAllFunctionArgs :: [[Ident]] -> (JS -> JS) -> JS -> ([[Ident]], JS, JS -> JS)
+  collectAllFunctionArgs :: [[String]] -> (JS -> JS) -> JS -> ([[String]], JS, JS -> JS)
   collectAllFunctionArgs allArgs f (JSFunction ident args (JSBlock (body@(JSReturn _):_))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction ident (map copyVar args) (JSBlock [b]))) body
   collectAllFunctionArgs allArgs f (JSFunction ident args body@(JSBlock _)) =
@@ -201,7 +199,7 @@ tco' = everywhere (mkT convert)
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args body@(JSBlock _))) =
     (args : allArgs, body, \b -> f (JSReturn (JSFunction ident (map copyVar args) b)))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
-  isTailCall :: Ident -> JS -> Bool
+  isTailCall :: String -> JS -> Bool
   isTailCall ident js =
     let
       numSelfCalls = everything (+) (mkQ 0 countSelfCalls) js
@@ -220,7 +218,7 @@ tco' = everywhere (mkT convert)
     countSelfCallsInTailPosition _ = 0
     countSelfCallsUnderFunctions (JSFunction _ _ js') = everything (+) (mkQ 0 countSelfCalls) js'
     countSelfCallsUnderFunctions _ = 0
-  toLoop :: Ident -> [Ident] -> JS -> JS
+  toLoop :: String -> [String] -> JS -> JS
   toLoop ident allArgs js = JSBlock $
         map (\arg -> JSVariableIntroduction arg (Just (JSVar (copyVar arg)))) allArgs ++
         [ JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhere (mkT loopify) js ]) ]
@@ -239,7 +237,7 @@ tco' = everywhere (mkT convert)
     collectSelfCallArgs :: [[JS]] -> JS -> [[JS]]
     collectSelfCallArgs allArgumentValues (JSApp fn args') = collectSelfCallArgs (args' : allArgumentValues) fn
     collectSelfCallArgs allArgumentValues _ = allArgumentValues
-  isSelfCall :: Ident -> JS -> Bool
+  isSelfCall :: String -> JS -> Bool
   isSelfCall ident (JSApp (JSVar ident') _) | ident == ident' = True
   isSelfCall ident (JSApp fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
@@ -251,10 +249,10 @@ magicDo opts | optionsMagicDo opts = magicDo'
 magicDo' :: JS -> JS
 magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   where
-  fnName = Ident "__do"
+  fnName = "__do"
   convert :: JS -> JS
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [Ident "_"] (JSBlock [JSReturn ret])]) | isBind bind =
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSReturn (JSApp ret []) ]
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
@@ -263,11 +261,11 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isBind _ = False
   isReturn (JSApp retPoly [JSApp effDict []]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
-  isBindPoly (JSVar (Op ">>=")) = True
-  isBindPoly (JSAccessor prop (JSVar (Ident "Prelude"))) | prop == identToJs (Op ">>=") = True
+  isBindPoly (JSVar op) | op == identToJs (Op ">>=") = True
+  isBindPoly (JSAccessor prop (JSVar "Prelude")) | prop == identToJs (Op ">>=") = True
   isBindPoly _ = False
-  isRetPoly (JSVar (Ident "ret")) = True
-  isRetPoly (JSAccessor "ret" (JSVar (Ident "Prelude"))) = True
+  isRetPoly (JSVar "ret") = True
+  isRetPoly (JSAccessor "ret" (JSVar "Prelude")) = True
   isRetPoly _ = False
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")
@@ -275,8 +273,8 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
-  isEffDict (JSVar (Ident ident)) | ident == effDictName = True
-  isEffDict (JSAccessor prop (JSVar (Ident "Eff"))) | prop == effDictName = True
+  isEffDict (JSVar ident) | ident == effDictName = True
+  isEffDict (JSAccessor prop (JSVar "Eff")) | prop == effDictName = True
   isEffDict _ = False
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
@@ -298,5 +296,5 @@ inlineDollar = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp dollar [f]) [x]) | isDollar dollar = JSApp f [x]
   convert other = other
-  isDollar (JSAccessor name (JSVar (Ident "Prelude"))) | name == identToJs (Op "$") = True
+  isDollar (JSAccessor name (JSVar "Prelude")) | name == identToJs (Op "$") = True
   isDollar _ = False

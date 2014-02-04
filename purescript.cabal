@@ -36,6 +36,7 @@ library
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.CodeGen
+                     Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST

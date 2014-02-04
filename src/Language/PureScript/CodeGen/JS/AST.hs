@@ -17,7 +17,6 @@
 
 module Language.PureScript.CodeGen.JS.AST where
 
-import Language.PureScript.Names
 import Language.PureScript.Values
 
 import Data.Data
@@ -65,7 +64,7 @@ data JS
   -- |
   -- A function introduction (optional name, arguments, body)
   --
-  | JSFunction (Maybe Ident) [Ident] JS
+  | JSFunction (Maybe String) [String] JS
   -- |
   -- Function application
   --
@@ -73,7 +72,7 @@ data JS
   -- |
   -- Variable
   --
-  | JSVar Ident
+  | JSVar String
   -- |
   -- Conditional expression
   --
@@ -85,7 +84,7 @@ data JS
   -- |
   -- A variable introduction and optional initialization
   --
-  | JSVariableIntroduction Ident (Maybe JS)
+  | JSVariableIntroduction String (Maybe JS)
   -- |
   -- A variable assignment
   --
@@ -97,7 +96,7 @@ data JS
   -- |
   -- For loop
   --
-  | JSFor Ident JS JS JS
+  | JSFor String JS JS JS
   -- |
   -- If-then-else statement
   --
@@ -138,7 +137,7 @@ data JSAssignment
   -- |
   -- Assign a variable
   --
-  = JSAssignVariable Ident
+  = JSAssignVariable String
   -- |
   -- Assign an object property
   --

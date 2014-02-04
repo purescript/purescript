@@ -52,8 +52,8 @@ parseIdentifierAndValue = (,) <$> (C.identifier <* C.colon)
 parseFunction :: P.Parsec String u JS
 parseFunction = do
   C.reserved "function"
-  name <- P.optionMaybe (Ident <$> C.identifier)
-  args <- P.parens C.tokenParser $ P.commaSep C.tokenParser (Ident <$> C.identifier)
+  name <- P.optionMaybe C.identifier
+  args <- P.parens C.tokenParser $ P.commaSep C.tokenParser C.identifier
   body <- parseJS
   return $ JSFunction name args body
 
@@ -61,7 +61,7 @@ parseBlock :: P.Parsec String u JS
 parseBlock = JSBlock <$> P.braces C.tokenParser (P.many parseJS)
 
 parseVar :: P.Parsec String u JS
-parseVar = JSVar <$> Ident <$> C.identifier
+parseVar = JSVar <$> C.identifier
 
 parseJSAtom :: P.Parsec String u JS
 parseJSAtom = P.choice
@@ -141,7 +141,7 @@ parseJS =
 parseVariableIntroduction :: P.Parsec String u JS
 parseVariableIntroduction = do
   C.reserved "var"
-  name <- Ident <$> P.identifier C.tokenParser
+  name <- P.identifier C.tokenParser
   value <- P.optionMaybe $ do
     _ <- C.lexeme $ P.char '='
     value <- parseJS
@@ -158,7 +158,7 @@ parseAssignment = do
   return $ JSAssignment tgt value
 
 parseAssignmentTarget :: P.Parsec String u JSAssignment
-parseAssignmentTarget = C.buildPostfixParser [] (JSAssignVariable <$> Ident <$> P.identifier C.tokenParser)
+parseAssignmentTarget = C.buildPostfixParser [] (JSAssignVariable <$> P.identifier C.tokenParser)
 
 parseWhile :: P.Parsec String u JS
 parseWhile = JSWhile <$> (C.reserved "while" *> P.parens C.tokenParser parseJS)
