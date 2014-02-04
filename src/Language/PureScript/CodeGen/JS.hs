@@ -51,15 +51,10 @@ moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
   [ JSVariableIntroduction name Nothing
   , JSApp (JSFunction Nothing [name]
-                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (sortBy typeClassesLast decls))))
+                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))))
           [JSAssignment (JSVar name)
                         (JSBinary Or (JSVar name) (JSObjectLiteral []))]
   ]
-  where
-  typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) (ExternDeclaration TypeClassDictionaryImport _ _ _) = EQ
-  typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) _ = GT
-  typeClassesLast _ (ExternDeclaration TypeClassDictionaryImport _ _ _) = LT
-  typeClassesLast _ _ = EQ
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
