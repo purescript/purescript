@@ -155,11 +155,7 @@ parseValue =
   postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= return . flip App) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
                   ]
-  operators = [ [ Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "!") >> return (Unary Not)
-                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "~") >> return (Unary BitwiseNot)
-                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "-") >> return (Unary Negate)
-                , Prefix $ C.lexeme (P.try $ C.indented *> C.reservedOp "+") >> return id ]
-              , [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
+  operators = [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
                     return (BinaryNoParens ident))) AssocRight ]
               ]
 

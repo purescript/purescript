@@ -60,7 +60,7 @@ customOperatorTable fixities =
   let
     applyUserOp name t1 t2 = App (App (Var name) t1) t2
     userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
-    sorted = sortBy (compare `on` (\(_, _, p, _) -> p)) (userOps ++ builtIns)
+    sorted = sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups
@@ -110,28 +110,4 @@ collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
 
 globalOp :: String -> Qualified Ident
 globalOp = Qualified Nothing . Op
-
-builtIns :: [(Qualified Ident, Value -> Value -> Value, Precedence, Associativity)]
-builtIns = [ (globalOp "<", Binary LessThan, 3, Infixl)
-           , (globalOp "<=", Binary LessThanOrEqualTo, 3, Infixl)
-           , (globalOp ">", Binary GreaterThan, 3, Infixl)
-           , (globalOp ">=", Binary GreaterThanOrEqualTo, 3, Infixl)
-           , (globalOp "!!", flip Indexer, 4, Infixl)
-           , (globalOp "*", Binary Multiply, 5, Infixl)
-           , (globalOp "/", Binary Divide, 5, Infixl)
-           , (globalOp "%", Binary Modulus, 5, Infixl)
-           , (globalOp "++", Binary Concat, 6, Infixr)
-           , (globalOp "+", Binary Add, 7, Infixl)
-           , (globalOp "-", Binary Subtract, 7, Infixl)
-           , (globalOp "<<", Binary ShiftLeft, 8, Infixl)
-           , (globalOp ">>", Binary ShiftRight, 8, Infixl)
-           , (globalOp ">>>", Binary ZeroFillShiftRight, 8, Infixl)
-           , (globalOp "==", Binary EqualTo, 9, Infixl)
-           , (globalOp "!=", Binary NotEqualTo, 9, Infixl)
-           , (globalOp "&", Binary BitwiseAnd, 10, Infixl)
-           , (globalOp "^", Binary BitwiseXor, 10, Infixl)
-           , (globalOp "|", Binary BitwiseOr, 10, Infixl)
-           , (globalOp "&&", Binary And, 11, Infixr)
-           , (globalOp "||", Binary Or, 11, Infixr)
-           ]
 

@@ -40,9 +40,169 @@ module Prelude where
     show true = "true"
     show false = "false"
 
+  foreign import showNumber "function numberToString(n) {\
+                            \  return n.toString();\
+                            \}" :: Number -> String
+
+  instance Prelude.Show Number where
+    show = showNumber
+
+  class Read a where
+    read :: String -> a
+
+  instance Read String where
+    read s = s
+
+  instance Read Boolean where
+    read "true" = true
+    read _ = false
+
   class Monad m where
     ret :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
+  class Num a where
+    (+) :: a -> a -> a
+    (-) :: a -> a -> a
+    (*) :: a -> a -> a
+    (/) :: a -> a -> a
+    (%) :: a -> a -> a
+    negate :: a -> a
+
+  foreign import addNumber "" :: Number -> Number -> Number
+
+  foreign import subNumber "" :: Number -> Number -> Number
+
+  foreign import mulNumber "" :: Number -> Number -> Number
+
+  foreign import divNumber "" :: Number -> Number -> Number
+
+  foreign import modNumber "" :: Number -> Number -> Number
+  
+  foreign import negateNumber "" :: Number -> Number
+
+  instance Num Number where
+    (+) = addNumber
+    (-) = subNumber
+    (*) = mulNumber
+    (/) = divNumber
+    (%) = modNumber
+    negate = negateNumber
+
+  class Eq a where
+    (==) :: a -> a -> Boolean
+    (/=) :: a -> a -> Boolean
+
+  -- Referential equality
+  data Ref a = Ref a
+
+  foreign import refEq "" :: forall a. Ref a -> Ref a -> Boolean
+  
+  foreign import refIneq "" :: forall a. Ref a -> Ref a -> Boolean
+
+  foreign import unsafeRefEq "" :: forall a. a -> a -> Boolean
+  
+  foreign import unsafeRefIneq "" :: forall a. a -> a -> Boolean
+
+  instance Eq (Ref a) where
+    (==) = refEq
+    (/=) = refIneq
+
+  instance Eq String where
+    (==) = unsafeRefEq
+    (/=) = unsafeRefIneq
+
+  instance Eq Number where
+    (==) = unsafeRefEq
+    (/=) = unsafeRefIneq
+
+  instance Eq Boolean where
+    (==) = unsafeRefEq
+    (/=) = unsafeRefIneq
+
+  instance (Eq a) => Eq [a] where
+    (==) = unsafeRefEq
+    (/=) = unsafeRefIneq
+
+  class Ord a where
+    (<) :: a -> a -> Boolean
+    (>) :: a -> a -> Boolean
+    (<=) :: a -> a -> Boolean
+    (>=) :: a -> a -> Boolean
+
+  foreign import numLess "" :: Number -> Number -> Boolean
+
+  foreign import numLessEq "" :: Number -> Number -> Boolean
+  
+  foreign import numGreater "" :: Number -> Number -> Boolean
+
+  foreign import numGreaterEq "" :: Number -> Number -> Boolean
+  
+  instance Ord Number where
+    (<) = numLess
+    (>) = numGreater
+    (<=) = numLessEq
+    (>=) = numGreaterEq
+
+  class Bits b where
+    (<<) :: b -> Number -> b
+    (>>) :: b -> Number -> b
+    (>>>) :: b -> Number -> b
+    (&) :: b -> b -> b
+    (|) :: b -> b -> b
+    (^) :: b -> b -> b
+    complement :: b -> b
+
+  foreign import numShl "" :: Number -> Number -> Number
+  
+  foreign import numShr "" :: Number -> Number -> Number
+  
+  foreign import numZfShr "" :: Number -> Number -> Number
+
+  foreign import numAnd "" :: Number -> Number -> Number
+
+  foreign import numOr "" :: Number -> Number -> Number
+
+  foreign import numXor "" :: Number -> Number -> Number
+  
+  foreign import numComplement "" :: Number -> Number
+  
+  instance Bits Number where
+    (<<) = numShl
+    (>>) = numShr
+    (>>>) = numZfShr
+    (&) = numAnd
+    (|) = numOr
+    (^) = numXor
+    complement = numComplement
+
+  foreign import (!!) "function $bang$bang(xs) {\
+                      \  return function(n) {\
+                      \    return xs[n];\
+                      \  };\
+                      \}" :: forall a. [a] -> Number -> a
+
+  class BoolLike b where
+    (&&) :: b -> b -> b
+    (||) :: b -> b -> b
+    not :: b -> b
+
+  foreign import boolAnd "" :: Boolean -> Boolean -> Boolean
+  
+  foreign import boolOr "" :: Boolean -> Boolean -> Boolean
+
+  foreign import boolNot "" :: Boolean -> Boolean
+  
+  instance BoolLike Boolean where
+    (&&) = boolAnd
+    (||) = boolOr
+    not = boolNot
+
+  foreign import (++) "function $plus$plus(s1) {\
+                      \  return function(s2) {\
+                      \    return s1 + s2;\
+                      \  };\
+                      \}" :: String -> String -> String
 
 module Maybe where
 
@@ -65,11 +225,11 @@ module Either where
 
   either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
   either f _ (Left a) = f a
-  either _ g (Right b) = g b 
+  either _ g (Right b) = g b
 
   instance Prelude.Monad (Either e) where
     ret = Right
-    (>>=) = either (\e _ -> Left e) (\a f -> f a) 
+    (>>=) = either (\e _ -> Left e) (\a f -> f a)
 
 module Arrays where
 
@@ -92,7 +252,7 @@ module Arrays where
 
   map :: forall a b. (a -> b) -> [a] -> [b]
   map _ [] = []
-  map f (x:xs) = f x : map f xs  
+  map f (x:xs) = f x : map f xs
 
   foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
   foldr f a (b : bs) = f (foldr f a bs) b
@@ -194,7 +354,7 @@ module Arrays where
 
   empty :: forall a. [a] -> Boolean
   empty [] = true
-  empty _ = false 
+  empty _ = false
 
   range :: Number -> Number -> [Number]
   range lo hi = {
@@ -382,12 +542,6 @@ module Global where
                              \  };\
                              \}" :: Number -> Number -> String
 
-  foreign import numberToString "function numberToString(n) {\
-                                \  return n.toString();\
-                                \}" :: Number -> String
-
-  foreign import isNaN :: Number -> Boolean
-
   foreign import isFinite :: Number -> Boolean
 
   foreign import parseFloat :: String -> Number
@@ -402,8 +556,7 @@ module Global where
 
   foreign import decodeURI :: String -> String
 
-  instance Prelude.Show Number where
-    show = numberToString
+  foreign import isNaN :: Number -> Boolean
 
 module Math where
 
@@ -493,7 +646,7 @@ module Eff where
                          \      return f(a())(); \
                          \    }; \
                          \  }; \
-                         \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b 
+                         \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
   type Pure a = forall e. Eff e a
 
@@ -544,11 +697,11 @@ module Errors where
 module IORef where
 
   import Eff
-  
+
   foreign import data Ref :: !
-  
+
   foreign import data IORef :: * -> *
-  
+
   foreign import newIORef "function newIORef(val) {\
                           \  return function () {\
                           \    return { value: val };\
@@ -582,9 +735,9 @@ module Trace where
 
   import Prelude
   import Eff
-  
+
   foreign import data Trace :: !
-  
+
   foreign import trace "function trace(s) { \
                        \  return function() { \
                        \    console.log(s); \
@@ -593,7 +746,7 @@ module Trace where
                        \}" :: forall r. String -> Eff (trace :: Trace | r) {}
 
   print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
-  print o = trace (show o) 
+  print o = trace (show o)
 
 module ST where
 
@@ -630,7 +783,7 @@ module ST where
                             \    };\
                             \  };\
                             \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) {}
-  
+
   foreign import runST "function runST(f) {\
                        \  return f;\
                        \}" :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a

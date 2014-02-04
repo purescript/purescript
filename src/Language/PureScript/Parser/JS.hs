@@ -122,7 +122,6 @@ parseJS =
               , [ binary    Multiply             "*"     P.AssocLeft]
               , [ binary    Divide               "/"     P.AssocLeft]
               , [ binary    Modulus              "%"     P.AssocLeft]
-              , [ binary    Concat               "+"     P.AssocLeft]
               , [ binary    Add                  "+"     P.AssocLeft]
               , [ binary    Subtract             "-"     P.AssocLeft]
               , [ binary    ShiftLeft            "<<"    P.AssocLeft]

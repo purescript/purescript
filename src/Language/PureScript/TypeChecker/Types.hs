@@ -388,13 +388,6 @@ infer' (ArrayLiteral vals) = do
   els <- fresh
   forM_ ts $ \(TypedValue _ _ t) -> els ?= TypeApp tyArray t
   return $ TypedValue True (ArrayLiteral ts) els
-infer' (Unary op val) = do
-  v <- infer val
-  inferUnary op v
-infer' (Binary op left right) = do
-  v1 <- infer left
-  v2 <- infer right
-  inferBinary op v1 v2
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   ts <- mapM (infer . snd) ps
@@ -409,11 +402,6 @@ infer' (ObjectUpdate o ps) = do
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
   o' <- check o $ Object $ rowFromList (oldTys, row)
   return $ TypedValue True (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
-infer' (Indexer index val) = do
-  el <- fresh
-  index' <- check index tyNumber
-  val' <- check val (TypeApp tyArray el)
-  return $ TypedValue True (Indexer (TypedValue True index' tyNumber) (TypedValue True val' (TypeApp tyArray el))) el
 infer' (Accessor prop val) = do
   typed@(TypedValue _ _ objTy) <- infer val
   propTy <- inferProperty objTy prop
@@ -491,102 +479,6 @@ inferProperty (ForAll ident ty) prop = do
   replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
 inferProperty _ _ = return Nothing
-
--- |
--- Infer the type of a unary operator application
---
-inferUnary :: UnaryOperator -> Value -> UnifyT Check Value
-inferUnary op (TypedValue _ val valTy) =
-  case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
-    (valTy', resTy) -> do
-      valTy' ?= valTy
-      return $ TypedValue True (Unary op val) resTy
-inferUnary _ _ = error "Invalid arguments to inferUnary"
-
--- |
--- Check the type of a unary operator application
---
-checkUnary :: UnaryOperator -> Value -> Type -> UnifyT Check Value
-checkUnary op val res =
-  case fromMaybe (error "Invalid operator") $ lookup op unaryOps of
-    (valTy, resTy) -> do
-      res ?= resTy
-      val' <- check val valTy
-      return $ Unary op val'
-
--- |
--- Built-in unary operators
---
-unaryOps :: [(UnaryOperator, (Type, Type))]
-unaryOps = [ (Negate, (tyNumber, tyNumber))
-           , (Not, (tyBoolean, tyBoolean))
-           , (BitwiseNot, (tyNumber, tyNumber))
-           ]
-
--- |
--- Infer the type of a binary operator application
---
-inferBinary :: BinaryOperator -> Value -> Value -> UnifyT Check Value
-inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) | isEqualityTest op = do
-  leftTy ?= rightTy
-  return $ TypedValue True (Binary op left right) tyBoolean
-inferBinary op left@(TypedValue _ _ leftTy) right@(TypedValue _ _ rightTy) =
-  case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
-    (valTy, resTy) -> do
-      leftTy ?= valTy
-      rightTy ?= valTy
-      return $ TypedValue True (Binary op left right) resTy
-inferBinary _ _ _ = error "Invalid arguments to inferBinary"
-
--- |
--- Check the type of a binary operator application
---
-checkBinary :: BinaryOperator -> Value -> Value -> Type -> UnifyT Check Value
-checkBinary op left right res | isEqualityTest op = do
-  res ?= tyBoolean
-  left'@(TypedValue _ _ t1) <- infer left
-  right'@(TypedValue _ _ t2) <- infer right
-  t1 ?= t2
-  return $ Binary op left' right'
-checkBinary op left right res =
-  case fromMaybe (error "Invalid operator") $ lookup op binaryOps of
-    (valTy, resTy) -> do
-      res ?= resTy
-      left' <- check left valTy
-      right' <- check right valTy
-      return $ Binary op left' right'
-
--- |
--- Check if a @BinaryOperator@ is an equality test
---
-isEqualityTest :: BinaryOperator -> Bool
-isEqualityTest EqualTo = True
-isEqualityTest NotEqualTo = True
-isEqualityTest _ = False
-
--- |
--- Built-in binary operators
---
-binaryOps :: [(BinaryOperator, (Type, Type))]
-binaryOps = [ (Add, (tyNumber, tyNumber))
-            , (Subtract, (tyNumber, tyNumber))
-            , (Multiply, (tyNumber, tyNumber))
-            , (Divide, (tyNumber, tyNumber))
-            , (Modulus, (tyNumber, tyNumber))
-            , (BitwiseAnd, (tyNumber, tyNumber))
-            , (BitwiseOr, (tyNumber, tyNumber))
-            , (BitwiseXor, (tyNumber, tyNumber))
-            , (ShiftRight, (tyNumber, tyNumber))
-            , (ZeroFillShiftRight, (tyNumber, tyNumber))
-            , (And, (tyBoolean, tyBoolean))
-            , (Or, (tyBoolean, tyBoolean))
-            , (Concat, (tyString, tyString))
-            , (Modulus, (tyNumber, tyNumber))
-            , (LessThan, (tyNumber, tyBoolean))
-            , (LessThanOrEqualTo, (tyNumber, tyBoolean))
-            , (GreaterThan, (tyNumber, tyBoolean))
-            , (GreaterThanOrEqualTo, (tyNumber, tyBoolean))
-            ]
 
 -- |
 -- Infer the types of variables brought into scope by a binder
@@ -795,13 +687,7 @@ check' val u@(TUnknown _) = do
 check' v@(NumericLiteral _) t | t == tyNumber = return v
 check' v@(StringLiteral _) t | t == tyString = return v
 check' v@(BooleanLiteral _) t | t == tyBoolean = return v
-check' (Unary op val) ty = checkUnary op val ty
-check' (Binary op left right) ty = checkBinary op left right ty
 check' (ArrayLiteral vals) (TypeApp a ty) | a == tyArray = ArrayLiteral <$> forM vals (\val -> check val ty)
-check' (Indexer index vals) ty = do
-  index' <- check index tyNumber
-  vals' <- check vals (TypeApp tyArray ty)
-  return $ Indexer index' vals'
 check' (Abs arg ret) (TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
   ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy

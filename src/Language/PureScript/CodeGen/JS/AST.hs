@@ -17,9 +17,111 @@
 
 module Language.PureScript.CodeGen.JS.AST where
 
-import Language.PureScript.Values
-
 import Data.Data
+
+
+
+-- |
+-- Built-in unary operators
+--
+data UnaryOperator
+  -- |
+  -- Numeric negation
+  --
+  = Negate
+  -- |
+  -- Boolean negation
+  --
+  | Not
+  -- |
+  -- Bitwise negation
+  --
+  | BitwiseNot
+  -- |
+  -- Numeric unary \'plus\'
+  --
+  | Positive deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- Built-in binary operators
+--
+data BinaryOperator
+  -- |
+  -- Numeric addition
+  --
+  = Add
+  -- |
+  -- Numeric subtraction
+  --
+  | Subtract
+  -- |
+  -- Numeric multiplication
+  --
+  | Multiply
+  -- |
+  -- Numeric division
+  --
+  | Divide
+  -- |
+  -- Remainder
+  --
+  | Modulus
+  -- |
+  -- Generic equality test
+  --
+  | EqualTo
+  -- |
+  -- Generic inequality test
+  --
+  | NotEqualTo
+  -- |
+  -- Numeric less-than
+  --
+  | LessThan
+  -- |
+  -- Numeric less-than-or-equal
+  --
+  | LessThanOrEqualTo
+  -- |
+  -- Numeric greater-than
+  --
+  | GreaterThan
+  -- |
+  -- Numeric greater-than-or-equal
+  --
+  | GreaterThanOrEqualTo
+  -- |
+  -- Boolean and
+  --
+  | And
+  -- |
+  -- Boolean or
+  --
+  | Or
+  -- |
+  -- Bitwise and
+  --
+  | BitwiseAnd
+  -- |
+  -- Bitwise or
+  --
+  | BitwiseOr
+  -- |
+  -- Bitwise xor
+  --
+  | BitwiseXor
+  -- |
+  -- Bitwise left shift
+  --
+  | ShiftLeft
+  -- |
+  -- Bitwise right shift
+  --
+  | ShiftRight
+  -- |
+  -- Bitwise right shift with zero-fill
+  --
+  | ZeroFillShiftRight deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- Data type for simplified Javascript expressions

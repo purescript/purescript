@@ -62,12 +62,6 @@ accessor = mkPattern match
   match (Accessor prop val) = Just (prop, val)
   match _ = Nothing
 
-indexer :: Pattern () Value (Value, Value)
-indexer = mkPattern match
-  where
-  match (Indexer index val) = Just (index, val)
-  match _ = Nothing
-
 objectUpdate :: Pattern () Value ([String], Value)
 objectUpdate = mkPattern match
   where
@@ -92,24 +86,6 @@ typed = mkPattern match
   match (TypedValue _ val ty) = Just (ty, val)
   match _ = Nothing
 
-unary :: UnaryOperator -> String -> Operator () Value String
-unary op str = Wrap match (++)
-  where
-  match :: Pattern () Value (String, Value)
-  match = mkPattern match'
-    where
-    match' (Unary op' val) | op' == op = Just (str, val)
-    match' _ = Nothing
-
-binary :: BinaryOperator -> String -> Operator () Value String
-binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
-  where
-  match :: Pattern () Value (Value, Value)
-  match = mkPattern match'
-    where
-    match' (Binary op' v1 v2) | op' == op = Just (v1, v2)
-    match' _ = Nothing
-
 prettyPrintDoNotationElement :: DoNotationElement -> String
 prettyPrintDoNotationElement (DoNotationValue val) = prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationBind binder val) = prettyPrintBinder binder ++ " <- " ++ prettyPrintValue val
@@ -131,31 +107,6 @@ prettyPrintValue = fromMaybe (error "Incomplete pattern") . pattern matchValue (
                   , [ Split lam $ \arg val -> "\\" ++ arg ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintValue th ++ " : " ++ prettyPrintValue el ]
                   , [ Wrap typed $ \ty val -> val ++ " :: " ++ prettyPrintType ty ]
-                  , [ AssocR indexer (\index val -> val ++ " !! " ++ index) ]
-                  , [ binary    LessThan             "<" ]
-                  , [ binary    LessThanOrEqualTo    "<=" ]
-                  , [ binary    GreaterThan          ">" ]
-                  , [ binary    GreaterThanOrEqualTo ">=" ]
-                  , [ unary     Not                  "!" ]
-                  , [ unary     BitwiseNot           "~" ]
-                  , [ unary     Negate               "-" ]
-                  , [ unary     Positive             "+" ]
-                  , [ binary    Multiply             "*" ]
-                  , [ binary    Divide               "/" ]
-                  , [ binary    Modulus              "%" ]
-                  , [ binary    Concat               "++" ]
-                  , [ binary    Add                  "+" ]
-                  , [ binary    Subtract             "-" ]
-                  , [ binary    ShiftLeft            "<<" ]
-                  , [ binary    ShiftRight           ">>" ]
-                  , [ binary    ZeroFillShiftRight   ">>>" ]
-                  , [ binary    EqualTo              "==" ]
-                  , [ binary    NotEqualTo           "!=" ]
-                  , [ binary    BitwiseAnd           "&" ]
-                  , [ binary    BitwiseXor           "^" ]
-                  , [ binary    BitwiseOr            "|" ]
-                  , [ binary    And                  "&&" ]
-                  , [ binary    Or                   "||" ]
                   ]
 
 prettyPrintBinderAtom :: Pattern () Binder String

@@ -83,17 +83,10 @@ reservedNames = [ "case"
                 , "undefined" ]
 
 -- |
--- A list of built-in operator names
---
-builtInOperators :: [String]
-builtInOperators = [ "~", "-", "<=", ">=", "<", ">", "*", "/", "%", "++", "+", "<<", ">>>", ">>"
-                  , "==", "!=", "&&", "||", "&", "^", "|", "!!", "!" ]
-
--- |
 -- A list of reserved operators
 --
 reservedOpNames :: [String]
-reservedOpNames = builtInOperators ++ [ "=>", "->", "=", ".", "\\" ]
+reservedOpNames = [ "=>", "->", "=", ".", "\\" ]
 
 -- |
 -- Valid first characters for an identifier
@@ -257,16 +250,10 @@ integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
                   Right <$> P.try (PT.float tokenParser)) P.<?> "number"
 
 -- |
--- Parse an operator or a built-in operator
---
-operatorOrBuiltIn :: P.Parsec String u String
-operatorOrBuiltIn = P.try operator <|> P.choice (map (\s -> P.try (reservedOp s) >> return s) builtInOperators)
-
--- |
 -- Parse an identifier or parenthesized operator
 --
 parseIdent :: P.Parsec String ParseState Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens operatorOrBuiltIn)
+parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
 
 
 -- |
@@ -374,7 +361,7 @@ buildPostfixParser fs first = do
 -- Parse an identifier in backticks or an operator
 --
 parseIdentInfix :: P.Parsec String ParseState (Qualified Ident)
-parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> parseQualified (Op <$> operatorOrBuiltIn)
+parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> parseQualified (Op <$> operator)
 
 -- |
 -- Mark the current indentation level
