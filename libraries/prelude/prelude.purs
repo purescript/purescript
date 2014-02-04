@@ -6,29 +6,33 @@ module Prelude where
   foreign import data Array :: * -> *
   foreign import data Function :: * -> * -> *
 
-  id :: forall a. a -> a
-  id = \x -> x
-
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
-  flip = \f -> \b -> \a -> f a b
+  flip f b a = f a b
 
   konst :: forall a b. a -> b -> a
-  konst = \a -> \b -> a
+  konst a _ = a
 
-  (|>) :: forall a b c. (a -> b) -> (b -> c) -> a -> c
-  (|>) = \f -> \g -> \a -> g (f a)
+  infixr 5 >>>
+  infixr 5 <<<
 
-  infixr 5 |>
+  class Category a where
+    id :: forall t. a t t
+    (<<<) :: forall b c d. a c d -> a b c -> a b d
+    (>>>) :: forall b c d. a b c -> a c d -> a b d
 
-  (<|) :: forall a b c. (b -> c) -> (a -> b) -> a -> c
-  (<|) = flip (|>)
+  instance Category (->) where
+    id x = x
+    (<<<) f g x = f (g x)
+    (>>>) f g x = g (f x)
 
-  infixr 5 <|
+  infixr 1000 $
+  infixl 1000 #
 
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
-  infixr 1000 $
+  (#) :: forall a b. a -> (a -> b) -> b
+  (#) x f = f x
 
   class Show a where
     show :: a -> String
@@ -169,8 +173,10 @@ module Prelude where
     (/=) = unsafeRefIneq
 
   instance (Eq a) => Eq [a] where
-    (==) = unsafeRefEq
-    (/=) = unsafeRefIneq
+    (==) [] [] = true
+    (==) (x:xs) (y:ys) = x == y && xs == ys
+    (==) _ _ = false
+    (/=) xs ys = not (xs == ys)
 
   infixl 3 <
   infixl 3 >
@@ -213,21 +219,17 @@ module Prelude where
     (<=) = numLessEq
     (>=) = numGreaterEq
 
-  infixl 8 <<
-  infixl 8 >>
-  infixl 8 >>>
-
   infixl 10 &
   infixl 10 |
-  infixl 10  ^
+  infixl 10 ^
 
   class Bits b where
-    (<<) :: b -> Number -> b
-    (>>) :: b -> Number -> b
-    (>>>) :: b -> Number -> b
     (&) :: b -> b -> b
     (|) :: b -> b -> b
     (^) :: b -> b -> b
+    shl :: b -> Number -> b
+    shr :: b -> Number -> b
+    zshr :: b -> Number -> b
     complement :: b -> b
 
   foreign import numShl "function numShl(n1) {\
@@ -242,7 +244,7 @@ module Prelude where
                         \  };\
                         \}" :: Number -> Number -> Number
 
-  foreign import numZfShr "function numZfShr(n1) {\
+  foreign import numZshr "function numZshr(n1) {\
                           \  return function(n2) {\
                           \    return n1 >>> n2;\
                           \  };\
@@ -271,12 +273,12 @@ module Prelude where
                                \}" :: Number -> Number
 
   instance Bits Number where
-    (<<) = numShl
-    (>>) = numShr
-    (>>>) = numZfShr
     (&) = numAnd
     (|) = numOr
     (^) = numXor
+    shl = numShl
+    shr = numShr
+    zshr = numZshr
     complement = numComplement
 
   infixl 4 !!
@@ -326,6 +328,8 @@ module Prelude where
 
 module Maybe where
 
+  import Prelude
+
   data Maybe a = Nothing | Just a
 
   maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
@@ -333,7 +337,7 @@ module Maybe where
   maybe _ f (Just a) = f a
 
   fromMaybe :: forall a. a -> Maybe a -> a
-  fromMaybe a = maybe a Prelude.id
+  fromMaybe a = maybe a (Prelude.id :: forall a. a -> a)
 
   instance Prelude.Monad Maybe where
     ret = Just
@@ -503,6 +507,7 @@ module Arrays where
 
 module Tuple where
 
+  import Prelude
   import Arrays
 
   type Tuple a b = { fst :: a, snd :: b }
@@ -514,7 +519,7 @@ module Tuple where
   uncurry f t = f t.fst t.snd
 
   tuple :: forall a b. a -> b -> Tuple a b
-  tuple = curry Prelude.id
+  tuple = curry (\t -> t)
 
   zip :: forall a b. [a] -> [b] -> [Tuple a b]
   zip = zipWith tuple

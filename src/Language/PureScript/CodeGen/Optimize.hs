@@ -27,7 +27,7 @@
 --
 --  * Inlining variables
 --
---  * Inline Prelude.($), Prelude.(++), Prelude.(!!)
+--  * Inline Prelude.($), Prelude.(#), Prelude.(++), Prelude.(!!)
 --
 --  * Inlining primitive Javascript operators
 --
@@ -63,6 +63,7 @@ optimize opts | optionsNoOptimizations opts = id
   , etaConvert
   , inlineVariables
   , inlineOperator "$" $ \f x -> JSApp f [x]
+  , inlineOperator "#" $ \x f -> JSApp f [x]
   , inlineOperator "!!" $ flip JSIndexer
   , inlineOperator "++" $ JSBinary Add
   , inlineCommonOperators ]
@@ -330,9 +331,9 @@ inlineCommonOperators = applyAll
   , binary "==" "Eq" tyBoolean EqualTo
   , binary "/=" "Eq" tyBoolean NotEqualTo
 
-  , binary "<<" "Bits" tyNumber ShiftLeft
-  , binary ">>" "Bits" tyNumber ShiftRight
-  , binary ">>>" "Bits" tyNumber ZeroFillShiftRight
+  , binaryFunction "shl" "Bits" tyNumber ShiftLeft
+  , binaryFunction "shr" "Bits" tyNumber ShiftRight
+  , binaryFunction "zshr" "Bits" tyNumber ZeroFillShiftRight
   , binary "&" "Bits" tyNumber BitwiseAnd
   , binary "|" "Bits" tyNumber BitwiseOr
   , binary "^" "Bits" tyNumber BitwiseXor
@@ -351,6 +352,14 @@ inlineCommonOperators = applyAll
     convert other = other
     isOp (JSAccessor longForm (JSVar "Prelude")) | longForm == identToJs (Op opString) = True
     isOp (JSIndexer (JSStringLiteral op') (JSVar "Prelude")) | opString == op' = True
+    isOp _ = False
+  binaryFunction :: String -> String -> Type -> BinaryOperator -> JS -> JS
+  binaryFunction fnName className classTy op = everywhere (mkT convert)
+    where
+    convert :: JS -> JS
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
+    convert other = other
+    isOp (JSAccessor fnName' (JSVar "Prelude")) | fnName == fnName' = True
     isOp _ = False
   unary :: String -> String -> Type -> UnaryOperator -> JS -> JS
   unary fnName className classTy op = everywhere (mkT convert)
