@@ -88,7 +88,7 @@ data JS
   -- |
   -- A variable assignment
   --
-  | JSAssignment JSAssignment JS
+  | JSAssignment JS JS
   -- |
   -- While loop
   --
@@ -129,16 +129,3 @@ data JS
   -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
   --
   | JSRaw String deriving (Show, Eq, Data, Typeable)
-
--- |
--- Data type for expressions which can appear on the left hand side of an assignment
---
-data JSAssignment
-  -- |
-  -- Assign a variable
-  --
-  = JSAssignVariable String
-  -- |
-  -- Assign an object property
-  --
-  | JSAssignProperty String JSAssignment deriving (Show, Eq, Data, Typeable)

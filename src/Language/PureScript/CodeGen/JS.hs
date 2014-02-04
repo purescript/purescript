@@ -52,8 +52,8 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
   [ JSVariableIntroduction name Nothing
   , JSApp (JSFunction Nothing [name]
                       (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (sortBy typeClassesLast decls))))
-          [JSAssignment (JSAssignVariable name)
-                         (JSBinary Or (JSVar name) (JSObjectLiteral []))]
+          [JSAssignment (JSVar name)
+                        (JSBinary Or (JSVar name) (JSObjectLiteral []))]
   ]
   where
   typeClassesLast (ExternDeclaration TypeClassDictionaryImport _ _ _) (ExternDeclaration TypeClassDictionaryImport _ _ _) = EQ
@@ -66,12 +66,12 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
 --
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
-  Just [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val)),
-         setProperty (identToJs ident) (var ident) mp ]
+  Just $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
+         : setProperty ident (var ident) mp
 declToJs opts mp (BindingGroupDeclaration vals) e =
   Just $ concatMap (\(ident, val) ->
-           [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val)),
-             setProperty (identToJs ident) (var ident) mp ]
+           JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
+           : setProperty ident (var ident) mp
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
@@ -83,19 +83,22 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
                       (JSBlock [JSReturn
                         (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn)))
                                          , ("value", JSVar "value") ])])
-    in [ ctorJs, setProperty ctor (JSVar ctor) mp ]
+    in ctorJs : setProperty (Escaped ctor) (JSVar ctor) mp
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
-  Just [ js
-       , setProperty (identToJs ident) (var ident) mp ]
+  Just $ js : setProperty ident (var ident) mp
 declToJs _ _ _ _ = Nothing
 
-setProperty :: String -> JS -> ModuleName -> JS
-setProperty prop val (ModuleName (ProperName moduleName)) = JSAssignment (JSAssignProperty prop (JSAssignVariable moduleName)) val
+setProperty :: Ident -> JS -> ModuleName -> [JS]
+setProperty ident@(Op op) val (ModuleName (ProperName moduleName)) =
+  [ JSAssignment (JSAccessor (identToJs ident) (JSVar moduleName)) val
+  , JSAssignment (JSIndexer (JSStringLiteral op) (JSVar moduleName)) (JSAccessor (identToJs ident) (JSVar moduleName)) ]
+setProperty ident val (ModuleName (ProperName moduleName)) =
+  [ JSAssignment (JSAccessor (identToJs ident) (JSVar moduleName)) val ]
 
 var :: Ident -> JS
-var name = JSVar $ identToJs name
+var = JSVar . identToJs
 
 valueToJs :: Options -> ModuleName -> Environment -> Value -> JS
 valueToJs _ _ _ (NumericLiteral n) = JSNumericLiteral n
@@ -154,13 +157,15 @@ runtimeTypeChecks arg ty =
   arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor "isArray" (JSVar "Array")) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
 
 varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
-varToJs m e qual@(Qualified _ ident) = case M.lookup (qualify m qual) (names e) of
-  Just (_, ty) | isExtern ty -> var ident
-  Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
-  _ -> case qual of
-         Qualified Nothing _ -> var ident
-         _ -> qualifiedToJS identToJs qual
+varToJs m e qual@(Qualified _ ident) = go qual
   where
+  go qual = case M.lookup (qualify m qual) (names e) of
+    Just (_, ty) | isExtern ty -> var ident
+    Just (_, Alias aliasModule aliasIdent) -> go (Qualified (Just aliasModule) aliasIdent)
+    _ -> case qual of
+           Qualified Nothing _ -> var ident
+           Qualified (Just (ModuleName (ProperName mn))) (Op op) -> JSIndexer (JSStringLiteral op) (JSVar mn)
+           _ -> qualifiedToJS identToJs qual
   isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
     Just (_, ty') -> isExtern ty'
@@ -263,7 +268,7 @@ isOnlyConstructor m e ctor =
 
 statementToJs :: Options -> ModuleName -> Environment -> Statement -> JS
 statementToJs opts m e (VariableIntroduction ident value) = JSVariableIntroduction (identToJs ident) (Just (valueToJs opts m e value))
-statementToJs opts m e (Assignment target value) = JSAssignment (JSAssignVariable (identToJs target)) (valueToJs opts m e value)
+statementToJs opts m e (Assignment target value) = JSAssignment (JSVar (identToJs target)) (valueToJs opts m e value)
 statementToJs opts m e (While cond sts) = JSWhile (valueToJs opts m e cond) (JSBlock (map (statementToJs opts m e) sts))
 statementToJs opts m e (For ident start end sts) = JSFor (identToJs ident) (valueToJs opts m e start) (valueToJs opts m e end) (JSBlock (map (statementToJs opts m e) sts))
 statementToJs opts m e (If ifst) = ifToJs ifst

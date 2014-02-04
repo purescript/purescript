@@ -96,7 +96,7 @@ literals = mkPattern' match
     , maybe (return "") (fmap (" = " ++) . prettyPrintJS') value
     ]
   match (JSAssignment target value) = fmap concat $ sequence
-    [ return $ targetToJs target
+    [ prettyPrintJS' target
     , return " = "
     , prettyPrintJS' value
     ]
@@ -137,10 +137,6 @@ literals = mkPattern' match
     ]
   match (JSRaw js) = return js
   match _ = mzero
-
-targetToJs :: JSAssignment -> String
-targetToJs (JSAssignVariable ident) = ident
-targetToJs (JSAssignProperty prop target) = targetToJs target ++ "." ++ prop
 
 conditional :: Pattern PrinterState JS ((JS, JS), JS)
 conditional = mkPattern match

@@ -74,7 +74,6 @@ parseJSAtom = P.choice
             , parseBlock
             , P.try parseVar
             , parseVariableIntroduction
-            , P.try parseAssignment
             , parseWhile
             , parseIf
             , parseReturn
@@ -110,7 +109,7 @@ parseJS =
    $ indexersAndAccessors) P.<?> "javascript"
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseJSAtom
-  postfixTable1 = [ parseAccessor, parseIndexer, parseConditional ]
+  postfixTable1 = [ parseAccessor, parseIndexer, parseConditional, parseAssignment ]
   postfixTable2 = [ \v -> P.try $ JSApp v <$> (P.parens C.tokenParser (P.commaSep C.tokenParser parseJS)) ]
   operators = [ [ binary    LessThan             "<"     P.AssocLeft]
               , [ binary    LessThanOrEqualTo    "<="    P.AssocLeft]
@@ -149,16 +148,12 @@ parseVariableIntroduction = do
     return value
   return $ JSVariableIntroduction name value
 
-parseAssignment :: P.Parsec String u JS
-parseAssignment = do
-  tgt <- parseAssignmentTarget
+parseAssignment :: JS -> P.Parsec String u JS
+parseAssignment tgt = do
   _ <- C.lexeme $ P.char '='
   value <- parseJS
   _ <- C.semi
   return $ JSAssignment tgt value
-
-parseAssignmentTarget :: P.Parsec String u JSAssignment
-parseAssignmentTarget = C.buildPostfixParser [] (JSAssignVariable <$> P.identifier C.tokenParser)
 
 parseWhile :: P.Parsec String u JS
 parseWhile = JSWhile <$> (C.reserved "while" *> P.parens C.tokenParser parseJS)

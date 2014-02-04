@@ -105,9 +105,11 @@ isUsed var1 = everything (||) (mkQ False check)
   check (JSAssignment target _) | var1 == targetVariable target = True
   check _ = False
 
-targetVariable :: JSAssignment -> String
-targetVariable (JSAssignVariable var) = var
-targetVariable (JSAssignProperty _ tgt) = targetVariable tgt
+targetVariable :: JS -> String
+targetVariable (JSVar var) = var
+targetVariable (JSAccessor _ tgt) = targetVariable tgt
+targetVariable (JSIndexer _ tgt) = targetVariable tgt
+targetVariable _ = error "Invalid argument to targetVariable"
 
 isUpdated :: (Data d) => String -> d -> Bool
 isUpdated var1 = everything (||) (mkQ False check)
@@ -231,7 +233,7 @@ tco' = everywhere (mkT convert)
         JSBlock $ zipWith (\val arg ->
                     JSVariableIntroduction (tcoVar arg) (Just val)) allArgumentValues allArgs
                   ++ map (\arg ->
-                    JSAssignment (JSAssignVariable arg) (JSVar (tcoVar arg))) allArgs
+                    JSAssignment (JSVar arg) (JSVar (tcoVar arg))) allArgs
                   ++ [ JSContinue tcoLabel ]
     loopify other = other
     collectSelfCallArgs :: [[JS]] -> JS -> [[JS]]
@@ -257,12 +259,13 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   convert other = other
-  isBind (JSApp bindPoly [JSApp effDict []]) | isBindPoly bindPoly && isEffDict effDict = True
+  isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
   isBind _ = False
-  isReturn (JSApp retPoly [JSApp effDict []]) | isRetPoly retPoly && isEffDict effDict = True
+  isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
   isBindPoly (JSVar op) | op == identToJs (Op ">>=") = True
   isBindPoly (JSAccessor prop (JSVar "Prelude")) | prop == identToJs (Op ">>=") = True
+  isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSVar "Prelude")) = True
   isBindPoly _ = False
   isRetPoly (JSVar "ret") = True
   isRetPoly (JSAccessor "ret" (JSVar "Prelude")) = True
@@ -296,5 +299,6 @@ inlineDollar = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp dollar [f]) [x]) | isDollar dollar = JSApp f [x]
   convert other = other
-  isDollar (JSAccessor name (JSVar "Prelude")) | name == identToJs (Op "$") = True
+  isDollar (JSAccessor "$dollar" (JSVar "Prelude")) = True
+  isDollar (JSIndexer (JSStringLiteral "$") (JSVar "Prelude")) = True
   isDollar _ = False
