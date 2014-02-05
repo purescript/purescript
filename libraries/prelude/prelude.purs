@@ -790,9 +790,7 @@ module Random where
   foreign import data Random :: !
 
   foreign import random "function random() {\
-                        \  return function() {\
-                        \    return Math.random();\
-                        \  };\
+                        \  return Math.random();\
                         \}" :: forall e. Eff (random :: Random | e) Number
 
 module Errors where
