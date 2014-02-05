@@ -39,7 +39,7 @@ preludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
 readInput :: [FilePath] -> IO (Either ParseError [P.Module])
 readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
   text <- U.readFile inputFile
-  return $ P.runIndentParser P.parseModules text
+  return $ P.runIndentParser inputFile P.parseModules text
 
 compile :: P.Options -> [FilePath] -> IO (Either String String)
 compile opts inputFiles = do
