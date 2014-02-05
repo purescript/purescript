@@ -238,7 +238,7 @@ entails moduleName context goal@(className, ty) = do
     return $ Just dict
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
   mkDictionary fnName Nothing = Var fnName
-  mkDictionary fnName (Just dicts) = foldr (flip App) (Var fnName) dicts
+  mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
   filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
