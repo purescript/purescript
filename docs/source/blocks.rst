@@ -73,7 +73,7 @@ While loops repeat a set of statements while a boolean expression evaluates to `
 If-Then-Else Statements
 -----------------------
 
-Else branches are optional, and may contain further ``if`` statements, just as in Javascript:
+Else branches are optional, and may contain further ``if`` statements, just as in Javascript::
 
   collatz n = {
       var count = 0;
