@@ -43,13 +43,14 @@ addDataType moduleName name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (moduleName, name) (ctorKind, Data) (types env) }
   forM_ dctors $ \(dctor, maybeTy) ->
-    rethrow (("Error in data constructor " ++ show name ++ ":\n") ++) $
+    rethrow (("Error in data constructor " ++ show dctor ++ ":\n") ++) $
       addDataConstructor moduleName name args dctor maybeTy
 
 addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> Maybe Type -> Check ()
 addDataConstructor moduleName name args dctor maybeTy = do
   env <- getEnv
   dataConstructorIsNotDefined moduleName dctor
+  when (runModuleName moduleName == dctor) $ throwError "A data constructor may not have the same name as its enclosing module."
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = maybe retTy (flip function retTy) maybeTy
   let polyType = mkForAll args dctorTy
