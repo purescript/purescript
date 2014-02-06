@@ -1,13 +1,7 @@
-Module Documentation
-====================
+# Module Documentation
+## Module Prelude
 
-Module Prelude
---------------
-
-Types
-~~~~~
-
-::
+### Types
 
     data Array :: * -> *
 
@@ -22,10 +16,8 @@ Types
 
     data String :: *
 
-Type Classes
-~~~~~~~~~~~~
 
-::
+### Type Classes
 
     class Alternative f where
       empty :: forall a. f a
@@ -85,10 +77,8 @@ Type Classes
     class Show a where
       show :: a -> Prelude.String
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-::
+### Type Class Instances
 
     (Monad (m)) => instance Applicative m
 
@@ -124,10 +114,8 @@ Type Class Instances
 
     instance Show Prelude.Boolean
 
-Values
-~~~~~~
 
-::
+### Values
 
     (!!) :: forall a. Prelude.Array a -> Prelude.Number -> a
 
@@ -191,51 +179,41 @@ Values
 
     unsafeRefIneq :: forall a. a -> a -> Prelude.Boolean
 
-Module Monoid
--------------
 
-Types
-~~~~~
+## Module Monoid
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-::
+
+### Type Classes
 
     class Monoid m where
       mempty :: m
       (<>) :: m -> m -> m
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-::
+### Type Class Instances
 
     instance Monoid Prelude.String
 
-Values
-~~~~~~
 
-::
+### Values
 
     mconcat :: forall m. (Monoid (m)) => Prelude.Array m -> m
 
-Module Monad
-------------
 
-Types
-~~~~~
+## Module Monad
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-Values
-~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
+
+
+### Values
 
     (<=<) :: forall c. forall b. forall a. forall m. (Monad (m)) => Prelude.Function b (m c) -> Prelude.Function a (m b) -> a -> m c
 
@@ -253,79 +231,62 @@ Values
 
     when :: forall m. (Monad (m)) => Prelude.Boolean -> m {  } -> m {  }
 
-Module Maybe
-------------
 
-Types
-~~~~~
+## Module Maybe
 
-::
+### Types
 
     data Maybe a where
       Nothing :: Maybe a
       Just :: a -> Maybe a
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
 
     instance Prelude.Monad Maybe
 
-Values
-~~~~~~
 
-::
+### Values
 
     fromMaybe :: forall a. a -> Maybe a -> a
 
     maybe :: forall b. forall a. b -> Prelude.Function a b -> Maybe a -> b
 
-Module Either
--------------
 
-Types
-~~~~~
+## Module Either
 
-::
+### Types
 
     data Either a b where
       Left :: a -> Either a b
       Right :: b -> Either a b
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
 
     instance Prelude.Monad Either e
 
-Values
-~~~~~~
 
-::
+### Values
 
     either :: forall c. forall b. forall a. Prelude.Function a c -> Prelude.Function b c -> Either a b -> c
 
-Module Arrays
--------------
 
-Types
-~~~~~
+## Module Arrays
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-::
+### Type Classes
+
+
+### Type Class Instances
 
     instance Prelude.Alternative Prelude.Array
 
@@ -333,10 +294,8 @@ Type Class Instances
 
     (Prelude.Show (a)) => instance Prelude.Show Prelude.Array a
 
-Values
-~~~~~~
 
-::
+### Values
 
     (:) :: forall a. a -> Prelude.Array a -> Prelude.Array a
 
@@ -394,26 +353,21 @@ Values
 
     zipWith :: forall c. forall b. forall a. Prelude.Function a (b -> c) -> Prelude.Array a -> Prelude.Array b -> Prelude.Array c
 
-Module Tuple
-------------
 
-Types
-~~~~~
+## Module Tuple
 
-::
+### Types
 
     type Tuple a b = { snd :: b, fst :: a }
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     curry :: forall c. forall b. forall a. Prelude.Function (Tuple a b) c -> a -> b -> c
 
@@ -425,22 +379,19 @@ Values
 
     zip :: forall b. forall a. Prelude.Array a -> Prelude.Array b -> Prelude.Array (Tuple a b)
 
-Module String
--------------
 
-Types
-~~~~~
+## Module String
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-Values
-~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
+
+
+### Values
 
     charAt :: Prelude.Number -> Prelude.String -> Prelude.String
 
@@ -468,26 +419,21 @@ Values
 
     trim :: Prelude.String -> Prelude.String
 
-Module Regex
-------------
 
-Types
-~~~~~
+## Module Regex
 
-::
+### Types
 
     data Regex :: *
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     match :: Regex -> Prelude.String -> Prelude.Array Prelude.String
 
@@ -499,22 +445,19 @@ Values
 
     test :: Regex -> Prelude.String -> Prelude.Boolean
 
-Module Global
--------------
 
-Types
-~~~~~
+## Module Global
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-Values
-~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
+
+
+### Values
 
     decodeURI :: Prelude.String -> Prelude.String
 
@@ -542,22 +485,19 @@ Values
 
     toPrecision :: Prelude.Number -> Prelude.Number -> Prelude.String
 
-Module Math
------------
 
-Types
-~~~~~
+## Module Math
 
-Type Classes
-~~~~~~~~~~~~
+### Types
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
-Values
-~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
+
+
+### Values
 
     abs :: Prelude.Number -> Prelude.Number
 
@@ -593,32 +533,25 @@ Values
 
     tan :: Prelude.Number -> Prelude.Number
 
-Module Eff
-----------
 
-Types
-~~~~~
+## Module Eff
 
-::
+### Types
 
     data Eff :: # ! -> * -> *
 
     type Pure a = forall e. Eff e a
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-::
+
+### Type Class Instances
 
     instance Prelude.Monad Eff e
 
-Values
-~~~~~~
 
-::
+### Values
 
     bindEff :: forall b. forall a. forall e. Eff e a -> Prelude.Function a (Eff e b) -> Eff e b
 
@@ -634,76 +567,61 @@ Values
 
     whileE :: forall e. Eff e Prelude.Boolean -> Eff e {  } -> Eff e {  }
 
-Module Random
--------------
 
-Types
-~~~~~
+## Module Random
 
-::
+### Types
 
     data Random :: !
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     random :: forall e. Eff random :: Random | e Prelude.Number
 
-Module Errors
--------------
 
-Types
-~~~~~
+## Module Errors
 
-::
+### Types
 
     data Error :: * -> !
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     catchError :: forall a. forall r. forall e. Prelude.Function e (Eff r a) -> Eff err :: Error e | r a -> Eff r a
 
     throwError :: forall r. forall e. forall a. e -> Eff err :: Error e | r a
 
-Module IORef
-------------
 
-Types
-~~~~~
+## Module IORef
 
-::
+### Types
 
     data IORef :: * -> *
 
     data Ref :: !
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     modifyIORef :: forall r. forall s. IORef s -> Prelude.Function s s -> Eff ref :: Ref | r {  }
 
@@ -713,53 +631,43 @@ Values
 
     writeIORef :: forall r. forall s. IORef s -> s -> Eff ref :: Ref | r {  }
 
-Module Trace
-------------
 
-Types
-~~~~~
+## Module Trace
 
-::
+### Types
 
     data Trace :: !
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     print :: forall r. forall a. (Prelude.Show (a)) => a -> Eff trace :: Trace | r {  }
 
     trace :: forall r. Prelude.String -> Eff trace :: Trace | r {  }
 
-Module ST
----------
 
-Types
-~~~~~
+## Module ST
 
-::
+### Types
 
     data ST :: * -> !
 
     data STRef :: * -> * -> *
 
-Type Classes
-~~~~~~~~~~~~
 
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
+### Type Classes
 
-Values
-~~~~~~
 
-::
+### Type Class Instances
+
+
+### Values
 
     modifySTRef :: forall r. forall h. forall a. STRef h a -> Prelude.Function a a -> Eff st :: ST h | r {  }
 
@@ -770,4 +678,6 @@ Values
     runST :: forall r. forall a. forall h. Eff st :: ST h | r a -> Eff r a
 
     writeSTRef :: forall r. forall h. forall a. STRef h a -> a -> Eff st :: ST h | r {  }
+
+
 
