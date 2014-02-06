@@ -76,7 +76,15 @@ data Type
   -- |
   -- A non-empty row
   --
-  | RCons String Type Type deriving (Show, Eq, Data, Typeable)
+  | RCons String Type Type
+  -- |
+  -- A placeholder used in pretty printing
+  --
+  | PrettyPrintFunction Type Type
+  -- |
+  -- A placeholder used in pretty printing
+  --
+  | PrettyPrintArray Type deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- Type constructor for functions

@@ -20,6 +20,7 @@ module Language.PureScript.Pretty.Types (
 
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
+import Data.Generics (mkT, everywhere)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows
@@ -33,8 +34,8 @@ typeLiterals = mkPattern match
   where
   match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
-  match (TypeApp arr ty) | arr == tyArray = Just $ "[" ++ prettyPrintType ty ++ "]"
-  match (TypeConstructor ctor) = Just $ show ctor
+  match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
+  match ty@(TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s _) = Just $ 's' : show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
@@ -68,23 +69,30 @@ typeApp = mkPattern match
   match (TypeApp f x) = Just (f, x)
   match _ = Nothing
 
-singleArgumentFunction :: Pattern () Type (Type, Type)
-singleArgumentFunction = mkPattern match
+appliedFunction :: Pattern () Type (Type, Type)
+appliedFunction = mkPattern match
   where
-  match (TypeApp (TypeApp t arg) ret) | t == tyFunction = Just (arg, ret)
+  match (PrettyPrintFunction arg ret) = Just (arg, ret)
   match _ = Nothing
+
+insertPlaceholders :: Type -> Type
+insertPlaceholders = everywhere (mkT convert)
+  where
+  convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
+  convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
+  convert other = other
 
 -- |
 -- Generate a pretty-printed string representing a Type
 --
 prettyPrintType :: Type -> String
-prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType ()
+prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
   where
   matchType :: Pattern () Type String
   matchType = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchType)
   operators :: OperatorTable () Type String
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
-                  , [ AssocR singleArgumentFunction $ \arg ret -> arg ++ " -> " ++ ret
+                  , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
                     ]
                   ]

@@ -59,11 +59,11 @@ Type Classes
       (/=) :: a -> a -> Prelude.Boolean
 
     class Functor f where
-      (<$>) :: forall b. forall a. Prelude.Function a b -> f a -> f b
+      (<$>) :: forall b. forall a. (a -> b) -> f a -> f b
 
     class Monad m where
       ret :: forall a. a -> m a
-      (>>=) :: forall b. forall a. m a -> Prelude.Function a (m b) -> m b
+      (>>=) :: forall b. forall a. m a -> (a -> m b) -> m b
 
     class Num a where
       (+) :: a -> a -> a
@@ -106,7 +106,7 @@ Type Class Instances
 
     instance Eq Prelude.Boolean
 
-    (Eq (a)) => instance Eq Prelude.Array a
+    (Eq (a)) => instance Eq [a]
 
     (Applicative (f)) => instance Functor f
 
@@ -129,11 +129,11 @@ Values
 
 ::
 
-    (!!) :: forall a. Prelude.Array a -> Prelude.Number -> a
+    (!!) :: forall a. [a] -> Prelude.Number -> a
 
-    (#) :: forall b. forall a. a -> Prelude.Function a b -> b
+    (#) :: forall b. forall a. a -> (a -> b) -> b
 
-    ($) :: forall b. forall a. Prelude.Function a b -> a -> b
+    ($) :: forall b. forall a. (a -> b) -> a -> b
 
     (++) :: Prelude.String -> Prelude.String -> Prelude.String
 
@@ -143,7 +143,7 @@ Values
 
     boolOr :: Prelude.Boolean -> Prelude.Boolean -> Prelude.Boolean
 
-    flip :: forall c. forall b. forall a. Prelude.Function a (b -> c) -> b -> a -> c
+    flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
 
     konst :: forall b. forall a. a -> b -> a
 
@@ -218,7 +218,7 @@ Values
 
 ::
 
-    mconcat :: forall m. (Monoid (m)) => Prelude.Array m -> m
+    mconcat :: forall m. (Monoid (m)) => [m] -> m
 
 Module Monad
 ------------
@@ -237,19 +237,19 @@ Values
 
 ::
 
-    (<=<) :: forall c. forall b. forall a. forall m. (Monad (m)) => Prelude.Function b (m c) -> Prelude.Function a (m b) -> a -> m c
+    (<=<) :: forall c. forall b. forall a. forall m. (Monad (m)) => (b -> m c) -> (a -> m b) -> a -> m c
 
-    (>=>) :: forall c. forall b. forall a. forall m. (Monad (m)) => Prelude.Function a (m b) -> Prelude.Function b (m c) -> a -> m c
+    (>=>) :: forall c. forall b. forall a. forall m. (Monad (m)) => (a -> m b) -> (b -> m c) -> a -> m c
 
-    foldM :: forall b. forall a. forall m. (Monad (m)) => Prelude.Function a (b -> m a) -> a -> Prelude.Array b -> m a
+    foldM :: forall b. forall a. forall m. (Monad (m)) => (a -> b -> m a) -> a -> [b] -> m a
 
     join :: forall a. forall m. (Monad (m)) => m (m a) -> m a
 
-    mapM :: forall b. forall a. forall m. (Monad (m)) => Prelude.Function a (m b) -> Prelude.Array a -> m [b]
+    mapM :: forall b. forall a. forall m. (Monad (m)) => (a -> m b) -> [a] -> m [b]
 
     replicateM :: forall a. forall m. (Monad (m)) => Prelude.Number -> m a -> m [a]
 
-    sequence :: forall a. forall m. (Monad (m)) => Prelude.Array (m a) -> m [a]
+    sequence :: forall a. forall m. (Monad (m)) => [m a] -> m [a]
 
     when :: forall m. (Monad (m)) => Prelude.Boolean -> m {  } -> m {  }
 
@@ -282,7 +282,7 @@ Values
 
     fromMaybe :: forall a. a -> Maybe a -> a
 
-    maybe :: forall b. forall a. b -> Prelude.Function a b -> Maybe a -> b
+    maybe :: forall b. forall a. b -> (a -> b) -> Maybe a -> b
 
 Module Either
 -------------
@@ -311,7 +311,7 @@ Values
 
 ::
 
-    either :: forall c. forall b. forall a. Prelude.Function a c -> Prelude.Function b c -> Either a b -> c
+    either :: forall c. forall b. forall a. (a -> c) -> (b -> c) -> Either a b -> c
 
 Module Arrays
 -------------
@@ -331,68 +331,68 @@ Type Class Instances
 
     instance Prelude.Monad Prelude.Array
 
-    (Prelude.Show (a)) => instance Prelude.Show Prelude.Array a
+    (Prelude.Show (a)) => instance Prelude.Show [a]
 
 Values
 ~~~~~~
 
 ::
 
-    (:) :: forall a. a -> Prelude.Array a -> Prelude.Array a
+    (:) :: forall a. a -> [a] -> [a]
 
-    all :: forall a. Prelude.Function a Prelude.Boolean -> Prelude.Array a -> Prelude.Boolean
+    all :: forall a. (a -> Prelude.Boolean) -> [a] -> Prelude.Boolean
 
-    any :: forall a. Prelude.Function a Prelude.Boolean -> Prelude.Array a -> Prelude.Boolean
+    any :: forall a. (a -> Prelude.Boolean) -> [a] -> Prelude.Boolean
 
-    concat :: forall a. Prelude.Array a -> Prelude.Array a -> Prelude.Array a
+    concat :: forall a. [a] -> [a] -> [a]
 
-    concatMap :: forall b. forall a. Prelude.Array a -> Prelude.Function a [b] -> Prelude.Array b
+    concatMap :: forall b. forall a. [a] -> (a -> [b]) -> [b]
 
-    filter :: forall a. Prelude.Function a Prelude.Boolean -> Prelude.Array a -> Prelude.Array a
+    filter :: forall a. (a -> Prelude.Boolean) -> [a] -> [a]
 
-    foldl :: forall b. forall a. Prelude.Function a (b -> b) -> b -> Prelude.Array a -> b
+    foldl :: forall b. forall a. (a -> b -> b) -> b -> [a] -> b
 
-    foldr :: forall b. forall a. Prelude.Function a (b -> a) -> a -> Prelude.Array b -> a
+    foldr :: forall b. forall a. (a -> b -> a) -> a -> [b] -> a
 
-    head :: forall a. Prelude.Array a -> a
+    head :: forall a. [a] -> a
 
-    headSafe :: forall a. Prelude.Array a -> Maybe a
+    headSafe :: forall a. [a] -> Maybe a
 
-    indexOf :: forall a. Prelude.Array a -> a -> Prelude.Number
+    indexOf :: forall a. [a] -> a -> Prelude.Number
 
-    isEmpty :: forall a. Prelude.Array a -> Prelude.Boolean
+    isEmpty :: forall a. [a] -> Prelude.Boolean
 
-    joinS :: Prelude.Array Prelude.String -> Prelude.String
+    joinS :: [Prelude.String] -> Prelude.String
 
-    joinWith :: Prelude.Array Prelude.String -> Prelude.String -> Prelude.String
+    joinWith :: [Prelude.String] -> Prelude.String -> Prelude.String
 
-    lastIndexOf :: forall a. Prelude.Array a -> a -> Prelude.Number
+    lastIndexOf :: forall a. [a] -> a -> Prelude.Number
 
-    length :: forall a. Prelude.Array a -> Prelude.Number
+    length :: forall a. [a] -> Prelude.Number
 
-    map :: forall b. forall a. Prelude.Function a b -> Prelude.Array a -> Prelude.Array b
+    map :: forall b. forall a. (a -> b) -> [a] -> [b]
 
-    push :: forall a. Prelude.Array a -> a -> Prelude.Array a
+    push :: forall a. [a] -> a -> [a]
 
-    range :: Prelude.Number -> Prelude.Number -> Prelude.Array Prelude.Number
+    range :: Prelude.Number -> Prelude.Number -> [Prelude.Number]
 
-    reverse :: forall a. Prelude.Array a -> Prelude.Array a
+    reverse :: forall a. [a] -> [a]
 
-    shift :: forall a. Prelude.Array a -> Prelude.Array a
+    shift :: forall a. [a] -> [a]
 
-    singleton :: forall a. a -> Prelude.Array a
+    singleton :: forall a. a -> [a]
 
-    slice :: forall a. Prelude.Number -> Prelude.Number -> Prelude.Array a -> Prelude.Array a
+    slice :: forall a. Prelude.Number -> Prelude.Number -> [a] -> [a]
 
-    sort :: forall a. Prelude.Array a -> Prelude.Array a
+    sort :: forall a. [a] -> [a]
 
-    splice :: forall a. Prelude.Number -> Prelude.Number -> Prelude.Array a -> Prelude.Array a -> Prelude.Array a
+    splice :: forall a. Prelude.Number -> Prelude.Number -> [a] -> [a] -> [a]
 
-    tail :: forall a. Prelude.Array a -> Prelude.Array a
+    tail :: forall a. [a] -> [a]
 
-    tailSafe :: forall a. Prelude.Array a -> Maybe [a]
+    tailSafe :: forall a. [a] -> Maybe [a]
 
-    zipWith :: forall c. forall b. forall a. Prelude.Function a (b -> c) -> Prelude.Array a -> Prelude.Array b -> Prelude.Array c
+    zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
 
 Module Tuple
 ------------
@@ -415,15 +415,15 @@ Values
 
 ::
 
-    curry :: forall c. forall b. forall a. Prelude.Function (Tuple a b) c -> a -> b -> c
+    curry :: forall c. forall b. forall a. (Tuple a b -> c) -> a -> b -> c
 
     tuple :: forall b. forall a. a -> b -> Tuple a b
 
-    uncurry :: forall c. forall b. forall a. Prelude.Function a (b -> c) -> Tuple a b -> c
+    uncurry :: forall c. forall b. forall a. (a -> b -> c) -> Tuple a b -> c
 
-    unzip :: forall b. forall a. Prelude.Array (Tuple a b) -> Tuple [a] [b]
+    unzip :: forall b. forall a. [Tuple a b] -> Tuple [a] [b]
 
-    zip :: forall b. forall a. Prelude.Array a -> Prelude.Array b -> Prelude.Array (Tuple a b)
+    zip :: forall b. forall a. [a] -> [b] -> [Tuple a b]
 
 Module String
 -------------
@@ -456,7 +456,7 @@ Values
 
     sliceS :: Prelude.Number -> Prelude.Number -> Prelude.String -> Prelude.String
 
-    split :: Prelude.String -> Prelude.String -> Prelude.Array Prelude.String
+    split :: Prelude.String -> Prelude.String -> [Prelude.String]
 
     substr :: Prelude.Number -> Prelude.Number -> Prelude.String -> Prelude.String
 
@@ -489,7 +489,7 @@ Values
 
 ::
 
-    match :: Regex -> Prelude.String -> Prelude.Array Prelude.String
+    match :: Regex -> Prelude.String -> [Prelude.String]
 
     regex :: Prelude.String -> Prelude.String -> Regex
 
@@ -620,11 +620,11 @@ Values
 
 ::
 
-    bindEff :: forall b. forall a. forall e. Eff e a -> Prelude.Function a (Eff e b) -> Eff e b
+    bindEff :: forall b. forall a. forall e. Eff e a -> (a -> Eff e b) -> Eff e b
 
-    forE :: forall e. Prelude.Number -> Prelude.Number -> Prelude.Function Prelude.Number (Eff e {  }) -> Eff e {  }
+    forE :: forall e. Prelude.Number -> Prelude.Number -> (Prelude.Number -> Eff e {  }) -> Eff e {  }
 
-    foreachE :: forall a. forall e. Prelude.Array a -> Prelude.Function a (Eff e {  }) -> Eff e {  }
+    foreachE :: forall a. forall e. [a] -> (a -> Eff e {  }) -> Eff e {  }
 
     retEff :: forall a. forall e. a -> Eff e a
 
@@ -678,7 +678,7 @@ Values
 
 ::
 
-    catchError :: forall a. forall r. forall e. Prelude.Function e (Eff r a) -> Eff err :: Error e | r a -> Eff r a
+    catchError :: forall a. forall r. forall e. (e -> Eff r a) -> Eff err :: Error e | r a -> Eff r a
 
     throwError :: forall r. forall e. forall a. e -> Eff err :: Error e | r a
 
@@ -705,7 +705,7 @@ Values
 
 ::
 
-    modifyIORef :: forall r. forall s. IORef s -> Prelude.Function s s -> Eff ref :: Ref | r {  }
+    modifyIORef :: forall r. forall s. IORef s -> (s -> s) -> Eff ref :: Ref | r {  }
 
     newIORef :: forall r. forall s. s -> Eff ref :: Ref | r (IORef s)
 
@@ -761,7 +761,7 @@ Values
 
 ::
 
-    modifySTRef :: forall r. forall h. forall a. STRef h a -> Prelude.Function a a -> Eff st :: ST h | r {  }
+    modifySTRef :: forall r. forall h. forall a. STRef h a -> (a -> a) -> Eff st :: ST h | r {  }
 
     newSTRef :: forall r. forall h. forall a. a -> Eff st :: ST h | r (STRef h a)
 
