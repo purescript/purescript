@@ -4,13 +4,13 @@ cabal-version: >=1.8
 build-type: Simple
 license: MIT
 license-file: LICENSE
-copyright: (c) Phil Freeman 2013
+copyright: (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 category: Language
-author: Phil Freeman <paf31@cantab.net>
+author: Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
 data-files: libraries/prelude/prelude.purs
 data-dir: ""
 
