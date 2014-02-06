@@ -27,60 +27,106 @@ import qualified Text.Parsec.Token as PT
 import Language.PureScript.Names
 
 -- |
--- A list of reserved identifiers
+-- A list of purescript reserved identifiers
 --
-reservedNames :: [String]
-reservedNames = [ "case"
-                , "of"
-                , "data"
-                , "type"
-                , "var"
-                , "val"
-                , "while"
-                , "for"
-                , "foreach"
-                , "if"
-                , "then"
-                , "else"
-                , "return"
-                , "true"
-                , "false"
-                , "foreign"
-                , "import"
-                , "member"
-                , "forall"
-                , "do"
-                , "until"
-                , "in"
-                , "break"
-                , "catch"
-                , "continue"
-                , "debugger"
-                , "default"
-                , "delete"
-                , "finally"
-                , "function"
-                , "instanceof"
-                , "new"
-                , "switch"
-                , "this"
-                , "throw"
-                , "try"
-                , "typeof"
-                , "void"
-                , "with"
-                , "Number"
-                , "String"
-                , "Boolean"
-                , "infixl"
-                , "infixr"
-                , "module"
-                , "let"
-                , "class"
-                , "instance"
-                , "where"
-                , "null"
-                , "undefined" ]
+reservedPsNames :: [String]
+reservedPsNames = [ "data"
+                  , "type"
+                  , "foreign"
+                  , "import"
+                  , "infixl"
+                  , "infixr"
+                  , "class"
+                  , "instance"
+                  , "module"
+                  , "case"
+                  , "of"
+                  , "if"
+                  , "then"
+                  , "else"
+                  , "do"
+                  , "let"
+                  , "true"
+                  , "false"
+                  , "until"
+                  ]
+
+-- |
+-- A list of javascript reserved identifiers
+--
+reservedJsNames :: [String]
+reservedJsNames = [ "abstract"
+                  , "boolean"
+                  , "break"
+                  , "byte"
+                  , "case"
+                  , "catch"
+                  , "char"
+                  , "class"
+                  , "const"
+                  , "continue"
+                  , "debugger"
+                  , "default"
+                  , "delete"
+                  , "do"
+                  , "double"
+                  , "else"
+                  , "enum"
+                  , "export"
+                  , "extends"
+                  , "final"
+                  , "finally"
+                  , "float"
+                  , "for"
+                  , "function"
+                  , "goto"
+                  , "if"
+                  , "implements"
+                  , "import"
+                  , "in"
+                  , "instanceof"
+                  , "int"
+                  , "interface"
+                  , "let"
+                  , "long"
+                  , "native"
+                  , "new"
+                  , "package"
+                  , "private"
+                  , "protected"
+                  , "public"
+                  , "return"
+                  , "short"
+                  , "static"
+                  , "super"
+                  , "switch"
+                  , "synchronized"
+                  , "this"
+                  , "throw"
+                  , "throws"
+                  , "transient"
+                  , "try"
+                  , "typeof"
+                  , "var"
+                  , "void"
+                  , "volatile"
+                  , "while"
+                  , "with"
+                  , "yield" ]
+
+-- |
+-- A list of reserved identifiers for types
+--
+reservedTypeNames :: [String]
+reservedTypeNames = [ "forall"
+                    , "where" ]
+
+-- |
+-- A list of reserved identifiers for block statements
+--
+reservedStatementNames :: [String]
+reservedStatementNames = [ "for"
+                         , "return" ]
 
 -- |
 -- A list of reserved operators
@@ -123,7 +169,7 @@ opLetter = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
 --
 langDef :: PT.GenLanguageDef String u Identity
 langDef = PT.LanguageDef
-  { PT.reservedNames   = reservedNames
+  { PT.reservedNames   = reservedPsNames
   , PT.reservedOpNames = reservedOpNames
   , PT.commentStart    = "{-"
   , PT.commentEnd      = "-}"
@@ -253,20 +299,12 @@ integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
 -- Parse an identifier or parenthesized operator
 --
 parseIdent :: P.Parsec String ParseState Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens operator)
-
-
--- |
--- Parse an identifier or parenthesized operator that is not a reserved keyword or operator
---
-parseNonReservedIdent :: P.Parsec String ParseState Ident
-parseNonReservedIdent = do
-  ident <- parseIdent
-  when (isReserved ident) $ P.unexpected $ "reserved identifier " ++ show ident
-  return ident
+parseIdent = parseIdent' <|> (Op <$> parens operator)
   where
-  isReserved (Ident ident) = ident `elem` reservedNames
-  isReserved (Op op) = op `elem` reservedOpNames
+  parseIdent' :: P.Parsec String ParseState Ident
+  parseIdent' = do
+    ident <- identifier
+    return $ if (ident `elem` reservedJsNames) then (Escaped $ "$" ++ ident) else (Ident ident)
 
 -- |
 -- Parse a token inside square brackets

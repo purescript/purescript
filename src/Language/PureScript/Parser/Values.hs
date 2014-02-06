@@ -209,8 +209,8 @@ parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.s
 --
 parseStatement :: P.Parsec String ParseState Statement
 parseStatement = P.choice
-                 [ parseVariableIntroduction
-                 , parseAssignment
+                 [ parseAssignment
+                 , parseVariableIntroduction
                  , parseWhile
                  , parseFor
                  , parseIf

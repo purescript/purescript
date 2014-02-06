@@ -22,6 +22,7 @@ import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import qualified Language.PureScript.Parser.Common as C
 import Control.Applicative
+import Control.Monad
 import Data.Functor.Identity
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as P
@@ -46,14 +47,20 @@ parseObjectLiteral :: P.Parsec String u JS
 parseObjectLiteral = JSObjectLiteral <$> P.braces C.tokenParser (P.commaSep C.tokenParser parseIdentifierAndValue)
 
 parseIdentifierAndValue :: P.Parsec String u (String, JS)
-parseIdentifierAndValue = (,) <$> (C.identifier <* C.colon)
+parseIdentifierAndValue = (,) <$> (identifier <* C.colon)
                               <*> parseJS
+
+identifier :: P.Parsec String u String
+identifier = do
+  ident <- C.identifier
+  when (ident `elem` C.reservedJsNames) $ P.unexpected $ ("reserved identifier " ++ show ident)
+  return ident
 
 parseFunction :: P.Parsec String u JS
 parseFunction = do
   C.reserved "function"
   name <- P.optionMaybe C.identifier
-  args <- P.parens C.tokenParser $ P.commaSep C.tokenParser C.identifier
+  args <- P.parens C.tokenParser $ P.commaSep C.tokenParser identifier
   body <- parseJS
   return $ JSFunction name args body
 
@@ -61,7 +68,7 @@ parseBlock :: P.Parsec String u JS
 parseBlock = JSBlock <$> P.braces C.tokenParser (P.many parseJS)
 
 parseVar :: P.Parsec String u JS
-parseVar = JSVar <$> C.identifier
+parseVar = JSVar <$> identifier
 
 parseJSAtom :: P.Parsec String u JS
 parseJSAtom = P.choice
@@ -80,7 +87,7 @@ parseJSAtom = P.choice
             , P.parens C.tokenParser parseJS ]
 
 parseAccessor :: JS -> P.Parsec String u JS
-parseAccessor js = P.try $ flip JSAccessor js <$> (C.dot *> P.notFollowedBy C.opLetter *> C.identifier)
+parseAccessor js = P.try $ flip JSAccessor js <$> (C.dot *> P.notFollowedBy C.opLetter *> identifier)
 
 parseIndexer :: JS -> P.Parsec String u JS
 parseIndexer js = P.try $ flip JSIndexer js <$> (P.squares C.tokenParser parseJS)

@@ -48,7 +48,10 @@ parseObject :: P.Parsec String ParseState Type
 parseObject = braces $ Object <$> parseRow False
 
 parseTypeVariable :: P.Parsec String ParseState Type
-parseTypeVariable = TypeVar <$> identifier
+parseTypeVariable = do
+  ident <- identifier
+  when (ident `elem` reservedTypeNames) $ P.unexpected $ ident
+  return $ TypeVar ident
 
 parseTypeConstructor :: P.Parsec String ParseState Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
