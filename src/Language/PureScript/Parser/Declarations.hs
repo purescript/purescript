@@ -31,7 +31,6 @@ import Language.PureScript.Declarations
 import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
-import Language.PureScript.Parser.JS
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Values
 
@@ -67,11 +66,9 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "im
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> do ident <- parseIdent
-          js <- P.optionMaybe (parseJSLiteral <$> stringLiteral)
+          js <- P.optionMaybe (JSRaw <$> stringLiteral)
           ty <- (lexeme (indented *> P.string "::") *> parsePolyType)
           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty)
-parseJSLiteral :: String -> JS
-parseJSLiteral s = either (const $ JSRaw s) id $ P.runParser parseJS () "Javascript" s
 
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =
