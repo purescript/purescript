@@ -263,6 +263,8 @@ entails moduleName context goal@(className, ty) = do
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
+typeHeadsAreEqual _ _ (TypeVar v) t = Just [(v, t)]
+typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
