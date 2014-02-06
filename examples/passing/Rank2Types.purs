@@ -16,9 +16,9 @@ module Rank2Types where
   foreign import push :: forall el. el -> [el] -> [el]
 
   replicateM :: forall m a. (forall a. a -> m a) -> (forall a b. m a -> (a -> m b) -> m b) -> Number -> m a -> m [a]
-  replicateM = \ret bind n m -> case n of
-    0 -> ret []
-    n -> bind m (\x -> bind (replicateM ret bind (n - 1) m) (\xs -> ret (push x xs)))
+  replicateM = \return bind n m -> case n of
+    0 -> return []
+    n -> bind m (\x -> bind (replicateM return bind (n - 1) m) (\xs -> return (push x xs)))
     
 module Main where
 

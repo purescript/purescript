@@ -5,7 +5,7 @@ import Prelude
 data Maybe a = Nothing | Just a
 
 instance Prelude.Monad Maybe where
-  ret = Just
+  return = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 

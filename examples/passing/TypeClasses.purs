@@ -22,20 +22,20 @@ instance (Prelude.Show a) => Prelude.Show (Data a) where
 test3 = \_ -> show (Data "testing")
 
 instance Prelude.Monad Data where
-  ret = Data
+  return = Data
   (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
 
 instance Prelude.Monad Maybe where
-  ret = Just
+  return = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
 test4 :: forall a m. (Monad m) => a -> m Number
-test4 = \_ -> ret 1
+test4 = \_ -> return 1
 
-test5 = \_ -> Just 1 >>= \n -> ret (n + 1)
+test5 = \_ -> Just 1 >>= \n -> return (n + 1)
 
 module TypeClasses2 where
 
@@ -49,7 +49,7 @@ instance (Prelude.Show a) => Prelude.Show [a] where
 test6 = \_ -> show ["testing"]
 
 instance Prelude.Monad (->) r where
-  ret a r = a
+  return a r = a
   (>>=) f g r = g (f r) r
 
 ask r = r
@@ -58,7 +58,7 @@ runReader r f = f r
 
 test9 _ = runReader 0 $ do
   n <- ask
-  ret $ n + 1
+  return $ n + 1
     
 module Main where
 

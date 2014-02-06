@@ -6,4 +6,4 @@ import ST
 
 test _ = do
   r <- runST (newSTRef 0)
-  ret 0 
+  return 0 

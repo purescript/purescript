@@ -4,5 +4,5 @@ test1 = do let x = 1
 
 test2 y = do x <- y
 
-test3 = do ret 1
-           ret 2
+test3 = do return 1
+           return 2

@@ -6,7 +6,7 @@ import ST
 import Errors
 import Trace
 
-test1 = catchError (\s -> ret 0) $ do
+test1 = catchError (\s -> return 0) $ do
           trace "Testing"
           throwError "Error!"
 

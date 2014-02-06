@@ -2,15 +2,15 @@ module Main where
 
   import Prelude
 
-  const = "test"
+  yield = "test"
   member = "test"
   
   fortest = {
-    var return = 0;
+    var function = 0;
     for (i <- 0 until 10) {
-      return = return + i;
+      function = function + i;
     }
-    return return;
+    return function;
   }
   
   whiletest = {

@@ -5,7 +5,7 @@ import Eff
 import Trace
 
 replicateM_ :: forall m a. (Monad m) => Number -> m a -> m {}
-replicateM_ 0 _ = ret {}
+replicateM_ 0 _ = return {}
 replicateM_ n act = do
   act
   replicateM_ (n - 1) act

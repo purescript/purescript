@@ -4,7 +4,7 @@ module ExternData where
 
   foreign import fmap :: forall a b. IO a -> (a -> b) -> IO b
 
-  foreign import ret :: forall a. a -> IO a
+  foreign import return :: forall a. a -> IO a
 
   foreign import bind :: forall a b. IO a -> (a -> IO b) -> IO b
 
