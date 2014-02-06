@@ -9,8 +9,8 @@ module Prelude where
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
 
-  konst :: forall a b. a -> b -> a
-  konst a _ = a
+  const :: forall a b. a -> b -> a
+  const a _ = a
 
   infixr 9 >>>
   infixr 9 <<<
@@ -82,15 +82,15 @@ module Prelude where
     (<|>) :: forall a. f a -> f a -> f a
 
   class Monad m where
-    ret :: forall a. a -> m a
+    return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
   instance (Monad m) => Applicative m where
-    pure = ret
+    pure = return
     (<*>) f a = do
       f' <- f
       a' <- a
-      ret (f' a')
+      return (f' a')
 
   infixl 7 *
   infixl 7 /
@@ -362,7 +362,7 @@ module Monoid where
   class Monoid m where
     mempty :: m
     (<>) :: m -> m -> m
-  
+
   instance Monoid String where
     mempty = ""
     (<>) = (++)
@@ -377,18 +377,18 @@ module Monad where
   import Arrays
 
   replicateM :: forall m a. (Monad m) => Number -> m a -> m [a]
-  replicateM 0 _ = ret []
+  replicateM 0 _ = return []
   replicateM n m = do
     a <- m
     as <- replicateM (n - 1) m
-    ret (a : as) 
+    return (a : as)
 
   mapM :: forall m a b. (Monad m) => (a -> m b) -> [a] -> m [b]
-  mapM _ [] = ret []
+  mapM _ [] = return []
   mapM f (a:as) = do
     b <- f a
     bs <- mapM f as
-    ret (b : bs)
+    return (b : bs)
 
   infixr 1 >=>
   infixr 1 <=<
@@ -397,16 +397,16 @@ module Monad where
   (>=>) f g a = do
     b <- f a
     g b
-    
-  (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c 
+
+  (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c
   (<=<) = flip (>=>)
 
   sequence :: forall m a. (Monad m) => [m a] -> m [a]
-  sequence [] = ret []
+  sequence [] = return []
   sequence (m:ms) = do
     a <- m
     as <- sequence ms
-    ret (a : as)
+    return (a : as)
 
   join :: forall m a. (Monad m) => m (m a) -> m a
   join mm = do
@@ -414,12 +414,12 @@ module Monad where
     m
 
   foldM :: forall m a b. (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
-  foldM _ a [] = ret a
+  foldM _ a [] = return a
   foldM f a (b:bs) = f a b >>= \a' -> foldM f a' bs
 
   when :: forall m. (Monad m) => Boolean -> m {} -> m {}
   when true m = m
-  when false _ = ret {}
+  when false _ = return {}
 
 module Maybe where
 
@@ -435,7 +435,7 @@ module Maybe where
   fromMaybe a = maybe a (Prelude.id :: forall a. a -> a)
 
   instance Prelude.Monad Maybe where
-    ret = Just
+    return = Just
     (>>=) m f = maybe Nothing f m
 
 module Either where
@@ -447,7 +447,7 @@ module Either where
   either _ g (Right b) = g b
 
   instance Prelude.Monad (Either e) where
-    ret = Right
+    return = Right
     (>>=) = either (\e _ -> Left e) (\a f -> f a)
 
 module Arrays where
@@ -604,7 +604,7 @@ module Arrays where
     show (x:xs) = show x ++ " : " ++ show xs
 
   instance Prelude.Monad [] where
-    ret = singleton
+    return = singleton
     (>>=) = concatMap
 
   instance Prelude.Alternative [] where
@@ -886,7 +886,7 @@ module Eff where
                          \}" :: forall a. Pure a -> a
 
   instance Prelude.Monad (Eff e) where
-    ret = retEff
+    return = retEff
     (>>=) = bindEff
 
   foreign import untilE "function untilE(f) {\
@@ -906,7 +906,7 @@ module Eff where
                         \    };\
                         \  };\
                         \}" :: forall e. Eff e Boolean -> Eff e {} -> Eff e {}
- 
+
   foreign import forE "function forE(lo) {\
 	              \  return function(hi) {\
 	              \    return function(f) {\

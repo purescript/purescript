@@ -5,27 +5,27 @@ import Eff
 import Errors
 import Trace
 import Global
- 
-test1 n = runPure (catchError (\s -> ret 0) $ do 
-  case {} of 
+
+test1 n = runPure (catchError (\s -> return 0) $ do
+  case {} of
     _ | n > 10 -> do
-      throwError "Error!" 
-    _ -> ret n)
+      throwError "Error!"
+    _ -> return n)
 
 test2 = do
   trace "Hello World"
   throwError "Error!"
 
-test3 n = catchError (\s -> ret 0) $ do 
-  case {} of 
+test3 n = catchError (\s -> return 0) $ do
+  case {} of
     _ | n > 10 -> do
       trace "n > 10"
-      throwError "Error!" 
-    _ -> ret n
+      throwError "Error!"
+    _ -> return n
 
 test4 = do
   trace "Hello World!"
-  ret 0
+  return 0
 
 test5 = do
   trace "Hello World!"
@@ -52,7 +52,7 @@ test9 _ = do
     n <- readSTRef r
     trace $ "Count " ++ show n
     modifySTRef r $ (+) 1
-    ret false
+    return false
 
 module Main where
 
