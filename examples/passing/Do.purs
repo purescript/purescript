@@ -42,22 +42,6 @@ test8 = \_ -> do
   Just (do 
     Just 1)
 
-(<$>) :: forall a b. (a -> b) -> Maybe a -> Maybe b
-(<$>) f m = do
-  a <- m
-  ret (f a)
-
-(<*>) :: forall a b. (Maybe (a -> b)) -> Maybe a -> Maybe b
-(<*>) f m = do
-  g <- f
-  a <- m
-  ret (g a)
-
-forever :: forall m a b. (Monad m) => m a -> m b
-forever a = do
-  a
-  forever a
-
 test9 = \_ -> (+) <$> Just 1 <*> Just 2
     
 module Main where
