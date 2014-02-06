@@ -49,6 +49,7 @@ reservedPsNames = [ "data"
                   , "true"
                   , "false"
                   , "until"
+
                   ]
 
 -- |
@@ -120,13 +121,6 @@ reservedJsNames = [ "abstract"
 reservedTypeNames :: [String]
 reservedTypeNames = [ "forall"
                     , "where" ]
-
--- |
--- A list of reserved identifiers for block statements
---
-reservedStatementNames :: [String]
-reservedStatementNames = [ "for"
-                         , "return" ]
 
 -- |
 -- A list of reserved operators

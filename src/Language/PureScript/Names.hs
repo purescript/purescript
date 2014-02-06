@@ -52,7 +52,7 @@ instance Show ProperName where
 -- |
 -- Module names
 --
-data ModuleName = ModuleName ProperName deriving (Eq, Ord, Data, Typeable)
+data ModuleName = ModuleName { runModuleName :: ProperName } deriving (Eq, Ord, Data, Typeable)
 
 instance Show ModuleName where
   show (ModuleName name) = show name
