@@ -297,9 +297,9 @@ skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@(TypedValue _ _ _) =
   case everythingWithContext [] (++) (mkQ ((,) []) go) root of
     [] -> return ()
-    ((binding, val) : _) -> throwError $ "Rigid/skolem type variable bound by " ++ prettyPrintValue binding ++ " has escaped at " ++ prettyPrintValue val
+    ((binding, val) : _) -> throwError $ "Rigid/skolem type variable bound by " ++ maybe "<unknown>" prettyPrintValue binding ++ " has escaped at " ++ prettyPrintValue val
   where
-  go :: Value -> [(SkolemScope, Value)] -> ([(Value, Value)], [(SkolemScope, Value)])
+  go :: Value -> [(SkolemScope, Value)] -> ([(Maybe Value, Value)], [(SkolemScope, Value)])
   go val@(TypedValue _ _ (ForAll _ _ (Just sco))) scos = ([], (sco, val) : scos)
   go val@(TypedValue _ _ ty) scos = case collectSkolems ty \\ map fst scos of
                                       (sco : _) -> ([(findBindingScope sco, val)], scos)
@@ -311,8 +311,8 @@ skolemEscapeCheck root@(TypedValue _ _ _) =
       collect (Skolem _ scope) = [scope]
       collect _ = []
   go _ scos = ([], scos)
-  findBindingScope :: SkolemScope -> Value
-  findBindingScope sco = fromMaybe (error "No introducing ForAll for skolem variable.") $ something (mkQ Nothing go) root
+  findBindingScope :: SkolemScope -> Maybe Value
+  findBindingScope sco = something (mkQ Nothing go) root
     where
     go val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
     go _ = Nothing
@@ -730,6 +730,10 @@ check' val t@(ConstrainedType constraints ty) = do
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
   return $ TypedValue True (foldr Abs val' dictNames) t
+check' val t@(SaturatedTypeSynonym name args) = do
+  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
+  val' <- check val ty
+  return $ TypedValue True val' ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -812,10 +816,6 @@ check' (Constructor c) ty = do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
-check' val t@(SaturatedTypeSynonym name args) = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  val' <- check val ty
-  return $ TypedValue True val' ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 -- |
