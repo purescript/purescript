@@ -86,6 +86,15 @@ executable psci
     other-modules:
     ghc-options: -Wall -O2
 
+executable docgen
+    build-depends: base >=4 && <5, cmdtheline -any, purescript -any, utf8-string -any,
+                   process -any, mtl -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: docgen
+    other-modules:
+    ghc-options: -Wall -O2
+
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any, syb -any,
