@@ -142,7 +142,7 @@ infer (TypeApp t1 t2) = do
   k2 <- infer t2
   k1 =?= FunKind k2 k0
   return k0
-infer (ForAll ident ty) = do
+infer (ForAll ident ty _) = do
   k <- fresh
   Just moduleName <- checkCurrentModule <$> get
   bindLocalTypeVariables moduleName [(ProperName ident, k)] $ infer ty

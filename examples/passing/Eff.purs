@@ -10,10 +10,10 @@ test1 = catchError (\s -> ret 0) $ do
           trace "Testing"
           throwError "Error!"
 
-test2 = runPure $ runST $ do
+test2 = runST (do
           ref <- newSTRef 0
           modifySTRef ref $ \n -> n + 1
-          readSTRef ref
+          readSTRef ref)
 
 module Main where
 
@@ -24,4 +24,4 @@ import TestEff
 main = do
   n <- test1
   Trace.print n
-  Trace.print test2
+  --Trace.print test2
