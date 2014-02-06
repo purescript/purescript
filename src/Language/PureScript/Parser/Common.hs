@@ -135,12 +135,6 @@ identStart :: P.Parsec String u Char
 identStart = P.lower <|> P.oneOf "_"
 
 -- |
--- Valid first characters for a proper name
---
-properNameStart :: P.Parsec String u Char
-properNameStart = P.upper
-
--- |
 -- Valid identifier characters
 --
 identLetter :: P.Parsec String u Char
@@ -270,7 +264,7 @@ natural = PT.natural tokenParser
 -- Parse a proper name
 --
 properName :: P.Parsec String u ProperName
-properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many (PT.identLetter langDef) P.<?> "name")
+properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many P.alphaNum P.<?> "name")
 
 -- |
 -- Parse a qualified name, i.e. M.name or just name
