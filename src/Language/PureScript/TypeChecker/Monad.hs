@@ -115,10 +115,20 @@ data Environment = Environment {
   } deriving (Show)
 
 -- |
--- An empty environment with no values and no types defined
+-- The basic types existing in the external javascript environment
 --
-emptyEnvironment :: Environment
-emptyEnvironment = Environment M.empty M.empty M.empty M.empty []
+jsTypes ::M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
+jsTypes = M.fromList [ ((ModuleName $ ProperName "Prim", ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
+                     , ((ModuleName $ ProperName "Prim", ProperName "Array"), (FunKind Star Star, ExternData))
+                     , ((ModuleName $ ProperName "Prim", ProperName "String"), (Star, ExternData))
+                     , ((ModuleName $ ProperName "Prim", ProperName "Number"), (Star, ExternData))
+                     , ((ModuleName $ ProperName "Prim", ProperName "Boolean"), (Star, ExternData)) ]
+
+-- |
+-- The initial environment with no values and only the default javascript types defined
+--
+initEnvironment :: Environment
+initEnvironment = Environment M.empty jsTypes M.empty M.empty []
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -271,7 +281,7 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 --
 runCheck :: Check a -> Either String (a, Environment)
 runCheck c = do
-  (a, s) <- flip runStateT (CheckState emptyEnvironment 0 0 Nothing) $ unCheck c
+  (a, s) <- flip runStateT (CheckState initEnvironment 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
 -- |

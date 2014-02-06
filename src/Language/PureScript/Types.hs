@@ -90,31 +90,31 @@ data Type
 -- Type constructor for functions
 --
 tyFunction :: Type
-tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Function")
+tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prim") (ProperName "Function")
 
 -- |
 -- Type constructor for strings
 --
 tyString :: Type
-tyString = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "String")
+tyString = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prim") (ProperName "String")
 
 -- |
 -- Type constructor for numbers
 --
 tyNumber :: Type
-tyNumber = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Number")
+tyNumber = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prim") (ProperName "Number")
 
 -- |
 -- Type constructor for booleans
 --
 tyBoolean :: Type
-tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Boolean")
+tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prim") (ProperName "Boolean")
 
 -- |
 -- Type constructor for arrays
 --
 tyArray :: Type
-tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prelude") (ProperName "Array")
+tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName $ ProperName "Prim") (ProperName "Array")
 
 -- |
 -- Smart constructor for function types
