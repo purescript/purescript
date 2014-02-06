@@ -1,4 +1,4 @@
-module Monad where
+module MonadTest where
 
   type Monad m = { ret :: forall a. a -> m a
 		 , bind :: forall a b. m a -> (a -> m b) -> m b }

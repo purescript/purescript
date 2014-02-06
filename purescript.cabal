@@ -1,5 +1,5 @@
 name: purescript
-version: 0.3.8.1
+version: 0.3.9
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -83,6 +83,15 @@ executable psci
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
+    other-modules:
+    ghc-options: -Wall -O2
+
+executable docgen
+    build-depends: base >=4 && <5, cmdtheline -any, purescript -any, utf8-string -any,
+                   process -any, mtl -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: docgen
     other-modules:
     ghc-options: -Wall -O2
 

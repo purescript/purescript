@@ -128,7 +128,7 @@ runtimeTypeChecks arg ty =
   where
   getFunctionArgumentType :: Type -> Maybe Type
   getFunctionArgumentType (TypeApp (TypeApp t funArg) _) | t == tyFunction = Just funArg
-  getFunctionArgumentType (ForAll _ ty') = getFunctionArgumentType ty'
+  getFunctionArgumentType (ForAll _ ty' _) = getFunctionArgumentType ty'
   getFunctionArgumentType _ = Nothing
   argumentCheck :: JS -> Type -> [JS]
   argumentCheck val t | t == tyNumber = [typeCheck val "number"]
@@ -141,7 +141,7 @@ runtimeTypeChecks arg ty =
     in
       typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor prop val) ty') pairs
   argumentCheck val (TypeApp (TypeApp t _) _) | t == tyFunction = [typeCheck val "function"]
-  argumentCheck val (ForAll _ ty') = argumentCheck val ty'
+  argumentCheck val (ForAll _ ty' _) = argumentCheck val ty'
   argumentCheck _ _ = []
   typeCheck :: JS -> String -> JS
   typeCheck js ty' = JSIfElse (JSBinary NotEqualTo (JSTypeOf js) (JSStringLiteral ty')) (JSBlock [JSThrow (JSStringLiteral $ ty' ++ " expected")]) Nothing
@@ -253,7 +253,7 @@ isOnlyConstructor m e ctor =
   where
   numConstructors ty = length $ filter (\(ty1, _) -> ((==) `on` typeConstructor) ty ty1) $ M.elems $ dataConstructors e
   typeConstructor (TypeConstructor qual) = qualify m qual
-  typeConstructor (ForAll _ ty) = typeConstructor ty
+  typeConstructor (ForAll _ ty _) = typeConstructor ty
   typeConstructor (TypeApp (TypeApp t _) ty) | t == tyFunction = typeConstructor ty
   typeConstructor (TypeApp ty _) = typeConstructor ty
   typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn

@@ -45,7 +45,8 @@ import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
-       (mkM, everywhereM, everything, mkT, something, everywhere, mkQ)
+       (everythingWithContext, mkM, everywhereM, everything, mkT,
+        something, everywhere, mkQ)
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -66,6 +67,7 @@ import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 import Data.Function (on)
+import Debug.Trace (trace)
 
 instance Partial Type where
   unknown = TUnknown
@@ -86,17 +88,23 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (TUnknown u) t = u =:= t
   unifyTypes' t (TUnknown u) = u =:= t
   unifyTypes' (SaturatedTypeSynonym name args) ty = do
-    ty1 <- expandTypeSynonym name args
+    ty1 <- introduceSkolemScope <=< expandTypeSynonym name $ args
     ty1 `unifyTypes` ty
   unifyTypes' ty s@(SaturatedTypeSynonym _ _) = s `unifyTypes` ty
-  unifyTypes' (ForAll ident1 ty1) (ForAll ident2 ty2) = do
-    sk <- skolemize ident1 ty1
-    replaced <- replaceVarWithUnknown ident2 ty2
-    sk `unifyTypes` replaced
-  unifyTypes' (ForAll ident ty1) ty2 = do
-    sk <- skolemize ident ty1
+  unifyTypes' (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
+    case (sc1, sc2) of
+      (Just sc1', Just sc2') -> do
+        sko <- newSkolemConstant
+        let sk1 = skolemize ident1 sko sc1' ty1
+        let sk2 = skolemize ident2 sko sc2' ty2
+        sk1 `unifyTypes` sk2
+      _ -> throwError (prettyPrintType ty1)
+  unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
+    sko <- newSkolemConstant
+    let sk = skolemize ident sko sc ty1
     sk `unifyTypes` ty2
-  unifyTypes' ty f@(ForAll _ _) = f `unifyTypes` ty
+  unifyTypes' (ForAll _ _ _) _ = throwError "Skolem variable scope is unspecified"
+  unifyTypes' ty f@(ForAll _ _ _) = f `unifyTypes` ty
   unifyTypes' (Object row1) (Object row2) = row1 =?= row2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
@@ -106,7 +114,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem s1) (Skolem s2) | s1 == s2 = return ()
+  unifyTypes' (Skolem s1 _) (Skolem s2 _) | s1 == s2 = return ()
   unifyTypes' r1@(RCons _ _ _) r2 = unifyRows r1 r2
   unifyTypes' r1 r2@(RCons _ _ _) = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
@@ -143,7 +151,7 @@ unifyRows r1 r2 =
     unifyRows' row r others u'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem s1) [] (Skolem s2) | s1 == s2 = return ()
+  unifyRows' [] (Skolem s1 _) [] (Skolem s2 _) | s1 == s2 = return ()
   unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
 
 -- |
@@ -171,22 +179,24 @@ typesOf moduleName vals = do
         (ident, (val, Just (ty, checkType))) -> do
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-          ty' <- replaceAllTypeSynonyms ty
-          val' <- bindNames dict $ if checkType then check val ty' else return val
+          ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+          val' <- bindNames dict $ if checkType
+                                   then TypedValue True <$> check val ty' <*> pure ty'
+                                   else return (TypedValue False val ty')
           return (ident, (val', ty'))
         (ident, (val, Nothing)) -> do
           TypedValue _ val' ty <- bindNames dict $ infer val
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-          return (ident, (val', ty))
+          return (ident, (TypedValue True val' ty, ty))
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       escapeCheck val ty
       return triple
-  forM_ tys $ skolemEscapeCheck . snd . snd
   forM tys $ \(ident, (val, ty)) -> do
     val' <- replaceTypeClassDictionaries moduleName val
-    return (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
+    rethrow (("Error in " ++ show ident ++ ": \n") ++) $ skolemEscapeCheck val'
+    return $ (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
   where
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
@@ -238,7 +248,7 @@ entails moduleName context goal@(className, ty) = do
     return $ Just dict
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
   mkDictionary fnName Nothing = Var fnName
-  mkDictionary fnName (Just dicts) = foldr (flip App) (Var fnName) dicts
+  mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
   filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
@@ -252,7 +262,9 @@ entails moduleName context goal@(className, ty) = do
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem s1) (Skolem s2) | s1 == s2 = Just []
+typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
+typeHeadsAreEqual _ _ (TypeVar v) t = Just [(v, t)]
+typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
@@ -268,7 +280,7 @@ escapeCheck value ty = do
   let allUnknowns = findAllTypes value
   forM_ allUnknowns $ \t -> do
     let unsolvedUnknowns = nub . unknowns $ subst $? t
-    guardWith ("Escape check fails" ++ show (subst $? ty, subst $? t)) $ null $ unsolvedUnknowns \\ visibleUnknowns
+    guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
 
 -- |
 -- Find all type annotations occuring inside a value
@@ -282,14 +294,31 @@ findAllTypes = everything (++) (mkQ [] go)
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: Type -> Check ()
-skolemEscapeCheck ty =
-  case something (mkQ Nothing findSkolems) ty of
-    Nothing -> return ()
-    Just _ -> throwError $ "Skolem variables cannot escape. Consider adding a type signature."
+skolemEscapeCheck :: Value -> Check ()
+skolemEscapeCheck (TypedValue False _ _) = return ()
+skolemEscapeCheck root@(TypedValue _ _ _) =
+  case everythingWithContext [] (++) (mkQ ((,) []) go) root of
+    [] -> return ()
+    ((binding, val) : _) -> throwError $ "Rigid/skolem type variable bound by " ++ maybe "<unknown>" prettyPrintValue binding ++ " has escaped at " ++ prettyPrintValue val
   where
-    findSkolems (Skolem _) = return ()
-    findSkolems _ = mzero
+  go :: Value -> [(SkolemScope, Value)] -> ([(Maybe Value, Value)], [(SkolemScope, Value)])
+  go val@(TypedValue _ _ (ForAll _ _ (Just sco))) scos = ([], (sco, val) : scos)
+  go val@(TypedValue _ _ ty) scos = case collectSkolems ty \\ map fst scos of
+                                      (sco : _) -> ([(findBindingScope sco, val)], scos)
+                                      _ -> ([], scos)
+    where
+    collectSkolems :: Type -> [SkolemScope]
+    collectSkolems = nub . everything (++) (mkQ [] collect)
+      where
+      collect (Skolem _ scope) = [scope]
+      collect _ = []
+  go _ scos = ([], scos)
+  findBindingScope :: SkolemScope -> Maybe Value
+  findBindingScope sco = something (mkQ Nothing go) root
+    where
+    go val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
+    go _ = Nothing
+skolemEscapeCheck val = throwError $ "Untyped value passed to skolemEscapeCheck: " ++ prettyPrintValue val
 
 -- |
 -- Ensure a row contains no duplicate labels
@@ -326,7 +355,7 @@ replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 -- Replace named type variables with new unification variables
 --
 replaceAllVarsWithUnknowns :: Type -> UnifyT Type Check Type
-replaceAllVarsWithUnknowns (ForAll ident ty) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
+replaceAllVarsWithUnknowns (ForAll ident ty _) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
 replaceAllVarsWithUnknowns ty = return ty
 
 -- |
@@ -404,7 +433,8 @@ infer' (ObjectUpdate o ps) = do
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
   let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
-  o' <- check o $ Object $ rowFromList (oldTys, row)
+  let oldTy = Object $ rowFromList (oldTys, row)
+  o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
 infer' (Accessor prop val) = do
   typed@(TypedValue _ _ objTy) <- infer val
@@ -424,19 +454,17 @@ infer' (Abs arg ret) = do
     return $ TypedValue True (Abs arg body) $ function ty bodyTy
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
-  ret <- fresh
-  app <- checkFunctionApplication f' ft arg ret
+  (ret, app) <- checkFunctionApplication f' ft arg
   return $ TypedValue True app ret
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
-  ty <- lookupVariable moduleName var
-  ty' <- replaceAllTypeSynonyms ty
-  case ty' of
+  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
+  case ty of
     ConstrainedType constraints _ -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
-    _ -> return $ TypedValue True (Var var) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty
+    _ -> return $ TypedValue True (Var var) ty
 infer' (Block ss) = do
   ret <- fresh
   (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
@@ -447,7 +475,7 @@ infer' v@(Constructor c) = do
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (ty, _) -> do ty' <- replaceAllTypeSynonyms ty
+    Just (ty, _) -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
                        return $ TypedValue True v ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
@@ -464,9 +492,9 @@ infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  ty' <- replaceAllTypeSynonyms ty
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $  ty
   val' <- if checkType then check val ty' else return val
-  return $ TypedValue True val' ty
+  return $ TypedValue True val' ty'
 infer' _ = error "Invalid argument to infer"
 
 -- |
@@ -477,9 +505,9 @@ inferProperty (Object row) prop = do
   let (props, _) = rowToList row
   return $ lookup prop props
 inferProperty (SaturatedTypeSynonym name args) prop = do
-  replaced <- expandTypeSynonym name args
+  replaced <- introduceSkolemScope <=< expandTypeSynonym name $ args
   inferProperty replaced prop
-inferProperty (ForAll ident ty) prop = do
+inferProperty (ForAll ident ty _) prop = do
   replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
 inferProperty _ _ = return Nothing
@@ -551,7 +579,7 @@ checkBinders nvals ret ((binders, grd, val):bs) = do
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables moduleName (M.toList m1) $ do
-    val' <- check val ret
+    val' <- TypedValue True <$> check val ret <*> pure ret
     case grd of
       Nothing -> return (binders, Nothing, val')
       Just g -> do
@@ -602,7 +630,7 @@ checkStatement mass ret (For ident start end inner) = do
   return (allCodePathsReturn, mass, For ident start' end' inner')
 checkStatement mass ret (Return val) = do
   val' <- check val ret
-  return (True, mass, Return val')
+  return (True, mass, Return (TypedValue True val' ret))
 
 -- |
 -- Check the type of an if-then-else statement
@@ -643,12 +671,31 @@ checkBlock mass ret (s:ss) = do
       return (b, m, s':ss'')
 
 -- |
+-- Generate a new skolem constant
+--
+newSkolemConstant :: UnifyT Type Check Int
+newSkolemConstant = runUnknown <$> fresh'
+
+-- |
+-- Generate a new skolem scope
+--
+newSkolemScope :: UnifyT Type Check SkolemScope
+newSkolemScope = SkolemScope . runUnknown <$> fresh'
+
+-- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
-skolemize :: String -> Type -> UnifyT Type Check Type
-skolemize ident ty = do
-  tsk <- Skolem . runUnknown <$> fresh'
-  return $ replaceTypeVars ident tsk ty
+skolemize :: (D.Data d) => String -> Int -> SkolemScope -> d -> d
+skolemize ident sko scope d = replaceTypeVars ident (Skolem sko scope) d
+
+-- |
+-- Introduce skolem scope at every occurence of a ForAll
+--
+introduceSkolemScope :: Type -> UnifyT Type Check Type
+introduceSkolemScope = everywhereM (mkM go)
+  where
+  go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)
+  go other = return other
 
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
@@ -668,10 +715,13 @@ check val ty = rethrow errorMessage $ check' val ty
 -- Check the type of a value
 --
 check' :: Value -> Type -> UnifyT Type Check Value
-check' val (ForAll idents ty) = do
-  sk <- skolemize idents ty
-  check val sk
-check' val (ConstrainedType constraints ty) = do
+check' val t@(ForAll ident ty _) = do
+  scope <- newSkolemScope
+  sko <- newSkolemConstant
+  let sk = skolemize ident sko scope ty
+  val' <- check val sk
+  return $ TypedValue True val' (ForAll ident ty (Just scope))
+check' val t@(ConstrainedType constraints ty) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
   dictNames <- flip mapM constraints $ \(Qualified _ (ProperName className), _) -> do
@@ -681,34 +731,43 @@ check' val (ConstrainedType constraints ty) = do
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
-  return $ foldr Abs val' dictNames
+  return $ TypedValue True (foldr Abs val' dictNames) t
+check' val t@(SaturatedTypeSynonym name args) = do
+  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
+  val' <- check val ty
+  return $ TypedValue True val' ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
   ty' <- replaceAllVarsWithUnknowns ty
   ty' =?= u
-  return val'
-check' v@(NumericLiteral _) t | t == tyNumber = return v
-check' v@(StringLiteral _) t | t == tyString = return v
-check' v@(BooleanLiteral _) t | t == tyBoolean = return v
-check' (ArrayLiteral vals) (TypeApp a ty) | a == tyArray = ArrayLiteral <$> forM vals (\val -> check val ty)
-check' (Abs arg ret) (TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
+  return $ TypedValue True val' ty'
+check' v@(NumericLiteral _) t | t == tyNumber =
+  return $ TypedValue True v t
+check' v@(StringLiteral _) t | t == tyString =
+  return $ TypedValue True v t
+check' v@(BooleanLiteral _) t | t == tyBoolean =
+  return $ TypedValue True v t
+check' (ArrayLiteral vals) t@(TypeApp a ty) | a == tyArray = do
+  arr <- ArrayLiteral <$> forM vals (\val -> check val ty)
+  return $ TypedValue True arr t
+check' (Abs arg ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
   ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
-  return $ Abs arg ret'
+  return $ TypedValue True (Abs arg ret') ty
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
-  app <- checkFunctionApplication f' ft arg ret
-  return $ app
+  (ret', app) <- checkFunctionApplication f' ft arg
+  subsumes Nothing ret' ret
+  return $ TypedValue True app ret
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
-  ty1 <- lookupVariable moduleName var
-  repl <- replaceAllTypeSynonyms ty1
-  ty' <- replaceAllTypeSynonyms ty
+  repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
     Nothing -> throwError "Unable to check type subsumption"
-    Just v'' -> return v''
+    Just v'' -> return $ TypedValue True v'' ty'
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty1
@@ -718,22 +777,22 @@ check' (TypedValue checkType val ty1) ty2 = do
     Nothing -> throwError "Unable to check type subsumption"
     Just val'' -> do
       val''' <- if checkType then check val'' ty1 else return val''
-      return $ TypedValue True val''' ty1
+      return $ TypedValue checkType (TypedValue True val''' ty1) ty2
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
   let ts = map (\(TypedValue _ _ t) -> t) vals'
   binders' <- checkBinders ts ret binders
-  return $ Case vals' binders'
+  return $ TypedValue True (Case vals' binders') ret
 check' (IfThenElse cond th el) ty = do
   cond' <- check cond tyBoolean
   th' <- check th ty
   el' <- check el ty
-  return $ IfThenElse cond' th' el'
-check' (ObjectLiteral ps) (Object row) = do
+  return $ TypedValue True (IfThenElse cond' th' el') ty
+check' (ObjectLiteral ps) t@(Object row) = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
-  return $ ObjectLiteral ps'
-check' (ObjectUpdate obj ps) (Object row) = do
+  return $ TypedValue True (ObjectLiteral ps') t
+check' (ObjectUpdate obj ps) t@(Object row) = do
   ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh
   let (propsToCheck, rest) = rowToList row
@@ -741,27 +800,24 @@ check' (ObjectUpdate obj ps) (Object row) = do
       remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
   obj' <- check obj (Object (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties ps row True
-  return $ ObjectUpdate obj' ps'
+  return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = do
   rest <- fresh
   val' <- check val (Object (RCons prop ty rest))
-  return $ Accessor prop val'
+  return $ TypedValue True (Accessor prop val') ty
 check' (Block ss) ret = do
   (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
   guardWith "Block is missing a return statement" allCodePathsReturn
-  return $ Block ss'
+  return $ TypedValue True (Block ss') ret
 check' (Constructor c) ty = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup (qualify moduleName c) (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just (ty1, _) -> do
-      repl <- replaceAllTypeSynonyms ty1
+      repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
-      return $ Constructor c
-check' val (SaturatedTypeSynonym name args) = do
-  ty <- expandTypeSynonym name args
-  check val ty
+      return $ TypedValue True (Constructor c) ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 -- |
@@ -774,7 +830,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
-  go [] [] (Skolem _) | lax = return []
+  go [] [] (Skolem _ _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have property " ++ p
   go ((p,_):_) [] REmpty = throwError $ "Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row
@@ -801,8 +857,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> Value -> Type -> UnifyT Type Check Value
-checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg ret
+checkFunctionApplication :: Value -> Type -> Value -> UnifyT Type Check (Type, Value)
+checkFunctionApplication fn fnTy arg = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
@@ -812,34 +868,33 @@ checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionA
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> Value -> Type -> UnifyT Type Check Value
-checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
+checkFunctionApplication' :: Value -> Type -> Value -> UnifyT Type Check (Type, Value)
+checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg = do
   tyFunction' =?= tyFunction
   arg' <- check arg argTy
-  _ <- subsumes Nothing retTy ret
-  return $ App fn arg'
-checkFunctionApplication' fn (ForAll ident ty) arg ret = do
+  return (retTy, App fn arg')
+checkFunctionApplication' fn (ForAll ident ty _) arg = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication fn replaced arg ret
-checkFunctionApplication' fn u@(TUnknown _) arg ret = do
+  checkFunctionApplication fn replaced arg
+checkFunctionApplication' fn u@(TUnknown _) arg = do
   arg' <- do
     TypedValue _ v t <- infer arg
     TypedValue True v <$> replaceAllVarsWithUnknowns t
   let ty = (\(TypedValue _ _ t) -> t) arg'
+  ret <- fresh
   u =?= function ty ret
-  return $ App fn arg'
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
-  ty <- expandTypeSynonym name tyArgs
-  checkFunctionApplication fn ty arg ret
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
+  return (ret, App fn arg')
+checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg = do
+  ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
+  checkFunctionApplication fn ty arg
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
-  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg ret
-checkFunctionApplication' _ fnTy arg ret = throwError $ "Applying a function of type "
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg
+checkFunctionApplication' _ fnTy arg = throwError $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
-  ++ " to argument(s) " ++ prettyPrintValue arg
-  ++ " does not yield a value of type " ++ prettyPrintType ret ++ "."
+  ++ " to argument " ++ prettyPrintValue arg
 
 -- |
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
@@ -857,18 +912,25 @@ subsumes val ty1 ty2 = rethrow errorMessage $ subsumes' val ty1 ty2
 -- Check whether one type subsumes another
 --
 subsumes' :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
-subsumes' val (ForAll ident ty1) ty2 = do
+subsumes' val (ForAll ident ty1 _) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2
+subsumes' val ty1 (ForAll ident ty2 sco) =
+  case sco of
+    Just sco' -> do
+      sko <- newSkolemConstant
+      let sk = skolemize ident sko sco' ty2
+      subsumes val ty1 sk
+    Nothing -> throwError "Skolem variable scope is unspecified"
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
   subsumes Nothing arg2 arg1
   subsumes Nothing ret1 ret2
   return val
 subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
-  ty1 <- expandTypeSynonym name tyArgs
+  ty1 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   subsumes val ty1 ty2
 subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
-  ty2 <- expandTypeSynonym name tyArgs
+  ty2 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   env <- getEnv
