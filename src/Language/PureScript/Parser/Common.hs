@@ -399,5 +399,5 @@ same = checkIndentation (==) P.<?> "no indentation"
 -- |
 -- Run a parser which supports indentation
 --
-runIndentParser :: P.Parsec String ParseState a -> String -> Either P.ParseError a
-runIndentParser p = P.runParser p (ParseState 0) ""
+runIndentParser :: FilePath -> P.Parsec String ParseState a -> String -> Either P.ParseError a
+runIndentParser filePath p = P.runParser p (ParseState 0) filePath

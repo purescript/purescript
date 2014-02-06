@@ -28,10 +28,10 @@ preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
 
 readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
-readInput Nothing = getContents >>= return . P.runIndentParser P.parseModules
+readInput Nothing = getContents >>= return . P.runIndentParser "" P.parseModules
 readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
   text <- U.readFile inputFile
-  return $ P.runIndentParser P.parseModules text
+  return $ P.runIndentParser inputFile P.parseModules text
 
 compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile opts input output externs = do

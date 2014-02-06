@@ -106,7 +106,7 @@ loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule moduleFile = do
   print moduleFile
   moduleText <- U.readFile moduleFile
-  return . either (Left . show) Right $ P.runIndentParser P.parseModules moduleText
+  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
 
 main :: IO ()
 main = do
@@ -128,7 +128,7 @@ main = do
     case cmd of
       Empty -> go imports loadedModules
       Expression ls -> do
-        case P.runIndentParser (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
+        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
           Left err -> outputStrLn (show err)
           Right decl -> handleDeclaration loadedModules imports decl
         go imports loadedModules
