@@ -60,7 +60,7 @@ customOperatorTable fixities =
   let
     applyUserOp name t1 t2 = App (App (Var name) t1) t2
     userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
-    sorted = sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
+    sorted = reverse $ sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups

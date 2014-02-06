@@ -12,8 +12,8 @@ module Prelude where
   konst :: forall a b. a -> b -> a
   konst a _ = a
 
-  infixr 5 >>>
-  infixr 5 <<<
+  infixr 9 >>>
+  infixr 9 <<<
 
   class Category a where
     id :: forall t. a t t
@@ -25,8 +25,8 @@ module Prelude where
     (<<<) f g x = f (g x)
     (>>>) f g x = g (f x)
 
-  infixr 1000 $
-  infixl 1000 #
+  infixr 0 $
+  infixl 0 #
 
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
@@ -92,12 +92,12 @@ module Prelude where
       a' <- a
       ret (f' a')
 
-  infixl 5 *
-  infixl 5 /
-  infixl 5 %
+  infixl 7 *
+  infixl 7 /
+  infixl 7 %
 
-  infixl 7 -
-  infixl 7 +
+  infixl 6 -
+  infixl 6 +
 
   class Num a where
     (+) :: a -> a -> a
@@ -149,8 +149,8 @@ module Prelude where
     (%) = numMod
     negate = numNegate
 
-  infixl 9 ==
-  infixl 9 /=
+  infixl 4 ==
+  infixl 4 /=
 
   class Eq a where
     (==) :: a -> a -> Boolean
@@ -205,10 +205,10 @@ module Prelude where
     (==) _ _ = false
     (/=) xs ys = not (xs == ys)
 
-  infixl 3 <
-  infixl 3 >
-  infixl 3 <=
-  infixl 3 >=
+  infixl 4 <
+  infixl 4 >
+  infixl 4 <=
+  infixl 4 >=
 
   class Ord a where
     (<) :: a -> a -> Boolean
@@ -308,7 +308,7 @@ module Prelude where
     zshr = numZshr
     complement = numComplement
 
-  infixl 4 !!
+  infixl 8 !!
 
   foreign import (!!) "function $bang$bang(xs) {\
                       \  return function(n) {\
@@ -316,8 +316,8 @@ module Prelude where
                       \  };\
                       \}" :: forall a. [a] -> Number -> a
 
-  infixr 11 ||
-  infixr 11 &&
+  infixr 2 ||
+  infixr 3 &&
 
   class BoolLike b where
     (&&) :: b -> b -> b
@@ -345,7 +345,7 @@ module Prelude where
     (||) = boolOr
     not = boolNot
 
-  infixr 6 ++
+  infixr 5 ++
 
   foreign import (++) "function $plus$plus(s1) {\
                       \  return function(s2) {\

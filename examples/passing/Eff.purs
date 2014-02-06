@@ -24,4 +24,4 @@ import TestEff
 main = do
   n <- test1
   Trace.print n
-  --Trace.print test2
+  Trace.print test2
