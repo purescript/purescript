@@ -61,9 +61,36 @@ module Prelude where
     read "true" = true
     read _ = false
 
+  infixl 4 <$>
+
+  class Functor f where
+    (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  infixl 4 <*>
+
+  class Applicative f where
+    pure :: forall a. a -> f a
+    (<*>) :: forall a b. f (a -> b) -> f a -> f b
+
+  instance (Applicative f) => Functor f where
+    (<$>) f a = pure f <*> a
+
+  infixl 3 <|>
+
+  class Alternative f where
+    empty :: forall a. f a
+    (<|>) :: forall a. f a -> f a -> f a
+
   class Monad m where
     ret :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
+  instance (Monad m) => Applicative m where
+    pure = ret
+    (<*>) f a = do
+      f' <- f
+      a' <- a
+      ret (f' a')
 
   infixl 5 *
   infixl 5 /
@@ -326,6 +353,74 @@ module Prelude where
                       \  };\
                       \}" :: String -> String -> String
 
+module Monoid where
+
+  import Prelude
+
+  infixr 6 <>
+
+  class Monoid m where
+    mempty :: m
+    (<>) :: m -> m -> m
+  
+  instance Monoid String where
+    mempty = ""
+    (<>) = (++)
+
+  mconcat :: forall m. (Monoid m) => [m] -> m
+  mconcat [] = mempty
+  mconcat (m:ms) = m <> mconcat ms
+
+module Monad where
+
+  import Prelude
+  import Arrays
+
+  replicateM :: forall m a. (Monad m) => Number -> m a -> m [a]
+  replicateM 0 _ = ret []
+  replicateM n m = do
+    a <- m
+    as <- replicateM (n - 1) m
+    ret (a : as) 
+
+  mapM :: forall m a b. (Monad m) => (a -> m b) -> [a] -> m [b]
+  mapM _ [] = ret []
+  mapM f (a:as) = do
+    b <- f a
+    bs <- mapM f as
+    ret (b : bs)
+
+  infixr 1 >=>
+  infixr 1 <=<
+
+  (>=>) :: forall m a b c. (Monad m) => (a -> m b) -> (b -> m c) -> a -> m c
+  (>=>) f g a = do
+    b <- f a
+    g b
+    
+  (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c 
+  (<=<) = flip (>=>)
+
+  sequence :: forall m a. (Monad m) => [m a] -> m [a]
+  sequence [] = ret []
+  sequence (m:ms) = do
+    a <- m
+    as <- sequence ms
+    ret (a : as)
+
+  join :: forall m a. (Monad m) => m (m a) -> m a
+  join mm = do
+    m <- mm
+    m
+
+  foldM :: forall m a b. (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
+  foldM _ a [] = ret a
+  foldM f a (b:bs) = f a b >>= \a' -> foldM f a' bs
+
+  when :: forall m. (Monad m) => Boolean -> m {} -> m {}
+  when true m = m
+  when false _ = ret {}
+
 module Maybe where
 
   import Prelude
@@ -408,9 +503,9 @@ module Arrays where
                         \  };\
                         \}" :: forall a. [a] -> [a] -> [a]
 
-  foreign import join "function join(l) {\
-                      \  return l.join();\
-                      \}" :: [String] -> String
+  foreign import joinS "function joinS(l) {\
+                       \  return l.join();\
+                       \}" :: [String] -> String
 
   foreign import joinWith "function joinWith(l) {\
                           \  return function (s) {\
@@ -467,6 +562,9 @@ module Arrays where
   (:) :: forall a. a -> [a] -> [a]
   (:) a = concat [a]
 
+  singleton :: forall a. a -> [a]
+  singleton a = [a]
+
   concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
   concatMap [] f = []
   concatMap (a:as) f = f a `concat` concatMap as f
@@ -476,9 +574,9 @@ module Arrays where
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
 
-  empty :: forall a. [a] -> Boolean
-  empty [] = true
-  empty _ = false
+  isEmpty :: forall a. [a] -> Boolean
+  isEmpty [] = true
+  isEmpty _ = false
 
   range :: Number -> Number -> [Number]
   range lo hi = {
@@ -504,6 +602,14 @@ module Arrays where
   instance (Prelude.Show a) => Prelude.Show [a] where
     show [] = "[]"
     show (x:xs) = show x ++ " : " ++ show xs
+
+  instance Prelude.Monad [] where
+    ret = singleton
+    (>>=) = concatMap
+
+  instance Prelude.Alternative [] where
+    empty = []
+    (<|>) = concat
 
 module Tuple where
 
@@ -782,6 +888,46 @@ module Eff where
   instance Prelude.Monad (Eff e) where
     ret = retEff
     (>>=) = bindEff
+
+  foreign import untilE "function untilE(f) {\
+			\  return function() {\
+			\    while (!f()) { }\
+			\    return {};\
+			\  };\
+                        \}" :: forall e. Eff e Boolean -> Eff e {}
+
+  foreign import whileE "function whileE(f) {\
+			\  return function(a) {\
+			\    return function() {\
+			\      while (f()) {\
+                        \        a();\
+                        \      }\
+			\      return {};\
+                        \    };\
+                        \  };\
+                        \}" :: forall e. Eff e Boolean -> Eff e {} -> Eff e {}
+ 
+  foreign import forE "function forE(lo) {\
+	              \  return function(hi) {\
+	              \    return function(f) {\
+	              \      return function() {\
+	              \        for (var i = lo; i < hi; i++) {\
+		      \          f(i)();\
+                      \        }\
+                      \      };\
+                      \    };\
+                      \  };\
+                      \}" :: forall e. Number -> Number -> (Number -> Eff e {}) -> Eff e {}
+
+
+  foreign import foreachE "function foreachE(as) {\
+	                  \  return function(f) {\
+	                  \    for (var i = 0; i < as.length; i++) {\
+		          \      f(as[i])();\
+                          \    }\
+                          \  };\
+                          \}" :: forall e a. [a] -> (a -> Eff e {}) -> Eff e {}
+
 
 module Random where
 
