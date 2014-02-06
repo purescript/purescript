@@ -25,6 +25,11 @@ import Control.Monad.Unify
 import Language.PureScript.Names
 
 -- |
+-- An identifier for the scope of a skolem variable
+--
+newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord, Data, Typeable)
+
+-- |
 -- The type of types
 --
 data Type
@@ -55,7 +60,7 @@ data Type
   -- |
   -- Forall quantifier
   --
-  | ForAll String Type
+  | ForAll String Type (Maybe SkolemScope)
   -- |
   -- A type with a set of type class constraints
   --
@@ -63,7 +68,7 @@ data Type
   -- |
   -- A skolem constant
   --
-  | Skolem Int
+  | Skolem Int SkolemScope
   -- |
   -- An empty row
   --
@@ -128,14 +133,14 @@ rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 -- Check whether a type is a monotype
 --
 isMonoType :: Type -> Bool
-isMonoType (ForAll _ _) = False
+isMonoType (ForAll _ _ _) = False
 isMonoType ty = True
 
 -- |
 -- Universally quantify a type
 --
 mkForAll :: [String] -> Type -> Type
-mkForAll = flip . foldl . flip $ ForAll
+mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
 
 -- |
 -- The empty record type
@@ -151,5 +156,5 @@ replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVa
   where
   replaceTypeVar (TypeVar v) | v == name = t
   replaceTypeVar other = other
-  isShadowed (ForAll v _) | v == name = True
+  isShadowed (ForAll v _ _) | v == name = True
   isShadowed _ = False

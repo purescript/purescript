@@ -74,7 +74,7 @@ typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> De
 typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
-    (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty))
+    (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty) Nothing)
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar Declaration
@@ -120,7 +120,7 @@ qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (J
 qualifiedToString _ (Qualified (Just (ModuleName mn)) pn) = runProperName mn ++ "_" ++ runProperName pn
 
 quantify :: Type -> Type
-quantify ty' = foldr ForAll ty' tyVars
+quantify ty' = foldr (\arg t -> ForAll arg t Nothing) ty' tyVars
   where
   tyVars = nub $ everything (++) (mkQ [] collect) ty'
   collect (TypeVar v) = [v]

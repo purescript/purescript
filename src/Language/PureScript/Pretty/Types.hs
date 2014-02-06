@@ -36,10 +36,10 @@ typeLiterals = mkPattern match
   match (TypeApp arr ty) | arr == tyArray = Just $ "[" ++ prettyPrintType ty ++ "]"
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
-  match (Skolem s) = Just $ 's' : show s
+  match (Skolem s _) = Just $ 's' : show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
-  match (ForAll ident ty) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
+  match (ForAll ident ty _) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
   match REmpty = Just $ prettyPrintRow REmpty
   match row@(RCons _ _ _) = Just $ prettyPrintRow row
   match _ = Nothing
@@ -56,7 +56,7 @@ prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs
   tailToPs REmpty = ""
   tailToPs (TUnknown (Unknown u)) = " | u" ++ show u
   tailToPs (TypeVar var) = " | " ++ var
-  tailToPs (Skolem s) = " | s" ++ show s
+  tailToPs (Skolem s _) = " | s" ++ show s
   tailToPs _ = error "Invalid row tail"
   toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
