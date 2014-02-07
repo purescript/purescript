@@ -90,6 +90,15 @@ addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries = do
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
 
+checkTypeClassInstance :: ModuleName -> Type -> Check ()
+checkTypeClassInstance _ (TypeVar _) = return ()
+checkTypeClassInstance m (TypeConstructor ctor) = do
+  env <- getEnv
+  when (canonicalizeType m env ctor `M.member` typeSynonyms env) $ throwError "Type synonym instances are disallowed"
+  return ()
+checkTypeClassInstance m (TypeApp ty (TypeVar _)) = checkTypeClassInstance m ty
+checkTypeClassInstance _ _ = throwError "Type class instance must be of the form T a1 ... an"
+
 -- |
 -- Type check all declarations in a module
 --
@@ -242,6 +251,8 @@ typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
 typeCheckAll moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
   env <- getEnv
   dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
+  checkTypeClassInstance moduleName ty
+  forM_ deps $ checkTypeClassInstance moduleName . snd
   addTypeClassDictionaries (qualifyAllUnqualifiedNames moduleName env
     [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className ty (Just deps) TCDRegular])
   ds <- typeCheckAll moduleName rest
