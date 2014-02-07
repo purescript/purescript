@@ -354,9 +354,17 @@ replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 -- |
 -- Replace named type variables with new unification variables
 --
-replaceAllVarsWithUnknowns :: Type -> UnifyT Type Check Type
-replaceAllVarsWithUnknowns (ForAll ident ty _) = replaceVarWithUnknown ident ty >>= replaceAllVarsWithUnknowns
-replaceAllVarsWithUnknowns ty = return ty
+instantiatePolyTypeWithUnknowns :: Value -> Type -> UnifyT Type Check (Value, Type)
+instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
+  ty' <- replaceVarWithUnknown ident ty
+  instantiatePolyTypeWithUnknowns val ty'
+instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
+   env <- getEnv
+   Just moduleName <- checkCurrentModule <$> get
+   dicts <- getTypeClassDictionaries
+   (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
+   return (foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints)), ty')
+instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- |
 -- Replace a single type variable with a new unification variable
@@ -460,10 +468,10 @@ infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
   case ty of
-    ConstrainedType constraints _ -> do
+    ConstrainedType constraints ty' -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' (Block ss) = do
   ret <- fresh
@@ -534,7 +542,7 @@ inferBinder val (UnaryBinder ctor binder) = do
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup (qualify moduleName ctor) (dataConstructors env) of
     Just (ty, _) -> do
-      fn <- replaceAllVarsWithUnknowns ty
+      (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
       case fn of
         TypeApp (TypeApp t obj) ret | t == tyFunction -> do
           _ <- subsumes Nothing val ret
@@ -739,9 +747,9 @@ check' val t@(SaturatedTypeSynonym name args) = do
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
-  ty' <- replaceAllVarsWithUnknowns ty
+  (val'', ty') <- instantiatePolyTypeWithUnknowns val' ty
   ty' =?= u
-  return $ TypedValue True val' ty'
+  return $ TypedValue True val'' ty'
 check' v@(NumericLiteral _) t | t == tyNumber =
   return $ TypedValue True v t
 check' v@(StringLiteral _) t | t == tyString =
@@ -879,7 +887,8 @@ checkFunctionApplication' fn (ForAll ident ty _) arg = do
 checkFunctionApplication' fn u@(TUnknown _) arg = do
   arg' <- do
     TypedValue _ v t <- infer arg
-    TypedValue True v <$> replaceAllVarsWithUnknowns t
+    (v', t') <- instantiatePolyTypeWithUnknowns arg t
+    return $ TypedValue True v' t'
   let ty = (\(TypedValue _ _ t) -> t) arg'
   ret <- fresh
   u =?= function ty ret

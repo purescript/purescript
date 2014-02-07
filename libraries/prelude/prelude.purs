@@ -75,6 +75,8 @@ module Prelude where
     empty :: forall a. f a
     (<|>) :: forall a. f a -> f a -> f a
 
+  infixl 1 >>=
+
   class Monad m where
     return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b

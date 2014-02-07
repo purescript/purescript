@@ -143,9 +143,11 @@ infer (TypeApp t1 t2) = do
   k1 =?= FunKind k2 k0
   return k0
 infer (ForAll ident ty _) = do
-  k <- fresh
+  k1 <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  bindLocalTypeVariables moduleName [(ProperName ident, k)] $ infer ty
+  k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
+  k2 =?= Star
+  return Star
 infer REmpty = do
   k <- fresh
   return $ Row k
