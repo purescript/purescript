@@ -1,11 +1,5 @@
 module Prelude where
 
-  foreign import data String :: *
-  foreign import data Number :: *
-  foreign import data Boolean :: *
-  foreign import data Array :: * -> *
-  foreign import data Function :: * -> * -> *
-
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
 
