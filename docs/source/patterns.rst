@@ -65,7 +65,7 @@ Array Patterns
 Array patterns match an input which is an array, and bring its elements into scope. For example::
 
   f [x] = x
-  f [x, y] = x * y + f xs
+  f [x, y] = x * y
   f _ = 0
 
 Here, the first pattern only matches arrays of length one, and brings the first element of the array into scope.
