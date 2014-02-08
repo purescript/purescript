@@ -244,7 +244,7 @@ typeCheckAll currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
   constructs (TypeApp (TypeApp t _) ty) pn | t == tyFunction = ty `constructs` pn
   constructs (TypeApp ty _) pn = ty `constructs` pn
   constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
-typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
+typeCheckAll moduleName (d@(TypeClassDeclaration _ _ _ _) : rest) = do
   env <- getEnv
   ds <- typeCheckAll moduleName rest
   return $ qualifyAllUnqualifiedNames moduleName env d : ds

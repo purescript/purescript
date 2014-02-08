@@ -96,11 +96,16 @@ parseImportDeclaration = do
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
   reserved "class"
+  implies <- P.optionMaybe $ do
+    indented
+    implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> parseType))
+    reservedOp "<="
+    return implies
   className <- indented *> properName
   ident <- indented *> identifier
   indented *> reserved "where"
   members <- mark (P.many (same *> parseTypeDeclaration))
-  return $ TypeClassDeclaration className ident members
+  return $ TypeClassDeclaration className ident (fromMaybe [] implies) members
 
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do

@@ -110,9 +110,9 @@ data Declaration
   --
   | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
   -- |
-  -- A type class declaration (name, argument, member declarations)
+  -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName String [Declaration]
+  | TypeClassDeclaration ProperName String [(Qualified ProperName, Type)] [Declaration]
   -- |
   -- A type instance declaration (dependencies, class name, instance type, member declarations)
   --
@@ -166,6 +166,6 @@ isExternDecl _ = False
 -- Test if a declaration is a type class or instance declaration
 --
 isTypeClassDeclaration :: Declaration -> Bool
-isTypeClassDeclaration (TypeClassDeclaration _ _ _) = True
+isTypeClassDeclaration (TypeClassDeclaration _ _ _ _) = True
 isTypeClassDeclaration (TypeInstanceDeclaration _ _ _ _) = True
 isTypeClassDeclaration _ = False
