@@ -142,10 +142,10 @@ valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 
 -- |
 -- Temporarily extends the environment to include a local variable name introduced by a lambda
--- abstraction. The stored type is incorrect, but not used.
+-- abstraction.
 --
 bindName :: ModuleName -> Ident -> Environment -> Environment
-bindName m ident env = env { names = M.insert (m, ident) (unit, LocalVariable) $ names env }
+bindName m ident env = env { names = M.insert (m, ident) (error "Temporary lambda variable type was read", LocalVariable) $ names env }
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for runtime type checks.
