@@ -45,7 +45,8 @@ import Language.PureScript.CodeGen.Common
 import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for all declarations in a module
+-- Generate code in the simplified Javascript intermediate representation for all declarations in a
+-- module.
 --
 moduleToJs :: Options -> Module -> Environment -> [JS]
 moduleToJs opts (Module pname@(ProperName name) decls) env =
@@ -85,6 +86,10 @@ declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
   Just $ js : setProperty ident (var ident) mp
 declToJs _ _ _ _ = Nothing
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for setting the property
+-- of an object.
+--
 setProperty :: Ident -> JS -> ModuleName -> [JS]
 setProperty ident@(Op op) val (ModuleName (ProperName moduleName)) =
   [ JSAssignment (accessor ident (JSVar moduleName)) val
@@ -92,13 +97,25 @@ setProperty ident@(Op op) val (ModuleName (ProperName moduleName)) =
 setProperty ident val (ModuleName (ProperName moduleName)) =
   [ JSAssignment (accessor ident (JSVar moduleName)) val ]
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a variable based on a
+-- PureScript identifier.
+--
 var :: Ident -> JS
 var = JSVar . identToJs
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for an accessor based on
+-- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
+-- indexer is returned.
+--
 accessor :: Ident -> JS -> JS
 accessor (Ident name) | nameIsJsReserved name = JSIndexer (JSStringLiteral name)
 accessor ident = JSAccessor (identToJs ident)
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a value or expression.
+--
 valueToJs :: Options -> ModuleName -> Environment -> Value -> JS
 valueToJs _ _ _ (NumericLiteral n) = JSNumericLiteral n
 valueToJs _ _ _ (StringLiteral s) = JSStringLiteral s
@@ -130,6 +147,9 @@ valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 bindName :: ModuleName -> Ident -> Environment -> Environment
 bindName m ident env = env { names = M.insert (m, ident) (unit, LocalVariable) $ names env }
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for runtime type checks.
+--
 runtimeTypeChecks :: String -> Type -> [JS]
 runtimeTypeChecks arg ty =
   let
@@ -159,6 +179,10 @@ runtimeTypeChecks arg ty =
   arrayCheck :: JS -> JS
   arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor "isArray" (JSVar "Array")) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a reference to a
+-- variable.
+--
 varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
 varToJs m e qual@(Qualified _ ident) = go qual
   where
@@ -174,10 +198,18 @@ varToJs m e qual@(Qualified _ ident) = go qual
     Nothing -> error "Undefined alias in varToJs"
   isExtern _ = False
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a reference to a
+-- variable that may have a qualified name.
+--
 qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
 qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = accessor (f a) (JSVar m)
 qualifiedToJS f (Qualified Nothing a) = JSVar $ identToJs (f a)
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for pattern match binders
+-- and guards.
+--
 bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do
   valNames <- replicateM (length vals) fresh
@@ -193,6 +225,10 @@ bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders,
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a pattern match
+-- binder.
+--
 binderToJs :: ModuleName -> Environment -> String -> [JS] -> Binder -> Gen [JS]
 binderToJs _ _ _ done NullBinder = return done
 binderToJs _ _ varName done (StringBinder str) =
@@ -256,6 +292,10 @@ binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
 
+-- |
+-- Checks whether a data constructor is the only constructor for that type, used to simplify the
+-- check when generating code for binders. 
+--
 isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
 isOnlyConstructor m e ctor =
   let (ty, _) = fromMaybe (error "Data constructor not found") $ qualify m ctor `M.lookup` dataConstructors e
@@ -268,6 +308,10 @@ isOnlyConstructor m e ctor =
   typeConstructor (TypeApp ty _) = typeConstructor ty
   typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn
 
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a statement in a
+-- PureScript block.
+--
 statementToJs :: Options -> ModuleName -> Environment -> Statement -> JS
 statementToJs opts m e (VariableIntroduction ident value) = JSVariableIntroduction (identToJs ident) (Just (valueToJs opts m e value))
 statementToJs opts m e (Assignment target value) = JSAssignment (JSVar (identToJs target)) (valueToJs opts m e value)
