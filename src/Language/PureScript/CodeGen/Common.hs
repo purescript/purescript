@@ -21,15 +21,22 @@ import Language.PureScript.Names
 -- |
 -- Convert an Ident into a valid Javascript identifier:
 --
---  * Alphanumeric characters are kept unmodified
+--  * Alphanumeric characters are kept unmodified.
 --
---  * Symbols are encoded as a dollar symbol ($) followed by their ordinal value
+--  * Reserved javascript identifiers are prefixed with '$$'.
+--
+--  * Symbols are prefixed with '$' followed by a symbol name or their ordinal value.
 --
 identToJs :: Ident -> String
+identToJs (Ident name) | nameIsJsReserved name = "$$" ++ name
 identToJs (Ident name) = concatMap identCharToString name
 identToJs (Op op) = concatMap identCharToString op
 identToJs (Escaped name) = name
 
+-- |
+-- Attempts to find a human-readable name for a symbol, if none has been specified returns the
+-- ordinal value.
+--
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]
 identCharToString '_' = "_"
@@ -54,3 +61,68 @@ identCharToString '\\' = "$bslash"
 identCharToString '?' = "$qmark"
 identCharToString '@' = "$at"
 identCharToString c = '$' : show (ord c)
+
+-- |
+-- Checks whether an identifier name is reserved in Javascript.
+--
+nameIsJsReserved :: String -> Bool
+nameIsJsReserved name =
+  elem name [ "abstract"
+            , "boolean"
+            , "break"
+            , "byte"
+            , "case"
+            , "catch"
+            , "char"
+            , "class"
+            , "const"
+            , "continue"
+            , "debugger"
+            , "default"
+            , "delete"
+            , "do"
+            , "double"
+            , "else"
+            , "enum"
+            , "export"
+            , "extends"
+            , "final"
+            , "finally"
+            , "float"
+            , "for"
+            , "function"
+            , "goto"
+            , "if"
+            , "implements"
+            , "import"
+            , "in"
+            , "instanceof"
+            , "int"
+            , "interface"
+            , "let"
+            , "long"
+            , "native"
+            , "new"
+            , "package"
+            , "private"
+            , "protected"
+            , "public"
+            , "return"
+            , "short"
+            , "static"
+            , "super"
+            , "switch"
+            , "synchronized"
+            , "this"
+            , "throw"
+            , "throws"
+            , "transient"
+            , "try"
+            , "typeof"
+            , "var"
+            , "void"
+            , "volatile"
+            , "while"
+            , "with"
+            , "yield" ]
+
