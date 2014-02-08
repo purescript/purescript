@@ -32,7 +32,7 @@ import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (eof)
 
 getPreludeFilename :: IO FilePath
-getPreludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
+getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 options :: P.Options
 options = P.Options True False True True True

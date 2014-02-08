@@ -1,5 +1,5 @@
 name: purescript
-version: 0.3.10.1
+version: 0.3.11
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -11,7 +11,7 @@ synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 category: Language
 author: Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
-data-files: libraries/prelude/prelude.purs
+data-files: prelude/prelude.purs
 data-dir: ""
 
 library

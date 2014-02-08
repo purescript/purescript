@@ -34,7 +34,7 @@ import qualified System.IO.UTF8 as U
 import qualified Data.Map as M
 
 preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
+preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 readInput :: [FilePath] -> IO (Either ParseError [P.Module])
 readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do

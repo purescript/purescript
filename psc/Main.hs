@@ -25,7 +25,7 @@ import qualified Paths_purescript as Paths
 import Data.Version (showVersion)
 
 preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "libraries/prelude/prelude.purs"
+preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
 readInput Nothing = getContents >>= return . P.runIndentParser "" P.parseModules
