@@ -607,28 +607,31 @@ module Arrays where
     empty = []
     (<|>) = concat
 
-module Tuple where
+module Tuples where
 
   import Prelude
   import Arrays
 
-  type Tuple a b = { fst :: a, snd :: b }
+  data Tuple a b = Tuple { fst :: a, snd :: b }
+
+  instance (Prelude.Show a, Prelude.Show b) => Prelude.Show (Tuple a b) where
+    show (Tuple { fst = a, snd = b }) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
 
   curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
-  curry f a b = f { fst: a, snd: b }
+  curry f a b = f (tuple a b)
 
   uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
-  uncurry f t = f t.fst t.snd
+  uncurry f (Tuple t) = f t.fst t.snd
 
   tuple :: forall a b. a -> b -> Tuple a b
-  tuple = curry (\t -> t)
+  tuple a b = Tuple { fst: a, snd: b }
 
   zip :: forall a b. [a] -> [b] -> [Tuple a b]
   zip = zipWith tuple
 
   unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
-  unzip (t:ts) = case unzip ts of
-      { fst = as, snd = bs } -> tuple (t.fst : as) (t.snd : bs)
+  unzip ((Tuple t):ts) = case unzip ts of
+    Tuple { fst = as, snd = bs } -> tuple (t.fst : as) (t.snd : bs)
   unzip [] = tuple [] []
 
 module String where
@@ -995,6 +998,10 @@ module IORef where
                             \    };\
                             \  };\
                             \}" :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {}
+
+  foreign import unsafeRunIORef "function unsafeRunIORef(f) {\
+                                \  return f;\
+                                \}" :: forall eff a. Eff (ref :: Ref | eff) a -> Eff eff a
 
 module Trace where
 
