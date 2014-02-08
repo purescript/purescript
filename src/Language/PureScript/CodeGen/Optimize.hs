@@ -94,14 +94,13 @@ isReassigned var1 = everything (||) (mkQ False check)
   where
   check :: JS -> Bool
   check (JSFunction _ args _) | var1 `elem` args = True
+  check (JSVariableIntroduction arg _) | var1 == arg = True
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
-isRebound js d = any (\var -> isReassigned var d) (variablesOf js)
+isRebound js d = any (\var -> isReassigned var d) (everything (++) (mkQ [] variablesOf) js)
   where
   variablesOf (JSVar var) = [var]
-  variablesOf (JSAccessor _ val) = variablesOf val
-  variablesOf (JSIndexer index val) = variablesOf index ++ variablesOf val
   variablesOf _ = []
 
 isUsed :: (Data d) => String -> d -> Bool
@@ -163,7 +162,10 @@ etaConvert = everywhere (mkT convert)
   where
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents block@(JSBlock body)) args)])
-    | all shouldInline args && not (or (map (flip isRebound block) args)) = JSBlock (replaceIdents (zip idents args) body)
+    | all shouldInline args &&
+      not (any (flip isRebound block) (map JSVar idents)) &&
+      not (or (map (flip isRebound block) args))
+      = JSBlock (replaceIdents (zip idents args) body)
   convert js = js
 
 unThunk :: JS -> JS
@@ -270,12 +272,10 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isBind _ = False
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
-  isBindPoly (JSVar op) | op == identToJs (Op ">>=") = True
   isBindPoly (JSAccessor prop (JSVar "Prelude")) | prop == identToJs (Op ">>=") = True
   isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSVar "Prelude")) = True
   isBindPoly _ = False
-  isRetPoly (JSVar "ret") = True
-  isRetPoly (JSAccessor "ret" (JSVar "Prelude")) = True
+  isRetPoly (JSAccessor "$return" (JSVar "Prelude")) = True
   isRetPoly _ = False
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")

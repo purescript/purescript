@@ -987,6 +987,7 @@ module IORef where
                              \  return function(f) {\
                              \    return function() {\
                              \      ref.value = f(ref.value);\
+                             \      return {};\
                              \    };\
                              \  };\
                              \}" :: forall s r. IORef s -> (s -> s) -> Eff (ref :: Ref | r) {}
@@ -995,6 +996,7 @@ module IORef where
                             \  return function(val) {\
                             \    return function() {\
                             \      ref.value = val;\
+                            \      return {};\
                             \    };\
                             \  };\
                             \}" :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {}
