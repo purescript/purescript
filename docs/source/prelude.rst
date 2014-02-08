@@ -9,18 +9,8 @@ Types
 
 ::
 
-    data Array :: * -> *
-
-    data Boolean :: *
-
-    data Function :: * -> * -> *
-
-    data Number :: *
-
     data Ref a where
       Ref :: a -> Ref a
-
-    data String :: *
 
 Type Classes
 ~~~~~~~~~~~~
@@ -39,9 +29,9 @@ Type Classes
       (&) :: b -> b -> b
       (|) :: b -> b -> b
       (^) :: b -> b -> b
-      shl :: b -> Prelude.Number -> b
-      shr :: b -> Prelude.Number -> b
-      zshr :: b -> Prelude.Number -> b
+      shl :: b -> Prim.Number -> b
+      shr :: b -> Prim.Number -> b
+      zshr :: b -> Prim.Number -> b
       complement :: b -> b
 
     class BoolLike b where
@@ -55,8 +45,8 @@ Type Classes
       (>>>) :: forall d. forall c. forall b. a b c -> a c d -> a b d
 
     class Eq a where
-      (==) :: a -> a -> Prelude.Boolean
-      (/=) :: a -> a -> Prelude.Boolean
+      (==) :: a -> a -> Prim.Boolean
+      (/=) :: a -> a -> Prim.Boolean
 
     class Functor f where
       (<$>) :: forall b. forall a. (a -> b) -> f a -> f b
@@ -74,16 +64,16 @@ Type Classes
       negate :: a -> a
 
     class Ord a where
-      (<) :: a -> a -> Prelude.Boolean
-      (>) :: a -> a -> Prelude.Boolean
-      (<=) :: a -> a -> Prelude.Boolean
-      (>=) :: a -> a -> Prelude.Boolean
+      (<) :: a -> a -> Prim.Boolean
+      (>) :: a -> a -> Prim.Boolean
+      (<=) :: a -> a -> Prim.Boolean
+      (>=) :: a -> a -> Prim.Boolean
 
     class Read a where
-      read :: Prelude.String -> a
+      read :: Prim.String -> a
 
     class Show a where
-      show :: a -> Prelude.String
+      show :: a -> Prim.String
 
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
@@ -92,37 +82,37 @@ Type Class Instances
 
     (Monad (m)) => instance Applicative m
 
-    instance Bits Prelude.Number
+    instance Bits Prim.Number
 
-    instance BoolLike Prelude.Boolean
+    instance BoolLike Prim.Boolean
 
-    instance Category Prelude.Function
+    instance Category Prim.Function
 
     instance Eq Ref a
 
-    instance Eq Prelude.String
+    instance Eq Prim.String
 
-    instance Eq Prelude.Number
+    instance Eq Prim.Number
 
-    instance Eq Prelude.Boolean
+    instance Eq Prim.Boolean
 
     (Eq (a)) => instance Eq [a]
 
     (Applicative (f)) => instance Functor f
 
-    instance Num Prelude.Number
+    instance Num Prim.Number
 
-    instance Ord Prelude.Number
+    instance Ord Prim.Number
 
-    instance Prelude.Show Prelude.Number
+    instance Prelude.Show Prim.Number
 
-    instance Read Prelude.String
+    instance Read Prim.String
 
-    instance Read Prelude.Boolean
+    instance Read Prim.Boolean
 
-    instance Show Prelude.String
+    instance Show Prim.String
 
-    instance Show Prelude.Boolean
+    instance Show Prim.Boolean
 
 Values
 ~~~~~~
@@ -131,65 +121,65 @@ Values
 
     $const :: forall b. forall a. a -> b -> a
 
-    (!!) :: forall a. [a] -> Prelude.Number -> a
+    (!!) :: forall a. [a] -> Prim.Number -> a
 
     (#) :: forall b. forall a. a -> (a -> b) -> b
 
     ($) :: forall b. forall a. (a -> b) -> a -> b
 
-    (++) :: Prelude.String -> Prelude.String -> Prelude.String
+    (++) :: Prim.String -> Prim.String -> Prim.String
 
-    boolAnd :: Prelude.Boolean -> Prelude.Boolean -> Prelude.Boolean
+    boolAnd :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
 
-    boolNot :: Prelude.Boolean -> Prelude.Boolean
+    boolNot :: Prim.Boolean -> Prim.Boolean
 
-    boolOr :: Prelude.Boolean -> Prelude.Boolean -> Prelude.Boolean
+    boolOr :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
 
     flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
 
-    numAdd :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numAdd :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numAnd :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numAnd :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numComplement :: Prelude.Number -> Prelude.Number
+    numComplement :: Prim.Number -> Prim.Number
 
-    numDiv :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numDiv :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numGreater :: Prelude.Number -> Prelude.Number -> Prelude.Boolean
+    numGreater :: Prim.Number -> Prim.Number -> Prim.Boolean
 
-    numGreaterEq :: Prelude.Number -> Prelude.Number -> Prelude.Boolean
+    numGreaterEq :: Prim.Number -> Prim.Number -> Prim.Boolean
 
-    numLess :: Prelude.Number -> Prelude.Number -> Prelude.Boolean
+    numLess :: Prim.Number -> Prim.Number -> Prim.Boolean
 
-    numLessEq :: Prelude.Number -> Prelude.Number -> Prelude.Boolean
+    numLessEq :: Prim.Number -> Prim.Number -> Prim.Boolean
 
-    numMod :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numMod :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numMul :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numMul :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numNegate :: Prelude.Number -> Prelude.Number
+    numNegate :: Prim.Number -> Prim.Number
 
-    numOr :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numOr :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numShl :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numShl :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numShr :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numShr :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numSub :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numSub :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numXor :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numXor :: Prim.Number -> Prim.Number -> Prim.Number
 
-    numZshr :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    numZshr :: Prim.Number -> Prim.Number -> Prim.Number
 
-    refEq :: forall a. Ref a -> Ref a -> Prelude.Boolean
+    refEq :: forall a. Ref a -> Ref a -> Prim.Boolean
 
-    refIneq :: forall a. Ref a -> Ref a -> Prelude.Boolean
+    refIneq :: forall a. Ref a -> Ref a -> Prim.Boolean
 
-    showNumber :: Prelude.Number -> Prelude.String
+    showNumber :: Prim.Number -> Prim.String
 
-    unsafeRefEq :: forall a. a -> a -> Prelude.Boolean
+    unsafeRefEq :: forall a. a -> a -> Prim.Boolean
 
-    unsafeRefIneq :: forall a. a -> a -> Prelude.Boolean
+    unsafeRefIneq :: forall a. a -> a -> Prim.Boolean
 
 Module Monoid
 -------------
@@ -211,7 +201,7 @@ Type Class Instances
 
 ::
 
-    instance Monoid Prelude.String
+    instance Monoid Prim.String
 
 Values
 ~~~~~~
@@ -247,11 +237,11 @@ Values
 
     mapM :: forall b. forall a. forall m. (Monad (m)) => (a -> m b) -> [a] -> m [b]
 
-    replicateM :: forall a. forall m. (Monad (m)) => Prelude.Number -> m a -> m [a]
+    replicateM :: forall a. forall m. (Monad (m)) => Prim.Number -> m a -> m [a]
 
     sequence :: forall a. forall m. (Monad (m)) => [m a] -> m [a]
 
-    when :: forall m. (Monad (m)) => Prelude.Boolean -> m {  } -> m {  }
+    when :: forall m. (Monad (m)) => Prim.Boolean -> m {  } -> m {  }
 
 Module Maybe
 ------------
@@ -327,9 +317,9 @@ Type Class Instances
 
 ::
 
-    instance Prelude.Alternative Prelude.Array
+    instance Prelude.Alternative Prim.Array
 
-    instance Prelude.Monad Prelude.Array
+    instance Prelude.Monad Prim.Array
 
     (Prelude.Show (a)) => instance Prelude.Show [a]
 
@@ -340,15 +330,15 @@ Values
 
     (:) :: forall a. a -> [a] -> [a]
 
-    all :: forall a. (a -> Prelude.Boolean) -> [a] -> Prelude.Boolean
+    all :: forall a. (a -> Prim.Boolean) -> [a] -> Prim.Boolean
 
-    any :: forall a. (a -> Prelude.Boolean) -> [a] -> Prelude.Boolean
+    any :: forall a. (a -> Prim.Boolean) -> [a] -> Prim.Boolean
 
     concat :: forall a. [a] -> [a] -> [a]
 
     concatMap :: forall b. forall a. [a] -> (a -> [b]) -> [b]
 
-    filter :: forall a. (a -> Prelude.Boolean) -> [a] -> [a]
+    filter :: forall a. (a -> Prim.Boolean) -> [a] -> [a]
 
     foldl :: forall b. forall a. (a -> b -> b) -> b -> [a] -> b
 
@@ -358,23 +348,23 @@ Values
 
     headSafe :: forall a. [a] -> Maybe a
 
-    indexOf :: forall a. [a] -> a -> Prelude.Number
+    indexOf :: forall a. [a] -> a -> Prim.Number
 
-    isEmpty :: forall a. [a] -> Prelude.Boolean
+    isEmpty :: forall a. [a] -> Prim.Boolean
 
-    joinS :: [Prelude.String] -> Prelude.String
+    joinS :: [Prim.String] -> Prim.String
 
-    joinWith :: [Prelude.String] -> Prelude.String -> Prelude.String
+    joinWith :: [Prim.String] -> Prim.String -> Prim.String
 
-    lastIndexOf :: forall a. [a] -> a -> Prelude.Number
+    lastIndexOf :: forall a. [a] -> a -> Prim.Number
 
-    length :: forall a. [a] -> Prelude.Number
+    length :: forall a. [a] -> Prim.Number
 
     map :: forall b. forall a. (a -> b) -> [a] -> [b]
 
     push :: forall a. [a] -> a -> [a]
 
-    range :: Prelude.Number -> Prelude.Number -> [Prelude.Number]
+    range :: Prim.Number -> Prim.Number -> [Prim.Number]
 
     reverse :: forall a. [a] -> [a]
 
@@ -382,11 +372,11 @@ Values
 
     singleton :: forall a. a -> [a]
 
-    slice :: forall a. Prelude.Number -> Prelude.Number -> [a] -> [a]
+    slice :: forall a. Prim.Number -> Prim.Number -> [a] -> [a]
 
     sort :: forall a. [a] -> [a]
 
-    splice :: forall a. Prelude.Number -> Prelude.Number -> [a] -> [a] -> [a]
+    splice :: forall a. Prim.Number -> Prim.Number -> [a] -> [a] -> [a]
 
     tail :: forall a. [a] -> [a]
 
@@ -394,21 +384,26 @@ Values
 
     zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
 
-Module Tuple
-------------
+Module Tuples
+-------------
 
 Types
 ~~~~~
 
 ::
 
-    type Tuple a b = { snd :: b, fst :: a }
+    data Tuple a b where
+      Tuple :: { snd :: b, fst :: a } -> Tuple a b
 
 Type Classes
 ~~~~~~~~~~~~
 
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    (Prelude.Show (a),Prelude.Show (b)) => instance Prelude.Show Tuple a b
 
 Values
 ~~~~~~
@@ -442,31 +437,31 @@ Values
 
 ::
 
-    charAt :: Prelude.Number -> Prelude.String -> Prelude.String
+    charAt :: Prim.Number -> Prim.String -> Prim.String
 
-    indexOfS :: Prelude.String -> Prelude.String -> Prelude.Number
+    indexOfS :: Prim.String -> Prim.String -> Prim.Number
 
-    lastIndexOfS :: Prelude.String -> Prelude.String -> Prelude.Number
+    lastIndexOfS :: Prim.String -> Prim.String -> Prim.Number
 
-    lengthS :: Prelude.String -> Prelude.Number
+    lengthS :: Prim.String -> Prim.Number
 
-    localeCompare :: Prelude.String -> Prelude.String -> Prelude.Number
+    localeCompare :: Prim.String -> Prim.String -> Prim.Number
 
-    replace :: Prelude.String -> Prelude.String -> Prelude.String -> Prelude.String
+    replace :: Prim.String -> Prim.String -> Prim.String -> Prim.String
 
-    sliceS :: Prelude.Number -> Prelude.Number -> Prelude.String -> Prelude.String
+    sliceS :: Prim.Number -> Prim.Number -> Prim.String -> Prim.String
 
-    split :: Prelude.String -> Prelude.String -> [Prelude.String]
+    split :: Prim.String -> Prim.String -> [Prim.String]
 
-    substr :: Prelude.Number -> Prelude.Number -> Prelude.String -> Prelude.String
+    substr :: Prim.Number -> Prim.Number -> Prim.String -> Prim.String
 
-    substring :: Prelude.Number -> Prelude.Number -> Prelude.String -> Prelude.String
+    substring :: Prim.Number -> Prim.Number -> Prim.String -> Prim.String
 
-    toLower :: Prelude.String -> Prelude.String
+    toLower :: Prim.String -> Prim.String
 
-    toUpper :: Prelude.String -> Prelude.String
+    toUpper :: Prim.String -> Prim.String
 
-    trim :: Prelude.String -> Prelude.String
+    trim :: Prim.String -> Prim.String
 
 Module Regex
 ------------
@@ -489,15 +484,15 @@ Values
 
 ::
 
-    match :: Regex -> Prelude.String -> [Prelude.String]
+    match :: Regex -> Prim.String -> [Prim.String]
 
-    regex :: Prelude.String -> Prelude.String -> Regex
+    regex :: Prim.String -> Prim.String -> Regex
 
-    replaceR :: Regex -> Prelude.String -> Prelude.String -> Prelude.String
+    replaceR :: Regex -> Prim.String -> Prim.String -> Prim.String
 
-    search :: Regex -> Prelude.String -> Prelude.Number
+    search :: Regex -> Prim.String -> Prim.Number
 
-    test :: Regex -> Prelude.String -> Prelude.Boolean
+    test :: Regex -> Prim.String -> Prim.Boolean
 
 Module Global
 -------------
@@ -516,31 +511,31 @@ Values
 
 ::
 
-    decodeURI :: Prelude.String -> Prelude.String
+    decodeURI :: Prim.String -> Prim.String
 
-    decodeURIComponent :: Prelude.String -> Prelude.String
+    decodeURIComponent :: Prim.String -> Prim.String
 
-    encodeURI :: Prelude.String -> Prelude.String
+    encodeURI :: Prim.String -> Prim.String
 
-    encodeURIComponent :: Prelude.String -> Prelude.String
+    encodeURIComponent :: Prim.String -> Prim.String
 
-    infinity :: Prelude.Number
+    infinity :: Prim.Number
 
-    isFinite :: Prelude.Number -> Prelude.Boolean
+    isFinite :: Prim.Number -> Prim.Boolean
 
-    isNaN :: Prelude.Number -> Prelude.Boolean
+    isNaN :: Prim.Number -> Prim.Boolean
 
-    nan :: Prelude.Number
+    nan :: Prim.Number
 
-    parseFloat :: Prelude.String -> Prelude.Number
+    parseFloat :: Prim.String -> Prim.Number
 
-    parseInt :: Prelude.String -> Prelude.Number
+    parseInt :: Prim.String -> Prim.Number
 
-    toExponential :: Prelude.Number -> Prelude.String
+    toExponential :: Prim.Number -> Prim.String
 
-    toFixed :: Prelude.Number -> Prelude.Number -> Prelude.String
+    toFixed :: Prim.Number -> Prim.Number -> Prim.String
 
-    toPrecision :: Prelude.Number -> Prelude.Number -> Prelude.String
+    toPrecision :: Prim.Number -> Prim.Number -> Prim.String
 
 Module Math
 -----------
@@ -559,39 +554,39 @@ Values
 
 ::
 
-    abs :: Prelude.Number -> Prelude.Number
+    abs :: Prim.Number -> Prim.Number
 
-    aceil :: Prelude.Number -> Prelude.Number
+    aceil :: Prim.Number -> Prim.Number
 
-    acos :: Prelude.Number -> Prelude.Number
+    acos :: Prim.Number -> Prim.Number
 
-    asin :: Prelude.Number -> Prelude.Number
+    asin :: Prim.Number -> Prim.Number
 
-    atan :: Prelude.Number -> Prelude.Number
+    atan :: Prim.Number -> Prim.Number
 
-    atan2 :: Prelude.Number -> Prelude.Number -> Prelude.Number
+    atan2 :: Prim.Number -> Prim.Number -> Prim.Number
 
-    cos :: Prelude.Number -> Prelude.Number
+    cos :: Prim.Number -> Prim.Number
 
-    exp :: Prelude.Number -> Prelude.Number
+    exp :: Prim.Number -> Prim.Number
 
-    floor :: Prelude.Number -> Prelude.Number
+    floor :: Prim.Number -> Prim.Number
 
-    log :: Prelude.Number -> Prelude.Number
+    log :: Prim.Number -> Prim.Number
 
-    max :: Prelude.Number -> Prelude.Number
+    max :: Prim.Number -> Prim.Number
 
-    min :: Prelude.Number -> Prelude.Number
+    min :: Prim.Number -> Prim.Number
 
-    pow :: Prelude.Number -> Prelude.Number
+    pow :: Prim.Number -> Prim.Number
 
-    round :: Prelude.Number -> Prelude.Number
+    round :: Prim.Number -> Prim.Number
 
-    sin :: Prelude.Number -> Prelude.Number
+    sin :: Prim.Number -> Prim.Number
 
-    sqrt :: Prelude.Number -> Prelude.Number
+    sqrt :: Prim.Number -> Prim.Number
 
-    tan :: Prelude.Number -> Prelude.Number
+    tan :: Prim.Number -> Prim.Number
 
 Module Eff
 ----------
@@ -622,7 +617,7 @@ Values
 
     bindEff :: forall b. forall a. forall e. Eff e a -> (a -> Eff e b) -> Eff e b
 
-    forE :: forall e. Prelude.Number -> Prelude.Number -> (Prelude.Number -> Eff e {  }) -> Eff e {  }
+    forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e {  }) -> Eff e {  }
 
     foreachE :: forall a. forall e. [a] -> (a -> Eff e {  }) -> Eff e {  }
 
@@ -630,9 +625,9 @@ Values
 
     runPure :: forall a. Pure a -> a
 
-    untilE :: forall e. Eff e Prelude.Boolean -> Eff e {  }
+    untilE :: forall e. Eff e Prim.Boolean -> Eff e {  }
 
-    whileE :: forall e. Eff e Prelude.Boolean -> Eff e {  } -> Eff e {  }
+    whileE :: forall e. Eff e Prim.Boolean -> Eff e {  } -> Eff e {  }
 
 Module Random
 -------------
@@ -655,7 +650,7 @@ Values
 
 ::
 
-    random :: forall e. Eff random :: Random | e Prelude.Number
+    random :: forall e. Eff random :: Random | e Prim.Number
 
 Module Errors
 -------------
@@ -711,6 +706,8 @@ Values
 
     readIORef :: forall r. forall s. IORef s -> Eff ref :: Ref | r s
 
+    unsafeRunIORef :: forall a. forall eff. Eff ref :: Ref | eff a -> Eff eff a
+
     writeIORef :: forall r. forall s. IORef s -> s -> Eff ref :: Ref | r {  }
 
 Module Trace
@@ -736,7 +733,7 @@ Values
 
     print :: forall r. forall a. (Prelude.Show (a)) => a -> Eff trace :: Trace | r {  }
 
-    trace :: forall r. Prelude.String -> Eff trace :: Trace | r {  }
+    trace :: forall r. Prim.String -> Eff trace :: Trace | r {  }
 
 Module ST
 ---------

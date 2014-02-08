@@ -344,17 +344,20 @@
     zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
 
 
-## Module Tuple
+## Module Tuples
 
 ### Types
 
-    type Tuple a b = { snd :: b, fst :: a }
+    data Tuple a b where
+      Tuple :: { snd :: b, fst :: a } -> Tuple a b
 
 
 ### Type Classes
 
 
 ### Type Class Instances
+
+    (Prelude.Show (a),Prelude.Show (b)) => instance Prelude.Show Tuple a b
 
 
 ### Values
@@ -618,6 +621,8 @@
     newIORef :: forall r. forall s. s -> Eff ref :: Ref | r (IORef s)
 
     readIORef :: forall r. forall s. IORef s -> Eff ref :: Ref | r s
+
+    unsafeRunIORef :: forall a. forall eff. Eff ref :: Ref | eff a -> Eff eff a
 
     writeIORef :: forall r. forall s. IORef s -> s -> Eff ref :: Ref | r {  }
 
