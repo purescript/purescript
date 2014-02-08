@@ -60,6 +60,7 @@ identCharToString ':' = "$colon"
 identCharToString '\\' = "$bslash"
 identCharToString '?' = "$qmark"
 identCharToString '@' = "$at"
+identCharToString '\'' = "$prime"
 identCharToString c = '$' : show (ord c)
 
 -- |
