@@ -41,7 +41,7 @@ import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
-import Language.PureScript.CodeGen.Common (identToJs)
+import Language.PureScript.CodeGen.Common
 import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 
 -- |
@@ -87,13 +87,17 @@ declToJs _ _ _ _ = Nothing
 
 setProperty :: Ident -> JS -> ModuleName -> [JS]
 setProperty ident@(Op op) val (ModuleName (ProperName moduleName)) =
-  [ JSAssignment (JSAccessor (identToJs ident) (JSVar moduleName)) val
-  , JSAssignment (JSIndexer (JSStringLiteral op) (JSVar moduleName)) (JSAccessor (identToJs ident) (JSVar moduleName)) ]
+  [ JSAssignment (accessor ident (JSVar moduleName)) val
+  , JSAssignment (JSIndexer (JSStringLiteral op) (JSVar moduleName)) (accessor ident (JSVar moduleName)) ]
 setProperty ident val (ModuleName (ProperName moduleName)) =
-  [ JSAssignment (JSAccessor (identToJs ident) (JSVar moduleName)) val ]
+  [ JSAssignment (accessor ident (JSVar moduleName)) val ]
 
 var :: Ident -> JS
 var = JSVar . identToJs
+
+accessor :: Ident -> JS -> JS
+accessor (Ident name) | nameIsJsReserved name = JSIndexer (JSStringLiteral name)
+accessor ident = JSAccessor (identToJs ident)
 
 valueToJs :: Options -> ModuleName -> Environment -> Value -> JS
 valueToJs _ _ _ (NumericLiteral n) = JSNumericLiteral n
@@ -104,9 +108,9 @@ valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs 
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
 valueToJs _ m e (Constructor (Qualified Nothing name)) =
   case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS identToJs (Qualified (Just aliasModule) aliasIdent)
+    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS id (Qualified (Just aliasModule) aliasIdent)
     _ -> JSVar . runProperName $ name
-valueToJs _ _ _ (Constructor name) = qualifiedToJS runProperName name
+valueToJs _ _ _ (Constructor name) = qualifiedToJS (Ident . runProperName) name
 valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
@@ -156,17 +160,16 @@ varToJs m e qual@(Qualified _ ident) = go qual
     Just (_, Alias aliasModule aliasIdent) -> go (Qualified (Just aliasModule) aliasIdent)
     _ -> case qual of
            Qualified Nothing _ -> var ident
-           Qualified (Just (ModuleName (ProperName mn))) (Op op) -> JSIndexer (JSStringLiteral op) (JSVar mn)
-           _ -> qualifiedToJS identToJs qual
+           _ -> qualifiedToJS id qual
   isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
     Just (_, ty') -> isExtern ty'
     Nothing -> error "Undefined alias in varToJs"
   isExtern _ = False
 
-qualifiedToJS :: (a -> String) -> Qualified a -> JS
-qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = JSAccessor (f a) (JSVar m)
-qualifiedToJS f (Qualified Nothing a) = JSVar (f a)
+qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
+qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = accessor (f a) (JSVar m)
+qualifiedToJS f (Qualified Nothing a) = JSVar $ identToJs (f a)
 
 bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do

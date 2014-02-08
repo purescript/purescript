@@ -44,7 +44,7 @@
       (<$>) :: forall b. forall a. (a -> b) -> f a -> f b
 
     class Monad m where
-      $return :: forall a. a -> m a
+      return :: forall a. a -> m a
       (>>=) :: forall b. forall a. m a -> (a -> m b) -> m b
 
     class Num a where
@@ -107,8 +107,6 @@
 
 ### Values
 
-    $const :: forall b. forall a. a -> b -> a
-
     (!!) :: forall a. [a] -> Prim.Number -> a
 
     (#) :: forall b. forall a. a -> (a -> b) -> b
@@ -122,6 +120,8 @@
     boolNot :: Prim.Boolean -> Prim.Boolean
 
     boolOr :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
+
+    const :: forall b. forall a. a -> b -> a
 
     flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
 

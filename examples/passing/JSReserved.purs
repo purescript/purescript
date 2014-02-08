@@ -1,11 +1,11 @@
-module Main where
+module JSReserved where
 
   import Prelude
 
-  yield = "test"
-  member = "test"
+  yield = 0
+  member = 1
   
-  fortest = {
+  this = {
     var function = 0;
     for (i <- 0 until 10) {
       function = function + i;
@@ -13,7 +13,7 @@ module Main where
     return function;
   }
   
-  whiletest = {
+  catch = {
     var for = 0;
     while (for > 0) {
       for = for - 1;
@@ -21,10 +21,23 @@ module Main where
     return for;
   }
   
-  vartest = {
+  instanceof = {
     var var = 1;
     var = var + 1;
     return var;
   }
+  
+  public = \return -> return
+  
+module Main where
 
-  main = Trace.trace "Done"
+  import Prelude
+  import Arrays
+  import JSReserved
+
+  main = Trace.print [ yield
+                     , member
+                     , this
+                     , catch
+                     , instanceof
+                     , public 1 ]

@@ -50,6 +50,8 @@ module Operators2 where
   test11 = [1, 2, 3] ... [4, 5, 6]
 
   test12 (<%>) a b = a <%> b
+  
+  test13 = \(<%>) a b -> a <%> b
 
 module Main where
 
@@ -75,4 +77,5 @@ main =
         , show test10
         , show test11
         , show (test12 k 1 2)
+        , show (test13 k 1 2)
         ]
