@@ -100,6 +100,8 @@
 
     instance Read Prim.Boolean
 
+    instance Read Prim.Number
+
     instance Show Prim.String
 
     instance Show Prim.Boolean
@@ -159,6 +161,8 @@
 
     numZshr :: Prim.Number -> Prim.Number -> Prim.Number
 
+    readNumber :: Prim.String -> Prim.Number
+
     refEq :: forall a. Ref a -> Ref a -> Prim.Boolean
 
     refIneq :: forall a. Ref a -> Ref a -> Prim.Boolean
@@ -185,6 +189,8 @@
 ### Type Class Instances
 
     instance Monoid Prim.String
+
+    instance Monoid [a]
 
 
 ### Values
@@ -236,7 +242,13 @@
 
 ### Type Class Instances
 
+    instance Prelude.Applicative Maybe
+
+    instance Prelude.Functor Maybe
+
     instance Prelude.Monad Maybe
+
+    (Show (a)) => instance Prelude.Show Maybe a
 
 
 ### Values
@@ -260,7 +272,11 @@
 
 ### Type Class Instances
 
+    instance Prelude.Applicative Either e
+
     instance Prelude.Monad Either e
+
+    (Show (a),Show (b)) => instance Prelude.Show Either a b
 
 
 ### Values
@@ -279,6 +295,8 @@
 ### Type Class Instances
 
     instance Prelude.Alternative Prim.Array
+
+    instance Prelude.Functor Prim.Array
 
     instance Prelude.Monad Prim.Array
 
