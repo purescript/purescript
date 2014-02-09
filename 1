@@ -2,9 +2,9 @@ module OptimizerBug where
 
 import Prelude
 
-x a = 1 + y a
+x _ = 1 + y
 
-y a = x a
+y _ = x
     
 module Main where
 

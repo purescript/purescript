@@ -167,39 +167,69 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
 typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
-    let es = map isTyped vals
-        typed = filter (isJust . snd . snd) es
-        untyped = filter (isNothing . snd . snd) es
-        typedDict = map (\(ident, (_, Just ty)) -> (ident, ty)) typed
+    let
+    -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
+      es = map isTyped vals
+    -- Filter the typed and untyped declarations
+      typed = filter (isJust . snd . snd) es
+      untyped = filter (isNothing . snd . snd) es
+    -- Make a map of names to typed declarations
+      typedDict = map (\(ident, (_, Just (ty, _))) -> (ident, ty)) typed
+    -- Create fresh unification variables for the types of untyped declarations
     untypedNames <- replicateM (length untyped) fresh
-    let untypedDict = zip (map fst untyped) untypedNames
-        dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ (map (id *** fst) typedDict) ++ untypedDict)
-    forM es $ \e -> do
+    let
+    -- Make a map of names to the unification variables of untyped declarations
+      untypedDict = zip (map fst untyped) untypedNames
+    -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
+      dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+    forM es $ \e@(_, (val, _)) -> do
+      -- If the declaration is a function, it has access to other values in the binding group.
+      -- If not, the generated code might fail at runtime since those values might be undefined.
+      let dict' = if isFunction val then dict else M.empty
       triple@(_, (val, ty)) <- case e of
+        -- Typed declarations
         (ident, (val, Just (ty, checkType))) -> do
+          -- Kind check
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+          -- Check the type with the new names in scope
           ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-          val' <- bindNames dict $ if checkType
+          val' <- bindNames dict' $ if checkType
                                    then TypedValue True <$> check val ty' <*> pure ty'
                                    else return (TypedValue False val ty')
           return (ident, (val', ty'))
+        -- Untyped declarations
         (ident, (val, Nothing)) -> do
-          TypedValue _ val' ty <- bindNames dict $ infer val
+          -- Infer the type with the new names in scope
+          TypedValue _ val' ty <- bindNames dict' $ infer val
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (TypedValue True val' ty, ty))
+      -- If run-main is enabled, need to check that Main.main has type Eff eff a for some eff, a
       when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
+      -- Make sure unification variables do not escape
       escapeCheck val ty
       return triple
-  forM tys $ \(ident, (val, ty)) -> do
+  forM tys $ \(ident, (val, ty)) -> rethrow (("Error in " ++ show ident ++ ": \n") ++) $ do
+    -- Replace type class dictionary placeholders with actual dictionaries
     val' <- replaceTypeClassDictionaries moduleName val
-    rethrow (("Error in " ++ show ident ++ ": \n") ++) $ skolemEscapeCheck val'
+    -- Check skolem variables did not escape their scope
+    skolemEscapeCheck val'
+    --
     return $ (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
                    , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
   where
+  -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
+
+-- |
+-- Check if a value introduces a function
+--
+isFunction :: Value -> Bool
+isFunction (Abs _ _) = True
+isFunction (TypedValue _ val _) = isFunction val
+isFunction _ = False
 
 -- |
 -- Check if a value contains a type annotation
