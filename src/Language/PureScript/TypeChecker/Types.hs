@@ -67,7 +67,6 @@ import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 import Data.Function (on)
-import Debug.Trace (trace)
 
 instance Partial Type where
   unknown = TUnknown
@@ -211,14 +210,16 @@ typesOf moduleName vals = do
       -- Make sure unification variables do not escape
       escapeCheck val ty
       return triple
-  forM tys $ \(ident, (val, ty)) -> rethrow (("Error in " ++ show ident ++ ": \n") ++) $ do
+  forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     val' <- replaceTypeClassDictionaries moduleName val
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
-    --
-    return $ (ident, (overTypes (desaturateAllTypeSynonyms . setifyAll) $ val'
-                   , varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty))
+    -- Remove type synonyms placeholders, remove duplicate row fields, and replace
+    -- top-level unification variables with named type variables.
+    let val'' = overTypes (desaturateAllTypeSynonyms . setifyAll) val'
+        ty' = varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty
+    return $ (ident, (val'', ty'))
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
@@ -309,6 +310,9 @@ typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
+typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e m name args of
+  Left err -> Nothing
+  Right t1 -> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual _ _ _ _ = Nothing
 
 -- |
@@ -429,12 +433,18 @@ replaceVarWithUnknown ident ty = do
 -- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
 -- better error messages during unification.
 --
-replaceAllTypeSynonyms :: (Functor m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
+replaceAllTypeSynonyms' :: (D.Data d) => Environment -> ModuleName -> d -> Either String d
+replaceAllTypeSynonyms' env moduleName d =
+  let
+    syns = map (\((path, name), (args, _)) -> ((path, name), length args)) . M.toList $ typeSynonyms env
+  in
+    saturateAllTypeSynonyms env moduleName syns d
+
+replaceAllTypeSynonyms :: (Functor m, Monad m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  let syns = map (\((path, name), (args, _)) -> ((path, name), length args)) . M.toList $ typeSynonyms env
-  either throwError return $ saturateAllTypeSynonyms env moduleName syns d
+  either throwError return $ replaceAllTypeSynonyms' env moduleName d
 
 -- |
 -- \"Desaturate\" @SaturatedTypeSynonym@s
@@ -448,13 +458,19 @@ desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
 -- |
 -- Replace a type synonym and its arguments with the aliased type
 --
-expandTypeSynonym :: Qualified ProperName -> [Type] -> UnifyT Type Check Type
+expandTypeSynonym' :: Environment -> ModuleName -> Qualified ProperName -> [Type] -> Either String Type
+expandTypeSynonym' env moduleName name args =
+  case M.lookup (canonicalizeType moduleName env name) (typeSynonyms env) of
+    Just (synArgs, body) -> do
+      let repl = replaceAllTypeVars (zip synArgs args) body
+      replaceAllTypeSynonyms' env moduleName repl
+    Nothing -> error "Type synonym was not defined"
+
+expandTypeSynonym :: (Functor m, Monad m, MonadState CheckState m, MonadError String m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (canonicalizeType moduleName env name) (typeSynonyms env) of
-    Just (synArgs, body) -> return $ replaceAllTypeVars (zip synArgs args) body
-    Nothing -> error "Type synonym was not defined"
+  either throwError return $ expandTypeSynonym' env moduleName name args
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
