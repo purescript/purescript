@@ -50,6 +50,44 @@ desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 desugarModule :: Module -> Desugar Module
 desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl (ModuleName name)) decls
 
+-- |
+-- Desugar type class and type class instance declarations
+--
+-- Type classes become type synonyms for their dictionaries, and type instances become dictionary declarations.
+-- Additional values are generated to access individual members of a dictionary, with the appropriate type.
+--
+-- E.g. the following
+--
+--   module Test where
+--
+--   class Foo a where
+--     foo :: a -> a
+--
+--   instance Foo String where
+--     foo s = s ++ s
+--
+--   instance (Foo a) => Foo [a] where
+--     foo = map foo
+--
+-- becomes
+--
+--   type Foo a = { foo :: a -> a }
+--
+--   foreign import foo "function foo(dict) {\
+--                      \  return dict.foo;\
+--                      \}" :: forall a. (Foo a) => a -> a
+--
+--   __Test_Foo_string_foo = (\s -> s ++ s) :: String -> String
+--
+--   __Test_Foo_string :: Foo String
+--   __Test_Foo_string = { foo: __Test_Foo_string_foo :: String -> String (unchecked) }
+--
+--   __Test_Foo_array_foo :: forall a. (Foo a) => [a] -> [a]
+--   __Test_Foo_array_foo _1 = map (foo _1)
+--
+--   __Test_Foo_array :: forall a. Foo a -> Foo [a]
+--   __Test_Foo_array _1 = { foo: __Test_Foo_array_foo _1 :: [a] -> [a] (unchecked) }
+--
 desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
 desugarDecl mn d@(TypeClassDeclaration name arg members) = do
   let tys = map memberToNameAndType members
@@ -118,13 +156,6 @@ typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
 qualifiedToString _ (Qualified (Just (ModuleName mn)) pn) = runProperName mn ++ "_" ++ runProperName pn
-
-quantify :: Type -> Type
-quantify ty' = foldr (\arg t -> ForAll arg t Nothing) ty' tyVars
-  where
-  tyVars = nub $ everything (++) (mkQ [] collect) ty'
-  collect (TypeVar v) = [v]
-  collect _ = []
 
 -- |
 -- Generate a name for a type class dictionary, based on the module name, class name and type name

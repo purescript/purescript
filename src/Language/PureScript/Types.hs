@@ -166,3 +166,25 @@ replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVa
   replaceTypeVar other = other
   isShadowed (ForAll v _ _) | v == name = True
   isShadowed _ = False
+
+-- |
+-- Collect all free type variables appearing in a type
+--
+freeTypeVariables :: Type -> [String]
+freeTypeVariables = go []
+  where
+  go :: [String] -> Type -> [String]
+  go bound (Object r) = go bound r
+  go bound (TypeVar v) | v `notElem` bound = [v]
+  go bound  (TypeApp t1 t2) = go bound t1 ++ go bound t2
+  go bound (SaturatedTypeSynonym _ ts) = concatMap (go bound) ts
+  go bound (ForAll v t _) = go (v : bound) t
+  go bound (ConstrainedType cs t) = concatMap (go bound . snd) cs ++ go bound t
+  go bound (RCons _ t r) = go bound t ++ go bound r
+  go _ _ = []
+
+-- |
+-- Universally quantify over all type variables appearing free in a type
+--
+quantify :: Type -> Type
+quantify ty = foldr (\arg t -> ForAll arg t Nothing) ty $ freeTypeVariables ty
