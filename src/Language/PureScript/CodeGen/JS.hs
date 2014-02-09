@@ -18,7 +18,8 @@
 module Language.PureScript.CodeGen.JS (
     module AST,
     declToJs,
-    moduleToJs
+    moduleToJs,
+    wrapExportsContainer
 ) where
 
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -55,6 +56,7 @@ moduleToJs opts (Module pname@(ProperName name) decls) env =
                       (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))))
           [JSAssignment (JSVar name)
                         (JSBinary Or (JSVar name) (JSObjectLiteral []))]
+  , JSAssignment (JSAccessor name (JSVar "exports")) (JSVar name)
   ]
 
 -- |
@@ -325,3 +327,11 @@ statementToJs opts m e (If ifst) = ifToJs ifst
   elseToJs (Else sts) = JSBlock (map (statementToJs opts m e) sts)
   elseToJs (ElseIf elif) = ifToJs elif
 statementToJs opts m e (Return value) = JSReturn (valueToJs opts m e value)
+
+wrapExportsContainer :: [JS] -> JS
+wrapExportsContainer modules = JSApp (JSFunction Nothing ["exports"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]
+  where exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
+                           (JSAccessor "exports" (JSVar "module"))
+                           (JSConditional (JSBinary NotEqualTo (JSTypeOf $ JSVar "window") (JSStringLiteral "undefined"))
+                             (JSAssignment (JSAccessor "PS" (JSVar "window")) (JSObjectLiteral []))
+                             (JSApp (JSFunction Nothing [] $ JSBlock [JSThrow $ JSStringLiteral "PureScript doesn't know how to export modules in the current environment"]) []))
