@@ -69,6 +69,7 @@ literals = mkPattern' match
     , fmap (intercalate ", ") $ forM xs prettyPrintJS'
     , return " ]"
     ]
+  match (JSObjectLiteral []) = return "{}" 
   match (JSObjectLiteral ps) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ do
@@ -107,7 +108,7 @@ literals = mkPattern' match
     , prettyPrintJS' sts
     ]
   match (JSFor ident start end sts) = fmap concat $ sequence
-    [ return $ "for (" ++ ident ++ " = "
+    [ return $ "for (var " ++ ident ++ " = "
     , prettyPrintJS' start
     , return $ "; " ++ ident ++ " < "
     , prettyPrintJS' end
