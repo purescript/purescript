@@ -282,7 +282,7 @@ entails moduleName context goal@(className, ty) = do
   solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, Type)] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
-    dict <- mapM (go env) (replaceAllTypeVars subst subgoals)
+    dict <- mapM (go env) (map (id *** replaceAllTypeVars subst) subgoals)
     return $ Just dict
   -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
@@ -399,7 +399,7 @@ varIfUnknown ty =
 -- |
 -- Replace named type variables with types
 --
-replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
+replaceAllTypeVars :: [(String, Type)] -> Type -> Type
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 -- |
@@ -760,8 +760,8 @@ newSkolemScope = SkolemScope . runUnknown <$> fresh'
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
-skolemize :: (D.Data d) => String -> Int -> SkolemScope -> d -> d
-skolemize ident sko scope d = replaceTypeVars ident (Skolem sko scope) d
+skolemize :: String -> Int -> SkolemScope -> Type -> Type
+skolemize ident sko scope = replaceTypeVars ident (Skolem sko scope)
 
 -- |
 -- Introduce skolem scope at every occurence of a ForAll

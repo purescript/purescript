@@ -59,7 +59,9 @@ instance Unifiable Check Kind where
 -- Infer the kind of a single type
 --
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf moduleName ty = fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
+kindOf moduleName ty =
+  rethrow (("Error checking kind of " ++ prettyPrintType ty ++ ":\n") ++) $
+    fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
   where
   tidyUp (k, sub) = sub $? k
 

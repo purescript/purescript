@@ -18,9 +18,11 @@
 module Language.PureScript.Types where
 
 import Data.Data
-import Data.Generics (mkT, mkQ, everywhereBut)
+import Data.List (nub)
+import Data.Generics (everything, mkT, mkQ, everywhereBut)
 
 import Control.Monad.Unify
+import Control.Arrow ((***))
 
 import Language.PureScript.Names
 
@@ -159,24 +161,49 @@ unit = Object REmpty
 -- |
 -- Replace a type variable, taking into account variable shadowing
 --
-replaceTypeVars :: (Data d) => String -> Type -> d -> d
-replaceTypeVars name t = everywhereBut (mkQ False isShadowed) (mkT replaceTypeVar)
+replaceTypeVars :: String -> Type -> Type -> Type
+replaceTypeVars = replaceTypeVars' []
   where
-  replaceTypeVar (TypeVar v) | v == name = t
-  replaceTypeVar other = other
-  isShadowed (ForAll v _ _) | v == name = True
-  isShadowed _ = False
+  replaceTypeVars' bound name replacement = go bound
+    where
+    go :: [String] -> Type -> Type
+    go bs (Object r) = Object $ go bs r
+    go bs (TypeVar v) | v == name = replacement
+    go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
+    go bs (SaturatedTypeSynonym name ts) = SaturatedTypeSynonym name $ map (go bs) ts
+    go bs f@(ForAll v t sco) | v == name = f
+                             | v `elem` usedTypeVariables replacement =
+                                 let v' = genName v (name : bs ++ usedTypeVariables replacement)
+                                     t' = replaceTypeVars' bs v (TypeVar v') t
+                                 in ForAll v' (go (v' : bs) t') sco
+                             | otherwise = ForAll v (go (v : bs) t) sco
+    go bs (ConstrainedType cs t) = ConstrainedType (map (id *** go bs) cs) (go bs t)
+    go bs (RCons name t r) = RCons name (go bs t) (go bs r)
+    go _ ty = ty
+  genName orig inUse = try 0
+    where
+    try n | (orig ++ show n) `elem` inUse = try (n + 1)
+          | otherwise = orig ++ show n
+
+-- |
+-- Collect all type variables appearing in a type
+--
+usedTypeVariables :: Type -> [String]
+usedTypeVariables = nub . everything (++) (mkQ [] go)
+  where
+  go (TypeVar v) = [v]
+  go _ = []
 
 -- |
 -- Collect all free type variables appearing in a type
 --
 freeTypeVariables :: Type -> [String]
-freeTypeVariables = go []
+freeTypeVariables = nub . go []
   where
   go :: [String] -> Type -> [String]
   go bound (Object r) = go bound r
   go bound (TypeVar v) | v `notElem` bound = [v]
-  go bound  (TypeApp t1 t2) = go bound t1 ++ go bound t2
+  go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
   go bound (SaturatedTypeSynonym _ ts) = concatMap (go bound) ts
   go bound (ForAll v t _) = go (v : bound) t
   go bound (ConstrainedType cs t) = concatMap (go bound . snd) cs ++ go bound t

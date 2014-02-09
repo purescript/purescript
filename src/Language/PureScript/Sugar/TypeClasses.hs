@@ -31,6 +31,8 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.State
+import Control.Arrow ((***))
+
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import Data.Generics (mkQ, everything)
@@ -120,7 +122,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   m <- get
   (arg, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right
                         $ M.lookup (qualify mn name) m
-  let memberTypes = map (replaceTypeVars arg ty) instanceTys
+  let memberTypes = map (id *** replaceTypeVars arg ty) instanceTys
   entryName <- lift $ mkDictionaryValueName mn name ty
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
