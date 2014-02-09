@@ -267,22 +267,33 @@ entails moduleName context goal@(className, ty) = do
   go env (className', ty') =
     [ mkDictionary (canonicalizeDictionary tcd) args
     | tcd <- context
+    -- Choose type class dictionaries in scope in the current module
     , filterModule tcd
+    -- Make sure the type class name matches the one we are trying to satisfy
     , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
+    -- Make sure the type unifies with the type in the type instance definition
     , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' (tcdInstanceType tcd)
+    -- Solve any necessary subgoals
     , args <- solveSubgoals env subst (tcdDependencies tcd) ]
+  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
+  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
+  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
   solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, Type)] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
     dict <- mapM (go env) (replaceAllTypeVars subst subgoals)
     return $ Just dict
+  -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
   mkDictionary fnName Nothing = Var fnName
   mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
+  -- Filter out type dictionaries which are in scope in the current module
   filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
   filterModule _ = False
+  -- Resolve a type class dictionary in scope to an actual value by following any (TCDAlias) pointers
+  -- which originated from module imports
   canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
@@ -327,6 +338,12 @@ findAllTypes = everything (++) (mkQ [] go)
 skolemEscapeCheck :: Value -> Check ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@(TypedValue _ _ _) =
+  -- Every skolem variable is created when a ForAll type is skolemized.
+  -- This determines the scope of that skolem variable, which is copied from the SkolemScope
+  -- field of the ForAll constructor.
+  -- We traverse the tree top-down, and collect any SkolemScopes introduced by ForAlls.
+  -- If a Skolem is encountered whose SkolemScope is not in the current list, we have found
+  -- an escaped skolem variable.
   case everythingWithContext [] (++) (mkQ ((,) []) go) root of
     [] -> return ()
     ((binding, val) : _) -> throwError $ "Rigid/skolem type variable bound by " ++ maybe "<unknown>" prettyPrintValue binding ++ " has escaped at " ++ prettyPrintValue val
@@ -382,7 +399,11 @@ replaceAllTypeVars :: (D.Data d) => [(String, Type)] -> d -> d
 replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 -- |
--- Replace named type variables with new unification variables
+-- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
+-- or TypeClassDictionary values.
+--
+-- This is necessary during type checking to avoid unifying a polymorphic type with a
+-- unification variable.
 --
 instantiatePolyTypeWithUnknowns :: Value -> Type -> UnifyT Type Check (Value, Type)
 instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
