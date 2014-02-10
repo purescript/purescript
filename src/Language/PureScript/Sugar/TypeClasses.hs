@@ -81,7 +81,7 @@ desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl
 --
 --   __Test_Foo_string_foo = (\s -> s ++ s) :: String -> String
 --
---   __Test_Foo_string :: Foo String
+--   __Test_Foo_string :: {} -> Foo String
 --   __Test_Foo_string = { foo: __Test_Foo_string_foo :: String -> String (unchecked) }
 --
 --   __Test_Foo_array_foo :: forall a. (Foo a) => [a] -> [a]
@@ -127,8 +127,11 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
-      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..length deps]))
-      (quantify (foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
+      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..max 1 (length deps)]))
+      (quantify (if null deps then
+                   function unit (TypeApp (TypeConstructor name) ty)
+                 else
+                   foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
@@ -136,8 +139,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
     memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys
     memberName <- mkDictionaryEntryName mn name ty ident
     return (identToJs ident, TypedValue False
-                               (if null deps then Var (Qualified Nothing memberName)
-                                else foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
+                               (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                                (quantify memberType))
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 

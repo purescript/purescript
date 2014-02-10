@@ -287,6 +287,7 @@ entails moduleName context goal@(className, ty) = do
   -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
   mkDictionary fnName Nothing = Var fnName
+  mkDictionary fnName (Just []) = App (Var fnName) (ObjectLiteral [])
   mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
   -- Filter out type dictionaries which are in scope in the current module
   filterModule :: TypeClassDictionaryInScope -> Bool
