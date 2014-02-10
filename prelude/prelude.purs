@@ -441,19 +441,19 @@ module Maybe where
   fromMaybe :: forall a. a -> Maybe a -> a
   fromMaybe a = maybe a (Prelude.id :: forall a. a -> a)
   
-  instance Prelude.Functor Maybe where
-    (<$>) fn (Just x) = Just (fn x)
-    (<$>) _ _ = Nothing
-  
+  instance Prelude.Monad Maybe where
+    return = Just
+    (>>=) m f = maybe Nothing f m
+    
   instance Prelude.Applicative Maybe where
     pure = Just
     (<*>) (Just fn) x = fn <$> x
     (<*>) Nothing _ = Nothing
 
-  instance Prelude.Monad Maybe where
-    return = Just
-    (>>=) m f = maybe Nothing f m
-    
+  instance Prelude.Functor Maybe where
+    (<$>) fn (Just x) = Just (fn x)
+    (<$>) _ _ = Nothing
+  
   instance (Show a) => Prelude.Show (Maybe a) where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
@@ -468,18 +468,18 @@ module Either where
   either f _ (Left a) = f a
   either _ g (Right b) = g b
   
-  instance Prelude.Functor (Either a) where
-    (<$>) _ (Left x) = Left x
-    (<$>) f (Right y) = Right (f y)
+  instance Prelude.Monad (Either e) where
+    return = Right
+    (>>=) = either (\e _ -> Left e) (\a f -> f a)
     
   instance Prelude.Applicative (Either e) where
     pure = Right
     (<*>) (Left e) _ = Left e
     (<*>) (Right f) r = f <$> r
 
-  instance Prelude.Monad (Either e) where
-    return = Right
-    (>>=) = either (\e _ -> Left e) (\a f -> f a)
+  instance Prelude.Functor (Either a) where
+    (<$>) _ (Left x) = Left x
+    (<$>) f (Right y) = Right (f y)
     
   instance (Show a, Show b) => Prelude.Show (Either a b) where
     show (Left x) = "Left " ++ (show x)
