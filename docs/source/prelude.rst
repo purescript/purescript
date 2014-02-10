@@ -308,6 +308,8 @@ Type Class Instances
 
     instance Prelude.Applicative Either e
 
+    instance Prelude.Functor Either a
+
     instance Prelude.Monad Either e
 
     (Show (a),Show (b)) => instance Prelude.Show Either a b
