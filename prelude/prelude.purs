@@ -690,13 +690,13 @@ module String where
 
   foreign import indexOfS "function indexOfS(s1) {\
                           \  return function(s2) {\
-                          \    return s2.indexOf(s2);\
+                          \    return s1.indexOf(s2);\
                           \  }; \
                           \}" :: String -> String -> Number
 
   foreign import lastIndexOfS "function lastIndexOfS(s1) {\
                               \  return function(s2) {\
-                              \    return s2.lastIndexOf(s2);\
+                              \    return s1.lastIndexOf(s2);\
                               \  };\
                               \}" :: String -> String -> Number
 
