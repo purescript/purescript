@@ -25,6 +25,8 @@ module Language.PureScript.CodeGen.JS (
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (sortBy)
 import Data.Function (on)
+import Data.Data (Data)
+import Data.Generics (mkQ, everything)
 
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
@@ -143,11 +145,20 @@ valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 
 -- |
--- Temporarily extends the environment to include a local variable name introduced by a lambda
--- abstraction.
+-- Temporarily extends the environment with a single local variable name
 --
 bindName :: ModuleName -> Ident -> Environment -> Environment
-bindName m ident env = env { names = M.insert (m, ident) (error "Temporary lambda variable type was read", LocalVariable) $ names env }
+bindName m ident = bindNames m [ident]
+
+-- |
+-- Temporarily extends the environment to include local variable names introduced by lambda
+-- abstractions or case statements
+--
+bindNames :: ModuleName -> [Ident] -> Environment -> Environment
+bindNames m idents env = env { names = M.fromList [ ((m, ident), (noType, LocalVariable)) | ident <- idents ] `M.union` names env }
+  where
+  noType = error "Temporary lambda variable type was read"
+
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for runtime type checks.
@@ -215,7 +226,7 @@ qualifiedToJS f (Qualified Nothing a) = JSVar $ identToJs (f a)
 bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do
   valNames <- replicateM (length vals) fresh
-  jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs opts m e result)] bs grd
+  jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (binderNames bs) e) result)] bs grd
   return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  vals
   where
@@ -226,6 +237,15 @@ bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders,
       done'' <- go vs done' bs grd
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
+
+-- |
+-- Collect all names introduced in binders in an expression
+--
+binderNames :: (Data d) => d -> [Ident]
+binderNames = everything (++) (mkQ [] go)
+  where
+  go (VarBinder ident) = [ident]
+  go _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
@@ -241,7 +261,7 @@ binderToJs _ _ varName done (BooleanBinder True) =
   return [JSIfElse (JSVar varName) (JSBlock done) Nothing]
 binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
-binderToJs _ _ varName done (VarBinder ident) =
+binderToJs m e varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
 binderToJs m e varName done (NullaryBinder ctor) =
   if isOnlyConstructor m e ctor
@@ -296,7 +316,7 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 
 -- |
 -- Checks whether a data constructor is the only constructor for that type, used to simplify the
--- check when generating code for binders. 
+-- check when generating code for binders.
 --
 isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
 isOnlyConstructor m e ctor =
