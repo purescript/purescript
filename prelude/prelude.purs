@@ -468,11 +468,9 @@ module Either where
   either f _ (Left a) = f a
   either _ g (Right b) = g b
   
-  {-
   instance Prelude.Functor (Either a) where
     (<$>) _ (Left x) = Left x
     (<$>) f (Right y) = Right (f y)
-  -}
     
   instance Prelude.Applicative (Either e) where
     pure = Right
