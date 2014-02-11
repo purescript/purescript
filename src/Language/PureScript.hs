@@ -59,12 +59,12 @@ compile opts ms = do
     modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
     Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let js = concatMap (flip (moduleToJs opts) env) $ regrouped
+  let js = map (flip (moduleToJs opts) env) $ regrouped
   let exts = intercalate "\n" . map (flip moduleToPs env) $ regrouped
   js' <- case () of
               _ | optionsRunMain opts -> do
                     when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
                       Left "Main.main is undefined"
-                    return $ js ++ [JSApp (JSAccessor "main" (JSVar "Main")) []]
+                    return $ js ++ [JSApp (JSAccessor "main" (JSAccessor "Main" (JSVar "_ps"))) []]
                 | otherwise -> return js
   return (prettyPrintJS [(wrapExportsContainer js')], exts, env)

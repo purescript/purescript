@@ -1,4 +1,4 @@
-module RecordScope where
+module FunctionScope where
 
   import Prelude
 
@@ -8,7 +8,7 @@ module RecordScope where
 module Main where
 
   import Prelude
-  import RecordScope
+  import FunctionScope
 
   main = do
     let value = mkValue 1
