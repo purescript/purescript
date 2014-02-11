@@ -898,6 +898,15 @@ module Math where
   foreign import tan "function tan(n){\
                      \  return Math.tan(n);\
                      \}" :: Number -> Number
+                     
+  foreign import e       "var e       = Math.E;"       :: Number
+  foreign import ln2     "var ln2     = Math.LN2;"     :: Number
+  foreign import ln10    "var ln10    = Math.LN10;"    :: Number
+  foreign import log2e   "var log2e   = Math.LOG2E;"   :: Number
+  foreign import log10e  "var log10e  = Math.LOG10E;"  :: Number
+  foreign import pi      "var pi      = Math.PI;"      :: Number
+  foreign import sqrt1_2 "var sqrt1_2 = Math.SQRT1_2;" :: Number
+  foreign import sqrt2   "var sqrt2   = Math.SQRT2;"   :: Number
 
 module Eff where
 

@@ -6,4 +6,5 @@ module Main where
 
   main = do
     print $ Math.sin 0
-    print $ Math.sin 0.5
+    print $ Math.sin $ Math.pi * 0.5
+    print $ Math.e / Math.ln2
