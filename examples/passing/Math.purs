@@ -1,7 +1,9 @@
 module Main where
 
   import Prelude
-  import Math
+  import Trace
+  import Eff
 
-  main = Trace.print $ sin 1
-
+  main = do
+    print $ Math.sin 0
+    print $ Math.sin 0.5
