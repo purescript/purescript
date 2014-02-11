@@ -112,11 +112,11 @@ Line by line, this reads as follows:
 The generated Javascript looks like this::
 
   var Person = function (value) { 
-      return { ctor: 'Person', value: value }; 
+      return { ctor: 'Person', values: [value] }; 
   };
   
   function showPerson(_1) {
-      return _1.value.name + ", aged " + numberToString(_1.value.age); 
+      return _1.values[0].name + ", aged " + numberToString(_1.values[0].age); 
   };
 
 Related Projects
