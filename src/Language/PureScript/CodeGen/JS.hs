@@ -55,7 +55,7 @@ moduleToJs :: Options -> Module -> Environment -> JS
 moduleToJs opts (Module pname@(ProperName name) decls) env =
   JSAssignment (JSAccessor name (JSVar "_ps")) $ JSApp (JSFunction Nothing ["module"]
                       (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
-          [JSObjectLiteral []]
+          [(JSBinary Or (JSAccessor name (JSVar "_ps")) (JSObjectLiteral []))]
   where
   jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))
 
@@ -347,5 +347,5 @@ wrapExportsContainer modules = JSApp (JSFunction Nothing ["_ps"] $ JSBlock $ (JS
   where exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
                            (JSAccessor "exports" (JSVar "module"))
                            (JSConditional (JSBinary NotEqualTo (JSTypeOf $ JSVar "window") (JSStringLiteral "undefined"))
-                             (JSAssignment (JSAccessor "PS" (JSVar "window")) (JSObjectLiteral []))
+                             (JSAssignment (JSAccessor "PS" (JSVar "window")) (JSBinary Or (JSAccessor "PS" (JSVar "window")) (JSObjectLiteral [])))
                              (JSApp (JSFunction Nothing [] $ JSBlock [JSThrow $ JSStringLiteral "PureScript doesn't know how to export modules in the current environment"]) []))
