@@ -48,6 +48,7 @@ The following options are supported:
 --no-prelude           Do not include the Prelude in the generated Javascript.
 --magic-do             Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
 --run-main             Generate a call to `Main.main` after all other generated Javascript.
+--browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
 
 Motivation
 ----------
