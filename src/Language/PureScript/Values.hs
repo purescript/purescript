@@ -99,6 +99,10 @@ data Value
   --
   | TypedValue Bool Value Type
   -- |
+  -- A let binding
+  --
+  | Let Binder Value Value
+  -- |
   -- A do-notation block
   --
   | Do [DoNotationElement]

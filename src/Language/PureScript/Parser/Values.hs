@@ -82,6 +82,20 @@ parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parse
                              <*> (C.indented *> C.reserved "then" *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
 
+parseLet :: P.Parsec String ParseState Value
+parseLet = do
+  C.reserved "let"
+  C.indented
+  binder <- parseBinder
+  C.indented
+  C.reservedOp "="
+  C.indented
+  value <- parseValue
+  C.indented
+  C.reserved "in"
+  result <- parseValue
+  return $ Let binder value result
+
 parseValueAtom :: P.Parsec String ParseState Value
 parseValueAtom = P.choice
             [ P.try parseNumericLiteral
@@ -95,6 +109,7 @@ parseValueAtom = P.choice
             , parseCase
             , parseIfThenElse
             , parseDo
+            , parseLet
             , Parens <$> C.parens parseValue ]
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
