@@ -342,10 +342,12 @@ statementToJs opts m e (If ifst) = ifToJs ifst
   elseToJs (ElseIf elif) = ifToJs elif
 statementToJs opts m e (Return value) = JSReturn (valueToJs opts m e value)
 
-wrapExportsContainer :: [JS] -> JS
-wrapExportsContainer modules = JSApp (JSFunction Nothing ["_ps"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]
-  where exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
+wrapExportsContainer :: Options -> [JS] -> JS
+wrapExportsContainer opts modules = JSApp (JSFunction Nothing ["_ps"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]
+  where
+  exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
                            (JSAccessor "exports" (JSVar "module"))
                            (JSConditional (JSBinary NotEqualTo (JSTypeOf $ JSVar "window") (JSStringLiteral "undefined"))
-                             (JSAssignment (JSAccessor "PS" (JSVar "window")) (JSBinary Or (JSAccessor "PS" (JSVar "window")) (JSObjectLiteral [])))
+                             (JSAssignment (JSAccessor browserNamespace (JSVar "window")) (JSBinary Or (JSAccessor browserNamespace (JSVar "window")) (JSObjectLiteral [])))
                              (JSApp (JSFunction Nothing [] $ JSBlock [JSThrow $ JSStringLiteral "PureScript doesn't know how to export modules in the current environment"]) []))
+  browserNamespace = optionsBrowserNamespace opts

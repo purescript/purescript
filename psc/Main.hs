@@ -94,8 +94,12 @@ noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
      { optDoc = "Skip the optimization phase." }
 
+browserNamespace :: Term String
+browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
+     { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

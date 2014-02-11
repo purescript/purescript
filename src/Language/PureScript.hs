@@ -67,4 +67,4 @@ compile opts ms = do
                       Left "Main.main is undefined"
                     return $ js ++ [JSApp (JSAccessor "main" (JSAccessor "Main" (JSVar "_ps"))) []]
                 | otherwise -> return js
-  return (prettyPrintJS [(wrapExportsContainer js')], exts, env)
+  return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
