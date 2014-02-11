@@ -126,7 +126,6 @@ valueToJs _ m e (Constructor (Qualified Nothing name)) =
     Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS m id (Qualified (Just aliasModule) aliasIdent)
     _ -> JSVar . runProperName $ name
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
-valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
 valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
@@ -323,24 +322,6 @@ isOnlyConstructor m e ctor =
   typeConstructor (TypeApp (TypeApp t _) ty) | t == tyFunction = typeConstructor ty
   typeConstructor (TypeApp ty _) = typeConstructor ty
   typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn
-
--- |
--- Generate code in the simplified Javascript intermediate representation for a statement in a
--- PureScript block.
---
-statementToJs :: Options -> ModuleName -> Environment -> Statement -> JS
-statementToJs opts m e (VariableIntroduction ident value) = JSVariableIntroduction (identToJs ident) (Just (valueToJs opts m e value))
-statementToJs opts m e (Assignment target value) = JSAssignment (JSVar (identToJs target)) (valueToJs opts m e value)
-statementToJs opts m e (While cond sts) = JSWhile (valueToJs opts m e cond) (JSBlock (map (statementToJs opts m e) sts))
-statementToJs opts m e (For ident start end sts) = JSFor (identToJs ident) (valueToJs opts m e start) (valueToJs opts m e end) (JSBlock (map (statementToJs opts m e) sts))
-statementToJs opts m e (If ifst) = ifToJs ifst
-  where
-  ifToJs :: IfStatement -> JS
-  ifToJs (IfStatement cond thens elses) = JSIfElse (valueToJs opts m e cond) (JSBlock (map (statementToJs opts m e) thens)) (fmap elseToJs elses)
-  elseToJs :: ElseStatement -> JS
-  elseToJs (Else sts) = JSBlock (map (statementToJs opts m e) sts)
-  elseToJs (ElseIf elif) = ifToJs elif
-statementToJs opts m e (Return value) = JSReturn (valueToJs opts m e value)
 
 wrapExportsContainer :: Options -> [JS] -> JS
 wrapExportsContainer opts modules = JSApp (JSFunction Nothing ["_ps"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]

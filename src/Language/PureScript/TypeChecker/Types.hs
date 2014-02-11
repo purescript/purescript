@@ -541,11 +541,6 @@ infer' (Var var) = do
       dicts <- getTypeClassDictionaries
       return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
     _ -> return $ TypedValue True (Var var) ty
-infer' (Block ss) = do
-  ret <- fresh
-  (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
-  guardWith "Block is missing a return statement" allCodePathsReturn
-  return $ TypedValue True (Block ss') ret
 infer' v@(Constructor c) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
@@ -669,77 +664,6 @@ assignVariable name = do
   case M.lookup (moduleName, name) (names env) of
     Just _ -> UnifyT . lift . throwError $ "Variable with name " ++ show name ++ " already exists."
     _ -> return ()
-
--- |
--- Check the type of the return values of a statement, returning whether or not the statement returns on
--- all code paths
---
-checkStatement :: M.Map Ident Type -> Type -> Statement -> UnifyT Type Check (Bool, M.Map Ident Type, Statement)
-checkStatement mass _ (VariableIntroduction name val) = do
-  assignVariable name
-  val'@(TypedValue _ _ t) <- infer val
-  return (False, M.insert name t mass, VariableIntroduction name val')
-checkStatement mass _ (Assignment ident val) = do
-  val'@(TypedValue _ _ t) <- infer val
-  case M.lookup ident mass of
-    Nothing -> throwError $ "No local variable with name " ++ show ident
-    Just ty -> do t =?= ty
-                  return (False, mass, Assignment ident val')
-checkStatement mass ret (While val inner) = do
-  val' <- check val tyBoolean
-  (allCodePathsReturn, _, inner') <- checkBlock mass ret inner
-  return (allCodePathsReturn, mass, While val' inner')
-checkStatement mass ret (If ifst) = do
-  (allCodePathsReturn, ifst') <- checkIfStatement mass ret ifst
-  return (allCodePathsReturn, mass, If ifst')
-checkStatement mass ret (For ident start end inner) = do
-  Just moduleName <- checkCurrentModule <$> get
-  assignVariable ident
-  start' <- check start tyNumber
-  end' <- check end tyNumber
-  (allCodePathsReturn, _, inner') <- bindLocalVariables moduleName [(ident, tyNumber)] $ checkBlock mass ret inner
-  return (allCodePathsReturn, mass, For ident start' end' inner')
-checkStatement mass ret (Return val) = do
-  val' <- check val ret
-  return (True, mass, Return (TypedValue True val' ret))
-
--- |
--- Check the type of an if-then-else statement
---
-checkIfStatement :: M.Map Ident Type -> Type -> IfStatement -> UnifyT Type Check (Bool, IfStatement)
-checkIfStatement mass ret (IfStatement val thens Nothing) = do
-  val' <- check val tyBoolean
-  (_, _, thens') <- checkBlock mass ret thens
-  return (False, IfStatement val' thens' Nothing)
-checkIfStatement mass ret (IfStatement val thens (Just elses)) = do
-  val' <- check val tyBoolean
-  (allCodePathsReturn1, _, thens') <- checkBlock mass ret thens
-  (allCodePathsReturn2, elses') <- checkElseStatement mass ret elses
-  return (allCodePathsReturn1 && allCodePathsReturn2, IfStatement val' thens' (Just elses'))
-
--- |
--- Check the type of an else statement
---
-checkElseStatement :: M.Map Ident Type -> Type -> ElseStatement -> UnifyT Type Check (Bool, ElseStatement)
-checkElseStatement mass ret (Else elses) = do
-  (allCodePathsReturn, _, elses') <- checkBlock mass ret elses
-  return (allCodePathsReturn, Else elses')
-checkElseStatement mass ret (ElseIf ifst) = (id *** ElseIf) <$> checkIfStatement mass ret ifst
-
--- |
--- Check the type of the return value of a block of statements
---
-checkBlock :: M.Map Ident Type -> Type -> [Statement] -> UnifyT Type Check (Bool, M.Map Ident Type, [Statement])
-checkBlock mass _ [] = return (False, mass, [])
-checkBlock mass ret (s:ss) = do
-  Just moduleName <- checkCurrentModule <$> get
-  (b1, mass1, s') <- checkStatement mass ret s
-  bindLocalVariables moduleName (M.toList mass1) $ case (b1, ss) of
-    (True, []) -> return (True, mass1, [s'])
-    (True, _) -> throwError "Unreachable code"
-    (False, ss') -> do
-      (b, m, ss'') <- checkBlock mass1 ret ss'
-      return (b, m, s':ss'')
 
 -- |
 -- Generate a new skolem constant
@@ -876,10 +800,6 @@ check' (Accessor prop val) ty = do
   rest <- fresh
   val' <- check val (Object (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
-check' (Block ss) ret = do
-  (allCodePathsReturn, _, ss') <- checkBlock M.empty ret ss
-  guardWith "Block is missing a return statement" allCodePathsReturn
-  return $ TypedValue True (Block ss') ret
 check' (Constructor c) ty = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get

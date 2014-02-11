@@ -614,13 +614,8 @@ module Arrays where
   isEmpty _ = false
 
   range :: Number -> Number -> [Number]
-  range lo hi = {
-      var ns = [];
-      for (n <- lo until hi) {
-        ns = push ns n;
-      }
-      return ns;
-    }
+  range lo hi | lo > hi = []
+  range lo hi = lo : range (lo + 1) hi
 
   zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
   zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
