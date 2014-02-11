@@ -39,10 +39,15 @@ data Options = Options {
     -- Skip all optimizations
     --
   , optionsNoOptimizations :: Bool
+    -- |
+    -- Specify the namespace that PureScript modules will be exported to when running in the
+    -- browser.
+    --
+  , optionsBrowserNamespace :: String
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False False
+defaultOptions = Options False False False False False "PS"

@@ -51,31 +51,30 @@ import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: Options -> Module -> Environment -> [JS]
+moduleToJs :: Options -> Module -> Environment -> JS
 moduleToJs opts (Module pname@(ProperName name) decls) env =
-  [ JSVariableIntroduction name Nothing
-  , JSApp (JSFunction Nothing [name]
-                      (JSBlock (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))))
-          [JSAssignment (JSVar name)
-                        (JSBinary Or (JSVar name) (JSObjectLiteral []))]
-  , JSAssignment (JSAccessor name (JSVar "exports")) (JSVar name)
-  ]
+  JSAssignment (JSAccessor name (JSVar "_ps")) $ JSApp (JSFunction Nothing ["module"]
+                      (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
+          [(JSBinary Or (JSAccessor name (JSVar "_ps")) (JSObjectLiteral []))]
+  where
+  jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
-  Just $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
-         : setProperty ident (var ident) mp
+  Just $ [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
+         , setExportProperty ident (var ident) ]
 declToJs opts mp (BindingGroupDeclaration vals) e =
   Just $ concatMap (\(ident, val) ->
-           JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
-           : setProperty ident (var ident) mp
+           [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
+           , setExportProperty ident (var ident) ]
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    JSVariableIntroduction ctor (Just (go pn 0 tys [])) : setProperty (Escaped ctor) (JSVar ctor) mp
+    [ JSVariableIntroduction ctor (Just (go pn 0 tys []))
+    , setExportProperty (Escaped ctor) (JSVar ctor) ]
     where
     go pn _ [] values =
       JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))), ("values", JSArrayLiteral $ reverse values) ]
@@ -85,19 +84,15 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
-  Just $ js : setProperty ident (var ident) mp
+  Just $ [js, setExportProperty ident (var ident)]
 declToJs _ _ _ _ = Nothing
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for setting the property
--- of an object.
+-- Generate code in the simplified Javascript intermediate representation for exporting a
+-- declaration from a module.
 --
-setProperty :: Ident -> JS -> ModuleName -> [JS]
-setProperty ident@(Op op) val (ModuleName (ProperName moduleName)) =
-  [ JSAssignment (accessor ident (JSVar moduleName)) val
-  , JSAssignment (JSIndexer (JSStringLiteral op) (JSVar moduleName)) (accessor ident (JSVar moduleName)) ]
-setProperty ident val (ModuleName (ProperName moduleName)) =
-  [ JSAssignment (accessor ident (JSVar moduleName)) val ]
+setExportProperty :: Ident -> JS -> JS
+setExportProperty ident val = JSAssignment (accessor ident (JSVar "module")) val
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
@@ -113,6 +108,7 @@ var = JSVar . identToJs
 --
 accessor :: Ident -> JS -> JS
 accessor (Ident name) | nameIsJsReserved name = JSIndexer (JSStringLiteral name)
+accessor (Op op) = JSIndexer (JSStringLiteral op)
 accessor ident = JSAccessor (identToJs ident)
 
 -- |
@@ -127,9 +123,9 @@ valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs 
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
 valueToJs _ m e (Constructor (Qualified Nothing name)) =
   case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS id (Qualified (Just aliasModule) aliasIdent)
+    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS m id (Qualified (Just aliasModule) aliasIdent)
     _ -> JSVar . runProperName $ name
-valueToJs _ _ _ (Constructor name) = qualifiedToJS (Ident . runProperName) name
+valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Block sts) = JSApp (JSFunction Nothing [] (JSBlock (map (statementToJs opts m e) sts))) []
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
@@ -202,7 +198,7 @@ varToJs m e qual@(Qualified _ ident) = go qual
     Just (_, Alias aliasModule aliasIdent) -> go (Qualified (Just aliasModule) aliasIdent)
     _ -> case qual of
            Qualified Nothing _ -> var ident
-           _ -> qualifiedToJS id qual
+           _ -> qualifiedToJS m id qual
   isExtern (Extern ForeignImport) = True
   isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
     Just (_, ty') -> isExtern ty'
@@ -213,9 +209,9 @@ varToJs m e qual@(Qualified _ ident) = go qual
 -- Generate code in the simplified Javascript intermediate representation for a reference to a
 -- variable that may have a qualified name.
 --
-qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
-qualifiedToJS f (Qualified (Just (ModuleName (ProperName m))) a) = accessor (f a) (JSVar m)
-qualifiedToJS f (Qualified Nothing a) = JSVar $ identToJs (f a)
+qualifiedToJS :: ModuleName -> (a -> Ident) -> Qualified a -> JS
+qualifiedToJS m f (Qualified (Just m'@(ModuleName (ProperName mn))) a) | m /= m' = accessor (f a) (JSAccessor mn $ JSVar "_ps")
+qualifiedToJS m f (Qualified _ a) = JSVar $ identToJs (f a)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for pattern match binders
@@ -346,10 +342,12 @@ statementToJs opts m e (If ifst) = ifToJs ifst
   elseToJs (ElseIf elif) = ifToJs elif
 statementToJs opts m e (Return value) = JSReturn (valueToJs opts m e value)
 
-wrapExportsContainer :: [JS] -> JS
-wrapExportsContainer modules = JSApp (JSFunction Nothing ["exports"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]
-  where exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
+wrapExportsContainer :: Options -> [JS] -> JS
+wrapExportsContainer opts modules = JSApp (JSFunction Nothing ["_ps"] $ JSBlock $ (JSStringLiteral "use strict") : modules) [exportSelector]
+  where
+  exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
                            (JSAccessor "exports" (JSVar "module"))
                            (JSConditional (JSBinary NotEqualTo (JSTypeOf $ JSVar "window") (JSStringLiteral "undefined"))
-                             (JSAssignment (JSAccessor "PS" (JSVar "window")) (JSObjectLiteral []))
+                             (JSAssignment (JSAccessor browserNamespace (JSVar "window")) (JSBinary Or (JSAccessor browserNamespace (JSVar "window")) (JSObjectLiteral [])))
                              (JSApp (JSFunction Nothing [] $ JSBlock [JSThrow $ JSStringLiteral "PureScript doesn't know how to export modules in the current environment"]) []))
+  browserNamespace = optionsBrowserNamespace opts

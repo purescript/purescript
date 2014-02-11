@@ -217,8 +217,8 @@ parseQualified parser = qual
 -- Parse an integer or floating point value
 --
 integerOrFloat :: P.Parsec String u (Either Integer Double)
-integerOrFloat = (Left <$> P.try (PT.natural tokenParser) <|>
-                  Right <$> P.try (PT.float tokenParser)) P.<?> "number"
+integerOrFloat = (Right <$> P.try (PT.float tokenParser) <|>
+                  Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
 
 -- |
 -- Parse an identifier or parenthesized operator
