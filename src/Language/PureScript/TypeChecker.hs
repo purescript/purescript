@@ -50,7 +50,6 @@ addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> [Typ
 addDataConstructor moduleName name args dctor tys = do
   env <- getEnv
   dataConstructorIsNotDefined moduleName dctor
-  when (runModuleName moduleName == dctor) $ throwError "A data constructor may not have the same name as its enclosing module."
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
