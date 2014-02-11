@@ -38,21 +38,21 @@ import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 import Language.PureScript.Sugar.TypeClasses
 
-addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, Maybe Type)] -> Kind -> Check ()
+addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (moduleName, name) (ctorKind, Data) (types env) }
-  forM_ dctors $ \(dctor, maybeTy) ->
+  forM_ dctors $ \(dctor, tys) ->
     rethrow (("Error in data constructor " ++ show dctor ++ ":\n") ++) $
-      addDataConstructor moduleName name args dctor maybeTy
+      addDataConstructor moduleName name args dctor tys
 
-addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> Maybe Type -> Check ()
-addDataConstructor moduleName name args dctor maybeTy = do
+addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
+addDataConstructor moduleName name args dctor tys = do
   env <- getEnv
   dataConstructorIsNotDefined moduleName dctor
   when (runModuleName moduleName == dctor) $ throwError "A data constructor may not have the same name as its enclosing module."
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
-  let dctorTy = maybe retTy (flip function retTy) maybeTy
+  let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
   putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType, DataConstructor) (dataConstructors env) }
 
@@ -117,7 +117,7 @@ typeCheckAll _ [] = return []
 typeCheckAll moduleName (d@(DataDeclaration name args dctors) : rest) = do
   rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do
     typeIsNotDefined moduleName name
-    ctorKind <- kindsOf moduleName name args (mapMaybe snd dctors)
+    ctorKind <- kindsOf moduleName name args (concatMap snd dctors)
     addDataType moduleName name args dctors ctorKind
   ds <- typeCheckAll moduleName rest
   return $ d : ds
@@ -125,7 +125,7 @@ typeCheckAll moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
   rethrow ("Error in data binding group:\n" ++) $ do
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
-    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, mapMaybe snd dctors)) dataDecls)
+    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
     forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) -> do
       typeIsNotDefined moduleName name
       addDataType moduleName name args dctors ctorKind

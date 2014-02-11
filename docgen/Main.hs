@@ -92,8 +92,8 @@ renderDeclaration n (P.ExternDeclaration _ ident _ ty) =
 renderDeclaration n (P.DataDeclaration name args ctors) = do
   let typeName = P.runProperName name ++ " " ++ intercalate " " args
   atIndent n $ "data " ++ typeName ++ " where"
-  forM_ ctors $ \(ctor, ty) -> do
-    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ maybe "" ((++ " -> ") . P.prettyPrintType) ty ++ typeName
+  forM_ ctors $ \(ctor, tys) -> do
+    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concat (map (\ty -> P.prettyPrintType ty ++ " -> ") tys) ++ typeName
 renderDeclaration n (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do

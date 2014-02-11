@@ -369,7 +369,7 @@
 ### Types
 
     data Tuple a b where
-      Tuple :: { snd :: b, fst :: a } -> Tuple a b
+      Tuple :: a -> b -> Tuple a b
 
 
 ### Type Classes
@@ -383,8 +383,6 @@
 ### Values
 
     curry :: forall c. forall b. forall a. (Tuple a b -> c) -> a -> b -> c
-
-    tuple :: forall b. forall a. a -> b -> Tuple a b
 
     uncurry :: forall c. forall b. forall a. (a -> b -> c) -> Tuple a b -> c
 

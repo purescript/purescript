@@ -72,7 +72,7 @@ data Declaration
   -- |
   -- A data type declaration (name, arguments, data constructors)
   --
-  = DataDeclaration ProperName [String] [(ProperName, Maybe Type)]
+  = DataDeclaration ProperName [String] [(ProperName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --

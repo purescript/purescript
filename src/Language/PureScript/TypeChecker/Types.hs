@@ -597,25 +597,20 @@ inferBinder val (StringBinder _) = val =?= tyString >> return M.empty
 inferBinder val (NumberBinder _) = val =?= tyNumber >> return M.empty
 inferBinder val (BooleanBinder _) = val =?= tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
-inferBinder val (NullaryBinder ctor) = do
-  env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName ctor) (dataConstructors env) of
-    Just (ty, _) -> do
-      _ <- subsumes Nothing ty val
-      return M.empty
-    _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
-inferBinder val (UnaryBinder ctor binder) = do
+inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup (qualify moduleName ctor) (dataConstructors env) of
     Just (ty, _) -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
-      case fn of
-        TypeApp (TypeApp t obj) ret | t == tyFunction -> do
-          _ <- subsumes Nothing val ret
-          inferBinder obj binder
-        _ -> throwError $ "Constructor " ++ show ctor ++ " is not a unary constructor"
+      go binders fn
+        where
+        go [] ty = do
+          subsumes Nothing val ty
+          return M.empty
+        go (binder : binders) (TypeApp (TypeApp t obj) ret) | t == tyFunction =
+          M.union <$> inferBinder obj binder <*> go binders ret
+        go _ _ = throwError $ "Wrong number of arguments to constructor " ++ show ctor
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (ObjectBinder props) = do
   row <- fresh

@@ -228,11 +228,11 @@ parseNumberBinder = NumberBinder <$> C.integerOrFloat
 parseVarBinder :: P.Parsec String ParseState Binder
 parseVarBinder = VarBinder <$> C.parseIdent
 
-parseNullaryBinder :: P.Parsec String ParseState Binder
-parseNullaryBinder = NullaryBinder <$> C.lexeme (C.parseQualified C.properName)
+parseNullaryConstructorBinder :: P.Parsec String ParseState Binder
+parseNullaryConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.properName) <*> pure []
 
-parseUnaryBinder :: P.Parsec String ParseState Binder
-parseUnaryBinder = UnaryBinder <$> C.lexeme (C.parseQualified C.properName) <*> (C.indented *> parseBinder)
+parseConstructorBinder :: P.Parsec String ParseState Binder
+parseConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.properName) <*> (many (C.indented *> parseBinderNoParens))
 
 parseObjectBinder :: P.Parsec String ParseState Binder
 parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep (C.indented *> parseIdentifierAndBinder))
@@ -262,8 +262,7 @@ parseBinderAtom = P.choice (map P.try
                   , parseNumberBinder
                   , parseNamedBinder
                   , parseVarBinder
-                  , parseUnaryBinder
-                  , parseNullaryBinder
+                  , parseConstructorBinder
                   , parseObjectBinder
                   , parseArrayBinder
                   , C.parens parseBinder ]) P.<?> "binder"
@@ -287,7 +286,7 @@ parseBinderNoParens = P.choice (map P.try
                   , parseNumberBinder
                   , parseNamedBinder
                   , parseVarBinder
-                  , parseNullaryBinder
+                  , parseNullaryConstructorBinder
                   , parseObjectBinder
                   , parseArrayBinder
                   , C.parens parseBinder ]) P.<?> "binder"

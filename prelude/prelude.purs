@@ -516,8 +516,8 @@ module Arrays where
   foldl _ b [] = b
   foldl f b (a:as) = foldl f (f a b) as
 
-  foreign import length "function length(xs) { \
-                        \  return xs.length; \
+  foreign import length "function length(xs) {\
+                        \  return xs.length;\
                         \}" :: forall a. [a] -> Number
 
   foreign import indexOf "function indexOf(l) {\
@@ -584,7 +584,7 @@ module Arrays where
 
   foreign import splice "function splice(s) {\
                         \  return function(e) {\
-                        \    return function(l1) { \
+                        \    return function(l1) {\
                         \      return function(l2) {\
                         \        return l2.splice(s, e, l1);\
                         \      }; \
@@ -654,27 +654,24 @@ module Tuples where
   import Prelude
   import Arrays
 
-  data Tuple a b = Tuple { fst :: a, snd :: b }
+  data Tuple a b = Tuple a b
 
   instance (Prelude.Show a, Prelude.Show b) => Prelude.Show (Tuple a b) where
-    show (Tuple { fst = a, snd = b }) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
+    show (Tuple a b) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
 
   curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
-  curry f a b = f (tuple a b)
+  curry f a b = f (Tuple a b)
 
   uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
-  uncurry f (Tuple t) = f t.fst t.snd
-
-  tuple :: forall a b. a -> b -> Tuple a b
-  tuple a b = Tuple { fst: a, snd: b }
+  uncurry f (Tuple a b) = f a b
 
   zip :: forall a b. [a] -> [b] -> [Tuple a b]
-  zip = zipWith tuple
+  zip = zipWith Tuple
 
   unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
-  unzip ((Tuple t):ts) = case unzip ts of
-    Tuple { fst = as, snd = bs } -> tuple (t.fst : as) (t.snd : bs)
-  unzip [] = tuple [] []
+  unzip ((Tuple a b):ts) = case unzip ts of
+    Tuple as bs -> Tuple (a : as) (b : bs)
+  unzip [] = Tuple [] []
 
 module String where
 
@@ -701,7 +698,7 @@ module String where
                               \}" :: String -> String -> Number
 
   foreign import localeCompare "function localeCompare(s1) {\
-                               \  return function(s2) { \
+                               \  return function(s2) {\
                                \    return s1.localeCompare(s2);\
                                \  };\
                                \}" :: String -> String -> Number
@@ -767,7 +764,7 @@ module Regex where
                        \}" :: String -> String -> Regex
 
   foreign import test "function test(r) {\
-                      \  return function (s) { \
+                      \  return function (s) {\
                       \    return r.test(s);\
                       \  };\
                       \}" :: Regex -> String -> Boolean
@@ -780,7 +777,7 @@ module Regex where
 
   foreign import replaceR "function replaceR(r) {\
                           \  return function(s1) {\
-                          \    return function(s2) { \
+                          \    return function(s2) {\
                           \      return s2.replace(r, s1);\
                           \    };\
                           \  };\
@@ -906,24 +903,24 @@ module Eff where
 
   foreign import data Eff :: # ! -> * -> *
 
-  foreign import retEff "function retEff(a) { \
-                        \  return function() { \
-                        \    return a; \
-                        \  }; \
+  foreign import retEff "function retEff(a) {\
+                        \  return function() {\
+                        \    return a;\
+                        \  };\
                         \}" :: forall e a. a -> Eff e a
 
-  foreign import bindEff "function bindEff(a) { \
-                         \  return function(f) { \
-                         \    return function() { \
-                         \      return f(a())(); \
-                         \    }; \
-                         \  }; \
+  foreign import bindEff "function bindEff(a) {\
+                         \  return function(f) {\
+                         \    return function() {\
+                         \      return f(a())();\
+                         \    };\
+                         \  };\
                          \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
   type Pure a = forall e. Eff e a
 
-  foreign import runPure "function runPure(f) { \
-                         \  return f(); \
+  foreign import runPure "function runPure(f) {\
+                         \  return f();\
                          \}" :: forall a. Pure a -> a
 
   instance Prelude.Monad (Eff e) where
@@ -986,22 +983,22 @@ module Errors where
 
   foreign import data Error :: * -> !
 
-  foreign import throwError "function throwError(e) { \
-                            \  return function() { \
-                            \    throw e; \
-                            \  }; \
+  foreign import throwError "function throwError(e) {\
+                            \  return function() {\
+                            \    throw e;\
+                            \  };\
                             \}" :: forall a e r. e -> Eff (err :: Error e | r) a
 
-  foreign import catchError "function catchError(c) { \
-                            \  return function(t) { \
-                            \    return function() { \
-                            \      try { \
-                            \        return t(); \
-                            \      } catch(e) { \
-                            \        return c(e)(); \
+  foreign import catchError "function catchError(c) {\
+                            \  return function(t) {\
+                            \    return function() {\
+                            \      try {\
+                            \        return t();\
+                            \      } catch(e) {\
+                            \        return c(e)();\
                             \      }\
-                            \    }; \
-                            \  }; \
+                            \    };\
+                            \  };\
                             \}" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
 module IORef where
@@ -1054,11 +1051,11 @@ module Trace where
 
   foreign import data Trace :: !
 
-  foreign import trace "function trace(s) { \
-                       \  return function() { \
-                       \    console.log(s); \
-                       \    return {}; \
-                       \  }; \
+  foreign import trace "function trace(s) {\
+                       \  return function() {\
+                       \    console.log(s);\
+                       \    return {};\
+                       \  };\
                        \}" :: forall r. String -> Eff (trace :: Trace | r) {}
 
   print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}

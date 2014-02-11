@@ -15,7 +15,8 @@
 
 module Language.PureScript.Parser.Types (
     parseType,
-    parsePolyType
+    parsePolyType,
+    parseTypeAtom
 ) where
 
 import Language.PureScript.Types
@@ -60,6 +61,9 @@ parseForAll :: P.Parsec String ParseState Type
 parseForAll = (mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
                         <*> parseConstrainedType)
 
+-- |
+-- Parse a type as it appears in e.g. a data constructor
+--
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try
             [ parseNumber

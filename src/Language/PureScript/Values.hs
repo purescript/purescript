@@ -247,13 +247,9 @@ data Binder
   --
   | VarBinder Ident
   -- |
-  -- A binder which matches a data constructor with no argument
+  -- A binder which matches a data constructor
   --
-  | NullaryBinder (Qualified ProperName)
-  -- |
-  -- A binder which matches a data constructor with one argument
-  --
-  | UnaryBinder (Qualified ProperName) Binder
+  | ConstructorBinder (Qualified ProperName) [Binder]
   -- |
   -- A binder which matches a record and binds its properties
   --

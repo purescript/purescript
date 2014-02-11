@@ -74,16 +74,14 @@ declToJs opts mp (BindingGroupDeclaration vals) e =
            : setProperty ident (var ident) mp
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
-  Just $ flip concatMap ctors $ \(pn@(ProperName ctor), maybeTy) ->
-    let
-      ctorJs =
-        case maybeTy of
-          Nothing -> JSVariableIntroduction ctor (Just (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))) ]))
-          Just _ -> JSFunction (Just ctor) ["value"]
-                      (JSBlock [JSReturn
-                        (JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn)))
-                                         , ("value", JSVar "value") ])])
-    in ctorJs : setProperty (Escaped ctor) (JSVar ctor) mp
+  Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
+    JSVariableIntroduction ctor (Just (go pn 0 tys [])) : setProperty (Escaped ctor) (JSVar ctor) mp
+    where
+    go pn _ [] values =
+      JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))), ("values", JSArrayLiteral $ reverse values) ]
+    go pn index (_ : tys') values =
+      JSFunction Nothing ["value" ++ show index]
+        (JSBlock [JSReturn (go pn (index + 1) tys' (JSVar ("value" ++ show index) : values))])
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ mp (ExternDeclaration importTy ident (Just js) _) _ =
@@ -263,23 +261,23 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs m e varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
-binderToJs m e varName done (NullaryBinder ctor) =
+binderToJs m e varName done (ConstructorBinder ctor bs) = do
+  js <- go 0 done bs
   if isOnlyConstructor m e ctor
   then
-    return done
-  else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor)))) (JSBlock done) Nothing]
-binderToJs m e varName done (UnaryBinder ctor b) = do
-  value <- fresh
-  js <- binderToJs m e value done b
-  let success = JSBlock (JSVariableIntroduction value (Just (JSAccessor "value" (JSVar varName))) : js)
-  if isOnlyConstructor m e ctor
-  then
-    return [success]
+    return js
   else
     return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
-                     success
+                     (JSBlock js)
                      Nothing]
+  where
+  go :: Integer -> [JS] -> [Binder] -> Gen [JS]
+  go _ done' [] = return done'
+  go index done' (binder:bs') = do
+    argVar <- fresh
+    done'' <- go (index + 1) done' bs'
+    js <- binderToJs m e argVar done'' binder
+    return (JSVariableIntroduction argVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSAccessor "values" (JSVar varName)))) : js)
 binderToJs m e varName done (ObjectBinder bs) = go done bs
   where
   go :: [JS] -> [(String, Binder)] -> Gen [JS]
