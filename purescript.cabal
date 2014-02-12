@@ -27,6 +27,7 @@ library
                      Language.PureScript.Types
                      Language.PureScript.Values
                      Language.PureScript.Scope
+                     Language.PureScript.DeadCodeElimination
                      Language.PureScript.Sugar
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Sugar.CaseDeclarations

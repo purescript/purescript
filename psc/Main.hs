@@ -98,8 +98,12 @@ browserNamespace :: Term String
 browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
 
+entryPoint :: Term (Maybe String)
+entryPoint = value $ opt Nothing $ (optInfo [ "entry-point" ])
+     { optDoc = "Specify the module which is the entry point. All code which is not a transitive dependency of this module will be removed." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> entryPoint
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

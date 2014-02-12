@@ -382,7 +382,7 @@ inlineCommonOperators = applyAll
   isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
     where
     Right (Ident dictName) = mkDictionaryValueName
-      (ModuleName (ProperName "Prelude"))
+      (ModuleName (ProperName "Prim"))
       (Qualified (Just (ModuleName (ProperName "Prelude"))) (ProperName className))
       ty
   isOpDict _ _ _ = False

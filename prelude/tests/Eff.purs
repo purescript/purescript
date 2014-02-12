@@ -58,4 +58,4 @@ module Main where
 
 import Tests
 
-main = test9 {}
+main = test5 {}

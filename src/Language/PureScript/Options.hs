@@ -44,10 +44,14 @@ data Options = Options {
     -- browser.
     --
   , optionsBrowserNamespace :: String
+    -- |
+    -- The entry point module, for dead code elimination
+    --
+  , optionsEntryPoint :: Maybe String
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False False "PS"
+defaultOptions = Options False False False False False "PS" Nothing

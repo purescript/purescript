@@ -1,2 +1,2 @@
-psc ../prelude.purs Eff.purs --magic-do --run-main --no-prelude -o Eff.js
+psc ../prelude.purs Eff.purs --magic-do --tco --run-main --no-prelude --entry-point Main -o Eff.js
 

@@ -224,11 +224,11 @@ canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types 
 -- |
 -- Canonicalize a data constructor by resolving any aliases introduced by module imports
 --
-canonicalizeDataConstructor :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, Ident)
-canonicalizeDataConstructor _ _ (Qualified (Just mn) i) = (mn, Ident $ show i)
-canonicalizeDataConstructor mn env (Qualified Nothing i) = case (mn, i) `M.lookup` dataConstructors env of
-  Just (_, Alias mn' i') -> (mn', i')
-  _ -> (mn, Ident $ show i)
+canonicalizeDataConstructor :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, ProperName)
+canonicalizeDataConstructor _ _ (Qualified (Just mn) pn) = (mn, pn)
+canonicalizeDataConstructor mn env (Qualified Nothing pn) = case (mn, pn) `M.lookup` dataConstructors env of
+  Just (_, Alias mn' (Ident pn')) -> (mn', ProperName pn')
+  _ -> (mn, pn)
 
 -- |
 -- State required for type checking:

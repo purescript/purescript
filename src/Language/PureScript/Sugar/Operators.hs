@@ -58,7 +58,11 @@ removeParens val = val
 customOperatorTable :: M.Map (Qualified Ident) Fixity -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
 customOperatorTable fixities =
   let
-    applyUserOp name t1 t2 = App (App (Var name) t1) t2
+    -- We make the assumption here that infix operators are not qualified. The parser currently enforces this.
+    -- The fixity map can therefore map from module name/ident pairs to fixities, where the module name is the name
+    -- of the module imported into, not from. This is useful in matchOp, but here we have to discard the module name to
+    -- make sure that the generated code is correct.
+    applyUserOp (Qualified _ name) t1 t2 = App (App (Var (Qualified Nothing name)) t1) t2
     userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
     sorted = reverse $ sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
@@ -107,7 +111,4 @@ collectFixities m moduleName (ImportDeclaration importedModule _ : rest) = do
   let m' = M.fromList (map (\(i, fixity) -> (Qualified (Just moduleName) i, fixity)) fs)
   collectFixities (M.union m' m) moduleName rest
 collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
-
-globalOp :: String -> Qualified Ident
-globalOp = Qualified Nothing . Op
 
