@@ -54,11 +54,11 @@ module Prelude where
   instance Read Boolean where
     read "true" = true
     read _ = false
-    
+
   foreign import readNumber "function readNumber(n) {\
                             \  return parseInt(n, 10);\
                             \}" :: String -> Number
-    
+
   instance Read Number where
     read = readNumber
 
@@ -369,7 +369,7 @@ module Monoid where
   instance Monoid String where
     mempty = ""
     (<>) = (++)
-    
+
   instance Monoid [a] where
     mempty = []
     (<>) = Arrays.concat
@@ -440,11 +440,11 @@ module Maybe where
 
   fromMaybe :: forall a. a -> Maybe a -> a
   fromMaybe a = maybe a (Prelude.id :: forall a. a -> a)
-  
+
   instance Prelude.Monad Maybe where
     return = Just
     (>>=) m f = maybe Nothing f m
-    
+
   instance Prelude.Applicative Maybe where
     pure = Just
     (<*>) (Just fn) x = fn <$> x
@@ -453,7 +453,7 @@ module Maybe where
   instance Prelude.Functor Maybe where
     (<$>) fn (Just x) = Just (fn x)
     (<$>) _ _ = Nothing
-  
+
   instance (Show a) => Prelude.Show (Maybe a) where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
@@ -467,11 +467,11 @@ module Either where
   either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
   either f _ (Left a) = f a
   either _ g (Right b) = g b
-  
+
   instance Prelude.Monad (Either e) where
     return = Right
     (>>=) = either (\e _ -> Left e) (\a f -> f a)
-    
+
   instance Prelude.Applicative (Either e) where
     pure = Right
     (<*>) (Left e) _ = Left e
@@ -480,7 +480,7 @@ module Either where
   instance Prelude.Functor (Either a) where
     (<$>) _ (Left x) = Left x
     (<$>) f (Right y) = Right (f y)
-    
+
   instance (Show a, Show b) => Prelude.Show (Either a b) where
     show (Left x) = "Left " ++ (show x)
     show (Right y) = "Right " ++ (show y)
@@ -632,10 +632,10 @@ module Arrays where
   instance (Prelude.Show a) => Prelude.Show [a] where
     show [] = "[]"
     show (x:xs) = show x ++ " : " ++ show xs
-    
+
   instance Prelude.Functor [] where
     (<$>) = map
-    
+
   instance Prelude.Monad [] where
     return = singleton
     (>>=) = concatMap
@@ -893,7 +893,7 @@ module Math where
   foreign import tan "function tan(n){\
                      \  return Math.tan(n);\
                      \}" :: Number -> Number
-                     
+
   foreign import e       "var e       = Math.E;"       :: Number
   foreign import ln2     "var ln2     = Math.LN2;"     :: Number
   foreign import ln10    "var ln10    = Math.LN10;"    :: Number
@@ -947,7 +947,7 @@ module Eff where
 			\      return {};\
                         \    };\
                         \  };\
-                        \}" :: forall e. Eff e Boolean -> Eff e {} -> Eff e {}
+                        \}" :: forall e a. Eff e Boolean -> Eff e a -> Eff e {}
 
   foreign import forE "function forE(lo) {\
 	              \  return function(hi) {\
@@ -1088,18 +1088,18 @@ module ST where
   foreign import modifySTRef "function modifySTRef(ref) {\
                              \  return function(f) {\
                              \    return function() {\
-                             \      ref.value = f(ref.value);\
+                             \      return ref.value = f(ref.value);\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) {}
+                             \}" :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
   foreign import writeSTRef "function writeSTRef(ref) {\
                             \  return function(a) {\
                             \    return function() {\
-                            \      ref.value = a;\
+                            \      return ref.value = a;\
                             \    };\
                             \  };\
-                            \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) {}
+                            \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 
   foreign import runST "function runST(f) {\
                        \  return f;\

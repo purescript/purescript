@@ -46,13 +46,12 @@ test7 _ = do
 
 test8 _ = (\_1 _2 -> {}) <$> print "Test" <*> print 8
 
-test9 _ = do
+test9 _ = runST (do
   r <- newSTRef 1
-  untilE $ do
+  whileE (return true) $ do
     n <- readSTRef r
     trace $ "Count " ++ show n
-    modifySTRef r $ (+) 1
-    return false
+    modifySTRef r $ (+) 1)
 
 module Main where
 

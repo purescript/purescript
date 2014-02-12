@@ -38,7 +38,8 @@ module Language.PureScript.CodeGen.Optimize (
 ) where
 
 import Data.Data
-import Data.Maybe (fromMaybe)
+import Data.List (nub)
+import Data.Maybe (fromJust, isJust, fromMaybe)
 import Data.Generics
 
 import Language.PureScript.Names
@@ -288,6 +289,12 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   -- Desugar >>=
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
+  -- Desugar untilE
+  convert (JSApp (JSApp f [arg]) []) | isEffFunc "untilE" f =
+    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn (JSObjectLiteral []) ])) []
+  -- Desugar whileE
+  convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc "whileE" f =
+    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn (JSObjectLiteral []) ])) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
   isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
@@ -303,6 +310,9 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isRetPoly (JSAccessor "$return" (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
+  -- Check if an expression represents a function in the Ef module
+  isEffFunc name (JSAccessor name' (JSAccessor "Eff" (JSVar "_ps"))) | name == name' = True
+  isEffFunc _ _ = False
   -- Module names
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")
@@ -324,20 +334,56 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
 -- Inline functions in the ST module
 --
 inlineST :: JS -> JS
-inlineST = everywhere (mkT convert)
+inlineST = everywhere (mkT convertBlock)
   where
-  convert (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
+  -- Look for runST blocks and inline the STRefs there.
+  -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
+  -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
+  convertBlock (JSApp f [arg]) | isSTFunc "runST" f =
+    let refs = nub . findSTRefsIn $ arg
+        usages = findAllSTUsagesIn arg
+        allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
+        localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
+    in everywhere (mkT $ if allUsagesAreLocalVars then convertAggressive else convertSafe) arg
+  convertBlock other = other
+  -- Convert a block in a safe way, preserving object wrappers of references
+  convertSafe (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
     JSObjectLiteral [("value", arg)]
-  convert (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
+  convertSafe (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
     JSAccessor "value" ref
-  convert (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
+  convertSafe (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
     JSAssignment (JSAccessor "value" ref) arg
-  convert (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
+  convertSafe (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
     JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
-  convert other = other
+  convertSafe other = other
+  -- Convert a block in a more agressive way, unwrapping object wrappers into local variables
+  convertAggressive (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f = arg
+  convertAggressive (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f = ref
+  convertAggressive (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f = JSAssignment ref arg
+  convertAggressive (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f = JSAssignment ref (JSApp func [ref])
+  convertAggressive other = other
   -- Check if an expression represents a function in the ST module
   isSTFunc name (JSAccessor name' (JSAccessor "ST" (JSVar "_ps"))) | name == name' = True
   isSTFunc _ _ = False
+  -- Find all ST Refs initialized in this block
+  findSTRefsIn = everything (++) (mkQ [] isSTRef)
+    where
+    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [arg]) []))) | isSTFunc "newSTRef" f = [ident]
+    isSTRef _ = []
+  -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
+  findAllSTUsagesIn = everything (++) (mkQ [] isSTUsage)
+    where
+    isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f = [ref]
+    isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc "writeSTRef" f || isSTFunc "modifySTRef" f = [ref]
+    isSTUsage _ = []
+  -- Find all uses of a variable
+  appearingIn ref = everything (++) (mkQ [] isVar)
+    where
+    isVar e@(JSVar v) | v == ref = [e]
+    isVar _ = []
+  -- Convert a JS value to a String if it is a JSVar
+  toVar (JSVar v) = Just v
+  toVar _ = Nothing
 
 collapseNestedBlocks :: JS -> JS
 collapseNestedBlocks = everywhere (mkT collapse)
