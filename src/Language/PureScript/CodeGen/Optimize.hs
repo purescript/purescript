@@ -261,6 +261,7 @@ magicDo' :: JS -> JS
 magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   where
   fnName = "__do"
+
   convert :: JS -> JS
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock [JSReturn ret])]) | isBind bind =
@@ -268,24 +269,33 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   convert other = other
+
   isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
   isBind _ = False
+
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
-  isBindPoly (JSAccessor prop (JSVar "Prelude")) | prop == identToJs (Op ">>=") = True
-  isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSVar "Prelude")) = True
+
+  isBindPoly (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) | prop == identToJs (Op ">>=") = True
+  isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isBindPoly _ = False
-  isRetPoly (JSAccessor "$return" (JSVar "Prelude")) = True
+
+  isRetPoly (JSAccessor "$return" (JSAccessor "Prelude" (JSVar "_ps"))) = True
+  isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
+
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")
+
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
-  isEffDict (JSVar ident) | ident == effDictName = True
-  isEffDict (JSAccessor prop (JSVar "Eff")) | prop == effDictName = True
+
+  isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
+  isEffDict (JSApp (JSAccessor prop (JSAccessor "Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
   isEffDict _ = False
+
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
@@ -306,8 +316,8 @@ inlineOperator op f = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp op [x]) [y]) | isOp op = f x y
   convert other = other
-  isOp (JSAccessor longForm (JSVar "Prelude")) | longForm == identToJs (Op op) = True
-  isOp (JSIndexer (JSStringLiteral op') (JSVar "Prelude")) | op == op' = True
+  isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar "_ps"))) | longForm == identToJs (Op op) = True
+  isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | op == op' = True
   isOp _ = False
 
 inlineCommonOperators :: JS -> JS
@@ -350,8 +360,8 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor longForm (JSVar "Prelude")) | longForm == identToJs (Op opString) = True
-    isOp (JSIndexer (JSStringLiteral op') (JSVar "Prelude")) | opString == op' = True
+    isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar ps))) | longForm == identToJs (Op opString) = True
+    isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | opString == op' = True
     isOp _ = False
   binaryFunction :: String -> String -> Type -> BinaryOperator -> JS -> JS
   binaryFunction fnName className classTy op = everywhere (mkT convert)
@@ -359,7 +369,7 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor fnName' (JSVar "Prelude")) | fnName == fnName' = True
+    isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName == fnName' = True
     isOp _ = False
   unary :: String -> String -> Type -> UnaryOperator -> JS -> JS
   unary fnName className classTy op = everywhere (mkT convert)
@@ -367,9 +377,9 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict className classTy dict = JSUnary op x
     convert other = other
-    isOp (JSAccessor fnName' (JSVar "Prelude")) | fnName' == fnName = True
+    isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName' == fnName = True
     isOp _ = False
-  isOpDict className ty (JSAccessor prop (JSVar "Prelude")) | prop == dictName = True
+  isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
     where
     Right (Ident dictName) = mkDictionaryValueName
       (ModuleName (ProperName "Prelude"))
