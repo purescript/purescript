@@ -340,29 +340,29 @@ inlineST = everywhere (mkT convertBlock)
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
-  convertBlock (JSApp f [arg]) | isSTFunc "runST" f =
+  convertBlock (JSApp f [arg]) | isSTFunc "runST" f || isSTFunc "runSTArray" f =
     let refs = nub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
         localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
-    in everywhere (mkT $ if allUsagesAreLocalVars then convertAggressive else convertSafe) arg
+    in everywhere (mkT $ convert allUsagesAreLocalVars) arg
   convertBlock other = other
-  -- Convert a block in a safe way, preserving object wrappers of references
-  convertSafe (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
-    JSObjectLiteral [("value", arg)]
-  convertSafe (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
-    JSAccessor "value" ref
-  convertSafe (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
-    JSAssignment (JSAccessor "value" ref) arg
-  convertSafe (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
-    JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
-  convertSafe other = other
-  -- Convert a block in a more agressive way, unwrapping object wrappers into local variables
-  convertAggressive (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f = arg
-  convertAggressive (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f = ref
-  convertAggressive (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f = JSAssignment ref arg
-  convertAggressive (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f = JSAssignment ref (JSApp func [ref])
-  convertAggressive other = other
+  -- Convert a block in a safe way, preserving object wrappers of references,
+  -- or in a more aggressive way, turning wrappers into local variables depending on the
+  -- agg(ressive) parameter.
+  convert agg (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
+    if agg then arg else JSObjectLiteral [("value", arg)]
+  convert agg (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
+    if agg then ref else JSAccessor "value" ref
+  convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
+    if agg then JSAssignment ref arg else JSAssignment (JSAccessor "value" ref) arg
+  convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
+    if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
+  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc "peekSTArray" f =
+    (JSIndexer i arr)
+  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc "pokeSTArray" f =
+    JSAssignment (JSIndexer i arr) val
+  convert _ other = other
   -- Check if an expression represents a function in the ST module
   isSTFunc name (JSAccessor name' (JSAccessor "ST" (JSVar "_ps"))) | name == name' = True
   isSTFunc _ _ = False
