@@ -49,6 +49,7 @@ The following options are supported:
 --magic-do             Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
 --run-main             Generate a call to `Main.main` after all other generated Javascript.
 --browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
+--entry-point          Specify the entry-point module (usually Main). If specified, code which is not referenced transitively from this module will be removed.
 
 Motivation
 ----------
