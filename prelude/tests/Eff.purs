@@ -27,9 +27,9 @@ test4 = do
   trace "Hello World!"
   return 0
 
-test5 = do
+test5 _ = do
   trace "Hello World!"
-  test5
+  test5 {}
 
 test6 s = do
   trace s
