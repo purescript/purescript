@@ -254,51 +254,90 @@ tco' = everywhere (mkT convert)
   isSelfCall _ _ = False
 
 magicDo :: Options -> JS -> JS
-magicDo opts | optionsMagicDo opts = magicDo'
+magicDo opts | optionsMagicDo opts = inlineST . magicDo'
              | otherwise = id
 
+-- |
+-- Inline type class dictionaries for >>= and return for the Eff monad
+--
+-- E.g.
+--
+--  Prelude[">>="](dict)(m1)(function(x) {
+--    return ...;
+--  })
+--
+-- becomes
+--
+--  function __do {
+--    var x = m1();
+--    ...
+--  }
+--
 magicDo' :: JS -> JS
 magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   where
+  -- The name of the function block which is added to denote a do block
   fnName = "__do"
-
+  -- Desugar monomorphic calls to >>= and return for the Eff monad
   convert :: JS -> JS
+  -- Desugar return
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
+  -- Desugae >>
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSReturn (JSApp ret []) ]
+  -- Desugar >>=
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   convert other = other
-
+  -- Check if an expression represents a monomorphic call to >>= for the Eff monad
   isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
   isBind _ = False
-
+  -- Check if an expression represents a monomorphic call to return for the Eff monad
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
-
+  -- Check if an expression represents the polymorphic >>= function
   isBindPoly (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) | prop == identToJs (Op ">>=") = True
   isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isBindPoly _ = False
-
+  -- Check if an expression represents the polymorphic return function
   isRetPoly (JSAccessor "$return" (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
-
+  -- Module names
   prelude = ModuleName (ProperName "Prelude")
   effModule = ModuleName (ProperName "Eff")
-
+  -- The name of the type class dictionary for the Monad Eff instance
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
-
+  -- Check if an expression represents the Monad Eff dictionary
   isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
   isEffDict (JSApp (JSAccessor prop (JSAccessor "Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
   isEffDict _ = False
-
+  -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
+
+-- |
+-- Inline functions in the ST module
+--
+inlineST :: JS -> JS
+inlineST = everywhere (mkT convert)
+  where
+  convert (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
+    JSObjectLiteral [("value", arg)]
+  convert (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
+    JSAccessor "value" ref
+  convert (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
+    JSAssignment (JSAccessor "value" ref) arg
+  convert (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
+    JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
+  convert other = other
+  -- Check if an expression represents a function in the ST module
+  isSTFunc name (JSAccessor name' (JSAccessor "ST" (JSVar "_ps"))) | name == name' = True
+  isSTFunc _ _ = False
 
 collapseNestedBlocks :: JS -> JS
 collapseNestedBlocks = everywhere (mkT collapse)
