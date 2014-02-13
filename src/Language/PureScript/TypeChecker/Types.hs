@@ -843,7 +843,8 @@ check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  val' <- subsumes (Just val) ty1 ty2
+  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
+  val' <- subsumes (Just val) ty1' ty2
   case val' of
     Nothing -> throwError "Unable to check type subsumption"
     Just val'' -> do
