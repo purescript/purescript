@@ -869,9 +869,9 @@ checkFunctionApplication' fn (ForAll ident ty _) arg = do
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn u@(TUnknown _) arg = do
   arg' <- do
-    TypedValue _ v t <- infer arg
-    (v', t') <- instantiatePolyTypeWithUnknowns arg t
-    return $ TypedValue True v' t'
+    TypedValue _ arg' t <- infer arg
+    (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
+    return $ TypedValue True arg'' t'
   let ty = (\(TypedValue _ _ t) -> t) arg'
   ret <- fresh
   u =?= function ty ret
