@@ -15,6 +15,7 @@ module Operators1 where
 module Operators2 where
 
   import Prelude
+  import Operators1 ((@@))
 
   test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
   test1 x y z = x * y + z x y
@@ -40,7 +41,7 @@ module Operators2 where
 
   test7 = "Hello" <> "World!"
 
-  test9 = Operators1.foo Operators1.@@ "Hello World"
+  test9 = Operators1.foo @@ "Hello World"
 
   test10 = "Hello" `Operators1.bar` "World"
 

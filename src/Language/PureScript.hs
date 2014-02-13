@@ -27,8 +27,10 @@ import Language.PureScript.Pretty as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 import Language.PureScript.ModuleDependencies as P
+import Language.PureScript.DeadCodeElimination as P
 
 import Data.List (intercalate)
+import Data.Maybe (mapMaybe)
 import Control.Monad (when, forM)
 import Control.Monad.State.Lazy
 import Control.Applicative ((<$>))
@@ -47,6 +49,8 @@ import qualified Data.Map as M
 --
 --  * Regroup values to take into account new value dependencies introduced by elaboration
 --
+--  * Eliminate dead code
+--
 --  * Generate Javascript, and perform optimization passes.
 --
 --  * Pretty-print the generated Javascript
@@ -59,8 +63,10 @@ compile opts ms = do
     modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
     Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let js = map (flip (moduleToJs opts) env) $ regrouped
-  let exts = intercalate "\n" . map (flip moduleToPs env) $ regrouped
+  let entryPoint = optionsEntryPoint opts
+  let elim = maybe regrouped (\ep -> eliminateDeadCode env ep regrouped) entryPoint
+  let js = mapMaybe (flip (moduleToJs opts) env) elim
+  let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
   js' <- case () of
               _ | optionsRunMain opts -> do
                     when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $

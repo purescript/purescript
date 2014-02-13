@@ -51,11 +51,13 @@ import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: Options -> Module -> Environment -> JS
+moduleToJs :: Options -> Module -> Environment -> Maybe JS
 moduleToJs opts (Module pname@(ProperName name) decls) env =
-  JSAssignment (JSAccessor name (JSVar "_ps")) $ JSApp (JSFunction Nothing ["module"]
-                      (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
-          [(JSBinary Or (JSAccessor name (JSVar "_ps")) (JSObjectLiteral []))]
+  case jsDecls of
+    [] -> Nothing
+    _ -> Just $ JSAssignment (JSAccessor name (JSVar "_ps")) $
+           JSApp (JSFunction Nothing ["module"] (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
+                 [(JSBinary Or (JSAccessor name (JSVar "_ps")) (JSObjectLiteral []))]
   where
   jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))
 
