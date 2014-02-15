@@ -163,8 +163,8 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
-typesOf moduleName vals = do
+typesOf :: ModuleName -> ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
+typesOf mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
     let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
@@ -204,7 +204,7 @@ typesOf moduleName vals = do
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (TypedValue True val' ty, ty))
       -- If run-main is enabled, need to check that Main.main has type Eff eff a for some eff, a
-      when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
+      when (moduleName == mainModuleName && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       -- Make sure unification variables do not escape

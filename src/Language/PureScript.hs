@@ -61,7 +61,7 @@ compile opts ms = do
   desugared <- desugar sorted
   (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> do
     modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
-    Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
+    Module moduleName <$> typeCheckAll mainModuleIdent (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoint = optionsEntryPoint opts <|> if (optionsRunMain opts) then Just "Main" else Nothing
   let elim = maybe regrouped (\ep -> eliminateDeadCode env ep regrouped) entryPoint
@@ -69,10 +69,11 @@ compile opts ms = do
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
   js' <- case () of
               _ | optionsRunMain opts -> do
-                    when ((ModuleName (ProperName mainModuleName), Ident "main") `M.notMember` (names env)) $
+                    when ((mainModuleIdent, Ident "main") `M.notMember` (names env)) $
                       Left $ mainModuleName ++ ".main is undefined"
                     return $ js ++ [JSApp (JSAccessor "main" (JSAccessor mainModuleName (JSVar "_ps"))) []]
                 | otherwise -> return js
   return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
   where
   mainModuleName = fromMaybe "Main" (optionsEntryPoint opts)
+  mainModuleIdent = ModuleName (ProperName mainModuleName)
