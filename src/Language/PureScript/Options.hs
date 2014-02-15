@@ -32,9 +32,10 @@ data Options = Options {
     --
   , optionsMagicDo :: Bool
     -- |
-    -- Check the type of Main.main and generate its code
+    -- When specified, checks the type of `main` in the module, and generate a call to run main
+    -- after the module definitions. 
     --
-  , optionsRunMain :: Bool
+  , optionsMain :: Maybe String
     -- |
     -- Skip all optimizations
     --
@@ -45,13 +46,13 @@ data Options = Options {
     --
   , optionsBrowserNamespace :: String
     -- |
-    -- The entry point module, for dead code elimination
+    -- The modules to keep while enabling dead code elimination
     --
-  , optionsEntryPoint :: Maybe String
+  , optionsModules :: [String]
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False False "PS" Nothing
+defaultOptions = Options False False False Nothing False "PS" []

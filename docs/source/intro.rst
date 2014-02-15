@@ -47,9 +47,9 @@ The following options are supported:
 --tco                  Perform tail-call elimination on the generated Javascript.
 --no-prelude           Do not include the Prelude in the generated Javascript.
 --magic-do             Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
---run-main             Generate a call to `Main.main` after all other generated Javascript.
+--main                 Generate a call to `main` in the specified module after all other generated Javascript. Defaults to `Main` if the option is used but no value is provided.
+--module               If specified, any code which is not referenced transitively from this module will be removed. This argument can be used multiple times.
 --browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
---entry-point          Specify the entry-point module (usually Main). If specified, code which is not referenced transitively from this module will be removed.
 
 Motivation
 ----------
