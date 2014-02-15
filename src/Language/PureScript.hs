@@ -33,7 +33,7 @@ import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
 import Control.Monad (when, forM)
 import Control.Monad.State.Lazy
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<|>))
 import qualified Data.Map as M
 
 -- |
@@ -63,7 +63,7 @@ compile opts ms = do
     modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
     Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoint = optionsEntryPoint opts
+  let entryPoint = optionsEntryPoint opts <|> if (optionsRunMain opts) then Just "Main" else Nothing
   let elim = maybe regrouped (\ep -> eliminateDeadCode env ep regrouped) entryPoint
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
