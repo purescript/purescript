@@ -30,7 +30,7 @@ import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.DeadCodeElimination as P
 
 import Data.List (intercalate)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Control.Monad (when, forM)
 import Control.Monad.State.Lazy
 import Control.Applicative ((<$>), (<|>))
@@ -69,8 +69,10 @@ compile opts ms = do
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
   js' <- case () of
               _ | optionsRunMain opts -> do
-                    when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
-                      Left "Main.main is undefined"
-                    return $ js ++ [JSApp (JSAccessor "main" (JSAccessor "Main" (JSVar "_ps"))) []]
+                    when ((ModuleName (ProperName mainModuleName), Ident "main") `M.notMember` (names env)) $
+                      Left $ mainModuleName ++ ".main is undefined"
+                    return $ js ++ [JSApp (JSAccessor "main" (JSAccessor mainModuleName (JSVar "_ps"))) []]
                 | otherwise -> return js
   return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
+  where
+  mainModuleName = fromMaybe "Main" (optionsEntryPoint opts)
