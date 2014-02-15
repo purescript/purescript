@@ -111,7 +111,7 @@ checkTypeClassInstance _ _ = throwError "Type class instance must be of the form
 --
 --  * Process module imports
 --
-typeCheckAll :: ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
+typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ _ [] = return []
 typeCheckAll mainModuleName moduleName (d@(DataDeclaration name args dctors) : rest) = do
   rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do

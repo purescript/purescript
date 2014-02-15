@@ -86,9 +86,9 @@ magicDo :: Term Bool
 magicDo = value $ flag $ (optInfo [ "magic-do" ])
      { optDoc = "Overload the do keyword to generate efficient code specifically for the Eff monad." }
 
-runMain :: Term Bool
-runMain = value $ flag $ (optInfo [ "run-main" ])
-     { optDoc = "Generate code to run the main method in the Main module." }
+runMain :: Term (Maybe String)
+runMain = value $ defaultOpt (Just "Main") Nothing $ (optInfo [ "main" ])
+     { optDoc = "Generate code to run the main method in the specified module." }
 
 noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
@@ -98,12 +98,12 @@ browserNamespace :: Term String
 browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
 
-entryPoint :: Term (Maybe String)
-entryPoint = value $ opt Nothing $ (optInfo [ "entry-point" ])
-     { optDoc = "Specify the module which is the entry point. All code which is not a transitive dependency of this module will be removed." }
+dceModules :: Term [String]
+dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
+     { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
 
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> entryPoint
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

@@ -35,7 +35,7 @@ getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 options :: P.Options
-options = P.Options True False True True True "PS" Nothing
+options = P.Options True False True Nothing True "PS" []
 
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
