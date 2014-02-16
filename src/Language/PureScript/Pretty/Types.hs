@@ -32,7 +32,7 @@ import Language.PureScript.Pretty.Common
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
-  match (Object row) = Just $ "{ " ++ prettyPrintObjectRow row ++ " }"
+  match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (TypeVar var) = Just var
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
   match ty@(TypeConstructor ctor) = Just $ show ctor
@@ -41,12 +41,9 @@ typeLiterals = mkPattern match
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
   match (ForAll ident ty _) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
-  match REmpty = Just $ "()"
+  match REmpty = Just "()"
   match row@(RCons _ _ _) = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
-  prettyPrintObjectRow REmpty = ""
-  prettyPrintObjectRow row@(RCons _ _ _) = prettyPrintRow row
-  prettyPrintObjectRow _ = error "Non-row type in Object"
 
 -- |
 -- Generate a pretty-printed string representing a Row
