@@ -56,7 +56,7 @@ module Prelude where
     read _ = false
 
   foreign import readNumber "function readNumber(n) {\
-                            \  return parseInt(n, 10);\
+                            \  return parseFloat(n);\
                             \}" :: String -> Number
 
   instance Read Number where
