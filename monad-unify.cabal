@@ -1,5 +1,5 @@
 name: monad-unify
-version: 0.2.0.0
+version: 0.2.0.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -13,7 +13,7 @@ author: Phil Freeman
 data-dir: ""
 
 library
-    build-depends: base ==4.6.*,
+    build-depends: base ==4.*,
                    mtl -any, syb -any,
                    unordered-containers -any
     exposed-modules: Control.Monad.Unify
