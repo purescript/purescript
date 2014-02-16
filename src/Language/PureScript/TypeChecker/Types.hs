@@ -47,6 +47,7 @@ import qualified Data.Data as D
 import Data.Generics
        (everythingWithContext, mkM, everywhereM, everything, mkT,
         something, everywhere, mkQ)
+import Data.Generics.Extras
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -249,7 +250,7 @@ overTypes f = everywhere (mkT f)
 -- Replace type class dictionary placeholders with inferred type class dictionaries
 --
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
-replaceTypeClassDictionaries mn = everywhereM (mkM go)
+replaceTypeClassDictionaries mn = everywhereM' (mkM go)
   where
   go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
