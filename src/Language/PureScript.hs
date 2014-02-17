@@ -63,7 +63,7 @@ compile opts ms = do
     modify (\s -> s { checkCurrentModule = Just moduleName })
     Module moduleName <$> typeCheckAll mainModuleIdent moduleName decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoints = (ModuleName . return . ProperName) `map` optionsModules opts
+  let entryPoints = (ModuleName . splitProperNames) `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
@@ -75,4 +75,8 @@ compile opts ms = do
     _ -> return js
   return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
   where
-  mainModuleIdent = (ModuleName . return . ProperName) <$> optionsMain opts
+  mainModuleIdent = ModuleName . splitProperNames <$> optionsMain opts
+  splitProperNames s = case dropWhile (== '.') s of
+    "" -> []
+    s' -> ProperName w : splitProperNames s''
+      where (w, s'') = break (== '.') s'
