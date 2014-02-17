@@ -204,14 +204,23 @@ properName :: P.Parsec String u ProperName
 properName = lexeme $ ProperName <$> P.try ((:) <$> P.upper <*> many P.alphaNum P.<?> "name")
 
 -- |
+-- Parse a module name
+--
+moduleName :: P.Parsec String ParseState ModuleName
+moduleName = ModuleName <$> P.try (sepBy properName dot)
+
+-- |
 -- Parse a qualified name, i.e. M.name or just name
 --
 parseQualified :: P.Parsec String ParseState a -> P.Parsec String ParseState (Qualified a)
-parseQualified parser = qual
+parseQualified parser = part []
   where
-  qual = (Qualified <$> (Just . ModuleName . pure <$> P.try (properName <* delimiter)) <*> parser)
-     <|> (Qualified Nothing <$> P.try parser)
-  delimiter = indented *> dot
+  part path = (do name <- P.try (properName <* delimiter)
+                  part (updatePath path name))
+              <|> (Qualified (qual path) <$> P.try parser)
+  delimiter = indented *> dot <* P.notFollowedBy dot
+  updatePath path name = path ++ [name]
+  qual path = if null path then Nothing else Just $ ModuleName path
 
 -- |
 -- Parse an integer or floating point value

@@ -16,6 +16,7 @@
 module Language.PureScript.CodeGen.Common where
 
 import Data.Char
+import Data.List (intercalate)
 import Language.PureScript.Names
 
 -- |
@@ -127,3 +128,5 @@ nameIsJsReserved name =
             , "with"
             , "yield" ]
 
+moduleNameToJs :: ModuleName -> String
+moduleNameToJs (ModuleName pns) = intercalate "_" (runProperName `map` pns)

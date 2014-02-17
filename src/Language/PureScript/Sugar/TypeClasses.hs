@@ -36,7 +36,7 @@ import Control.Arrow ((***))
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import Data.Generics (mkQ, everything)
-import Language.PureScript.CodeGen.Common (identToJs)
+import Language.PureScript.CodeGen.Common (identToJs, moduleNameToJs)
 
 type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
 
@@ -159,7 +159,7 @@ typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in
 
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
-qualifiedToString _ (Qualified (Just mn) pn) = runModuleName mn ++ "_" ++ runProperName pn
+qualifiedToString _ (Qualified (Just mn) pn) = moduleNameToJs mn ++ "_" ++ runProperName pn
 
 -- |
 -- Generate a name for a type class dictionary, based on the module name, class name and type name
