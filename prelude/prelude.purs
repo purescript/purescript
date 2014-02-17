@@ -636,7 +636,7 @@ module Arrays where
 
   instance (Prelude.Show a) => Prelude.Show [a] where
     show [] = "[]"
-    show (x:xs) = show x ++ " : " ++ show xs
+    show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
   instance Prelude.Functor [] where
     (<$>) = map
