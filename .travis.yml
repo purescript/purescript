@@ -1,3 +1,5 @@
 language: haskell
 notifications:
   email: true
+after_success:
+  - ./execTests.sh
