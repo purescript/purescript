@@ -80,7 +80,7 @@ data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typea
 
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
-  show (Qualified (Just (ModuleName name)) a) = show name ++ "." ++ show a
+  show (Qualified (Just name) a) = show name ++ "." ++ show a
 
 -- |
 -- Provide a default module name, if a name is unqualified
