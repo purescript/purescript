@@ -26,8 +26,9 @@ import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
 import System.Console.Haskeline
-import System.Directory (findExecutable)
+import System.Directory (createDirectoryIfMissing, findExecutable)
 import System.Exit
+import System.Environment.XDG.BaseDir
 import System.Process
 
 import qualified Language.PureScript as P
@@ -120,11 +121,19 @@ findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
     where names = ["nodejs", "node"]
 
+getHistoryFilename :: IO FilePath
+getHistoryFilename = do
+  purescriptConfig <- getUserConfigDir "purescript"
+  createDirectoryIfMissing True purescriptConfig
+  getUserConfigFile "purescript" "psci_history"
+
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
   (Right prelude) <- loadModule preludeFilename
-  runInputT (setComplete (completion prelude) defaultSettings) $ do
+  historyFilename <- getHistoryFilename
+  let settings = defaultSettings {historyFile = Just historyFilename}
+  runInputT (setComplete (completion prelude) settings) $ do
     outputStrLn " ____                 ____            _       _   "
     outputStrLn "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
     outputStrLn "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
