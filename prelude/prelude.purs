@@ -635,7 +635,6 @@ module Arrays where
   all p (a:as) = p a && all p as
 
   instance (Prelude.Show a) => Prelude.Show [a] where
-    show [] = "[]"
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
   instance Prelude.Functor [] where
