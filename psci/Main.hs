@@ -16,15 +16,19 @@
 
 module Main where
 
-import Control.Monad.IO.Class
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (mapMaybe)
+import Data.Traversable (traverse)
 
-import System.Process
 import System.Console.Haskeline
+import System.Directory (findExecutable)
+import System.Exit
+import System.Process
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -35,7 +39,7 @@ getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 options :: P.Options
-options = P.Options True False True Nothing True "PS" []
+options = P.Options True False True (Just "Main") True "PS" []
 
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
@@ -75,8 +79,12 @@ handleDeclaration loadedModules imports value = do
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
-      output <- liftIO $ readProcess "nodejs" [] js
-      outputStrLn output
+      process <- lift findNodeProcess
+      result <- lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+      case result of
+        Just (ExitSuccess,   out, _)   -> outputStrLn out
+        Just (ExitFailure _, _,   err) -> outputStrLn err
+        Nothing                        -> outputStrLn "Couldn't find node.js"
 
 data Command
   = Empty
@@ -108,6 +116,10 @@ loadModule moduleFile = do
   moduleText <- U.readFile moduleFile
   return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
 
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
+
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
@@ -121,14 +133,15 @@ main = do
     outputStrLn "                                       |_|        "
     outputStrLn ""
     outputStrLn "Expressions are terminated using Ctrl+D"
-    go [P.ProperName "Prelude"] prelude
+    go [P.ProperName "Prelude", P.ProperName "Eff"] prelude
   where
   go imports loadedModules = do
     cmd <- getCommand
     case cmd of
       Empty -> go imports loadedModules
       Expression ls -> do
-        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
+        let returned = unlines $ ["return ("] ++ ls ++ [")"]
+        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) returned of
           Left err -> outputStrLn (show err)
           Right decl -> handleDeclaration loadedModules imports decl
         go imports loadedModules
