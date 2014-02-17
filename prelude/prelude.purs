@@ -578,7 +578,7 @@ module Arrays where
 
   foreign import sort "function sort(l) {\
                       \  var l1 = l.slice();\
-                      \  l.sort();\
+                      \  l1.sort();\
                       \  return l1;\
                       \}" :: forall a. [a] -> [a]
 

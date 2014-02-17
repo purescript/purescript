@@ -4,7 +4,7 @@ import Prelude
 
 test1 arr = arr !! 0 + arr !! 1 + 1
 
-test2 = \arr -> case arr of 
+test2 = \arr -> case arr of
   [x, y] -> x + y
   [x] -> x
   [] -> 0
@@ -16,12 +16,19 @@ test3 = \tree sum -> case tree of
   One n -> n
   Some (n1 : n2 : rest) -> test3 n1 sum * 10 + test3 n2 sum * 5 + sum rest
 
-test4 = \arr -> case arr of 
+test4 = \arr -> case arr of
   [] -> 0
   [_] -> 0
   x : y : xs -> x * y + test4 xs
-    
+
 module Main where
 
-main = Trace.trace "Done"
+import Arrays
+import Prelude
 
+main = do
+  let x = [3,2,1]
+  let y = sort x
+  if x == [3,2,1]
+    then Trace.trace "Done"
+    else Errors.throwError "Not done"
