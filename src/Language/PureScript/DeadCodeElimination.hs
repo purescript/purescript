@@ -30,12 +30,12 @@ import Language.PureScript.TypeChecker.Monad
 -- |
 -- Eliminate all declarations which are not a transitive dependency of the entry point module
 --
-eliminateDeadCode :: Environment -> [String] -> [Module] -> [Module]
+eliminateDeadCode :: Environment -> [ModuleName] -> [Module] -> [Module]
 eliminateDeadCode env entryPoints ms =
   let declarations = concatMap (declarationsByModule env) ms
       (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
-      entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((ModuleName (ProperName mn), _), _) -> mn `elem` entryPoints) $ declarations
-  in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed (ModuleName moduleName) graph vertexFor entryPointVertices) ds)
+      entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
+  in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed (moduleName) graph vertexFor entryPointVertices) ds)
 
 type Key = (ModuleName, Either Ident ProperName)
 
@@ -43,10 +43,10 @@ declarationsByModule :: Environment -> Module -> [(Key, [Key])]
 declarationsByModule env (Module moduleName ds) = concatMap go $ ds
   where
   go :: Declaration -> [(Key, [Key])]
-  go d@(ValueDeclaration name _ _ _) = [((ModuleName moduleName, Left name), dependencies env (ModuleName moduleName) d)]
-  go (DataDeclaration _ _ dctors) = map (\(name, _) -> ((ModuleName moduleName, Right name), [])) dctors
-  go (ExternDeclaration _ name _ _) = [((ModuleName moduleName, Left name), [])]
-  go d@(BindingGroupDeclaration names) = map (\(name, _) -> ((ModuleName moduleName, Left name), dependencies env (ModuleName moduleName) d)) names
+  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies env (moduleName) d)]
+  go (DataDeclaration _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
+  go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
+  go d@(BindingGroupDeclaration names) = map (\(name, _) -> ((moduleName, Left name), dependencies env moduleName d)) names
   go (DataBindingGroupDeclaration ds) = concatMap go ds
   go _ = []
 

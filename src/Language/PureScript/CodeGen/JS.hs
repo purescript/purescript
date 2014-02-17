@@ -52,14 +52,14 @@ import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 -- module.
 --
 moduleToJs :: Options -> Module -> Environment -> Maybe JS
-moduleToJs opts (Module pname@(ProperName name) decls) env =
+moduleToJs opts (Module name decls) env =
   case jsDecls of
     [] -> Nothing
-    _ -> Just $ JSAssignment (JSAccessor name (JSVar "_ps")) $
+    _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar "_ps")) $
            JSApp (JSFunction Nothing ["module"] (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
-                 [(JSBinary Or (JSAccessor name (JSVar "_ps")) (JSObjectLiteral []))]
+                 [(JSBinary Or (JSAccessor (moduleNameToJs name) (JSVar "_ps")) (JSObjectLiteral []))]
   where
-  jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts (ModuleName pname) decl env) (decls))
+  jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) (decls))
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
@@ -212,7 +212,7 @@ varToJs m e qual@(Qualified _ ident) = go qual
 -- variable that may have a qualified name.
 --
 qualifiedToJS :: ModuleName -> (a -> Ident) -> Qualified a -> JS
-qualifiedToJS m f (Qualified (Just m'@(ModuleName (ProperName mn))) a) | m /= m' = accessor (f a) (JSAccessor mn $ JSVar "_ps")
+qualifiedToJS m f (Qualified (Just m') a) | m /= m' = accessor (f a) (JSAccessor (moduleNameToJs m') $ JSVar "_ps")
 qualifiedToJS m f (Qualified _ a) = JSVar $ identToJs (f a)
 
 -- |

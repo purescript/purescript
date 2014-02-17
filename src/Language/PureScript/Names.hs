@@ -17,6 +17,7 @@
 
 module Language.PureScript.Names where
 
+import Data.List
 import Data.Data
 import Data.Function (on)
 
@@ -64,10 +65,13 @@ instance Show ProperName where
 -- |
 -- Module names
 --
-data ModuleName = ModuleName { runModuleName :: ProperName } deriving (Eq, Ord, Data, Typeable)
+data ModuleName = ModuleName [ProperName] deriving (Eq, Ord, Data, Typeable)
+
+runModuleName :: ModuleName -> String
+runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
 
 instance Show ModuleName where
-  show (ModuleName name) = show name
+  show = runModuleName
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -76,7 +80,7 @@ data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typea
 
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
-  show (Qualified (Just (ModuleName name)) a) = show name ++ "." ++ show a
+  show (Qualified (Just name) a) = show name ++ "." ++ show a
 
 -- |
 -- Provide a default module name, if a name is unqualified

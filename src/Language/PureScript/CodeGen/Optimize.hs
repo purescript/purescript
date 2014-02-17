@@ -284,8 +284,8 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
 
-  prelude = ModuleName (ProperName "Prelude")
-  effModule = ModuleName (ProperName "Eff")
+  prelude = ModuleName [ProperName "Prelude"]
+  effModule = ModuleName [ProperName "Eff"]
 
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
@@ -382,7 +382,7 @@ inlineCommonOperators = applyAll
   isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
     where
     Right (Ident dictName) = mkDictionaryValueName
-      (ModuleName (ProperName "Prim"))
-      (Qualified (Just (ModuleName (ProperName "Prelude"))) (ProperName className))
+      (ModuleName [ProperName "Prim"])
+      (Qualified (Just (ModuleName [ProperName "Prelude"])) (ProperName className))
       ty
   isOpDict _ _ _ = False

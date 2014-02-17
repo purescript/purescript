@@ -118,11 +118,11 @@ data Environment = Environment {
 -- The basic types existing in the external javascript environment
 --
 jsTypes ::M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
-jsTypes = M.fromList [ ((ModuleName $ ProperName "Prim", ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
-                     , ((ModuleName $ ProperName "Prim", ProperName "Array"), (FunKind Star Star, ExternData))
-                     , ((ModuleName $ ProperName "Prim", ProperName "String"), (Star, ExternData))
-                     , ((ModuleName $ ProperName "Prim", ProperName "Number"), (Star, ExternData))
-                     , ((ModuleName $ ProperName "Prim", ProperName "Boolean"), (Star, ExternData)) ]
+jsTypes = M.fromList [ ((ModuleName [ProperName "Prim"], ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
+                     , ((ModuleName [ProperName "Prim"], ProperName "Array"), (FunKind Star Star, ExternData))
+                     , ((ModuleName [ProperName "Prim"], ProperName "String"), (Star, ExternData))
+                     , ((ModuleName [ProperName "Prim"], ProperName "Number"), (Star, ExternData))
+                     , ((ModuleName [ProperName "Prim"], ProperName "Boolean"), (Star, ExternData)) ]
 
 -- |
 -- The initial environment with no values and only the default javascript types defined

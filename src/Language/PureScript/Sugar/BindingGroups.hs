@@ -36,7 +36,7 @@ import Language.PureScript.Types
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
 createBindingGroupsModule :: [Module] -> Either String [Module]
-createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups (ModuleName name) ds
+createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups name ds
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
