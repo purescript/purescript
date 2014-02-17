@@ -50,7 +50,7 @@ desugarTypeClasses :: [Module] -> Either String [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
-desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl (ModuleName name)) decls
+desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl name) decls
 
 -- |
 -- Desugar type class and type class instance declarations
@@ -159,7 +159,7 @@ typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in
 
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
-qualifiedToString _ (Qualified (Just (ModuleName mn)) pn) = runProperName mn ++ "_" ++ runProperName pn
+qualifiedToString _ (Qualified (Just mn) pn) = runModuleName mn ++ "_" ++ runProperName pn
 
 -- |
 -- Generate a name for a type class dictionary, based on the module name, class name and type name

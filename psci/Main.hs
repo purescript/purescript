@@ -51,7 +51,7 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
                     | P.Module moduleName ds <- ms
                     , ident <- mapMaybe getDeclName ds
                     , qual <- [ P.Qualified Nothing ident
-                              , P.Qualified (Just (P.ModuleName moduleName)) ident]
+                              , P.Qualified (Just moduleName) ident]
                     ]
     let matches = filter (isPrefixOf str) names
     return $ map simpleCompletion matches ++ files
@@ -62,16 +62,16 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
 createTemporaryModule :: [P.ProperName] -> P.Value -> P.Module
 createTemporaryModule imports value =
   let
-    moduleName = P.ProperName "Main"
+    moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
-    traceModule = P.ModuleName (P.ProperName "Trace")
+    traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
         (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
               ])
   in
-    P.Module moduleName $ map (importDecl . P.ModuleName) imports ++ [mainDecl]
+    P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
 handleDeclaration :: [P.Module] -> [P.ProperName] -> P.Value -> InputT IO ()
 handleDeclaration loadedModules imports value = do

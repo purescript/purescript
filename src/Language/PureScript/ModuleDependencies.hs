@@ -40,21 +40,21 @@ sortModules ms = do
 -- |
 -- Calculate a list of used modules based on explicit imports and qualified names
 --
-usedModules :: (Data d) => d -> [ProperName]
+usedModules :: (Data d) => d -> [ModuleName]
 usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProperNames `extQ` imports)
   where
-  qualifiedIdents :: Qualified Ident -> [ProperName]
-  qualifiedIdents (Qualified (Just (ModuleName pn)) _) = [pn]
+  qualifiedIdents :: Qualified Ident -> [ModuleName]
+  qualifiedIdents (Qualified (Just mn) _) = [mn]
   qualifiedIdents _ = []
-  qualifiedProperNames :: Qualified ProperName -> [ProperName]
-  qualifiedProperNames (Qualified (Just (ModuleName pn)) _) = [pn]
+  qualifiedProperNames :: Qualified ProperName -> [ModuleName]
+  qualifiedProperNames (Qualified (Just mn) _) = [mn]
   qualifiedProperNames _ = []
-  imports :: Declaration -> [ProperName]
-  imports (ImportDeclaration (ModuleName pn) _) = [pn]
+  imports :: Declaration -> [ModuleName]
+  imports (ImportDeclaration mn _) = [mn]
   imports _ = []
 
-getModuleName :: Module -> ProperName
-getModuleName (Module pn _) = pn
+getModuleName :: Module -> ModuleName
+getModuleName (Module mn _) = mn
 
 -- |
 -- Convert a strongly connected component of the module graph to a module

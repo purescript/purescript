@@ -89,7 +89,7 @@ parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  moduleName <- ModuleName <$> properName
+  moduleName <- ModuleName . pure <$> properName
   idents <- P.optionMaybe $ parens $ commaSep1 (Left <$> parseIdent <|> Right <$> properName)
   return $ ImportDeclaration moduleName idents
 
@@ -141,7 +141,7 @@ parseModule = do
   name <- properName
   _ <- lexeme $ P.string "where"
   decls <- mark (P.many (same *> parseDeclaration))
-  return $ Module name decls
+  return $ Module (ModuleName [name]) decls
 
 -- |
 -- Parse a collection of modules
