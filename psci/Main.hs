@@ -66,9 +66,8 @@ createTemporaryModule imports value =
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName (P.ProperName "Trace")
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    returnedValue = P.App (P.Var (P.Qualified Nothing (P.Ident "return"))) value
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) returnedValue
+        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
               ])
   in
