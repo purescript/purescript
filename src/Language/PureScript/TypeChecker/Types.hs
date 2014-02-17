@@ -68,6 +68,7 @@ import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 import Data.Function (on)
+import Data.Ord (comparing)
 
 instance Partial Type where
   unknown = TUnknown
@@ -1012,6 +1013,27 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
   return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+subsumes' val (Object r1) (Object r2) = do
+  let
+    (ts1, r1') = rowToList r1
+    (ts2, r2') = rowToList r2
+    ts1' = sortBy (comparing fst) ts1
+    ts2' = sortBy (comparing fst) ts2
+  go ts1' ts2' r1' r2'
+  return val
+  where
+  go [] ts2 r1 r2 = r1 =?= rowFromList (ts2, r2)
+  go ts1 [] r1 r2 = r2 =?= rowFromList (ts1, r1)
+  go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1 r2
+    | p1 == p2 = do subsumes Nothing ty1 ty2
+                    go ts1 ts2 r1 r2
+    | p1 < p2 = do rest <- fresh
+                   r2 =?= RCons p1 ty1 rest
+                   go ts1 ((p2, ty2) : ts2) r1 rest
+    | p1 > p2 = do rest <- fresh
+                   r1 =?= RCons p2 ty2 rest
+                   go ((p1, ty1) : ts1) ts2 rest r2
+subsumes' val ty1 ty2@(Object _) = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
