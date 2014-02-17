@@ -77,9 +77,9 @@ executable psc
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
-    build-depends: base >=4 && <5, containers -any, mtl -any,
-                   parsec -any, haskeline <=0.7.1.1, purescript -any, syb -any,
-                   transformers -any, utf8-string -any, process -any
+    build-depends: base >=4 && <5, containers -any, directory -any,
+                   mtl -any, parsec -any, haskeline <=0.7.1.1, purescript -any,
+                   syb -any, transformers -any, utf8-string -any, process -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
