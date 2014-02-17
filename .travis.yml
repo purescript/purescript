@@ -1,3 +1,6 @@
 language: haskell
 notifications:
   email: true
+after_success:
+  - cabal install
+  - ./execTests.sh
