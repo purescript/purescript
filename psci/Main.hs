@@ -47,12 +47,12 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   findCompletions :: String -> IO [Completion]
   findCompletions str = do
     files <- listFiles str
-    let names = nub $ [ show qual
-                      | P.Module moduleName ds <- ms
-                      , ident <- mapMaybe getDeclName ds
-                      , qual <- [ P.Qualified Nothing ident
-                                , P.Qualified (Just (P.ModuleName moduleName)) ident]
-                      ]
+    let names = nub [ show qual
+                    | P.Module moduleName ds <- ms
+                    , ident <- mapMaybe getDeclName ds
+                    , qual <- [ P.Qualified Nothing ident
+                              , P.Qualified (Just (P.ModuleName moduleName)) ident]
+                    ]
     let matches = filter (isPrefixOf str) names
     return $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
@@ -66,8 +66,9 @@ createTemporaryModule imports value =
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName (P.ProperName "Trace")
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
+    returnedValue = P.App (P.Var (P.Qualified Nothing (P.Ident "return"))) value
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
+        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) returnedValue
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
               ])
   in
@@ -140,8 +141,7 @@ main = do
     case cmd of
       Empty -> go imports loadedModules
       Expression ls -> do
-        let returned = unlines $ ["return ("] ++ ls ++ [")"]
-        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) returned of
+        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
           Left err -> outputStrLn (show err)
           Right decl -> handleDeclaration loadedModules imports decl
         go imports loadedModules
