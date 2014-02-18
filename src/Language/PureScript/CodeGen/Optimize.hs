@@ -38,7 +38,8 @@ module Language.PureScript.CodeGen.Optimize (
 ) where
 
 import Data.Data
-import Data.Maybe (fromMaybe)
+import Data.List (nub)
+import Data.Maybe (fromJust, isJust, fromMaybe)
 import Data.Generics
 
 import Language.PureScript.Names
@@ -95,6 +96,7 @@ isReassigned var1 = everything (||) (mkQ False check)
   check :: JS -> Bool
   check (JSFunction _ args _) | var1 `elem` args = True
   check (JSVariableIntroduction arg _) | var1 == arg = True
+  check (JSAssignment (JSVar arg) _) | var1 == arg = True
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
@@ -254,51 +256,135 @@ tco' = everywhere (mkT convert)
   isSelfCall _ _ = False
 
 magicDo :: Options -> JS -> JS
-magicDo opts | optionsMagicDo opts = magicDo'
+magicDo opts | optionsMagicDo opts = inlineST . magicDo'
              | otherwise = id
 
+-- |
+-- Inline type class dictionaries for >>= and return for the Eff monad
+--
+-- E.g.
+--
+--  Prelude[">>="](dict)(m1)(function(x) {
+--    return ...;
+--  })
+--
+-- becomes
+--
+--  function __do {
+--    var x = m1();
+--    ...
+--  }
+--
 magicDo' :: JS -> JS
 magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   where
+  -- The name of the function block which is added to denote a do block
   fnName = "__do"
-
+  -- Desugar monomorphic calls to >>= and return for the Eff monad
   convert :: JS -> JS
+  -- Desugar return
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
+  -- Desugae >>
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSReturn (JSApp ret []) ]
+  -- Desugar >>=
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
+  -- Desugar untilE
+  convert (JSApp (JSApp f [arg]) []) | isEffFunc "untilE" f =
+    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn (JSObjectLiteral []) ])) []
+  -- Desugar whileE
+  convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc "whileE" f =
+    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn (JSObjectLiteral []) ])) []
   convert other = other
-
+  -- Check if an expression represents a monomorphic call to >>= for the Eff monad
   isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
   isBind _ = False
-
+  -- Check if an expression represents a monomorphic call to return for the Eff monad
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
-
+  -- Check if an expression represents the polymorphic >>= function
   isBindPoly (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) | prop == identToJs (Op ">>=") = True
   isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isBindPoly _ = False
-
+  -- Check if an expression represents the polymorphic return function
   isRetPoly (JSAccessor "$return" (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
-
-  prelude = ModuleName (ProperName "Prelude")
-  effModule = ModuleName (ProperName "Eff")
-
+  -- Check if an expression represents a function in the Ef module
+  isEffFunc name (JSAccessor name' (JSAccessor "Eff" (JSVar "_ps"))) | name == name' = True
+  isEffFunc _ _ = False
+  -- Module names
+  prelude = ModuleName [ProperName "Prelude"]
+  effModule = ModuleName [ProperName "Eff"]
+  -- The name of the type class dictionary for the Monad Eff instance
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
-
+  -- Check if an expression represents the Monad Eff dictionary
   isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
   isEffDict (JSApp (JSAccessor prop (JSAccessor "Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
   isEffDict _ = False
-
+  -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
+
+-- |
+-- Inline functions in the ST module
+--
+inlineST :: JS -> JS
+inlineST = everywhere (mkT convertBlock)
+  where
+  -- Look for runST blocks and inline the STRefs there.
+  -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
+  -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
+  convertBlock (JSApp f [arg]) | isSTFunc "runST" f || isSTFunc "runSTArray" f =
+    let refs = nub . findSTRefsIn $ arg
+        usages = findAllSTUsagesIn arg
+        allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
+        localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
+    in everywhere (mkT $ convert allUsagesAreLocalVars) arg
+  convertBlock other = other
+  -- Convert a block in a safe way, preserving object wrappers of references,
+  -- or in a more aggressive way, turning wrappers into local variables depending on the
+  -- agg(ressive) parameter.
+  convert agg (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
+    if agg then arg else JSObjectLiteral [("value", arg)]
+  convert agg (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
+    if agg then ref else JSAccessor "value" ref
+  convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
+    if agg then JSAssignment ref arg else JSAssignment (JSAccessor "value" ref) arg
+  convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
+    if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
+  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc "peekSTArray" f =
+    (JSIndexer i arr)
+  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc "pokeSTArray" f =
+    JSAssignment (JSIndexer i arr) val
+  convert _ other = other
+  -- Check if an expression represents a function in the ST module
+  isSTFunc name (JSAccessor name' (JSAccessor "ST" (JSVar "_ps"))) | name == name' = True
+  isSTFunc _ _ = False
+  -- Find all ST Refs initialized in this block
+  findSTRefsIn = everything (++) (mkQ [] isSTRef)
+    where
+    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [arg]) []))) | isSTFunc "newSTRef" f = [ident]
+    isSTRef _ = []
+  -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
+  findAllSTUsagesIn = everything (++) (mkQ [] isSTUsage)
+    where
+    isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f = [ref]
+    isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc "writeSTRef" f || isSTFunc "modifySTRef" f = [ref]
+    isSTUsage _ = []
+  -- Find all uses of a variable
+  appearingIn ref = everything (++) (mkQ [] isVar)
+    where
+    isVar e@(JSVar v) | v == ref = [e]
+    isVar _ = []
+  -- Convert a JS value to a String if it is a JSVar
+  toVar (JSVar v) = Just v
+  toVar _ = Nothing
 
 collapseNestedBlocks :: JS -> JS
 collapseNestedBlocks = everywhere (mkT collapse)
@@ -382,7 +468,7 @@ inlineCommonOperators = applyAll
   isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
     where
     Right (Ident dictName) = mkDictionaryValueName
-      (ModuleName (ProperName "Prim"))
-      (Qualified (Just (ModuleName (ProperName "Prelude"))) (ProperName className))
+      (ModuleName [ProperName "Prim"])
+      (Qualified (Just (ModuleName [ProperName "Prelude"])) (ProperName className))
       ty
   isOpDict _ _ _ = False

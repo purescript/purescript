@@ -38,7 +38,6 @@ literals = mkPattern match
   match (ArrayLiteral xs) = Just $ "[" ++ intercalate ", " (map prettyPrintValue xs) ++ "]"
   match (ObjectLiteral ps) = Just $ "{" ++ intercalate ", " (map (uncurry prettyPrintObjectProperty) ps) ++ "}"
   match (Constructor name) = Just $ show name
-  match (Block sts) = Just $ "do { " ++ intercalate " ; " (map prettyPrintStatement sts) ++ " }"
   match (Case values binders) = Just $ "case " ++ intercalate " " (map prettyPrintValue values) ++
     " of { " ++ intercalate " ; " (map prettyPrintCaseAlternative binders) ++ " }"
   match (Var ident) = Just $ show ident
@@ -148,25 +147,3 @@ prettyPrintObjectPropertyBinder key binder = key ++ ": " ++ prettyPrintBinder bi
 
 prettyPrintObjectProperty :: String -> Value -> String
 prettyPrintObjectProperty key value = key ++ ": " ++ prettyPrintValue value
-
-prettyPrintStatement :: Statement -> String
-prettyPrintStatement (VariableIntroduction ident value) = "var " ++ show ident ++ " = " ++ prettyPrintValue value
-prettyPrintStatement (Assignment target value) = show target ++ " = " ++ prettyPrintValue value
-prettyPrintStatement (While cond sts) = "while " ++ prettyPrintValue cond ++ ": {" ++ intercalate ";" (map prettyPrintStatement sts) ++ " }"
-prettyPrintStatement (For ident start end sts) = "for " ++ show ident
-  ++ " <- " ++ prettyPrintValue start
-  ++ " until " ++ prettyPrintValue end ++ ": {"
-  ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
-prettyPrintStatement (If ifst) = prettyPrintIfStatement ifst
-prettyPrintStatement (Return value) = "return " ++ prettyPrintValue value
-
-prettyPrintIfStatement :: IfStatement -> String
-prettyPrintIfStatement (IfStatement cond thens elst) =
-  "if "
-  ++ prettyPrintValue cond ++ ": {"
-  ++ intercalate "; " (map prettyPrintStatement thens) ++ " }"
-  ++ maybe "" prettyPrintElseStatement elst
-
-prettyPrintElseStatement :: ElseStatement -> String
-prettyPrintElseStatement (Else sts) = "else: {" ++ intercalate "; " (map prettyPrintStatement sts) ++ " }"
-prettyPrintElseStatement (ElseIf ifst) = "else " ++ prettyPrintIfStatement ifst

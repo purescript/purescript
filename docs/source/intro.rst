@@ -8,7 +8,7 @@ PureScript is a small strongly, statically typed compile-to-JS language with a n
 - Support for basic Javascript types
 - Extensible records
 - Extensible effects
-- Type-safe blocks with for/while/assignment etc.
+- Optimizer rules for generation of efficient Javascript
 - Pattern matching
 - Simple FFI
 - Modules
@@ -64,7 +64,7 @@ I was looking for a simple functional language which would compile to JavaScript
 
 I didn't find exactly what I was looking for, so I wrote PureScript. It doesn't have everything right now, but it should serve as a simple core on which to develop new ideas.
 
-PureScript is *not* designed to be a general-purpose programming language. The primary use case is as a generator for purely-functional core libraries, with the main application code written in another language.
+PureScript was originally designed to implement purely functional core logic. However, recent additions to the compiler and libraries now also make it a good option for general-purpose programming.
 
 PureScript can also be seen as a trade-off between a theoretically ideal language and one which generates reasonably high performance code.
 

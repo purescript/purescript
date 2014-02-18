@@ -614,13 +614,8 @@ module Arrays where
   isEmpty _ = false
 
   range :: Number -> Number -> [Number]
-  range lo hi = {
-      var ns = [];
-      for (n <- lo until hi) {
-        ns = push ns n;
-      }
-      return ns;
-    }
+  range lo hi | lo > hi = []
+  range lo hi = lo : range (lo + 1) hi
 
   zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
   zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
@@ -635,7 +630,6 @@ module Arrays where
   all p (a:as) = p a && all p as
 
   instance (Prelude.Show a) => Prelude.Show [a] where
-    show [] = "[]"
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
   instance Prelude.Functor [] where
@@ -952,7 +946,7 @@ module Eff where
 			\      return {};\
                         \    };\
                         \  };\
-                        \}" :: forall e. Eff e Boolean -> Eff e {} -> Eff e {}
+                        \}" :: forall e a. Eff e Boolean -> Eff e a -> Eff e {}
 
   foreign import forE "function forE(lo) {\
 	              \  return function(hi) {\
@@ -1078,6 +1072,8 @@ module ST where
 
   foreign import data STRef :: * -> * -> *
 
+  foreign import data STArray :: * -> * -> *
+
   foreign import newSTRef "function newSTRef(val) {\
                           \  return function () {\
                           \    return { value: val };\
@@ -1093,20 +1089,54 @@ module ST where
   foreign import modifySTRef "function modifySTRef(ref) {\
                              \  return function(f) {\
                              \    return function() {\
-                             \      ref.value = f(ref.value);\
+                             \      return ref.value = f(ref.value);\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) {}
+                             \}" :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
   foreign import writeSTRef "function writeSTRef(ref) {\
                             \  return function(a) {\
                             \    return function() {\
-                            \      ref.value = a;\
+                            \      return ref.value = a;\
                             \    };\
                             \  };\
-                            \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) {}
+                            \}" :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
+
+  foreign import newSTArray "function newSTArray(len) {\
+                            \  return function(a) {\
+                            \    return function() {\
+                            \      var arr = [];\
+                            \      for (var i = 0; i < len; i++) {\
+                            \        arr[i] = a;\
+                            \      };\
+                            \      return arr;\
+                            \    };\
+                            \  };\
+                            \}" :: forall a h r. Number -> a -> Eff (st :: ST h | r) (STArray h a)
+
+  foreign import peekSTArray "function peekSTArray(arr) {\
+                             \  return function(i) {\
+                             \    return function() {\
+                             \      return arr[i];\
+                             \    };\
+                             \  };\
+                             \}" :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
+
+  foreign import pokeSTArray "function pokeSTArray(arr) {\
+                             \  return function(i) {\
+                             \    return function(a) {\
+                             \      return function() {\
+                             \        return arr[i] = a;\
+                             \      };\
+                             \    };\
+                             \  };\
+                             \}" :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
 
   foreign import runST "function runST(f) {\
                        \  return f;\
                        \}" :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
+
+  foreign import runSTArray "function runSTArray(f) {\
+                            \  return f;\
+                            \}" :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 

@@ -15,7 +15,6 @@
 
 module Language.PureScript.Parser.Values (
     parseValue,
-    parseStatement,
     parseGuard,
     parseBinder,
     parseBinderNoParens,
@@ -83,16 +82,19 @@ parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parse
                              <*> (C.indented *> C.reserved "then" *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
 
-parseBlock :: P.Parsec String ParseState Value
-parseBlock = Block <$> parseManyStatements
-
-parseManyStatements :: P.Parsec String ParseState [Statement]
-parseManyStatements = (do
-  _ <- C.lexeme $ P.char '{'
+parseLet :: P.Parsec String ParseState Value
+parseLet = do
+  C.reserved "let"
   C.indented
-  sts <- C.mark (P.many (C.same *> C.mark parseStatement))
-  _ <- C.lexeme (P.char '}')
-  return sts) P.<?> "block"
+  binder <- parseBinder
+  C.indented
+  C.reservedOp "="
+  C.indented
+  value <- parseValue
+  C.indented
+  C.reserved "in"
+  result <- parseValue
+  return $ Let binder value result
 
 parseValueAtom :: P.Parsec String ParseState Value
 parseValueAtom = P.choice
@@ -104,10 +106,10 @@ parseValueAtom = P.choice
             , parseAbs
             , P.try parseConstructor
             , P.try parseVar
-            , parseBlock
             , parseCase
             , parseIfThenElse
             , parseDo
+            , parseLet
             , Parens <$> C.parens parseValue ]
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
@@ -158,63 +160,6 @@ parseValue =
   operators = [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
                     return (BinaryNoParens ident))) AssocRight ]
               ]
-
-parseVariableIntroduction :: P.Parsec String ParseState Statement
-parseVariableIntroduction = do
-  C.reserved "var"
-  name <- C.indented *> C.parseIdent
-  _ <- C.lexeme $ C.indented *> P.char '='
-  value <- parseValue
-  _ <- C.indented *> C.semi
-  return $ VariableIntroduction name value
-
-parseAssignment :: P.Parsec String ParseState Statement
-parseAssignment = do
-  tgt <- P.try $ do
-    tgt <- C.parseIdent
-    _ <- C.lexeme $ C.indented *> P.char '='
-    return tgt
-  value <- parseValue
-  _ <- C.indented *> C.semi
-  return $ Assignment tgt value
-
-parseWhile :: P.Parsec String ParseState Statement
-parseWhile = While <$> (C.reserved "while" *> C.indented *> C.parens parseValue)
-                   <*> (C.indented *> parseManyStatements)
-
-parseFor :: P.Parsec String ParseState Statement
-parseFor = For <$> (C.reserved "for" *> C.indented *> C.lexeme (P.char '(') *> C.indented *> C.parseIdent)
-               <*> (C.indented *> C.lexeme (P.string "<-") *> parseValue)
-               <*> (C.indented *> C.reserved "until" *> parseValue <* C.indented <* C.lexeme (P.char ')'))
-               <*> parseManyStatements
-
-parseIf :: P.Parsec String ParseState Statement
-parseIf = If <$> parseIfStatement
-
-parseIfStatement :: P.Parsec String ParseState IfStatement
-parseIfStatement =
-  IfStatement <$> (C.reserved "if" *> C.indented *> C.parens parseValue)
-              <*> parseManyStatements
-              <*> P.optionMaybe parseElseStatement
-
-parseElseStatement :: P.Parsec String ParseState ElseStatement
-parseElseStatement = C.reserved "else" >> (ElseIf <$> parseIfStatement
-                                           <|> Else <$> parseManyStatements)
-
-parseReturn :: P.Parsec String ParseState Statement
-parseReturn = Return <$> (C.reserved "return" *> parseValue <* C.indented <* C.semi)
-
--- |
--- Parse a statement
---
-parseStatement :: P.Parsec String ParseState Statement
-parseStatement = P.choice
-                 [ parseAssignment
-                 , parseVariableIntroduction
-                 , parseWhile
-                 , parseFor
-                 , parseIf
-                 , parseReturn ] P.<?> "statement"
 
 parseStringBinder :: P.Parsec String ParseState Binder
 parseStringBinder = StringBinder <$> C.stringLiteral

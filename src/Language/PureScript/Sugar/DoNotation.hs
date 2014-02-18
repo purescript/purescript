@@ -33,7 +33,7 @@ desugarDo :: (Data d) => d -> Either String d
 desugarDo = everywhereM (mkM replace)
   where
   prelude :: ModuleName
-  prelude = ModuleName (ProperName "Prelude")
+  prelude = ModuleName [ProperName "Prelude"]
   ret :: Value
   ret = Var (Qualified (Just prelude) (Ident "ret"))
   bind :: Value

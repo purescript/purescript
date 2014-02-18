@@ -16,6 +16,7 @@
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Monad
+import Control.Arrow ((>>>))
 
 import Language.PureScript.Declarations
 
@@ -25,9 +26,12 @@ import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.Let as S
 
 -- |
 -- The desugaring pipeline proceeds as follows:
+--
+--  * Desugar let bindings
 --
 --  * Introduce type synonyms for type class dictionaries
 --
@@ -45,6 +49,7 @@ desugar :: [Module] -> Either String [Module]
 desugar = desugarTypeClasses
           >=> rebracket
           >=> desugarDo
-          >=> desugarCasesModule
+          >=> desugarLetBindings
+          >>> desugarCasesModule
           >=> desugarTypeDeclarationsModule
           >=> createBindingGroupsModule

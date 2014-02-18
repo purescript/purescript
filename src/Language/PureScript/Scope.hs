@@ -30,16 +30,12 @@ import Language.PureScript.CodeGen.JS.AST
 -- Gather all used names appearing inside a value
 --
 usedNames :: (Data d) => d -> [Ident]
-usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB `extQ` namesJS) val
+usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesB `extQ` namesJS) val
   where
   namesV :: Value -> [Ident]
   namesV (Abs arg _) = [arg]
   namesV (Var (Qualified Nothing name)) = [name]
   namesV _ = []
-  namesS :: Statement -> [Ident]
-  namesS (VariableIntroduction name _) = [name]
-  namesS (For name _ _ _) = [name]
-  namesS _ = []
   namesB :: Binder -> [Ident]
   namesB (VarBinder name) = [name]
   namesB _ = []
