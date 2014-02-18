@@ -21,7 +21,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
-import Data.List (nub, isPrefixOf)
+import Data.List (nub, isPrefixOf, sort)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
@@ -61,7 +61,7 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
                     , qual <- [ P.Qualified Nothing ident
                               , P.Qualified (Just moduleName) ident]
                     ]
-    let matches = filter (isPrefixOf str) names
+    let matches = sort $ filter (isPrefixOf str) names
     return $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
