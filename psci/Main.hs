@@ -144,14 +144,14 @@ main = do
             case P.runIndentParser "" parseExpression (unlines ls) of
               Left err -> outputStrLn (show err)
               Right decl -> do
-                handleDeclaration loadedModules imports binders decl
+                handleDeclaration loadedModules imports (reverse binders) decl
                 go imports loadedModules binders
-          Right binder -> go imports loadedModules (binders ++ [binder])
+          Right binder -> go imports loadedModules (binder:binders)
       Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules binders
       Let line -> do
         moreLets <- case P.runIndentParser "" parseDoNotationLet line of
           Left err -> outputStrLn (show err) >> return binders
-          Right l -> return $ binders ++ [l]
+          Right l -> return $ l:binders
         go imports loadedModules moreLets
       LoadModule moduleFile -> do
         ms <- lift $ loadModule moduleFile
