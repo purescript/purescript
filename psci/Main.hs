@@ -73,14 +73,14 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   getDeclName _ = Nothing
 
 createTemporaryModule :: [P.ProperName] -> [P.DoNotationElement] -> P.Value -> P.Module
-createTemporaryModule imports lets value =
+createTemporaryModule imports binders value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do (lets ++
+        (P.Do (binders ++
               [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
               ]))
@@ -88,8 +88,8 @@ createTemporaryModule imports lets value =
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
 handleDeclaration :: [P.Module] -> [P.ProperName] -> [P.DoNotationElement] -> P.Value -> InputT IO ()
-handleDeclaration loadedModules imports lets value = do
-  let m = createTemporaryModule imports lets value
+handleDeclaration loadedModules imports binders value = do
+  let m = createTemporaryModule imports binders value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
@@ -113,6 +113,9 @@ parseDoNotationLet = P.DoNotationLet <$> (P.reserved "let" *> P.indented *> P.pa
 parseDoNotationBind :: Parsec.Parsec String P.ParseState P.DoNotationElement
 parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.reservedOp "<-" *> P.parseValue)
 
+parseExpression :: Parsec.Parsec String P.ParseState P.Value
+parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
+
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
@@ -131,29 +134,33 @@ main = do
     go defaultImports prelude []
   where
   go :: [P.ProperName] -> [P.Module] -> [P.DoNotationElement] -> InputT IO ()
-  go imports loadedModules lets = do
+  go imports loadedModules binders = do
     cmd <- getCommand
     case cmd of
-      Empty -> go imports loadedModules lets
-      Expression ls -> do
-        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
-          Left err -> outputStrLn (show err)
-          Right decl -> handleDeclaration loadedModules imports lets decl
-        go imports loadedModules lets
-      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules lets
+      Empty -> go imports loadedModules binders
+      Expression ls ->
+        case P.runIndentParser "" parseDoNotationBind (unlines ls) of
+          Left _ ->
+            case P.runIndentParser "" parseExpression (unlines ls) of
+              Left err -> outputStrLn (show err)
+              Right decl -> do
+                handleDeclaration loadedModules imports binders decl
+                go imports loadedModules binders
+          Right binder -> go imports loadedModules (binders ++ [binder])
+      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules binders
       Let line -> do
         moreLets <- case P.runIndentParser "" parseDoNotationLet line of
-          Left err -> outputStrLn (show err) >> return lets
-          Right l -> return $ lets ++ [l]
+          Left err -> outputStrLn (show err) >> return binders
+          Right l -> return $ binders ++ [l]
         go imports loadedModules moreLets
       LoadModule moduleFile -> do
         ms <- lift $ loadModule moduleFile
         case ms of
           Left err -> outputStrLn err
-          Right ms' -> go imports (loadedModules ++ ms') lets
+          Right ms' -> go imports (loadedModules ++ ms') binders
       Reload -> do
         preludeFilename <- lift getPreludeFilename
         (Right prelude) <- lift $ loadModule preludeFilename
-        go defaultImports prelude lets
+        go defaultImports prelude binders
 
 
