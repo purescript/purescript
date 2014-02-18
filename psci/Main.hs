@@ -16,6 +16,8 @@
 
 module Main where
 
+import Commands
+
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -34,7 +36,7 @@ import System.Process
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (eof)
+import qualified Text.Parsec as Parsec (Parsec, eof)
 
 getHistoryFilename :: IO FilePath
 getHistoryFilename = getUserConfigFile "purescript" "psci_history"
@@ -45,6 +47,9 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
     where names = ["nodejs", "node"]
+
+defaultImports :: [P.ProperName]
+defaultImports = [P.ProperName "Prelude", P.ProperName "Eff"]
 
 options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
@@ -67,23 +72,24 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
 
-createTemporaryModule :: [P.ProperName] -> P.Value -> P.Module
-createTemporaryModule imports value =
+createTemporaryModule :: [P.ProperName] -> [P.DoNotationElement] -> P.Value -> P.Module
+createTemporaryModule imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
+        (P.Do (lets ++
+              [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
-              ])
+              ]))
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
-handleDeclaration :: [P.Module] -> [P.ProperName] -> P.Value -> InputT IO ()
-handleDeclaration loadedModules imports value = do
-  let m = createTemporaryModule imports value
+handleDeclaration :: [P.Module] -> [P.ProperName] -> [P.DoNotationElement] -> P.Value -> InputT IO ()
+handleDeclaration loadedModules imports lets value = do
+  let m = createTemporaryModule imports lets value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
@@ -94,35 +100,18 @@ handleDeclaration loadedModules imports value = do
         Just (ExitFailure _, _,   err) -> outputStrLn err
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
-data Command
-  = Empty
-  | Expression [String]
-  | Import String
-  | LoadModule FilePath
-  | Reload deriving (Show, Eq)
-
-getCommand :: InputT IO Command
-getCommand = do
-  firstLine <- getInputLine  "> "
-  case firstLine of
-    Nothing -> return Empty
-    Just (':':'i':' ':moduleName) -> return $ Import moduleName
-    Just (':':'m':' ':modulePath) -> return $ LoadModule modulePath
-    Just ":r" -> return Reload
-    Just (':':_) -> outputStrLn "Unknown command" >> getCommand
-    Just other -> Expression <$> go [other]
-  where
-  go ls = do
-    l <- getInputLine "  "
-    case l of
-      Nothing -> return $ reverse ls
-      Just l' -> go (l' : ls)
-
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule moduleFile = do
   print moduleFile
   moduleText <- U.readFile moduleFile
   return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
+
+parseDoNotationLet :: Parsec.Parsec String P.ParseState P.DoNotationElement
+parseDoNotationLet = P.DoNotationLet <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+                                   <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+
+parseDoNotationBind :: Parsec.Parsec String P.ParseState P.DoNotationElement
+parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.reservedOp "<-" *> P.parseValue)
 
 main :: IO ()
 main = do
@@ -139,26 +128,32 @@ main = do
     outputStrLn "                                       |_|        "
     outputStrLn ""
     outputStrLn "Expressions are terminated using Ctrl+D"
-    go [P.ProperName "Prelude", P.ProperName "Eff"] prelude
+    go defaultImports prelude []
   where
-  go imports loadedModules = do
+  go :: [P.ProperName] -> [P.Module] -> [P.DoNotationElement] -> InputT IO ()
+  go imports loadedModules lets = do
     cmd <- getCommand
     case cmd of
-      Empty -> go imports loadedModules
+      Empty -> go imports loadedModules lets
       Expression ls -> do
         case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
           Left err -> outputStrLn (show err)
-          Right decl -> handleDeclaration loadedModules imports decl
-        go imports loadedModules
-      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules
+          Right decl -> handleDeclaration loadedModules imports lets decl
+        go imports loadedModules lets
+      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules lets
+      Let line -> do
+        moreLets <- case P.runIndentParser "" parseDoNotationLet line of
+          Left err -> outputStrLn (show err) >> return lets
+          Right l -> return $ lets ++ [l]
+        go imports loadedModules moreLets
       LoadModule moduleFile -> do
         ms <- lift $ loadModule moduleFile
         case ms of
           Left err -> outputStrLn err
-          Right ms' -> go imports (loadedModules ++ ms')
+          Right ms' -> go imports (loadedModules ++ ms') lets
       Reload -> do
         preludeFilename <- lift getPreludeFilename
         (Right prelude) <- lift $ loadModule preludeFilename
-        go [P.ProperName "Prelude"] prelude
+        go defaultImports prelude lets
 
 
