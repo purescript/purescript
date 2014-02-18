@@ -30,10 +30,10 @@ import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.DeadCodeElimination as P
 
 import Data.List (intercalate)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Control.Monad (when, forM)
 import Control.Monad.State.Lazy
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<|>))
 import qualified Data.Map as M
 
 -- |
@@ -47,9 +47,9 @@ import qualified Data.Map as M
 --
 --  * Type check, and elaborate values to include type annotations and type class dictionaries.
 --
---  * Regroup values to take into account new value dependencies introduced by elaboration
+--  * Regroup values to take into account new value dependencies introduced by elaboration.
 --
---  * Eliminate dead code
+--  * Eliminate dead code.
 --
 --  * Generate Javascript, and perform optimization passes.
 --
@@ -61,16 +61,18 @@ compile opts ms = do
   desugared <- desugar sorted
   (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> do
     modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
-    Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
+    Module moduleName <$> typeCheckAll mainModuleIdent (ModuleName moduleName) decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoint = optionsEntryPoint opts
-  let elim = maybe regrouped (\ep -> eliminateDeadCode env ep regrouped) entryPoint
+  let entryPoints = optionsModules opts
+  let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
-  js' <- case () of
-              _ | optionsRunMain opts -> do
-                    when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
-                      Left "Main.main is undefined"
-                    return $ js ++ [JSApp (JSAccessor "main" (JSAccessor "Main" (JSVar "_ps"))) []]
-                | otherwise -> return js
+  js' <- case optionsMain opts of
+    Just mainModuleName -> do
+      when ((ModuleName (ProperName mainModuleName), Ident "main") `M.notMember` (names env)) $
+        Left $ mainModuleName ++ ".main is undefined"
+      return $ js ++ [JSApp (JSAccessor "main" (JSAccessor mainModuleName (JSVar "_ps"))) []]
+    _ -> return js
   return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
+  where
+  mainModuleIdent = ModuleName . ProperName <$> (optionsMain opts)

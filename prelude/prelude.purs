@@ -56,7 +56,7 @@ module Prelude where
     read _ = false
 
   foreign import readNumber "function readNumber(n) {\
-                            \  return parseInt(n, 10);\
+                            \  return parseFloat(n);\
                             \}" :: String -> Number
 
   instance Read Number where
@@ -164,13 +164,13 @@ module Prelude where
 
   foreign import refEq "function refEq(r1) {\
                        \  return function(r2) {\
-                       \    return r1.value === r2.value;\
+                       \    return r1.values[0] === r2.values[0];\
                        \  };\
                        \}" :: forall a. Ref a -> Ref a -> Boolean
 
   foreign import refIneq "function refIneq(r1) {\
                          \  return function(r2) {\
-                         \    return r1.value !== r2.value;\
+                         \    return r1.values[0] !== r2.values[0];\
                          \  };\
                          \}" :: forall a. Ref a -> Ref a -> Boolean
 

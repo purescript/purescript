@@ -30,11 +30,11 @@ import Language.PureScript.TypeChecker.Monad
 -- |
 -- Eliminate all declarations which are not a transitive dependency of the entry point module
 --
-eliminateDeadCode :: Environment -> String -> [Module] -> [Module]
-eliminateDeadCode env entryPoint ms =
+eliminateDeadCode :: Environment -> [String] -> [Module] -> [Module]
+eliminateDeadCode env entryPoints ms =
   let declarations = concatMap (declarationsByModule env) ms
       (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
-      entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((ModuleName (ProperName mn), _), _) -> mn == entryPoint) $ declarations
+      entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((ModuleName (ProperName mn), _), _) -> mn `elem` entryPoints) $ declarations
   in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed (ModuleName moduleName) graph vertexFor entryPointVertices) ds)
 
 type Key = (ModuleName, Either Ident ProperName)

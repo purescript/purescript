@@ -47,6 +47,7 @@ import qualified Data.Data as D
 import Data.Generics
        (everythingWithContext, mkM, everywhereM, everything, mkT,
         something, everywhere, mkQ)
+import Data.Generics.Extras
 
 import Language.PureScript.Values
 import Language.PureScript.Types
@@ -67,6 +68,7 @@ import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 import Data.Function (on)
+import Data.Ord (comparing)
 
 instance Partial Type where
   unknown = TUnknown
@@ -151,7 +153,7 @@ unifyRows r1 r2 =
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem s1 _) [] (Skolem s2 _) | s1 == s2 = return ()
-  unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify " ++ prettyPrintRow (rowFromList (sd3, r3)) ++ " with " ++ prettyPrintRow (rowFromList (sd4, r4)) ++ "."
+  unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")."
 
 -- |
 -- Ensure type constructors are equal after canonicalization
@@ -163,8 +165,8 @@ typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName 
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
-typesOf moduleName vals = do
+typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
+typesOf mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
     let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
@@ -203,8 +205,8 @@ typesOf moduleName vals = do
           TypedValue _ val' ty <- bindNames dict' $ infer val
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (TypedValue True val' ty, ty))
-      -- If run-main is enabled, need to check that Main.main has type Eff eff a for some eff, a
-      when (moduleName == ModuleName (ProperName "Main") && fst e == Ident "main") $ do
+      -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
+      when (Just moduleName == mainModuleName && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName (ProperName "Eff"))) (ProperName "Eff"))) eff) a
       -- Make sure unification variables do not escape
@@ -249,7 +251,7 @@ overTypes f = everywhere (mkT f)
 -- Replace type class dictionary placeholders with inferred type class dictionaries
 --
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
-replaceTypeClassDictionaries mn = everywhereM (mkM go)
+replaceTypeClassDictionaries mn = everywhereM' (mkM go)
   where
   go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
@@ -767,7 +769,8 @@ check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  val' <- subsumes (Just val) ty1 ty2
+  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
+  val' <- subsumes (Just val) ty1' ty2
   case val' of
     Nothing -> throwError "Unable to check type subsumption"
     Just val'' -> do
@@ -930,6 +933,27 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
   return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+subsumes' val (Object r1) (Object r2) = do
+  let
+    (ts1, r1') = rowToList r1
+    (ts2, r2') = rowToList r2
+    ts1' = sortBy (comparing fst) ts1
+    ts2' = sortBy (comparing fst) ts2
+  go ts1' ts2' r1' r2'
+  return val
+  where
+  go [] ts2 r1 r2 = r1 =?= rowFromList (ts2, r2)
+  go ts1 [] r1 r2 = r2 =?= rowFromList (ts1, r1)
+  go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1 r2
+    | p1 == p2 = do subsumes Nothing ty1 ty2
+                    go ts1 ts2 r1 r2
+    | p1 < p2 = do rest <- fresh
+                   r2 =?= RCons p1 ty1 rest
+                   go ts1 ((p2, ty2) : ts2) r1 rest
+    | p1 > p2 = do rest <- fresh
+                   r1 =?= RCons p2 ty2 rest
+                   go ((p1, ty1) : ts1) ts2 rest r2
+subsumes' val ty1 ty2@(Object _) = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
