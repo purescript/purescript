@@ -26,7 +26,7 @@ import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
 import System.Console.Haskeline
-import System.Directory (createDirectoryIfMissing, findExecutable)
+import System.Directory (findExecutable)
 import System.Exit
 import System.Environment.XDG.BaseDir
 import System.Process
@@ -36,8 +36,15 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (eof)
 
+getHistoryFilename :: IO FilePath
+getHistoryFilename = getUserConfigFile "purescript" "psci_history"
+
 getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
+
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
 
 options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
@@ -116,16 +123,6 @@ loadModule moduleFile = do
   print moduleFile
   moduleText <- U.readFile moduleFile
   return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
-
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
-
-getHistoryFilename :: IO FilePath
-getHistoryFilename = do
-  purescriptConfig <- getUserConfigDir "purescript"
-  createDirectoryIfMissing True purescriptConfig
-  getUserConfigFile "purescript" "psci_history"
 
 main :: IO ()
 main = do

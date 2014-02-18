@@ -1,7 +1,7 @@
 name: purescript
 version: 0.4.1
 cabal-version: >=1.8
-build-type: Simple
+build-type: Custom
 license: MIT
 license-file: LICENSE
 copyright: (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
@@ -17,7 +17,8 @@ data-dir: ""
 library
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
                    directory -any, filepath -any, mtl -any, parsec -any, syb -any,
-                   transformers -any, utf8-string -any, pattern-arrows -any, monad-unify >= 0.2 && < 0.3
+                   transformers -any, utf8-string -any, pattern-arrows -any, monad-unify >= 0.2 && < 0.3,
+                   xdg-basedir -any, unix -any
     exposed-modules: Data.Generics.Extras
                      Language.PureScript
                      Language.PureScript.Options
