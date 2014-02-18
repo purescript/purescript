@@ -8,7 +8,7 @@ PureScript is a small strongly, statically typed compile-to-JS language with a n
 - Support for basic Javascript types
 - Extensible records
 - Extensible effects
-- Type-safe blocks with for/while/assignment etc.
+- Optimizer rules for generation of efficient Javascript
 - Pattern matching
 - Simple FFI
 - Modules
