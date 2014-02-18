@@ -59,8 +59,8 @@ renderModules ms = do
   mapM_ renderModule ms
 
 renderModule :: P.Module -> Docs
-renderModule (P.Module (P.ProperName moduleName) ds) = do
-  headerLevel 2 $ "Module " ++ moduleName
+renderModule (P.Module moduleName ds) = do
+  headerLevel 2 $ "Module " ++ (P.runModuleName moduleName)
   spacer
   headerLevel 3 "Types"
   spacer

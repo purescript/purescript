@@ -42,7 +42,7 @@ data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable
 -- |
 -- A module declaration, consisting of a module name and a list of declarations
 --
-data Module = Module ProperName [Declaration] deriving (Show, D.Data, D.Typeable)
+data Module = Module ModuleName [Declaration] deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- The type of a foreign import

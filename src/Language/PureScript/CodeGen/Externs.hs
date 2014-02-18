@@ -29,9 +29,9 @@ import Data.List (intercalate)
 -- Generate foreign imports for all declarations in a module
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module pname@(ProperName moduleName) decls) env =
-  "module " ++ moduleName ++ " where\n" ++
-  (intercalate "\n" . map ("  " ++) . concatMap (declToPs (ModuleName pname) env) $ decls)
+moduleToPs (Module mn decls) env =
+  "module " ++ (runModuleName mn) ++ " where\n" ++
+  (intercalate "\n" . map ("  " ++) . concatMap (declToPs mn env) $ decls)
 
 declToPs :: ModuleName -> Environment -> Declaration -> [String]
 declToPs path env (ValueDeclaration name _ _ _) = maybeToList $ do

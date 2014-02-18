@@ -315,8 +315,8 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isEffFunc name (JSAccessor name' (JSAccessor "Eff" (JSVar "_ps"))) | name == name' = True
   isEffFunc _ _ = False
   -- Module names
-  prelude = ModuleName (ProperName "Prelude")
-  effModule = ModuleName (ProperName "Eff")
+  prelude = ModuleName [ProperName "Prelude"]
+  effModule = ModuleName [ProperName "Eff"]
   -- The name of the type class dictionary for the Monad Eff instance
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
@@ -468,7 +468,7 @@ inlineCommonOperators = applyAll
   isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
     where
     Right (Ident dictName) = mkDictionaryValueName
-      (ModuleName (ProperName "Prim"))
-      (Qualified (Just (ModuleName (ProperName "Prelude"))) (ProperName className))
+      (ModuleName [ProperName "Prim"])
+      (Qualified (Just (ModuleName [ProperName "Prelude"])) (ProperName className))
       ty
   isOpDict _ _ _ = False

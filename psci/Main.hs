@@ -16,15 +16,19 @@
 
 module Main where
 
-import Control.Monad.IO.Class
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (mapMaybe)
+import Data.Traversable (traverse)
 
-import System.Process
 import System.Console.Haskeline
+import System.Directory (findExecutable)
+import System.Exit
+import System.Process
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -35,7 +39,7 @@ getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 options :: P.Options
-options = P.Options True False True Nothing True "PS" []
+options = P.Options True False True (Just "Main") True "PS" []
 
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
@@ -43,12 +47,12 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   findCompletions :: String -> IO [Completion]
   findCompletions str = do
     files <- listFiles str
-    let names = nub $ [ show qual
-                      | P.Module moduleName ds <- ms
-                      , ident <- mapMaybe getDeclName ds
-                      , qual <- [ P.Qualified Nothing ident
-                                , P.Qualified (Just (P.ModuleName moduleName)) ident]
-                      ]
+    let names = nub [ show qual
+                    | P.Module moduleName ds <- ms
+                    , ident <- mapMaybe getDeclName ds
+                    , qual <- [ P.Qualified Nothing ident
+                              , P.Qualified (Just moduleName) ident]
+                    ]
     let matches = filter (isPrefixOf str) names
     return $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
@@ -58,16 +62,16 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
 createTemporaryModule :: [P.ProperName] -> P.Value -> P.Module
 createTemporaryModule imports value =
   let
-    moduleName = P.ProperName "Main"
+    moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
-    traceModule = P.ModuleName (P.ProperName "Trace")
+    traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
         (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
               , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
               ])
   in
-    P.Module moduleName $ map (importDecl . P.ModuleName) imports ++ [mainDecl]
+    P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
 handleDeclaration :: [P.Module] -> [P.ProperName] -> P.Value -> InputT IO ()
 handleDeclaration loadedModules imports value = do
@@ -75,8 +79,12 @@ handleDeclaration loadedModules imports value = do
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
-      output <- liftIO $ readProcess "nodejs" [] js
-      outputStrLn output
+      process <- lift findNodeProcess
+      result <- lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+      case result of
+        Just (ExitSuccess,   out, _)   -> outputStrLn out
+        Just (ExitFailure _, _,   err) -> outputStrLn err
+        Nothing                        -> outputStrLn "Couldn't find node.js"
 
 data Command
   = Empty
@@ -108,6 +116,10 @@ loadModule moduleFile = do
   moduleText <- U.readFile moduleFile
   return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
 
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
+
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
@@ -121,7 +133,7 @@ main = do
     outputStrLn "                                       |_|        "
     outputStrLn ""
     outputStrLn "Expressions are terminated using Ctrl+D"
-    go [P.ProperName "Prelude"] prelude
+    go [P.ProperName "Prelude", P.ProperName "Eff"] prelude
   where
   go imports loadedModules = do
     cmd <- getCommand
