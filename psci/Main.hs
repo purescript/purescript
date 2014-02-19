@@ -164,7 +164,7 @@ parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" parseDoNotationBind (unlines ls) of
+  case P.runIndentParser "" parseDoNotationLet (unlines ls) of
     Left _ ->
       case P.runIndentParser "" parseExpression (unlines ls) of
         Left err -> inputTToState $ outputStrLn (show err)
@@ -172,10 +172,6 @@ handleCommand (Expression ls) =
     Right binder -> modify (updateBinders binder)
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
-handleCommand (Let line) =
-  case P.runIndentParser "" parseDoNotationLet line of
-    Left err -> inputTToState $ outputStrLn (show err)
-    Right binder -> modify (updateBinders binder)
 handleCommand (LoadFile filePath) = do
   mf <- ioToState $ loadModule filePath
   case mf of

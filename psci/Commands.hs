@@ -8,7 +8,6 @@ data Command
   | Expression [String]
   | Help
   | Import String
-  | Let String
   | LoadFile FilePath
   | Quit
   | Reload
@@ -25,7 +24,6 @@ getCommand = do
     Just ":q" -> return Quit
     Just ":r" -> return Reload
     Just (':':_) -> return Unknown
-    Just l@('l':'e':'t':_) -> return $ Let l
     Just other -> Expression <$> go [other]
   where
   go ls = do
