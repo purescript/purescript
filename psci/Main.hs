@@ -54,8 +54,8 @@ updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
 updateModules :: [P.Module] -> PSCI -> PSCI
 updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
 
-updateBinders :: (P.Value -> P.Value) -> PSCI -> PSCI
-updateBinders name (PSCI i m b) = PSCI i m (b ++ [name])
+updateLets :: (P.Value -> P.Value) -> PSCI -> PSCI
+updateLets name (PSCI i m b) = PSCI i m (b ++ [name])
 
 -- File helpers
 defaultImports :: [P.ProperName]
@@ -122,20 +122,20 @@ options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
 
 createTemporaryModule :: [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
-createTemporaryModule imports binders value =
+createTemporaryModule imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    value' = foldr ($) value binders
+    value' = foldr ($) value lets
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace value')
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
 handleDeclaration :: P.Value -> PSCI -> InputT IO ()
-handleDeclaration value (PSCI imports loadedModules binders) = do
-  let m = createTemporaryModule imports binders value
+handleDeclaration value (PSCI imports loadedModules lets) = do
+  let m = createTemporaryModule imports lets value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
@@ -147,9 +147,9 @@ handleDeclaration value (PSCI imports loadedModules binders) = do
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
 -- Parser helpers
-parseDoNotationLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
-parseDoNotationLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                           <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
+parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
 
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
@@ -158,12 +158,12 @@ parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" parseDoNotationLet (unlines ls) of
+  case P.runIndentParser "" parseLet (unlines ls) of
     Left _ ->
       case P.runIndentParser "" parseExpression (unlines ls) of
         Left err -> inputTToState $ outputStrLn (show err)
         Right decl -> get >>= inputTToState . handleDeclaration decl
-    Right binder -> modify (updateBinders binder)
+    Right l -> modify (updateLets l)
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
