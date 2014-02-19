@@ -5,11 +5,18 @@ module Main where
   import Eff
   import Trace
   import Date
+  
+  foreign import testJSDateOk "var testJSDateOk = new Date();" :: JSDate
+  foreign import testJSDateBad "var testJSDateBad = new Date('fail');" :: JSDate
 
   main = do
     d <- now
     Trace.print d
-    Trace.print $ parse "Tue Feb 18 2014 23:24:53 GMT+3000"
+    
+    Trace.print $ fromJSDate testJSDateOk
+    Trace.print $ fromJSDate testJSDateBad
+    
+    Trace.print $ fromString "Tue Feb 18 2014 23:24:53 GMT+3000"
     Trace.print $ date 2003 January 01
     Trace.print $ dateTime 2044 February 01 13 26 48 06
     

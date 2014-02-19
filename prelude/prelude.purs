@@ -1160,36 +1160,31 @@ module Date where
   import Enum
   import Maybe
   
-  foreign import unsafeFromJust
-    "function unsafeFromJust(d) { \
-    \  return d.values[0]; \
-    \}" :: forall a. Maybe a -> a
+  unsafeFromJust :: forall a. Maybe a -> a
+  unsafeFromJust (Just a) = a
     
-  foreign import dateMethod
-    "function dateMethod(method) { \
+  foreign import jsDateMethod
+    "function jsDateMethod(method) { \
     \  return function(date) { \
-    \    return date.values[0][method](); \
+    \    return date[method](); \
     \  }; \
-    \}" :: forall a. String -> Date -> a
+    \}" :: forall a. String -> JSDate -> a
+    
+  foreign import jsDateConstructor
+    "function jsDateConstructor(x) { \
+    \  return new Date(x); \
+    \}" :: forall a. a -> JSDate
 
-  foreign import jsDate
-    "function jsDate(year) {\
-    \  return function(month) { \
-    \    return function(day) { \
-    \      return function(hour) { \
-    \        return function(min) { \
-    \          return function(sec) { \
-    \            return function(ms) { \
-    \              return new Date(year, month, day, hour, min, sec, ms); \
-    \            }; \
-    \          }; \
-    \        }; \
-    \      }; \
-    \    }; \
-    \  }; \
-    \}" :: Number -> Number -> Number 
-        -> Number -> Number -> Number -> Number 
-        -> JSDate
+  foreign import jsDateFromRecord
+    "function jsDateFromRecord(r) {\
+    \  return new Date(r.year, r.month, r.day, r.hours, r.minutes, r.seconds, r.milliseconds); \
+    \}" :: { year :: Number
+           , month :: Number
+           , day :: Number
+           , hours :: Number
+           , minutes :: Number
+           , seconds :: Number
+           , milliseconds :: Number } -> JSDate
 
   foreign import data JSDate :: *
   foreign import data Now :: !
@@ -1301,93 +1296,96 @@ module Date where
     show Friday    = "Friday"   
     show Saturday  = "Saturday" 
 
-  foreign import fromJSDate
-    "function fromJSDate(d) { \
-    \  if (isNaN(d.getTime())) { \
-    \    return _ps.Maybe.Nothing; \
-    \  }\
-    \  return _ps.Maybe.Just(module.DateTime(d)); \
-    \}" :: JSDate -> Maybe Date
+  fromJSDate :: JSDate -> Maybe Date
+  fromJSDate d = if Global.isNaN (jsDateMethod "getTime" d) 
+                 then Nothing
+                 else Just $ DateTime d
     
   toJSDate :: Date -> JSDate
   toJSDate (DateTime d) = d
+  
+  liftDate :: forall a. (JSDate -> a) -> Date -> a
+  liftDate f (DateTime d) = f d
     
-  foreign import now
+  foreign import now 
     "function now() { \
-    \  return module.DateTime(new Date()); \
+    \  return DateTime(new Date()); \
     \}" :: forall e. Eff (now :: Now | e) Date
-    
-  foreign import parse
-    "function parse(s) { \
-    \  return fromJSDate(new Date(s)); \
-    \}" :: String -> Maybe Date
     
   dateTime :: Year -> Month -> Day 
            -> Hours -> Minutes -> Seconds -> Milliseconds
-           -> Date
-  dateTime y m d h n s ms = unsafeFromJust $ fromJSDate $ jsDate y (fromEnum m) d h n s ms 
+           -> Maybe Date
+  dateTime y m d h n s ms =
+    fromJSDate $ jsDateFromRecord { year: y
+                                  , month: (fromEnum m)
+                                  , day: d
+                                  , hours: h
+                                  , minutes: n
+                                  , seconds: s
+                                  , milliseconds: ms }
   
-  date :: Year -> Month -> Day -> Date
+  date :: Year -> Month -> Day -> Maybe Date
   date y m d = dateTime y m d 0 0 0 0
 
   toYear :: Date -> Year
-  toYear = dateMethod "getFullYear"
+  toYear = liftDate $ jsDateMethod "getFullYear"
   
   toMonth :: Date -> Month
-  toMonth = unsafeFromJust <<< toEnum <<< dateMethod "getMonth"
+  toMonth = unsafeFromJust <<< toEnum <<< liftDate (jsDateMethod "getMonth")
   
   toDay :: Date -> Day
-  toDay = dateMethod "getDate"
+  toDay = liftDate $ jsDateMethod "getDate"
   
   toDayOfWeek :: Date -> DayOfWeek
-  toDayOfWeek = unsafeFromJust <<< toEnum <<< dateMethod "getDay"
+  toDayOfWeek = unsafeFromJust <<< toEnum <<< liftDate (jsDateMethod "getDay")
   
   toHours :: Date -> Hours
-  toHours = dateMethod "getHours"
+  toHours = liftDate $ jsDateMethod "getHours"
   
   toMinutes :: Date -> Minutes
-  toMinutes = dateMethod "getMinutes"
+  toMinutes = liftDate $ jsDateMethod "getMinutes"
   
   toSeconds :: Date -> Seconds
-  toSeconds = dateMethod "getSeconds"
+  toSeconds = liftDate $ jsDateMethod "getSeconds"
   
   toMilliseconds :: Date -> Seconds
-  toMilliseconds = dateMethod "getMilliseconds"
+  toMilliseconds = liftDate $ jsDateMethod "getMilliseconds"
   
   toUTCYear :: Date -> Year
-  toUTCYear = dateMethod "getUTCFullYear"
+  toUTCYear = liftDate $ jsDateMethod "getUTCFullYear"
   
   toUTCMonth :: Date -> Month
-  toUTCMonth = unsafeFromJust <<< toEnum <<< dateMethod "getUTCMonth"
+  toUTCMonth = unsafeFromJust <<< toEnum <<< liftDate (jsDateMethod "getUTCMonth")
   
   toUTCDay :: Date -> Day
-  toUTCDay = dateMethod "getUTCDate"
+  toUTCDay = liftDate $ jsDateMethod "getUTCDate"
   
   toUTCDayOfWeek :: Date -> DayOfWeek
-  toUTCDayOfWeek = unsafeFromJust <<< toEnum <<< dateMethod "getUTCDay"
+  toUTCDayOfWeek = unsafeFromJust <<< toEnum <<< liftDate (jsDateMethod "getUTCDay")
   
   toUTCHours :: Date -> Hours
-  toUTCHours = dateMethod "getUTCHours"
+  toUTCHours = liftDate $ jsDateMethod "getUTCHours"
   
   toUTCMinutes :: Date -> Minutes
-  toUTCMinutes = dateMethod "getUTCMinutes"
+  toUTCMinutes = liftDate $ jsDateMethod "getUTCMinutes"
   
   toUTCSeconds :: Date -> Seconds
-  toUTCSeconds = dateMethod "getUTCSeconds"
+  toUTCSeconds = liftDate $ jsDateMethod "getUTCSeconds"
   
   toUTCMilliseconds :: Date -> Seconds
-  toUTCMilliseconds = dateMethod "getUTCMilliseconds"
+  toUTCMilliseconds = liftDate $ jsDateMethod "getUTCMilliseconds"
   
   timezoneOffset :: Date -> Minutes
-  timezoneOffset = dateMethod "getTimezoneOffset"
+  timezoneOffset = liftDate $ jsDateMethod "getTimezoneOffset"
   
   toEpochMilliseconds :: Date -> Milliseconds
-  toEpochMilliseconds = dateMethod "getTime"
+  toEpochMilliseconds = liftDate $ jsDateMethod "getTime"
   
-  foreign import fromEpochMilliseconds
-    "function fromEpochMilliseconds(ms) { \
-    \  return fromJSDate(new Date(ms)); \
-    \}" :: Milliseconds -> Maybe Date
+  fromEpochMilliseconds :: Milliseconds -> Maybe Date
+  fromEpochMilliseconds = fromJSDate <<< jsDateConstructor
+  
+  fromString :: String -> Maybe Date
+  fromString = fromJSDate <<< jsDateConstructor
   
   instance Prelude.Show Date where
-    show = dateMethod "toString"
+    show = liftDate $ jsDateMethod "toString"
