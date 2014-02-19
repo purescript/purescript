@@ -608,6 +608,11 @@ module Arrays where
   filter _ [] = []
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
+  
+  find :: forall a. (a -> Boolean) -> [a] -> Maybe a
+  find _ [] = Nothing
+  find p (x:xs) | p x = Just x
+  find p (_:xs) = find p xs
 
   isEmpty :: forall a. [a] -> Boolean
   isEmpty [] = true
@@ -1140,3 +1145,249 @@ module ST where
                             \  return f;\
                             \}" :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 
+module Enum where
+
+  import Maybe
+
+  class Enum a where
+    toEnum :: Number -> Maybe a
+    fromEnum :: a -> Number
+
+module Date where
+
+  import Prelude
+  import Eff
+  import Enum
+  import Maybe
+  
+  foreign import unsafeFromJust
+    "function unsafeFromJust(d) { \
+    \  return d.values[0]; \
+    \}" :: forall a. Maybe a -> a
+    
+  foreign import dateMethod
+    "function dateMethod(method) { \
+    \  return function(date) { \
+    \    return date.values[0][method](); \
+    \  }; \
+    \}" :: forall a. String -> Date -> a
+
+  foreign import jsDate
+    "function jsDate(year) {\
+    \  return function(month) { \
+    \    return function(day) { \
+    \      return function(hour) { \
+    \        return function(min) { \
+    \          return function(sec) { \
+    \            return function(ms) { \
+    \              return new Date(year, month, day, hour, min, sec, ms); \
+    \            }; \
+    \          }; \
+    \        }; \
+    \      }; \
+    \    }; \
+    \  }; \
+    \}" :: Number -> Number -> Number 
+        -> Number -> Number -> Number -> Number 
+        -> JSDate
+
+  foreign import data JSDate :: *
+  foreign import data Now :: !
+  
+  data Date = DateTime JSDate
+  
+  type Year = Number
+  
+  data Month 
+    = January
+    | February
+    | March
+    | April
+    | May
+    | June
+    | July
+    | August
+    | September
+    | October
+    | November
+    | December
+  
+  type Day = Number
+  
+  data DayOfWeek
+    = Sunday
+    | Monday
+    | Tuesday
+    | Wednesday
+    | Thursday
+    | Friday
+    | Saturday
+  
+  type Hours = Number
+  type Minutes = Number
+  type Seconds = Number
+  type Milliseconds = Number
+  
+  instance Enum.Enum Month where
+  
+    toEnum 0  = Just January
+    toEnum 1  = Just February
+    toEnum 2  = Just March
+    toEnum 3  = Just April
+    toEnum 4  = Just May
+    toEnum 5  = Just June
+    toEnum 6  = Just July
+    toEnum 7  = Just August
+    toEnum 8  = Just September
+    toEnum 8  = Just October
+    toEnum 10 = Just November
+    toEnum 11 = Just December
+    toEnum _  = Nothing
+    
+    fromEnum January   = 0
+    fromEnum February  = 1
+    fromEnum March     = 2
+    fromEnum April     = 3
+    fromEnum May       = 4
+    fromEnum June      = 5
+    fromEnum July      = 6
+    fromEnum August    = 7
+    fromEnum September = 8
+    fromEnum October   = 9
+    fromEnum November  = 10
+    fromEnum December  = 11
+    
+  instance Prelude.Show Month where
+  
+    show January   = "January"
+    show February  = "February"
+    show March     = "March"
+    show April     = "April"
+    show May       = "May"
+    show June      = "June"
+    show July      = "July"
+    show August    = "August"
+    show September = "September"
+    show October   = "October"
+    show November  = "November"
+    show December  = "December"
+    
+  instance Enum.Enum DayOfWeek where
+  
+    toEnum 0  = Just Sunday
+    toEnum 1  = Just Monday
+    toEnum 2  = Just Tuesday
+    toEnum 3  = Just Wednesday
+    toEnum 4  = Just Thursday
+    toEnum 5  = Just Friday
+    toEnum 6  = Just Saturday
+    toEnum _  = Nothing
+    
+    fromEnum Sunday    = 0
+    fromEnum Monday    = 1
+    fromEnum Tuesday   = 2
+    fromEnum Wednesday = 3
+    fromEnum Thursday  = 4
+    fromEnum Friday    = 5
+    fromEnum Saturday  = 6
+    
+  instance Prelude.Show DayOfWeek where
+  
+    show Sunday    = "Sunday"   
+    show Monday    = "Monday"  
+    show Tuesday   = "Tuesday"  
+    show Wednesday = "Wednesday"
+    show Thursday  = "Thursday" 
+    show Friday    = "Friday"   
+    show Saturday  = "Saturday" 
+
+  foreign import fromJSDate
+    "function fromJSDate(d) { \
+    \  if (isNaN(d.getTime())) { \
+    \    return _ps.Maybe.Nothing; \
+    \  }\
+    \  return _ps.Maybe.Just(module.DateTime(d)); \
+    \}" :: JSDate -> Maybe Date
+    
+  toJSDate :: Date -> JSDate
+  toJSDate (DateTime d) = d
+    
+  foreign import now
+    "function now() { \
+    \  return module.DateTime(new Date()); \
+    \}" :: forall e. Eff (now :: Now | e) Date
+    
+  foreign import parse
+    "function parse(s) { \
+    \  return fromJSDate(new Date(s)); \
+    \}" :: String -> Maybe Date
+    
+  dateTime :: Year -> Month -> Day 
+           -> Hours -> Minutes -> Seconds -> Milliseconds
+           -> Date
+  dateTime y m d h n s ms = unsafeFromJust $ fromJSDate $ jsDate y (fromEnum m) d h n s ms 
+  
+  date :: Year -> Month -> Day -> Date
+  date y m d = dateTime y m d 0 0 0 0
+
+  toYear :: Date -> Year
+  toYear = dateMethod "getFullYear"
+  
+  toMonth :: Date -> Month
+  toMonth = unsafeFromJust <<< toEnum <<< dateMethod "getMonth"
+  
+  toDay :: Date -> Day
+  toDay = dateMethod "getDate"
+  
+  toDayOfWeek :: Date -> DayOfWeek
+  toDayOfWeek = unsafeFromJust <<< toEnum <<< dateMethod "getDay"
+  
+  toHours :: Date -> Hours
+  toHours = dateMethod "getHours"
+  
+  toMinutes :: Date -> Minutes
+  toMinutes = dateMethod "getMinutes"
+  
+  toSeconds :: Date -> Seconds
+  toSeconds = dateMethod "getSeconds"
+  
+  toMilliseconds :: Date -> Seconds
+  toMilliseconds = dateMethod "getMilliseconds"
+  
+  toUTCYear :: Date -> Year
+  toUTCYear = dateMethod "getUTCFullYear"
+  
+  toUTCMonth :: Date -> Month
+  toUTCMonth = unsafeFromJust <<< toEnum <<< dateMethod "getUTCMonth"
+  
+  toUTCDay :: Date -> Day
+  toUTCDay = dateMethod "getUTCDate"
+  
+  toUTCDayOfWeek :: Date -> DayOfWeek
+  toUTCDayOfWeek = unsafeFromJust <<< toEnum <<< dateMethod "getUTCDay"
+  
+  toUTCHours :: Date -> Hours
+  toUTCHours = dateMethod "getUTCHours"
+  
+  toUTCMinutes :: Date -> Minutes
+  toUTCMinutes = dateMethod "getUTCMinutes"
+  
+  toUTCSeconds :: Date -> Seconds
+  toUTCSeconds = dateMethod "getUTCSeconds"
+  
+  toUTCMilliseconds :: Date -> Seconds
+  toUTCMilliseconds = dateMethod "getUTCMilliseconds"
+  
+  timezoneOffset :: Date -> Minutes
+  timezoneOffset = dateMethod "getTimezoneOffset"
+  
+  toEpochMilliseconds :: Date -> Milliseconds
+  toEpochMilliseconds = dateMethod "getTime"
+  
+  foreign import fromEpochMilliseconds
+    "function fromEpochMilliseconds(ms) { \
+    \  return fromJSDate(new Date(ms)); \
+    \}" :: Milliseconds -> Maybe Date
+  
+  instance Prelude.Show Date where
+    show = dateMethod "toString"
