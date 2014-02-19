@@ -23,7 +23,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
-import Data.List (nub, isPrefixOf, sort)
+import Data.List (intercalate, isPrefixOf, nub, sort)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
@@ -116,6 +116,10 @@ parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.re
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 
+helpMessage :: String
+helpMessage = "The following commands are available:\n\n    " ++
+  intercalate "\n    " (map (intercalate "    ") help)
+
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
@@ -138,29 +142,36 @@ main = do
     cmd <- getCommand
     case cmd of
       Empty -> go imports loadedModules binders
-      Expression ls ->
-        case P.runIndentParser "" parseDoNotationBind (unlines ls) of
+      Expression ls -> do
+        binders' <- case P.runIndentParser "" parseDoNotationBind (unlines ls) of
           Left _ ->
             case P.runIndentParser "" parseExpression (unlines ls) of
-              Left err -> outputStrLn (show err)
+              Left err -> outputStrLn (show err) >> return binders
               Right decl -> do
                 handleDeclaration loadedModules imports (reverse binders) decl
-                go imports loadedModules binders
-          Right binder -> go imports loadedModules (binder:binders)
-      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules binders
+                return binders
+          Right binder -> return $ binder:binders
+        go imports loadedModules binders'
+      Help -> do
+        outputStrLn helpMessage
+        go imports loadedModules binders
+      Import moduleName ->
+        go (imports ++ [P.ProperName moduleName]) loadedModules binders
       Let line -> do
-        moreLets <- case P.runIndentParser "" parseDoNotationLet line of
+        binders' <- case P.runIndentParser "" parseDoNotationLet line of
           Left err -> outputStrLn (show err) >> return binders
-          Right l -> return $ l:binders
-        go imports loadedModules moreLets
+          Right binder -> return $ binder:binders
+        go imports loadedModules binders'
       LoadModule moduleFile -> do
         ms <- lift $ loadModule moduleFile
-        case ms of
-          Left err -> outputStrLn err
-          Right ms' -> go imports (loadedModules ++ ms') binders
+        loadedModules' <- case ms of
+          Left err -> outputStrLn err >> return loadedModules
+          Right ms' -> return $ loadedModules ++ ms'
+        go imports loadedModules' binders
       Reload -> do
         preludeFilename <- lift getPreludeFilename
         (Right prelude) <- lift $ loadModule preludeFilename
         go defaultImports prelude binders
-
-
+      Unknown -> do
+        outputStrLn "Unknown command"
+        go imports loadedModules binders
