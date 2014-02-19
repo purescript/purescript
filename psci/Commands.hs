@@ -9,18 +9,20 @@ data Command
   | Help
   | Import String
   | Let String
-  | LoadModule FilePath
+  | LoadFile FilePath
+  | Quit
   | Reload
   | Unknown deriving (Show, Eq)
 
 getCommand :: InputT IO Command
 getCommand = do
-  firstLine <- getInputLine  "> "
+  firstLine <- getInputLine "> "
   case firstLine of
     Nothing -> return Empty
     Just ":?" -> return Help
     Just (':':'i':' ':moduleName) -> return $ Import moduleName
-    Just (':':'m':' ':modulePath) -> return $ LoadModule modulePath
+    Just (':':'m':' ':filePath) -> return $ LoadFile filePath
+    Just ":q" -> return Quit
     Just ":r" -> return Reload
     Just (':':_) -> return Unknown
     Just l@('l':'e':'t':_) -> return $ Let l
@@ -36,7 +38,7 @@ help :: [[String]]
 help =
   [ [":?         ", "Show this help menu"]
   , [":i <module>", "Import <module> for use in PSCI"]
-  , [":m <module>", "Load <module> for importing"]
-  , [":q         ", "Quit PSCI"]
+  , [":m <file>  ", "Load <file> for importing"]
+  , [":q         ", "Quit PSCi"]
   , [":r         ", "Reload all modules."]
   ]

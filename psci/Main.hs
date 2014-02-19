@@ -22,6 +22,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Trans.State
 
 import Data.List (intercalate, isPrefixOf, nub, sort)
 import Data.Maybe (mapMaybe)
@@ -38,6 +39,25 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (Parsec, eof)
 
+data PSCI = PSCI [P.ProperName] [P.Module] [P.DoNotationElement]
+
+-- State helpers
+inputTToState :: InputT IO a -> StateT PSCI (InputT IO) a
+inputTToState = lift
+
+ioToState :: IO a -> StateT PSCI (InputT IO) a
+ioToState = lift . lift
+
+updateImports :: String -> PSCI -> PSCI
+updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
+
+updateModules :: [P.Module] -> PSCI -> PSCI
+updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
+
+updateBinders :: P.DoNotationElement -> PSCI -> PSCI
+updateBinders name (PSCI i m b) = PSCI i m (b ++ [name])
+
+-- File helpers
 getHistoryFilename :: IO FilePath
 getHistoryFilename = getUserConfigFile "purescript" "psci_history"
 
@@ -50,6 +70,33 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 
 defaultImports :: [P.ProperName]
 defaultImports = [P.ProperName "Prelude", P.ProperName "Eff"]
+
+loadModule :: FilePath -> IO (Either String [P.Module])
+loadModule moduleFile = do
+  moduleText <- U.readFile moduleFile
+  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
+
+-- Messages
+helpMessage :: String
+helpMessage = "The following commands are available:\n\n    " ++
+  intercalate "\n    " (map (intercalate "    ") help)
+
+prologueMessage :: String
+prologueMessage = intercalate "\n"
+  [ " ____                 ____            _       _   "
+  , "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
+  , "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
+  , "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
+  , "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
+  , "                                       |_|        "
+  , ""
+  , ":? shows help"
+  , ""
+  , "Expressions are terminated using Ctrl+D"
+  ]
+
+quitMessage :: String
+quitMessage = "See ya!"
 
 options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
@@ -87,8 +134,8 @@ createTemporaryModule imports binders value =
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
-handleDeclaration :: [P.Module] -> [P.ProperName] -> [P.DoNotationElement] -> P.Value -> InputT IO ()
-handleDeclaration loadedModules imports binders value = do
+handleDeclaration :: P.Value -> PSCI -> InputT IO ()
+handleDeclaration value (PSCI imports loadedModules binders) = do
   let m = createTemporaryModule imports binders value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
@@ -100,12 +147,6 @@ handleDeclaration loadedModules imports binders value = do
         Just (ExitFailure _, _,   err) -> outputStrLn err
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
-loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule moduleFile = do
-  print moduleFile
-  moduleText <- U.readFile moduleFile
-  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
-
 parseDoNotationLet :: Parsec.Parsec String P.ParseState P.DoNotationElement
 parseDoNotationLet = P.DoNotationLet <$> (P.reserved "let" *> P.indented *> P.parseBinder)
                                    <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
@@ -116,9 +157,30 @@ parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.re
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 
-helpMessage :: String
-helpMessage = "The following commands are available:\n\n    " ++
-  intercalate "\n    " (map (intercalate "    ") help)
+handleCommand :: Command -> StateT PSCI (InputT IO) ()
+handleCommand Empty = return ()
+handleCommand (Expression ls) =
+  case P.runIndentParser "" parseDoNotationBind (unlines ls) of
+    Left _ ->
+      case P.runIndentParser "" parseExpression (unlines ls) of
+        Left err -> inputTToState $ outputStrLn (show err)
+        Right decl -> get >>= inputTToState . handleDeclaration decl
+    Right binder -> modify (updateBinders binder)
+handleCommand Help = inputTToState $ outputStrLn helpMessage
+handleCommand (Import moduleName) = modify (updateImports moduleName)
+handleCommand (Let line) =
+  case P.runIndentParser "" parseDoNotationLet line of
+    Left err -> inputTToState $ outputStrLn (show err)
+    Right binder -> modify (updateBinders binder)
+handleCommand (LoadFile filePath) = do
+  mf <- ioToState $ loadModule filePath
+  case mf of
+    Left err -> inputTToState $ outputStrLn err
+    Right mf' -> modify (updateModules mf')
+handleCommand Reload = do
+  (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
+  put (PSCI defaultImports prelude [])
+handleCommand Unknown = inputTToState $ outputStrLn "Unknown command"
 
 main :: IO ()
 main = do
@@ -127,51 +189,12 @@ main = do
   historyFilename <- getHistoryFilename
   let settings = defaultSettings {historyFile = Just historyFilename}
   runInputT (setComplete (completion prelude) settings) $ do
-    outputStrLn " ____                 ____            _       _   "
-    outputStrLn "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
-    outputStrLn "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
-    outputStrLn "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
-    outputStrLn "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
-    outputStrLn "                                       |_|        "
-    outputStrLn ""
-    outputStrLn "Expressions are terminated using Ctrl+D"
-    go defaultImports prelude []
+    outputStrLn prologueMessage
+    evalStateT go (PSCI defaultImports prelude [])
   where
-  go :: [P.ProperName] -> [P.Module] -> [P.DoNotationElement] -> InputT IO ()
-  go imports loadedModules binders = do
-    cmd <- getCommand
-    case cmd of
-      Empty -> go imports loadedModules binders
-      Expression ls -> do
-        binders' <- case P.runIndentParser "" parseDoNotationBind (unlines ls) of
-          Left _ ->
-            case P.runIndentParser "" parseExpression (unlines ls) of
-              Left err -> outputStrLn (show err) >> return binders
-              Right decl -> do
-                handleDeclaration loadedModules imports (reverse binders) decl
-                return binders
-          Right binder -> return $ binder:binders
-        go imports loadedModules binders'
-      Help -> do
-        outputStrLn helpMessage
-        go imports loadedModules binders
-      Import moduleName ->
-        go (imports ++ [P.ProperName moduleName]) loadedModules binders
-      Let line -> do
-        binders' <- case P.runIndentParser "" parseDoNotationLet line of
-          Left err -> outputStrLn (show err) >> return binders
-          Right binder -> return $ binder:binders
-        go imports loadedModules binders'
-      LoadModule moduleFile -> do
-        ms <- lift $ loadModule moduleFile
-        loadedModules' <- case ms of
-          Left err -> outputStrLn err >> return loadedModules
-          Right ms' -> return $ loadedModules ++ ms'
-        go imports loadedModules' binders
-      Reload -> do
-        preludeFilename <- lift getPreludeFilename
-        (Right prelude) <- lift $ loadModule preludeFilename
-        go defaultImports prelude binders
-      Unknown -> do
-        outputStrLn "Unknown command"
-        go imports loadedModules binders
+    go :: StateT PSCI (InputT IO) ()
+    go = do
+      c <- inputTToState getCommand
+      case c of
+        Quit -> inputTToState $ outputStrLn quitMessage
+        _    -> handleCommand c >> go
