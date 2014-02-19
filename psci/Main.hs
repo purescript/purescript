@@ -58,18 +58,18 @@ updateBinders :: P.DoNotationElement -> PSCI -> PSCI
 updateBinders name (PSCI i m b) = PSCI i m (b ++ [name])
 
 -- File helpers
-getHistoryFilename :: IO FilePath
-getHistoryFilename = getUserConfigFile "purescript" "psci_history"
-
-getPreludeFilename :: IO FilePath
-getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
+defaultImports :: [P.ProperName]
+defaultImports = [P.ProperName "Prelude", P.ProperName "Eff"]
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
     where names = ["nodejs", "node"]
 
-defaultImports :: [P.ProperName]
-defaultImports = [P.ProperName "Prelude", P.ProperName "Eff"]
+getHistoryFilename :: IO FilePath
+getHistoryFilename = getUserConfigFile "purescript" "psci_history"
+
+getPreludeFilename :: IO FilePath
+getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule moduleFile = do
@@ -98,9 +98,7 @@ prologueMessage = intercalate "\n"
 quitMessage :: String
 quitMessage = "See ya!"
 
-options :: P.Options
-options = P.Options True False True (Just "Main") True "PS" []
-
+-- Haskeline completions
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
   where
@@ -118,6 +116,10 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
+
+-- Compilation
+options :: P.Options
+options = P.Options True False True (Just "Main") True "PS" []
 
 createTemporaryModule :: [P.ProperName] -> [P.DoNotationElement] -> P.Value -> P.Module
 createTemporaryModule imports binders value =
@@ -147,6 +149,7 @@ handleDeclaration value (PSCI imports loadedModules binders) = do
         Just (ExitFailure _, _,   err) -> outputStrLn err
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
+-- Parser helpers
 parseDoNotationLet :: Parsec.Parsec String P.ParseState P.DoNotationElement
 parseDoNotationLet = P.DoNotationLet <$> (P.reserved "let" *> P.indented *> P.parseBinder)
                                    <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
@@ -157,6 +160,7 @@ parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.re
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 
+-- Commands
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
