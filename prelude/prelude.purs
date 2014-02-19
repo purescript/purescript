@@ -608,6 +608,11 @@ module Arrays where
   filter _ [] = []
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
+  
+  find :: forall a. (a -> Boolean) -> [a] -> Maybe a
+  find _ [] = Nothing
+  find p (x:xs) | p x = Just x
+  find p (_:xs) = find p xs
 
   isEmpty :: forall a. [a] -> Boolean
   isEmpty [] = true
@@ -1140,3 +1145,10 @@ module ST where
                             \  return f;\
                             \}" :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 
+module Enum where
+
+  import Maybe
+
+  class Enum a where
+    toEnum :: Number -> Maybe a
+    fromEnum :: a -> Number
