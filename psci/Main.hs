@@ -39,7 +39,7 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (Parsec, eof)
 
-data PSCI = PSCI [P.ProperName] [P.Module] [P.DoNotationElement]
+data PSCI = PSCI [P.ProperName] [P.Module] [P.Value -> P.Value]
 
 -- State helpers
 inputTToState :: InputT IO a -> StateT PSCI (InputT IO) a
@@ -54,7 +54,7 @@ updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
 updateModules :: [P.Module] -> PSCI -> PSCI
 updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
 
-updateBinders :: P.DoNotationElement -> PSCI -> PSCI
+updateBinders :: (P.Value -> P.Value) -> PSCI -> PSCI
 updateBinders name (PSCI i m b) = PSCI i m (b ++ [name])
 
 -- File helpers
@@ -121,18 +121,15 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
 options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
 
-createTemporaryModule :: [P.ProperName] -> [P.DoNotationElement] -> P.Value -> P.Module
+createTemporaryModule :: [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
 createTemporaryModule imports binders value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do (binders ++
-              [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
-              , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
-              ]))
+    value' = foldr ($) value binders
+    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace value')
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
@@ -150,12 +147,9 @@ handleDeclaration value (PSCI imports loadedModules binders) = do
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
 -- Parser helpers
-parseDoNotationLet :: Parsec.Parsec String P.ParseState P.DoNotationElement
-parseDoNotationLet = P.DoNotationLet <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                                   <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
-
-parseDoNotationBind :: Parsec.Parsec String P.ParseState P.DoNotationElement
-parseDoNotationBind = P.DoNotationBind <$> P.parseBinder <*> (P.indented *> P.reservedOp "<-" *> P.parseValue)
+parseDoNotationLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
+parseDoNotationLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+                           <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
 
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
