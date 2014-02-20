@@ -9,6 +9,7 @@
 -- Portability :
 --
 -- |
+-- PureScript Compiler Interactive.
 --
 -----------------------------------------------------------------------------
 
@@ -16,31 +17,143 @@
 
 module Main where
 
+import Commands
+
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Trans.State
 
-import Data.List (nub, isPrefixOf)
+import Data.List (intercalate, isPrefixOf, nub, sort)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
 import System.Console.Haskeline
 import System.Directory (findExecutable)
 import System.Exit
+import System.Environment.XDG.BaseDir
 import System.Process
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (eof)
+import qualified Text.Parsec as Parsec (Parsec, eof)
 
+-- |
+-- The PSCI state.
+-- Holds a list of imported modules, loaded files, and partial let bindings.
+-- The let bindings are partial,
+-- because it makes more sense to apply the binding to the final evaluated expression.
+--
+data PSCI = PSCI [P.ProperName] [P.Module] [P.Value -> P.Value]
+
+-- State helpers
+
+-- |
+-- Synonym to be more descriptive.
+-- This is just @lift@
+--
+inputTToState :: InputT IO a -> StateT PSCI (InputT IO) a
+inputTToState = lift
+
+-- |
+-- Synonym to be more descriptive.
+-- This is just @lift . lift@
+--
+ioToState :: IO a -> StateT PSCI (InputT IO) a
+ioToState = lift . lift
+
+-- |
+-- Updates the state to have more imported modules.
+--
+updateImports :: String -> PSCI -> PSCI
+updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
+
+-- |
+-- Updates the state to have more loaded files.
+--
+updateModules :: [P.Module] -> PSCI -> PSCI
+updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
+
+-- |
+-- Updates the state to have more let bindings.
+--
+updateLets :: (P.Value -> P.Value) -> PSCI -> PSCI
+updateLets name (PSCI i m b) = PSCI i m (b ++ [name])
+
+-- File helpers
+-- |
+-- Load the necessary modules.
+--
+defaultImports :: [P.ProperName]
+defaultImports = [P.ProperName "Prelude"]
+
+-- |
+-- Locates the node executable.
+-- Checks for either @nodejs@ or @node@.
+--
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
+
+-- |
+-- Grabs the filename where the history is stored.
+--
+getHistoryFilename :: IO FilePath
+getHistoryFilename = getUserConfigFile "purescript" "psci_history"
+
+-- |
+-- Grabs the filename where prelude is.
+--
 getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
-options :: P.Options
-options = P.Options True False True (Just "Main") True "PS" []
+-- |
+-- Loads a file for use with imports.
+--
+loadModule :: FilePath -> IO (Either String [P.Module])
+loadModule moduleFile = do
+  moduleText <- U.readFile moduleFile
+  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
 
+-- Messages
+
+-- |
+-- The help message.
+--
+helpMessage :: String
+helpMessage = "The following commands are available:\n\n    " ++
+  intercalate "\n    " (map (intercalate "    ") help)
+
+-- |
+-- The welcome prologue.
+--
+prologueMessage :: String
+prologueMessage = intercalate "\n"
+  [ " ____                 ____            _       _   "
+  , "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
+  , "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
+  , "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
+  , "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
+  , "                                       |_|        "
+  , ""
+  , ":? shows help"
+  , ""
+  , "Expressions are terminated using Ctrl+D"
+  ]
+
+-- |
+-- The quit message.
+--
+quitMessage :: String
+quitMessage = "See ya!"
+
+-- Haskeline completions
+
+-- |
+-- Loads module, function, and file completions.
+--
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
   where
@@ -53,29 +166,40 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
                     , qual <- [ P.Qualified Nothing ident
                               , P.Qualified (Just moduleName) ident]
                     ]
-    let matches = filter (isPrefixOf str) names
+    let matches = sort $ filter (isPrefixOf str) names
     return $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
 
-createTemporaryModule :: [P.ProperName] -> P.Value -> P.Module
-createTemporaryModule imports value =
+-- Compilation
+
+-- | Compilation options.
+--
+options :: P.Options
+options = P.Options True False True (Just "Main") True "PS" []
+
+-- |
+-- Makes a volatile module to execute the current expression.
+--
+createTemporaryModule :: [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
+createTemporaryModule imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing
-        (P.Do [ P.DoNotationBind (P.VarBinder (P.Ident "it")) value
-              , P.DoNotationValue (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))) )
-              ])
+    value' = foldr ($) value lets
+    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace value')
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
-handleDeclaration :: [P.Module] -> [P.ProperName] -> P.Value -> InputT IO ()
-handleDeclaration loadedModules imports value = do
-  let m = createTemporaryModule imports value
+-- |
+-- Takes a value declaration and evaluates it with the current state.
+--
+handleDeclaration :: P.Value -> PSCI -> InputT IO ()
+handleDeclaration value (PSCI imports loadedModules lets) = do
+  let m = createTemporaryModule imports lets value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
@@ -86,73 +210,65 @@ handleDeclaration loadedModules imports value = do
         Just (ExitFailure _, _,   err) -> outputStrLn err
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
-data Command
-  = Empty
-  | Expression [String]
-  | Import String
-  | LoadModule FilePath
-  | Reload deriving (Show, Eq)
+-- Parser helpers
 
-getCommand :: InputT IO Command
-getCommand = do
-  firstLine <- getInputLine  "> "
-  case firstLine of
-    Nothing -> return Empty
-    Just (':':'i':' ':moduleName) -> return $ Import moduleName
-    Just (':':'m':' ':modulePath) -> return $ LoadModule modulePath
-    Just ":r" -> return Reload
-    Just (':':_) -> outputStrLn "Unknown command" >> getCommand
-    Just other -> Expression <$> go [other]
-  where
-  go ls = do
-    l <- getInputLine "  "
-    case l of
-      Nothing -> return $ reverse ls
-      Just l' -> go (l' : ls)
+-- |
+-- Parser for our PSCI version of @let@.
+-- This is essentially let from do-notation.
+-- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
+--
+parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
+parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
 
-loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule moduleFile = do
-  print moduleFile
-  moduleText <- U.readFile moduleFile
-  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
+-- |
+-- Parser for any other valid expression.
+--
+parseExpression :: Parsec.Parsec String P.ParseState P.Value
+parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
+-- Commands
 
+-- |
+-- Performs an action for each meta-command given, and also for expressions..
+--
+handleCommand :: Command -> StateT PSCI (InputT IO) ()
+handleCommand Empty = return ()
+handleCommand (Expression ls) =
+  case P.runIndentParser "" parseLet (unlines ls) of
+    Left _ ->
+      case P.runIndentParser "" parseExpression (unlines ls) of
+        Left err -> inputTToState $ outputStrLn (show err)
+        Right decl -> get >>= inputTToState . handleDeclaration decl
+    Right l -> modify (updateLets l)
+handleCommand Help = inputTToState $ outputStrLn helpMessage
+handleCommand (Import moduleName) = modify (updateImports moduleName)
+handleCommand (LoadFile filePath) = do
+  mf <- ioToState $ loadModule filePath
+  case mf of
+    Left err -> inputTToState $ outputStrLn err
+    Right mf' -> modify (updateModules mf')
+handleCommand Reload = do
+  (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
+  put (PSCI defaultImports prelude [])
+handleCommand Unknown = inputTToState $ outputStrLn "Unknown command"
+
+-- |
+-- The PSCI main loop.
+--
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
   (Right prelude) <- loadModule preludeFilename
-  runInputT (setComplete (completion prelude) defaultSettings) $ do
-    outputStrLn " ____                 ____            _       _   "
-    outputStrLn "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
-    outputStrLn "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
-    outputStrLn "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
-    outputStrLn "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
-    outputStrLn "                                       |_|        "
-    outputStrLn ""
-    outputStrLn "Expressions are terminated using Ctrl+D"
-    go [P.ProperName "Prelude", P.ProperName "Eff"] prelude
+  historyFilename <- getHistoryFilename
+  let settings = defaultSettings {historyFile = Just historyFilename}
+  runInputT (setComplete (completion prelude) settings) $ do
+    outputStrLn prologueMessage
+    evalStateT go (PSCI defaultImports prelude [])
   where
-  go imports loadedModules = do
-    cmd <- getCommand
-    case cmd of
-      Empty -> go imports loadedModules
-      Expression ls -> do
-        case P.runIndentParser "" (P.whiteSpace *> P.parseValue <* Parsec.eof) (unlines ls) of
-          Left err -> outputStrLn (show err)
-          Right decl -> handleDeclaration loadedModules imports decl
-        go imports loadedModules
-      Import moduleName -> go (imports ++ [P.ProperName moduleName]) loadedModules
-      LoadModule moduleFile -> do
-        ms <- lift $ loadModule moduleFile
-        case ms of
-          Left err -> outputStrLn err
-          Right ms' -> go imports (loadedModules ++ ms')
-      Reload -> do
-        preludeFilename <- lift getPreludeFilename
-        (Right prelude) <- lift $ loadModule preludeFilename
-        go [P.ProperName "Prelude"] prelude
-
-
+    go :: StateT PSCI (InputT IO) ()
+    go = do
+      c <- inputTToState getCommand
+      case c of
+        Quit -> inputTToState $ outputStrLn quitMessage
+        _    -> handleCommand c >> go
