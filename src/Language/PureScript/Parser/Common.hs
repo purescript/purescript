@@ -49,7 +49,6 @@ reservedPsNames = [ "data"
                   , "true"
                   , "false"
                   , "until"
-                  , "let"
                   , "in"
                   ]
 
