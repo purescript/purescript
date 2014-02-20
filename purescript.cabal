@@ -10,7 +10,9 @@ stability: experimental
 synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 category: Language
-author: Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
+author: Phil Freeman <paf31@cantab.net>,
+        Gary Burgess <gary.burgess@gmail.com>,
+        Hardy Jones <jones3.hardy@gmail.com>
 data-files: prelude/prelude.purs
 data-dir: ""
 
