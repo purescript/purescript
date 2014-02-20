@@ -40,48 +40,95 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (Parsec, eof)
 
+-- |
+-- The PSCI state.
+-- Holds a list of imported modules, loaded files, and partial let bindings.
+-- The let bindings are partial,
+-- because it makes more sense to apply the binding to the final evaluated expression.
+--
 data PSCI = PSCI [P.ProperName] [P.Module] [P.Value -> P.Value]
 
 -- State helpers
+
+-- |
+-- Synonym to be more descriptive.
+-- This is just @lift@
+--
 inputTToState :: InputT IO a -> StateT PSCI (InputT IO) a
 inputTToState = lift
 
+-- |
+-- Synonym to be more descriptive.
+-- This is just @lift . lift@
+--
 ioToState :: IO a -> StateT PSCI (InputT IO) a
 ioToState = lift . lift
 
+-- |
+-- Updates the state to have more imported modules.
+--
 updateImports :: String -> PSCI -> PSCI
 updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
 
+-- |
+-- Updates the state to have more loaded files.
+--
 updateModules :: [P.Module] -> PSCI -> PSCI
 updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
 
+-- |
+-- Updates the state to have more let bindings.
+--
 updateLets :: (P.Value -> P.Value) -> PSCI -> PSCI
 updateLets name (PSCI i m b) = PSCI i m (b ++ [name])
 
 -- File helpers
+-- |
+-- Load the necessary modules.
+--
 defaultImports :: [P.ProperName]
-defaultImports = [P.ProperName "Prelude", P.ProperName "Eff"]
+defaultImports = [P.ProperName "Prelude"]
 
+-- |
+-- Locates the node executable.
+-- Checks for either @nodejs@ or @node@.
+--
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
     where names = ["nodejs", "node"]
 
+-- |
+-- Grabs the filename where the history is stored.
+--
 getHistoryFilename :: IO FilePath
 getHistoryFilename = getUserConfigFile "purescript" "psci_history"
 
+-- |
+-- Grabs the filename where prelude is.
+--
 getPreludeFilename :: IO FilePath
 getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
+-- |
+-- Loads a file for use with imports.
+--
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule moduleFile = do
   moduleText <- U.readFile moduleFile
   return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
 
 -- Messages
+
+-- |
+-- The help message.
+--
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
   intercalate "\n    " (map (intercalate "    ") help)
 
+-- |
+-- The welcome prologue.
+--
 prologueMessage :: String
 prologueMessage = intercalate "\n"
   [ " ____                 ____            _       _   "
@@ -96,10 +143,17 @@ prologueMessage = intercalate "\n"
   , "Expressions are terminated using Ctrl+D"
   ]
 
+-- |
+-- The quit message.
+--
 quitMessage :: String
 quitMessage = "See ya!"
 
 -- Haskeline completions
+
+-- |
+-- Loads module, function, and file completions.
+--
 completion :: [P.Module] -> CompletionFunc IO
 completion ms = completeWord Nothing " \t\n\r" findCompletions
   where
@@ -119,9 +173,15 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   getDeclName _ = Nothing
 
 -- Compilation
+
+-- | Compilation options.
+--
 options :: P.Options
 options = P.Options True False True (Just "Main") True "PS" []
 
+-- |
+-- Makes a volatile module to execute the current expression.
+--
 createTemporaryModule :: [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
 createTemporaryModule imports lets value =
   let
@@ -134,6 +194,9 @@ createTemporaryModule imports lets value =
   in
     P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
 
+-- |
+-- Takes a value declaration and evaluates it with the current state.
+--
 handleDeclaration :: P.Value -> PSCI -> InputT IO ()
 handleDeclaration value (PSCI imports loadedModules lets) = do
   let m = createTemporaryModule imports lets value
@@ -148,14 +211,27 @@ handleDeclaration value (PSCI imports loadedModules lets) = do
         Nothing                        -> outputStrLn "Couldn't find node.js"
 
 -- Parser helpers
+
+-- |
+-- Parser for our PSCI version of @let@.
+-- This is essentially let from do-notation.
+-- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
+--
 parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
 parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
                  <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
 
+-- |
+-- Parser for any other valid expression.
+--
 parseExpression :: Parsec.Parsec String P.ParseState P.Value
 parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 
 -- Commands
+
+-- |
+-- Performs an action for each meta-command given, and also for expressions..
+--
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
@@ -177,6 +253,9 @@ handleCommand Reload = do
   put (PSCI defaultImports prelude [])
 handleCommand Unknown = inputTToState $ outputStrLn "Unknown command"
 
+-- |
+-- The PSCI main loop.
+--
 main :: IO ()
 main = do
   preludeFilename <- getPreludeFilename
