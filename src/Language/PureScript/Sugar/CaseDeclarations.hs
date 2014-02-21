@@ -20,6 +20,8 @@ module Language.PureScript.Sugar.CaseDeclarations (
 ) where
 
 import Data.List (groupBy)
+import Data.Generics (mkT, everywhere)
+
 import Control.Applicative ((<$>))
 import Control.Monad (forM, join, unless)
 import Control.Monad.Error.Class
@@ -33,7 +35,18 @@ import Language.PureScript.Scope
 -- Replace all top-level binders in a module with case expressions.
 --
 desugarCasesModule :: [Module] -> Either String [Module]
-desugarCasesModule ms = forM ms $ \(Module name ds) -> Module name <$> desugarCases ds
+desugarCasesModule ms = forM ms $ \(Module name ds) -> Module name <$> (desugarCases . desugarAbs $ ds)
+
+desugarAbs :: [Declaration] -> [Declaration]
+desugarAbs = everywhere (mkT replace)
+  where
+  replace (Abs (Right binder) val) =
+    let
+      ident = head $ unusedNames (binder, val)
+    in
+      Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [([binder], Nothing, val)]
+  replace other = other
+
 -- |
 -- Replace all top-level binders with case expressions.
 --
@@ -64,7 +77,7 @@ makeCaseDeclaration ident alternatives =
     args = take argPattern $ unusedNames (ident, alternatives)
     vars = map (\arg -> Var (Qualified Nothing arg)) args
     binders = [ (bs, g, val) | (bs, (g, val)) <- alternatives ]
-    value = foldr (\args' ret -> Abs args' ret) (Case vars binders) args
+    value = foldr (\arg ret -> Abs (Left arg) ret) (Case vars binders) args
   in
     ValueDeclaration ident [] Nothing value
 

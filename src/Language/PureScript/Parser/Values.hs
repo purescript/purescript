@@ -53,7 +53,7 @@ parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C
 parseAbs :: P.Parsec String ParseState Value
 parseAbs = do
   C.reservedOp "\\"
-  args <- P.many1 (C.indented *> (Abs <$> C.parseIdent))
+  args <- P.many1 (C.indented *> (Abs <$> (Left <$> P.try C.parseIdent <|> Right <$> parseBinderNoParens)))
   C.indented *> C.reservedOp "->"
   value <- parseValue
   return $ toFunction args value
@@ -199,19 +199,6 @@ parseIdentifierAndBinder = do
   binder <- C.indented *> parseBinder
   return (name, binder)
 
-parseBinderAtom :: P.Parsec String ParseState Binder
-parseBinderAtom = P.choice (map P.try
-                  [ parseNullBinder
-                  , parseStringBinder
-                  , parseBooleanBinder
-                  , parseNumberBinder
-                  , parseNamedBinder
-                  , parseVarBinder
-                  , parseConstructorBinder
-                  , parseObjectBinder
-                  , parseArrayBinder
-                  , C.parens parseBinder ]) P.<?> "binder"
-
 -- |
 -- Parse a binder
 --
@@ -219,6 +206,18 @@ parseBinder :: P.Parsec String ParseState Binder
 parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expression"
   where
   operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
+  parseBinderAtom :: P.Parsec String ParseState Binder
+  parseBinderAtom = P.choice (map P.try
+                    [ parseNullBinder
+                    , parseStringBinder
+                    , parseBooleanBinder
+                    , parseNumberBinder
+                    , parseNamedBinder
+                    , parseVarBinder
+                    , parseConstructorBinder
+                    , parseObjectBinder
+                    , parseArrayBinder
+                    , C.parens parseBinder ]) P.<?> "binder"
 
 -- |
 -- Parse a binder as it would appear in a top level declaration

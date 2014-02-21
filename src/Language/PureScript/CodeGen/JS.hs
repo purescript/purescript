@@ -132,8 +132,8 @@ valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (va
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
 valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
-valueToJs opts m e (Abs arg val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
-valueToJs opts m e (TypedValue _ (Abs arg val) ty) | optionsPerformRuntimeTypeChecks opts = let arg' = identToJs arg in JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn (valueToJs opts m e val)])
+valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
+valueToJs opts m e (TypedValue _ (Abs (Left arg) val) ty) | optionsPerformRuntimeTypeChecks opts = let arg' = identToJs arg in JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn (valueToJs opts m e val)])
 valueToJs _ m e (Var ident) = varToJs m e ident
 valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"

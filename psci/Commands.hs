@@ -51,6 +51,10 @@ data Command
   --
   | Reload
   -- |
+  -- Find the type of an expression
+  --
+  | TypeOf String
+  -- |
   -- An attempt at a meta command that wasn't recognized.
   --
   | Unknown deriving (Show, Eq)
@@ -68,6 +72,7 @@ getCommand = do
     Just (':':'m':' ':filePath) -> return $ LoadFile filePath
     Just ":q" -> return Quit
     Just ":r" -> return Reload
+    Just (':':'t':' ':expr) -> return $ TypeOf expr
     Just (':':_) -> return Unknown
     Just other -> Expression <$> go [other]
   where
