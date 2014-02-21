@@ -253,8 +253,7 @@ getCommand = do
         _               -> lift $ return c
   where
     go :: [String] -> InputT IO String
-    go ls =
-      maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
+    go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
 -- |
 -- Performs an action for each meta-command given, and also for expressions..
