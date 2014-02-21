@@ -251,7 +251,7 @@ handleCommand (LoadFile filePath) = do
 handleCommand Reload = do
   (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
   put (PSCI defaultImports prelude [])
-handleCommand Unknown = inputTToState $ outputStrLn "Unknown command"
+handleCommand _ = inputTToState $ outputStrLn "Unknown command"
 
 -- |
 -- The PSCI main loop.

@@ -524,12 +524,13 @@ infer' (Accessor prop val) = do
       _ <- subsumes Nothing objTy (Object (RCons prop field rest))
       return $ TypedValue True (Accessor prop typed) field
     Just ty -> return $ TypedValue True (Accessor prop typed) ty
-infer' (Abs arg ret) = do
+infer' (Abs (Left arg) ret) = do
   ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
   bindLocalVariables moduleName [(arg, ty)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
-    return $ TypedValue True (Abs arg body) $ function ty bodyTy
+    return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
+infer' (Abs (Right _) _) = error "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
   (ret, app) <- checkFunctionApplication f' ft arg
@@ -728,7 +729,7 @@ check' val t@(ConstrainedType constraints ty) = do
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
-  return $ TypedValue True (foldr Abs val' dictNames) t
+  return $ TypedValue True (foldr Abs val' (map Left dictNames)) t
 check' val t@(SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
   val' <- check val ty
@@ -748,10 +749,11 @@ check' v@(BooleanLiteral _) t | t == tyBoolean =
 check' (ArrayLiteral vals) t@(TypeApp a ty) | a == tyArray = do
   arr <- ArrayLiteral <$> forM vals (\val -> check val ty)
   return $ TypedValue True arr t
-check' (Abs arg ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
+check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
   ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
-  return $ TypedValue True (Abs arg ret') ty
+  return $ TypedValue True (Abs (Left arg) ret') ty
+check' (Abs (Right _) _) _ = error "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (ret', app) <- checkFunctionApplication f' ft arg

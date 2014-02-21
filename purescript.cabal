@@ -1,5 +1,5 @@
 name: purescript
-version: 0.4.1
+version: 0.4.2
 cabal-version: >=1.8
 build-type: Custom
 license: MIT
@@ -10,6 +10,7 @@ stability: experimental
 synopsis: PureScript Programming Language Compiler
 description: A small compile-to-JS language with extensible records and type-safe blocks
 category: Language
+Homepage: http://www.purescript.org/
 author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>

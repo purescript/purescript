@@ -127,7 +127,7 @@ typeInstanceDictionaryDeclaration mn deps name ty decls = do
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
-      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..max 1 (length deps)]))
+      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Left . Ident $ '_' : show n) [1..max 1 (length deps)]))
       (quantify (if null deps then
                    function unit (TypeApp (TypeConstructor name) ty)
                  else

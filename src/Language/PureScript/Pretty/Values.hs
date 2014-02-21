@@ -76,7 +76,7 @@ app = mkPattern match
 lam :: Pattern () Value (String, Value)
 lam = mkPattern match
   where
-  match (Abs arg val) = Just (show arg, val)
+  match (Abs (Left arg) val) = Just (show arg, val)
   match _ = Nothing
 
 typed :: Pattern () Value (Type, Value)

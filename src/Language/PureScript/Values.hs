@@ -72,7 +72,7 @@ data Value
   -- |
   -- Function introduction
   --
-  | Abs Ident Value
+  | Abs (Either Ident Binder) Value
   -- |
   -- Function application
   --
