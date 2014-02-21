@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DoAndIfThenElse, FlexibleContexts #-}
 
 module Main where
 
@@ -30,7 +30,7 @@ import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
 import System.Console.Haskeline
-import System.Directory (findExecutable)
+import System.Directory (doesFileExist, findExecutable)
 import System.Exit
 import System.Environment.XDG.BaseDir
 import System.Process
@@ -38,7 +38,7 @@ import System.Process
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (Parsec, eof)
+import qualified Text.Parsec as Parsec (Parsec, ParseError, eof)
 
 -- |
 -- The PSCI state.
@@ -113,9 +113,7 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule moduleFile = do
-  moduleText <- U.readFile moduleFile
-  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
+loadModule = fmap (either (Left . show) Right . parseModules) . U.readFile
 
 -- Messages
 
@@ -213,45 +211,74 @@ handleDeclaration value (PSCI imports loadedModules lets) = do
 -- Parser helpers
 
 -- |
--- Parser for our PSCI version of @let@.
--- This is essentially let from do-notation.
--- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
+-- PSCI version of the indent parser.
+-- This really does nothing except provide a shorter alias.
 --
-parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
-parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+parser :: Parsec.Parsec String P.ParseState a -> String -> Either Parsec.ParseError a
+parser = P.runIndentParser ""
 
 -- |
 -- Parser for any other valid expression.
 --
-parseExpression :: Parsec.Parsec String P.ParseState P.Value
-parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
+parseExpression :: String  -> Either Parsec.ParseError P.Value
+parseExpression = parser (P.whiteSpace *> P.parseValue <* Parsec.eof)
+
+-- |
+-- Parser for our PSCI version of @let@.
+-- This is essentially let from do-notation.
+-- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
+--
+parseLet :: String  -> Either Parsec.ParseError (P.Value -> P.Value)
+parseLet = parser $
+  P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+        <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+
+-- |
+-- Parser for PSCI modules.
+--
+parseModules :: String -> Either Parsec.ParseError [P.Module]
+parseModules = parser P.parseModules
 
 -- Commands
 
 -- |
--- Performs an action for each meta-command given, and also for expressions..
+-- Performs an action for each meta-command given, and also for expressions.
 --
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" parseLet (unlines ls) of
+  let expr = unlines ls
+  in case parseLet expr of
     Left _ ->
-      case P.runIndentParser "" parseExpression (unlines ls) of
-        Left err -> inputTToState $ outputStrLn (show err)
-        Right decl -> get >>= inputTToState . handleDeclaration decl
+      either outprintT (\decl -> get >>= inputTToState . handleDeclaration decl)
+             (parseExpression expr)
     Right l -> modify (updateLets l)
-handleCommand Help = inputTToState $ outputStrLn helpMessage
+handleCommand Help = outputTStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
-  mf <- ioToState $ loadModule filePath
-  case mf of
-    Left err -> inputTToState $ outputStrLn err
-    Right mf' -> modify (updateModules mf')
+  exists <- ioToState $ doesFileExist filePath
+  if exists then
+    ioToState (loadModule filePath) >>= either outputTStrLn (modify . updateModules)
+  else
+    outputTStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reload = do
   (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
   put (PSCI defaultImports prelude [])
-handleCommand Unknown = inputTToState $ outputStrLn "Unknown command"
+handleCommand Unknown = outputTStrLn "Unknown command"
+
+-- Command helpers
+
+-- |
+-- Lifts the output call to the StateT.
+--
+outputTStrLn :: String -> StateT PSCI (InputT IO) ()
+outputTStrLn = inputTToState . outputStrLn
+
+-- |
+-- The corresponding @print@ version for the StateT.
+--
+outprintT :: Show a => a -> StateT PSCI (InputT IO) ()
+outprintT = outputTStrLn . show
 
 -- |
 -- The PSCI main loop.
@@ -270,5 +297,5 @@ main = do
     go = do
       c <- inputTToState getCommand
       case c of
-        Quit -> inputTToState $ outputStrLn quitMessage
+        Quit -> outputTStrLn quitMessage
         _    -> handleCommand c >> go
