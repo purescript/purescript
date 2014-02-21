@@ -65,9 +65,10 @@ data Command
 --
 help :: [[String]]
 help =
-  [ [":?         ", "Show this help menu"]
-  , [":i <module>", "Import <module> for use in PSCI"]
-  , [":m <file>  ", "Load <file> for importing"]
-  , [":q         ", "Quit PSCi"]
-  , [":r         ", "Reload all modules."]
+  [ [":?          ", "Show this help menu"]
+  , [":i <module> ", "Import <module> for use in PSCI"]
+  , [":m <file>   ", "Load <file> for importing"]
+  , [":q          ", "Quit PSCi"]
+  , [":r          ", "Reload all modules"]
+  , [":t <expr>   ", "Show the type of <expr>"]
   ]
