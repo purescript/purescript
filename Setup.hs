@@ -30,7 +30,6 @@ setupXDG :: Args -> InstallFlags -> PackageDescription -> LocalBuildInfo -> IO (
 setupXDG _ _ _ _ = do
     configDir <- getUserConfigDir "purescript"
     configExists <- doesDirectoryExist configDir
-    putStrLn "\n\n\noh it worked!\n\n\n"
     unless configExists $ do
         createDirectoryIfMissing True configDir
 #if POSIX_LIKE
