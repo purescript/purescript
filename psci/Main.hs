@@ -199,7 +199,7 @@ createTemporaryModule exec imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
-    traceModule = P.ModuleName [P.ProperName "Trace"]
+    traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     value' = foldr ($) value lets
     itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing value'
