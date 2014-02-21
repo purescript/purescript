@@ -72,8 +72,8 @@ ioToState = lift . lift
 -- |
 -- Updates the state to have more imported modules.
 --
-updateImports :: String -> PSCI -> PSCI
-updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
+updateImports :: P.ProperName -> PSCI -> PSCI
+updateImports name (PSCI i m b) = PSCI (i ++ [name]) m b
 
 -- |
 -- Updates the state to have more loaded files.
@@ -299,3 +299,25 @@ main = do
       case c of
         Quit -> outputTStrLn quitMessage
         _    -> handleCommand c >> go
+
+-- |
+-- Parses the input and returns either a Metacommand or an expression.
+--
+getCommand :: InputT IO Command
+getCommand = do
+  firstLine <- getInputLine "> "
+  case firstLine of
+    Nothing   -> return Empty
+    Just line -> either (return . Unknown) lift (parseCommands line)
+    --Just (':':'m':' ':filePath) -> return $ LoadFile filePath
+    --Just ":q" -> return Quit
+    --Just ":r" -> return Reload
+    --Just (':':'t':' ':expr) -> return $ TypeOf expr
+    --Just (':':_) -> return Unknown
+    --Just other -> Expression <$> go [other]
+  where
+  go ls = do
+    l <- getInputLine "  "
+    case l of
+      Nothing -> return $ reverse ls
+      Just l' -> go (l' : ls)

@@ -15,6 +15,8 @@
 
 module Parser where
 
+import Commands
+
 import Control.Applicative
 
 import Text.Parsec hiding ((<|>))
@@ -66,3 +68,18 @@ parseLet = psciParser psciLet
 --
 parseExpression :: String -> Either ParseError P.Value
 parseExpression = psciParser psciExpression
+
+parseCommands :: String -> Either ParseError (IO Command)
+parseCommands = either Left (Right . return) . psciParser (choice availableCommands)
+
+psciHelp :: Parsec String P.ParseState Command
+psciHelp = Help <$ (string ":?" >> spaces)
+
+psciImport :: Parsec String P.ParseState Command
+psciImport = Import <$> (string ":i" >> spaces >> P.properName)
+
+availableCommands :: [Parsec String P.ParseState Command]
+availableCommands =
+  map try [ psciHelp
+          , psciImport
+          ]

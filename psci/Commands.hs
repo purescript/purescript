@@ -15,8 +15,9 @@
 
 module Commands where
 
-import Control.Applicative
-import System.Console.Haskeline
+import Language.PureScript
+
+import Text.Parsec
 
 -- |
 -- Valid Meta-commands for PSCI
@@ -37,7 +38,7 @@ data Command
   -- |
   -- Import a module from a loaded file
   --
-  | Import String
+  | Import ProperName
   -- |
   -- Load a file for use with importing
   --
@@ -57,30 +58,31 @@ data Command
   -- |
   -- An attempt at a meta command that wasn't recognized.
   --
-  | Unknown deriving (Show, Eq)
+  | Unknown ParseError
 
--- |
--- Parses the input and returns either a Metacommand or an expression.
---
-getCommand :: InputT IO Command
-getCommand = do
-  firstLine <- getInputLine "> "
-  case firstLine of
-    Nothing -> return Empty
-    Just ":?" -> return Help
-    Just (':':'i':' ':moduleName) -> return $ Import moduleName
-    Just (':':'m':' ':filePath) -> return $ LoadFile filePath
-    Just ":q" -> return Quit
-    Just ":r" -> return Reload
-    Just (':':'t':' ':expr) -> return $ TypeOf expr
-    Just (':':_) -> return Unknown
-    Just other -> Expression <$> go [other]
-  where
-  go ls = do
-    l <- getInputLine "  "
-    case l of
-      Nothing -> return $ reverse ls
-      Just l' -> go (l' : ls)
+---- |
+---- Parses the input and returns either a Metacommand or an expression.
+----
+--getCommand :: InputT IO Command
+--getCommand = do
+--  firstLine <- getInputLine "> "
+--  case firstLine of
+--    Nothing -> return Empty
+--    Just line -> psciParser psciHelp
+--    --Just ":?" -> return Help
+--    --Just (':':'i':' ':moduleName) -> return $ Import moduleName
+--    --Just (':':'m':' ':filePath) -> return $ LoadFile filePath
+--    --Just ":q" -> return Quit
+--    --Just ":r" -> return Reload
+--    --Just (':':'t':' ':expr) -> return $ TypeOf expr
+--    --Just (':':_) -> return Unknown
+--    --Just other -> Expression <$> go [other]
+--  where
+--  go ls = do
+--    l <- getInputLine "  "
+--    case l of
+--      Nothing -> return $ reverse ls
+--      Just l' -> go (l' : ls)
 
 -- |
 -- The help menu.
