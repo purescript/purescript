@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 #ifndef POSIX_LIKE
-#define POSIX_LIKE !defined(_WIN32_HOST_OS) && \
+#define POSIX_LIKE !(defined(_WIN32_HOST_OS) || defined(_WIN64_HOST_OS)) && \
                   (defined(unix_HOST_OS) || defined(__unix___HOST_OS) || \
                    defined(__unix_HOST_OS) || defined(linux_HOST_OS) || \
                    defined(__linux___HOST_OS) || defined(__linux_HOST_OS) || \
