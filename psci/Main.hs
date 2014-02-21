@@ -308,16 +308,11 @@ getCommand = do
   firstLine <- getInputLine "> "
   case firstLine of
     Nothing   -> return Empty
-    Just line -> either (return . Unknown) lift (parseCommands line)
-    --Just (':':'m':' ':filePath) -> return $ LoadFile filePath
-    --Just ":q" -> return Quit
-    --Just ":r" -> return Reload
-    --Just (':':'t':' ':expr) -> return $ TypeOf expr
-    --Just (':':_) -> return Unknown
+    Just line -> either (return . Unknown) (lift . return) (parseCommands line)
     --Just other -> Expression <$> go [other]
-  where
-  go ls = do
-    l <- getInputLine "  "
-    case l of
-      Nothing -> return $ reverse ls
-      Just l' -> go (l' : ls)
+  --where
+  --go ls = do
+  --  l <- getInputLine "  "
+  --  case l of
+  --    Nothing -> return $ reverse ls
+  --    Just l' -> go (l' : ls)

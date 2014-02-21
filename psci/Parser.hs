@@ -17,7 +17,7 @@ module Parser where
 
 import Commands
 
-import Control.Applicative
+import Control.Applicative hiding (many)
 
 import Text.Parsec hiding ((<|>))
 
@@ -69,17 +69,36 @@ parseLet = psciParser psciLet
 parseExpression :: String -> Either ParseError P.Value
 parseExpression = psciParser psciExpression
 
-parseCommands :: String -> Either ParseError (IO Command)
-parseCommands = either Left (Right . return) . psciParser (choice availableCommands)
+parseCommands :: String -> Either ParseError Command
+parseCommands = psciParser $ choice availableCommands
 
 psciHelp :: Parsec String P.ParseState Command
-psciHelp = Help <$ (string ":?" >> spaces)
+psciHelp = Help <$ (string ":?" *> spaces)
 
 psciImport :: Parsec String P.ParseState Command
-psciImport = Import <$> (string ":i" >> spaces >> P.properName)
+psciImport = Import <$> (string ":i" *> spaces *> P.properName)
+
+psciLoadFile :: Parsec String P.ParseState Command
+psciLoadFile = LoadFile <$> do
+  string ":m"
+  spaces
+  try (manyTill anyChar space) <|> many1 anyChar
+
+psciQuit :: Parsec String P.ParseState Command
+psciQuit = Quit <$ (string ":q" *> spaces)
+
+psciReload :: Parsec String P.ParseState Command
+psciReload = Reload <$ (string ":r" *> spaces)
+
+psciTypeOf :: Parsec String P.ParseState Command
+psciTypeOf = TypeOf <$> (string ":t" *> spaces *> many anyChar)
 
 availableCommands :: [Parsec String P.ParseState Command]
 availableCommands =
   map try [ psciHelp
           , psciImport
+          , psciLoadFile
+          , psciQuit
+          , psciReload
+          , psciTypeOf
           ]
