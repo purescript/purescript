@@ -487,19 +487,13 @@ module Data.Array where
   import Prelude
   import Data.Maybe
 
-  head :: forall a. [a] -> a
-  head (x : _) = x
+  head :: forall a. [a] -> Maybe a
+  head (x : _) = Just x
+  head _ = Nothing
 
-  headSafe :: forall a. [a] -> Maybe a
-  headSafe (x : _) = Just x
-  headSafe _ = Nothing
-
-  tail :: forall a. [a] -> [a]
-  tail (_ : xs) = xs
-
-  tailSafe :: forall a. [a] -> Maybe [a]
-  tailSafe (_ : xs) = Just xs
-  tailSafe _ = Nothing
+  tail :: forall a. [a] -> Maybe [a]
+  tail (_ : xs) = Just xs
+  tail _ = Nothing
 
   map :: forall a b. (a -> b) -> [a] -> [b]
   map _ [] = []
@@ -644,6 +638,14 @@ module Data.Array where
   instance Prelude.Alternative [] where
     empty = []
     (<|>) = concat
+    
+module Data.Array.Unsafe where
+
+  head :: forall a. [a] -> a
+  head (x : _) = x
+
+  tail :: forall a. [a] -> [a]
+  tail (_ : xs) = xs
 
 module Data.Tuple where
 
