@@ -29,6 +29,7 @@ import Data.List (intercalate, isPrefixOf, nub, sort)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
+
 import System.Console.Haskeline
 import System.Directory (findExecutable)
 import System.Exit
@@ -38,7 +39,8 @@ import System.Process
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (Parsec, eof)
+import qualified Text.Parsec as Parsec (Parsec, eof, try)
+import qualified Data.Map as M
 
 -- |
 -- The PSCI state.
@@ -182,24 +184,25 @@ options = P.Options True False True (Just "Main") True "PS" []
 -- |
 -- Makes a volatile module to execute the current expression.
 --
-createTemporaryModule :: [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
-createTemporaryModule imports lets value =
+createTemporaryModule :: Bool -> [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
+createTemporaryModule exec imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     value' = foldr ($) value lets
-    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace value')
+    itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing value'
+    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))))
   in
-    P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ [mainDecl]
+    P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ if exec then [itDecl, mainDecl] else [itDecl]
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
 handleDeclaration :: P.Value -> PSCI -> InputT IO ()
 handleDeclaration value (PSCI imports loadedModules lets) = do
-  let m = createTemporaryModule imports lets value
+  let m = createTemporaryModule True imports lets value
   case P.compile options (loadedModules ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
@@ -209,6 +212,19 @@ handleDeclaration value (PSCI imports loadedModules lets) = do
         Just (ExitSuccess,   out, _)   -> outputStrLn out
         Just (ExitFailure _, _,   err) -> outputStrLn err
         Nothing                        -> outputStrLn "Couldn't find node.js"
+
+-- |
+-- Takes a value and prints its type
+--
+handleTypeOf :: P.Value -> PSCI -> InputT IO ()
+handleTypeOf value (PSCI imports loadedModules lets) = do
+  let m = createTemporaryModule False imports lets value
+  case P.compile options { P.optionsMain = Nothing } (loadedModules ++ [m]) of
+    Left err -> outputStrLn err
+    Right (_, _, env') -> do
+      case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
+        Just (ty, _) -> outputStrLn . P.prettyPrintType $ ty
+        Nothing -> outputStrLn "Could not find type"
 
 -- Parser helpers
 
@@ -235,12 +251,14 @@ parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" parseLet (unlines ls) of
-    Left _ ->
-      case P.runIndentParser "" parseExpression (unlines ls) of
-        Left err -> inputTToState $ outputStrLn (show err)
-        Right decl -> get >>= inputTToState . handleDeclaration decl
-    Right l -> modify (updateLets l)
+  case P.runIndentParser "" (Left <$> Parsec.try parseLet <|> Right <$> parseExpression) (unlines ls) of
+    Left err -> inputTToState $ outputStrLn (show err)
+    Right (Left l) -> modify (updateLets l)
+    Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
+handleCommand (TypeOf expr) =
+  case P.runIndentParser "" parseExpression expr of
+    Left err -> inputTToState $ outputStrLn (show err)
+    Right expr' -> get >>= inputTToState . handleTypeOf expr'
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
