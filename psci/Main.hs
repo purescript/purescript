@@ -48,7 +48,7 @@ import qualified Text.Parsec as Parsec (Parsec, eof, try)
 -- The let bindings are partial,
 -- because it makes more sense to apply the binding to the final evaluated expression.
 --
-data PSCI = PSCI [P.ProperName] [P.Module] [P.Value -> P.Value]
+data PSCI = PSCI [P.ModuleName] [P.Module] [P.Value -> P.Value]
 
 -- State helpers
 
@@ -70,7 +70,7 @@ ioToState = lift . lift
 -- Updates the state to have more imported modules.
 --
 updateImports :: String -> PSCI -> PSCI
-updateImports name (PSCI i m b) = PSCI (i ++ [P.ProperName name]) m b
+updateImports name (PSCI i m b) = PSCI (P.moduleNameFromString name : i) m b
 
 -- |
 -- Updates the state to have more loaded files.
@@ -88,8 +88,8 @@ updateLets name (PSCI i m b) = PSCI i m (b ++ [name])
 -- |
 -- Load the necessary modules.
 --
-defaultImports :: [P.ProperName]
-defaultImports = [P.ProperName "Prelude"]
+defaultImports :: [P.ModuleName]
+defaultImports = [P.ModuleName [P.ProperName "Prelude"]]
 
 -- |
 -- Locates the node executable.
@@ -191,7 +191,7 @@ options = P.Options True False True (Just "Main") True "PS" []
 -- |
 -- Makes a volatile module to execute the current expression.
 --
-createTemporaryModule :: Bool -> [P.ProperName] -> [P.Value -> P.Value] -> P.Value -> P.Module
+createTemporaryModule :: Bool -> [P.ModuleName] -> [P.Value -> P.Value] -> P.Value -> P.Module
 createTemporaryModule exec imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
@@ -202,7 +202,7 @@ createTemporaryModule exec imports lets value =
     itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing value'
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))))
   in
-    P.Module moduleName $ map (importDecl . P.ModuleName . return) imports ++ if exec then [itDecl, mainDecl] else [itDecl]
+    P.Module moduleName $ map importDecl imports ++ if exec then [itDecl, mainDecl] else [itDecl]
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
