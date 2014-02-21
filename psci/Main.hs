@@ -25,7 +25,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State
 
-import Data.List (intercalate, isPrefixOf, nub, sort)
+import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
@@ -158,17 +158,20 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   findCompletions :: String -> IO [Completion]
   findCompletions str = do
     files <- listFiles str
-    let names = nub [ show qual
-                    | P.Module moduleName ds <- ms
-                    , ident <- mapMaybe getDeclName ds
-                    , qual <- [ P.Qualified Nothing ident
-                              , P.Qualified (Just moduleName) ident]
-                    ]
-    let matches = sort $ filter (isPrefixOf str) names
-    return $ map simpleCompletion matches ++ files
+    let matches = filter (isPrefixOf str) names
+    return $ sortBy sorter $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
+  names :: [String]
+  names = nub [ show qual
+              | P.Module moduleName ds <- ms
+              , ident <- mapMaybe getDeclName ds
+              , qual <- [ P.Qualified Nothing ident
+                        , P.Qualified (Just moduleName) ident]
+              ]
+  sorter :: Completion -> Completion -> Ordering
+  sorter (Completion _ d1 _) (Completion _ d2 _) = compare d1 d2
 
 -- Compilation
 
