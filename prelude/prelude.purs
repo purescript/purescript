@@ -356,7 +356,7 @@ module Prelude where
                       \  };\
                       \}" :: String -> String -> String
 
-module Monoid where
+module Data.Monoid where
 
   import Prelude
 
@@ -372,16 +372,16 @@ module Monoid where
 
   instance Monoid [a] where
     mempty = []
-    (<>) = Arrays.concat
+    (<>) = Data.Array.concat
 
   mconcat :: forall m. (Monoid m) => [m] -> m
   mconcat [] = mempty
   mconcat (m:ms) = m <> mconcat ms
 
-module Monad where
+module Control.Monad where
 
   import Prelude
-  import Arrays
+  import Data.Array
 
   replicateM :: forall m a. (Monad m) => Number -> m a -> m [a]
   replicateM 0 _ = return []
@@ -428,7 +428,7 @@ module Monad where
   when true m = m
   when false _ = return {}
 
-module Maybe where
+module Data.Maybe where
 
   import Prelude
 
@@ -458,7 +458,7 @@ module Maybe where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
 
-module Either where
+module Data.Either where
 
   import Prelude
 
@@ -485,10 +485,10 @@ module Either where
     show (Left x) = "Left " ++ (show x)
     show (Right y) = "Right " ++ (show y)
 
-module Arrays where
+module Data.Array where
 
   import Prelude
-  import Maybe
+  import Data.Maybe
 
   head :: forall a. [a] -> a
   head (x : _) = x
@@ -648,10 +648,10 @@ module Arrays where
     empty = []
     (<|>) = concat
 
-module Tuples where
+module Data.Tuple where
 
   import Prelude
-  import Arrays
+  import Data.Array
 
   data Tuple a b = Tuple a b
 
@@ -672,7 +672,7 @@ module Tuples where
     Tuple as bs -> Tuple (a : as) (b : bs)
   unzip [] = Tuple [] []
 
-module String where
+module Data.String where
 
   foreign import lengthS "function lengthS(s) {\
                          \  return s.length;\
@@ -752,7 +752,7 @@ module String where
                       \  return s.trim();\
                       \}" :: String -> String
 
-module Regex where
+module Data.String.Regex where
 
   foreign import data Regex :: *
 
@@ -907,7 +907,7 @@ module Math where
   foreign import sqrt1_2 "var sqrt1_2 = Math.SQRT1_2;" :: Number
   foreign import sqrt2   "var sqrt2   = Math.SQRT2;"   :: Number
 
-module Eff where
+module Control.Monad.Eff where
 
   foreign import data Eff :: # ! -> * -> *
 
@@ -936,29 +936,29 @@ module Eff where
     (>>=) = bindEff
 
   foreign import untilE "function untilE(f) {\
-			\  return function() {\
-			\    while (!f()) { }\
-			\    return {};\
-			\  };\
+                        \  return function() {\
+                        \    while (!f()) { }\
+                        \    return {};\
+                        \  };\
                         \}" :: forall e. Eff e Boolean -> Eff e {}
 
   foreign import whileE "function whileE(f) {\
-			\  return function(a) {\
-			\    return function() {\
-			\      while (f()) {\
+                        \  return function(a) {\
+                        \    return function() {\
+                        \      while (f()) {\
                         \        a();\
                         \      }\
-			\      return {};\
+                        \      return {};\
                         \    };\
                         \  };\
                         \}" :: forall e a. Eff e Boolean -> Eff e a -> Eff e {}
 
   foreign import forE "function forE(lo) {\
-	              \  return function(hi) {\
-	              \    return function(f) {\
-	              \      return function() {\
-	              \        for (var i = lo; i < hi; i++) {\
-		      \          f(i)();\
+                      \  return function(hi) {\
+                      \    return function(f) {\
+                      \      return function() {\
+                      \        for (var i = lo; i < hi; i++) {\
+                      \          f(i)();\
                       \        }\
                       \      };\
                       \    };\
@@ -967,9 +967,9 @@ module Eff where
 
 
   foreign import foreachE "function foreachE(as) {\
-	                  \  return function(f) {\
-	                  \    for (var i = 0; i < as.length; i++) {\
-		          \      f(as[i])();\
+                          \  return function(f) {\
+                          \    for (var i = 0; i < as.length; i++) {\
+                          \      f(as[i])();\
                           \    }\
                           \  };\
                           \}" :: forall e a. [a] -> (a -> Eff e {}) -> Eff e {}
@@ -977,7 +977,7 @@ module Eff where
 
 module Random where
 
-  import Eff
+  import Control.Monad.Eff
 
   foreign import data Random :: !
 
@@ -985,9 +985,9 @@ module Random where
                         \  return Math.random();\
                         \}" :: forall e. Eff (random :: Random | e) Number
 
-module Errors where
+module Control.Monad.Error where
 
-  import Eff
+  import Control.Monad.Eff
 
   foreign import data Error :: * -> !
 
@@ -1009,9 +1009,9 @@ module Errors where
                             \  };\
                             \}" :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
-module IORef where
+module Data.IORef where
 
-  import Eff
+  import Control.Monad.Eff
 
   foreign import data Ref :: !
 
@@ -1052,10 +1052,10 @@ module IORef where
                                 \  return f;\
                                 \}" :: forall eff a. Eff (ref :: Ref | eff) a -> Eff eff a
 
-module Trace where
+module Debug.Trace where
 
   import Prelude
-  import Eff
+  import Control.Monad.Eff
 
   foreign import data Trace :: !
 
@@ -1069,9 +1069,9 @@ module Trace where
   print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
   print o = trace (show o)
 
-module ST where
+module Control.Monad.ST where
 
-  import Eff
+  import Control.Monad.Eff
 
   foreign import data ST :: * -> !
 
@@ -1145,9 +1145,9 @@ module ST where
                             \  return f;\
                             \}" :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 
-module Enum where
+module Data.Enum where
 
-  import Maybe
+  import Data.Maybe
 
   class Enum a where
     toEnum :: Number -> Maybe a
