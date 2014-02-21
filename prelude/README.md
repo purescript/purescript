@@ -127,6 +127,8 @@
 
     flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
 
+    liftRef :: forall b. forall a. (a -> a -> b) -> Ref a -> Ref a -> b
+
     numAdd :: Prim.Number -> Prim.Number -> Prim.Number
 
     numAnd :: Prim.Number -> Prim.Number -> Prim.Number
@@ -174,7 +176,7 @@
     unsafeRefIneq :: forall a. a -> a -> Prim.Boolean
 
 
-## Module Monoid
+## Module Data.Monoid
 
 ### Types
 
@@ -198,7 +200,7 @@
     mconcat :: forall m. (Monoid (m)) => [m] -> m
 
 
-## Module Monad
+## Module Control.Monad
 
 ### Types
 
@@ -228,7 +230,7 @@
     when :: forall m. (Monad (m)) => Prim.Boolean -> m {  } -> m {  }
 
 
-## Module Maybe
+## Module Data.Maybe
 
 ### Types
 
@@ -258,7 +260,7 @@
     maybe :: forall b. forall a. b -> (a -> b) -> Maybe a -> b
 
 
-## Module Either
+## Module Data.Either
 
 ### Types
 
@@ -286,7 +288,7 @@
     either :: forall c. forall b. forall a. (a -> c) -> (b -> c) -> Either a b -> c
 
 
-## Module Arrays
+## Module Data.Array
 
 ### Types
 
@@ -319,13 +321,13 @@
 
     filter :: forall a. (a -> Prim.Boolean) -> [a] -> [a]
 
+    find :: forall a. (a -> Prim.Boolean) -> [a] -> Maybe a
+
     foldl :: forall b. forall a. (a -> b -> b) -> b -> [a] -> b
 
     foldr :: forall b. forall a. (a -> b -> a) -> a -> [b] -> a
 
-    head :: forall a. [a] -> a
-
-    headSafe :: forall a. [a] -> Maybe a
+    head :: forall a. [a] -> Maybe a
 
     indexOf :: forall a. [a] -> a -> Prim.Number
 
@@ -357,14 +359,30 @@
 
     splice :: forall a. Prim.Number -> Prim.Number -> [a] -> [a] -> [a]
 
-    tail :: forall a. [a] -> [a]
-
-    tailSafe :: forall a. [a] -> Maybe [a]
+    tail :: forall a. [a] -> Maybe [a]
 
     zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
 
 
-## Module Tuples
+## Module Data.Array.Unsafe
+
+### Types
+
+
+### Type Classes
+
+
+### Type Class Instances
+
+
+### Values
+
+    head :: forall a. [a] -> a
+
+    tail :: forall a. [a] -> [a]
+
+
+## Module Data.Tuple
 
 ### Types
 
@@ -391,7 +409,7 @@
     zip :: forall b. forall a. [a] -> [b] -> [Tuple a b]
 
 
-## Module String
+## Module Data.String
 
 ### Types
 
@@ -431,7 +449,7 @@
     trim :: Prim.String -> Prim.String
 
 
-## Module Regex
+## Module Data.String.Regex
 
 ### Types
 
@@ -524,15 +542,27 @@
 
     cos :: Prim.Number -> Prim.Number
 
+    e :: Prim.Number
+
     exp :: Prim.Number -> Prim.Number
 
     floor :: Prim.Number -> Prim.Number
 
+    ln10 :: Prim.Number
+
+    ln2 :: Prim.Number
+
     log :: Prim.Number -> Prim.Number
+
+    log10e :: Prim.Number
+
+    log2e :: Prim.Number
 
     max :: Prim.Number -> Prim.Number
 
     min :: Prim.Number -> Prim.Number
+
+    pi :: Prim.Number
 
     pow :: Prim.Number -> Prim.Number
 
@@ -542,10 +572,14 @@
 
     sqrt :: Prim.Number -> Prim.Number
 
+    sqrt1_2 :: Prim.Number
+
+    sqrt2 :: Prim.Number
+
     tan :: Prim.Number -> Prim.Number
 
 
-## Module Eff
+## Module Control.Monad.Eff
 
 ### Types
 
@@ -576,7 +610,7 @@
 
     untilE :: forall e. Eff e Prim.Boolean -> Eff e {  }
 
-    whileE :: forall e. Eff e Prim.Boolean -> Eff e {  } -> Eff e {  }
+    whileE :: forall a. forall e. Eff e Prim.Boolean -> Eff e a -> Eff e {  }
 
 
 ## Module Random
@@ -594,10 +628,10 @@
 
 ### Values
 
-    random :: forall e. Eff random :: Random | e Prim.Number
+    random :: forall e. Eff (random :: Random | e) Prim.Number
 
 
-## Module Errors
+## Module Control.Monad.Error
 
 ### Types
 
@@ -612,12 +646,12 @@
 
 ### Values
 
-    catchError :: forall a. forall r. forall e. (e -> Eff r a) -> Eff err :: Error e | r a -> Eff r a
+    catchError :: forall a. forall r. forall e. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
-    throwError :: forall r. forall e. forall a. e -> Eff err :: Error e | r a
+    throwError :: forall r. forall e. forall a. e -> Eff (err :: Error e | r) a
 
 
-## Module IORef
+## Module Data.IORef
 
 ### Types
 
@@ -634,18 +668,18 @@
 
 ### Values
 
-    modifyIORef :: forall r. forall s. IORef s -> (s -> s) -> Eff ref :: Ref | r {  }
+    modifyIORef :: forall r. forall s. IORef s -> (s -> s) -> Eff (ref :: Ref | r) {  }
 
-    newIORef :: forall r. forall s. s -> Eff ref :: Ref | r (IORef s)
+    newIORef :: forall r. forall s. s -> Eff (ref :: Ref | r) (IORef s)
 
-    readIORef :: forall r. forall s. IORef s -> Eff ref :: Ref | r s
+    readIORef :: forall r. forall s. IORef s -> Eff (ref :: Ref | r) s
 
-    unsafeRunIORef :: forall a. forall eff. Eff ref :: Ref | eff a -> Eff eff a
+    unsafeRunIORef :: forall a. forall eff. Eff (ref :: Ref | eff) a -> Eff eff a
 
-    writeIORef :: forall r. forall s. IORef s -> s -> Eff ref :: Ref | r {  }
+    writeIORef :: forall r. forall s. IORef s -> s -> Eff (ref :: Ref | r) {  }
 
 
-## Module Trace
+## Module Debug.Trace
 
 ### Types
 
@@ -660,16 +694,18 @@
 
 ### Values
 
-    print :: forall r. forall a. (Prelude.Show (a)) => a -> Eff trace :: Trace | r {  }
+    print :: forall r. forall a. (Prelude.Show (a)) => a -> Eff (trace :: Trace | r) {  }
 
-    trace :: forall r. Prim.String -> Eff trace :: Trace | r {  }
+    trace :: forall r. Prim.String -> Eff (trace :: Trace | r) {  }
 
 
-## Module ST
+## Module Control.Monad.ST
 
 ### Types
 
     data ST :: * -> !
+
+    data STArray :: * -> * -> *
 
     data STRef :: * -> * -> *
 
@@ -682,15 +718,41 @@
 
 ### Values
 
-    modifySTRef :: forall r. forall h. forall a. STRef h a -> (a -> a) -> Eff st :: ST h | r {  }
+    modifySTRef :: forall r. forall h. forall a. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
-    newSTRef :: forall r. forall h. forall a. a -> Eff st :: ST h | r (STRef h a)
+    newSTArray :: forall r. forall h. forall a. Prim.Number -> a -> Eff (st :: ST h | r) (STArray h a)
 
-    readSTRef :: forall r. forall h. forall a. STRef h a -> Eff st :: ST h | r a
+    newSTRef :: forall r. forall h. forall a. a -> Eff (st :: ST h | r) (STRef h a)
 
-    runST :: forall r. forall a. forall h. Eff st :: ST h | r a -> Eff r a
+    peekSTArray :: forall r. forall h. forall a. STArray h a -> Eff (st :: ST h | r) a
 
-    writeSTRef :: forall r. forall h. forall a. STRef h a -> a -> Eff st :: ST h | r {  }
+    pokeSTArray :: forall r. forall h. forall a. STArray h a -> Prim.Number -> a -> Eff (st :: ST h | r) a
+
+    readSTRef :: forall r. forall h. forall a. STRef h a -> Eff (st :: ST h | r) a
+
+    runST :: forall r. forall a. forall h. Eff (st :: ST h | r) a -> Eff r a
+
+    runSTArray :: forall r. forall a. forall h. Eff (st :: ST h | r) (STArray h a) -> Eff r [a]
+
+    writeSTRef :: forall r. forall h. forall a. STRef h a -> a -> Eff (st :: ST h | r) a
+
+
+## Module Data.Enum
+
+### Types
+
+
+### Type Classes
+
+    class Enum a where
+      toEnum :: Prim.Number -> Maybe a
+      fromEnum :: a -> Prim.Number
+
+
+### Type Class Instances
+
+
+### Values
 
 
 
