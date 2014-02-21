@@ -316,7 +316,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isEffFunc _ _ = False
   -- Module names
   prelude = ModuleName [ProperName "Prelude"]
-  effModule = ModuleName [ProperName "Eff"]
+  effModule = ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"]
   -- The name of the type class dictionary for the Monad Eff instance
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
