@@ -36,11 +36,13 @@ import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
+import qualified Parser
+
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (Parsec, eof, try)
+import qualified Text.Parsec as Parsec (try)
 
 -- |
 -- The PSCI state.
@@ -115,7 +117,7 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule = fmap (either (Left . show) Right . P.runIndentParser "" P.parseModules) . U.readFile
+loadModule = fmap (either (Left . show) Right . Parser.parseModules) . U.readFile
 
 -- |
 -- Expands tilde in path.
@@ -233,23 +235,6 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
         Just (ty, _) -> outputStrLn . P.prettyPrintType $ ty
         Nothing -> outputStrLn "Could not find type"
 
--- Parser helpers
-
--- |
--- Parser for our PSCI version of @let@.
--- This is essentially let from do-notation.
--- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
---
-parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
-parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
-
--- |
--- Parser for any other valid expression.
---
-parseExpression :: Parsec.Parsec String P.ParseState P.Value
-parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
-
 -- Commands
 
 -- |
@@ -258,7 +243,7 @@ parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" (Left <$> Parsec.try parseLet <|> Right <$> parseExpression) (unlines ls) of
+  case Parser.psciParser (Left <$> Parsec.try Parser.parseLet <|> Right <$> Parser.parseExpression) (unlines ls) of
     Left err -> inputTToState $ outputStrLn (show err)
     Right (Left l) -> modify (updateLets l)
     Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
@@ -275,7 +260,7 @@ handleCommand Reload = do
   (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
 handleCommand (TypeOf expr) =
-  case P.runIndentParser "" parseExpression expr of
+  case Parser.psciParser Parser.parseExpression expr of
     Left err -> inputTToState $ outputStrLn (show err)
     Right expr' -> get >>= inputTToState . handleTypeOf expr'
 handleCommand _ = outputTStrLn "Unknown command"
