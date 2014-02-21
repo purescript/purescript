@@ -239,12 +239,30 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
 -- Commands
 
 -- |
+-- Parses the input and returns either a Metacommand or an expression.
+--
+getCommand :: InputT IO Command
+getCommand = do
+  firstLine <- getInputLine "> "
+  case firstLine of
+    Nothing   -> return Empty
+    Just line -> case parseCommands line of
+      Left err -> return $ Unknown err
+      Right c  -> case c of
+        Expression expr -> Expression <$> go [expr]
+        _               -> lift $ return c
+  where
+    go :: [String] -> InputT IO String
+    go ls =
+      maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
+
+-- |
 -- Performs an action for each meta-command given, and also for expressions..
 --
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case psciParser (choice [Left <$> psciLet, Right <$> psciExpression]) (unlines ls) of
+  case psciParser (choice [Left <$> psciLet, Right <$> psciExpression]) ls of
     Left  err          -> inputTToState $ outputStrLn (show err)
     Right (Left l)     -> modify (updateLets l)
     Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
@@ -299,20 +317,3 @@ main = do
       case c of
         Quit -> outputTStrLn quitMessage
         _    -> handleCommand c >> go
-
--- |
--- Parses the input and returns either a Metacommand or an expression.
---
-getCommand :: InputT IO Command
-getCommand = do
-  firstLine <- getInputLine "> "
-  case firstLine of
-    Nothing   -> return Empty
-    Just line -> either (return . Unknown) (lift . return) (parseCommands line)
-    --Just other -> Expression <$> go [other]
-  --where
-  --go ls = do
-  --  l <- getInputLine "  "
-  --  case l of
-  --    Nothing -> return $ reverse ls
-  --    Just l' -> go (l' : ls)

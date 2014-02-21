@@ -32,7 +32,8 @@ psciModules = P.parseModules
 -- |
 -- PSCI version of 'let'.
 -- This is essentially let from do-notation.
--- However, since we don't support the 'Eff' monad, we actually want the normal 'let'.
+-- However, since we don't support the 'Eff' monad,
+-- we actually want the normal 'let'.
 --
 psciLet :: Parsec String P.ParseState (P.Value -> P.Value)
 psciLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
@@ -72,30 +73,35 @@ parseExpression = psciParser psciExpression
 parseCommands :: String -> Either ParseError Command
 parseCommands = psciParser $ choice availableCommands
 
+psciExpr :: Parsec String P.ParseState Command
+psciExpr = Expression <$> (lookAhead (try (satisfy (/= ':'))) *> many1 anyChar)
+
 psciHelp :: Parsec String P.ParseState Command
-psciHelp = Help <$ (string ":?" *> spaces)
+psciHelp = Help <$ (spaces *> string ":?" *> spaces)
 
 psciImport :: Parsec String P.ParseState Command
-psciImport = Import <$> (string ":i" *> spaces *> P.properName)
+psciImport = Import <$> (spaces *> string ":i" *> spaces *> P.properName)
 
 psciLoadFile :: Parsec String P.ParseState Command
 psciLoadFile = LoadFile <$> do
+  spaces
   string ":m"
   spaces
   try (manyTill anyChar space) <|> many1 anyChar
 
 psciQuit :: Parsec String P.ParseState Command
-psciQuit = Quit <$ (string ":q" *> spaces)
+psciQuit = Quit <$ (spaces *> string ":q" *> spaces)
 
 psciReload :: Parsec String P.ParseState Command
-psciReload = Reload <$ (string ":r" *> spaces)
+psciReload = Reload <$ (spaces *> string ":r" *> spaces)
 
 psciTypeOf :: Parsec String P.ParseState Command
-psciTypeOf = TypeOf <$> (string ":t" *> spaces *> many anyChar)
+psciTypeOf = TypeOf <$> (spaces *> string ":t" *> spaces *> many anyChar)
 
 availableCommands :: [Parsec String P.ParseState Command]
 availableCommands =
-  map try [ psciHelp
+  map try [ psciExpr
+          , psciHelp
           , psciImport
           , psciLoadFile
           , psciQuit
