@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DoAndIfThenElse, FlexibleContexts #-}
 
 module Main where
 
@@ -25,22 +25,22 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State
 
-import Data.List (intercalate, isPrefixOf, nub, sort)
+import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
-
 import System.Console.Haskeline
-import System.Directory (findExecutable)
+import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
 import System.Exit
 import System.Environment.XDG.BaseDir
+import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
+import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
 import qualified Text.Parsec as Parsec (Parsec, eof, try)
-import qualified Data.Map as M
 
 -- |
 -- The PSCI state.
@@ -97,7 +97,7 @@ defaultImports = [P.ProperName "Prelude"]
 --
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
+  where names = ["nodejs", "node"]
 
 -- |
 -- Grabs the filename where the history is stored.
@@ -115,10 +115,14 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule moduleFile = do
-  moduleText <- U.readFile moduleFile
-  return . either (Left . show) Right $ P.runIndentParser "" P.parseModules moduleText
+loadModule = fmap (either (Left . show) Right . P.runIndentParser "" P.parseModules) . U.readFile
 
+-- |
+-- Expands tilde in path.
+--
+expandTilde :: FilePath -> IO FilePath
+expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
+expandTilde p = return p
 -- Messages
 
 -- |
@@ -162,17 +166,20 @@ completion ms = completeWord Nothing " \t\n\r" findCompletions
   findCompletions :: String -> IO [Completion]
   findCompletions str = do
     files <- listFiles str
-    let names = nub [ show qual
-                    | P.Module moduleName ds <- ms
-                    , ident <- mapMaybe getDeclName ds
-                    , qual <- [ P.Qualified Nothing ident
-                              , P.Qualified (Just moduleName) ident]
-                    ]
-    let matches = sort $ filter (isPrefixOf str) names
-    return $ map simpleCompletion matches ++ files
+    let matches = filter (isPrefixOf str) names
+    return $ sortBy sorter $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
+  names :: [String]
+  names = nub [ show qual
+              | P.Module moduleName ds <- ms
+              , ident <- mapMaybe getDeclName ds
+              , qual <- [ P.Qualified Nothing ident
+                        , P.Qualified (Just moduleName) ident]
+              ]
+  sorter :: Completion -> Completion -> Ordering
+  sorter (Completion _ d1 _) (Completion _ d2 _) = compare d1 d2
 
 -- Compilation
 
@@ -221,7 +228,7 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
   let m = createTemporaryModule False imports lets value
   case P.compile options { P.optionsMain = Nothing } (loadedModules ++ [m]) of
     Left err -> outputStrLn err
-    Right (_, _, env') -> do
+    Right (_, _, env') ->
       case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
         Just (ty, _) -> outputStrLn . P.prettyPrintType $ ty
         Nothing -> outputStrLn "Could not find type"
@@ -255,21 +262,37 @@ handleCommand (Expression ls) =
     Left err -> inputTToState $ outputStrLn (show err)
     Right (Left l) -> modify (updateLets l)
     Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
+handleCommand Help = inputTToState $ outputStrLn helpMessage
+handleCommand (Import moduleName) = modify (updateImports moduleName)
+handleCommand (LoadFile filePath) = do
+  absPath <- ioToState $ expandTilde filePath
+  exists <- ioToState $ doesFileExist absPath
+  if exists then
+    either outputTStrLn (modify . updateModules) =<< ioToState (loadModule absPath)
+  else
+    outputTStrLn $ "Couldn't locate: " ++ filePath
+handleCommand Reload = do
+  (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
+  put (PSCI defaultImports prelude [])
 handleCommand (TypeOf expr) =
   case P.runIndentParser "" parseExpression expr of
     Left err -> inputTToState $ outputStrLn (show err)
     Right expr' -> get >>= inputTToState . handleTypeOf expr'
-handleCommand Help = inputTToState $ outputStrLn helpMessage
-handleCommand (Import moduleName) = modify (updateImports moduleName)
-handleCommand (LoadFile filePath) = do
-  mf <- ioToState $ loadModule filePath
-  case mf of
-    Left err -> inputTToState $ outputStrLn err
-    Right mf' -> modify (updateModules mf')
-handleCommand Reload = do
-  (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
-  put (PSCI defaultImports prelude [])
-handleCommand _ = inputTToState $ outputStrLn "Unknown command"
+handleCommand _ = outputTStrLn "Unknown command"
+
+-- Command helpers
+
+-- |
+-- Lifts the output call to the StateT.
+--
+outputTStrLn :: String -> StateT PSCI (InputT IO) ()
+outputTStrLn = inputTToState . outputStrLn
+
+-- |
+-- The corresponding @print@ version for the StateT.
+--
+outprintT :: Show a => a -> StateT PSCI (InputT IO) ()
+outprintT = outputTStrLn . show
 
 -- |
 -- The PSCI main loop.
@@ -288,5 +311,5 @@ main = do
     go = do
       c <- inputTToState getCommand
       case c of
-        Quit -> inputTToState $ outputStrLn quitMessage
+        Quit -> outputTStrLn quitMessage
         _    -> handleCommand c >> go
