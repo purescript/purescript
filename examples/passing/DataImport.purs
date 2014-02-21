@@ -10,4 +10,4 @@ unTest (Test s) = s
 
 main = do
   let x = unTest (Test "Done")
-  Trace.trace x
+  Debug.Trace.trace x

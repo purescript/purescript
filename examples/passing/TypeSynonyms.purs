@@ -22,7 +22,8 @@ module TypeSynonyms where
   test1 :: forall a b c. Lens (Pair (Pair a b) c) a
   test1 = composeLenses fst fst
 
-  import Arrays
+  import Data.Array ((:))
+  import Data.Array.Unsafe
 
   headLens :: forall a. Lens [a] a
   headLens =
@@ -36,4 +37,4 @@ module TypeSynonyms where
     
 module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

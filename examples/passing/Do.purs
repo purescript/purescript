@@ -46,4 +46,4 @@ test9 = \_ -> (+) <$> Just 1 <*> Just 2
     
 module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

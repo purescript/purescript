@@ -1,8 +1,8 @@
 module Main where
 
   import Prelude
-  import Trace
-  import Eff
+  import Debug.Trace
+  import Control.Monad.Eff
 
   main = do
     print $ Math.sin 0

@@ -17,4 +17,4 @@ module Main where
 import Prelude
 import TailCall
 
-main = Trace.print (test 0 [1, 2, 3])
+main = Debug.Trace.print (test 0 [1, 2, 3])

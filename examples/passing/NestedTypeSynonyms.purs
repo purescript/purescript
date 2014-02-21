@@ -10,4 +10,4 @@ module Main where
 
   import Prelude
 
-  main = Trace.print (NestedTypeSynonyms.fn "Done")
+  main = Debug.Trace.print (NestedTypeSynonyms.fn "Done")
