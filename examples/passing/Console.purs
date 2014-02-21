@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Eff
-import Trace
+import Control.Monad.Eff
+import Debug.Trace
 
 replicateM_ :: forall m a. (Monad m) => Number -> m a -> m {}
 replicateM_ 0 _ = return {}

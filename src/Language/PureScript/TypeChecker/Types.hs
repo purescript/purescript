@@ -208,7 +208,7 @@ typesOf mainModuleName moduleName vals = do
       -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
       when (Just moduleName == mainModuleName && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
-        ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Eff"])) (ProperName "Eff"))) eff) a
+        ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
       -- Make sure unification variables do not escape
       escapeCheck val ty
       return triple

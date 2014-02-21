@@ -1,7 +1,7 @@
 module Cons where
 
   import Prelude
-  import Arrays
+  import Data.Array
 
   test1 = \xs -> 1 : xs
 
@@ -9,4 +9,4 @@ module Cons where
     
 module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

@@ -38,7 +38,7 @@ data Command
   -- |
   -- Import a module from a loaded file
   --
-  | Import ProperName
+  | Import ModuleName
   -- |
   -- Load a file for use with importing
   --

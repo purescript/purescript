@@ -13,5 +13,5 @@ module Main where
   main = do
     let value = mkValue 1
     if value == 1
-      then Trace.trace "Done"
-      else Errors.throwError "Not done"
+      then Debug.Trace.trace "Done"
+      else Control.Monad.Error.throwError "Not done"

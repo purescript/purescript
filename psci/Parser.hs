@@ -92,7 +92,7 @@ psciHelp = Help <$ (spaces *> string ":?" *> spaces)
 -- Parses 'Commands.Import' command.
 --
 psciImport :: Parsec String P.ParseState Command
-psciImport = Import <$> (spaces *> string ":i" *> spaces *> P.properName)
+psciImport = Import <$> (spaces *> string ":i" *> spaces *> P.moduleName)
 
 -- |
 -- Parses 'Commands.LoadFile' command.

@@ -13,4 +13,4 @@ test2 x = id id $ id x
     
 module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

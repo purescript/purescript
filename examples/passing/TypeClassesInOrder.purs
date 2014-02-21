@@ -8,4 +8,4 @@ class Foo a where
 instance Foo String where
   foo s = s
 
-main = Trace.trace $ foo "Done"
+main = Debug.Trace.trace $ foo "Done"

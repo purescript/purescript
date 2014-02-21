@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Eff
+import Control.Monad.Eff
 
 test1 x = let y = x + 1 in y
 
@@ -13,6 +13,6 @@ test2 x y =
 test3 x = let 1 = x in 2
 
 main = do
-  Trace.print (test1 1)
-  Trace.print (test2 1 2)
-  Trace.print (test3 1)
+  Debug.Trace.print (test1 1)
+  Debug.Trace.print (test2 1 2)
+  Debug.Trace.print (test3 1)

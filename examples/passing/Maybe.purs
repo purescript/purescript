@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Maybe
+import Data.Maybe
 import Global
 
 main = do
@@ -9,4 +9,4 @@ main = do
     a <- Just 1
     b <- Just 2
     return (a + b)
-  Trace.print test1
+  Debug.Trace.print test1
