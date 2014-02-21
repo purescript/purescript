@@ -162,17 +162,14 @@ module Prelude where
   -- Referential equality
   data Ref a = Ref a
 
-  foreign import refEq "function refEq(r1) {\
-                       \  return function(r2) {\
-                       \    return r1.values[0] === r2.values[0];\
-                       \  };\
-                       \}" :: forall a. Ref a -> Ref a -> Boolean
-
-  foreign import refIneq "function refIneq(r1) {\
-                         \  return function(r2) {\
-                         \    return r1.values[0] !== r2.values[0];\
-                         \  };\
-                         \}" :: forall a. Ref a -> Ref a -> Boolean
+  liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
+  liftRef f (Ref x) (Ref y) = f x y
+  
+  refEq :: forall a. Ref a -> Ref a -> Boolean
+  refEq = liftRef unsafeRefEq
+  
+  refIneq :: forall a. Ref a -> Ref a -> Boolean
+  refIneq = liftRef unsafeRefIneq
 
   foreign import unsafeRefEq "function unsafeRefEq(r1) {\
                              \  return function(r2) {\
