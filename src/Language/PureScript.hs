@@ -69,7 +69,7 @@ compile opts ms = do
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
   js' <- case mainModuleIdent of 
-    Just mmi@(ModuleName pns) -> do
+    Just mmi -> do
       when ((mmi, Ident "main") `M.notMember` (names env)) $
         Left $ (show mmi) ++ ".main is undefined"
       return $ js ++ [JSApp (JSAccessor "main" (JSAccessor (moduleNameToJs mmi) (JSVar "_ps"))) []]
