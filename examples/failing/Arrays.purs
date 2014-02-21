@@ -1,4 +1,4 @@
-module Arrays where
+module Data.Array where
 
   import Prelude
 

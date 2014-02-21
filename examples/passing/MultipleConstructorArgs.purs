@@ -1,6 +1,6 @@
 module MultipleConstructorArgs where
 
-import Arrays
+import Data.Array
 
 data P a b = P a b
 
@@ -20,9 +20,9 @@ module Main where
 import Prelude
 import MultipleConstructorArgs
 import Global
-import Eff
-import Arrays
+import Control.Monad.Eff
+import Data.Array
 
 main = do
-  Trace.trace (runP (\s n -> s ++ show n) (P "Test" 1))
-  Trace.print test1
+  Debug.Trace.trace (runP (\s n -> s ++ show n) (P "Test" 1))
+  Debug.Trace.print test1

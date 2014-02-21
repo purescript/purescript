@@ -1,9 +1,9 @@
 module Main where
 
 import Prelude
-import Eff
-import ST
-import Arrays
+import Control.Monad.Eff
+import Control.Monad.ST
+import Data.Array
 
 test = runSTArray (do
   a <- newSTArray 2 0
@@ -20,4 +20,4 @@ fromTo lo hi = runSTArray (do
   arr <- newSTArray (hi - lo + 1) 0
   fromTo' lo hi 0 arr)
 
-main = Trace.print $ runPure (fromTo 10 20)
+main = Debug.Trace.print $ runPure (fromTo 10 20)

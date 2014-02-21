@@ -12,10 +12,10 @@ module JSReserved where
 module Main where
 
   import Prelude
-  import Arrays
+  import Data.Array
   import JSReserved
 
-  main = Trace.print [ yield
+  main = Debug.Trace.print [ yield
                      , member
                      , this 1
                      , public 1 ]

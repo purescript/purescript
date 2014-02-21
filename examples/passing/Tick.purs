@@ -4,4 +4,4 @@ test' x = x
 
 module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

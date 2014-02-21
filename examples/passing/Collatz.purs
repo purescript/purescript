@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Eff
-import ST
+import Control.Monad.Eff
+import Control.Monad.ST
 
 collatz :: Number -> Number
 collatz n = runPure (runST (do
@@ -15,4 +15,4 @@ collatz n = runPure (runST (do
     return $ m == 1
   readSTRef count))
 
-main = Trace.print $ collatz 1
+main = Debug.Trace.print $ collatz 1

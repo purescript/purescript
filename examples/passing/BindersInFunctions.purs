@@ -1,12 +1,12 @@
 module Main where
 
 import Prelude
-import Arrays
+import Data.Array
 
 tails = map (\(_:xs) -> xs)
 
 main = 
   let ts = tails [[1, 2, 3], [4, 5], [6]] in
   if ts == [[2, 3], [5], []] 
-  then Trace.trace "Done"
-  else Errors.throwError "Incorrect result from 'tails'."
+  then Debug.Trace.trace "Done"
+  else Control.Monad.Error.throwError "Incorrect result from 'tails'."

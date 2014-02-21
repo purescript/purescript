@@ -1,10 +1,10 @@
 module TestEff where
 
 import Prelude
-import Eff
-import ST
-import Errors
-import Trace
+import Control.Monad.Eff
+import Control.Monad.ST
+import Control.Monad.Error
+import Debug.Trace
 
 test1 = catchError (\s -> return 0) $ do
           trace "Testing"
@@ -18,10 +18,10 @@ test2 = runPure (runST (do
 module Main where
 
 import Prelude
-import Eff
+import Control.Monad.Eff
 import TestEff
 
 main = do
   n <- test1
-  Trace.print n
-  Trace.print test2
+  Debug.Trace.print n
+  Debug.Trace.print test2

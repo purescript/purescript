@@ -65,5 +65,5 @@ module Main where
 import Prelude
 import TypeClasses
 
-main = Trace.trace (test7 "Done")
+main = Debug.Trace.trace (test7 "Done")
 

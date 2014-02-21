@@ -1,10 +1,10 @@
 module Main where
 
   import Prelude
-  import Either
+  import Data.Either
 
   instance Prelude.Functor (Either a) where
     (<$>) _ (Left x) = Left x
     (<$>) f (Right y) = Right (f y)
 
-  main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

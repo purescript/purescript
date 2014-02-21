@@ -1,4 +1,4 @@
-module ArraysTests where
+module Data.ArrayTests where
 
 import Prelude
 
@@ -23,12 +23,12 @@ test4 = \arr -> case arr of
 
 module Main where
 
-import Arrays
+import Data.Array
 import Prelude
 
 main = do
   let x = [3,2,1]
   let y = sort x
   if x == [3,2,1]
-    then Trace.trace "Done"
-    else Errors.throwError "Not done"
+    then Debug.Trace.trace "Done"
+    else Control.Monad.Error.throwError "Not done"

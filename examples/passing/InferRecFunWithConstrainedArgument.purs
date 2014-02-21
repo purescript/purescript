@@ -5,4 +5,4 @@ import Prelude
 test 100 = 100
 test n = test(1 + n)
 
-main = Trace.print $ test 0
+main = Debug.Trace.print $ test 0

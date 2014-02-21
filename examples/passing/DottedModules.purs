@@ -17,4 +17,4 @@ module Main where
     
   unwrap (Text x) = x
 
-  main = Trace.print $ foo $ unwrap x
+  main = Debug.Trace.print $ foo $ unwrap x

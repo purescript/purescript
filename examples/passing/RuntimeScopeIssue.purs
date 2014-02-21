@@ -22,4 +22,4 @@ import RuntimeScopeIssue
 
 import Prelude
 
-main = Trace.print $ a 10
+main = Debug.Trace.print $ a 10

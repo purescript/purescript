@@ -60,10 +60,10 @@ import Operators1
 import Operators2
 
 import Prelude
-import Eff
-import Trace
+import Control.Monad.Eff
+import Debug.Trace
 import Global
-import Arrays
+import Data.Array
 
 main = 
   print [ show $ test1 1 2 $ \x y -> x + y
