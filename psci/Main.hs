@@ -30,9 +30,10 @@ import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
 import System.Console.Haskeline
-import System.Directory (doesFileExist, findExecutable)
+import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
 import System.Exit
 import System.Environment.XDG.BaseDir
+import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
 import qualified Language.PureScript as P
@@ -95,7 +96,7 @@ defaultImports = [P.ProperName "Prelude"]
 --
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
+  where names = ["nodejs", "node"]
 
 -- |
 -- Grabs the filename where the history is stored.
@@ -115,6 +116,12 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule = fmap (either (Left . show) Right . parseModules) . U.readFile
 
+-- |
+-- Expands tilde in path.
+--
+expandTilde :: FilePath -> IO FilePath
+expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
+expandTilde p = return p
 -- Messages
 
 -- |
@@ -259,13 +266,14 @@ handleCommand (Expression ls) =
 handleCommand Help = outputTStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
-  exists <- ioToState $ doesFileExist filePath
+  absPath <- ioToState $ expandTilde filePath
+  exists <- ioToState $ doesFileExist absPath
   if exists then
-    ioToState (loadModule filePath) >>= either outputTStrLn (modify . updateModules)
+    either outputTStrLn (modify . updateModules) =<< ioToState (loadModule absPath)
   else
     outputTStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reload = do
-  (Right prelude) <- ioToState $ getPreludeFilename >>= loadModule
+  (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
 handleCommand Unknown = outputTStrLn "Unknown command"
 
