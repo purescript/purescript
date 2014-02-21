@@ -70,6 +70,7 @@ identCharToString c = '$' : show (ord c)
 nameIsJsReserved :: String -> Bool
 nameIsJsReserved name =
   elem name [ "abstract"
+            , "arguments"
             , "boolean"
             , "break"
             , "byte"
@@ -86,6 +87,7 @@ nameIsJsReserved name =
             , "double"
             , "else"
             , "enum"
+            , "eval"
             , "export"
             , "extends"
             , "final"
