@@ -22,6 +22,7 @@ import Language.PureScript.Declarations as P
 import Language.PureScript.Names as P
 import Language.PureScript.Parser as P
 import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen.Common as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Sugar as P
@@ -63,20 +64,16 @@ compile opts ms = do
     modify (\s -> s { checkCurrentModule = Just moduleName })
     Module moduleName <$> typeCheckAll mainModuleIdent moduleName decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoints = (ModuleName . splitProperNames) `map` optionsModules opts
+  let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
-  js' <- case optionsMain opts of
-    Just mainModuleName -> do
-      when ((ModuleName [ProperName mainModuleName], Ident "main") `M.notMember` (names env)) $
-        Left $ mainModuleName ++ ".main is undefined"
-      return $ js ++ [JSApp (JSAccessor "main" (JSAccessor mainModuleName (JSVar "_ps"))) []]
+  js' <- case mainModuleIdent of 
+    Just mmi -> do
+      when ((mmi, Ident "main") `M.notMember` (names env)) $
+        Left $ (show mmi) ++ ".main is undefined"
+      return $ js ++ [JSApp (JSAccessor "main" (JSAccessor (moduleNameToJs mmi) (JSVar "_ps"))) []]
     _ -> return js
   return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
   where
-  mainModuleIdent = ModuleName . splitProperNames <$> optionsMain opts
-  splitProperNames s = case dropWhile (== '.') s of
-    "" -> []
-    s' -> ProperName w : splitProperNames s''
-      where (w, s'') = break (== '.') s'
+  mainModuleIdent = moduleNameFromString <$> optionsMain opts

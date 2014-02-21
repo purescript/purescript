@@ -70,6 +70,14 @@ data ModuleName = ModuleName [ProperName] deriving (Eq, Ord, Data, Typeable)
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
 
+moduleNameFromString :: String -> ModuleName
+moduleNameFromString = ModuleName . splitProperNames
+  where
+  splitProperNames s = case dropWhile (== '.') s of
+    "" -> []
+    s' -> ProperName w : splitProperNames s''
+      where (w, s'') = break (== '.') s'
+
 instance Show ModuleName where
   show = runModuleName
 
