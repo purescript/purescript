@@ -17,9 +17,30 @@ module Parser where
 
 import Control.Applicative
 
-import Text.Parsec
+import Text.Parsec hiding ((<|>))
 
 import qualified Language.PureScript as P
+
+-- |
+-- PSCI version of modules
+--
+psciModules :: Parsec String P.ParseState [P.Module]
+psciModules = P.parseModules
+
+-- |
+-- PSCI version of 'let'.
+-- This is essentially let from do-notation.
+-- However, since we don't support the 'Eff' monad, we actually want the normal 'let'.
+--
+psciLet :: Parsec String P.ParseState (P.Value -> P.Value)
+psciLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+                <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+
+-- |
+-- PSCI version of any other valid expression.
+--
+psciExpression :: Parsec String P.ParseState P.Value
+psciExpression = P.whiteSpace *> P.parseValue <* eof
 
 -- |
 -- Parser for PSCI.
@@ -29,22 +50,19 @@ psciParser :: Parsec String P.ParseState a -> String -> Either ParseError a
 psciParser = P.runIndentParser ""
 
 -- |
--- Parses modules
+-- Parses PSCI modules.
 --
 parseModules :: String -> Either ParseError [P.Module]
-parseModules = psciParser P.parseModules
+parseModules = psciParser psciModules
 
 -- |
--- Parser for our PSCI version of @let@.
--- This is essentially let from do-notation.
--- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
+-- Parses PSCI 'let' bindings.
 --
-parseLet :: Parsec String P.ParseState (P.Value -> P.Value)
-parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
+parseLet :: String -> Either ParseError (P.Value -> P.Value)
+parseLet = psciParser psciLet
 
 -- |
--- Parser for any other valid expression.
+-- Parses PSCI expressions.
 --
-parseExpression :: Parsec String P.ParseState P.Value
-parseExpression = P.whiteSpace *> P.parseValue <* eof
+parseExpression :: String -> Either ParseError P.Value
+parseExpression = psciParser psciExpression

@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Main
+-- Module      :  Commands
 -- Copyright   :  (c) Phil Freeman 2014
 -- License     :  MIT
 --

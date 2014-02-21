@@ -29,6 +29,8 @@ import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
+import Parser
+
 import System.Console.Haskeline
 import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
 import System.Exit
@@ -36,13 +38,12 @@ import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
-import qualified Parser
+import Text.Parsec (choice)
 
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (try)
 
 -- |
 -- The PSCI state.
@@ -117,7 +118,7 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule = fmap (either (Left . show) Right . Parser.parseModules) . U.readFile
+loadModule = fmap (either (Left . show) Right . parseModules) . U.readFile
 
 -- |
 -- Expands tilde in path.
@@ -243,9 +244,9 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case Parser.psciParser (Left <$> Parsec.try Parser.parseLet <|> Right <$> Parser.parseExpression) (unlines ls) of
-    Left err -> inputTToState $ outputStrLn (show err)
-    Right (Left l) -> modify (updateLets l)
+  case psciParser (choice [Left <$> psciLet, Right <$> psciExpression]) (unlines ls) of
+    Left  err          -> inputTToState $ outputStrLn (show err)
+    Right (Left l)     -> modify (updateLets l)
     Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
@@ -260,8 +261,8 @@ handleCommand Reload = do
   (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
 handleCommand (TypeOf expr) =
-  case Parser.psciParser Parser.parseExpression expr of
-    Left err -> inputTToState $ outputStrLn (show err)
+  case parseExpression expr of
+    Left err    -> inputTToState $ outputStrLn (show err)
     Right expr' -> get >>= inputTToState . handleTypeOf expr'
 handleCommand _ = outputTStrLn "Unknown command"
 
