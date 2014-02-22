@@ -17,8 +17,6 @@ module Language.PureScript.Pretty.JS (
     prettyPrintJS
 ) where
 
-import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Pretty.Common
 import Language.PureScript.CodeGen.JS.AST
 
@@ -69,7 +67,7 @@ literals = mkPattern' match
     , fmap (intercalate ", ") $ forM xs prettyPrintJS'
     , return " ]"
     ]
-  match (JSObjectLiteral []) = return "{}" 
+  match (JSObjectLiteral []) = return "{}"
   match (JSObjectLiteral ps) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ do
@@ -82,10 +80,7 @@ literals = mkPattern' match
     ]
   match (JSBlock sts) = fmap concat $ sequence
     [ return "{\n"
-    , withIndent $ do
-        jss <- forM sts prettyPrintJS'
-        indentString <- currentIndent
-        return $ intercalate "\n" $ map (++ ";") $ map (indentString ++) jss
+    , withIndent $ prettyStatements sts
     , return "\n"
     , currentIndent
     , return "}"
@@ -195,6 +190,12 @@ binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
     match' (JSBinary op' v1 v2) | op' == op = Just (v1, v2)
     match' _ = Nothing
 
+prettyStatements :: [JS] -> StateT PrinterState Maybe String
+prettyStatements sts = do
+  jss <- forM sts prettyPrintJS'
+  indentString <- currentIndent
+  return $ intercalate "\n" $ map ((++ ";") . (indentString ++)) jss
+
 -- |
 -- Generate a pretty-printed string representing a Javascript expression
 --
@@ -205,10 +206,7 @@ prettyPrintJS1 = fromMaybe (error "Incomplete pattern") . flip evalStateT (Print
 -- Generate a pretty-printed string representing a collection of Javascript expressions at the same indentation level
 --
 prettyPrintJS :: [JS] -> String
-prettyPrintJS sts = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) $ do
-  jss <- forM sts prettyPrintJS'
-  indentString <- currentIndent
-  return $ intercalate "\n" $ map (++ ";") $ map (indentString ++) jss
+prettyPrintJS = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements
 
 -- |
 -- Generate an indented, pretty-printed string representing a Javascript expression
@@ -224,8 +222,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Wrap lam $ \(name, args) ret -> "function "
-                        ++ maybe "" id name
-                        ++ "(" ++ (intercalate ", " args) ++ ") "
+                        ++ fromMaybe "" name
+                        ++ "(" ++ intercalate ", " args ++ ") "
                         ++ ret ]
                   , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS1 th ++ " : " ++ prettyPrintJS1 el ]
                   , [ binary    LessThan             "<" ]

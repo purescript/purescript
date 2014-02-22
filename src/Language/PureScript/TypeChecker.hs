@@ -86,7 +86,7 @@ addValue moduleName name ty = do
   putEnv (env { names = M.insert (moduleName, name) (qualifyAllUnqualifiedNames moduleName env ty, Value) (names env) })
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
-addTypeClassDictionaries entries = do
+addTypeClassDictionaries entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
 
 checkTypeClassInstance :: ModuleName -> Type -> Check ()
@@ -154,7 +154,7 @@ typeCheckAll mainModuleName moduleName (ValueDeclaration name [] Nothing val : r
     return $ ValueDeclaration name [] Nothing val'
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
-typeCheckAll _ _ (ValueDeclaration _ _ _ _ : _) = error "Binders were not desugared"
+typeCheckAll _ _ (ValueDeclaration{} : _) = error "Binders were not desugared"
 typeCheckAll mainModuleName moduleName (BindingGroupDeclaration vals : rest) = do
   d <- rethrow (("Error in binding group " ++ show (map fst vals) ++ ":\n") ++) $ do
     forM_ (map fst vals) $ \name ->
@@ -206,7 +206,7 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
   filterModule = filter ((== moduleName) . fst) . M.keys
   moduleExists env = not (null (filterModule (names env))) || not (null (filterModule (types env)))
   shadowIdents idents' env =
-    forM_ idents' $ \ident -> do
+    forM_ idents' $ \ident ->
       case (moduleName, ident) `M.lookup` names env of
         Just (_, Alias _ _) -> return ()
         Just (pt, _) -> do
@@ -214,7 +214,7 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
           modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
         Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
   shadowTypes pns env =
-    forM_ pns $ \pn -> do
+    forM_ pns $ \pn ->
       case (moduleName, pn) `M.lookup` types env of
         Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
         Just (_, DataAlias _ _) -> return ()
@@ -222,7 +222,7 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
           guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
           modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
           let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
-          forM_ keys $ \dctor -> do
+          forM_ keys $ \dctor ->
             case (moduleName, dctor) `M.lookup` dataConstructors env of
               Just (_, Alias _ _) -> return ()
               Just (ctorTy, _) -> do
@@ -236,14 +236,14 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
                     ) (typeClassDictionaries env)
     forM_ instances $ \tcd -> do
       let (Qualified _ ident) = tcdName tcd
-      addTypeClassDictionaries [tcd { tcdName = (Qualified (Just currentModule) ident), tcdType = TCDAlias (tcdName tcd) }]
+      addTypeClassDictionaries [tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (tcdName tcd) }]
   constructs (TypeConstructor (Qualified (Just mn) pn')) pn
     = mn == moduleName && pn' == pn
   constructs (ForAll _ ty _) pn = ty `constructs` pn
   constructs (TypeApp (TypeApp t _) ty) pn | t == tyFunction = ty `constructs` pn
   constructs (TypeApp ty _) pn = ty `constructs` pn
   constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
-typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration _ _ _) : rest) = do
+typeCheckAll mainModuleName moduleName (d@TypeClassDeclaration{} : rest) = do
   env <- getEnv
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ qualifyAllUnqualifiedNames moduleName env d : ds

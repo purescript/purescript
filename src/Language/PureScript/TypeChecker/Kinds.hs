@@ -14,7 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.PureScript.TypeChecker.Kinds (
@@ -29,10 +28,8 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 
-import Control.Monad (forM_)
 import Control.Monad.State
 import Control.Monad.Error
-import Control.Monad.Reader
 import Control.Monad.Unify
 
 import Control.Applicative
@@ -60,7 +57,7 @@ instance Unifiable Check Kind where
 -- Infer the kind of a single type
 --
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf moduleName ty =
+kindOf _ ty =
   rethrow (("Error checking kind of " ++ prettyPrintType ty ++ ":\n") ++) $
     fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
   where
@@ -88,8 +85,8 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
   let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
   bindLocalTypeVariables moduleName dict $ do
     tyCons <- replicateM (length tys) fresh
-    let dict = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
-    bindLocalTypeVariables moduleName dict $ do
+    let dict' = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
+    bindLocalTypeVariables moduleName dict' $ do
       data_ks <- zipWithM (\tyCon (_, args, ts) -> do
         kargs <- replicateM (length args) fresh
         let argDict = zip (map ProperName args) kargs

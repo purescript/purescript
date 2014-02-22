@@ -51,15 +51,15 @@ parseObject = braces $ Object <$> parseRow False
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do
   ident <- identifier
-  when (ident `elem` reservedTypeNames) $ P.unexpected $ ident
+  when (ident `elem` reservedTypeNames) $ P.unexpected ident
   return $ TypeVar ident
 
 parseTypeConstructor :: P.Parsec String ParseState Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: P.Parsec String ParseState Type
-parseForAll = (mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
-                        <*> parseConstrainedType)
+parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
+                       <*> parseConstrainedType
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor
@@ -94,7 +94,7 @@ parseConstrainedType = do
   return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
-parseAnyType = (P.buildExpressionParser operators $ parseTypeAtom) P.<?> "type"
+parseAnyType = P.buildExpressionParser operators parseTypeAtom P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
@@ -112,9 +112,7 @@ parseType = do
 -- Parse a polytype
 --
 parsePolyType :: P.Parsec String ParseState Type
-parsePolyType = do
-  ty <- parseAnyType
-  return ty
+parsePolyType = parseAnyType
 
 parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
 parseNameAndType p = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> p
@@ -123,5 +121,5 @@ parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
 parseRow :: Bool -> P.Parsec String ParseState Type
-parseRow nonEmpty = (curry rowFromList <$> (many $ parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
-  where many = if nonEmpty then commaSep1 else commaSep
+parseRow nonEmpty = (curry rowFromList <$> many' (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
+  where many' = if nonEmpty then commaSep1 else commaSep

@@ -18,6 +18,8 @@ module Language.PureScript.Scope (
     unusedNames
 ) where
 
+import Control.Applicative ((<$>))
+
 import Data.Data
 import Data.List ((\\), nub)
 import Data.Generics (extQ, mkQ, everything)
@@ -41,8 +43,8 @@ usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesB `extQ` namesJ
   namesB _ = []
   namesJS :: JS -> [Ident]
   namesJS (JSVar name) = [Ident name]
-  namesJS (JSFunction (Just name) args _) = (Ident name) : (Ident `map` args)
-  namesJS (JSFunction Nothing args _) = (Ident `map` args)
+  namesJS (JSFunction (Just name) args _) = Ident name : (Ident <$> args)
+  namesJS (JSFunction Nothing args _) = Ident <$> args
   namesJS (JSVariableIntroduction name _) = [Ident name]
   namesJS (JSFor name _ _ _) = [Ident name]
   namesJS _ = []

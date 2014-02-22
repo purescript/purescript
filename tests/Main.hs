@@ -20,7 +20,6 @@ import qualified Language.PureScript as P
 
 import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import System.Exit
@@ -31,7 +30,6 @@ import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
-import qualified Data.Map as M
 
 preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
@@ -45,13 +43,13 @@ compile :: P.Options -> [FilePath] -> IO (Either String String)
 compile opts inputFiles = do
   modules <- readInput inputFiles
   case modules of
-    Left parseError -> do
+    Left parseError ->
       return (Left $ show parseError)
-    Right ms -> do
+    Right ms ->
       case P.compile opts ms of
-        Left typeError -> do
+        Left typeError ->
           return (Left typeError)
-        Right (js, _, _) -> do
+        Right (js, _, _) ->
           return (Right js)
 
 assert :: P.Options -> [FilePath] -> (Either String String -> IO (Maybe String)) -> IO ()
@@ -93,7 +91,7 @@ assertDoesNotCompile inputFile = do
 main :: IO ()
 main = do
   cd <- getCurrentDirectory
-  putStrLn $ cd
+  putStrLn cd
   let examples = cd ++ pathSeparator : "examples"
   let passing = examples ++ pathSeparator : "passing"
   passingTestCases <- getDirectoryContents passing

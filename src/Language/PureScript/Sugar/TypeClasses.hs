@@ -31,11 +31,9 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Arrow ((***))
+import Control.Arrow (second)
 
-import Data.Maybe (fromMaybe)
-import Data.List (intercalate, nub)
-import Data.Generics (mkQ, everything)
+import Data.List (intercalate)
 import Language.PureScript.CodeGen.Common (identToJs, moduleNameToJs)
 
 type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
@@ -122,16 +120,16 @@ typeInstanceDictionaryDeclaration mn deps name tys decls = do
   m <- get
   (args, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right
                         $ M.lookup (qualify mn name) m
-  let memberTypes = map (id *** (\instanceTy -> replaceAllTypeVars (zip args tys) instanceTy)) instanceTys
+  let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
   entryName <- lift $ mkDictionaryValueName mn name tys
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
-      (foldr Abs (ObjectLiteral memberNames) (map (\n -> Left . Ident $ '_' : show n) [1..max 1 (length deps)]))
+      (foldr (Abs . (\n -> Left . Ident $ '_' : show n)) (ObjectLiteral memberNames) [1..max 1 (length deps)])
       (quantify (if null deps then
                    function unit (foldl TypeApp (TypeConstructor name) tys)
                  else
-                   foldr function (foldl TypeApp (TypeConstructor name) tys) (map (\(pn, tys) -> foldl TypeApp (TypeConstructor pn) tys) deps)))
+                   foldr (function . (\(pn, tys') -> foldl TypeApp (TypeConstructor pn) tys')) (foldl TypeApp (TypeConstructor name) tys) deps))
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)

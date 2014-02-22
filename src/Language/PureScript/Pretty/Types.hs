@@ -35,14 +35,14 @@ typeLiterals = mkPattern match
   match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (TypeVar var) = Just var
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
-  match ty@(TypeConstructor ctor) = Just $ show ctor
+  match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s _) = Just $ 's' : show s
-  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ intercalate " " (map prettyPrintType ty') ++ ")") deps) ++ ") => " ++ prettyPrintType ty
+  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ unwords (map prettyPrintType ty') ++ ")") deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
   match (ForAll ident ty _) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
   match REmpty = Just "()"
-  match row@(RCons _ _ _) = Just $ '(' : prettyPrintRow row ++ ")"
+  match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
 
 -- |

@@ -30,14 +30,14 @@ import Data.List (intercalate)
 --
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module mn decls) env =
-  "module " ++ (runModuleName mn) ++ " where\n" ++
+  "module " ++ runModuleName mn ++ " where\n" ++
   (intercalate "\n" . map ("  " ++) . concatMap (declToPs mn env) $ decls)
 
 declToPs :: ModuleName -> Environment -> Declaration -> [String]
 declToPs path env (ValueDeclaration name _ _ _) = maybeToList $ do
   (ty, _) <- M.lookup (path, name) $ names env
   return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
-declToPs path env (BindingGroupDeclaration vals) = do
+declToPs path env (BindingGroupDeclaration vals) =
   flip mapMaybe vals $ \(name, _) -> do
     (ty, _) <- M.lookup (path, name) $ names env
     return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty

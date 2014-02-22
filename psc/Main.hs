@@ -28,7 +28,7 @@ preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
-readInput Nothing = getContents >>= return . P.runIndentParser "" P.parseModules
+readInput Nothing = P.runIndentParser "" P.parseModules <$> getContents
 readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
   text <- U.readFile inputFile
   return $ P.runIndentParser inputFile P.parseModules text
@@ -118,7 +118,7 @@ term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile 
 termInfo :: TermInfo
 termInfo = defTI
   { termName = "psc"
-  , version  = showVersion $ Paths.version
+  , version  = showVersion Paths.version
   , termDoc  = "Compiles PureScript to Javascript"
   }
 

@@ -69,7 +69,7 @@ createBindingGroups moduleName ds = do
 -- Collapse all binding groups to individual declarations
 --
 collapseBindingGroups :: [Declaration] -> [Declaration]
-collapseBindingGroups ds = concatMap go ds
+collapseBindingGroups = concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, val) -> ValueDeclaration ident [] Nothing val) ds
@@ -112,10 +112,10 @@ toDataBindingGroup (CyclicSCC ds')
   | all isTypeSynonym ds' = Left "Cycle in type synonyms"
   | otherwise = return $ DataBindingGroupDeclaration ds'
   where
-  isTypeSynonym (TypeSynonymDeclaration _ _ _) = True
+  isTypeSynonym TypeSynonymDeclaration{} = True
   isTypeSynonym _ = False
 
 fromValueDecl :: Declaration -> (Ident, Value)
 fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
-fromValueDecl (ValueDeclaration _ _ _ _) = error "Binders should have been desugared"
+fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
 fromValueDecl _ = error "Expected ValueDeclaration"

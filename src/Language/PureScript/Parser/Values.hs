@@ -20,13 +20,16 @@ module Language.PureScript.Parser.Values (
     parseBinderNoParens,
 ) where
 
+import Control.Applicative
+
 import Language.PureScript.Values
 import Language.PureScript.Parser.State
-import qualified Language.PureScript.Parser.Common as C
-import Control.Applicative
-import qualified Text.Parsec as P
-import Text.Parsec.Expr
 import Language.PureScript.Parser.Types
+
+import Text.Parsec.Expr
+
+import qualified Language.PureScript.Parser.Common as C
+import qualified Text.Parsec as P
 
 booleanLiteral :: P.Parsec String ParseState Bool
 booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
@@ -59,7 +62,7 @@ parseAbs = do
   return $ toFunction args value
   where
   toFunction :: [Value -> Value] -> Value -> Value
-  toFunction args value = foldr (($)) value args
+  toFunction args value = foldr ($) value args
 
 parseVar :: P.Parsec String ParseState Value
 parseVar = Var <$> C.parseQualified C.parseIdent
@@ -154,7 +157,7 @@ parseValue =
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
                   , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> C.braces (C.commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
-  postfixTable2 = [ \v -> P.try (C.indented *> indexersAndAccessors >>= return . flip App) <*> pure v
+  postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
                   ]
   operators = [ [ Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
@@ -177,13 +180,13 @@ parseNullaryConstructorBinder :: P.Parsec String ParseState Binder
 parseNullaryConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.properName) <*> pure []
 
 parseConstructorBinder :: P.Parsec String ParseState Binder
-parseConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.properName) <*> (many (C.indented *> parseBinderNoParens))
+parseConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.properName) <*> many (C.indented *> parseBinderNoParens)
 
 parseObjectBinder :: P.Parsec String ParseState Binder
 parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep (C.indented *> parseIdentifierAndBinder))
 
 parseArrayBinder :: P.Parsec String ParseState Binder
-parseArrayBinder = C.squares $ ArrayBinder <$> (C.commaSep (C.indented *> parseBinder))
+parseArrayBinder = C.squares $ ArrayBinder <$> C.commaSep (C.indented *> parseBinder)
 
 parseNamedBinder :: P.Parsec String ParseState Binder
 parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* C.lexeme (P.char '@'))
@@ -203,7 +206,7 @@ parseIdentifierAndBinder = do
 -- Parse a binder
 --
 parseBinder :: P.Parsec String ParseState Binder
-parseBinder = (buildExpressionParser operators parseBinderAtom) P.<?> "expression"
+parseBinder = buildExpressionParser operators parseBinderAtom P.<?> "expression"
   where
   operators = [ [ Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) AssocRight ] ]
   parseBinderAtom :: P.Parsec String ParseState Binder

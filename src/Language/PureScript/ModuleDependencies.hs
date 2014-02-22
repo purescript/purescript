@@ -19,13 +19,10 @@ module Language.PureScript.ModuleDependencies (
 import Data.Data
 import Data.Graph
 import Data.Generics
-import Data.List (nub, intersect)
-import Control.Applicative ((<$>))
+import Data.List (nub)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
-import Language.PureScript.Values
-import Language.PureScript.Types
 
 -- |
 -- Sort a collection of modules based on module dependencies.

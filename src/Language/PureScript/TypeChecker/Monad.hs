@@ -13,8 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances, RankNTypes, DeriveDataTypeable,
-    GADTs, StandaloneDeriving, MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances, RankNTypes,
+    MultiParamTypeClasses, FlexibleContexts #-}
 
 module Language.PureScript.TypeChecker.Monad where
 
@@ -26,15 +26,13 @@ import Language.PureScript.Declarations
 
 import Data.Data
 import Data.Maybe
-import Data.Monoid
 import Data.Generics (mkT, everywhere)
 
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
-import Control.Monad.Reader
 import Control.Monad.Unify
-import Control.Arrow ((***))
+import Control.Arrow (first)
 
 import qualified Data.Map as M
 
@@ -173,15 +171,15 @@ getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 -- Temporarily bind a collection of names to local variables
 --
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a
-bindLocalVariables moduleName bindings action =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((moduleName, name), (ty, LocalVariable))) action
+bindLocalVariables moduleName bindings =
+  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((moduleName, name), (ty, LocalVariable)))
 
 -- |
 -- Temporarily bind a collection of names to local type variables
 --
 bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
-bindLocalTypeVariables moduleName bindings action =
-  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> ((moduleName, name), (k, LocalTypeVariable))) action
+bindLocalTypeVariables moduleName bindings =
+  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> ((moduleName, name), (k, LocalTypeVariable)))
 
 -- |
 -- Lookup the type of a value by name in the @Environment@
@@ -322,7 +320,7 @@ liftUnify unify = do
   case e of
     Left err -> throwError err
     Right (a, ust) -> do
-      modify $ \st -> st { checkNextVar = unifyNextVar ust }
+      modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
       return (a, unifyCurrentSubstitution ust)
 
 -- |
@@ -334,7 +332,7 @@ qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
   go :: Type -> Type
   go (TypeConstructor nm) = TypeConstructor $ qualify' nm
   go (SaturatedTypeSynonym nm args) = SaturatedTypeSynonym (qualify' nm) args
-  go (ConstrainedType constraints ty) = ConstrainedType (map (qualify' *** id) constraints) ty
+  go (ConstrainedType constraints ty) = ConstrainedType (map (first qualify') constraints) ty
   go other = other
   qualify' qual = let (mn', pn') = canonicalizeType mn env qual
                   in Qualified (Just mn') pn'
