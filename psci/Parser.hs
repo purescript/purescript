@@ -19,6 +19,8 @@ import Commands
 
 import Control.Applicative hiding (many)
 
+import Data.Text (pack, strip, unpack)
+
 import Text.Parsec hiding ((<|>))
 
 import qualified Language.PureScript as P
@@ -102,7 +104,8 @@ psciLoadFile = LoadFile <$> do
   spaces
   string ":m"
   spaces
-  try (manyTill anyChar space) <|> many1 anyChar
+  rawPath <- manyTill anyChar eof
+  return . unpack . strip . pack $ rawPath
 
 -- |
 -- Parses 'Commands.Quit' command.
