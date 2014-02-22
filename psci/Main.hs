@@ -29,6 +29,8 @@ import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 
+import Parser
+
 import System.Console.Haskeline
 import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
 import System.Exit
@@ -36,11 +38,12 @@ import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
+import Text.Parsec (choice)
+
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U (readFile)
-import qualified Text.Parsec as Parsec (Parsec, eof, try)
 
 -- |
 -- The PSCI state.
@@ -69,8 +72,8 @@ ioToState = lift . lift
 -- |
 -- Updates the state to have more imported modules.
 --
-updateImports :: String -> PSCI -> PSCI
-updateImports name (PSCI i m b) = PSCI (P.moduleNameFromString name : i) m b
+updateImports :: P.ModuleName -> PSCI -> PSCI
+updateImports name (PSCI i m b) = PSCI (name : i) m b
 
 -- |
 -- Updates the state to have more loaded files.
@@ -115,7 +118,7 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule = fmap (either (Left . show) Right . P.runIndentParser "" P.parseModules) . U.readFile
+loadModule = fmap (either (Left . show) Right . parseModules) . U.readFile
 
 -- |
 -- Expands tilde in path.
@@ -196,7 +199,7 @@ createTemporaryModule exec imports lets value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
-    traceModule = P.ModuleName [P.ProperName "Trace"]
+    traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     value' = foldr ($) value lets
     itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing value'
@@ -233,24 +236,24 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
         Just (ty, _) -> outputStrLn . P.prettyPrintType $ ty
         Nothing -> outputStrLn "Could not find type"
 
--- Parser helpers
-
--- |
--- Parser for our PSCI version of @let@.
--- This is essentially let from do-notation.
--- However, since we don't support the @Eff@ monad, we actually want the normal @let@.
---
-parseLet :: Parsec.Parsec String P.ParseState (P.Value -> P.Value)
-parseLet = P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
-                 <*> (P.indented *> P.reservedOp "=" *> P.parseValue)
-
--- |
--- Parser for any other valid expression.
---
-parseExpression :: Parsec.Parsec String P.ParseState P.Value
-parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
-
 -- Commands
+
+-- |
+-- Parses the input and returns either a Metacommand or an expression.
+--
+getCommand :: InputT IO Command
+getCommand = do
+  firstLine <- getInputLine "> "
+  case firstLine of
+    Nothing   -> return Empty
+    Just line -> case parseCommands line of
+      Left err -> return $ Unknown err
+      Right c  -> case c of
+        Expression expr -> Expression <$> go [expr]
+        _               -> lift $ return c
+  where
+    go :: [String] -> InputT IO String
+    go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
 -- |
 -- Performs an action for each meta-command given, and also for expressions..
@@ -258,9 +261,9 @@ parseExpression = P.whiteSpace *> P.parseValue <* Parsec.eof
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
 handleCommand (Expression ls) =
-  case P.runIndentParser "" (Left <$> Parsec.try parseLet <|> Right <$> parseExpression) (unlines ls) of
-    Left err -> inputTToState $ outputStrLn (show err)
-    Right (Left l) -> modify (updateLets l)
+  case psciParser (choice [Left <$> psciLet, Right <$> psciExpression]) ls of
+    Left  err          -> inputTToState $ outputStrLn (show err)
+    Right (Left l)     -> modify (updateLets l)
     Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
@@ -275,8 +278,8 @@ handleCommand Reload = do
   (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
 handleCommand (TypeOf expr) =
-  case P.runIndentParser "" parseExpression expr of
-    Left err -> inputTToState $ outputStrLn (show err)
+  case parseExpression expr of
+    Left err    -> inputTToState $ outputStrLn (show err)
     Right expr' -> get >>= inputTToState . handleTypeOf expr'
 handleCommand _ = outputTStrLn "Unknown command"
 
