@@ -23,7 +23,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 
 import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
@@ -53,41 +53,38 @@ import qualified System.IO.UTF8 as U (readFile)
 -- The let bindings are partial,
 -- because it makes more sense to apply the binding to the final evaluated expression.
 --
-data PSCI = PSCI [P.ModuleName] [P.Module] [P.Value -> P.Value]
+data PSCiState = PSCiState
+  { psciImportedFilenames   :: [FilePath]
+  , psciImportedModuleNames :: [P.ModuleName]
+  , psciLoadedModules       :: [P.Module]
+  , psciLetBindings         :: [P.Value -> P.Value]
+  }
 
 -- State helpers
 
 -- |
--- Synonym to be more descriptive.
--- This is just @lift@
+-- Updates the state to have more imported modules.
 --
-inputTToState :: InputT IO a -> StateT PSCI (InputT IO) a
-inputTToState = lift
-
--- |
--- Synonym to be more descriptive.
--- This is just @lift . lift@
---
-ioToState :: IO a -> StateT PSCI (InputT IO) a
-ioToState = lift . lift
+updateImportedFiles :: FilePath -> PSCiState -> PSCiState
+updateImportedFiles filename st = st { psciImportedFilenames = filename : psciImportedFilenames st }
 
 -- |
 -- Updates the state to have more imported modules.
 --
-updateImports :: P.ModuleName -> PSCI -> PSCI
-updateImports name (PSCI i m b) = PSCI (name : i) m b
+updateImports :: P.ModuleName -> PSCiState -> PSCiState
+updateImports name st = st { psciImportedModuleNames = name : psciImportedModuleNames st }
 
 -- |
 -- Updates the state to have more loaded files.
 --
-updateModules :: [P.Module] -> PSCI -> PSCI
-updateModules modules (PSCI i m b) = PSCI i (m ++ modules) b
+updateModules :: [P.Module] -> PSCiState -> PSCiState
+updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modules }
 
 -- |
 -- Updates the state to have more let bindings.
 --
-updateLets :: (P.Value -> P.Value) -> PSCI -> PSCI
-updateLets name (PSCI i m b) = PSCI i m (b ++ [name])
+updateLets :: (P.Value -> P.Value) -> PSCiState -> PSCiState
+updateLets name st = st { psciLetBindings = psciLetBindings st ++ [name] }
 
 -- File helpers
 -- |
@@ -165,19 +162,20 @@ quitMessage = "See ya!"
 -- |
 -- Loads module, function, and file completions.
 --
-completion :: [P.Module] -> CompletionFunc IO
-completion ms = completeWord Nothing " \t\n\r" findCompletions
+completion :: CompletionFunc (StateT PSCiState IO)
+completion = completeWord Nothing " \t\n\r" findCompletions
   where
-  findCompletions :: String -> IO [Completion]
+  findCompletions :: String -> StateT PSCiState IO [Completion]
   findCompletions str = do
+    ms <- psciLoadedModules <$> get
     files <- listFiles str
-    let matches = filter (isPrefixOf str) names
+    let matches = filter (isPrefixOf str) (names ms)
     return $ sortBy sorter $ map simpleCompletion matches ++ files
   getDeclName :: P.Declaration -> Maybe P.Ident
   getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
   getDeclName _ = Nothing
-  names :: [String]
-  names = nub [ show qual
+  names :: [P.Module] -> [String]
+  names ms = nub [ show qual
               | P.Module moduleName ds <- ms
               , ident <- mapMaybe getDeclName ds
               , qual <- [ P.Qualified Nothing ident
@@ -212,14 +210,14 @@ createTemporaryModule exec imports lets value =
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
-handleDeclaration :: P.Value -> PSCI -> InputT IO ()
-handleDeclaration value (PSCI imports loadedModules lets) = do
-  let m = createTemporaryModule True imports lets value
-  case P.compile options (loadedModules ++ [m]) of
+handleDeclaration :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
+handleDeclaration value st = do
+  let m = createTemporaryModule True (psciImportedModuleNames st) (psciLetBindings st) value
+  case P.compile options (psciLoadedModules st ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
-      process <- lift findNodeProcess
-      result <- lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+      process <- lift . lift $ findNodeProcess
+      result <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
       case result of
         Just (ExitSuccess,   out, _)   -> outputStrLn out
         Just (ExitFailure _, _,   err) -> outputStrLn err
@@ -228,10 +226,10 @@ handleDeclaration value (PSCI imports loadedModules lets) = do
 -- |
 -- Takes a value and prints its type
 --
-handleTypeOf :: P.Value -> PSCI -> InputT IO ()
-handleTypeOf value (PSCI imports loadedModules lets) = do
-  let m = createTemporaryModule False imports lets value
-  case P.compile options { P.optionsMain = Nothing } (loadedModules ++ [m]) of
+handleTypeOf :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
+handleTypeOf value st = do
+  let m = createTemporaryModule False (psciImportedModuleNames st) (psciLetBindings st) value
+  case P.compile options { P.optionsMain = Nothing } (psciLoadedModules st ++ [m]) of
     Left err -> outputStrLn err
     Right (_, _, env') ->
       case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
@@ -243,7 +241,7 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: InputT IO (Either ParseError (Maybe Command))
+getCommand :: InputT (StateT PSCiState IO) (Either ParseError (Maybe Command))
 getCommand = do
   firstLine <- getInputLine "> "
   case firstLine of
@@ -251,43 +249,34 @@ getCommand = do
     Just s@ (':' : _) -> return . either Left (Right . Just) $ parseCommand s -- The start of a command
     Just s -> either Left (Right . Just) . parseCommand <$> go [s]
   where
-    go :: [String] -> InputT IO String
+    go :: [String] -> InputT (StateT PSCiState IO) String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
 -- |
 -- Performs an action for each meta-command given, and also for expressions..
 --
-handleCommand :: Command -> StateT PSCI (InputT IO) ()
-handleCommand (Expression val) = get >>= inputTToState . handleDeclaration val
-handleCommand (Let l) = modify (updateLets l)
-handleCommand Help = inputTToState $ outputStrLn helpMessage
-handleCommand (Import moduleName) = modify (updateImports moduleName)
+handleCommand :: Command -> InputT (StateT PSCiState IO) ()
+handleCommand (Expression val) = lift get >>= handleDeclaration val
+handleCommand (Let l) = lift $ modify (updateLets l)
+handleCommand Help = outputStrLn helpMessage
+handleCommand (Import moduleName) = lift $ modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
-  absPath <- ioToState $ expandTilde filePath
-  exists <- ioToState $ doesFileExist absPath
-  if exists then
-    either outputTStrLn (modify . updateModules) =<< ioToState (loadModule absPath)
+  absPath <- lift . lift $ expandTilde filePath
+  exists <- lift . lift $ doesFileExist absPath
+  if exists then do
+    lift $ modify (updateImportedFiles absPath)
+    either outputStrLn (lift . modify . updateModules) =<< (lift . lift $ loadModule absPath)
   else
-    outputTStrLn $ "Couldn't locate: " ++ filePath
+    outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
-  (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
-  put (PSCI defaultImports prelude [])
-handleCommand (TypeOf val) = get >>= inputTToState . handleTypeOf val
-handleCommand _ = outputTStrLn "Unknown command"
-
--- Command helpers
-
--- |
--- Lifts the output call to the StateT.
---
-outputTStrLn :: String -> StateT PSCI (InputT IO) ()
-outputTStrLn = inputTToState . outputStrLn
-
--- |
--- The corresponding @print@ version for the StateT.
---
-outprintT :: Show a => a -> StateT PSCI (InputT IO) ()
-outprintT = outputTStrLn . show
+  preludeFilename <- lift . lift $ getPreludeFilename
+  files <- psciImportedFilenames <$> lift get
+  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) (preludeFilename : files)
+  case modulesOrFirstError of
+    Left err -> lift . lift $ putStrLn err >> exitFailure
+    Right modules -> lift $ put (PSCiState (preludeFilename : files) defaultImports modules [])
+handleCommand (TypeOf val) = lift get >>= handleTypeOf val
+handleCommand _ = outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]
 inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posDoc = "The input .ps files" }
@@ -304,17 +293,17 @@ loop files = do
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings {historyFile = Just historyFilename}
-      runInputT (setComplete (completion modules) settings) $ do
+      flip evalStateT (PSCiState (preludeFilename : files) defaultImports modules []) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
-        evalStateT go (PSCI defaultImports modules [])
+        go
       where
-        go :: StateT PSCI (InputT IO) ()
+        go :: InputT (StateT PSCiState IO) ()
         go = do
-          c <- inputTToState getCommand
+          c <- getCommand
           case c of
-            Left err -> outputTStrLn (show err) >> go
+            Left err -> outputStrLn (show err) >> go
             Right Nothing -> go
-            Right (Just Quit) -> outputTStrLn quitMessage
+            Right (Just Quit) -> outputStrLn quitMessage
             Right (Just c') -> handleCommand c' >> go
 
 term :: Cmd.Term (IO ())
