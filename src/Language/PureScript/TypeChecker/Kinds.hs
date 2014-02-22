@@ -29,6 +29,7 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 
+import Control.Monad (forM_)
 import Control.Monad.State
 import Control.Monad.Error
 import Control.Monad.Reader
@@ -159,7 +160,9 @@ infer (RCons _ ty row) = do
   k2 =?= Row k1
   return $ Row k1
 infer (ConstrainedType deps ty) = do
-  mapM_ (infer . snd) deps
+  forM_ deps $ \(className, tys) -> do
+    _ <- infer $ foldl TypeApp (TypeConstructor className) tys
+    return ()
   k <- infer ty
   k =?= Star
   return Star

@@ -112,7 +112,7 @@ data Value
   -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Qualified ProperName, Type) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
+  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 
 -- |
 -- The type of a type class dictionary
@@ -141,13 +141,13 @@ data TypeClassDictionaryInScope
     --
     , tcdClassName :: Qualified ProperName
     -- |
-    -- The type to which this type class instance applies
+    -- The types to which this type class instance applies
     --
-    , tcdInstanceType :: Type
+    , tcdInstanceTypes :: [Type]
     -- |
     -- Type class dependencies which must be satisfied to construct this dictionary
     --
-    , tcdDependencies :: Maybe [(Qualified ProperName, Type)]
+    , tcdDependencies :: Maybe [(Qualified ProperName, [Type])]
     -- |
     -- The type of this dictionary
     --

@@ -247,12 +247,12 @@ typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration _ _ _) : rest) =
   env <- getEnv
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ qualifyAllUnqualifiedNames moduleName env d : ds
-typeCheckAll mainModuleName moduleName (d@(TypeInstanceDeclaration deps className ty _) : rest) = do
+typeCheckAll mainModuleName moduleName (d@(TypeInstanceDeclaration deps className tys _) : rest) = do
   env <- getEnv
-  dictName <- Check . lift $ mkDictionaryValueName moduleName className ty
-  checkTypeClassInstance moduleName ty
-  forM_ deps $ checkTypeClassInstance moduleName . snd
+  dictName <- Check . lift $ mkDictionaryValueName moduleName className tys
+  mapM_ (checkTypeClassInstance moduleName) tys
+  forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
   addTypeClassDictionaries (qualifyAllUnqualifiedNames moduleName env
-    [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className ty (Just deps) TCDRegular])
+    [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular])
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ qualifyAllUnqualifiedNames moduleName env d : ds

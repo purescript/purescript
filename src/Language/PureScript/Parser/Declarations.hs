@@ -97,21 +97,21 @@ parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
   reserved "class"
   className <- indented *> properName
-  ident <- indented *> identifier
+  idents <- indented *> P.many identifier
   indented *> reserved "where"
   members <- mark (P.many (same *> parseTypeDeclaration))
-  return $ TypeClassDeclaration className ident members
+  return $ TypeClassDeclaration className idents members
 
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
   reserved "instance"
   deps <- P.optionMaybe $ do
-    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> parseType))
+    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
     indented
     reservedOp "=>"
     return deps
   className <- indented *> parseQualified properName
-  ty <- indented *> parseType
+  ty <- indented *> P.many parseTypeAtom
   indented *> reserved "where"
   members <- mark (P.many (same *> parseValueDeclaration))
   return $ TypeInstanceDeclaration (fromMaybe [] deps) className ty members

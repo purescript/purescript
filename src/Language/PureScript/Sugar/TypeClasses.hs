@@ -34,11 +34,11 @@ import Control.Monad.State
 import Control.Arrow ((***))
 
 import Data.Maybe (fromMaybe)
-import Data.List (nub)
+import Data.List (intercalate, nub)
 import Data.Generics (mkQ, everything)
 import Language.PureScript.CodeGen.Common (identToJs, moduleNameToJs)
 
-type MemberMap = M.Map (ModuleName, ProperName) (String, [(String, Type)])
+type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
 
 type Desugar = StateT MemberMap (Either String)
 
@@ -91,10 +91,10 @@ desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl
 --   __Test_Foo_array _1 = { foo: __Test_Foo_array_foo _1 :: [a] -> [a] (unchecked) }
 --
 desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
-desugarDecl mn d@(TypeClassDeclaration name arg members) = do
+desugarDecl mn d@(TypeClassDeclaration name args members) = do
   let tys = map memberToNameAndType members
-  modify (M.insert (mn, name) (arg, tys))
-  return $ d : typeClassDictionaryDeclaration name arg members : map (typeClassMemberToDictionaryAccessor name arg) members
+  modify (M.insert (mn, name) (args, tys))
+  return $ d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor name args) members
 desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) desugared
@@ -106,50 +106,50 @@ memberToNameAndType :: Declaration -> (String, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (identToJs ident, ty)
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration :: ProperName -> String -> [Declaration] -> Declaration
-typeClassDictionaryDeclaration name arg members =
-  TypeSynonymDeclaration name [arg] (Object $ rowFromList (map memberToNameAndType members, REmpty))
+typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration name args members =
+  TypeSynonymDeclaration name args (Object $ rowFromList (map memberToNameAndType members, REmpty))
 
-typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
-typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
+typeClassMemberToDictionaryAccessor :: ProperName -> [String] -> Declaration -> Declaration
+typeClassMemberToDictionaryAccessor name args (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
-    (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty) Nothing)
+    (quantify (ConstrainedType [(Qualified Nothing name, map TypeVar args)] ty))
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
-typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar Declaration
-typeInstanceDictionaryDeclaration mn deps name ty decls = do
+typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
+typeInstanceDictionaryDeclaration mn deps name tys decls = do
   m <- get
-  (arg, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right
+  (args, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show name ++ " is undefined. Type class names must be qualified.") Right
                         $ M.lookup (qualify mn name) m
-  let memberTypes = map (id *** replaceTypeVars arg ty) instanceTys
-  entryName <- lift $ mkDictionaryValueName mn name ty
+  let memberTypes = map (id *** (\instanceTy -> replaceAllTypeVars (zip args tys) instanceTy)) instanceTys
+  entryName <- lift $ mkDictionaryValueName mn name tys
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True
       (foldr Abs (ObjectLiteral memberNames) (map (\n -> Left . Ident $ '_' : show n) [1..max 1 (length deps)]))
       (quantify (if null deps then
-                   function unit (TypeApp (TypeConstructor name) ty)
+                   function unit (foldl TypeApp (TypeConstructor name) tys)
                  else
-                   foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
+                   foldr function (foldl TypeApp (TypeConstructor name) tys) (map (\(pn, tys) -> foldl TypeApp (TypeConstructor pn) tys) deps)))
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
-  memberToNameAndValue tys (ValueDeclaration ident _ _ _) = do
-    memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys
-    memberName <- mkDictionaryEntryName mn name ty ident
+  memberToNameAndValue tys' (ValueDeclaration ident _ _ _) = do
+    memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys'
+    memberName <- mkDictionaryEntryName mn name tys ident
     return (identToJs ident, TypedValue False
                                (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                                (quantify memberType))
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
-typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
-typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [] _ val) = do
+typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> Declaration -> Desugar Declaration
+typeInstanceDictionaryEntryDeclaration mn deps name tys (ValueDeclaration ident [] _ val) = do
   m <- get
-  valTy <- lift $ do (arg, members) <- lookupTypeClass m
+  valTy <- lift $ do (args, members) <- lookupTypeClass m
                      ty' <- lookupIdent members
-                     return $ replaceTypeVars arg ty ty'
-  entryName <- mkDictionaryEntryName mn name ty ident
+                     return $ replaceAllTypeVars (zip args tys) ty'
+  entryName <- mkDictionaryEntryName mn name tys ident
   return $ ValueDeclaration entryName [] Nothing
     (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
   where
@@ -164,10 +164,10 @@ qualifiedToString _ (Qualified (Just mn) pn) = moduleNameToJs mn ++ "_" ++ runPr
 -- |
 -- Generate a name for a type class dictionary, based on the module name, class name and type name
 --
-mkDictionaryValueName :: ModuleName -> Qualified ProperName -> Type -> Either String Ident
-mkDictionaryValueName mn cl ty = do
-  tyStr <- typeToString mn ty
-  return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ tyStr
+mkDictionaryValueName :: ModuleName -> Qualified ProperName -> [Type] -> Either String Ident
+mkDictionaryValueName mn cl tys = do
+  tyStr <- mapM (typeToString mn) tys
+  return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ intercalate "_" tyStr
 
 typeToString :: ModuleName -> Type -> Either String String
 typeToString _ (TypeVar _) = return "var"
@@ -179,7 +179,7 @@ typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"
 -- Generate a name for a type class dictionary member, based on the module name, class name, type name and
 -- member name
 --
-mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
-mkDictionaryEntryName mn name ty ident = do
-  Ident dictName <- lift $ mkDictionaryValueName mn name ty
+mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> [Type] -> Ident -> Desugar Ident
+mkDictionaryEntryName mn name tys ident = do
+  Ident dictName <- lift $ mkDictionaryValueName mn name tys
   return $ Escaped $ dictName ++ "_" ++ identToJs ident

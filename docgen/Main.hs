@@ -99,14 +99,14 @@ renderDeclaration n (P.ExternDataDeclaration name kind) =
 renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do
   let typeName = P.runProperName name ++ " " ++ intercalate " " args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
-renderDeclaration n (P.TypeClassDeclaration name arg ds) = do
-  atIndent n $ "class " ++ P.runProperName name ++ " " ++ arg ++ " where"
+renderDeclaration n (P.TypeClassDeclaration name args ds) = do
+  atIndent n $ "class " ++ P.runProperName name ++ " " ++ intercalate " " args ++ " where"
   mapM_ (renderDeclaration (n + 2)) ds
-renderDeclaration n (P.TypeInstanceDeclaration constraints name ty _) = do
+renderDeclaration n (P.TypeInstanceDeclaration constraints name tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
-                          cs -> "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ P.prettyPrintType ty' ++ ")") cs) ++ ") => "
-  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ P.prettyPrintType ty
+                          cs -> "(" ++ intercalate "," (map (\(pn, tys') -> show pn ++ " (" ++ intercalate " " (map (("(" ++) . (++ ")") . P.prettyPrintType) tys') ++ ")") cs) ++ ") => "
+  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ intercalate " " (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
 renderDeclaration _ _ = return ()
 
 getName :: P.Declaration -> String

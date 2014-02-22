@@ -48,7 +48,7 @@ instance (Prelude.Show a) => Prelude.Show [a] where
 
 test6 = \_ -> show ["testing"]
 
-instance Prelude.Monad (->) r where
+instance Prelude.Monad ((->) r) where
   return a r = a
   (>>=) f g r = g (f r) r
 

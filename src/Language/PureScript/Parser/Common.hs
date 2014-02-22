@@ -49,6 +49,7 @@ reservedPsNames = [ "data"
                   , "true"
                   , "false"
                   , "in"
+                  , "where"
                   ]
 
 -- |

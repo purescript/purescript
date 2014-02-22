@@ -321,7 +321,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   Right (Ident effDictName) = mkDictionaryValueName
     effModule
     (Qualified (Just prelude) (ProperName "Monad"))
-    (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
+    [TypeConstructor (Qualified (Just effModule) (ProperName "Eff"))]
   -- Check if an expression represents the Monad Eff dictionary
   isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
   isEffDict (JSApp (JSAccessor prop (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
@@ -470,5 +470,5 @@ inlineCommonOperators = applyAll
     Right (Ident dictName) = mkDictionaryValueName
       (ModuleName [ProperName "Prim"])
       (Qualified (Just (ModuleName [ProperName "Prelude"])) (ProperName className))
-      ty
+      [ty]
   isOpDict _ _ _ = False

@@ -85,7 +85,7 @@ parseConstrainedType = do
     constraints <- parens . commaSep1 $ do
       className <- parseQualified properName
       indented
-      ty <- parseType
+      ty <- P.many parseTypeAtom
       return (className, ty)
     _ <- lexeme $ P.string "=>"
     return constraints

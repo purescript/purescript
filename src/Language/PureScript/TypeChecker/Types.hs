@@ -260,14 +260,14 @@ replaceTypeClassDictionaries mn = everywhereM' (mkM go)
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, Type) -> Check Value
-entails moduleName context goal@(className, ty) = do
+entails :: ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
+entails moduleName context goal@(className, tys) = do
   env <- getEnv
   case go env goal of
-    [] -> throwError $ "No " ++ show className ++ " instance found for " ++ prettyPrintType ty
+    [] -> throwError $ "No " ++ show className ++ " instance found for " ++ intercalate ", " (map prettyPrintType tys)
     (dict : _) -> return dict
   where
-  go env (className', ty') =
+  go env (className', tys') =
     [ mkDictionary (canonicalizeDictionary tcd) args
     | tcd <- context
     -- Choose type class dictionaries in scope in the current module
@@ -275,16 +275,16 @@ entails moduleName context goal@(className, ty) = do
     -- Make sure the type class name matches the one we are trying to satisfy
     , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
     -- Make sure the type unifies with the type in the type instance definition
-    , subst <- maybeToList $ typeHeadsAreEqual moduleName env ty' (tcdInstanceType tcd)
+    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
     -- Solve any necessary subgoals
     , args <- solveSubgoals env subst (tcdDependencies tcd) ]
   -- Create dictionaries for subgoals which still need to be solved by calling go recursively
   -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
   -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-  solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, Type)] -> [Maybe [Value]]
+  solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
-    dict <- mapM (go env) (map (id *** replaceAllTypeVars subst) subgoals)
+    dict <- mapM (go env) (map (id *** map (replaceAllTypeVars subst)) subgoals)
     return $ Just dict
   -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
@@ -301,6 +301,12 @@ entails moduleName context goal@(className, ty) = do
   canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
+  -- Ensure that a substitution is valid
+  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
+  verifySubstitution subst = do
+    let grps = groupBy ((==) `on` fst) subst
+    guard (all ((==) 1 . length . nubBy ((==) `on` snd)) grps)
+    return $ map head grps
 
 -- |
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
@@ -398,12 +404,6 @@ varIfUnknown ty =
       typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
       typeToVar t = t
   in mkForAll (sort . map (toName . runUnknown) $ unks) ty'
-
--- |
--- Replace named type variables with types
---
-replaceAllTypeVars :: [(String, Type)] -> Type -> Type
-replaceAllTypeVars = foldl' (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns

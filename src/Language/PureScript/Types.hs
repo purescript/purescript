@@ -66,7 +66,7 @@ data Type
   -- |
   -- A type with a set of type class constraints
   --
-  | ConstrainedType [(Qualified ProperName, Type)] Type
+  | ConstrainedType [(Qualified ProperName, [Type])] Type
   -- |
   -- A skolem constant
   --
@@ -177,13 +177,19 @@ replaceTypeVars = replaceTypeVars' []
                                      t' = replaceTypeVars' bs v (TypeVar v') t
                                  in ForAll v' (go (v' : bs) t') sco
                              | otherwise = ForAll v (go (v : bs) t) sco
-    go bs (ConstrainedType cs t) = ConstrainedType (map (id *** go bs) cs) (go bs t)
+    go bs (ConstrainedType cs t) = ConstrainedType (map (id *** map (go bs)) cs) (go bs t)
     go bs (RCons name t r) = RCons name (go bs t) (go bs r)
     go _ ty = ty
   genName orig inUse = try 0
     where
     try n | (orig ++ show n) `elem` inUse = try (n + 1)
           | otherwise = orig ++ show n
+
+-- |
+-- Replace named type variables with types
+--
+replaceAllTypeVars :: [(String, Type)] -> Type -> Type
+replaceAllTypeVars = foldl (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 -- |
 -- Collect all type variables appearing in a type
@@ -206,7 +212,7 @@ freeTypeVariables = nub . go []
   go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
   go bound (SaturatedTypeSynonym _ ts) = concatMap (go bound) ts
   go bound (ForAll v t _) = go (v : bound) t
-  go bound (ConstrainedType cs t) = concatMap (go bound . snd) cs ++ go bound t
+  go bound (ConstrainedType cs t) = concatMap (concatMap (go bound) . snd) cs ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
   go _ _ = []
 
