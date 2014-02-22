@@ -312,7 +312,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
   isRetPoly _ = False
   -- Check if an expression represents a function in the Ef module
-  isEffFunc name (JSAccessor name' (JSAccessor "Eff" (JSVar "_ps"))) | name == name' = True
+  isEffFunc name (JSAccessor name' (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) | name == name' = True
   isEffFunc _ _ = False
   -- Module names
   prelude = ModuleName [ProperName "Prelude"]
@@ -324,7 +324,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
     (TypeConstructor (Qualified (Just effModule) (ProperName "Eff")))
   -- Check if an expression represents the Monad Eff dictionary
   isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
-  isEffDict (JSApp (JSAccessor prop (JSAccessor "Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
+  isEffDict (JSApp (JSAccessor prop (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
   isEffDict _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
@@ -345,7 +345,7 @@ inlineST = everywhere (mkT convertBlock)
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
         localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
-    in everywhere (mkT $ convert allUsagesAreLocalVars) arg
+    in everywhere (mkT $ convert (allUsagesAreLocalVars && localVarsDoNotEscape)) arg
   convertBlock other = other
   -- Convert a block in a safe way, preserving object wrappers of references,
   -- or in a more aggressive way, turning wrappers into local variables depending on the
@@ -364,7 +364,7 @@ inlineST = everywhere (mkT convertBlock)
     JSAssignment (JSIndexer i arr) val
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (JSAccessor name' (JSAccessor "ST" (JSVar "_ps"))) | name == name' = True
+  isSTFunc name (JSAccessor name' (JSAccessor "Control_Monad_ST" (JSVar "_ps"))) | name == name' = True
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) (mkQ [] isSTRef)

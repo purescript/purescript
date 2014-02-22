@@ -15,4 +15,4 @@ collatz n = runPure (runST (do
     return $ m == 1
   readSTRef count))
 
-main = Debug.Trace.print $ collatz 1
+main = Debug.Trace.print $ collatz 1000
