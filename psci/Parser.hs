@@ -83,7 +83,7 @@ psciQuit = Quit <$ char 'q'
 -- Parses 'Commands.Reload' command.
 --
 psciReload :: Parsec String P.ParseState Command
-psciReload = Reload <$ char 'r'
+psciReload = Reset <$ char 'r'
 
 -- |
 -- Parses 'Commands.TypeOf' command.

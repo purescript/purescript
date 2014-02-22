@@ -28,6 +28,7 @@ import Control.Monad.Trans.State
 import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
+import Data.Version (showVersion)
 
 import Parser
 
@@ -36,6 +37,7 @@ import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
 import System.Exit
 import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
+import qualified System.Console.CmdTheLine as Cmd
 import System.Process
 
 import Text.Parsec (ParseError)
@@ -256,7 +258,6 @@ getCommand = do
 -- Performs an action for each meta-command given, and also for expressions..
 --
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
-handleCommand Empty = return ()
 handleCommand (Expression val) = get >>= inputTToState . handleDeclaration val
 handleCommand (Let l) = modify (updateLets l)
 handleCommand Help = inputTToState $ outputStrLn helpMessage
@@ -268,7 +269,7 @@ handleCommand (LoadFile filePath) = do
     either outputTStrLn (modify . updateModules) =<< ioToState (loadModule absPath)
   else
     outputTStrLn $ "Couldn't locate: " ++ filePath
-handleCommand Reload = do
+handleCommand Reset = do
   (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
 handleCommand (TypeOf val) = get >>= inputTToState . handleTypeOf val
@@ -288,24 +289,44 @@ outputTStrLn = inputTToState . outputStrLn
 outprintT :: Show a => a -> StateT PSCI (InputT IO) ()
 outprintT = outputTStrLn . show
 
+inputFiles :: Cmd.Term [FilePath]
+inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posDoc = "The input .ps files" }
+
 -- |
 -- The PSCI main loop.
 --
-main :: IO ()
-main = do
+loop :: [FilePath] -> IO ()
+loop files = do
   preludeFilename <- getPreludeFilename
-  (Right prelude) <- loadModule preludeFilename
-  historyFilename <- getHistoryFilename
-  let settings = defaultSettings {historyFile = Just historyFilename}
-  runInputT (setComplete (completion prelude) settings) $ do
-    outputStrLn prologueMessage
-    evalStateT go (PSCI defaultImports prelude [])
-  where
-    go :: StateT PSCI (InputT IO) ()
-    go = do
-      c <- inputTToState getCommand
-      case c of
-        Left err -> outputTStrLn (show err) >> go
-        Right Nothing -> go
-        Right (Just Quit) -> outputTStrLn quitMessage
-        Right (Just c') -> handleCommand c' >> go
+  modulesOrFirstError <- fmap concat . sequence <$> mapM loadModule (preludeFilename : files)
+  case modulesOrFirstError of
+    Left err -> putStrLn err >> exitFailure
+    Right modules -> do
+      historyFilename <- getHistoryFilename
+      let settings = defaultSettings {historyFile = Just historyFilename}
+      runInputT (setComplete (completion modules) settings) $ do
+        outputStrLn prologueMessage
+        evalStateT go (PSCI defaultImports modules [])
+      where
+        go :: StateT PSCI (InputT IO) ()
+        go = do
+          c <- inputTToState getCommand
+          case c of
+            Left err -> outputTStrLn (show err) >> go
+            Right Nothing -> go
+            Right (Just Quit) -> outputTStrLn quitMessage
+            Right (Just c') -> handleCommand c' >> go
+
+term :: Cmd.Term (IO ())
+term = loop <$> inputFiles
+
+termInfo :: Cmd.TermInfo
+termInfo = Cmd.defTI
+  { Cmd.termName = "psci"
+  , Cmd.version  = showVersion $ Paths.version
+  , Cmd.termDoc  = "Interactive mode for PureScript"
+  }
+
+main :: IO ()
+main = Cmd.run (term, termInfo)
+

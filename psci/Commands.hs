@@ -22,13 +22,9 @@ import Language.PureScript
 --
 data Command
   -- |
-  -- And empty line
-  --
-  = Empty
-  -- |
   -- A purescript expression
   --
-  | Expression Value
+  = Expression Value
   -- |
   -- Show the help command
   --
@@ -46,9 +42,9 @@ data Command
   --
   | Quit
   -- |
-  -- Reload the current modules
+  -- Reset the state of the REPL
   --
-  | Reload
+  | Reset
   -- |
   -- Binds a value to a name
   --
@@ -67,6 +63,6 @@ help =
   , [":i <module> ", "Import <module> for use in PSCI"]
   , [":m <file>   ", "Load <file> for importing"]
   , [":q          ", "Quit PSCi"]
-  , [":r          ", "Reload all modules"]
+  , [":r          ", "Reset"]
   , [":t <expr>   ", "Show the type of <expr>"]
   ]
