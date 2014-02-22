@@ -7,6 +7,7 @@
 ### New Features
 
 - `let ... in` syntax for bindings (paf31)
+- Multi parameter typeclasses (paf31)
 
 ### Enhancements
 
@@ -26,7 +27,8 @@
 
 - The subsumes relation has been fixed for object types (paf31)
 - `sort` no longer mutates arrays (joneshf)
-- PSCI evaluates expressions (joneshf)
+- PSCI now evaluates expressions (joneshf)
+- Overlapping variables in typeclass instances are rejected (paf31)
 
 ### Libraries
 
