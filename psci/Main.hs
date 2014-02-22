@@ -38,7 +38,7 @@ import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
 import System.Process
 
-import Text.Parsec (choice)
+import Text.Parsec (ParseError)
 
 import qualified Data.Map as M
 import qualified Language.PureScript as P
@@ -118,7 +118,7 @@ getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule = fmap (either (Left . show) Right . parseModules) . U.readFile
+loadModule filename = either (Left . show) Right . P.runIndentParser filename P.parseModules <$> U.readFile filename
 
 -- |
 -- Expands tilde in path.
@@ -241,16 +241,13 @@ handleTypeOf value (PSCI imports loadedModules lets) = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: InputT IO Command
+getCommand :: InputT IO (Either ParseError (Maybe Command))
 getCommand = do
   firstLine <- getInputLine "> "
   case firstLine of
-    Nothing   -> return Empty
-    Just line -> case parseCommands line of
-      Left err -> return $ Unknown err
-      Right c  -> case c of
-        Expression expr -> Expression <$> go [expr]
-        _               -> lift $ return c
+    Nothing -> return (Right Nothing)
+    Just s@ (':' : _) -> return . either Left (Right . Just) $ parseCommand s -- The start of a command
+    Just s -> either Left (Right . Just) . parseCommand <$> go [s]
   where
     go :: [String] -> InputT IO String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
@@ -260,11 +257,8 @@ getCommand = do
 --
 handleCommand :: Command -> StateT PSCI (InputT IO) ()
 handleCommand Empty = return ()
-handleCommand (Expression ls) =
-  case psciParser (choice [Left <$> psciLet, Right <$> psciExpression]) ls of
-    Left  err          -> inputTToState $ outputStrLn (show err)
-    Right (Left l)     -> modify (updateLets l)
-    Right (Right decl) -> get >>= inputTToState . handleDeclaration decl
+handleCommand (Expression val) = get >>= inputTToState . handleDeclaration val
+handleCommand (Let l) = modify (updateLets l)
 handleCommand Help = inputTToState $ outputStrLn helpMessage
 handleCommand (Import moduleName) = modify (updateImports moduleName)
 handleCommand (LoadFile filePath) = do
@@ -277,10 +271,7 @@ handleCommand (LoadFile filePath) = do
 handleCommand Reload = do
   (Right prelude) <- ioToState $ loadModule =<< getPreludeFilename
   put (PSCI defaultImports prelude [])
-handleCommand (TypeOf expr) =
-  case parseExpression expr of
-    Left err    -> inputTToState $ outputStrLn (show err)
-    Right expr' -> get >>= inputTToState . handleTypeOf expr'
+handleCommand (TypeOf val) = get >>= inputTToState . handleTypeOf val
 handleCommand _ = outputTStrLn "Unknown command"
 
 -- Command helpers
@@ -314,5 +305,7 @@ main = do
     go = do
       c <- inputTToState getCommand
       case c of
-        Quit -> outputTStrLn quitMessage
-        _    -> handleCommand c >> go
+        Left err -> outputTStrLn (show err) >> go
+        Right Nothing -> go
+        Right (Just Quit) -> outputTStrLn quitMessage
+        Right (Just c') -> handleCommand c' >> go

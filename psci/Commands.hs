@@ -17,8 +17,6 @@ module Commands where
 
 import Language.PureScript
 
-import Text.Parsec
-
 -- |
 -- Valid Meta-commands for PSCI
 --
@@ -30,7 +28,7 @@ data Command
   -- |
   -- A purescript expression
   --
-  | Expression String
+  | Expression Value
   -- |
   -- Show the help command
   --
@@ -52,13 +50,13 @@ data Command
   --
   | Reload
   -- |
+  -- Binds a value to a name
+  --
+  | Let (Value -> Value)
+  -- |
   -- Find the type of an expression
   --
-  | TypeOf String
-  -- |
-  -- An attempt at a meta command that wasn't recognized.
-  --
-  | Unknown ParseError
+  | TypeOf Value
 
 -- |
 -- The help menu.
