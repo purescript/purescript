@@ -20,11 +20,9 @@ module Language.PureScript.Parser.Declarations (
 ) where
 
 import Data.Maybe (isJust, fromMaybe)
-import Control.Monad (when)
 import Control.Applicative
 import qualified Text.Parsec as P
 
-import Language.PureScript.Names
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
 import Language.PureScript.Declarations
@@ -32,7 +30,6 @@ import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.Values
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
@@ -59,15 +56,15 @@ parseValueDeclaration =
   ValueDeclaration <$> parseIdent
                    <*> P.many parseBinderNoParens
                    <*> P.optionMaybe parseGuard
-                   <*> ((lexeme (indented *> P.char '=')) *> parseValue)
+                   <*> (lexeme (indented *> P.char '=') *> parseValue)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
-parseExternDeclaration = P.try (reserved "foreign") *> indented *> (reserved "import") *> indented *>
+parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                              <*> (lexeme (indented *> P.string "::") *> parseKind)
    <|> do ident <- parseIdent
           js <- P.optionMaybe (JSRaw <$> stringLiteral)
-          ty <- (lexeme (indented *> P.string "::") *> parsePolyType)
+          ty <- lexeme (indented *> P.string "::") *> parsePolyType
           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty)
 
 parseAssociativity :: P.Parsec String ParseState Associativity
@@ -89,9 +86,9 @@ parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  moduleName <- moduleName
+  moduleName' <- moduleName
   idents <- P.optionMaybe $ parens $ commaSep1 (Left <$> parseIdent <|> Right <$> properName)
-  return $ ImportDeclaration moduleName idents
+  return $ ImportDeclaration moduleName' idents
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do

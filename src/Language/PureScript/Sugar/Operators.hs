@@ -27,13 +27,17 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.Values
 
+import Control.Applicative
+import Control.Arrow (first)
+import Control.Monad.State
+
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
+
 import qualified Data.Map as M
 import qualified Data.Generics as G
 import qualified Data.Generics.Extras as G
-import Control.Monad.State
-import Control.Applicative
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
@@ -62,9 +66,9 @@ customOperatorTable fixities =
     -- The fixity map can therefore map from module name/ident pairs to fixities, where the module name is the name
     -- of the module imported into, not from. This is useful in matchOp, but here we have to discard the module name to
     -- make sure that the generated code is correct.
-    applyUserOp (Qualified _ name) t1 t2 = App (App (Var (Qualified Nothing name)) t1) t2
+    applyUserOp (Qualified _ name) t1 = App (App (Var (Qualified Nothing name)) t1)
     userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
-    sorted = reverse $ sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
+    sorted = sortBy (flip compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups
@@ -72,10 +76,10 @@ customOperatorTable fixities =
 type Chain = [Either Value (Qualified Ident)]
 
 matchOperators :: ModuleName -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
-matchOperators moduleName ops val = G.everywhereM' (G.mkM parseChains) val
+matchOperators moduleName ops = G.everywhereM' (G.mkM parseChains)
   where
   parseChains :: Value -> Either String Value
-  parseChains b@(BinaryNoParens _ _ _) = bracketChain (extendChain b)
+  parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
   parseChains other = return other
   extendChain :: Value -> Chain
   extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
@@ -108,7 +112,7 @@ collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
   collectFixities (M.insert qual fixity m) moduleName rest
 collectFixities m moduleName (ImportDeclaration importedModule _ : rest) = do
   let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule ]
-  let m' = M.fromList (map (\(i, fixity) -> (Qualified (Just moduleName) i, fixity)) fs)
-  collectFixities (M.union m' m) moduleName rest
+  let m' = M.fromList (map (first (Qualified (Just moduleName))) fs)
+  collectFixities (m' `M.union` m) moduleName rest
 collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
 

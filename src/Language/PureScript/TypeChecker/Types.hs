@@ -14,7 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -60,7 +59,6 @@ import Language.PureScript.Pretty
 
 import Control.Monad.State
 import Control.Monad.Error
-import Control.Monad.Reader
 import Control.Monad.Unify
 
 import Control.Applicative
@@ -82,7 +80,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $ do
+unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ e) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
@@ -104,8 +102,8 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     sko <- newSkolemConstant
     let sk = skolemize ident sko sc ty1
     sk `unifyTypes` ty2
-  unifyTypes' (ForAll _ _ _) _ = throwError "Skolem variable scope is unspecified"
-  unifyTypes' ty f@(ForAll _ _ _) = f `unifyTypes` ty
+  unifyTypes' ForAll{} _ = throwError "Skolem variable scope is unspecified"
+  unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (Object row1) (Object row2) = row1 =?= row2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
@@ -116,8 +114,8 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem s1 _) (Skolem s2 _) | s1 == s2 = return ()
-  unifyTypes' r1@(RCons _ _ _) r2 = unifyRows r1 r2
-  unifyTypes' r1 r2@(RCons _ _ _) = unifyRows r1 r2
+  unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
+  unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
@@ -187,30 +185,30 @@ typesOf mainModuleName moduleName vals = do
       -- If the declaration is a function, it has access to other values in the binding group.
       -- If not, the generated code might fail at runtime since those values might be undefined.
       let dict' = if isFunction val then dict else M.empty
-      triple@(_, (val, ty)) <- case e of
+      triple@(_, (val', ty)) <- case e of
         -- Typed declarations
-        (ident, (val, Just (ty, checkType))) -> do
+        (ident, (val', Just (ty, checkType))) -> do
           -- Kind check
           kind <- liftCheck $ kindOf moduleName ty
           guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
           -- Check the type with the new names in scope
           ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-          val' <- bindNames dict' $ if checkType
-                                   then TypedValue True <$> check val ty' <*> pure ty'
-                                   else return (TypedValue False val ty')
-          return (ident, (val', ty'))
+          val'' <- bindNames dict' $ if checkType
+                                   then TypedValue True <$> check val' ty' <*> pure ty'
+                                   else return (TypedValue False val' ty')
+          return (ident, (val'', ty'))
         -- Untyped declarations
-        (ident, (val, Nothing)) -> do
+        (ident, (val', Nothing)) -> do
           -- Infer the type with the new names in scope
-          TypedValue _ val' ty <- bindNames dict' $ infer val
+          TypedValue _ val'' ty <- bindNames dict' $ infer val'
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-          return (ident, (TypedValue True val' ty, ty))
+          return (ident, (TypedValue True val'' ty, ty))
       -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
       when (Just moduleName == mainModuleName && fst e == Ident "main") $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
       -- Make sure unification variables do not escape
-      escapeCheck val ty
+      escapeCheck val' ty
       return triple
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
@@ -221,7 +219,7 @@ typesOf mainModuleName moduleName vals = do
     -- top-level unification variables with named type variables.
     let val'' = overTypes (desaturateAllTypeSynonyms . setifyAll) val'
         ty' = varIfUnknown . desaturateAllTypeSynonyms . setifyAll $ ty
-    return $ (ident, (val'', ty'))
+    return (ident, (val'', ty'))
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
@@ -284,7 +282,7 @@ entails moduleName context goal@(className, tys) = do
   solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [Value]]
   solveSubgoals _ _ Nothing = return Nothing
   solveSubgoals env subst (Just subgoals) = do
-    dict <- mapM (go env) (map (id *** map (replaceAllTypeVars subst)) subgoals)
+    dict <- mapM (go env . second (map (replaceAllTypeVars subst))) subgoals
     return $ Just dict
   -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
@@ -320,7 +318,7 @@ typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructo
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e m name args of
-  Left err -> Nothing
+  Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual _ _ _ _ = Nothing
 
@@ -350,7 +348,7 @@ findAllTypes = everything (++) (mkQ [] go)
 --
 skolemEscapeCheck :: Value -> Check ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
-skolemEscapeCheck root@(TypedValue _ _ _) =
+skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.
   -- This determines the scope of that skolem variable, which is copied from the SkolemScope
   -- field of the ForAll constructor.
@@ -374,10 +372,10 @@ skolemEscapeCheck root@(TypedValue _ _ _) =
       collect _ = []
   go _ scos = ([], scos)
   findBindingScope :: SkolemScope -> Maybe Value
-  findBindingScope sco = something (mkQ Nothing go) root
+  findBindingScope sco = something (mkQ Nothing go') root
     where
-    go val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
-    go _ = Nothing
+    go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
+    go' _ = Nothing
 skolemEscapeCheck val = throwError $ "Untyped value passed to skolemEscapeCheck: " ++ prettyPrintValue val
 
 -- |
@@ -399,7 +397,7 @@ varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let unks = nub $ unknowns ty
       toName = (:) 't' . show
-      ty' = everywhere (mkT typeToVar) $ ty
+      ty' = everywhere (mkT typeToVar) ty
       typeToVar :: Type -> Type
       typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
       typeToVar t = t
@@ -430,7 +428,7 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
-  return $ replaceTypeVars ident tu $ ty
+  return $ replaceTypeVars ident tu ty
 
 -- |
 -- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
@@ -603,11 +601,11 @@ inferBinder val (ConstructorBinder ctor binders) = do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
       go binders fn
         where
-        go [] ty = do
-          subsumes Nothing val ty
+        go [] ty' = do
+          subsumes Nothing val ty'
           return M.empty
-        go (binder : binders) (TypeApp (TypeApp t obj) ret) | t == tyFunction =
-          M.union <$> inferBinder obj binder <*> go binders ret
+        go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
+          M.union <$> inferBinder obj binder <*> go binders' ret
         go _ _ = throwError $ "Wrong number of arguments to constructor " ++ show ctor
     _ -> throwError $ "Constructor " ++ show ctor ++ " is not defined"
 inferBinder val (ObjectBinder props) = do
@@ -713,7 +711,7 @@ check val ty = rethrow errorMessage $ check' val ty
 -- Check the type of a value
 --
 check' :: Value -> Type -> UnifyT Type Check Value
-check' val t@(ForAll ident ty _) = do
+check' val (ForAll ident ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
   let sk = skolemize ident sko scope ty
@@ -722,15 +720,15 @@ check' val t@(ForAll ident ty _) = do
 check' val t@(ConstrainedType constraints ty) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  dictNames <- flip mapM constraints $ \(Qualified _ (ProperName className), _) -> do
+  dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
   val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       (qualifyAllUnqualifiedNames moduleName env constraints)) $
         check val ty
-  return $ TypedValue True (foldr Abs val' (map Left dictNames)) t
-check' val t@(SaturatedTypeSynonym name args) = do
+  return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
+check' val (SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
   val' <- check val ty
   return $ TypedValue True val' ty
@@ -747,8 +745,8 @@ check' v@(StringLiteral _) t | t == tyString =
 check' v@(BooleanLiteral _) t | t == tyBoolean =
   return $ TypedValue True v t
 check' (ArrayLiteral vals) t@(TypeApp a ty) | a == tyArray = do
-  arr <- ArrayLiteral <$> forM vals (\val -> check val ty)
-  return $ TypedValue True arr t
+  array <- ArrayLiteral <$> forM vals (`check` ty)
+  return $ TypedValue True array t
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
   ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
@@ -944,17 +942,17 @@ subsumes' val (Object r1) (Object r2) = do
   go ts1' ts2' r1' r2'
   return val
   where
-  go [] ts2 r1 r2 = r1 =?= rowFromList (ts2, r2)
-  go ts1 [] r1 r2 = r2 =?= rowFromList (ts1, r1)
-  go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1 r2
+  go [] ts2 r1' r2' = r1' =?= rowFromList (ts2, r2')
+  go ts1 [] r1' r2' = r2' =?= rowFromList (ts1, r1')
+  go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
     | p1 == p2 = do subsumes Nothing ty1 ty2
-                    go ts1 ts2 r1 r2
+                    go ts1 ts2 r1' r2'
     | p1 < p2 = do rest <- fresh
-                   r2 =?= RCons p1 ty1 rest
-                   go ts1 ((p2, ty2) : ts2) r1 rest
+                   r2' =?= RCons p1 ty1 rest
+                   go ts1 ((p2, ty2) : ts2) r1' rest
     | p1 > p2 = do rest <- fresh
-                   r1 =?= RCons p2 ty2 rest
-                   go ((p1, ty1) : ts1) ts2 rest r2
+                   r1' =?= RCons p2 ty2 rest
+                   go ((p1, ty1) : ts1) ts2 rest r2'
 subsumes' val ty1 ty2@(Object _) = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2

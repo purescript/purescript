@@ -19,10 +19,10 @@ module Language.PureScript.Types where
 
 import Data.Data
 import Data.List (nub)
-import Data.Generics (everything, mkT, mkQ, everywhereBut)
+import Data.Generics (everything, mkQ)
 
 import Control.Monad.Unify
-import Control.Arrow ((***))
+import Control.Arrow (second)
 
 import Language.PureScript.Names
 
@@ -122,7 +122,7 @@ tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) 
 -- Smart constructor for function types
 --
 function :: Type -> Type -> Type
-function t1 t2 = TypeApp (TypeApp tyFunction t1) t2
+function t1 = TypeApp (TypeApp tyFunction t1)
 
 -- |
 -- Convert a row to a list of pairs of labels and types
@@ -143,8 +143,8 @@ rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 -- Check whether a type is a monotype
 --
 isMonoType :: Type -> Bool
-isMonoType (ForAll _ _ _) = False
-isMonoType ty = True
+isMonoType ForAll{} = False
+isMonoType _        = True
 
 -- |
 -- Universally quantify a type
@@ -168,17 +168,17 @@ replaceTypeVars = replaceTypeVars' []
     where
     go :: [String] -> Type -> Type
     go bs (Object r) = Object $ go bs r
-    go bs (TypeVar v) | v == name = replacement
+    go _  (TypeVar v) | v == name = replacement
     go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
-    go bs (SaturatedTypeSynonym name ts) = SaturatedTypeSynonym name $ map (go bs) ts
+    go bs (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs) ts
     go bs f@(ForAll v t sco) | v == name = f
                              | v `elem` usedTypeVariables replacement =
                                  let v' = genName v (name : bs ++ usedTypeVariables replacement)
                                      t' = replaceTypeVars' bs v (TypeVar v') t
                                  in ForAll v' (go (v' : bs) t') sco
                              | otherwise = ForAll v (go (v : bs) t) sco
-    go bs (ConstrainedType cs t) = ConstrainedType (map (id *** map (go bs)) cs) (go bs t)
-    go bs (RCons name t r) = RCons name (go bs t) (go bs r)
+    go bs (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs)) cs) (go bs t)
+    go bs (RCons name' t r) = RCons name' (go bs t) (go bs r)
     go _ ty = ty
   genName orig inUse = try 0
     where

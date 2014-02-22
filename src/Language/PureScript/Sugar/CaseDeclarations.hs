@@ -75,7 +75,7 @@ makeCaseDeclaration ident alternatives =
   let
     argPattern = length . fst . head $ alternatives
     args = take argPattern $ unusedNames (ident, alternatives)
-    vars = map (\arg -> Var (Qualified Nothing arg)) args
+    vars = map (Var . Qualified Nothing) args
     binders = [ (bs, g, val) | (bs, (g, val)) <- alternatives ]
     value = foldr (\arg ret -> Abs (Left arg) ret) (Case vars binders) args
   in

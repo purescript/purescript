@@ -38,7 +38,7 @@ literals = mkPattern match
   match (ArrayLiteral xs) = Just $ "[" ++ intercalate ", " (map prettyPrintValue xs) ++ "]"
   match (ObjectLiteral ps) = Just $ "{" ++ intercalate ", " (map (uncurry prettyPrintObjectProperty) ps) ++ "}"
   match (Constructor name) = Just $ show name
-  match (Case values binders) = Just $ "case " ++ intercalate " " (map prettyPrintValue values) ++
+  match (Case values binders) = Just $ "case " ++ unwords (map prettyPrintValue values) ++
     " of { " ++ intercalate " ; " (map prettyPrintCaseAlternative binders) ++ " }"
   match (Var ident) = Just $ show ident
   match (Do els) = Just $ " do { " ++ intercalate "; " (map prettyPrintDoNotationElement els) ++ " }"
@@ -47,7 +47,7 @@ literals = mkPattern match
 
 prettyPrintCaseAlternative :: ([Binder], Maybe Guard, Value) -> String
 prettyPrintCaseAlternative (binders, grd, val) = "(" ++ intercalate ", " (map prettyPrintBinder binders) ++ ") " ++
-  (maybe "" (("| " ++) . prettyPrintValue) grd) ++ " -> " ++ prettyPrintValue val
+  maybe "" (("| " ++) . prettyPrintValue) grd ++ " -> " ++ prettyPrintValue val
 
 ifThenElse :: Pattern () Value ((Value, Value), Value)
 ifThenElse = mkPattern match
@@ -118,7 +118,7 @@ prettyPrintBinderAtom = mkPattern match
   match (BooleanBinder True) = Just "true"
   match (BooleanBinder False) = Just "false"
   match (VarBinder ident) = Just $ show ident
-  match (ConstructorBinder ctor args) = Just $ show ctor ++ " " ++ intercalate " " (map (parens . prettyPrintBinder) args)
+  match (ConstructorBinder ctor args) = Just $ show ctor ++ " " ++ unwords (map (parens . prettyPrintBinder) args)
   match (ObjectBinder bs) = Just $ "{ " ++ intercalate ", " (map (uncurry prettyPrintObjectPropertyBinder) bs) ++ " }"
   match (ArrayBinder bs) = Just $ "[ " ++ intercalate ", " (map prettyPrintBinder bs) ++ " ]"
   match (NamedBinder ident binder) = Just $ show ident ++ "@" ++ prettyPrintBinder binder

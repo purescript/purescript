@@ -73,10 +73,10 @@ applyAll :: [a -> a] -> a -> a
 applyAll = foldl1 (.)
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
-untilFixedPoint f a = go a
+untilFixedPoint f = go
   where
-  go a' = let a'' = f a' in
-          if a'' == a' then a'' else go a''
+  go a = let a' = f a in
+          if a' == a then a' else go a'
 
 replaceIdent :: (Data d) => String -> JS -> d -> d
 replaceIdent var1 js = everywhere (mkT replace)
@@ -100,7 +100,7 @@ isReassigned var1 = everything (||) (mkQ False check)
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
-isRebound js d = any (\var -> isReassigned var d) (everything (++) (mkQ [] variablesOf) js)
+isRebound js d = any (`isReassigned` d) (everything (++) (mkQ [] variablesOf) js)
   where
   variablesOf (JSVar var) = [var]
   variablesOf _ = []
@@ -135,25 +135,23 @@ shouldInline (JSAccessor _ val) = shouldInline val
 shouldInline (JSIndexer index val) = shouldInline index && shouldInline val
 shouldInline _ = False
 
+removeFromBlock :: ([JS] -> [JS]) -> JS -> JS
+removeFromBlock go (JSBlock sts) = JSBlock (go sts)
+removeFromBlock _  js = js
+
 inlineVariables :: JS -> JS
-inlineVariables = everywhere (mkT removeFromBlock)
+inlineVariables = everywhere (mkT $ removeFromBlock go)
   where
-  removeFromBlock :: JS -> JS
-  removeFromBlock (JSBlock sts) = JSBlock (go sts)
-  removeFromBlock js = js
   go :: [JS] -> [JS]
   go [] = []
-  go (s@(JSVariableIntroduction var (Just js)) : sts)
+  go (JSVariableIntroduction var (Just js) : sts)
     | shouldInline js && not (isReassigned var sts) && not (isRebound js sts) && not (isUpdated var sts) =
       go (replaceIdent var js sts)
   go (s:sts) = s : go sts
 
 removeUnusedVariables :: JS -> JS
-removeUnusedVariables = everywhere (mkT removeFromBlock)
+removeUnusedVariables = everywhere (mkT $ removeFromBlock go)
   where
-  removeFromBlock :: JS -> JS
-  removeFromBlock (JSBlock sts) = JSBlock (go sts)
-  removeFromBlock js = js
   go :: [JS] -> [JS]
   go [] = []
   go (JSVariableIntroduction var _ : sts) | not (isUsed var sts) = go sts
@@ -165,8 +163,8 @@ etaConvert = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents block@(JSBlock body)) args)])
     | all shouldInline args &&
-      not (any (flip isRebound block) (map JSVar idents)) &&
-      not (or (map (flip isRebound block) args))
+      not (any (`isRebound` block) (map JSVar idents)) &&
+      not (any (`isRebound` block) args)
       = JSBlock (replaceIdents (zip idents args) body)
   convert js = js
 
@@ -191,7 +189,7 @@ tco' = everywhere (mkT convert)
   copyVar :: String -> String
   copyVar arg = "__copy_" ++ arg
   convert :: JS -> JS
-  convert js@(JSVariableIntroduction name (Just fn@(JSFunction _ _ _))) =
+  convert js@(JSVariableIntroduction name (Just fn@JSFunction {})) =
     let
       (argss, body', replace) = collectAllFunctionArgs [] id fn
     in case () of
@@ -206,11 +204,11 @@ tco' = everywhere (mkT convert)
   collectAllFunctionArgs allArgs f (JSFunction ident args (JSBlock (body@(JSReturn _):_))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction ident (map copyVar args) (JSBlock [b]))) body
   collectAllFunctionArgs allArgs f (JSFunction ident args body@(JSBlock _)) =
-    (args : allArgs, body, \b -> f (JSFunction ident (map copyVar args) b))
+    (args : allArgs, body, f . JSFunction ident (map copyVar args))
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args (JSBlock [body]))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSReturn (JSFunction ident (map copyVar args) (JSBlock [b])))) body
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args body@(JSBlock _))) =
-    (args : allArgs, body, \b -> f (JSReturn (JSFunction ident (map copyVar args) b)))
+    (args : allArgs, body, f . JSReturn . JSFunction ident (map copyVar args))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
   isTailCall :: String -> JS -> Bool
   isTailCall ident js =
@@ -359,7 +357,7 @@ inlineST = everywhere (mkT convertBlock)
   convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
     if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
   convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc "peekSTArray" f =
-    (JSIndexer i arr)
+    JSIndexer i arr
   convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc "pokeSTArray" f =
     JSAssignment (JSIndexer i arr) val
   convert _ other = other
@@ -369,7 +367,7 @@ inlineST = everywhere (mkT convertBlock)
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) (mkQ [] isSTRef)
     where
-    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [arg]) []))) | isSTFunc "newSTRef" f = [ident]
+    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [_]) []))) | isSTFunc "newSTRef" f = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
   findAllSTUsagesIn = everything (++) (mkQ [] isSTUsage)
@@ -400,7 +398,7 @@ inlineOperator :: String -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator op f = everywhere (mkT convert)
   where
   convert :: JS -> JS
-  convert (JSApp (JSApp op [x]) [y]) | isOp op = f x y
+  convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
   convert other = other
   isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar "_ps"))) | longForm == identToJs (Op op) = True
   isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | op == op' = True
@@ -446,7 +444,7 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar ps))) | longForm == identToJs (Op opString) = True
+    isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar _))) | longForm == identToJs (Op opString) = True
     isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | opString == op' = True
     isOp _ = False
   binaryFunction :: String -> String -> Type -> BinaryOperator -> JS -> JS

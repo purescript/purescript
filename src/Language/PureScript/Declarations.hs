@@ -123,49 +123,49 @@ data Declaration
 -- Test if a declaration is a value declaration
 --
 isValueDecl :: Declaration -> Bool
-isValueDecl (ValueDeclaration _ _ _ _) = True
+isValueDecl ValueDeclaration{} = True
 isValueDecl _ = False
 
 -- |
 -- Test if a declaration is a data type or type synonym declaration
 --
 isDataDecl :: Declaration -> Bool
-isDataDecl (DataDeclaration _ _ _) = True
-isDataDecl (TypeSynonymDeclaration _ _ _) = True
+isDataDecl DataDeclaration{} = True
+isDataDecl TypeSynonymDeclaration{} = True
 isDataDecl _ = False
 
 -- |
 -- Test if a declaration is a module import
 --
 isImportDecl :: Declaration -> Bool
-isImportDecl (ImportDeclaration _ _) = True
+isImportDecl ImportDeclaration{} = True
 isImportDecl _ = False
 
 -- |
 -- Test if a declaration is a data type foreign import
 --
 isExternDataDecl :: Declaration -> Bool
-isExternDataDecl (ExternDataDeclaration _ _) = True
+isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl _ = False
 
 -- |
 -- Test if a declaration is a fixity declaration
 --
 isFixityDecl :: Declaration -> Bool
-isFixityDecl (FixityDeclaration _ _) = True
+isFixityDecl FixityDeclaration{} = True
 isFixityDecl _ = False
 
 -- |
 -- Test if a declaration is a foreign import
 --
 isExternDecl :: Declaration -> Bool
-isExternDecl (ExternDeclaration _ _ _ _) = True
+isExternDecl ExternDeclaration{} = True
 isExternDecl _ = False
 
 -- |
 -- Test if a declaration is a type class or instance declaration
 --
 isTypeClassDeclaration :: Declaration -> Bool
-isTypeClassDeclaration (TypeClassDeclaration _ _ _) = True
-isTypeClassDeclaration (TypeInstanceDeclaration _ _ _ _) = True
+isTypeClassDeclaration TypeClassDeclaration{} = True
+isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration _ = False

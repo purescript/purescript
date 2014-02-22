@@ -33,7 +33,7 @@ data Options = Options {
   , optionsMagicDo :: Bool
     -- |
     -- When specified, checks the type of `main` in the module, and generate a call to run main
-    -- after the module definitions. 
+    -- after the module definitions.
     --
   , optionsMain :: Maybe String
     -- |

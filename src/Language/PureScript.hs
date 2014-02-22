@@ -31,10 +31,9 @@ import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.DeadCodeElimination as P
 
 import Data.List (intercalate)
-import Data.Maybe (mapMaybe, fromMaybe)
-import Control.Monad (when, forM)
+import Data.Maybe (mapMaybe)
 import Control.Monad.State.Lazy
-import Control.Applicative ((<$>), (<|>))
+import Control.Applicative ((<$>))
 import qualified Data.Map as M
 
 -- |
@@ -60,20 +59,20 @@ compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   sorted <- sortModules ms
   desugared <- desugar sorted
-  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> do
-    modify (\s -> s { checkCurrentModule = Just moduleName })
-    Module moduleName <$> typeCheckAll mainModuleIdent moduleName decls
+  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName' decls) -> do
+    modify (\s -> s { checkCurrentModule = Just moduleName' })
+    Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
   let js = mapMaybe (flip (moduleToJs opts) env) elim
-  let exts = intercalate "\n" . map (flip moduleToPs env) $ elim
-  js' <- case mainModuleIdent of 
+  let exts = intercalate "\n" . map (`moduleToPs` env) $ elim
+  js' <- case mainModuleIdent of
     Just mmi -> do
-      when ((mmi, Ident "main") `M.notMember` (names env)) $
-        Left $ (show mmi) ++ ".main is undefined"
+      when ((mmi, Ident "main") `M.notMember` names env) $
+        Left $ show mmi ++ ".main is undefined"
       return $ js ++ [JSApp (JSAccessor "main" (JSAccessor (moduleNameToJs mmi) (JSVar "_ps"))) []]
     _ -> return js
-  return (prettyPrintJS [(wrapExportsContainer opts js')], exts, env)
+  return (prettyPrintJS [wrapExportsContainer opts js'], exts, env)
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts

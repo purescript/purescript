@@ -60,7 +60,7 @@ renderModules ms = do
 
 renderModule :: P.Module -> Docs
 renderModule (P.Module moduleName ds) = do
-  headerLevel 2 $ "Module " ++ (P.runModuleName moduleName)
+  headerLevel 2 $ "Module " ++ P.runModuleName moduleName
   spacer
   headerLevel 3 "Types"
   spacer
@@ -90,23 +90,23 @@ renderDeclaration n (P.TypeDeclaration ident ty) =
 renderDeclaration n (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
 renderDeclaration n (P.DataDeclaration name args ctors) = do
-  let typeName = P.runProperName name ++ " " ++ intercalate " " args
+  let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "data " ++ typeName ++ " where"
-  forM_ ctors $ \(ctor, tys) -> do
-    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concat (map (\ty -> P.prettyPrintType ty ++ " -> ") tys) ++ typeName
+  forM_ ctors $ \(ctor, tys) ->
+    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> P.prettyPrintType ty ++ " -> ") tys ++ typeName
 renderDeclaration n (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do
-  let typeName = P.runProperName name ++ " " ++ intercalate " " args
+  let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
 renderDeclaration n (P.TypeClassDeclaration name args ds) = do
-  atIndent n $ "class " ++ P.runProperName name ++ " " ++ intercalate " " args ++ " where"
+  atIndent n $ "class " ++ P.runProperName name ++ " " ++ unwords args ++ " where"
   mapM_ (renderDeclaration (n + 2)) ds
 renderDeclaration n (P.TypeInstanceDeclaration constraints name tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
-                          cs -> "(" ++ intercalate "," (map (\(pn, tys') -> show pn ++ " (" ++ intercalate " " (map (("(" ++) . (++ ")") . P.prettyPrintType) tys') ++ ")") cs) ++ ") => "
-  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ intercalate " " (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
+                          cs -> "(" ++ intercalate "," (map (\(pn, tys') -> show pn ++ " (" ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys') ++ ")") cs) ++ ") => "
+  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
 renderDeclaration _ _ = return ()
 
 getName :: P.Declaration -> String
@@ -120,22 +120,22 @@ getName (P.TypeInstanceDeclaration _ name _ _) = show name
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool
-isValueDeclaration (P.TypeDeclaration _ _) = True
-isValueDeclaration (P.ExternDeclaration _ _ _ _) = True
+isValueDeclaration P.TypeDeclaration{} = True
+isValueDeclaration P.ExternDeclaration{} = True
 isValueDeclaration _ = False
 
 isTypeDeclaration :: P.Declaration -> Bool
-isTypeDeclaration (P.DataDeclaration _ _ _) = True
-isTypeDeclaration (P.ExternDataDeclaration _ _) = True
-isTypeDeclaration (P.TypeSynonymDeclaration _ _ _) = True
+isTypeDeclaration P.DataDeclaration{} = True
+isTypeDeclaration P.ExternDataDeclaration{} = True
+isTypeDeclaration P.TypeSynonymDeclaration{} = True
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
-isTypeClassDeclaration (P.TypeClassDeclaration _ _ _) = True
+isTypeClassDeclaration P.TypeClassDeclaration{} = True
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool
-isTypeInstanceDeclaration (P.TypeInstanceDeclaration _ _ _ _) = True
+isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration _ = False
 
 inputFile :: Term FilePath
@@ -147,7 +147,7 @@ term = docgen <$> inputFile
 termInfo :: TermInfo
 termInfo = defTI
   { termName = "docgen"
-  , version  = showVersion $ Paths.version
+  , version  = showVersion Paths.version
   , termDoc  = "Generate Markdown documentation from PureScript extern files"
   }
 

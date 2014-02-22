@@ -328,7 +328,7 @@ buildPostfixParser fs first = do
 -- Parse an identifier in backticks or an operator
 --
 parseIdentInfix :: P.Parsec String ParseState (Qualified Ident)
-parseIdentInfix = (P.between tick tick (parseQualified (Ident <$> identifier))) <|> Qualified Nothing <$> (Op <$> operator)
+parseIdentInfix = P.between tick tick (parseQualified (Ident <$> identifier)) <|> Qualified Nothing <$> (Op <$> operator)
 
 -- |
 -- Mark the current indentation level

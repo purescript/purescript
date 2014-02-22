@@ -35,19 +35,19 @@ eliminateDeadCode env entryPoints ms =
   let declarations = concatMap (declarationsByModule env) ms
       (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
       entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
-  in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed (moduleName) graph vertexFor entryPointVertices) ds)
+  in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed moduleName graph vertexFor entryPointVertices) ds)
 
 type Key = (ModuleName, Either Ident ProperName)
 
 declarationsByModule :: Environment -> Module -> [(Key, [Key])]
-declarationsByModule env (Module moduleName ds) = concatMap go $ ds
+declarationsByModule env (Module moduleName ds) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
-  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies env (moduleName) d)]
+  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies env moduleName d)]
   go (DataDeclaration _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
-  go d@(BindingGroupDeclaration names) = map (\(name, _) -> ((moduleName, Left name), dependencies env moduleName d)) names
-  go (DataBindingGroupDeclaration ds) = concatMap go ds
+  go d@(BindingGroupDeclaration names') = map (\(name, _) -> ((moduleName, Left name), dependencies env moduleName d)) names'
+  go (DataBindingGroupDeclaration ds') = concatMap go ds'
   go _ = []
 
 dependencies :: (Data d) => Environment -> ModuleName -> d -> [Key]

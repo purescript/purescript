@@ -312,7 +312,7 @@ term = loop <$> inputFiles
 termInfo :: Cmd.TermInfo
 termInfo = Cmd.defTI
   { Cmd.termName = "psci"
-  , Cmd.version  = showVersion $ Paths.version
+  , Cmd.version  = showVersion Paths.version
   , Cmd.termDoc  = "Interactive mode for PureScript"
   }
 
