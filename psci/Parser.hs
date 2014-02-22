@@ -19,7 +19,7 @@ import Commands
 
 import Control.Applicative hiding (many)
 
-import Data.Text (pack, strip, unpack)
+import Data.Char
 
 import Text.Parsec hiding ((<|>))
 
@@ -105,7 +105,7 @@ psciLoadFile = LoadFile <$> do
   string ":m"
   spaces
   rawPath <- manyTill anyChar eof
-  return . unpack . strip . pack $ rawPath
+  return . reverse . dropWhile isSpace . reverse $ rawPath
 
 -- |
 -- Parses 'Commands.Quit' command.
