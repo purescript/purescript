@@ -356,6 +356,7 @@ module Prelude where
 module Data.Monoid where
 
   import Prelude
+  import Data.Array (foldl)
 
   infixr 6 <>
 
@@ -372,8 +373,7 @@ module Data.Monoid where
     (<>) = Data.Array.concat
 
   mconcat :: forall m. (Monoid m) => [m] -> m
-  mconcat [] = mempty
-  mconcat (m:ms) = m <> mconcat ms
+  mconcat = foldl (<>) mempty
 
 module Control.Monad where
 
@@ -503,9 +503,9 @@ module Data.Array where
   foldr f a (b : bs) = f (foldr f a bs) b
   foldr _ a [] = a
 
-  foldl :: forall a b. (a -> b -> b) -> b -> [a] -> b
+  foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
   foldl _ b [] = b
-  foldl f b (a:as) = foldl f (f a b) as
+  foldl f b (a:as) = foldl f (f b a) as
 
   foreign import length "function length(xs) {\
                         \  return xs.length;\
@@ -573,15 +573,38 @@ module Data.Array where
                       \  return l1;\
                       \}" :: forall a. [a] -> [a]
 
-  foreign import splice "function splice(s) {\
-                        \  return function(e) {\
-                        \    return function(l1) {\
-                        \      return function(l2) {\
-                        \        return l2.splice(s, e, l1);\
-                        \      }; \
-                        \    }; \
-                        \  };\
-                        \}":: forall a. Number -> Number -> [a] -> [a] -> [a]
+  foreign import insertAt 
+    "function insertAt(index) {\
+    \  return function(a) {\
+    \    return function(l) {\
+    \      var l1 = l.slice();\
+    \      l1.splice(index, 0, a);\
+    \      return l1;\
+    \    }; \
+    \  };\
+    \}":: forall a. Number -> a -> [a] -> [a]
+
+  foreign import deleteAt 
+    "function deleteAt(index) {\
+    \  return function(n) {\
+    \    return function(l) {\
+    \      var l1 = l.slice();\
+    \      l1.splice(index, n);\
+    \      return l1;\
+    \    }; \
+    \  };\
+    \}":: forall a. Number -> Number -> [a] -> [a]
+
+  foreign import updateAt 
+    "function updateAt(index) {\
+    \  return function(a) {\
+    \    return function(l) {\
+    \      var l1 = l.slice();\
+    \      l1[index] = a;\
+    \      return l1;\
+    \    }; \
+    \  };\
+    \}":: forall a. Number -> a -> [a] -> [a]
 
   infixr 6 :
 
