@@ -279,7 +279,8 @@ handleCommand (TypeOf val) = lift get >>= handleTypeOf val
 handleCommand _ = outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]
-inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posDoc = "The input .ps files" }
+inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
+                                                     , Cmd.posDoc = "Optional .purs files to load on start" }
 
 -- |
 -- The PSCI main loop.
