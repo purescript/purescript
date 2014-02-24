@@ -22,6 +22,7 @@
 - PSCI now has help commands (joneshf)
 - PSCI history is in XDG config (joneshf)
 - PSCI allows loading of modules from ~ paths (joneshf)
+- PSCI can accept a list of modules to load on start from the command line (paf31)
 
 ### Bug Fixes
 
