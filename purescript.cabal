@@ -91,7 +91,8 @@ executable psci
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
-    other-modules:
+    other-modules: Commands
+                   Parser
     ghc-options: -Wall -O2
 
 executable docgen
