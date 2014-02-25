@@ -219,7 +219,7 @@ handleDeclaration value st = do
     Left err -> outputStrLn err
     Right (js, _, _) -> do
       process <- lift . lift $ findNodeProcess
-      result <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+      result  <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
       case result of
         Just (ExitSuccess,   out, _)   -> outputStrLn out
         Just (ExitFailure _, _,   err) -> outputStrLn err
@@ -259,9 +259,9 @@ getCommand = do
 --
 handleCommand :: Command -> InputT (StateT PSCiState IO) ()
 handleCommand (Expression val) = lift get >>= handleDeclaration val
-handleCommand (Let l) = lift $ modify (updateLets l)
 handleCommand Help = outputStrLn helpMessage
 handleCommand (Import moduleName) = lift $ modify (updateImports moduleName)
+handleCommand (Let l) = lift $ modify (updateLets l)
 handleCommand (LoadFile filePath) = do
   absPath <- lift . lift $ expandTilde filePath
   exists <- lift . lift $ doesFileExist absPath
@@ -271,12 +271,11 @@ handleCommand (LoadFile filePath) = do
   else
     outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
-  preludeFilename <- lift . lift $ getPreludeFilename
   files <- psciImportedFilenames <$> lift get
-  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) (preludeFilename : files)
+  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) files
   case modulesOrFirstError of
     Left err -> lift . lift $ putStrLn err >> exitFailure
-    Right modules -> lift $ put (PSCiState (preludeFilename : files) defaultImports modules [])
+    Right modules -> lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = lift get >>= handleTypeOf val
 handleCommand _ = outputStrLn "Unknown command"
 
