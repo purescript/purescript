@@ -425,9 +425,6 @@ module Control.Monad where
   when true m = m
   when false _ = return {}
   
-  joinM :: forall m a. (Monad m) => m (m a) -> m a
-  joinM x = x >>= id
-  
   zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
   zipWithM f xs ys = sequence $ zipWith f xs ys
   
