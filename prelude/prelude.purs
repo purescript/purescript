@@ -424,6 +424,18 @@ module Control.Monad where
   when :: forall m. (Monad m) => Boolean -> m {} -> m {}
   when true m = m
   when false _ = return {}
+  
+  zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+  zipWithM f xs ys = sequence $ zipWith f xs ys
+  
+  liftM :: forall m a r. (Monad m) => (a -> r) -> m a -> m r
+  liftM f m1 = m1 >>= return <<< f
+  
+  liftM2 :: forall m a1 a2 r. (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
+  liftM2 f m1 m2 = do
+    x1 <- m1
+    x2 <- m2
+    return $ f x1 x2
 
 module Data.Maybe where
 
