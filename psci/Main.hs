@@ -84,7 +84,7 @@ updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modu
 -- Updates the state to have more let bindings.
 --
 updateLets :: (P.Value -> P.Value) -> PSCiState -> PSCiState
-updateLets name st = st { psciLetBindings = psciLetBindings st ++ [name] }
+updateLets name st = st { psciLetBindings = name : psciLetBindings st }
 
 -- File helpers
 -- |
@@ -194,30 +194,32 @@ options = P.Options True False True (Just "Main") True "PS" []
 -- |
 -- Makes a volatile module to execute the current expression.
 --
-createTemporaryModule :: Bool -> [P.ModuleName] -> [P.Value -> P.Value] -> P.Value -> P.Module
-createTemporaryModule exec imports lets value =
+createTemporaryModule :: Bool -> PSCiState -> P.Value -> P.Module
+createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    value' = foldr ($) value lets
-    itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing value'
-    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing (P.App trace (P.Var (P.Qualified Nothing (P.Ident "it"))))
+    itValue = foldl (\x f -> f x) value lets
+    mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
+    itDecl = P.ValueDeclaration (P.Ident "it") [] Nothing itValue
+    mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing mainValue
+    decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module moduleName $ map importDecl imports ++ if exec then [itDecl, mainDecl] else [itDecl]
+    P.Module moduleName $ map importDecl imports ++ decls
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
 handleDeclaration :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
 handleDeclaration value st = do
-  let m = createTemporaryModule True (psciImportedModuleNames st) (psciLetBindings st) value
+  let m = createTemporaryModule True st value
   case P.compile options (psciLoadedModules st ++ [m]) of
     Left err -> outputStrLn err
     Right (js, _, _) -> do
       process <- lift . lift $ findNodeProcess
-      result <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+      result  <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
       case result of
         Just (ExitSuccess,   out, _)   -> outputStrLn out
         Just (ExitFailure _, _,   err) -> outputStrLn err
@@ -228,7 +230,7 @@ handleDeclaration value st = do
 --
 handleTypeOf :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
 handleTypeOf value st = do
-  let m = createTemporaryModule False (psciImportedModuleNames st) (psciLetBindings st) value
+  let m = createTemporaryModule False st value
   case P.compile options { P.optionsMain = Nothing } (psciLoadedModules st ++ [m]) of
     Left err -> outputStrLn err
     Right (_, _, env') ->
@@ -257,9 +259,9 @@ getCommand = do
 --
 handleCommand :: Command -> InputT (StateT PSCiState IO) ()
 handleCommand (Expression val) = lift get >>= handleDeclaration val
-handleCommand (Let l) = lift $ modify (updateLets l)
 handleCommand Help = outputStrLn helpMessage
 handleCommand (Import moduleName) = lift $ modify (updateImports moduleName)
+handleCommand (Let l) = lift $ modify (updateLets l)
 handleCommand (LoadFile filePath) = do
   absPath <- lift . lift $ expandTilde filePath
   exists <- lift . lift $ doesFileExist absPath
@@ -269,12 +271,11 @@ handleCommand (LoadFile filePath) = do
   else
     outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
-  preludeFilename <- lift . lift $ getPreludeFilename
   files <- psciImportedFilenames <$> lift get
-  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) (preludeFilename : files)
+  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) files
   case modulesOrFirstError of
     Left err -> lift . lift $ putStrLn err >> exitFailure
-    Right modules -> lift $ put (PSCiState (preludeFilename : files) defaultImports modules [])
+    Right modules -> lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = lift get >>= handleTypeOf val
 handleCommand _ = outputStrLn "Unknown command"
 
