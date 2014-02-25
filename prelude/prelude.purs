@@ -425,6 +425,9 @@ module Control.Monad where
   when true m = m
   when false _ = return {}
 
+  zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+  zipWithM f xs ys = sequence $ zipWith f xs ys
+
 module Data.Maybe where
 
   import Prelude
