@@ -26,7 +26,6 @@ import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getDirectoryContents, findExecutable)
-import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
@@ -65,16 +64,12 @@ assertCompiles inputFile = do
   putStrLn $ "assert " ++ inputFile ++ " compiles successfully"
   prelude <- preludeFilename
   assert (P.defaultOptions { P.optionsMain = Just "Main", P.optionsNoOptimizations = True, P.optionsModules = ["Main"] }) [prelude, inputFile] $ either (return . Just) $ \js -> do
-    args <- getArgs
-    if "--run-js" `elem` args
-    then do
-      process <- findNodeProcess
-      result <- traverse (\node -> readProcessWithExitCode node [] js) process
-      case result of
-        Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
-        Just (ExitFailure _, _, err) -> return $ Just err
-        Nothing -> return $ Just "Couldn't find node.js executable"
-    else return Nothing
+    process <- findNodeProcess
+    result <- traverse (\node -> readProcessWithExitCode node [] js) process
+    case result of
+      Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
+      Just (ExitFailure _, _, err) -> return $ Just err
+      Nothing -> return $ Just "Couldn't find node.js executable"
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
