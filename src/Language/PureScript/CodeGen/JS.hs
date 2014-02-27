@@ -43,7 +43,6 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
 import Language.PureScript.CodeGen.Common
-import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
@@ -121,10 +120,6 @@ valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
-valueToJs _ m e (Constructor (Qualified Nothing name)) =
-  case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS m id (Qualified (Just aliasModule) aliasIdent)
-    _ -> JSVar . runProperName $ name
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
@@ -262,7 +257,7 @@ binderToJs m e varName done (ConstructorBinder ctor bs) = do
   then
     return js
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ctor)))
                      (JSBlock js)
                      Nothing]
   where
@@ -313,10 +308,10 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 --
 isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
 isOnlyConstructor m e ctor =
-  let (ty, _) = fromMaybe (error "Data constructor not found") $ qualify m ctor `M.lookup` dataConstructors e
+  let ty = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
   in numConstructors ty == 1
   where
-  numConstructors ty = length $ filter (\(ty1, _) -> ((==) `on` typeConstructor) ty ty1) $ M.elems $ dataConstructors e
+  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.elems $ dataConstructors e
   typeConstructor (TypeConstructor qual) = qualify m qual
   typeConstructor (ForAll _ ty _) = typeConstructor ty
   typeConstructor (TypeApp (TypeApp t _) ty) | t == tyFunction = typeConstructor ty

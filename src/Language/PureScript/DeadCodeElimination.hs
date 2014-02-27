@@ -55,7 +55,8 @@ dependencies env moduleName = nub . everything (++) (mkQ [] values)
   where
   values :: Value -> [Key]
   values (Var ident) = let (mn, name) = canonicalize moduleName env ident in [(mn, Left name)]
-  values (Constructor pn) = let (mn, name) = canonicalizeDataConstructor moduleName env pn in [(mn, Right name)]
+  values (Constructor (Qualified (Just mn) name)) = [(mn, Right name)]
+  values (Constructor (Qualified Nothing _)) = error "Found unqualified data constructor"
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaration -> Bool

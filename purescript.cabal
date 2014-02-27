@@ -43,6 +43,7 @@ library
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.Let
+                     Language.PureScript.Sugar.Names
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs

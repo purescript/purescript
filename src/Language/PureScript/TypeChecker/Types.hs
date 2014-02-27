@@ -109,7 +109,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
     env <- getEnv
     Just moduleName <- checkCurrentModule <$> get
-    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (typeConstructorsAreEqual env moduleName c1 c2)
+    guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (c1 == c2)
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
@@ -152,12 +152,6 @@ unifyRows r1 r2 =
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem s1 _) [] (Skolem s2 _) | s1 == s2 = return ()
   unifyRows' sd3 r3 sd4 r4 = throwError $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")."
-
--- |
--- Ensure type constructors are equal after canonicalization
---
-typeConstructorsAreEqual :: Environment -> ModuleName -> Qualified ProperName -> Qualified ProperName -> Bool
-typeConstructorsAreEqual env moduleName = (==) `on` canonicalizeType moduleName env
 
 -- |
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
@@ -271,7 +265,7 @@ entails moduleName context goal@(className, tys) = do
     -- Choose type class dictionaries in scope in the current module
     , filterModule tcd
     -- Make sure the type class name matches the one we are trying to satisfy
-    , typeConstructorsAreEqual env moduleName className' (tcdClassName tcd)
+    , className' == tcdClassName tcd
     -- Make sure the type unifies with the type in the type instance definition
     , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
     -- Solve any necessary subgoals
@@ -314,7 +308,7 @@ typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String
 typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ (TypeVar v) t = Just [(v, t)]
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
-typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | typeConstructorsAreEqual e m c1 c2 = Just []
+typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e m name args of
@@ -419,7 +413,7 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    Just moduleName <- checkCurrentModule <$> get
    dicts <- getTypeClassDictionaries
    (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
-   return (foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints)), ty')
+   return (foldl App val (map (flip TypeClassDictionary dicts) constraints), ty')
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- |
@@ -437,7 +431,7 @@ replaceVarWithUnknown ident ty = do
 replaceAllTypeSynonyms' :: (D.Data d) => Environment -> ModuleName -> d -> Either String d
 replaceAllTypeSynonyms' env moduleName d =
   let
-    syns = map (\((path, name), (args, _)) -> ((path, name), length args)) . M.toList $ typeSynonyms env
+    syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
   in
     saturateAllTypeSynonyms env moduleName syns d
 
@@ -461,7 +455,7 @@ desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
 --
 expandTypeSynonym' :: Environment -> ModuleName -> Qualified ProperName -> [Type] -> Either String Type
 expandTypeSynonym' env moduleName name args =
-  case M.lookup (canonicalizeType moduleName env name) (typeSynonyms env) of
+  case M.lookup name (typeSynonyms env) of
     Just (synArgs, body) -> do
       let repl = replaceAllTypeVars (zip synArgs args) body
       replaceAllTypeSynonyms' env moduleName repl
@@ -540,15 +534,15 @@ infer' (Var var) = do
     ConstrainedType constraints ty' -> do
       env <- getEnv
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName c) (dataConstructors env) of
+  case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (ty, _) -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-                       return $ TypedValue True v ty'
+    Just ty -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+                  return $ TypedValue True v ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
   ret <- fresh
@@ -596,8 +590,8 @@ inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName ctor) (dataConstructors env) of
-    Just (ty, _) -> do
+  case M.lookup ctor (dataConstructors env) of
+    Just ty -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
       go binders fn
         where
@@ -725,8 +719,7 @@ check' val t@(ConstrainedType constraints ty) = do
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
   val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
-      (qualifyAllUnqualifiedNames moduleName env constraints)) $
-        check val ty
+      constraints) $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
 check' val (SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
@@ -806,9 +799,9 @@ check' (Accessor prop val) ty = do
 check' (Constructor c) ty = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName c) (dataConstructors env) of
+  case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
-    Just (ty1, _) -> do
+    Just ty1 -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
@@ -886,7 +879,7 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
   env <- getEnv
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
-  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))) fnTy arg
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg
 checkFunctionApplication' _ fnTy arg = throwError $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument " ++ prettyPrintValue arg
@@ -932,7 +925,7 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
-  return . Just $ foldl App val (map (flip TypeClassDictionary dicts) (qualifyAllUnqualifiedNames moduleName env constraints))
+  return . Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)
 subsumes' val (Object r1) (Object r2) = do
   let
     (ts1, r1') = rowToList r1

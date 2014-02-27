@@ -92,7 +92,7 @@ desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
 desugarDecl mn d@(TypeClassDeclaration name args members) = do
   let tys = map memberToNameAndType members
   modify (M.insert (mn, name) (args, tys))
-  return $ d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor name args) members
+  return $ d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members
 desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) desugared
@@ -108,12 +108,12 @@ typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Dec
 typeClassDictionaryDeclaration name args members =
   TypeSynonymDeclaration name args (Object $ rowFromList (map memberToNameAndType members, REmpty))
 
-typeClassMemberToDictionaryAccessor :: ProperName -> [String] -> Declaration -> Declaration
-typeClassMemberToDictionaryAccessor name args (TypeDeclaration ident ty) =
+typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
+typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
-    (quantify (ConstrainedType [(Qualified Nothing name, map TypeVar args)] ty))
-typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
+    (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
+typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclaration :: ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration mn deps name tys decls = do
@@ -155,9 +155,10 @@ typeInstanceDictionaryEntryDeclaration mn deps name tys (ValueDeclaration ident 
   lookupIdent members = maybe (Left $ "Type class " ++ show name ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
+
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
-qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
-qualifiedToString _ (Qualified (Just mn) pn) = moduleNameToJs mn ++ "_" ++ runProperName pn
+qualifiedToString mn (Qualified _ pn) = moduleNameToJs mn ++ "_" ++ runProperName pn
+
 
 -- |
 -- Generate a name for a type class dictionary, based on the module name, class name and type name
