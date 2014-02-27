@@ -43,7 +43,6 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
 import Language.PureScript.CodeGen.Common
-import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
@@ -262,7 +261,7 @@ binderToJs m e varName done (ConstructorBinder ctor bs) = do
   then
     return js
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ctor)))
                      (JSBlock js)
                      Nothing]
   where
