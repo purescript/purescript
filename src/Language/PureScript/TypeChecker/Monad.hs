@@ -185,18 +185,6 @@ canonicalize mn env (Qualified Nothing i) = case (mn, i) `M.lookup` names env of
   Just (_, Alias mn' i') -> (mn', i')
   _ -> (mn, i)
 
-{-
--- |
--- Canonicalize a type variable by resolving any aliases introduced by module imports
---
-canonicalizeType :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, ProperName)
-canonicalizeType _ _ (Qualified (Just mn) nm) = (mn, nm)
-canonicalizeType mn env (Qualified Nothing nm) = error $ "unqualified type " ++ (show nm) ++ " in " ++ show mn
-    {-case (mn, nm) `M.lookup` types env of
-      Just (_, DataAlias mn' pn') -> (mn', pn')
-      _ -> (mn, nm)-}
-      -}
-
 -- |
 -- State required for type checking:
 --
