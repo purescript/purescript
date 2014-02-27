@@ -52,7 +52,7 @@ createBindingGroups moduleName ds = do
   let values = filter isValueDecl ds
       dataDecls = filter isDataDecl ds
       allProperNames = map getProperName dataDecls
-      dataVerts = map (\d -> (d, getProperName d, usedProperNames d `intersect` allProperNames)) dataDecls
+      dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
   dataBindingGroupDecls <- mapM toDataBindingGroup $ stronglyConnComp dataVerts
   let allIdents = map getIdent values
       valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
@@ -83,11 +83,11 @@ usedIdents moduleName = nub . everything (++) (mkQ [] names)
   names (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   names _ = []
 
-usedProperNames :: (Data d) => d -> [ProperName]
-usedProperNames = nub . everything (++) (mkQ [] names)
+usedProperNames :: (Data d) => ModuleName -> d -> [ProperName]
+usedProperNames moduleName = nub . everything (++) (mkQ [] names)
   where
   names :: Type -> [ProperName]
-  names (TypeConstructor (Qualified Nothing name)) = [name]
+  names (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   names _ = []
 
 getIdent :: Declaration -> Ident
