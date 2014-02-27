@@ -111,9 +111,9 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
     (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) -> do
+    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) -> 
       addDataType moduleName name args dctors ctorKind
-    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) ->
       addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds

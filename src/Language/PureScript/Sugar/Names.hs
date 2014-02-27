@@ -54,8 +54,8 @@ addTypeclass env mn id = env { exportedTypeClasses = M.insertWith addExport mn (
 addExport :: (Ord s, Show s) => S.Set s -> S.Set s -> S.Set s
 addExport new old =
     if null overlap
-    then S.union new old
-    else error $ (show $ head overlap) ++ " has already been defined"
+    then new `S.union` old
+    else error $ show (head overlap) ++ " has already been defined"
     where overlap = S.toList $ S.intersection new old
 
 rename :: [Module] -> Either String [Module]
