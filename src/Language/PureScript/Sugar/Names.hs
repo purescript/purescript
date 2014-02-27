@@ -42,13 +42,21 @@ data ImportEnvironment = ImportEnvironment
 nullEnv = ExportEnvironment M.empty M.empty M.empty
 
 addType :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addType env mn id = env { exportedTypes = M.insertWith S.union mn (S.singleton id) (exportedTypes env) }
+addType env mn id = env { exportedTypes = M.insertWith addExport mn (S.singleton id) (exportedTypes env) }
 
 addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addDataConstructor env mn id = env { exportedDataConstructors = M.insertWith S.union mn (S.singleton id) (exportedDataConstructors env) }
+addDataConstructor env mn id = env { exportedDataConstructors = M.insertWith addExport mn (S.singleton id) (exportedDataConstructors env) }
 
 addTypeclass :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addTypeclass env mn id = env { exportedTypeClasses = M.insertWith S.union mn (S.singleton id) (exportedTypeClasses env) }
+addTypeclass env mn id = env { exportedTypeClasses = M.insertWith addExport mn (S.singleton id) (exportedTypeClasses env) }
+
+-- TODO: do this properly with Either
+addExport :: (Ord s, Show s) => S.Set s -> S.Set s -> S.Set s
+addExport new old =
+    if null overlap
+    then S.union new old
+    else error $ (show $ head overlap) ++ " has already been defined"
+    where overlap = S.toList $ S.intersection new old
 
 rename :: [Module] -> Either String [Module]
 rename modules = mapM renameInModule' modules

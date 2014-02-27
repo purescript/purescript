@@ -135,7 +135,7 @@ infer (TypeConstructor v) = do
   Just moduleName <- checkCurrentModule <$> get
   case M.lookup v (types env) of
     Nothing -> UnifyT . lift . throwError $ "Unknown type constructor '" ++ show v ++ "'" ++ show (M.keys (types env))
-    Just (kind, _) -> return kind
+    Just kind -> return kind
 infer (TypeApp t1 t2) = do
   k0 <- fresh
   k1 <- infer t1

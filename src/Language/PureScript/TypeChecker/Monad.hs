@@ -62,31 +62,6 @@ data NameKind
   | DataConstructor deriving Show
 
 -- |
--- The type of a type declaration
---
-data TypeDeclarationKind
-  -- |
-  -- A data constructor
-  --
-  = Data
-  -- |
-  -- A data type foreign import
-  --
-  | ExternData
-  -- |
-  -- A type synonym
-  --
-  | TypeSynonym
-  -- |
-  -- An alias for a type in another module, introduced using an import declaration
-  --
-  | DataAlias ModuleName ProperName
-  -- |
-  -- A local type name introduced using a forall quantifier
-  --
-  | LocalTypeVariable deriving Show
-
--- |
 -- The @Environment@ defines all values and types which are currently in scope:
 --
 data Environment = Environment {
@@ -97,7 +72,7 @@ data Environment = Environment {
   -- |
   -- Type names currently in scope
   --
-  , types :: M.Map (Qualified ProperName) (Kind, TypeDeclarationKind)
+  , types :: M.Map (Qualified ProperName) Kind
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
@@ -115,12 +90,12 @@ data Environment = Environment {
 -- |
 -- The basic types existing in the external javascript environment
 --
-jsTypes ::M.Map (Qualified ProperName) (Kind, TypeDeclarationKind)
-jsTypes = M.fromList [ (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array"), (FunKind Star Star, ExternData))
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "String"), (Star, ExternData))
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Number"), (Star, ExternData))
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Boolean"), (Star, ExternData)) ]
+jsTypes ::M.Map (Qualified ProperName) Kind
+jsTypes = M.fromList [ (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Function"), (FunKind Star (FunKind Star Star)))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array"), (FunKind Star Star))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "String"), (Star))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Number"), (Star))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Boolean"), (Star)) ]
 
 -- |
 -- The initial environment with no values and only the default javascript types defined
@@ -142,7 +117,7 @@ bindNames newNames action = do
 -- |
 -- Temporarily bind a collection of names to types
 --
-bindTypes :: (MonadState CheckState m) => M.Map (Qualified ProperName) (Kind, TypeDeclarationKind) -> m a -> m a
+bindTypes :: (MonadState CheckState m) => M.Map (Qualified ProperName) Kind -> m a -> m a
 bindTypes newNames action = do
   orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { types = newNames `M.union` (types . checkEnv $ st) } }
@@ -179,7 +154,7 @@ bindLocalVariables moduleName bindings =
 --
 bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> (Qualified (Just moduleName) name, (k, LocalTypeVariable)))
+  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> (Qualified (Just moduleName) name, k))
 
 -- |
 -- Lookup the type of a value by name in the @Environment@
@@ -199,7 +174,7 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
     Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
-    Just (k, _) -> return k
+    Just k -> return k
 
 -- |
 -- Canonicalize an identifier by resolving any aliases introduced by module imports
