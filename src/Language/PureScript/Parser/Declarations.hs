@@ -36,8 +36,9 @@ parseDataDeclaration = do
   reserved "data"
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
-  _ <- lexeme $ indented *> P.char '='
-  ctors <- sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
+  ctors <- P.option [] $ do
+    _ <- lexeme $ indented *> P.char '='
+    sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
   return $ DataDeclaration name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
@@ -94,9 +95,10 @@ parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
   reserved "class"
   className <- indented *> properName
-  idents <- indented *> P.many identifier
-  indented *> reserved "where"
-  members <- mark (P.many (same *> parseTypeDeclaration))
+  idents <- P.many (indented *> identifier)
+  members <- P.option [] . P.try $ do
+    indented *> reserved "where"
+    mark (P.many (same *> parseTypeDeclaration))
   return $ TypeClassDeclaration className idents members
 
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
@@ -108,9 +110,10 @@ parseTypeInstanceDeclaration = do
     reservedOp "=>"
     return deps
   className <- indented *> parseQualified properName
-  ty <- indented *> P.many parseTypeAtom
-  indented *> reserved "where"
-  members <- mark (P.many (same *> parseValueDeclaration))
+  ty <- P.many (indented *> parseTypeAtom)
+  members <- P.option [] . P.try $ do
+    indented *> reserved "where"
+    mark (P.many (same *> parseValueDeclaration))
   return $ TypeInstanceDeclaration (fromMaybe [] deps) className ty members
 
 -- |
