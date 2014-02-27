@@ -25,7 +25,6 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
-import Debug.Trace
 
 data ExportEnvironment = ExportEnvironment
     { exportedTypes :: M.Map ModuleName (S.Set ProperName)
@@ -41,28 +40,34 @@ data ImportEnvironment = ImportEnvironment
 
 nullEnv = ExportEnvironment M.empty M.empty M.empty
 
-addType :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addType env mn id = env { exportedTypes = M.insertWith addExport mn (S.singleton id) (exportedTypes env) }
+addType :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
+addType env mn name = do
+    types <- addExport (exportedTypes env) mn name
+    return $ env { exportedTypes = types  }
 
-addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addDataConstructor env mn id = env { exportedDataConstructors = M.insertWith addExport mn (S.singleton id) (exportedDataConstructors env) }
+addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
+addDataConstructor env mn name = do
+    dataConstructors <- addExport (exportedDataConstructors env) mn name
+    return $ env { exportedDataConstructors = dataConstructors }
 
-addTypeclass :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
-addTypeclass env mn id = env { exportedTypeClasses = M.insertWith addExport mn (S.singleton id) (exportedTypeClasses env) }
+addTypeclass :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
+addTypeclass env mn name = do
+    classes <- addExport (exportedTypeClasses env) mn name
+    return $ env { exportedTypeClasses = classes }
 
--- TODO: do this properly with Either
-addExport :: (Ord s, Show s) => S.Set s -> S.Set s -> S.Set s
-addExport new old =
-    if null overlap
-    then new `S.union` old
-    else error $ show (head overlap) ++ " has already been defined"
-    where overlap = S.toList $ S.intersection new old
+addExport :: (Ord s, Show s) => M.Map ModuleName (S.Set s) -> ModuleName -> s -> Either String (M.Map ModuleName (S.Set s))
+addExport exports mn name = case M.lookup mn exports of
+    Just s -> if S.member name s
+              then Left $ "Module '" ++ show mn ++ "' has multiple definitions for '" ++ (show name) ++ "'"
+              else Right $ M.insert mn (S.insert name s) exports
+    Nothing -> Right $ M.insert mn (S.singleton name) exports
 
 rename :: [Module] -> Either String [Module]
-rename modules = mapM renameInModule' modules
+rename modules = do
+    exports <- findExports modules
+    mapM (renameInModule' exports) modules
     where
-    exports = findExports modules
-    renameInModule' m = do
+    renameInModule' exports m = do
         imports <- resolveImports exports m
         renameInModule imports m
 
@@ -96,15 +101,17 @@ renameInModule imports (Module mn decls) =
     updateDataConstructorName = update "data constructor" importedDataConstructors
     update t get nm = maybe (Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'") return $ M.lookup nm (get imports)
     
-findExports :: [Module] -> ExportEnvironment
-findExports = foldl addModule nullEnv
+findExports :: [Module] -> Either String ExportEnvironment
+findExports = foldM addModule nullEnv
     where
-    addModule env (Module mn ds) = foldl (addDecl mn) env ds
+    addModule env (Module mn ds) = foldM (addDecl mn) env ds
     addDecl mn env (TypeClassDeclaration tcn _ _) = addTypeclass env mn tcn
-    addDecl mn env (DataDeclaration tn _ dcs) = addType (foldl (`addDataConstructor` mn) env (map fst dcs)) mn tn
+    addDecl mn env (DataDeclaration tn _ dcs) = do
+      env' <- foldM (`addDataConstructor` mn) env (map fst dcs)
+      addType env' mn tn
     addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn
     addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn
-    addDecl _  env _ = env
+    addDecl _  env _ = return env
 
 findImports :: [Declaration] -> [ModuleName]
 findImports decls = [ mn | (ImportDeclaration mn Nothing) <- decls ]
