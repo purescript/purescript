@@ -22,6 +22,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad (Environment(..))
 
+import Control.Applicative ((<$>))
 import Data.Maybe (fromMaybe)
 import Data.Data
 import Data.Generics
@@ -32,7 +33,7 @@ import Control.Monad.Error
 -- |
 -- Build a type substitution for a type synonym
 --
-buildTypeSubstitution :: Environment -> ModuleName -> (Qualified ProperName) -> Int -> Type -> Either String (Maybe Type)
+buildTypeSubstitution :: Environment -> ModuleName -> Qualified ProperName -> Int -> Type -> Either String (Maybe Type)
 buildTypeSubstitution env moduleName name n = go n []
   where
   go :: Int -> [Type] -> Type -> Either String (Maybe Type)
@@ -44,15 +45,15 @@ buildTypeSubstitution env moduleName name n = go n []
 -- |
 -- Replace all instances of a specific type synonym with the @SaturatedTypeSynonym@ data constructor
 --
-saturateTypeSynonym :: (Data d) => Environment -> ModuleName -> (Qualified ProperName) -> Int -> d -> Either String d
+saturateTypeSynonym :: (Data d) => Environment -> ModuleName -> Qualified ProperName -> Int -> d -> Either String d
 saturateTypeSynonym env moduleName name n = everywhereM' (mkM replace)
   where
-  replace t = fmap (fromMaybe t) $ buildTypeSubstitution env moduleName name n t
+  replace t = fromMaybe t <$> buildTypeSubstitution env moduleName name n t
 
 -- |
 -- Replace all type synonyms with the @SaturatedTypeSynonym@ data constructor
 --
-saturateAllTypeSynonyms :: (Data d) => Environment -> ModuleName -> [((Qualified ProperName), Int)] -> d -> Either String d
+saturateAllTypeSynonyms :: (Data d) => Environment -> ModuleName -> [(Qualified ProperName, Int)] -> d -> Either String d
 saturateAllTypeSynonyms env moduleName syns d = foldM (\result (name, n) -> saturateTypeSynonym env moduleName name n result) d syns
 
 

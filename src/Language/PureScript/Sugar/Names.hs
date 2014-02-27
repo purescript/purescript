@@ -17,7 +17,7 @@ module Language.PureScript.Sugar.Names (
 ) where
 
 import Control.Applicative ((<$>))
-import Control.Monad (foldM)
+import Control.Monad (foldM, liftM)
 import Data.Generics (extM, mkM, everywhereM)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -67,16 +67,16 @@ renameInModule imports (Module mn decls) =
       cs' <- updateConstraints cs
       return $ TypeInstanceDeclaration cs' cn' ts ds
     updateDecl d = return d
-    updateValue (Constructor (Qualified Nothing nm)) = updateDataConstructorName nm >>= return . Constructor
+    updateValue (Constructor (Qualified Nothing nm)) = liftM Constructor $ updateDataConstructorName nm
     updateValue v = return v
-    updateBinder (ConstructorBinder (Qualified Nothing nm) b) = updateDataConstructorName nm >>= return . (`ConstructorBinder` b)
+    updateBinder (ConstructorBinder (Qualified Nothing nm) b) = liftM (`ConstructorBinder` b) $ updateDataConstructorName nm
     updateBinder v = return v
-    updateType (TypeConstructor (Qualified Nothing nm)) = updateTypeName nm >>= return . TypeConstructor
+    updateType (TypeConstructor (Qualified Nothing nm)) = liftM TypeConstructor $ updateTypeName nm
     updateType (SaturatedTypeSynonym (Qualified Nothing nm) tys) = do
         nm' <- updateTypeName nm
         tys' <- mapM updateType tys
         return $ SaturatedTypeSynonym nm' tys'
-    updateType (ConstrainedType cs t) = updateConstraints cs >>= return . (`ConstrainedType` t)
+    updateType (ConstrainedType cs t) = liftM (`ConstrainedType` t) $ updateConstraints cs
     updateType t = return t
     updateConstraints = mapM updateConstraint
     updateConstraint (Qualified Nothing nm, ts) = do

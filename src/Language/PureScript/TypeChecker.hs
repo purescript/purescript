@@ -209,16 +209,16 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
         Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
   shadowTypes pns env =
     forM_ pns $ \pn ->
-      case (Qualified (Just moduleName) pn) `M.lookup` types env of
+      case Qualified (Just moduleName) pn `M.lookup` types env of
         Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
         Just (_, DataAlias _ _) -> return ()
         Just (k, _) -> do
-          guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (Qualified (Just currentModule) pn) `M.notMember` types env
+          guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ Qualified (Just currentModule) pn `M.notMember` types env
           modifyEnv (\e -> e { types = M.insert (Qualified (Just currentModule) pn) (k, DataAlias moduleName pn) (types e) })
           let keys = map fst . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
           forM_ keys $ \dctor ->
             case dctor `M.lookup` dataConstructors env of
-              Just ctorTy -> do
+              Just ctorTy -> 
                 modifyEnv (\e -> e { dataConstructors = M.insert dctor ctorTy (dataConstructors e) })
               Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
   shadowTypeClassInstances env = do

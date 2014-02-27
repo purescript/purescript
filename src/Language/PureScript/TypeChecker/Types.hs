@@ -265,7 +265,7 @@ entails moduleName context goal@(className, tys) = do
     -- Choose type class dictionaries in scope in the current module
     , filterModule tcd
     -- Make sure the type class name matches the one we are trying to satisfy
-    , className' == (tcdClassName tcd)
+    , className' == tcdClassName tcd
     -- Make sure the type unifies with the type in the type instance definition
     , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
     -- Solve any necessary subgoals
