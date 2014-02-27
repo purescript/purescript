@@ -8,6 +8,7 @@
 
 - `let ... in` syntax for bindings (paf31)
 - Multi parameter typeclasses (paf31)
+- Empty data declarations and empty type classes are now supported (paf31)
 
 ### Enhancements
 
@@ -34,6 +35,7 @@
 ### Libraries
 
 - The [purescript-date](https://github.com/purescript/purescript-date) library provides basic date/time functions
+- The [purescript-reactive](https://github.com/purescript/purescript-reactive) and [purescript-reactive-jquery]() libraries provide reactive variables, and bindings to jQuery properties.
 
 ### Documentation
 
