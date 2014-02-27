@@ -28,16 +28,21 @@ import Language.PureScript.Values
 import Debug.Trace
 
 data ExportEnvironment = ExportEnvironment
-    { exportedDataConstructors :: M.Map ModuleName (S.Set ProperName)
+    { exportedTypes :: M.Map ModuleName (S.Set ProperName)
+    , exportedDataConstructors :: M.Map ModuleName (S.Set ProperName)
     , exportedTypeClasses :: M.Map ModuleName (S.Set ProperName)
     } deriving (Show)
     
 data ImportEnvironment = ImportEnvironment
-    { importedDataConstructors :: M.Map ProperName (Qualified ProperName)
+    { importedTypes :: M.Map ProperName (Qualified ProperName)
+    , importedDataConstructors :: M.Map ProperName (Qualified ProperName)
     , importedTypeClasses :: M.Map ProperName (Qualified ProperName)
     } deriving (Show)
 
-nullEnv = ExportEnvironment M.empty M.empty
+nullEnv = ExportEnvironment M.empty M.empty M.empty
+
+addType :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
+addType env mn id = env { exportedTypes = M.insertWith S.union mn (S.singleton id) (exportedTypes env) }
 
 addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironment
 addDataConstructor env mn id = env { exportedDataConstructors = M.insertWith S.union mn (S.singleton id) (exportedDataConstructors env) }
@@ -62,35 +67,35 @@ renameInModule imports (Module mn decls) =
       cs' <- updateConstraints cs
       return $ TypeInstanceDeclaration cs' cn' ts ds
     updateDecl d = return d
-    updateValue (Constructor (Qualified Nothing nm)) = do
-        nm' <- updateDataConstructorName nm
-        return $ Constructor nm'
+    updateValue (Constructor (Qualified Nothing nm)) = updateDataConstructorName nm >>= return . Constructor
     updateValue v = return v
-    updateBinder (ConstructorBinder (Qualified Nothing nm) b) = do
-        nm' <- updateDataConstructorName nm
-        return $ ConstructorBinder nm' b
+    updateBinder (ConstructorBinder (Qualified Nothing nm) b) = updateDataConstructorName nm >>= return . (`ConstructorBinder` b)
     updateBinder v = return v
-    updateType (ConstrainedType cs t) = do
-      cs' <- updateConstraints cs
-      return $ ConstrainedType cs' t
+    updateType (TypeConstructor (Qualified Nothing nm)) = updateTypeName nm >>= return . TypeConstructor
+    updateType (SaturatedTypeSynonym (Qualified Nothing nm) tys) = do
+        nm' <- updateTypeName nm
+        tys' <- mapM updateType tys
+        return $ SaturatedTypeSynonym nm' tys'
+    updateType (ConstrainedType cs t) = updateConstraints cs >>= return . (`ConstrainedType` t)
     updateType t = return t
     updateConstraints = mapM updateConstraint
     updateConstraint (Qualified Nothing nm, ts) = do
       nm' <- updateClassName nm
       return (nm', ts)
     updateConstraint other = return other
-    updateClassName nm =
-      maybe (err "typeclass" nm mn) return $ M.lookup nm (importedTypeClasses imports)
-    updateDataConstructorName nm =
-      maybe (err "data constructor" nm mn) return $ M.lookup nm (importedDataConstructors imports)
-    err t nm mn = Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'"
-
+    updateTypeName = update "type" importedTypes
+    updateClassName = update "typeclass" importedTypeClasses
+    updateDataConstructorName = update "data constructor" importedDataConstructors
+    update t get nm = maybe (Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'") return $ M.lookup nm (get imports)
+    
 findExports :: [Module] -> ExportEnvironment
 findExports = foldl addModule nullEnv
     where
     addModule env (Module mn ds) = foldl (addDecl mn) env ds
     addDecl mn env (TypeClassDeclaration tcn _ _) = addTypeclass env mn tcn
-    addDecl mn env (DataDeclaration tcn _ dcs) = foldl (`addDataConstructor` mn) env (map fst dcs)
+    addDecl mn env (DataDeclaration tn _ dcs) = addType (foldl (`addDataConstructor` mn) env (map fst dcs)) mn tn
+    addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn
+    addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn
     addDecl _  env _ = env
 
 findImports :: [Declaration] -> [ModuleName]
@@ -98,9 +103,10 @@ findImports decls = [ mn | (ImportDeclaration mn Nothing) <- decls ]
 
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
 resolveImports env (Module currentModule decls) = do
+    types <- resolve exportedTypes
     dataConstructors <- resolve exportedDataConstructors
     typeClasses <- resolve exportedTypeClasses
-    return $ ImportEnvironment dataConstructors typeClasses
+    return $ ImportEnvironment types dataConstructors typeClasses
     where
     scope = currentModule : findImports decls
     resolve get = foldM resolveDefs M.empty (M.toList $ get env)

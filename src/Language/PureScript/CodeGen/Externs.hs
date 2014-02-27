@@ -42,7 +42,7 @@ declToPs path env (BindingGroupDeclaration vals) =
     (ty, _) <- M.lookup (path, name) $ names env
     return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
 declToPs path env (DataDeclaration name _ _) = maybeToList $ do
-  (kind, _) <- M.lookup (path, name) $ types env
+  (kind, _) <- M.lookup (Qualified (Just path) name) $ types env
   return $ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
 declToPs _ _ (ExternDataDeclaration name kind) =
   return $ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind

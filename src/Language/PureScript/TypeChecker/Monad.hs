@@ -97,7 +97,7 @@ data Environment = Environment {
   -- |
   -- Type names currently in scope
   --
-  , types :: M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
+  , types :: M.Map (Qualified ProperName) (Kind, TypeDeclarationKind)
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
@@ -105,7 +105,7 @@ data Environment = Environment {
   -- |
   -- Type synonyms currently in scope
   --
-  , typeSynonyms :: M.Map (ModuleName, ProperName) ([String], Type)
+  , typeSynonyms :: M.Map (Qualified ProperName) ([String], Type)
   -- |
   -- Available type class dictionaries
   --
@@ -115,12 +115,12 @@ data Environment = Environment {
 -- |
 -- The basic types existing in the external javascript environment
 --
-jsTypes ::M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind)
-jsTypes = M.fromList [ ((ModuleName [ProperName "Prim"], ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
-                     , ((ModuleName [ProperName "Prim"], ProperName "Array"), (FunKind Star Star, ExternData))
-                     , ((ModuleName [ProperName "Prim"], ProperName "String"), (Star, ExternData))
-                     , ((ModuleName [ProperName "Prim"], ProperName "Number"), (Star, ExternData))
-                     , ((ModuleName [ProperName "Prim"], ProperName "Boolean"), (Star, ExternData)) ]
+jsTypes ::M.Map (Qualified ProperName) (Kind, TypeDeclarationKind)
+jsTypes = M.fromList [ (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Function"), (FunKind Star $ FunKind Star Star, ExternData))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array"), (FunKind Star Star, ExternData))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "String"), (Star, ExternData))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Number"), (Star, ExternData))
+                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Boolean"), (Star, ExternData)) ]
 
 -- |
 -- The initial environment with no values and only the default javascript types defined
@@ -142,7 +142,7 @@ bindNames newNames action = do
 -- |
 -- Temporarily bind a collection of names to types
 --
-bindTypes :: (MonadState CheckState m) => M.Map (ModuleName, ProperName) (Kind, TypeDeclarationKind) -> m a -> m a
+bindTypes :: (MonadState CheckState m) => M.Map (Qualified ProperName) (Kind, TypeDeclarationKind) -> m a -> m a
 bindTypes newNames action = do
   orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { types = newNames `M.union` (types . checkEnv $ st) } }
@@ -179,7 +179,7 @@ bindLocalVariables moduleName bindings =
 --
 bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> ((moduleName, name), (k, LocalTypeVariable)))
+  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> (Qualified (Just moduleName) name, (k, LocalTypeVariable)))
 
 -- |
 -- Lookup the type of a value by name in the @Environment@
@@ -197,7 +197,7 @@ lookupVariable currentModule (Qualified moduleName var) = do
 lookupTypeVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified ProperName -> m Kind
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
-  case M.lookup (fromMaybe currentModule moduleName, name) (types env) of
+  case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
     Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
     Just (k, _) -> return k
 
@@ -210,14 +210,17 @@ canonicalize mn env (Qualified Nothing i) = case (mn, i) `M.lookup` names env of
   Just (_, Alias mn' i') -> (mn', i')
   _ -> (mn, i)
 
+{-
 -- |
 -- Canonicalize a type variable by resolving any aliases introduced by module imports
 --
 canonicalizeType :: ModuleName -> Environment -> Qualified ProperName -> (ModuleName, ProperName)
 canonicalizeType _ _ (Qualified (Just mn) nm) = (mn, nm)
-canonicalizeType mn env (Qualified Nothing nm) = case (mn, nm) `M.lookup` types env of
-  Just (_, DataAlias mn' pn') -> (mn', pn')
-  _ -> (mn, nm)
+canonicalizeType mn env (Qualified Nothing nm) = error $ "unqualified type " ++ (show nm) ++ " in " ++ show mn
+    {-case (mn, nm) `M.lookup` types env of
+      Just (_, DataAlias mn' pn') -> (mn', pn')
+      _ -> (mn, nm)-}
+      -}
 
 -- |
 -- State required for type checking:
@@ -313,17 +316,3 @@ liftUnify unify = do
     Right (a, ust) -> do
       modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
       return (a, unifyCurrentSubstitution ust)
-
--- |
--- Replace any unqualified names in a type with their qualified versions
---
-qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
-qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
-  where
-  go :: Type -> Type
-  go (TypeConstructor nm) = TypeConstructor $ qualify' nm
-  go (SaturatedTypeSynonym nm args) = SaturatedTypeSynonym (qualify' nm) args
-  go (ConstrainedType constraints ty) = ConstrainedType (map (first qualify') constraints) ty
-  go other = other
-  qualify' qual = let (mn', pn') = canonicalizeType mn env qual
-                  in Qualified (Just mn') pn'
