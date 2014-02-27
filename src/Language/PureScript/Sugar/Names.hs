@@ -68,7 +68,7 @@ rename modules = mapM renameInModule' modules
 
 renameInModule :: ImportEnvironment -> Module -> Either String Module
 renameInModule imports (Module mn decls) =
-    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType) >>= everywhereM (mkM updateValue) >>= everywhereM (mkM updateBinder)
+    Module mn <$> mapM updateDecl decls >>= everywhereM ((mkM updateType) `extM` updateValue `extM` updateBinder)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) = do
       cn' <- updateClassName cn
