@@ -120,10 +120,6 @@ valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
-valueToJs _ m e (Constructor (Qualified Nothing name)) =
-  case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS m id (Qualified (Just aliasModule) aliasIdent)
-    _ -> JSVar . runProperName $ name
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
