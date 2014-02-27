@@ -545,7 +545,7 @@ infer' (Var var) = do
 infer' v@(Constructor c) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName c) (dataConstructors env) of
+  case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
                   return $ TypedValue True v ty'
@@ -596,7 +596,7 @@ inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName ctor) (dataConstructors env) of
+  case M.lookup ctor (dataConstructors env) of
     Just ty -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
       go binders fn
@@ -806,7 +806,7 @@ check' (Accessor prop val) ty = do
 check' (Constructor c) ty = do
   env <- getEnv
   Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (qualify moduleName c) (dataConstructors env) of
+  case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty1 -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1

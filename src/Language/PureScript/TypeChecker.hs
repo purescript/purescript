@@ -49,11 +49,10 @@ addDataType moduleName name args dctors ctorKind = do
 addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
 addDataConstructor moduleName name args dctor tys = do
   env <- getEnv
-  dataConstructorIsNotDefined moduleName dctor
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType) (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (qualifyAllUnqualifiedNames moduleName env polyType) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -66,12 +65,6 @@ typeIsNotDefined moduleName name = do
   env <- getEnv
   guardWith (show name ++ " is already defined") $
     not $ M.member (moduleName, name) (types env)
-
-dataConstructorIsNotDefined :: ModuleName -> ProperName -> Check ()
-dataConstructorIsNotDefined moduleName dctor = do
-  env <- getEnv
-  guardWith (show dctor ++ " is already defined") $
-    not $ M.member (moduleName, dctor) (dataConstructors env)
 
 valueIsNotDefined :: ModuleName -> Ident -> Check ()
 valueIsNotDefined moduleName name = do
@@ -221,12 +214,11 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
         Just (k, _) -> do
           guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
           modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
-          let keys = map (snd . fst) . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
+          let keys = map fst . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
           forM_ keys $ \dctor ->
-            case (moduleName, dctor) `M.lookup` dataConstructors env of
+            case dctor `M.lookup` dataConstructors env of
               Just ctorTy -> do
-                guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
-                modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) ctorTy (dataConstructors e) })
+                modifyEnv (\e -> e { dataConstructors = M.insert dctor ctorTy (dataConstructors e) })
               Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
   shadowTypeClassInstances env = do
     let instances = filter (\tcd ->

@@ -308,7 +308,7 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 --
 isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
 isOnlyConstructor m e ctor =
-  let ty = fromMaybe (error "Data constructor not found") $ qualify m ctor `M.lookup` dataConstructors e
+  let ty = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
   in numConstructors ty == 1
   where
   numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.elems $ dataConstructors e

@@ -101,7 +101,7 @@ data Environment = Environment {
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
-  , dataConstructors :: M.Map (ModuleName, ProperName) Type
+  , dataConstructors :: M.Map (Qualified ProperName) Type
   -- |
   -- Type synonyms currently in scope
   --
