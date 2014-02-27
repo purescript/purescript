@@ -651,6 +651,16 @@ module Data.Array where
   all _ [] = true
   all p (a:as) = p a && all p as
 
+  drop :: forall a. Number -> [a] -> [a]
+  drop 0 xs = xs
+  drop _ [] = []
+  drop n (x:xs) = drop (n - 1) xs
+
+  take :: forall a. Number -> [a] -> [a]
+  take 0 _ = []
+  take _ [] = []
+  take n (x:xs) = x : take (n - 1) xs
+
   instance (Prelude.Show a) => Prelude.Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
@@ -999,6 +1009,14 @@ module Control.Monad.Eff where
                           \  };\
                           \}" :: forall e a. [a] -> (a -> Eff e {}) -> Eff e {}
 
+module Control.Monad.Eff.Unsafe where
+
+  import Control.Monad.Eff
+
+  foreign import unsafeInterleaveEff
+    "function unsafeInterleaveEff(f) {\
+    \  return f;\
+    \}" :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 
 module Random where
 
