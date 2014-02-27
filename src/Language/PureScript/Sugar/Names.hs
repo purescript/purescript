@@ -90,7 +90,7 @@ findExports = foldl addModule nullEnv
     where
     addModule env (Module mn ds) = foldl (addDecl mn) env ds
     addDecl mn env (TypeClassDeclaration tcn _ _) = addTypeclass env mn tcn
-    addDecl mn env (DataDeclaration tcn _ dcs) = foldl (flip addDataConstructor mn) env (map fst dcs)
+    addDecl mn env (DataDeclaration tcn _ dcs) = foldl (`addDataConstructor` mn) env (map fst dcs)
     addDecl _  env _ = env
 
 findImports :: [Declaration] -> [ModuleName]
@@ -102,12 +102,12 @@ resolveImports env (Module currentModule decls) = do
     typeClasses <- resolve exportedTypeClasses
     return $ ImportEnvironment dataConstructors typeClasses
     where
-    scope = (currentModule : findImports decls)
+    scope = currentModule : findImports decls
     resolve get = foldM resolveDefs M.empty (M.toList $ get env)
     resolveDefs result (mn, names) | mn `elem` scope = foldM (resolveDef mn) result (S.toList names)
     resolveDefs result _ = return result
     resolveDef mn result name = case M.lookup name result of
         Nothing -> return $ M.insert name (Qualified (Just mn) name) result
-        Just x@(Qualified (Just mn') _) -> if mn' == currentModule
-            then Left $ "Module '" ++ show currentModule ++ "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
-            else Left $ "Module '" ++ show currentModule ++ "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
+        Just x@(Qualified (Just mn') _) -> Left $ "Module '" ++ show currentModule ++ if mn' == currentModule
+            then "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
+            else "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"

@@ -53,7 +53,7 @@ addDataConstructor moduleName name args dctor tys = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType, DataConstructor) (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (moduleName, dctor) (qualifyAllUnqualifiedNames moduleName env polyType) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -221,13 +221,12 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
         Just (k, _) -> do
           guardWith (show currentModule ++ "." ++ show pn ++ " is already defined") $ (currentModule, pn) `M.notMember` types env
           modifyEnv (\e -> e { types = M.insert (currentModule, pn) (k, DataAlias moduleName pn) (types e) })
-          let keys = map (snd . fst) . filter (\(_, (fn, _)) -> fn `constructs` pn) . M.toList . dataConstructors $ env
+          let keys = map (snd . fst) . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
           forM_ keys $ \dctor ->
             case (moduleName, dctor) `M.lookup` dataConstructors env of
-              Just (_, Alias _ _) -> return ()
-              Just (ctorTy, _) -> do
+              Just ctorTy -> do
                 guardWith (show currentModule ++ "." ++ show dctor ++ " is already defined") $ (currentModule, dctor) `M.notMember` dataConstructors env
-                modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) (ctorTy, Alias moduleName (Ident (runProperName dctor))) (dataConstructors e) })
+                modifyEnv (\e -> e { dataConstructors = M.insert (currentModule, dctor) ctorTy (dataConstructors e) })
               Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
   shadowTypeClassInstances env = do
     let instances = filter (\tcd ->

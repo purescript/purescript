@@ -101,7 +101,7 @@ data Environment = Environment {
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
-  , dataConstructors :: M.Map (ModuleName, ProperName) (Type, NameKind)
+  , dataConstructors :: M.Map (ModuleName, ProperName) Type
   -- |
   -- Type synonyms currently in scope
   --
@@ -315,7 +315,7 @@ liftUnify unify = do
       return (a, unifyCurrentSubstitution ust)
 
 -- |
--- Replace any unqualified names in a type wit their qualified versionss
+-- Replace any unqualified names in a type with their qualified versions
 --
 qualifyAllUnqualifiedNames :: (Data d) => ModuleName -> Environment -> d -> d
 qualifyAllUnqualifiedNames mn env = everywhere (mkT go)
