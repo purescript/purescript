@@ -17,6 +17,7 @@ module Language.PureScript.Sugar.Names (
 ) where
 
 import Control.Applicative ((<$>))
+import Control.Monad (foldM)
 import Data.Generics (extM, mkM, everywhereM)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -45,10 +46,16 @@ addTypeclass :: ExportEnvironment -> ModuleName -> ProperName -> ExportEnvironme
 addTypeclass env mn id = env { exportedTypeClasses = M.insertWith S.union mn (S.singleton id) (exportedTypeClasses env) }
 
 rename :: [Module] -> Either String [Module]
-rename modules = trace (show $ findExports modules) $ mapM (renameInModule $ findExports modules) modules
+rename modules = mapM renameInModule' modules
+    where
+    exports = findExports modules
+    renameInModule' m = do
+        imports <- resolveImports exports m
+        renameInModule imports m
 
-renameInModule :: ExportEnvironment -> Module -> Either String Module
-renameInModule exports m@(Module mn decls) = Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType) >>= everywhereM (mkM updateValue) >>= everywhereM (mkM updateBinder)
+renameInModule :: ImportEnvironment -> Module -> Either String Module
+renameInModule imports (Module mn decls) =
+    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType) >>= everywhereM (mkM updateValue) >>= everywhereM (mkM updateBinder)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) = do
       cn' <- updateClassName cn
@@ -76,7 +83,6 @@ renameInModule exports m@(Module mn decls) = Module mn <$> mapM updateDecl decls
       maybe (err "typeclass" nm mn) return $ M.lookup nm (importedTypeClasses imports)
     updateDataConstructorName nm =
       maybe (err "data constructor" nm mn) return $ M.lookup nm (importedDataConstructors imports)
-    imports = resolveImports exports m
     err t nm mn = Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'"
 
 findExports :: [Module] -> ExportEnvironment
@@ -90,12 +96,18 @@ findExports = foldl addModule nullEnv
 findImports :: [Declaration] -> [ModuleName]
 findImports decls = [ mn | (ImportDeclaration mn Nothing) <- decls ]
 
-resolveImports :: ExportEnvironment -> Module -> ImportEnvironment
-resolveImports env (Module mn decls) = ImportEnvironment (resolve scope $ exportedDataConstructors env)
-                                                         (resolve scope $ exportedTypeClasses env)
+resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
+resolveImports env (Module currentModule decls) = do
+    dataConstructors <- resolve exportedDataConstructors
+    typeClasses <- resolve exportedTypeClasses
+    return $ ImportEnvironment dataConstructors typeClasses
     where
-    scope = (mn : findImports decls)
-    resolve imns = M.foldlWithKey (resolveDefs imns) M.empty
-    resolveDefs imns result mn ids | mn `elem` imns = S.foldl (resolveDef mn) result ids
-    resolveDefs imns result mn ids = result
-    resolveDef mn result id = M.insert id (Qualified (Just mn) id) result
+    scope = (currentModule : findImports decls)
+    resolve get = foldM resolveDefs M.empty (M.toList $ get env)
+    resolveDefs result (mn, names) | mn `elem` scope = foldM (resolveDef mn) result (S.toList names)
+    resolveDefs result _ = return result
+    resolveDef mn result name = case M.lookup name result of
+        Nothing -> return $ M.insert name (Qualified (Just mn) name) result
+        Just x@(Qualified (Just mn') _) -> if mn' == currentModule
+            then Left $ "Module '" ++ show currentModule ++ "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
+            else Left $ "Module '" ++ show currentModule ++ "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
