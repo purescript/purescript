@@ -154,7 +154,7 @@ bindLocalVariables moduleName bindings =
 --
 bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ \(name, k) -> (Qualified (Just moduleName) name, k))
+  bindTypes (M.fromList $ flip map bindings $ first $ Qualified (Just moduleName))
 
 -- |
 -- Lookup the type of a value by name in the @Environment@

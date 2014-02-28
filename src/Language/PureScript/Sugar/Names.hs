@@ -92,7 +92,7 @@ addTypeclass env mn name = do
 addExport :: (Ord s, Show s) => M.Map ModuleName (S.Set s) -> ModuleName -> s -> Either String (M.Map ModuleName (S.Set s))
 addExport exports mn name = case M.lookup mn exports of
     Just s -> if S.member name s
-              then Left $ "Module '" ++ show mn ++ "' has multiple definitions for '" ++ (show name) ++ "'"
+              then Left $ "Module '" ++ show mn ++ "' has multiple definitions for '" ++ show name ++ "'"
               else Right $ M.insert mn (S.insert name s) exports
     Nothing -> Right $ M.insert mn (S.singleton name) exports
 
@@ -113,7 +113,7 @@ rename modules = do
 --
 renameInModule :: ImportEnvironment -> Module -> Either String Module
 renameInModule imports (Module mn decls) =
-    Module mn <$> mapM updateDecl decls >>= everywhereM ((mkM updateType) `extM` updateValue `extM` updateBinder)
+    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) = do
         cn' <- updateClassName cn
@@ -197,7 +197,7 @@ resolveImports env (Module currentModule decls) = do
     resolveDcons result (mn, tcons) = case M.lookup mn scope of
         Just Nothing -> foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result (S.toList tcons)
         Just (Just expl) ->
-          let selectedTcons = filter (\(tcon, _) -> any (either (const False) ((==) tcon)) expl) (S.toList tcons) in
+          let selectedTcons = filter (\(tcon, _) -> any (either (const False) (tcon ==)) expl) (S.toList tcons) in
           foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result selectedTcons
         Nothing -> Right result
     filterTypes result = either (const result) (`S.insert` result)
