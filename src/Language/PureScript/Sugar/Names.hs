@@ -26,35 +26,69 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
 
+-- |
+-- The global export environment - every declaration exported from every module
+--
 data ExportEnvironment = ExportEnvironment
+    -- |
+    -- The types exported from each module
+    --
     { exportedTypes :: M.Map ModuleName (S.Set ProperName)
-    , exportedDataConstructors :: M.Map ModuleName (S.Set ProperName)
+    -- |
+    -- The data constructors exported from each module, grouped by type constructor
+    --
+    , exportedDataConstructors :: M.Map ModuleName (S.Set (ProperName, [ProperName]))
+    -- |
+    -- The classes exported from each module
+    --
     , exportedTypeClasses :: M.Map ModuleName (S.Set ProperName)
     } deriving (Show)
-    
+
+-- |
+-- An imported environment for a particular module. This also contains the module's own members.
+--
 data ImportEnvironment = ImportEnvironment
+    -- |
+    -- Local names for types within a module mapped to to their qualified names
+    --
     { importedTypes :: M.Map ProperName (Qualified ProperName)
+    -- |
+    -- Local names for data constructors within a module mapped to to their qualified names
+    --
     , importedDataConstructors :: M.Map ProperName (Qualified ProperName)
+    -- |
+    -- Local names for classes within a module mapped to to their qualified names
+    --
     , importedTypeClasses :: M.Map ProperName (Qualified ProperName)
     } deriving (Show)
 
-nullEnv = ExportEnvironment M.empty M.empty M.empty
-
+-- |
+-- Adds a type belonging to a module to the export environment.
+--
 addType :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
 addType env mn name = do
     types <- addExport (exportedTypes env) mn name
     return $ env { exportedTypes = types  }
 
-addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
-addDataConstructor env mn name = do
-    dataConstructors <- addExport (exportedDataConstructors env) mn name
+-- |
+-- Adds a group of data constructors with their associated type constructor the export environment.
+--
+addDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either String ExportEnvironment
+addDataConstructors env mn tcon dcons = do
+    dataConstructors <- addExport (exportedDataConstructors env) mn (tcon, dcons)
     return $ env { exportedDataConstructors = dataConstructors }
 
+-- |
+-- Adds a class to the export environment.
+--
 addTypeclass :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
 addTypeclass env mn name = do
     classes <- addExport (exportedTypeClasses env) mn name
     return $ env { exportedTypeClasses = classes }
 
+-- |
+-- Adds an export to a map of exports of that type.
+--
 addExport :: (Ord s, Show s) => M.Map ModuleName (S.Set s) -> ModuleName -> s -> Either String (M.Map ModuleName (S.Set s))
 addExport exports mn name = case M.lookup mn exports of
     Just s -> if S.member name s
@@ -62,6 +96,9 @@ addExport exports mn name = case M.lookup mn exports of
               else Right $ M.insert mn (S.insert name s) exports
     Nothing -> Right $ M.insert mn (S.singleton name) exports
 
+-- |
+-- Replaces all local names with qualified names within a set of modules.
+--
 rename :: [Module] -> Either String [Module]
 rename modules = do
     exports <- findExports modules
@@ -71,14 +108,17 @@ rename modules = do
         imports <- resolveImports exports m
         renameInModule imports m
 
+-- |
+-- Replaces all local names with qualified names within a module.
+--
 renameInModule :: ImportEnvironment -> Module -> Either String Module
 renameInModule imports (Module mn decls) =
     Module mn <$> mapM updateDecl decls >>= everywhereM ((mkM updateType) `extM` updateValue `extM` updateBinder)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) = do
-      cn' <- updateClassName cn
-      cs' <- updateConstraints cs
-      return $ TypeInstanceDeclaration cs' cn' ts ds
+        cn' <- updateClassName cn
+        cs' <- updateConstraints cs
+        return $ TypeInstanceDeclaration cs' cn' ts ds
     updateDecl d = return d
     updateValue (Constructor (Qualified Nothing nm)) = liftM Constructor $ updateDataConstructorName nm
     updateValue v = return v
@@ -93,42 +133,72 @@ renameInModule imports (Module mn decls) =
     updateType t = return t
     updateConstraints = mapM updateConstraint
     updateConstraint (Qualified Nothing nm, ts) = do
-      nm' <- updateClassName nm
-      return (nm', ts)
+        nm' <- updateClassName nm
+        return (nm', ts)
     updateConstraint other = return other
     updateTypeName = update "type" importedTypes
     updateClassName = update "typeclass" importedTypeClasses
     updateDataConstructorName = update "data constructor" importedDataConstructors
     update t get nm = maybe (Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'") return $ M.lookup nm (get imports)
-    
+
+-- |
+-- Finds all exported declarations in a set of modules.
+--
 findExports :: [Module] -> Either String ExportEnvironment
-findExports = foldM addModule nullEnv
+findExports = foldM addModule (ExportEnvironment M.empty M.empty M.empty)
     where
     addModule env (Module mn ds) = foldM (addDecl mn) env ds
     addDecl mn env (TypeClassDeclaration tcn _ _) = addTypeclass env mn tcn
     addDecl mn env (DataDeclaration tn _ dcs) = do
-      env' <- foldM (`addDataConstructor` mn) env (map fst dcs)
-      addType env' mn tn
+        env' <- addDataConstructors env mn tn (map fst dcs)
+        addType env' mn tn
     addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn
     addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn
     addDecl _  env _ = return env
 
-findImports :: [Declaration] -> [ModuleName]
-findImports decls = [ mn | (ImportDeclaration mn Nothing) <- decls ]
+-- |
+-- Type representing a set of declarations being explicitly imported from a module
+--
+type ExplicitImports = [Either Ident ProperName]
 
+-- |
+-- Finds the imports within a module, mapping the imported module name to an optional set of
+-- explicitly imported declarations.
+--
+findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports)
+findImports = foldl findImports' M.empty
+    where
+    findImports' result (ImportDeclaration mn Nothing) = M.insert mn Nothing result
+    findImports' result (ImportDeclaration mn (Just expl)) = M.insert mn (Just expl) result
+    findImports' result _ = result
+
+-- |
+-- Constructs a local environment for a module.
+--
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
 resolveImports env (Module currentModule decls) = do
-    types <- resolve exportedTypes
-    dataConstructors <- resolve exportedDataConstructors
-    typeClasses <- resolve exportedTypeClasses
+    types <- resolve exportedTypes (resolveDefs filterTypes)
+    dataConstructors <- resolve exportedDataConstructors resolveDcons
+    typeClasses <- resolve exportedTypeClasses (resolveDefs filterClasses)
     return $ ImportEnvironment types dataConstructors typeClasses
     where
-    scope = currentModule : findImports decls
-    resolve get = foldM resolveDefs M.empty (M.toList $ get env)
-    resolveDefs result (mn, names) | mn `elem` scope = foldM (resolveDef mn) result (S.toList names)
-    resolveDefs result _ = return result
+    scope = M.insert currentModule Nothing (findImports decls)
+    resolve get f = foldM f M.empty (M.toList $ get env)
+    resolveDefs filt result (mn, names) = case M.lookup mn scope of
+        Just Nothing -> foldM (resolveDef mn) result (S.toList names)
+        Just (Just expl) -> foldM (resolveDef mn) result (S.toList (S.intersection names (foldl filt S.empty expl)))
+        Nothing -> Right result
     resolveDef mn result name = case M.lookup name result of
         Nothing -> return $ M.insert name (Qualified (Just mn) name) result
-        Just x@(Qualified (Just mn') _) -> Left $ "Module '" ++ show currentModule ++ if mn' == currentModule
+        Just x@(Qualified (Just mn') _) -> Left $ "Module '" ++ show currentModule ++
+            if mn' == currentModule || mn == currentModule
             then "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
             else "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
+    resolveDcons result (mn, tcons) = case M.lookup mn scope of
+        Just Nothing -> foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result (S.toList tcons)
+        Just (Just expl) ->
+          let selectedTcons = filter (\(tcon, _) -> any (either (const False) ((==) tcon)) expl) (S.toList tcons) in
+          foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result selectedTcons
+        Nothing -> Right result
+    filterTypes result = either (const result) (`S.insert` result)
+    filterClasses result _ = result
