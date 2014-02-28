@@ -178,8 +178,8 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
         shadowIdents (map snd $ filterModule (names env)) env
         shadowTypes (map (\(Qualified _ name) -> name) $ filterModuleQ (types env)) env
       Just idents' -> do
-        shadowIdents (lefts idents') env
-        shadowTypes (rights idents') env
+        shadowIdents (nameImports idents') env
+        shadowTypes (typeImports idents') env
     shadowTypeClassInstances env
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds

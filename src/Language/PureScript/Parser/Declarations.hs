@@ -87,7 +87,7 @@ parseImportDeclaration = do
   reserved "import"
   indented
   moduleName' <- moduleName
-  idents <- P.optionMaybe $ parens $ commaSep1 (Left <$> parseIdent <|> Right <$> properName)
+  idents <- P.optionMaybe $ parens $ commaSep1 (NameImport <$> parseIdent <|> TypeImport <$> properName)
   return $ ImportDeclaration moduleName' idents
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration

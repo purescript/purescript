@@ -19,6 +19,7 @@ module Language.PureScript.Sugar.Names (
 import Control.Applicative ((<$>))
 import Control.Monad (foldM, liftM)
 import Data.Generics (extM, mkM, everywhereM)
+import Data.List (intersect)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Language.PureScript.Declarations
@@ -159,7 +160,7 @@ findExports = foldM addModule (ExportEnvironment M.empty M.empty M.empty)
 -- |
 -- Type representing a set of declarations being explicitly imported from a module
 --
-type ExplicitImports = [Either Ident ProperName]
+type ExplicitImports = [ImportType]
 
 -- |
 -- Finds the imports within a module, mapping the imported module name to an optional set of
@@ -174,19 +175,20 @@ findImports = foldl findImports' M.empty
 
 -- |
 -- Constructs a local environment for a module.
+-- TODO: check explicit imports actually exist
 --
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
 resolveImports env (Module currentModule decls) = do
-    types <- resolve exportedTypes (resolveDefs filterTypes)
+    types <- resolve exportedTypes (resolveDefs typeImports)
     dataConstructors <- resolve exportedDataConstructors resolveDcons
-    typeClasses <- resolve exportedTypeClasses (resolveDefs filterClasses)
+    typeClasses <- resolve exportedTypeClasses (resolveDefs classImports)
     return $ ImportEnvironment types dataConstructors typeClasses
     where
     scope = M.insert currentModule Nothing (findImports decls)
     resolve get f = foldM f M.empty (M.toList $ get env)
     resolveDefs filt result (mn, names) = case M.lookup mn scope of
         Just Nothing -> foldM (resolveDef mn) result (S.toList names)
-        Just (Just expl) -> foldM (resolveDef mn) result (S.toList (S.intersection names (foldl filt S.empty expl)))
+        Just (Just expl) -> foldM (resolveDef mn) result (S.toList names `intersect` filt expl)
         Nothing -> Right result
     resolveDef mn result name = case M.lookup name result of
         Nothing -> return $ M.insert name (Qualified (Just mn) name) result
@@ -195,10 +197,9 @@ resolveImports env (Module currentModule decls) = do
             then "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
             else "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
     resolveDcons result (mn, tcons) = case M.lookup mn scope of
-        Just Nothing -> foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result (S.toList tcons)
-        Just (Just expl) ->
-          let selectedTcons = filter (\(tcon, _) -> any (either (const False) (tcon ==)) expl) (S.toList tcons) in
-          foldM (\result (tcon, dcons) -> foldM (resolveDef mn) result dcons) result selectedTcons
+        Just Nothing -> foldM (foldM $ resolveDef mn) result (snd `map` S.toList tcons)
+        Just (Just expl) -> foldM (foldM $ resolveDef mn) result (snd `map` selectedTcons)
+              where
+              selectedTcons = filter ((`elem` explTypeImports) . fst) (S.toList tcons)
+              explTypeImports = typeImports expl
         Nothing -> Right result
-    filterTypes result = either (const result) (`S.insert` result)
-    filterClasses result _ = result
