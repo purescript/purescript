@@ -661,7 +661,6 @@ module Data.Array where
   take _ [] = []
   take n (x:xs) = x : take (n - 1) xs
 
-  instance (Prelude.Show a) => Prelude.Show [a] where
   instance (Show a) => Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
