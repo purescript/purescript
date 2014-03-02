@@ -16,8 +16,8 @@ module Language.PureScript.Sugar.Names (
   rename
 ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad (foldM, liftM)
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad (forM_, unless, foldM, liftM)
 import Data.Generics (extM, mkM, everywhereM)
 import Data.List (intersect)
 import qualified Data.Map as M
@@ -178,24 +178,53 @@ findImports = foldl findImports' M.empty
 -- TODO: check explicit imports actually exist
 --
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
-resolveImports env (Module currentModule decls) = do
-    types <- resolve exportedTypes (resolveDefs typeImports)
-    dataConstructors <- resolve exportedDataConstructors resolveDcons
-    typeClasses <- resolve exportedTypeClasses (resolveDefs classImports)
-    return $ ImportEnvironment types dataConstructors typeClasses
+resolveImports env (Module currentModule decls) = ImportEnvironment
+    <$> resolve (exportedTypes env) (resolveDefs typeImports)
+    <*> resolve (exportedDataConstructors env) resolveDcons
+    <*> resolve (exportedTypeClasses env) (resolveDefs classImports)
     where
+    -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported
+    scope :: M.Map ModuleName (Maybe ExplicitImports)
     scope = M.insert currentModule Nothing (findImports decls)
-    resolve get f = foldM f M.empty (M.toList $ get env)
-    resolveDefs filt result (mn, names) = case M.lookup mn scope of
-        Just Nothing -> foldM (resolveDef mn) result (S.toList names)
-        Just (Just expl) -> foldM (resolveDef mn) result (S.toList names `intersect` filt expl)
-        Nothing -> Right result
+
+    -- Resolve all exported names in a set by applying a type-specific resolver function
+    resolve :: M.Map ModuleName (S.Set id) ->
+               (M.Map ProperName (Qualified ProperName) -> (ModuleName, S.Set id) -> Either String (M.Map ProperName (Qualified ProperName))) ->
+               Either String (M.Map ProperName (Qualified ProperName))
+    resolve m f = foldM f M.empty (M.toList m)
+
+    -- Resolve a single name by adding it to the Map with a specified ModuleName, checking first
+    -- that the name does not currently exist in scope.
+    resolveDef :: (Ord id, Show id) => ModuleName ->
+                                       M.Map id (Qualified id) ->
+                                       id ->
+                                       Either String (M.Map id (Qualified id))
     resolveDef mn result name = case M.lookup name result of
         Nothing -> return $ M.insert name (Qualified (Just mn) name) result
         Just x@(Qualified (Just mn') _) -> Left $ "Module '" ++ show currentModule ++
             if mn' == currentModule || mn == currentModule
             then "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
             else "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
+
+    -- Resolve a set of ProperName exports for a specific imported set of names
+    -- This function is used to resolve both types and type classes, hence the filter function as
+    -- its first argument
+    resolveDefs :: (ExplicitImports -> [ProperName]) ->
+                   M.Map ProperName (Qualified ProperName) ->
+                   (ModuleName, S.Set ProperName) ->
+                   Either String (M.Map ProperName (Qualified ProperName))
+    resolveDefs filt result (mn, names) = case M.lookup mn scope of
+        Just Nothing -> foldM (resolveDef mn) result (S.toList names)
+        Just (Just expl) -> do
+          forM_ (filt expl) $ \name ->
+            unless (name `S.member` names) $ Left $ runProperName name ++ " is explicitly imported but not defined"
+          foldM (resolveDef mn) result (S.toList names `intersect` filt expl)
+        Nothing -> Right result
+
+    -- Resolve a set of data constructors keyed by their type constructor
+    resolveDcons :: M.Map ProperName (Qualified ProperName) ->
+                    (ModuleName, S.Set (ProperName, [ProperName])) ->
+                    Either String (M.Map ProperName (Qualified ProperName))
     resolveDcons result (mn, tcons) = case M.lookup mn scope of
         Just Nothing -> foldM (foldM $ resolveDef mn) result (snd `map` S.toList tcons)
         Just (Just expl) -> foldM (foldM $ resolveDef mn) result (snd `map` selectedTcons)

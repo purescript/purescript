@@ -111,7 +111,7 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
     (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) -> 
+    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) ->
       addDataType moduleName name args dctors ctorKind
     forM_ (zip syns syn_ks) $ \((name, args, ty), kind) ->
       addTypeSynonym moduleName name args ty kind
@@ -176,10 +176,8 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
     case idents of
       Nothing -> do
         shadowIdents (map snd $ filterModule (names env)) env
-        shadowTypes (map (\(Qualified _ name) -> name) $ filterModuleQ (types env)) env
       Just idents' -> do
         shadowIdents (nameImports idents') env
-        shadowTypes (typeImports idents') env
     shadowTypeClassInstances env
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
@@ -196,18 +194,6 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
           guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
           modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
         Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
-  shadowTypes pns env =
-    forM_ pns $ \pn ->
-      case Qualified (Just moduleName) pn `M.lookup` types env of
-        Nothing -> throwError (show moduleName ++ "." ++ show pn ++ " is undefined")
-        Just k -> do
-          modifyEnv (\e -> e { types = M.insert (Qualified (Just currentModule) pn) k (types e) })
-          let keys = map fst . filter (\(_, fn) -> fn `constructs` pn) . M.toList . dataConstructors $ env
-          forM_ keys $ \dctor ->
-            case dctor `M.lookup` dataConstructors env of
-              Just ctorTy -> 
-                modifyEnv (\e -> e { dataConstructors = M.insert dctor ctorTy (dataConstructors e) })
-              Nothing -> throwError (show moduleName ++ "." ++ show dctor ++ " is undefined")
   shadowTypeClassInstances env = do
     let instances = filter (\tcd ->
                       let Qualified (Just mn) _ = tcdName tcd in
