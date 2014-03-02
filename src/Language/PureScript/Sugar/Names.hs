@@ -214,11 +214,10 @@ resolveImports env (Module currentModule decls) = ImportEnvironment
                    (ModuleName, S.Set ProperName) ->
                    Either String (M.Map ProperName (Qualified ProperName))
     resolveDefs filt result (mn, names) = case M.lookup mn scope of
-        Just Nothing -> foldM (resolveDef mn) result (S.toList names)
-        Just (Just expl) -> do
-          forM_ (filt expl) $ \name ->
-            unless (name `S.member` names) $ Left $ runProperName name ++ " is explicitly imported but not defined"
-          foldM (resolveDef mn) result (S.toList names `intersect` filt expl)
+        Just maybeExpl -> foldM (resolveDef mn) result $
+          case maybeExpl of
+            Just expl -> S.toList names `intersect` filt expl
+            Nothing -> S.toList names
         Nothing -> Right result
 
     -- Resolve a set of data constructors keyed by their type constructor
@@ -226,9 +225,8 @@ resolveImports env (Module currentModule decls) = ImportEnvironment
                     (ModuleName, S.Set (ProperName, [ProperName])) ->
                     Either String (M.Map ProperName (Qualified ProperName))
     resolveDcons result (mn, tcons) = case M.lookup mn scope of
-        Just Nothing -> foldM (foldM $ resolveDef mn) result (snd `map` S.toList tcons)
-        Just (Just expl) -> foldM (foldM $ resolveDef mn) result (snd `map` selectedTcons)
-              where
-              selectedTcons = filter ((`elem` explTypeImports) . fst) (S.toList tcons)
-              explTypeImports = typeImports expl
+        Just maybeExpl -> foldM (foldM $ resolveDef mn) result $ map snd $
+          case maybeExpl of
+            Just expl -> filter ((`elem` typeImports expl) . fst) (S.toList tcons)
+            Nothing -> S.toList tcons
         Nothing -> Right result
