@@ -66,6 +66,20 @@ data ForeignImportType
   | TypeClassAccessorImport deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
+-- An item in a list of explicit imports
+--
+data ImportType
+  -- |
+  -- A type constructor import
+  --
+  = TypeImport ProperName
+  -- |
+  -- A declaration import
+  --
+  | NameImport Ident
+  deriving (Show, D.Data, D.Typeable)
+
+-- |
 -- The data type of declarations
 --
 data Declaration
@@ -108,7 +122,7 @@ data Declaration
   -- |
   -- A module import (module name, optional set of identifiers to import)
   --
-  | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
+  | ImportDeclaration ModuleName (Maybe [ImportType])
   -- |
   -- A type class declaration (name, argument, member declarations)
   --
@@ -169,3 +183,26 @@ isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration _ = False
+
+-- |
+-- Extracts names from a list of explicit imports.
+--
+nameImports :: [ImportType] -> [Ident]
+nameImports ((NameImport ident):xs) = ident : nameImports xs
+nameImports (_ : xs) = nameImports xs
+nameImports _ = []
+
+-- |
+-- Extracts types from a list of explicit imports.
+--
+typeImports :: [ImportType] -> [ProperName]
+typeImports (TypeImport ident : xs) = ident : typeImports xs
+typeImports (_ : xs) = typeImports xs
+typeImports _ = []
+
+-- |
+-- Extracts classes from a list of explicit imports.
+-- note: class imports are indistinguishable from types at the moment
+--
+classImports :: [ImportType] -> [ProperName]
+classImports = typeImports

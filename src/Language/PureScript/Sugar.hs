@@ -27,6 +27,7 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.Let as S
+import Language.PureScript.Sugar.Names as S
 
 -- |
 -- The desugaring pipeline proceeds as follows:
@@ -46,7 +47,8 @@ import Language.PureScript.Sugar.Let as S
 --  * Group mutually recursive value and data declarations into binding groups.
 --
 desugar :: [Module] -> Either String [Module]
-desugar = desugarTypeClasses
+desugar = rename
+          >=> desugarTypeClasses
           >=> rebracket
           >=> desugarDo
           >=> desugarLetBindings
