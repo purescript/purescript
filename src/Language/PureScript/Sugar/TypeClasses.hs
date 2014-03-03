@@ -155,7 +155,6 @@ typeInstanceDictionaryEntryDeclaration mn deps name tys (ValueDeclaration ident 
   lookupIdent members = maybe (Left $ "Type class " ++ show name ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
-
 qualifiedToString :: ModuleName -> Qualified ProperName -> String
 qualifiedToString mn (Qualified _ pn) = moduleNameToJs mn ++ "_" ++ runProperName pn
 

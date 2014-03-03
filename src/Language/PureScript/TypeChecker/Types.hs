@@ -288,8 +288,6 @@ entails moduleName context goal@(className, tys) = do
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
   filterModule _ = False
-  -- Resolve a type class dictionary in scope to an actual value by following any (TCDAlias) pointers
-  -- which originated from module imports
   canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
   canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm

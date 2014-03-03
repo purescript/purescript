@@ -21,6 +21,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 
 import Data.Data
+import Data.Generics (mkQ, everything)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -115,19 +116,6 @@ data Value
   | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 
 -- |
--- The type of a type class dictionary
---
-data TypeClassDictionaryType
-  -- |
-  -- A regular type class dictionary
-  --
-  = TCDRegular
-  -- |
-  -- A type class dictionary which is an alias for an imported dictionary from another module
-  --
-  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
-
--- |
 -- Data representing a type class dictionary which is in scope
 --
 data TypeClassDictionaryInScope
@@ -153,6 +141,19 @@ data TypeClassDictionaryInScope
     --
     , tcdType :: TypeClassDictionaryType
     } deriving (Show, Data, Typeable)
+
+-- |
+-- The type of a type class dictionary
+--
+data TypeClassDictionaryType
+  -- |
+  -- A regular type class dictionary
+  --
+  = TCDRegular
+  -- |
+  -- A type class dictionary which is an alias for an imported dictionary from another module
+  --
+  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- A statement in a do-notation block
@@ -215,3 +216,14 @@ data Binder
   -- A binder which binds its input to an identifier
   --
   | NamedBinder Ident Binder deriving (Show, Data, Typeable)
+
+
+-- |
+-- Collect all names introduced in binders in an expression
+--
+binderNames :: (Data d) => d -> [Ident]
+binderNames = everything (++) (mkQ [] go)
+  where
+  go (VarBinder ident) = [ident]
+  go (NamedBinder ident _) = [ident]
+  go _ = []

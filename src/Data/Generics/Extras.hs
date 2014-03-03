@@ -47,17 +47,28 @@ everywhereM' f x = do
 -- >   go locals lam@(Lam local _) = (local : locals, lam)
 -- >   go locals other = (locals, other)
 --
-everywhereWithContext' :: (Data d) => s -> (forall d1. (Data d1) => s -> d1 -> (s, d1)) -> d -> d
-everywhereWithContext' s0 f x =
-  let (s, y) = f s0 x in
-  gmapT (everywhereWithContext' s f) y
+everywhereWithContextM' :: (Monad m, Data d) => s -> (forall d1. (Data d1) => s -> d1 -> m (s, d1)) -> d -> m d
+everywhereWithContextM' s0 f x = do
+  (s, y) <- f s0 x
+  gmapM (everywhereWithContextM' s f) y
 
 -- |
 -- Make a stateful transformation function
 --
-mkS :: (Data a, Data b) => (s -> a -> (s, a)) -> s -> b -> (s, b)
-mkS f s b = fromMaybe (s, b) $ do
-  a <- cast b
-  let (s', a') = f s a
-  b' <- cast a'
-  return (s', b')
+mkS :: (Monad m, Data a, Data b) => (s -> a -> m (s, a)) -> s -> b -> m (s, b)
+mkS = extS (curry return)
+
+-- |
+-- Extend a stateful transformation function
+--
+extS :: (Monad m, Data a, Data b) => (s -> a -> m (s, a)) -> (s -> b -> m (s, b)) -> (s -> a -> m (s, a))
+extS f g s a = do
+  (s', a') <- f s a
+  case cast a' of
+    Just b -> do
+      (s'', b') <- g s' b
+      case cast b' of
+        Just a'' -> return (s'', a'')
+        Nothing -> return (s', a')
+    Nothing -> return (s', a')
+

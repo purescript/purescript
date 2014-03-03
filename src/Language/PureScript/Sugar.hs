@@ -46,12 +46,14 @@ import Language.PureScript.Sugar.Names as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
+--  * Qualify any unqualified names and types
+--
 desugar :: [Module] -> Either String [Module]
-desugar = rename
-          >=> desugarTypeClasses
-          >=> rebracket
+desugar = rebracket
           >=> desugarDo
           >=> desugarLetBindings
           >>> desugarCasesModule
           >=> desugarTypeDeclarationsModule
+          >=> desugarImports
+          >=> desugarTypeClasses
           >=> createBindingGroupsModule

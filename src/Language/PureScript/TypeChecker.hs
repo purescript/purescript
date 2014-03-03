@@ -171,43 +171,15 @@ typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = d
   return $ d : ds
 typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
   env <- getEnv
-  rethrow errorMessage $ do
-    guardWith ("Module " ++ show moduleName ++ " does not exist") $ moduleExists env
-    case idents of
-      Nothing -> do
-        shadowIdents (map snd $ filterModule (names env)) env
-      Just idents' -> do
-        shadowIdents (nameImports idents') env
-    shadowTypeClassInstances env
+  let instances = filter (\tcd ->
+                    let Qualified (Just mn) _ = tcdName tcd in
+                    moduleName == mn && tcdType tcd == TCDRegular
+                  ) (typeClassDictionaries env)
+  forM_ instances $ \tcd -> do
+    let (Qualified _ ident) = tcdName tcd
+    addTypeClassDictionaries [tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (tcdName tcd) }]
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
-  where
-  errorMessage = (("Error in import declaration " ++ show moduleName ++ ":\n") ++)
-  filterModule = filter ((== moduleName) . fst) . M.keys
-  filterModuleQ = filter (\(Qualified (Just mn) _) -> mn == moduleName) . M.keys
-  moduleExists env = not (null (filterModule (names env))) || not (null (filterModuleQ (types env)))
-  shadowIdents idents' env =
-    forM_ idents' $ \ident ->
-      case (moduleName, ident) `M.lookup` names env of
-        Just (_, Alias _ _) -> return ()
-        Just (pt, _) -> do
-          guardWith (show currentModule ++ "." ++ show ident ++ " is already defined") $ (currentModule, ident) `M.notMember` names env
-          modifyEnv (\e -> e { names = M.insert (currentModule, ident) (pt, Alias moduleName ident) (names e) })
-        Nothing -> throwError (show moduleName ++ "." ++ show ident ++ " is undefined")
-  shadowTypeClassInstances env = do
-    let instances = filter (\tcd ->
-                      let Qualified (Just mn) _ = tcdName tcd in
-                      moduleName == mn && tcdType tcd == TCDRegular
-                    ) (typeClassDictionaries env)
-    forM_ instances $ \tcd -> do
-      let (Qualified _ ident) = tcdName tcd
-      addTypeClassDictionaries [tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (tcdName tcd) }]
-  constructs (TypeConstructor (Qualified (Just mn) pn')) pn
-    = mn == moduleName && pn' == pn
-  constructs (ForAll _ ty _) pn = ty `constructs` pn
-  constructs (TypeApp (TypeApp t _) ty) pn | t == tyFunction = ty `constructs` pn
-  constructs (TypeApp ty _) pn = ty `constructs` pn
-  constructs fn _ = error $ "Invalid arguments to constructs: " ++ show fn
 typeCheckAll mainModuleName moduleName (d@TypeClassDeclaration{} : rest) = do
   env <- getEnv
   ds <- typeCheckAll mainModuleName moduleName rest

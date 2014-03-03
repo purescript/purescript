@@ -227,15 +227,6 @@ bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders,
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
 
 -- |
--- Collect all names introduced in binders in an expression
---
-binderNames :: (Data d) => d -> [Ident]
-binderNames = everything (++) (mkQ [] go)
-  where
-  go (VarBinder ident) = [ident]
-  go _ = []
-
--- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
 -- binder.
 --
