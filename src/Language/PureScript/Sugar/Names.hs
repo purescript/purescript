@@ -23,7 +23,7 @@ import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Monad (forM_, unless, foldM, liftM)
+import Control.Monad (forM_, unless, foldM)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -140,19 +140,21 @@ renameInModule imports (Module mn decls) =
           bindBinders :: [Ident] -> ([Binder], Maybe Guard, Value) -> Either String ([Ident], ([Binder], Maybe Guard, Value))
           bindBinders bound (bs, grd, val) = return (binderNames bs ++ bound, (bs, grd, val))
     updateDecl d = return d
-    updateValue (Constructor (Qualified Nothing nm)) = liftM Constructor $ updateDataConstructorName nm
+    updateValue (Constructor (Qualified Nothing nm)) =
+                 Constructor <$> updateDataConstructorName nm
     updateValue v = return v
-    updateBinder (ConstructorBinder (Qualified Nothing nm) b) = liftM (`ConstructorBinder` b) $ updateDataConstructorName nm
+    updateBinder (ConstructorBinder (Qualified Nothing nm) b) =
+                  ConstructorBinder <$> updateDataConstructorName nm <*> pure b
     updateBinder v = return v
-    updateType (TypeConstructor (Qualified Nothing nm)) = liftM TypeConstructor $ updateTypeName nm
+    updateType (TypeConstructor (Qualified Nothing nm)) =
+                TypeConstructor <$> updateTypeName nm
     updateType (SaturatedTypeSynonym (Qualified Nothing nm) tys) =
-        SaturatedTypeSynonym <$> updateTypeName nm <*> mapM updateType tys
-    updateType (ConstrainedType cs t) = liftM (`ConstrainedType` t) $ updateConstraints cs
+                SaturatedTypeSynonym <$> updateTypeName nm <*> mapM updateType tys
+    updateType (ConstrainedType cs t) =
+                ConstrainedType <$> updateConstraints cs <*> pure t
     updateType t = return t
     updateConstraints = mapM updateConstraint
-    updateConstraint (Qualified Nothing nm, ts) = do
-        nm' <- updateClassName nm
-        return (nm', ts)
+    updateConstraint (Qualified Nothing nm, ts) = (,) <$> updateClassName nm <*> pure ts
     updateConstraint other = return other
     updateTypeName = update "type" importedTypes
     updateClassName = update "type class" importedTypeClasses
