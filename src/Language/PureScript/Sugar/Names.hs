@@ -223,8 +223,9 @@ resolveImports env (Module currentModule decls) =
       values' <- updateImports mn (importedValues imp) name
       return $ imp { importedValues = values' }
     importExplicit mn imp (TypeImport name dctors) = do
+      allDctors <- allExportedDataConstructors env mn name
       types' <- updateImports mn (importedTypes imp) name
-      dctors' <- foldM (updateImports mn) (importedDataConstructors imp) (fromMaybe (allExportedDataConstructors env mn name) dctors)
+      dctors' <- foldM (updateImports mn) (importedDataConstructors imp) (fromMaybe allDctors dctors)
       return $ imp { importedTypes = types', importedDataConstructors = dctors' }
     importExplicit mn imp (TypeClassImport name) = do
       typeClasses' <- updateImports mn (importedTypeClasses imp) name
@@ -241,8 +242,8 @@ resolveImports env (Module currentModule decls) =
         (S.toList . fromMaybe S.empty $ mn `M.lookup` exportedTypeClasses env)
 
     -- Find all exported data constructors for a given type
-    allExportedDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName]
-    allExportedDataConstructors env mn name = fromMaybe (error $ "Unable to find exported data constructors for type " ++ show name) $ do
+    allExportedDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> Either String [ProperName]
+    allExportedDataConstructors env mn name = maybe (throwError $ "Unable to find exported data constructors for type " ++ show name) return $ do
       s <- mn `M.lookup` exportedTypes env
       name `lookup` S.toList s
 
