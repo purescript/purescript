@@ -24,6 +24,7 @@ import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad (forM_, unless, foldM)
+import Control.Monad.Error
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -103,9 +104,9 @@ addValue env mn name = do
 addExport :: (Ord s, Show s) => M.Map ModuleName (S.Set s) -> ModuleName -> s -> Either String (M.Map ModuleName (S.Set s))
 addExport exports mn name = case M.lookup mn exports of
     Just s -> if S.member name s
-              then Left $ "Module '" ++ show mn ++ "' has multiple definitions for '" ++ show name ++ "'"
-              else Right $ M.insert mn (S.insert name s) exports
-    Nothing -> Right $ M.insert mn (S.singleton name) exports
+              then throwError $ "Multiple definitions for '" ++ show name ++ "'"
+              else return $ M.insert mn (S.insert name s) exports
+    Nothing -> return $ M.insert mn (S.singleton name) exports
 
 -- |
 -- Replaces all local names with qualified names within a set of modules.
@@ -117,7 +118,13 @@ desugarImports modules = do
     where
     renameInModule' exports m = do
         imports <- resolveImports exports m
-        renameInModule imports m
+        rethrowForModule m (renameInModule imports m)
+
+-- |
+-- Rethrow an error with the name of the current module in the case of a failure
+--
+rethrowForModule :: Module -> Either String a -> Either String a
+rethrowForModule (Module mn _) = flip catchError $ \e -> throwError ("Error in module '" ++ (show mn) ++ "':\n" ++  e)
 
 -- |
 -- Replaces all local names with qualified names within a module.
@@ -160,7 +167,7 @@ renameInModule imports (Module mn decls) =
     updateClassName = update "type class" importedTypeClasses
     updateValueName = update "value" importedValues
     updateDataConstructorName = update "data constructor" importedDataConstructors
-    update t get nm = maybe (Left $ "Unknown " ++ t ++ " '" ++ show nm ++ "' in module '" ++ show mn ++ "'") return $ M.lookup nm (get imports)
+    update t get nm = maybe (throwError $ "Unknown " ++ t ++ " '" ++ show nm ++ "'") return $ M.lookup nm (get imports)
 
 -- |
 -- Finds all exported declarations in a set of modules.
@@ -168,7 +175,7 @@ renameInModule imports (Module mn decls) =
 findExports :: [Module] -> Either String ExportEnvironment
 findExports = foldM addModule (ExportEnvironment M.empty M.empty M.empty)
     where
-    addModule env (Module mn ds) = foldM (addDecl mn) env ds
+    addModule env m@(Module mn ds) = rethrowForModule m $ foldM (addDecl mn) env ds
     addDecl mn env (TypeClassDeclaration tcn _ ds) = do
       env' <- addTypeClass env mn tcn
       foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
@@ -235,7 +242,7 @@ resolveImports env (Module currentModule decls) =
 
     -- Find all exported data constructors for a given type
     allExportedDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName]
-    allExportedDataConstructors env mn name = fromMaybe (error $ "Unable to find exported data constructors for type " ++ show name ++ " in module " ++ show mn) $ do
+    allExportedDataConstructors env mn name = fromMaybe (error $ "Unable to find exported data constructors for type " ++ show name) $ do
       s <- mn `M.lookup` exportedTypes env
       name `lookup` S.toList s
 
@@ -243,8 +250,8 @@ resolveImports env (Module currentModule decls) =
     updateImports :: (Ord id, Show id) => ModuleName -> M.Map id (Qualified id) -> id -> Either String (M.Map id (Qualified id))
     updateImports mn m name = case M.lookup name m of
       Nothing -> return $ M.insert name (Qualified (Just mn) name) m
-      Just x@(Qualified (Just mn') _) -> Left $ "Module '" ++ show currentModule ++
+      Just x@(Qualified (Just mn') _) -> throwError $
         if mn' == currentModule || mn == currentModule
-        then "' defines '" ++ show name ++ "' which conflicts with imported definition '" ++ show (Qualified (Just mn) name) ++ "'"
-        else "' has conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
+        then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just mn) name) ++ "'"
+        else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
 
