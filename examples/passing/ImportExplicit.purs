@@ -6,7 +6,8 @@ module M1 where
 module Main where
 
   import M1 (X)
-  
+
+  testX :: X  
   testX = X
   testY = Y
 

@@ -16,12 +16,16 @@ module Language.PureScript.Sugar.Names (
   rename
 ) where
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Monad (forM_, unless, foldM, liftM)
+import Data.Maybe (fromMaybe)
 import Data.Generics (extM, mkM, everywhereM)
 import Data.List (intersect)
+
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad (forM_, unless, foldM, liftM)
+
 import qualified Data.Map as M
 import qualified Data.Set as S
+
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -175,13 +179,12 @@ findImports = foldl findImports' M.empty
 
 -- |
 -- Constructs a local environment for a module.
--- TODO: check explicit imports actually exist
 --
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
 resolveImports env (Module currentModule decls) = ImportEnvironment
     <$> resolve (exportedTypes env) (resolveDefs typeImports)
     <*> resolve (exportedDataConstructors env) resolveDcons
-    <*> resolve (exportedTypeClasses env) (resolveDefs classImports)
+    <*> resolve (exportedTypeClasses env) (resolveDefs (const []))
     where
     -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported
     scope :: M.Map ModuleName (Maybe ExplicitImports)
@@ -189,9 +192,9 @@ resolveImports env (Module currentModule decls) = ImportEnvironment
 
     -- Resolve all exported names in a set by applying a type-specific resolver function
     resolve :: M.Map ModuleName (S.Set id) ->
-               (M.Map ProperName (Qualified ProperName) -> (ModuleName, S.Set id) -> Either String (M.Map ProperName (Qualified ProperName))) ->
+               (M.Map ProperName (Qualified ProperName) -> ModuleName -> S.Set id -> Maybe ExplicitImports -> Either String (M.Map ProperName (Qualified ProperName))) ->
                Either String (M.Map ProperName (Qualified ProperName))
-    resolve m f = foldM f M.empty (M.toList m)
+    resolve m f = foldM (\m' (mn, maybeExpl) -> f m' mn (fromMaybe S.empty $ mn `M.lookup` m) maybeExpl) M.empty (M.toList scope)
 
     -- Resolve a single name by adding it to the Map with a specified ModuleName, checking first
     -- that the name does not currently exist in scope.
@@ -211,22 +214,26 @@ resolveImports env (Module currentModule decls) = ImportEnvironment
     -- its first argument
     resolveDefs :: (ExplicitImports -> [ProperName]) ->
                    M.Map ProperName (Qualified ProperName) ->
-                   (ModuleName, S.Set ProperName) ->
+                   ModuleName ->
+                   S.Set ProperName ->
+                   Maybe ExplicitImports ->
                    Either String (M.Map ProperName (Qualified ProperName))
-    resolveDefs filt result (mn, names) = case M.lookup mn scope of
-        Just maybeExpl -> foldM (resolveDef mn) result $
-          case maybeExpl of
-            Just expl -> S.toList names `intersect` filt expl
-            Nothing -> S.toList names
-        Nothing -> Right result
+    resolveDefs filt result mn names maybeExpl = do
+      names' <- case maybeExpl of
+        Just expl -> do
+          forM_ (filt expl) $ \name ->
+            unless (name `S.member` names) $ Left $ show name ++ " is explictly imported but is not defined in module " ++ show mn
+          return $ S.toList names `intersect` filt expl
+        Nothing -> return $ S.toList names
+      foldM (resolveDef mn) result names'
 
     -- Resolve a set of data constructors keyed by their type constructor
     resolveDcons :: M.Map ProperName (Qualified ProperName) ->
-                    (ModuleName, S.Set (ProperName, [ProperName])) ->
+                    ModuleName ->
+                    S.Set (ProperName, [ProperName]) ->
+                    Maybe ExplicitImports ->
                     Either String (M.Map ProperName (Qualified ProperName))
-    resolveDcons result (mn, tcons) = case M.lookup mn scope of
-        Just maybeExpl -> foldM (foldM $ resolveDef mn) result $ map snd $
-          case maybeExpl of
-            Just expl -> filter ((`elem` typeImports expl) . fst) (S.toList tcons)
-            Nothing -> S.toList tcons
-        Nothing -> Right result
+    resolveDcons result mn tcons maybeExpl = foldM (foldM $ resolveDef mn) result $ map snd $
+      case maybeExpl of
+        Just expl -> filter ((`elem` typeImports expl) . fst) (S.toList tcons)
+        Nothing -> S.toList tcons
