@@ -16,8 +16,8 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
-import Data.Maybe (fromMaybe)
-import Data.List (intersect)
+import Data.Maybe (fromMaybe, isJust)
+import Data.List (intersect, intercalate, (\\))
 import Data.Data
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
@@ -116,7 +116,7 @@ desugarImports modules = do
     exports <- findExports modules
     mapM (renameInModule' exports) modules
     where
-    renameInModule' exports m = do
+    renameInModule' exports m@(Module mn _) = do
         imports <- resolveImports exports m
         rethrowForModule m (renameInModule imports m)
 
@@ -225,11 +225,19 @@ resolveImports env (Module currentModule decls) =
     importExplicit mn imp (TypeImport name dctors) = do
       allDctors <- allExportedDataConstructors env mn name
       types' <- updateImports mn (importedTypes imp) name
-      dctors' <- foldM (updateImports mn) (importedDataConstructors imp) (fromMaybe allDctors dctors)
-      return $ imp { importedTypes = types', importedDataConstructors = dctors' }
+      dctors' <- maybe (return allDctors) (check "data constructor" allDctors) dctors
+      dctors'' <- foldM (updateImports mn) (importedDataConstructors imp) dctors'
+      return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
     importExplicit mn imp (TypeClassImport name) = do
       typeClasses' <- updateImports mn (importedTypeClasses imp) name
       return $ imp { importedTypeClasses = typeClasses' }
+
+    -- Check that each item in a list of explicit imports does actually exist
+    check :: (Show a, Eq a) => String -> [a] -> [a] -> Either String [a]
+    check t all selected = case selected \\ all of
+        [] -> return selected
+        (unknown:[]) -> throwError $ "Unknown " ++ t ++  " '" ++ show unknown ++ "'"
+        unknowns -> throwError $ "Unknown " ++ t ++ "s '" ++ (intercalate "', '" (show `map` unknowns)) ++ "'"
 
     -- Import everything from a module
     importAll :: ImportEnvironment -> ModuleName -> ExportEnvironment -> Either String ImportEnvironment

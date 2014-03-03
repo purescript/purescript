@@ -1,7 +1,7 @@
 module M1 where
 
-  foo = "foo"
+  data X = Y
 
 module Main where
 
-  import M1 (X(..))
+  import M1 (X(Z, Q))
