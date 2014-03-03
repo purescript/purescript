@@ -173,8 +173,7 @@ type ExplicitImports = [ImportType]
 findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports)
 findImports = foldl findImports' M.empty
     where
-    findImports' result (ImportDeclaration mn Nothing) = M.insert mn Nothing result
-    findImports' result (ImportDeclaration mn (Just expl)) = M.insert mn (Just expl) result
+    findImports' result (ImportDeclaration mn expl) = M.insert mn expl result
     findImports' result _ = result
 
 -- |
