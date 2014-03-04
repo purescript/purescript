@@ -116,15 +116,15 @@ desugarImports modules = do
     exports <- findExports modules
     mapM (renameInModule' exports) modules
     where
-    renameInModule' exports m@(Module mn _) = do
+    renameInModule' exports m = rethrowForModule m $ do
         imports <- resolveImports exports m
-        rethrowForModule m (renameInModule imports m)
+        renameInModule imports m
 
 -- |
 -- Rethrow an error with the name of the current module in the case of a failure
 --
 rethrowForModule :: Module -> Either String a -> Either String a
-rethrowForModule (Module mn _) = flip catchError $ \e -> throwError ("Error in module '" ++ (show mn) ++ "':\n" ++  e)
+rethrowForModule (Module mn _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
 
 -- |
 -- Replaces all local names with qualified names within a module.
@@ -220,24 +220,20 @@ resolveImports env (Module currentModule decls) =
     -- Import something explicitly
     importExplicit :: ModuleName -> ImportEnvironment -> ImportType -> Either String ImportEnvironment
     importExplicit mn imp (NameImport name) = do
+      checkValueExists env mn name
       values' <- updateImports mn (importedValues imp) name
       return $ imp { importedValues = values' }
     importExplicit mn imp (TypeImport name dctors) = do
-      allDctors <- allExportedDataConstructors env mn name
+      checkTypeExists env mn name
       types' <- updateImports mn (importedTypes imp) name
-      dctors' <- maybe (return allDctors) (check "data constructor" allDctors) dctors
+      let allDctors = allExportedDataConstructors env mn name
+      dctors' <- maybe (return allDctors) (mapM $ checkDctorExists mn allDctors) dctors
       dctors'' <- foldM (updateImports mn) (importedDataConstructors imp) dctors'
       return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
     importExplicit mn imp (TypeClassImport name) = do
+      checkClassExists env mn name
       typeClasses' <- updateImports mn (importedTypeClasses imp) name
       return $ imp { importedTypeClasses = typeClasses' }
-
-    -- Check that each item in a list of explicit imports does actually exist
-    check :: (Show a, Eq a) => String -> [a] -> [a] -> Either String [a]
-    check t all selected = case selected \\ all of
-        [] -> return selected
-        (unknown:[]) -> throwError $ "Unknown " ++ t ++  " '" ++ show unknown ++ "'"
-        unknowns -> throwError $ "Unknown " ++ t ++ "s '" ++ (intercalate "', '" (show `map` unknowns)) ++ "'"
 
     -- Import everything from a module
     importAll :: ImportEnvironment -> ModuleName -> ExportEnvironment -> Either String ImportEnvironment
@@ -250,8 +246,8 @@ resolveImports env (Module currentModule decls) =
         (S.toList . fromMaybe S.empty $ mn `M.lookup` exportedTypeClasses env)
 
     -- Find all exported data constructors for a given type
-    allExportedDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> Either String [ProperName]
-    allExportedDataConstructors env mn name = maybe (throwError $ "Unable to find exported data constructors for type " ++ show name) return $ do
+    allExportedDataConstructors :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName]
+    allExportedDataConstructors env mn name = fromMaybe [] $ do
       s <- mn `M.lookup` exportedTypes env
       name `lookup` S.toList s
 
@@ -263,4 +259,31 @@ resolveImports env (Module currentModule decls) =
         if mn' == currentModule || mn == currentModule
         then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just mn) name) ++ "'"
         else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just mn) name) ++ "'"
+
+    -- Ensure that an explicitly imported value exists in the module it is being imported from
+    checkValueExists :: ExportEnvironment -> ModuleName -> Ident -> Either String Ident
+    checkValueExists env mn = checkImportExists "value" mn values
+        where values = S.toList $ fromMaybe S.empty $ mn `M.lookup` exportedValues env
+
+    -- Ensure that an explicitly imported type exists in the module it is being imported from
+    checkTypeExists :: ExportEnvironment -> ModuleName -> ProperName -> Either String ProperName
+    checkTypeExists env mn = checkImportExists "type" mn types
+        where types = fst `map` S.toList (fromMaybe S.empty $ mn `M.lookup` exportedTypes env)
+
+    -- Ensure that an explicitly imported class exists in the module it is being imported from
+    checkClassExists :: ExportEnvironment -> ModuleName -> ProperName -> Either String ProperName
+    checkClassExists env mn = checkImportExists "type class" mn classes
+        where classes = S.toList $ fromMaybe S.empty $ mn `M.lookup` exportedTypeClasses env
+
+    -- Ensure that an explicitly imported data constructor exists for the type it is being imported
+    -- from
+    checkDctorExists :: ModuleName -> [ProperName] -> ProperName -> Either String ProperName
+    checkDctorExists = checkImportExists "data constructor"
+
+    -- Check that an explicitly imported item exists in the module it is being imported from
+    checkImportExists :: (Show a, Eq a) => String -> ModuleName -> [a] -> a -> Either String a
+    checkImportExists t mn exports item =
+        if item `elem` exports
+        then return item
+        else throwError $ "Unable to find " ++ t ++  " '" ++ show (Qualified (Just mn) item) ++ "'"
 
