@@ -49,10 +49,6 @@ data NameKind
   --
   | Extern ForeignImportType
   -- |
-  -- An alias for a value in another module, introduced using an import declaration
-  --
-  | Alias ModuleName Ident
-  -- |
   -- A local name introduced using a lambda abstraction, variable introduction or binder
   --
   | LocalVariable
@@ -175,15 +171,6 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
     Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
     Just k -> return k
-
--- |
--- Canonicalize an identifier by resolving any aliases introduced by module imports
---
-canonicalize :: ModuleName -> Environment -> Qualified Ident -> (ModuleName, Ident)
-canonicalize _ _ (Qualified (Just mn) i) = (mn, i)
-canonicalize mn env (Qualified Nothing i) = case (mn, i) `M.lookup` names env of
-  Just (_, Alias mn' i') -> (mn', i')
-  _ -> (mn, i)
 
 -- |
 -- State required for type checking:

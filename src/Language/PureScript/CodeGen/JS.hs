@@ -189,14 +189,10 @@ varToJs m e qual@(Qualified _ ident) = go qual
   where
   go qual' = case M.lookup (qualify m qual') (names e) of
     Just (_, ty) | isExtern ty -> var ident
-    Just (_, Alias aliasModule aliasIdent) -> go (Qualified (Just aliasModule) aliasIdent)
     _ -> case qual' of
            Qualified Nothing _ -> var ident
            _ -> qualifiedToJS m id qual'
   isExtern (Extern ForeignImport) = True
-  isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
-    Just (_, ty') -> isExtern ty'
-    Nothing -> error "Undefined alias in varToJs"
   isExtern _ = False
 
 -- |
@@ -211,10 +207,10 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 -- Generate code in the simplified Javascript intermediate representation for pattern match binders
 -- and guards.
 --
-bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
+bindersToJs :: Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do
   valNames <- replicateM (length vals) fresh
-  jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (binderNames bs) e) result)] bs grd
+  jss <- forM binders $ \(CaseAlternative bs grd result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (binderNames bs) e) result)] bs grd
   return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  vals
   where

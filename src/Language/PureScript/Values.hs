@@ -94,7 +94,7 @@ data Value
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
   --
-  | Case [Value] [([Binder], Maybe Guard, Value)]
+  | Case [Value] [CaseAlternative]
   -- |
   -- A value with a type annotation
   --
@@ -114,6 +114,24 @@ data Value
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
+
+-- |
+-- An alternative in a case statement
+--
+data CaseAlternative = CaseAlternative
+  { -- |
+    -- A collection of binders with which to match the inputs
+    --
+    caseAlternativeBinders :: [Binder]
+    -- |
+    -- An optional guard
+    --
+  , caseAlternativeGuard :: Maybe Guard
+    -- |
+    -- The result expression
+    --
+  , caseAlternativeResult :: Value
+  } deriving (Show, Data, Typeable)
 
 -- |
 -- Data representing a type class dictionary which is in scope

@@ -44,7 +44,7 @@ desugarAbs = everywhere (mkT replace)
     let
       ident = head $ unusedNames (binder, val)
     in
-      Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [([binder], Nothing, val)]
+      Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing val]
   replace other = other
 
 -- |
@@ -76,7 +76,7 @@ makeCaseDeclaration ident alternatives =
     argPattern = length . fst . head $ alternatives
     args = take argPattern $ unusedNames (ident, alternatives)
     vars = map (Var . Qualified Nothing) args
-    binders = [ (bs, g, val) | (bs, (g, val)) <- alternatives ]
+    binders = [ CaseAlternative bs g val | (bs, (g, val)) <- alternatives ]
     value = foldr (\arg ret -> Abs (Left arg) ret) (Case vars binders) args
   in
     ValueDeclaration ident [] Nothing value

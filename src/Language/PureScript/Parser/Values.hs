@@ -74,11 +74,11 @@ parseCase :: P.Parsec String ParseState Value
 parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") (return <$> parseValue)
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
-parseCaseAlternative :: P.Parsec String ParseState ([Binder], Maybe Guard, Value)
-parseCaseAlternative = (,,) <$> (return <$> parseBinder)
-                            <*> P.optionMaybe parseGuard
-                            <*> (C.indented *> C.reservedOp "->" *> parseValue)
-                            P.<?> "case alternative"
+parseCaseAlternative :: P.Parsec String ParseState CaseAlternative
+parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
+                                       <*> P.optionMaybe parseGuard
+                                       <*> (C.indented *> C.reservedOp "->" *> parseValue)
+                                       P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Value
 parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parseValue)

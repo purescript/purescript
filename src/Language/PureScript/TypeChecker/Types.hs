@@ -632,18 +632,18 @@ inferBinder val (NamedBinder name binder) = do
 -- |
 -- Check the types of the return values in a set of binders in a case statement
 --
-checkBinders :: [Type] -> Type -> [([Binder], Maybe Guard, Value)] -> UnifyT Type Check [([Binder], Maybe Guard, Value)]
+checkBinders :: [Type] -> Type -> [CaseAlternative] -> UnifyT Type Check [CaseAlternative]
 checkBinders _ _ [] = return []
-checkBinders nvals ret ((binders, grd, val):bs) = do
+checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables moduleName (M.toList m1) $ do
     val' <- TypedValue True <$> check val ret <*> pure ret
     case grd of
-      Nothing -> return (binders, Nothing, val')
+      Nothing -> return $ CaseAlternative binders Nothing val'
       Just g -> do
         g' <- check g tyBoolean
-        return (binders, Just g', val')
+        return $ CaseAlternative binders (Just g') val'
   rs <- checkBinders nvals ret bs
   return $ r : rs
 

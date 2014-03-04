@@ -147,19 +147,20 @@ renameInModule imports (Module mn decls) =
     Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) =
-        TypeInstanceDeclaration <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
+        TypeInstanceDeclaration <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> updateVars ds
     updateDecl (ValueDeclaration name bs grd val) =
         ValueDeclaration name <$> updateVars bs <*> updateVars grd <*> updateVars val
-        where
-        updateVars :: (Data d) => d -> Either String d
-        updateVars = everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders)
-          where
-          bindFunctionArgs bound (Abs (Left arg) val) = return (arg : bound, Abs (Left arg) val)
-          bindFunctionArgs bound (Var (Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName ident)
-          bindFunctionArgs bound other = return (bound, other)
-          bindBinders :: [Ident] -> ([Binder], Maybe Guard, Value) -> Either String ([Ident], ([Binder], Maybe Guard, Value))
-          bindBinders bound (bs, grd, val) = return (binderNames bs ++ bound, (bs, grd, val))
     updateDecl d = return d
+
+    updateVars :: (Data d) => d -> Either String d
+    updateVars = everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders)
+      where
+      bindFunctionArgs bound (Abs (Left arg) val) = return (arg : bound, Abs (Left arg) val)
+      bindFunctionArgs bound (Var (Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName ident)
+      bindFunctionArgs bound other = return (bound, other)
+      bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
+      bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
+
     updateValue (Constructor (Qualified Nothing nm)) =
                  Constructor <$> updateDataConstructorName nm
     updateValue v = return v
