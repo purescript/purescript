@@ -45,8 +45,9 @@ literals = mkPattern match
   match (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
   match _ = Nothing
 
-prettyPrintCaseAlternative :: ([Binder], Maybe Guard, Value) -> String
-prettyPrintCaseAlternative (binders, grd, val) = "(" ++ intercalate ", " (map prettyPrintBinder binders) ++ ") " ++
+prettyPrintCaseAlternative :: CaseAlternative -> String
+prettyPrintCaseAlternative (CaseAlternative binders grd val) =
+  "(" ++ intercalate ", " (map prettyPrintBinder binders) ++ ") " ++
   maybe "" (("| " ++) . prettyPrintValue) grd ++ " -> " ++ prettyPrintValue val
 
 ifThenElse :: Pattern () Value ((Value, Value), Value)

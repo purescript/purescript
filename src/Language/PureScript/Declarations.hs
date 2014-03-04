@@ -66,6 +66,24 @@ data ForeignImportType
   | TypeClassAccessorImport deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
+-- An item in a list of explicit imports
+--
+data ImportType
+  -- |
+  -- A type constructor import
+  --
+  = TypeImport ProperName (Maybe [ProperName])
+  -- |
+  -- A declaration import
+  --
+  | NameImport Ident
+  -- |
+  -- A type class import
+  --
+  | TypeClassImport ProperName
+  deriving (Show, D.Data, D.Typeable)
+
+-- |
 -- The data type of declarations
 --
 data Declaration
@@ -108,7 +126,7 @@ data Declaration
   -- |
   -- A module import (module name, optional set of identifiers to import)
   --
-  | ImportDeclaration ModuleName (Maybe [Either Ident ProperName])
+  | ImportDeclaration ModuleName (Maybe [ImportType])
   -- |
   -- A type class declaration (name, argument, member declarations)
   --

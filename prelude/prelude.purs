@@ -42,7 +42,7 @@ module Prelude where
                             \  return n.toString();\
                             \}" :: Number -> String
 
-  instance Prelude.Show Number where
+  instance Show Number where
     show = showNumber
 
   class Read a where
@@ -439,22 +439,22 @@ module Data.Maybe where
   maybe _ f (Just a) = f a
 
   fromMaybe :: forall a. a -> Maybe a -> a
-  fromMaybe a = maybe a (Prelude.id :: forall a. a -> a)
+  fromMaybe a = maybe a (id :: forall a. a -> a)
 
-  instance Prelude.Monad Maybe where
+  instance Monad Maybe where
     return = Just
     (>>=) m f = maybe Nothing f m
 
-  instance Prelude.Applicative Maybe where
+  instance Applicative Maybe where
     pure = Just
     (<*>) (Just fn) x = fn <$> x
     (<*>) Nothing _ = Nothing
 
-  instance Prelude.Functor Maybe where
+  instance Functor Maybe where
     (<$>) fn (Just x) = Just (fn x)
     (<$>) _ _ = Nothing
 
-  instance (Show a) => Prelude.Show (Maybe a) where
+  instance (Show a) => Show (Maybe a) where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
 
@@ -468,20 +468,20 @@ module Data.Either where
   either f _ (Left a) = f a
   either _ g (Right b) = g b
 
-  instance Prelude.Monad (Either e) where
+  instance Monad (Either e) where
     return = Right
     (>>=) = either (\e _ -> Left e) (\a f -> f a)
 
-  instance Prelude.Applicative (Either e) where
+  instance Applicative (Either e) where
     pure = Right
     (<*>) (Left e) _ = Left e
     (<*>) (Right f) r = f <$> r
 
-  instance Prelude.Functor (Either a) where
+  instance Functor (Either a) where
     (<$>) _ (Left x) = Left x
     (<$>) f (Right y) = Right (f y)
 
-  instance (Show a, Show b) => Prelude.Show (Either a b) where
+  instance (Show a, Show b) => Show (Either a b) where
     show (Left x) = "Left " ++ (show x)
     show (Right y) = "Right " ++ (show y)
 
@@ -661,17 +661,17 @@ module Data.Array where
   take _ [] = []
   take n (x:xs) = x : take (n - 1) xs
 
-  instance (Prelude.Show a) => Prelude.Show [a] where
+  instance (Show a) => Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
-  instance Prelude.Functor [] where
+  instance Functor [] where
     (<$>) = map
 
-  instance Prelude.Monad [] where
+  instance Monad [] where
     return = singleton
     (>>=) = concatMap
 
-  instance Prelude.Alternative [] where
+  instance Alternative [] where
     empty = []
     (<|>) = concat
     
@@ -690,7 +690,7 @@ module Data.Tuple where
 
   data Tuple a b = Tuple a b
 
-  instance (Prelude.Show a, Prelude.Show b) => Prelude.Show (Tuple a b) where
+  instance (Show a, Show b) => Show (Tuple a b) where
     show (Tuple a b) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
 
   curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
@@ -944,6 +944,8 @@ module Math where
 
 module Control.Monad.Eff where
 
+  import Prelude
+
   foreign import data Eff :: # ! -> * -> *
 
   foreign import retEff "function retEff(a) {\
@@ -966,7 +968,7 @@ module Control.Monad.Eff where
                          \  return f();\
                          \}" :: forall a. Pure a -> a
 
-  instance Prelude.Monad (Eff e) where
+  instance Monad (Eff e) where
     return = retEff
     (>>=) = bindEff
 
@@ -1109,7 +1111,7 @@ module Debug.Trace where
                        \  };\
                        \}" :: forall r. String -> Eff (trace :: Trace | r) {}
 
-  print :: forall a r. (Prelude.Show a) => a -> Eff (trace :: Trace | r) {}
+  print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) {}
   print o = trace (show o)
 
 module Control.Monad.ST where

@@ -43,7 +43,6 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
 import Language.PureScript.CodeGen.Common
-import Language.PureScript.TypeChecker.Monad (canonicalizeDataConstructor)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
@@ -121,10 +120,6 @@ valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
 valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
-valueToJs _ m e (Constructor (Qualified Nothing name)) =
-  case M.lookup (m, name) (dataConstructors e) of
-    Just (_, Alias aliasModule aliasIdent) -> qualifiedToJS m id (Qualified (Just aliasModule) aliasIdent)
-    _ -> JSVar . runProperName $ name
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
@@ -194,14 +189,10 @@ varToJs m e qual@(Qualified _ ident) = go qual
   where
   go qual' = case M.lookup (qualify m qual') (names e) of
     Just (_, ty) | isExtern ty -> var ident
-    Just (_, Alias aliasModule aliasIdent) -> go (Qualified (Just aliasModule) aliasIdent)
     _ -> case qual' of
            Qualified Nothing _ -> var ident
            _ -> qualifiedToJS m id qual'
   isExtern (Extern ForeignImport) = True
-  isExtern (Alias m' ident') = case M.lookup (m', ident') (names e) of
-    Just (_, ty') -> isExtern ty'
-    Nothing -> error "Undefined alias in varToJs"
   isExtern _ = False
 
 -- |
@@ -216,10 +207,10 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 -- Generate code in the simplified Javascript intermediate representation for pattern match binders
 -- and guards.
 --
-bindersToJs :: Options -> ModuleName -> Environment -> [([Binder], Maybe Guard, Value)] -> [JS] -> JS
+bindersToJs :: Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do
   valNames <- replicateM (length vals) fresh
-  jss <- forM binders $ \(bs, grd, result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (binderNames bs) e) result)] bs grd
+  jss <- forM binders $ \(CaseAlternative bs grd result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (binderNames bs) e) result)] bs grd
   return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  vals
   where
@@ -230,15 +221,6 @@ bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders,
       done'' <- go vs done' bs grd
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
-
--- |
--- Collect all names introduced in binders in an expression
---
-binderNames :: (Data d) => d -> [Ident]
-binderNames = everything (++) (mkQ [] go)
-  where
-  go (VarBinder ident) = [ident]
-  go _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
@@ -262,7 +244,7 @@ binderToJs m e varName done (ConstructorBinder ctor bs) = do
   then
     return js
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ((\(mp, nm) -> Qualified (Just mp) nm) $ canonicalizeDataConstructor m e ctor))))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ctor)))
                      (JSBlock js)
                      Nothing]
   where
@@ -313,10 +295,10 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 --
 isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
 isOnlyConstructor m e ctor =
-  let (ty, _) = fromMaybe (error "Data constructor not found") $ qualify m ctor `M.lookup` dataConstructors e
+  let ty = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
   in numConstructors ty == 1
   where
-  numConstructors ty = length $ filter (\(ty1, _) -> ((==) `on` typeConstructor) ty ty1) $ M.elems $ dataConstructors e
+  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.elems $ dataConstructors e
   typeConstructor (TypeConstructor qual) = qualify m qual
   typeConstructor (ForAll _ ty _) = typeConstructor ty
   typeConstructor (TypeApp (TypeApp t _) ty) | t == tyFunction = typeConstructor ty

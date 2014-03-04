@@ -43,19 +43,20 @@ declarationsByModule :: Environment -> Module -> [(Key, [Key])]
 declarationsByModule env (Module moduleName ds) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
-  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies env moduleName d)]
+  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
   go (DataDeclaration _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
-  go d@(BindingGroupDeclaration names') = map (\(name, _) -> ((moduleName, Left name), dependencies env moduleName d)) names'
+  go d@(BindingGroupDeclaration names') = map (\(name, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
   go (DataBindingGroupDeclaration ds') = concatMap go ds'
   go _ = []
 
-dependencies :: (Data d) => Environment -> ModuleName -> d -> [Key]
-dependencies env moduleName = nub . everything (++) (mkQ [] values)
+dependencies :: (Data d) => ModuleName -> d -> [Key]
+dependencies moduleName = nub . everything (++) (mkQ [] values)
   where
   values :: Value -> [Key]
-  values (Var ident) = let (mn, name) = canonicalize moduleName env ident in [(mn, Left name)]
-  values (Constructor pn) = let (mn, name) = canonicalizeDataConstructor moduleName env pn in [(mn, Right name)]
+  values (Var ident) = let (mn, name) = qualify moduleName ident in [(mn, Left name)]
+  values (Constructor (Qualified (Just mn) name)) = [(mn, Right name)]
+  values (Constructor (Qualified Nothing _)) = error "Found unqualified data constructor"
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaration -> Bool

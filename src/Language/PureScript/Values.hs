@@ -21,6 +21,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 
 import Data.Data
+import Data.Generics (mkQ, everything)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -93,7 +94,7 @@ data Value
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
   --
-  | Case [Value] [([Binder], Maybe Guard, Value)]
+  | Case [Value] [CaseAlternative]
   -- |
   -- A value with a type annotation
   --
@@ -115,17 +116,22 @@ data Value
   | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, Data, Typeable)
 
 -- |
--- The type of a type class dictionary
+-- An alternative in a case statement
 --
-data TypeClassDictionaryType
-  -- |
-  -- A regular type class dictionary
-  --
-  = TCDRegular
-  -- |
-  -- A type class dictionary which is an alias for an imported dictionary from another module
-  --
-  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+data CaseAlternative = CaseAlternative
+  { -- |
+    -- A collection of binders with which to match the inputs
+    --
+    caseAlternativeBinders :: [Binder]
+    -- |
+    -- An optional guard
+    --
+  , caseAlternativeGuard :: Maybe Guard
+    -- |
+    -- The result expression
+    --
+  , caseAlternativeResult :: Value
+  } deriving (Show, Data, Typeable)
 
 -- |
 -- Data representing a type class dictionary which is in scope
@@ -153,6 +159,19 @@ data TypeClassDictionaryInScope
     --
     , tcdType :: TypeClassDictionaryType
     } deriving (Show, Data, Typeable)
+
+-- |
+-- The type of a type class dictionary
+--
+data TypeClassDictionaryType
+  -- |
+  -- A regular type class dictionary
+  --
+  = TCDRegular
+  -- |
+  -- A type class dictionary which is an alias for an imported dictionary from another module
+  --
+  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- A statement in a do-notation block
@@ -215,3 +234,14 @@ data Binder
   -- A binder which binds its input to an identifier
   --
   | NamedBinder Ident Binder deriving (Show, Data, Typeable)
+
+
+-- |
+-- Collect all names introduced in binders in an expression
+--
+binderNames :: (Data d) => d -> [Ident]
+binderNames = everything (++) (mkQ [] go)
+  where
+  go (VarBinder ident) = [ident]
+  go (NamedBinder ident _) = [ident]
+  go _ = []

@@ -28,5 +28,5 @@ import Language.PureScript.Declarations
 desugarLetBindings :: [Module] -> [Module]
 desugarLetBindings = everywhere (mkT go)
   where
-  go (Let binder value result) = Case [value] [([binder], Nothing, result)]
+  go (Let binder value result) = Case [value] [CaseAlternative [binder] Nothing result]
   go other = other
