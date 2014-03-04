@@ -22,8 +22,8 @@ module Language.PureScript.Sugar.CaseDeclarations (
 import Data.List (groupBy)
 import Data.Generics (mkT, everywhere)
 
-import Control.Applicative ((<$>))
-import Control.Monad (forM, join, unless)
+import Control.Applicative
+import Control.Monad ((<=<), forM, join, unless)
 import Control.Monad.Error.Class
 
 import Language.PureScript.Names
@@ -51,7 +51,13 @@ desugarAbs = everywhere (mkT replace)
 -- Replace all top-level binders with case expressions.
 --
 desugarCases :: [Declaration] -> Either String [Declaration]
-desugarCases = fmap join . mapM toDecls . groupBy inSameGroup
+desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
+  where
+    desugarRest :: [Declaration] -> Either String [Declaration]
+    desugarRest ((TypeInstanceDeclaration constraints className tys ds) : rest) =
+      (:) <$> (TypeInstanceDeclaration constraints className tys <$> desugarCases ds) <*> desugarRest rest
+    desugarRest (d : ds) = (:) d <$> desugarRest ds
+    desugarRest [] = pure []
 
 inSameGroup :: Declaration -> Declaration -> Bool
 inSameGroup (ValueDeclaration ident1 _ _ _) (ValueDeclaration ident2 _ _ _) = ident1 == ident2

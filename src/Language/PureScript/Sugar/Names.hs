@@ -226,7 +226,7 @@ resolveImports env (Module currentModule decls) =
     scope :: M.Map ModuleName (Maybe ExplicitImports)
     scope = M.insert currentModule Nothing (findImports decls)
     resolveImport' imp (mn, i) = do
-        m <- maybe (throwError $ "Cannot import from unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
+        let m = fromMaybe (Exports S.empty S.empty S.empty) $ mn `M.lookup` env
         resolveImport currentModule mn m imp i
 
 -- |
