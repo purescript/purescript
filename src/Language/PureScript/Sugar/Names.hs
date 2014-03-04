@@ -84,9 +84,15 @@ data ImportEnvironment = ImportEnvironment
 --
 updateExportedModule :: ExportEnvironment -> ModuleName -> (Exports -> Either String Exports) -> Either String ExportEnvironment
 updateExportedModule env mn update = do
-    let exports = fromMaybe (Exports S.empty S.empty S.empty) $ mn `M.lookup` env
+    let exports = fromMaybe (error "Module was undefined in updateExportedModule") $ mn `M.lookup` env
     exports' <- update exports
     return $ M.insert mn exports' env
+
+-- |
+-- Adds an empty module to an ExportEnvironment.
+--
+addEmptyModule :: ExportEnvironment -> ModuleName -> ExportEnvironment
+addEmptyModule env name = M.insert name (Exports S.empty S.empty S.empty) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
@@ -144,26 +150,28 @@ rethrowForModule (Module mn _) = flip catchError $ \e -> throwError ("Error in m
 --
 renameInModule :: ImportEnvironment -> Module -> Either String Module
 renameInModule imports (Module mn decls) =
-    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
+    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)
     where
     updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) =
-        TypeInstanceDeclaration <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> updateVars ds
-    updateDecl (ValueDeclaration name bs grd val) =
-        ValueDeclaration name <$> updateVars bs <*> updateVars grd <*> updateVars val
+        TypeInstanceDeclaration <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
     updateDecl d = return d
 
-    updateVars :: (Data d) => d -> Either String d
-    updateVars = everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders)
+    updateVars :: Declaration -> Either String Declaration
+    updateVars (ValueDeclaration name [] Nothing val) =
+      ValueDeclaration name [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
       where
       bindFunctionArgs bound (Abs (Left arg) val) = return (arg : bound, Abs (Left arg) val)
       bindFunctionArgs bound (Var (Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName ident)
       bindFunctionArgs bound other = return (bound, other)
       bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
       bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
+    updateVars (ValueDeclaration name _ _ _) = error $ "Binders should have been desugared in " ++ show name
+    updateVars other = return other
 
     updateValue (Constructor (Qualified Nothing nm)) =
                  Constructor <$> updateDataConstructorName nm
     updateValue v = return v
+
     updateBinder (ConstructorBinder (Qualified Nothing nm) b) =
                   ConstructorBinder <$> updateDataConstructorName nm <*> pure b
     updateBinder v = return v
@@ -189,7 +197,7 @@ renameInModule imports (Module mn decls) =
 findExports :: [Module] -> Either String ExportEnvironment
 findExports = foldM addModule M.empty
     where
-    addModule env m@(Module mn ds) = rethrowForModule m $ foldM (addDecl mn) env ds
+    addModule env m@(Module mn ds) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
     addDecl mn env (TypeClassDeclaration tcn _ ds) = do
       env' <- addTypeClass env mn tcn
       foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
@@ -226,7 +234,7 @@ resolveImports env (Module currentModule decls) =
     scope :: M.Map ModuleName (Maybe ExplicitImports)
     scope = M.insert currentModule Nothing (findImports decls)
     resolveImport' imp (mn, i) = do
-        let m = fromMaybe (Exports S.empty S.empty S.empty) $ mn `M.lookup` env
+        m <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
         resolveImport currentModule mn m imp i
 
 -- |
