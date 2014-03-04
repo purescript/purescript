@@ -16,14 +16,13 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
-import Data.Maybe (fromMaybe, isJust, fromJust)
-import Data.List (intersect, intercalate, (\\))
+import Data.Maybe (fromMaybe)
 import Data.Data
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Monad (forM_, unless, foldM)
+import Control.Monad (foldM)
 import Control.Monad.Error
 
 import qualified Data.Map as M
