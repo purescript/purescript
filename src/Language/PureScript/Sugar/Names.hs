@@ -211,7 +211,7 @@ findExports = foldM addModule M.empty
 -- |
 -- Type representing a set of declarations being explicitly imported from a module
 --
-type ExplicitImports = [ImportType]
+type ExplicitImports = [DeclarationRef]
 
 -- |
 -- Finds the imports within a module, mapping the imported module name to an optional set of
@@ -249,24 +249,24 @@ resolveImport currentModule importModule exp imp i = case i of
     -- Import everything from a module
     importAll :: ImportEnvironment -> Either String ImportEnvironment
     importAll imp = do
-      imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeImport name (Just dctors))) imp (S.toList $ exportedTypes exp)
-      imp'' <- foldM (\m name -> importExplicit m (NameImport name)) imp' (S.toList $ exportedValues exp)
-      foldM (\m name -> importExplicit m (TypeClassImport name)) imp'' (S.toList $ exportedTypeClasses exp)
+      imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeRef name (Just dctors))) imp (S.toList $ exportedTypes exp)
+      imp'' <- foldM (\m name -> importExplicit m (ValueRef name)) imp' (S.toList $ exportedValues exp)
+      foldM (\m name -> importExplicit m (TypeClassRef name)) imp'' (S.toList $ exportedTypeClasses exp)
 
     -- Import something explicitly
-    importExplicit :: ImportEnvironment -> ImportType -> Either String ImportEnvironment
-    importExplicit imp (NameImport name) = do
+    importExplicit :: ImportEnvironment -> DeclarationRef -> Either String ImportEnvironment
+    importExplicit imp (ValueRef name) = do
       checkImportExists "value" values name
       values' <- updateImports (importedValues imp) name
       return $ imp { importedValues = values' }
-    importExplicit imp (TypeImport name dctors) = do
+    importExplicit imp (TypeRef name dctors) = do
       checkImportExists "type" types name
       types' <- updateImports (importedTypes imp) name
       let allDctors = allExportedDataConstructors name
       dctors' <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
       dctors'' <- foldM updateImports (importedDataConstructors imp) dctors'
       return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
-    importExplicit imp (TypeClassImport name) = do
+    importExplicit imp (TypeClassRef name) = do
       checkImportExists "type class" classes name
       typeClasses' <- updateImports (importedTypeClasses imp) name
       return $ imp { importedTypeClasses = typeClasses' }
