@@ -27,7 +27,6 @@ import Control.Monad (foldM)
 import Control.Monad.Error
 
 import qualified Data.Map as M
-import qualified Data.Set as S
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
@@ -47,14 +46,14 @@ data Exports = Exports
     -- |
     -- The types exported from each module
     --
-    { exportedTypes :: S.Set (ProperName, [ProperName])
+    { exportedTypes :: [(ProperName, [ProperName])]
     -- |
     -- The classes exported from each module
     --
-    , exportedTypeClasses :: S.Set ProperName
+    , exportedTypeClasses :: [ProperName]
     -- |
     -- The values exported from each module
-    , exportedValues :: S.Set Ident
+    , exportedValues :: [Ident]
     --
     } deriving (Show)
 
@@ -94,7 +93,7 @@ updateExportedModule env mn update = do
 -- Adds an empty module to an ExportEnvironment.
 --
 addEmptyModule :: ExportEnvironment -> ModuleName -> ExportEnvironment
-addEmptyModule env name = M.insert name (Exports S.empty S.empty S.empty) env
+addEmptyModule env name = M.insert name (Exports [] [] []) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
@@ -121,13 +120,14 @@ addValue env mn name = updateExportedModule env mn $ \m -> do
     return $ m { exportedValues = values }
 
 -- |
--- Adds an export to a map of exports of that type.
+-- Adds an entry to a list of exports unless it is already present, in which case an error is
+-- returned.
 --
-addExport :: (Ord s, Show s) => S.Set s -> s -> Either String (S.Set s)
+addExport :: (Eq a, Show a) => [a] -> a -> Either String [a]
 addExport exports name =
-    if S.member name exports
+    if name `elem` exports
     then throwError $ "Multiple definitions for '" ++ show name ++ "'"
-    else return $ S.insert name exports
+    else return $ name : exports
 
 -- |
 -- Replaces all local names with qualified names within a set of modules.
@@ -184,14 +184,14 @@ renameInModule imports exports (Module mn decls exps) =
     updateTypeName (Qualified Nothing name) = update "type" importedTypes name
     updateTypeName (Qualified (Just mn) name) = do
       modExports <- getExports mn
-      case name `lookup` S.toList (exportedTypes modExports) of
+      case name `lookup` exportedTypes modExports of
         Nothing -> throwError $ "Unknown type '" ++ show (Qualified (Just mn) name) ++ "'"
         _ -> return $ Qualified (Just mn) name
 
     updateDataConstructorName (Qualified Nothing name) = update "data constructor" importedDataConstructors name
     updateDataConstructorName (Qualified (Just mn) name) = do
       modExports <- getExports mn
-      let allDcons = join $ snd `map` S.toList (exportedTypes modExports)
+      let allDcons = join $ snd `map` exportedTypes modExports
       if name `elem` allDcons
         then return $ Qualified (Just mn) name
         else throwError $ "Unknown data constructor '" ++ show (Qualified (Just mn) name) ++ "'"
@@ -203,14 +203,14 @@ renameInModule imports exports (Module mn decls exps) =
     updateValueName (Qualified (Just mn) name) = check "value" exportedValues mn name
 
     -- Replace an unqualified name with a qualified
-    update :: (Show a, Ord a) => String -> (ImportEnvironment -> M.Map a (Qualified a)) -> a -> Either String (Qualified a)
+    update :: (Ord a, Show a) => String -> (ImportEnvironment -> M.Map a (Qualified a)) -> a -> Either String (Qualified a)
     update t get name = maybe (throwError $ "Unknown " ++ t ++ " '" ++ show name ++ "'") return $ M.lookup name (get imports)
 
     -- Check that a qualified name is valid
-    check :: (Show a, Ord a) => String -> (Exports -> S.Set a) -> ModuleName -> a -> Either String (Qualified a)
+    check :: (Show a, Eq a) => String -> (Exports -> [a]) -> ModuleName -> a -> Either String (Qualified a)
     check t get mn name = do
       modExports <- getExports mn
-      if name `S.member` get modExports
+      if name `elem` get modExports
         then return $ Qualified (Just mn) name
         else throwError $ "Unknown " ++ t ++ " '" ++ show (Qualified (Just mn) name) ++ "'"
 
@@ -226,7 +226,9 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
     where
 
     -- The exported types from the Prim module
-    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` M.keys primTypes) S.empty S.empty
+    primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] []
+      where
+      mkTypeEntry (Qualified _ name) = (name, [])
 
     -- Add all of the exported declarations from a module to the global export environment
     addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
@@ -261,18 +263,18 @@ filterExports mn exps env = do
   -- Filter the exports for the specific module
   filterModule :: [DeclarationRef] -> Exports -> Either String Exports
   filterModule exps exported = do
-    types <- foldM (filterTypes $ S.toList $ exportedTypes exported) S.empty exps
-    values <- foldM (filterValues $ exportedValues exported) S.empty exps
-    classes <- foldM (filterClasses $ exportedTypeClasses exported) S.empty exps
+    types <- foldM (filterTypes $ exportedTypes exported) [] exps
+    values <- foldM (filterValues $ exportedValues exported) [] exps
+    classes <- foldM (filterClasses $ exportedTypeClasses exported) [] exps
     return exported { exportedTypes = types, exportedTypeClasses = classes, exportedValues = values }
 
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
-  filterTypes :: [(ProperName, [ProperName])] -> S.Set (ProperName, [ProperName]) -> DeclarationRef -> Either String (S.Set (ProperName, [ProperName]))
+  filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> Either String [(ProperName, [ProperName])]
   filterTypes exps result (TypeRef name expDcons) = do
     dcons <- maybe (throwError $ "Cannot export undefined type '" ++ show name ++ "'") return $ name `lookup` exps
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
-    return $ S.insert (name, dcons') result
+    return $ (name, dcons') : result
   filterTypes exps result _ = return result
 
   -- Ensure the exported data constructors exists for a type and add them to the list of exports
@@ -283,18 +285,18 @@ filterExports mn exps env = do
     else throwError $ "Cannot export undefined data constructor '" ++ show name ++ "' for type '" ++ show tcon ++ "'"
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
-  filterClasses :: S.Set ProperName -> S.Set ProperName -> DeclarationRef -> Either String (S.Set ProperName)
+  filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> Either String [ProperName]
   filterClasses exps result (TypeClassRef name) =
-    if name `S.member` exps
-    then return $ S.insert name result
+    if name `elem` exps
+    then return $ name : result
     else throwError $ "Cannot export undefined type class '" ++ show name ++ "'"
   filterClasses exps result _ = return result
 
   -- Ensure the exported values exist in the module and add them to the set of exports
-  filterValues :: S.Set Ident -> S.Set Ident -> DeclarationRef -> Either String (S.Set Ident)
+  filterValues :: [Ident] -> [Ident] -> DeclarationRef -> Either String [Ident]
   filterValues exps result (ValueRef name) =
-    if name `S.member` exps
-    then return $ S.insert name result
+    if name `elem` exps
+    then return $ name : result
     else throwError $ "Cannot export undefined value '" ++ show name ++ "'"
   filterValues exps result _ = return result
 
@@ -339,9 +341,9 @@ resolveImport currentModule importModule exp imp i = case i of
     -- Import everything from a module
     importAll :: ImportEnvironment -> Either String ImportEnvironment
     importAll imp = do
-      imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeRef name (Just dctors))) imp (S.toList $ exportedTypes exp)
-      imp'' <- foldM (\m name -> importExplicit m (ValueRef name)) imp' (S.toList $ exportedValues exp)
-      foldM (\m name -> importExplicit m (TypeClassRef name)) imp'' (S.toList $ exportedTypeClasses exp)
+      imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeRef name (Just dctors))) imp (exportedTypes exp)
+      imp'' <- foldM (\m name -> importExplicit m (ValueRef name)) imp' (exportedValues exp)
+      foldM (\m name -> importExplicit m (TypeClassRef name)) imp'' (exportedTypeClasses exp)
 
     -- Import something explicitly
     importExplicit :: ImportEnvironment -> DeclarationRef -> Either String ImportEnvironment
@@ -363,10 +365,10 @@ resolveImport currentModule importModule exp imp i = case i of
 
     -- Find all exported data constructors for a given type
     allExportedDataConstructors :: ProperName -> [ProperName]
-    allExportedDataConstructors name = fromMaybe [] $ name `lookup` S.toList (exportedTypes exp)
+    allExportedDataConstructors name = fromMaybe [] $ name `lookup` exportedTypes exp
 
     -- Add something to the ImportEnvironment if it does not already exist there
-    updateImports :: (Ord id, Show id) => M.Map id (Qualified id) -> id -> Either String (M.Map id (Qualified id))
+    updateImports :: (Ord a, Show a) => M.Map a (Qualified a) -> a -> Either String (M.Map a (Qualified a))
     updateImports m name = case M.lookup name m of
       Nothing -> return $ M.insert name (Qualified (Just importModule) name) m
       Just x@(Qualified (Just mn) _) -> throwError $
@@ -376,18 +378,18 @@ resolveImport currentModule importModule exp imp i = case i of
 
     -- The available values, types, and classes in the module being imported
     values = exportedValues exp
-    types = fst `S.map` exportedTypes exp
+    types = fst `map` exportedTypes exp
     classes = exportedTypeClasses exp
 
     -- Ensure that an explicitly imported data constructor exists for the type it is being imported
     -- from
     checkDctorExists :: [ProperName] -> ProperName -> Either String ProperName
-    checkDctorExists names = checkImportExists "data constructor" (S.fromList names)
+    checkDctorExists = checkImportExists "data constructor"
 
     -- Check that an explicitly imported item exists in the module it is being imported from
-    checkImportExists :: (Show a, Ord a, Eq a) => String -> S.Set a -> a -> Either String a
+    checkImportExists :: (Eq a, Show a) => String -> [a] -> a -> Either String a
     checkImportExists t exports item =
-        if item `S.member` exports
+        if item `elem` exports
         then return item
         else throwError $ "Unable to find " ++ t ++  " '" ++ show (Qualified (Just importModule) item) ++ "'"
 
