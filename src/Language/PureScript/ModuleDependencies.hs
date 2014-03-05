@@ -51,7 +51,7 @@ usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProp
   imports _ = []
 
 getModuleName :: Module -> ModuleName
-getModuleName (Module mn _) = mn
+getModuleName (Module mn _ _) = mn
 
 -- |
 -- Convert a strongly connected component of the module graph to a module

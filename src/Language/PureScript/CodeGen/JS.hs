@@ -49,7 +49,7 @@ import Language.PureScript.CodeGen.Common
 -- module.
 --
 moduleToJs :: Options -> Module -> Environment -> Maybe JS
-moduleToJs opts (Module name decls) env =
+moduleToJs opts (Module name decls exps) env =
   case jsDecls of
     [] -> Nothing
     _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar "_ps")) $

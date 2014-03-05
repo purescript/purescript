@@ -58,8 +58,9 @@ renderModules ms = do
   headerLevel 1 "Module Documentation"
   mapM_ renderModule ms
 
+-- TODO: filter everything by exports
 renderModule :: P.Module -> Docs
-renderModule (P.Module moduleName ds) = do
+renderModule (P.Module moduleName ds exps) = do
   headerLevel 2 $ "Module " ++ P.runModuleName moduleName
   spacer
   headerLevel 3 "Types"

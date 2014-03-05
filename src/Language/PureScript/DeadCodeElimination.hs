@@ -35,12 +35,12 @@ eliminateDeadCode env entryPoints ms =
   let declarations = concatMap (declarationsByModule env) ms
       (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
       entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
-  in flip map ms $ \(Module moduleName ds) -> Module moduleName (filter (isUsed moduleName graph vertexFor entryPointVertices) ds)
+  in flip map ms $ \(Module moduleName ds exps) -> Module moduleName (filter (isUsed moduleName graph vertexFor entryPointVertices) ds) exps
 
 type Key = (ModuleName, Either Ident ProperName)
 
 declarationsByModule :: Environment -> Module -> [(Key, [Key])]
-declarationsByModule env (Module moduleName ds) = concatMap go ds
+declarationsByModule env (Module moduleName ds _) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
   go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies moduleName d)]

@@ -146,9 +146,10 @@ parseModule = do
   reserved "module"
   indented
   name <- moduleName
+  exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   _ <- lexeme $ P.string "where"
   decls <- mark (P.many (same *> parseDeclaration))
-  return $ Module name decls
+  return $ Module name decls exports
 
 -- |
 -- Parse a collection of modules

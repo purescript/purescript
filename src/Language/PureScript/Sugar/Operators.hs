@@ -49,11 +49,11 @@ rebracket :: [Module] -> Either String [Module]
 rebracket = go M.empty []
   where
   go _ rb [] = return . reverse $ rb
-  go m rb (Module name ds : ms) = do
+  go m rb (Module name ds exps : ms) = do
     m' <- M.union m <$> collectFixities m name ds
     let opTable = customOperatorTable m'
     ds' <- G.everywhereM' (G.mkM (matchOperators name opTable)) ds
-    go m' (Module name (G.everywhere (G.mkT removeParens) ds') : rb) ms
+    go m' (Module name (G.everywhere (G.mkT removeParens) ds') exps : rb) ms
 
 removeParens :: Value -> Value
 removeParens (Parens val) = val

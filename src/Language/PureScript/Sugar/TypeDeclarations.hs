@@ -30,7 +30,7 @@ import Language.PureScript.Values
 -- Replace all top level type declarations in a module with type annotations
 --
 desugarTypeDeclarationsModule :: [Module] -> Either String [Module]
-desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds) -> Module name <$> desugarTypeDeclarations ds
+desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds exps) -> Module name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |
 -- Replace all top level type declarations with type annotations

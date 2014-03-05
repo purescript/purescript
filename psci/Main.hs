@@ -161,6 +161,7 @@ quitMessage = "See ya!"
 
 -- |
 -- Loads module, function, and file completions.
+-- TODO: filter names to only include exported decls
 --
 completion :: CompletionFunc (StateT PSCiState IO)
 completion = completeWord Nothing " \t\n\r" findCompletions
@@ -176,7 +177,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
   getDeclName _ = Nothing
   names :: [P.Module] -> [String]
   names ms = nub [ show qual
-              | P.Module moduleName ds <- ms
+              | P.Module moduleName ds _ <- ms
               , ident <- mapMaybe getDeclName ds
               , qual <- [ P.Qualified Nothing ident
                         , P.Qualified (Just moduleName) ident]
@@ -207,7 +208,7 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
     mainDecl = P.ValueDeclaration (P.Ident "main") [] Nothing mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module moduleName $ map importDecl imports ++ decls
+    P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.

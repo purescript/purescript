@@ -143,14 +143,14 @@ desugarImports modules = do
 -- Rethrow an error with the name of the current module in the case of a failure
 --
 rethrowForModule :: Module -> Either String a -> Either String a
-rethrowForModule (Module mn _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
+rethrowForModule (Module mn _ _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
 
 -- |
 -- Replaces all local names with qualified names within a module.
 --
 renameInModule :: ImportEnvironment -> Module -> Either String Module
-renameInModule imports (Module mn decls) =
-    Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)
+renameInModule imports (Module mn decls exps) =
+    Module mn <$> (mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)) <*> pure exps
     where
     updateDecl (TypeInstanceDeclaration name cs (Qualified Nothing cn) ts ds) =
         TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
@@ -197,7 +197,7 @@ renameInModule imports (Module mn decls) =
 findExports :: [Module] -> Either String ExportEnvironment
 findExports = foldM addModule M.empty
     where
-    addModule env m@(Module mn ds) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
+    addModule env m@(Module mn ds exps) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds 
     addDecl mn env (TypeClassDeclaration tcn _ ds) = do
       env' <- addTypeClass env mn tcn
       foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
@@ -227,7 +227,7 @@ findImports = foldl findImports' M.empty
 -- Constructs a local environment for a module.
 --
 resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
-resolveImports env (Module currentModule decls) =
+resolveImports env (Module currentModule decls _) =
     foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
     where
     -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported

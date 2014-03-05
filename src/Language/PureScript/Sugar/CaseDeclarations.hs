@@ -35,7 +35,7 @@ import Language.PureScript.Scope
 -- Replace all top-level binders in a module with case expressions.
 --
 desugarCasesModule :: [Module] -> Either String [Module]
-desugarCasesModule ms = forM ms $ \(Module name ds) -> Module name <$> (desugarCases . desugarAbs $ ds)
+desugarCasesModule ms = forM ms $ \(Module name ds exps) -> Module name <$> (desugarCases . desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> [Declaration]
 desugarAbs = everywhere (mkT replace)
