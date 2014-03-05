@@ -184,14 +184,14 @@ renameInModule imports exports (Module mn decls exps) =
     updateTypeName (Qualified Nothing name) = update "type" importedTypes name
     updateTypeName (Qualified (Just mn) name) = do
       modExports <- getExports mn
-      case name `lookup` (S.toList (exportedTypes modExports)) of
+      case name `lookup` S.toList (exportedTypes modExports) of
         Nothing -> throwError $ "Unknown type '" ++ show (Qualified (Just mn) name) ++ "'"
         _ -> return $ Qualified (Just mn) name
 
     updateDataConstructorName (Qualified Nothing name) = update "data constructor" importedDataConstructors name
     updateDataConstructorName (Qualified (Just mn) name) = do
       modExports <- getExports mn
-      let allDcons = join (snd `map` (S.toList $ exportedTypes modExports))
+      let allDcons = join $ snd `map` S.toList (exportedTypes modExports)
       if name `elem` allDcons
         then return $ Qualified (Just mn) name
         else throwError $ "Unknown data constructor '" ++ show (Qualified (Just mn) name) ++ "'"
@@ -210,7 +210,7 @@ renameInModule imports exports (Module mn decls exps) =
     check :: (Show a, Ord a) => String -> (Exports -> S.Set a) -> ModuleName -> a -> Either String (Qualified a)
     check t get mn name = do
       modExports <- getExports mn
-      if name `S.member` (get modExports)
+      if name `S.member` get modExports
         then return $ Qualified (Just mn) name
         else throwError $ "Unknown " ++ t ++ " '" ++ show (Qualified (Just mn) name) ++ "'"
 
@@ -226,7 +226,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
     where
 
     -- The exported types from the Prim module
-    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` (M.keys primTypes)) S.empty S.empty
+    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` M.keys primTypes) S.empty S.empty
 
     -- Add all of the exported declarations from a module to the global export environment
     addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment

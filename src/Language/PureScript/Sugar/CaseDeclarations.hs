@@ -54,7 +54,7 @@ desugarCases :: [Declaration] -> Either String [Declaration]
 desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> Either String [Declaration]
-    desugarRest ((TypeInstanceDeclaration name constraints className tys ds) : rest) =
+    desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
