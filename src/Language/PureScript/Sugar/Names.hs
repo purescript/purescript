@@ -34,6 +34,8 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
 
+import Language.PureScript.TypeChecker.Monad (jsTypes)
+
 -- |
 -- The global export environment - every declaration exported from every module.
 --
@@ -138,7 +140,7 @@ desugarImports modules = do
     where
     renameInModule' exports m = rethrowForModule m $ do
         imports <- resolveImports exports m
-        renameInModule imports m
+        renameInModule imports exports m
 
 -- |
 -- Rethrow an error with the name of the current module in the case of a failure
@@ -147,13 +149,14 @@ rethrowForModule :: Module -> Either String a -> Either String a
 rethrowForModule (Module mn _ _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
 
 -- |
--- Replaces all local names with qualified names within a module.
+-- Replaces all local names with qualified names within a module and checks that all existing
+-- qualified names are valid.
 --
-renameInModule :: ImportEnvironment -> Module -> Either String Module
-renameInModule imports (Module mn decls exps) =
+renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either String Module
+renameInModule imports exports (Module mn decls exps) =
     Module mn <$> (mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)) <*> pure exps
     where
-    updateDecl (TypeInstanceDeclaration name cs (Qualified Nothing cn) ts ds) =
+    updateDecl (TypeInstanceDeclaration name cs cn ts ds) =
         TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
     updateDecl d = return d
 
@@ -162,42 +165,68 @@ renameInModule imports (Module mn decls exps) =
       ValueDeclaration name [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
       where
       bindFunctionArgs bound (Abs (Left arg) val) = return (arg : bound, Abs (Left arg) val)
-      bindFunctionArgs bound (Var (Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName ident)
+      bindFunctionArgs bound (Var name@(Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName name)
+      bindFunctionArgs bound (Var name@(Qualified (Just _) _)) = (,) bound <$> (Var <$> updateValueName name)
       bindFunctionArgs bound other = return (bound, other)
       bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
       bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
     updateVars (ValueDeclaration name _ _ _) = error $ "Binders should have been desugared in " ++ show name
     updateVars other = return other
-
-    updateValue (Constructor (Qualified Nothing nm)) =
-                 Constructor <$> updateDataConstructorName nm
+    updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
     updateValue v = return v
-
-    updateBinder (ConstructorBinder (Qualified Nothing nm) b) =
-                  ConstructorBinder <$> updateDataConstructorName nm <*> pure b
+    updateBinder (ConstructorBinder name b) = ConstructorBinder <$> updateDataConstructorName name <*> pure b
     updateBinder v = return v
-    updateType (TypeConstructor (Qualified Nothing nm)) =
-                TypeConstructor <$> updateTypeName nm
-    updateType (SaturatedTypeSynonym (Qualified Nothing nm) tys) =
-                SaturatedTypeSynonym <$> updateTypeName nm <*> mapM updateType tys
-    updateType (ConstrainedType cs t) =
-                ConstrainedType <$> updateConstraints cs <*> pure t
+    updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name
+    updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
+    updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
     updateType t = return t
-    updateConstraints = mapM updateConstraint
-    updateConstraint (Qualified Nothing nm, ts) = (,) <$> updateClassName nm <*> pure ts
-    updateConstraint other = return other
-    updateTypeName = update "type" importedTypes
-    updateClassName = update "type class" importedTypeClasses
-    updateValueName = update "value" importedValues
-    updateDataConstructorName = update "data constructor" importedDataConstructors
-    update t get nm = maybe (throwError $ "Unknown " ++ t ++ " '" ++ show nm ++ "'") return $ M.lookup nm (get imports)
+    updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
+
+    updateTypeName (Qualified Nothing name) = update "type" importedTypes name
+    updateTypeName (Qualified (Just mn) name) = do
+      modExports <- getExports mn
+      case name `lookup` (S.toList (exportedTypes modExports)) of
+        Nothing -> throwError $ "Unknown type '" ++ show (Qualified (Just mn) name) ++ "'"
+        _ -> return $ Qualified (Just mn) name
+
+    updateDataConstructorName (Qualified Nothing name) = update "data constructor" importedDataConstructors name
+    updateDataConstructorName (Qualified (Just mn) name) = do
+      modExports <- getExports mn
+      let allDcons = join (snd `map` (S.toList $ exportedTypes modExports))
+      if name `elem` allDcons
+        then return $ Qualified (Just mn) name
+        else throwError $ "Unknown data constructor '" ++ show (Qualified (Just mn) name) ++ "'"
+    
+    updateClassName (Qualified Nothing name) = update "type class" importedTypeClasses name
+    updateClassName (Qualified (Just mn) name) = check "type class" exportedTypeClasses mn name
+    
+    updateValueName (Qualified Nothing name) = update "value" importedValues name
+    updateValueName (Qualified (Just mn) name) = check "value" exportedValues mn name
+
+    -- Replace an unqualified name with a qualified
+    update :: (Show a, Ord a) => String -> (ImportEnvironment -> M.Map a (Qualified a)) -> a -> Either String (Qualified a)
+    update t get name = maybe (throwError $ "Unknown " ++ t ++ " '" ++ show name ++ "'") return $ M.lookup name (get imports)
+
+    -- Check that a qualified name is valid
+    check :: (Show a, Ord a) => String -> (Exports -> S.Set a) -> ModuleName -> a -> Either String (Qualified a)
+    check t get mn name = do
+      modExports <- getExports mn
+      if name `S.member` (get modExports)
+        then return $ Qualified (Just mn) name
+        else throwError $ "Unknown " ++ t ++ " '" ++ show (Qualified (Just mn) name) ++ "'"
+
+    -- Gets the exports for a module, or an error message if the module doesn't exist
+    getExports :: ModuleName -> Either String Exports
+    getExports mn = maybe (throwError $ "Unknown module '" ++ show mn ++ "'") return $ M.lookup mn exports
 
 -- |
 -- Finds all exported declarations in a set of modules.
 --
 findExports :: [Module] -> Either String ExportEnvironment
-findExports = foldM addModule M.empty
+findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) primExports
     where
+
+    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` (M.keys jsTypes)) S.empty S.empty
 
     -- Add all of the exported declarations from a module to the global export environment
     addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
