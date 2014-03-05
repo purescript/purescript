@@ -909,17 +909,23 @@ module Math where
                      \  return Math.log(n);\
                      \}" :: Number -> Number
 
-  foreign import max "function max(n){\
-                     \  return Math.max(n);\
-                     \}" :: Number -> Number
+  foreign import max "function max(n1){\
+                     \  return function(n2) {\ 
+                     \    return Math.max(n1, n2);\
+                     \  }\
+                     \}" :: Number -> Number -> Number
 
-  foreign import min "function min(n){\
-                     \  return Math.min(n);\
-                     \}" :: Number -> Number
+  foreign import min "function min(n1){\
+                     \  return function(n2) {\ 
+                     \    return Math.min(n1, n2);\
+                     \  }\
+                     \}" :: Number -> Number -> Number
 
   foreign import pow "function pow(n){\
-                     \  return Math.pow(n);\
-                     \}" :: Number -> Number
+                     \  return function(p) {\ 
+                     \    return Math.pow(n, p);\
+                     \  }\
+                     \}" :: Number -> Number -> Number
 
   foreign import round "function round(n){\
                        \  return Math.round(n);\
