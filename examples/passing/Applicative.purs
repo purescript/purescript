@@ -6,7 +6,7 @@ class Applicative f where
 
 data Maybe a = Nothing | Just a
 
-instance Applicative Maybe where
+instance applicativeMaybe :: Applicative Maybe where
   pure = Just
   (<*>) (Just f) (Just a) = Just (f a)
   (<*>) _ _ = Nothing

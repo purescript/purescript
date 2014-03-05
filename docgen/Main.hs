@@ -102,11 +102,11 @@ renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do
 renderDeclaration n (P.TypeClassDeclaration name args ds) = do
   atIndent n $ "class " ++ P.runProperName name ++ " " ++ unwords args ++ " where"
   mapM_ (renderDeclaration (n + 2)) ds
-renderDeclaration n (P.TypeInstanceDeclaration constraints name tys _) = do
+renderDeclaration n (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
                           cs -> "(" ++ intercalate "," (map (\(pn, tys') -> show pn ++ " (" ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys') ++ ")") cs) ++ ") => "
-  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
+  atIndent n $ constraintsText ++ "instance " ++ show name ++ " :: " ++ show className ++ " " ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
 renderDeclaration _ _ = return ()
 
 getName :: P.Declaration -> String
@@ -116,7 +116,7 @@ getName (P.DataDeclaration name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _) = P.runProperName name
-getName (P.TypeInstanceDeclaration _ name _ _) = show name
+getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool

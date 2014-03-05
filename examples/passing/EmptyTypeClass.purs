@@ -7,7 +7,7 @@ head (x:xs) = x
 
 module AllowPartialFns where
 
-instance EmptyTypeClass.Partial
+instance allowPartials :: EmptyTypeClass.Partial
 
 module Main where
 

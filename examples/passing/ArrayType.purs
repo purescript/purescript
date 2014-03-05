@@ -8,7 +8,7 @@ class Functor f where
 
 foreign import (:) :: forall a. a -> [a] -> [a]
 
-instance Functor [] where
+instance functorArray :: Functor [] where
   fmap _ [] = []
   fmap f (x:xs) = f x : fmap f xs
     

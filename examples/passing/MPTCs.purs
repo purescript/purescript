@@ -6,19 +6,19 @@ import Data.Array
 class NullaryTypeClass where
   greeting :: String
 
-instance NullaryTypeClass where
+instance nullaryTypeClass :: NullaryTypeClass where
   greeting = "Hello, World!"
 
 class Coerce a b where
   coerce :: a -> b
 
-instance Coerce a a where
+instance coerceRefl :: Coerce a a where
   coerce a = a
 
-instance (Prelude.Show a) => Coerce a String where
+instance coerceShow :: (Prelude.Show a) => Coerce a String where
   coerce = show
 
-instance (Coerce a b) => Coerce [a] [b] where
+instance coerceArray :: (Coerce a b) => Coerce [a] [b] where
   coerce = map coerce
 
 main = Debug.Trace.print $ coerce [greeting] :: [String]

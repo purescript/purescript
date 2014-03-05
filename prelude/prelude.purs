@@ -14,7 +14,7 @@ module Prelude where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
     (>>>) :: forall b c d. a b c -> a c d -> a b d
 
-  instance Category (->) where
+  instance categoryArr :: Category (->) where
     id x = x
     (<<<) f g x = f (g x)
     (>>>) f g x = g (f x)
@@ -31,36 +31,36 @@ module Prelude where
   class Show a where
     show :: a -> String
 
-  instance Show String where
+  instance showString :: Show String where
     show s = s
 
-  instance Show Boolean where
+  instance showBoolean :: Show Boolean where
     show true = "true"
     show false = "false"
 
-  foreign import showNumber "function showNumber(n) {\
-                            \  return n.toString();\
-                            \}" :: Number -> String
+  foreign import showNumberImpl "function showNumberImpl(n) {\
+                                \  return n.toString();\
+                                \}" :: Number -> String
 
-  instance Show Number where
-    show = showNumber
+  instance showNumber :: Show Number where
+    show = showNumberImpl
 
   class Read a where
     read :: String -> a
 
-  instance Read String where
+  instance readString :: Read String where
     read s = s
 
-  instance Read Boolean where
+  instance readBoolean :: Read Boolean where
     read "true" = true
     read _ = false
 
-  foreign import readNumber "function readNumber(n) {\
-                            \  return parseFloat(n);\
-                            \}" :: String -> Number
+  foreign import readNumberImpl "function readNumber(n) {\
+                                \  return parseFloat(n);\
+                                \}" :: String -> Number
 
-  instance Read Number where
-    read = readNumber
+  instance readNumber :: Read Number where
+    read = readNumberImpl
 
   infixl 4 <$>
 
@@ -73,7 +73,7 @@ module Prelude where
     pure :: forall a. a -> f a
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
-  instance (Applicative f) => Functor f where
+  instance functorFromApplicative :: (Applicative f) => Functor f where
     (<$>) f a = pure f <*> a
 
   infixl 3 <|>
@@ -88,7 +88,7 @@ module Prelude where
     return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
-  instance (Monad m) => Applicative m where
+  instance applicativeFromMonad :: (Monad m) => Applicative m where
     pure = return
     (<*>) f a = do
       f' <- f
@@ -144,7 +144,7 @@ module Prelude where
                            \  return -n;\
                            \}" :: Number -> Number
 
-  instance Num Number where
+  instance numNumber :: Num Number where
     (+) = numAdd
     (-) = numSub
     (*) = numMul
@@ -159,18 +159,6 @@ module Prelude where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
 
-  -- Referential equality
-  data Ref a = Ref a
-
-  liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
-  liftRef f (Ref x) (Ref y) = f x y
-  
-  refEq :: forall a. Ref a -> Ref a -> Boolean
-  refEq = liftRef unsafeRefEq
-  
-  refIneq :: forall a. Ref a -> Ref a -> Boolean
-  refIneq = liftRef unsafeRefIneq
-
   foreign import unsafeRefEq "function unsafeRefEq(r1) {\
                              \  return function(r2) {\
                              \    return r1 === r2;\
@@ -183,23 +171,19 @@ module Prelude where
                                \  };\
                                \}" :: forall a. a -> a -> Boolean
 
-  instance Eq (Ref a) where
-    (==) = refEq
-    (/=) = refIneq
-
-  instance Eq String where
+  instance eqString :: Eq String where
     (==) = unsafeRefEq
     (/=) = unsafeRefIneq
 
-  instance Eq Number where
+  instance eqNumber :: Eq Number where
     (==) = unsafeRefEq
     (/=) = unsafeRefIneq
 
-  instance Eq Boolean where
+  instance eqBoolean :: Eq Boolean where
     (==) = unsafeRefEq
     (/=) = unsafeRefIneq
 
-  instance (Eq a) => Eq [a] where
+  instance eqArray :: (Eq a) => Eq [a] where
     (==) [] [] = true
     (==) (x:xs) (y:ys) = x == y && xs == ys
     (==) _ _ = false
@@ -240,7 +224,7 @@ module Prelude where
                               \  };\
                               \}" :: Number -> Number -> Boolean
 
-  instance Ord Number where
+  instance ordNumber :: Ord Number where
     (<) = numLess
     (>) = numGreater
     (<=) = numLessEq
@@ -299,7 +283,7 @@ module Prelude where
                                \  return ~n;\
                                \}" :: Number -> Number
 
-  instance Bits Number where
+  instance bitsNumber :: Bits Number where
     (&) = numAnd
     (|) = numOr
     (^) = numXor
@@ -340,7 +324,7 @@ module Prelude where
                          \  return !b;\
                          \}" :: Boolean -> Boolean
 
-  instance BoolLike Boolean where
+  instance boolLikeBoolean :: BoolLike Boolean where
     (&&) = boolAnd
     (||) = boolOr
     not = boolNot
@@ -364,11 +348,11 @@ module Data.Monoid where
     mempty :: m
     (<>) :: m -> m -> m
 
-  instance Monoid String where
+  instance monoidString :: Monoid String where
     mempty = ""
     (<>) = (++)
 
-  instance Monoid [a] where
+  instance monoidArray :: Monoid [a] where
     mempty = []
     (<>) = Data.Array.concat
 
@@ -441,20 +425,20 @@ module Data.Maybe where
   fromMaybe :: forall a. a -> Maybe a -> a
   fromMaybe a = maybe a (id :: forall a. a -> a)
 
-  instance Monad Maybe where
+  instance monadMaybe :: Monad Maybe where
     return = Just
     (>>=) m f = maybe Nothing f m
 
-  instance Applicative Maybe where
+  instance applicativeMaybe :: Applicative Maybe where
     pure = Just
     (<*>) (Just fn) x = fn <$> x
     (<*>) Nothing _ = Nothing
 
-  instance Functor Maybe where
+  instance functorMaybe :: Functor Maybe where
     (<$>) fn (Just x) = Just (fn x)
     (<$>) _ _ = Nothing
 
-  instance (Show a) => Show (Maybe a) where
+  instance showMaybe :: (Show a) => Show (Maybe a) where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
 
@@ -468,20 +452,20 @@ module Data.Either where
   either f _ (Left a) = f a
   either _ g (Right b) = g b
 
-  instance Monad (Either e) where
+  instance monadEither :: Monad (Either e) where
     return = Right
     (>>=) = either (\e _ -> Left e) (\a f -> f a)
 
-  instance Applicative (Either e) where
+  instance applicativeEither :: Applicative (Either e) where
     pure = Right
     (<*>) (Left e) _ = Left e
     (<*>) (Right f) r = f <$> r
 
-  instance Functor (Either a) where
+  instance functorEither :: Functor (Either a) where
     (<$>) _ (Left x) = Left x
     (<$>) f (Right y) = Right (f y)
 
-  instance (Show a, Show b) => Show (Either a b) where
+  instance showEither :: (Show a, Show b) => Show (Either a b) where
     show (Left x) = "Left " ++ (show x)
     show (Right y) = "Right " ++ (show y)
 
@@ -576,7 +560,7 @@ module Data.Array where
                       \  return l1;\
                       \}" :: forall a. [a] -> [a]
 
-  foreign import insertAt 
+  foreign import insertAt
     "function insertAt(index) {\
     \  return function(a) {\
     \    return function(l) {\
@@ -587,7 +571,7 @@ module Data.Array where
     \  };\
     \}":: forall a. Number -> a -> [a] -> [a]
 
-  foreign import deleteAt 
+  foreign import deleteAt
     "function deleteAt(index) {\
     \  return function(n) {\
     \    return function(l) {\
@@ -598,7 +582,7 @@ module Data.Array where
     \  };\
     \}":: forall a. Number -> Number -> [a] -> [a]
 
-  foreign import updateAt 
+  foreign import updateAt
     "function updateAt(index) {\
     \  return function(a) {\
     \    return function(l) {\
@@ -625,7 +609,7 @@ module Data.Array where
   filter _ [] = []
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
-  
+
   find :: forall a. (a -> Boolean) -> [a] -> Maybe a
   find _ [] = Nothing
   find p (x:xs) | p x = Just x
@@ -661,20 +645,40 @@ module Data.Array where
   take _ [] = []
   take n (x:xs) = x : take (n - 1) xs
 
-  instance (Show a) => Show [a] where
+  instance showArray :: (Show a) => Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
-  instance Functor [] where
-    (<$>) = map
-
-  instance Monad [] where
+  instance monadArray :: Monad [] where
     return = singleton
     (>>=) = concatMap
 
-  instance Alternative [] where
+  instance functorArray :: Functor [] where
+    (<$>) = map
+
+  instance alternativeArray :: Alternative [] where
     empty = []
     (<|>) = concat
-    
+
+module Data.Eq where
+
+  import Prelude
+
+  -- Referential equality
+  data Ref a = Ref a
+
+  liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
+  liftRef f (Ref x) (Ref y) = f x y
+
+  refEq :: forall a. Ref a -> Ref a -> Boolean
+  refEq = liftRef unsafeRefEq
+
+  refIneq :: forall a. Ref a -> Ref a -> Boolean
+  refIneq = liftRef unsafeRefIneq
+
+  instance eqRef :: Eq (Ref a) where
+    (==) = refEq
+    (/=) = refIneq
+
 module Data.Array.Unsafe where
 
   head :: forall a. [a] -> a
@@ -690,7 +694,7 @@ module Data.Tuple where
 
   data Tuple a b = Tuple a b
 
-  instance (Show a, Show b) => Show (Tuple a b) where
+  instance showTuple :: (Show a, Show b) => Show (Tuple a b) where
     show (Tuple a b) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
 
   curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
@@ -968,7 +972,7 @@ module Control.Monad.Eff where
                          \  return f();\
                          \}" :: forall a. Pure a -> a
 
-  instance Monad (Eff e) where
+  instance monadEff :: Monad (Eff e) where
     return = retEff
     (>>=) = bindEff
 

@@ -11,12 +11,12 @@ data State s a = State (s -> Tuple s a)
 
 runState s (State f) = f s
 
-instance Prelude.Monad (State s) where
+instance monadState :: Prelude.Monad (State s) where
   return a = State $ \s -> Tuple s a
   (>>=) f g = State $ \s -> let (Tuple s1 a) = runState s f in 
                             runState s1 (g a)
 
-instance MonadState s (State s) where
+instance monadStateState :: MonadState s (State s) where
   get = State (\s -> Tuple s s)
   put s = State (\_ -> Tuple s {})
 

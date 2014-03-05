@@ -152,8 +152,8 @@ renameInModule :: ImportEnvironment -> Module -> Either String Module
 renameInModule imports (Module mn decls) =
     Module mn <$> mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)
     where
-    updateDecl (TypeInstanceDeclaration cs (Qualified Nothing cn) ts ds) =
-        TypeInstanceDeclaration <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
+    updateDecl (TypeInstanceDeclaration name cs (Qualified Nothing cn) ts ds) =
+        TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
     updateDecl d = return d
 
     updateVars :: Declaration -> Either String Declaration

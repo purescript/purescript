@@ -110,6 +110,7 @@ parseTypeClassDeclaration = do
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
   reserved "instance"
+  name <- parseIdent <* lexeme (indented *> P.string "::")
   deps <- P.optionMaybe $ do
     deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
     indented
@@ -120,7 +121,7 @@ parseTypeInstanceDeclaration = do
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> parseValueDeclaration))
-  return $ TypeInstanceDeclaration (fromMaybe [] deps) className ty members
+  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty members
 
 -- |
 -- Parse a single declaration

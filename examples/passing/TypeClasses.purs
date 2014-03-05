@@ -16,18 +16,18 @@ test8 = \_ -> show $ "testing"
 
 data Data a = Data a
 
-instance (Prelude.Show a) => Prelude.Show (Data a) where
+instance showData :: (Prelude.Show a) => Prelude.Show (Data a) where
   show (Data a) = "Data (" ++ show a ++ ")"
 
 test3 = \_ -> show (Data "testing")
 
-instance Prelude.Monad Data where
+instance monadData :: Prelude.Monad Data where
   return = Data
   (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
 
-instance Prelude.Monad Maybe where
+instance monadMaybe :: Prelude.Monad Maybe where
   return = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
@@ -42,13 +42,13 @@ module TypeClasses2 where
 import Prelude
 import TypeClasses
 
-instance (Prelude.Show a) => Prelude.Show [a] where
+instance showArray :: (Prelude.Show a) => Prelude.Show [a] where
   show [] = "[]"
   show (x:xs) = show x ++ ", " ++ show xs
 
 test6 = \_ -> show ["testing"]
 
-instance Prelude.Monad ((->) r) where
+instance monadFunction :: Prelude.Monad ((->) r) where
   return a r = a
   (>>=) f g r = g (f r) r
 

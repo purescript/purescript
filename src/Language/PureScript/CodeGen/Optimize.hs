@@ -46,8 +46,6 @@ import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.Common (identToJs)
-import Language.PureScript.Sugar.TypeClasses
-       (mkDictionaryValueName)
 import Language.PureScript.Types
 
 -- |
@@ -316,10 +314,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   prelude = ModuleName [ProperName "Prelude"]
   effModule = ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"]
   -- The name of the type class dictionary for the Monad Eff instance
-  Right (Ident effDictName) = mkDictionaryValueName
-    effModule
-    (Qualified (Just prelude) (ProperName "Monad"))
-    [TypeConstructor (Qualified (Just effModule) (ProperName "Eff"))]
+  effDictName = "monadEff"
   -- Check if an expression represents the Monad Eff dictionary
   isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
   isEffDict (JSApp (JSAccessor prop (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
@@ -406,67 +401,62 @@ inlineOperator op f = everywhere (mkT convert)
 
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll
-  [ binary "+" "Num" tyNumber Add
-  , binary "-" "Num" tyNumber Subtract
-  , binary "*" "Num" tyNumber Multiply
-  , binary "/" "Num" tyNumber Divide
-  , binary "%" "Num" tyNumber Modulus
-  , unary "negate" "Num" tyNumber Negate
+  [ binary "numNumber" "+" "Num" tyNumber Add
+  , binary "numNumber" "-" "Num" tyNumber Subtract
+  , binary "numNumber" "*" "Num" tyNumber Multiply
+  , binary "numNumber" "/" "Num" tyNumber Divide
+  , binary "numNumber" "%" "Num" tyNumber Modulus
+  , unary  "numNumber" "negate" "Num" tyNumber Negate
 
-  , binary "<" "Ord" tyNumber LessThan
-  , binary ">" "Ord" tyNumber GreaterThan
-  , binary "<=" "Ord" tyNumber LessThanOrEqualTo
-  , binary ">=" "Ord" tyNumber GreaterThanOrEqualTo
+  , binary "ordNumber" "<" "Ord" tyNumber LessThan
+  , binary "ordNumber" ">" "Ord" tyNumber GreaterThan
+  , binary "ordNumber" "<=" "Ord" tyNumber LessThanOrEqualTo
+  , binary "ordNumber" ">=" "Ord" tyNumber GreaterThanOrEqualTo
 
-  , binary "==" "Eq" tyNumber EqualTo
-  , binary "/=" "Eq" tyNumber NotEqualTo
-  , binary "==" "Eq" tyString EqualTo
-  , binary "/=" "Eq" tyString NotEqualTo
-  , binary "==" "Eq" tyBoolean EqualTo
-  , binary "/=" "Eq" tyBoolean NotEqualTo
+  , binary "eqNumber" "==" "Eq" tyNumber EqualTo
+  , binary "eqNumber" "/=" "Eq" tyNumber NotEqualTo
+  , binary "eqString" "==" "Eq" tyString EqualTo
+  , binary "eqString" "/=" "Eq" tyString NotEqualTo
+  , binary "eqBoolean" "==" "Eq" tyBoolean EqualTo
+  , binary "eqBoolean" "/=" "Eq" tyBoolean NotEqualTo
 
-  , binaryFunction "shl" "Bits" tyNumber ShiftLeft
-  , binaryFunction "shr" "Bits" tyNumber ShiftRight
-  , binaryFunction "zshr" "Bits" tyNumber ZeroFillShiftRight
-  , binary "&" "Bits" tyNumber BitwiseAnd
-  , binary "|" "Bits" tyNumber BitwiseOr
-  , binary "^" "Bits" tyNumber BitwiseXor
-  , unary "complement" "Bits" tyNumber BitwiseNot
+  , binaryFunction "bitsNumber" "shl" "Bits" tyNumber ShiftLeft
+  , binaryFunction "bitsNumber" "shr" "Bits" tyNumber ShiftRight
+  , binaryFunction "bitsNumber" "zshr" "Bits" tyNumber ZeroFillShiftRight
+  , binary         "bitsNumber" "&" "Bits" tyNumber BitwiseAnd
+  , binary         "bitsNumber" "|" "Bits" tyNumber BitwiseOr
+  , binary         "bitsNumber" "^" "Bits" tyNumber BitwiseXor
+  , unary          "bitsNumber" "complement" "Bits" tyNumber BitwiseNot
 
-  , binary "&&" "BoolLike" tyBoolean And
-  , binary "||" "BoolLike" tyBoolean Or
-  , unary "not" "BoolLike" tyBoolean Not
+  , binary "boolLikeBoolean" "&&" "BoolLike" tyBoolean And
+  , binary "boolLikeBoolean" "||" "BoolLike" tyBoolean Or
+  , unary  "boolLikeBoolean" "not" "BoolLike" tyBoolean Not
   ]
   where
-  binary :: String -> String -> Type -> BinaryOperator -> JS -> JS
-  binary opString className classTy op = everywhere (mkT convert)
+  binary :: String -> String -> String -> Type -> BinaryOperator -> JS -> JS
+  binary dictName opString className classTy op = everywhere (mkT convert)
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName className classTy dict = JSBinary op x y
     convert other = other
     isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar _))) | longForm == identToJs (Op opString) = True
     isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | opString == op' = True
     isOp _ = False
-  binaryFunction :: String -> String -> Type -> BinaryOperator -> JS -> JS
-  binaryFunction fnName className classTy op = everywhere (mkT convert)
+  binaryFunction :: String -> String -> String -> Type -> BinaryOperator -> JS -> JS
+  binaryFunction dictName fnName className classTy op = everywhere (mkT convert)
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict className classTy dict = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName className classTy dict = JSBinary op x y
     convert other = other
     isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName == fnName' = True
     isOp _ = False
-  unary :: String -> String -> Type -> UnaryOperator -> JS -> JS
-  unary fnName className classTy op = everywhere (mkT convert)
+  unary :: String -> String -> String -> Type -> UnaryOperator -> JS -> JS
+  unary dictName fnName className classTy op = everywhere (mkT convert)
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict className classTy dict = JSUnary op x
+    convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict dictName className classTy dict = JSUnary op x
     convert other = other
     isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName' == fnName = True
     isOp _ = False
-  isOpDict className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
-    where
-    Right (Ident dictName) = mkDictionaryValueName
-      (ModuleName [ProperName "Prim"])
-      (Qualified (Just (ModuleName [ProperName "Prelude"])) (ProperName className))
-      [ty]
-  isOpDict _ _ _ = False
+  isOpDict dictName className ty (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
+  isOpDict _ _ _ _ = False

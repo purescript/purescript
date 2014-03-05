@@ -4,7 +4,7 @@ import Prelude
 
 data Maybe a = Nothing | Just a
 
-instance Prelude.Monad Maybe where
+instance monadMaybe :: Prelude.Monad Maybe where
   return = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a

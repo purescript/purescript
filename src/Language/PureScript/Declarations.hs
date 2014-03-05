@@ -134,7 +134,7 @@ data Declaration
   -- |
   -- A type instance declaration (dependencies, class name, instance type, member declarations)
   --
-  | TypeInstanceDeclaration [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
+  | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
   deriving (Show, D.Data, D.Typeable)
 
 -- |

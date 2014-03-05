@@ -8,11 +8,11 @@ class A a where
 class B a where
   b :: a -> Boolean
 
-instance A Number where
+instance aNumber :: A Number where
   a 0 = true
   a n = b (n - 1)
 
-instance B Number where
+instance bNumber :: B Number where
   b 0 = false
   b n = a (n - 1)
 

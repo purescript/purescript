@@ -3,6 +3,10 @@
 ## Breaking Changes
 
 - Support for blocks has been removed. (paf31)
+- Type class instances must now be named (paf31)
+
+    instance showNumber :: Show Number where
+      ...
 
 ### New Features
 
@@ -24,6 +28,7 @@
 - PSCI history is in XDG config (joneshf)
 - PSCI allows loading of modules from ~ paths (joneshf)
 - PSCI can accept a list of modules to load on start from the command line (paf31)
+- Type class instances are now named, to enable easier interop with Javascript (paf31)
 
 ### Bug Fixes
 
