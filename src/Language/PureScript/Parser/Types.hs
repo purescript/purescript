@@ -19,13 +19,16 @@ module Language.PureScript.Parser.Types (
     parseTypeAtom
 ) where
 
+import Control.Applicative
+import Control.Monad (when, unless)
+
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
-import Control.Applicative
+import Language.PureScript.Prim
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
-import Control.Monad (when, unless)
 
 parseNumber :: P.Parsec String ParseState Type
 parseNumber = const tyNumber <$> reserved "Number"

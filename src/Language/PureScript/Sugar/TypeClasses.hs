@@ -25,6 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.Values
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Prim
 
 import qualified Data.Map as M
 

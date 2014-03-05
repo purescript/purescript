@@ -43,6 +43,7 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.CodeGen.Optimize
 import Language.PureScript.CodeGen.Common
+import Language.PureScript.Prim
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a

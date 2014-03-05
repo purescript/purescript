@@ -56,6 +56,7 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Pretty
+import Language.PureScript.Prim
 
 import Control.Monad.State
 import Control.Monad.Error

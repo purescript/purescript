@@ -33,8 +33,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
-
-import Language.PureScript.TypeChecker.Monad (jsTypes)
+import Language.PureScript.Prim
 
 -- |
 -- The global export environment - every declaration exported from every module.
@@ -226,7 +225,8 @@ findExports :: [Module] -> Either String ExportEnvironment
 findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) primExports
     where
 
-    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` (M.keys jsTypes)) S.empty S.empty
+    -- The exported types from the Prim module
+    primExports = Exports (S.fromList $ (\(Qualified _ name) -> (name, [])) `map` (M.keys primTypes)) S.empty S.empty
 
     -- Add all of the exported declarations from a module to the global export environment
     addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
