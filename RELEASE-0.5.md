@@ -5,8 +5,8 @@
 - Support for blocks has been removed. (paf31)
 - Type class instances must now be named (paf31)
 
-    instance showNumber :: Show Number where
-      ...
+      instance showNumber :: Show Number where
+        ...
 
 ### New Features
 
