@@ -3,9 +3,6 @@
 
 ### Types
 
-    data Ref a where
-      Ref :: a -> Ref a
-
 
 ### Type Classes
 
@@ -70,41 +67,39 @@
 
 ### Type Class Instances
 
-    (Monad (m)) => instance Applicative m
+    (Monad ((m))) => instance applicativeFromMonad :: Applicative (m)
 
-    instance Bits Prim.Number
+    instance bitsNumber :: Bits (Prim.Number)
 
-    instance BoolLike Prim.Boolean
+    instance boolLikeBoolean :: BoolLike (Prim.Boolean)
 
-    instance Category Prim.Function
+    instance categoryArr :: Category (Prim.Function)
 
-    instance Eq Ref a
+    (Eq ((a))) => instance eqArray :: Eq ([a])
 
-    instance Eq Prim.String
+    instance eqBoolean :: Eq (Prim.Boolean)
 
-    instance Eq Prim.Number
+    instance eqNumber :: Eq (Prim.Number)
 
-    instance Eq Prim.Boolean
+    instance eqString :: Eq (Prim.String)
 
-    (Eq (a)) => instance Eq [a]
+    (Applicative ((f))) => instance functorFromApplicative :: Functor (f)
 
-    (Applicative (f)) => instance Functor f
+    instance numNumber :: Num (Prim.Number)
 
-    instance Num Prim.Number
+    instance ordNumber :: Ord (Prim.Number)
 
-    instance Ord Prim.Number
+    instance readBoolean :: Read (Prim.Boolean)
 
-    instance Prelude.Show Prim.Number
+    instance readNumber :: Read (Prim.Number)
 
-    instance Read Prim.String
+    instance readString :: Read (Prim.String)
 
-    instance Read Prim.Boolean
+    instance showBoolean :: Show (Prim.Boolean)
 
-    instance Read Prim.Number
+    instance showNumber :: Show (Prim.Number)
 
-    instance Show Prim.String
-
-    instance Show Prim.Boolean
+    instance showString :: Show (Prim.String)
 
 
 ### Values
@@ -126,8 +121,6 @@
     const :: forall b. forall a. a -> b -> a
 
     flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
-
-    liftRef :: forall b. forall a. (a -> a -> b) -> Ref a -> Ref a -> b
 
     numAdd :: Prim.Number -> Prim.Number -> Prim.Number
 
@@ -163,13 +156,9 @@
 
     numZshr :: Prim.Number -> Prim.Number -> Prim.Number
 
-    readNumber :: Prim.String -> Prim.Number
+    readNumberImpl :: Prim.String -> Prim.Number
 
-    refEq :: forall a. Ref a -> Ref a -> Prim.Boolean
-
-    refIneq :: forall a. Ref a -> Ref a -> Prim.Boolean
-
-    showNumber :: Prim.Number -> Prim.String
+    showNumberImpl :: Prim.Number -> Prim.String
 
     unsafeRefEq :: forall a. a -> a -> Prim.Boolean
 
@@ -190,9 +179,9 @@
 
 ### Type Class Instances
 
-    instance Monoid Prim.String
+    instance monoidArray :: Monoid ([a])
 
-    instance Monoid [a]
+    instance monoidString :: Monoid (Prim.String)
 
 
 ### Values
@@ -229,6 +218,8 @@
 
     when :: forall m. (Monad (m)) => Prim.Boolean -> m {  } -> m {  }
 
+    zipWithM :: forall c. forall b. forall a. forall m. (Monad (m)) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+
 
 ## Module Data.Maybe
 
@@ -244,13 +235,13 @@
 
 ### Type Class Instances
 
-    instance Prelude.Applicative Maybe
+    instance applicativeMaybe :: Applicative (Maybe)
 
-    instance Prelude.Functor Maybe
+    instance functorMaybe :: Functor (Maybe)
 
-    instance Prelude.Monad Maybe
+    instance monadMaybe :: Monad (Maybe)
 
-    (Show (a)) => instance Prelude.Show Maybe a
+    (Show ((a))) => instance showMaybe :: Show (Maybe a)
 
 
 ### Values
@@ -274,13 +265,13 @@
 
 ### Type Class Instances
 
-    instance Prelude.Applicative Either e
+    instance applicativeEither :: Applicative (Either e)
 
-    instance Prelude.Functor Either a
+    instance functorEither :: Functor (Either a)
 
-    instance Prelude.Monad Either e
+    instance monadEither :: Monad (Either e)
 
-    (Show (a),Show (b)) => instance Prelude.Show Either a b
+    (Show ((a)),Show ((b))) => instance showEither :: Show (Either a b)
 
 
 ### Values
@@ -298,13 +289,13 @@
 
 ### Type Class Instances
 
-    instance Prelude.Alternative Prim.Array
+    instance alternativeArray :: Alternative (Prim.Array)
 
-    instance Prelude.Functor Prim.Array
+    instance functorArray :: Functor (Prim.Array)
 
-    instance Prelude.Monad Prim.Array
+    instance monadArray :: Monad (Prim.Array)
 
-    (Prelude.Show (a)) => instance Prelude.Show [a]
+    (Show ((a))) => instance showArray :: Show ([a])
 
 
 ### Values
@@ -319,17 +310,23 @@
 
     concatMap :: forall b. forall a. [a] -> (a -> [b]) -> [b]
 
+    deleteAt :: forall a. Prim.Number -> Prim.Number -> [a] -> [a]
+
+    drop :: forall a. Prim.Number -> [a] -> [a]
+
     filter :: forall a. (a -> Prim.Boolean) -> [a] -> [a]
 
     find :: forall a. (a -> Prim.Boolean) -> [a] -> Maybe a
 
-    foldl :: forall b. forall a. (a -> b -> b) -> b -> [a] -> b
+    foldl :: forall b. forall a. (b -> a -> b) -> b -> [a] -> b
 
     foldr :: forall b. forall a. (a -> b -> a) -> a -> [b] -> a
 
     head :: forall a. [a] -> Maybe a
 
     indexOf :: forall a. [a] -> a -> Prim.Number
+
+    insertAt :: forall a. Prim.Number -> a -> [a] -> [a]
 
     isEmpty :: forall a. [a] -> Prim.Boolean
 
@@ -357,11 +354,38 @@
 
     sort :: forall a. [a] -> [a]
 
-    splice :: forall a. Prim.Number -> Prim.Number -> [a] -> [a] -> [a]
-
     tail :: forall a. [a] -> Maybe [a]
 
+    take :: forall a. Prim.Number -> [a] -> [a]
+
+    updateAt :: forall a. Prim.Number -> a -> [a] -> [a]
+
     zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
+
+
+## Module Data.Eq
+
+### Types
+
+    data Ref a where
+      Ref :: a -> Ref a
+
+
+### Type Classes
+
+
+### Type Class Instances
+
+    instance eqRef :: Eq (Ref a)
+
+
+### Values
+
+    liftRef :: forall b. forall a. (a -> a -> b) -> Ref a -> Ref a -> b
+
+    refEq :: forall a. Ref a -> Ref a -> Prim.Boolean
+
+    refIneq :: forall a. Ref a -> Ref a -> Prim.Boolean
 
 
 ## Module Data.Array.Unsafe
@@ -395,7 +419,7 @@
 
 ### Type Class Instances
 
-    (Prelude.Show (a),Prelude.Show (b)) => instance Prelude.Show Tuple a b
+    (Show ((a)),Show ((b))) => instance showTuple :: Show (Tuple a b)
 
 
 ### Values
@@ -593,7 +617,7 @@
 
 ### Type Class Instances
 
-    instance Prelude.Monad Eff e
+    instance monadEff :: Monad (Eff e)
 
 
 ### Values
@@ -611,6 +635,22 @@
     untilE :: forall e. Eff e Prim.Boolean -> Eff e {  }
 
     whileE :: forall a. forall e. Eff e Prim.Boolean -> Eff e a -> Eff e {  }
+
+
+## Module Control.Monad.Eff.Unsafe
+
+### Types
+
+
+### Type Classes
+
+
+### Type Class Instances
+
+
+### Values
+
+    unsafeInterleaveEff :: forall a. forall eff2. forall eff1. Eff eff1 a -> Eff eff2 a
 
 
 ## Module Random
@@ -694,7 +734,7 @@
 
 ### Values
 
-    print :: forall r. forall a. (Prelude.Show (a)) => a -> Eff (trace :: Trace | r) {  }
+    print :: forall r. forall a. (Show (a)) => a -> Eff (trace :: Trace | r) {  }
 
     trace :: forall r. Prim.String -> Eff (trace :: Trace | r) {  }
 
