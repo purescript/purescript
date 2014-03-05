@@ -82,7 +82,7 @@ data DeclarationRef
   -- A type class
   --
   | TypeClassRef ProperName
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- The data type of declarations

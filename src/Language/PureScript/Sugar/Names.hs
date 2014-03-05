@@ -20,6 +20,7 @@ import Data.Maybe (fromMaybe)
 import Data.Data
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
+import Data.List (find)
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad (foldM)
@@ -97,10 +98,20 @@ addEmptyModule env name = M.insert name (Exports S.empty S.empty S.empty) env
 -- |
 -- Adds a type belonging to a module to the export environment.
 --
-addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either String ExportEnvironment
-addType env mn name dctors = updateExportedModule env mn $ \m -> do
-    types <- addExport (exportedTypes m) (name, dctors)
+addType :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
+addType env mn name = updateExportedModule env mn $ \m -> do
+    types <- addExport (exportedTypes m) (name, [])
     return $ m { exportedTypes = types }
+
+-- |
+-- Adds a data constructor belonging to a type and module to the export environment.
+--
+addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> ProperName -> Either String ExportEnvironment
+addDataConstructor env mn tcon dcon = updateExportedModule env mn $ \m -> do
+    let types = exportedTypes m
+    let dcons = fromMaybe (error $ "Type '" ++ show tcon ++ "' is missing from exportedTypes") (tcon `lookup` (S.toList types))
+    let types' = S.insert (tcon, dcon : dcons) $ S.delete (tcon, dcons) types 
+    return $ m { exportedTypes = types' }
 
 -- |
 -- Adds a class to the export environment.
@@ -197,16 +208,42 @@ renameInModule imports (Module mn decls exps) =
 findExports :: [Module] -> Either String ExportEnvironment
 findExports = foldM addModule M.empty
     where
-    addModule env m@(Module mn ds exps) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds 
-    addDecl mn env (TypeClassDeclaration tcn _ ds) = do
+
+    -- Add all of the exported declarations from a module to the global export environment
+    addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
+    addModule env m@(Module mn ds exps) = rethrowForModule m $ foldM (addDecl mn exps) (addEmptyModule env mn) ds
+
+    -- Add a declaration from a module to the global export environment, ensuring it is exported
+    -- from the module it resides within
+    addDecl :: ModuleName -> Maybe [DeclarationRef] -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
+    addDecl mn exps env (TypeClassDeclaration tcn _ ds) | isExported (TypeClassRef tcn) exps = do
       env' <- addTypeClass env mn tcn
-      foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
-    addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)
-    addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
-    addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
-    addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
-    addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
-    addDecl _  env _ = return env
+      foldM (addClassMember mn exps) env' ds
+    addDecl mn exps env (DataDeclaration tn _ dcs) | isExported (TypeRef tn Nothing) exps = do
+      env' <- addType env mn tn
+      foldM (\env'' -> addDataConstructor env'' mn tn) env' (map fst dcs)
+    addDecl mn exps env (TypeSynonymDeclaration tn _ _) | isExported (TypeRef tn Nothing) exps = addType env mn tn
+    addDecl mn exps env (ExternDataDeclaration tn _)  | isExported (TypeRef tn Nothing) exps = addType env mn tn
+    addDecl mn exps env (ValueDeclaration name _ _ _) | isExported (ValueRef name) exps = addValue env mn name
+    addDecl mn exps env (ExternDeclaration _ name _ _) | isExported (ValueRef name) exps = addValue env mn name
+    addDecl _  _    env _ = return env
+
+    -- Add a class member from a module to the global export environment, ensuring it is exported
+    -- from the module it resides within
+    addClassMember :: ModuleName -> Maybe [DeclarationRef] -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
+    addClassMember mn exps env (TypeDeclaration name _) | isExported (ValueRef name) exps = addValue env mn name
+    addClassMember mn exps env _ = return env
+
+    -- Check whether a declaration is exported from a module. When checking if a type is exported
+    -- the specific data constructors are ignored, only the export for the type constructor is
+    -- tested for.
+    isExported :: DeclarationRef -> Maybe [DeclarationRef] -> Bool
+    isExported (TypeRef tn _) (Just exps) = any (typeMatches tn) exps
+        where
+        typeMatches tn (TypeRef tn' _) = tn == tn'
+        typeMatches _ _ = False
+    isExported dec (Just exps) = dec `elem` exps
+    isExported dec Nothing = True
 
 -- |
 -- Type representing a set of declarations being explicitly imported from a module
