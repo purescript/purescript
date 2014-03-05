@@ -98,20 +98,10 @@ addEmptyModule env name = M.insert name (Exports S.empty S.empty S.empty) env
 -- |
 -- Adds a type belonging to a module to the export environment.
 --
-addType :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
-addType env mn name = updateExportedModule env mn $ \m -> do
-    types <- addExport (exportedTypes m) (name, [])
+addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either String ExportEnvironment
+addType env mn name dctors = updateExportedModule env mn $ \m -> do
+    types <- addExport (exportedTypes m) (name, dctors)
     return $ m { exportedTypes = types }
-
--- |
--- Adds a data constructor belonging to a type and module to the export environment.
---
-addDataConstructor :: ExportEnvironment -> ModuleName -> ProperName -> ProperName -> Either String ExportEnvironment
-addDataConstructor env mn tcon dcon = updateExportedModule env mn $ \m -> do
-    let types = exportedTypes m
-    let dcons = fromMaybe (error $ "Type '" ++ show tcon ++ "' is missing from exportedTypes") (tcon `lookup` (S.toList types))
-    let types' = S.insert (tcon, dcon : dcons) $ S.delete (tcon, dcons) types 
-    return $ m { exportedTypes = types' }
 
 -- |
 -- Adds a class to the export environment.
@@ -211,39 +201,73 @@ findExports = foldM addModule M.empty
 
     -- Add all of the exported declarations from a module to the global export environment
     addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
-    addModule env m@(Module mn ds exps) = rethrowForModule m $ foldM (addDecl mn exps) (addEmptyModule env mn) ds
+    addModule env m@(Module mn ds Nothing) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
+    addModule env m@(Module mn ds (Just exps)) = rethrowForModule m $ do
+      env' <- foldM (addDecl mn) (addEmptyModule env mn) ds
+      filterExports mn exps env'
 
-    -- Add a declaration from a module to the global export environment, ensuring it is exported
-    -- from the module it resides within
-    addDecl :: ModuleName -> Maybe [DeclarationRef] -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
-    addDecl mn exps env (TypeClassDeclaration tcn _ ds) | isExported (TypeClassRef tcn) exps = do
+    -- Add a declaration from a module to the global export environment
+    addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
+    addDecl mn env (TypeClassDeclaration tcn _ ds) = do
       env' <- addTypeClass env mn tcn
-      foldM (addClassMember mn exps) env' ds
-    addDecl mn exps env (DataDeclaration tn _ dcs) | isExported (TypeRef tn Nothing) exps = do
-      env' <- addType env mn tn
-      foldM (\env'' -> addDataConstructor env'' mn tn) env' (map fst dcs)
-    addDecl mn exps env (TypeSynonymDeclaration tn _ _) | isExported (TypeRef tn Nothing) exps = addType env mn tn
-    addDecl mn exps env (ExternDataDeclaration tn _)  | isExported (TypeRef tn Nothing) exps = addType env mn tn
-    addDecl mn exps env (ValueDeclaration name _ _ _) | isExported (ValueRef name) exps = addValue env mn name
-    addDecl mn exps env (ExternDeclaration _ name _ _) | isExported (ValueRef name) exps = addValue env mn name
-    addDecl _  _    env _ = return env
+      foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
+    addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)
+    addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
+    addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
+    addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
+    addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
+    addDecl _  env _ = return env
 
-    -- Add a class member from a module to the global export environment, ensuring it is exported
-    -- from the module it resides within
-    addClassMember :: ModuleName -> Maybe [DeclarationRef] -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
-    addClassMember mn exps env (TypeDeclaration name _) | isExported (ValueRef name) exps = addValue env mn name
-    addClassMember mn exps env _ = return env
+-- |
+-- Filters the exports for a module to ensure only explicit exports are kept in the global exports
+-- environment.
+--
+filterExports :: ModuleName -> [DeclarationRef] -> ExportEnvironment -> Either String ExportEnvironment
+filterExports mn exps env = do
+  let moduleExports = fromMaybe (error "Module is missing") (mn `M.lookup` env)
+  moduleExports' <- filterModule exps moduleExports
+  return $ M.insert mn moduleExports' env
+  where
 
-    -- Check whether a declaration is exported from a module. When checking if a type is exported
-    -- the specific data constructors are ignored, only the export for the type constructor is
-    -- tested for.
-    isExported :: DeclarationRef -> Maybe [DeclarationRef] -> Bool
-    isExported (TypeRef tn _) (Just exps) = any (typeMatches tn) exps
-        where
-        typeMatches tn (TypeRef tn' _) = tn == tn'
-        typeMatches _ _ = False
-    isExported dec (Just exps) = dec `elem` exps
-    isExported dec Nothing = True
+  -- Filter the exports for the specific module
+  filterModule :: [DeclarationRef] -> Exports -> Either String Exports
+  filterModule exps exported = do
+    types <- foldM (filterTypes $ S.toList $ exportedTypes exported) S.empty exps
+    values <- foldM (filterValues $ exportedValues exported) S.empty exps
+    classes <- foldM (filterClasses $ exportedTypeClasses exported) S.empty exps
+    return exported { exportedTypes = types, exportedTypeClasses = classes, exportedValues = values }
+
+  -- Ensure the exported types and data constructors exist in the module and add them to the set of
+  -- exports
+  filterTypes :: [(ProperName, [ProperName])] -> S.Set (ProperName, [ProperName]) -> DeclarationRef -> Either String (S.Set (ProperName, [ProperName]))
+  filterTypes exps result (TypeRef name expDcons) = do
+    dcons <- maybe (throwError $ "Cannot export undefined type '" ++ show name ++ "'") return $ name `lookup` exps
+    dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
+    return $ S.insert (name, dcons') result
+  filterTypes exps result _ = return result
+
+  -- Ensure the exported data constructors exists for a type and add them to the list of exports
+  filterDcons :: ProperName -> [ProperName] -> [ProperName] -> ProperName -> Either String [ProperName]
+  filterDcons tcon exps result name =
+    if name `elem` exps
+    then return $ name : result
+    else throwError $ "Cannot export undefined data constructor '" ++ show name ++ "' for type '" ++ show tcon ++ "'"
+
+  -- Ensure the exported classes exist in the module and add them to the set of exports
+  filterClasses :: S.Set ProperName -> S.Set ProperName -> DeclarationRef -> Either String (S.Set ProperName)
+  filterClasses exps result (TypeClassRef name) =
+    if name `S.member` exps
+    then return $ S.insert name result
+    else throwError $ "Cannot export undefined type class '" ++ show name ++ "'"
+  filterClasses exps result _ = return result
+
+  -- Ensure the exported values exist in the module and add them to the set of exports
+  filterValues :: S.Set Ident -> S.Set Ident -> DeclarationRef -> Either String (S.Set Ident)
+  filterValues exps result (ValueRef name) =
+    if name `S.member` exps
+    then return $ S.insert name result
+    else throwError $ "Cannot export undefined value '" ++ show name ++ "'"
+  filterValues exps result _ = return result
 
 -- |
 -- Type representing a set of declarations being explicitly imported from a module
