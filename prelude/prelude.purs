@@ -55,7 +55,7 @@ module Prelude where
     read "true" = true
     read _ = false
 
-  foreign import readNumberImpl "function readNumber(n) {\
+  foreign import readNumberImpl "function readNumberImpl(n) {\
                                 \  return parseFloat(n);\
                                 \}" :: String -> Number
 
