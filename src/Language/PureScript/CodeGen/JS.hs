@@ -64,17 +64,14 @@ moduleToJs opts (Module name decls exps) env =
 --
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ val) e =
-  Just [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
-         , setExportProperty ident (var ident) ]
+  Just $ export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
 declToJs opts mp (BindingGroupDeclaration vals) e =
   Just $ concatMap (\(ident, val) ->
-           [ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
-           , setExportProperty ident (var ident) ]
+           export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    [ JSVariableIntroduction ctor (Just (go pn 0 tys []))
-    , setExportProperty (Escaped ctor) (JSVar ctor) ]
+    export (Escaped ctor) $ JSVariableIntroduction ctor (Just (go pn 0 tys []))
     where
     go pn _ [] values =
       JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))), ("values", JSArrayLiteral $ reverse values) ]
@@ -84,15 +81,15 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
 declToJs opts mp (DataBindingGroupDeclaration ds) e =
   Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ _ (ExternDeclaration _ ident (Just js) _) _ =
-  Just [js, setExportProperty ident (var ident)]
+  Just $ export ident js
 declToJs _ _ _ _ = Nothing
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for exporting a
 -- declaration from a module.
 --
-setExportProperty :: Ident -> JS -> JS
-setExportProperty ident = JSAssignment (accessor ident (JSVar "module"))
+export :: Ident -> JS -> [JS]
+export ident value = [ value, JSAssignment (accessor ident (JSVar "module")) (var ident) ]
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
