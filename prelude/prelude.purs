@@ -780,11 +780,11 @@ module Data.String where
                            \}" :: Number -> Number -> String -> String
 
   foreign import toLower "function toLower(s) {\
-                         \  return s.toLower();\
+                         \  return s.toLowerCase();\
                          \}" :: String -> String
 
   foreign import toUpper "function toUpper(s) {\
-                         \  return s.toUpper();\
+                         \  return s.toUpperCase();\
                          \}" :: String -> String
 
   foreign import trim "function trim(s) {\
