@@ -42,6 +42,7 @@
 
 - The [purescript-date](https://github.com/purescript/purescript-date) library provides basic date/time functions
 - The [purescript-reactive](https://github.com/purescript/purescript-reactive) and [purescript-reactive-jquery]() libraries provide reactive variables, and bindings to jQuery properties.
+- The [purescript-generics](https://github.com/purescript/purescript-generics) library provides generic programming capabilities.
 
 ### Documentation
 
