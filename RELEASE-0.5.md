@@ -30,6 +30,7 @@
 - PSCI can accept a list of modules to load on start from the command line (paf31)
 - Type class instances are now named, to enable easier interop with Javascript (paf31)
 - Class names no longer need to be qualified in instance declarations (garyb)
+- Module exports can now be specified explicitly (garyb)
 
 ### Bug Fixes
 
