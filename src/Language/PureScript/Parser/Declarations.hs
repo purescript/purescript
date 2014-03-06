@@ -94,7 +94,7 @@ parseImportDeclaration = do
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
 parseDeclarationRef = ValueRef <$> parseIdent
                   <|> do name <- properName
-                         dctors <- P.optionMaybe $ parens (Just <$> commaSep properName <|> lexeme (P.string "..") *> pure Nothing)
+                         dctors <- P.optionMaybe $ parens (lexeme (P.string "..") *> pure Nothing <|> Just <$> commaSep properName)
                          return $ maybe (TypeClassRef name) (TypeRef name) dctors
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
