@@ -23,6 +23,7 @@ import Language.PureScript.Kinds
 import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Declarations
+import Language.PureScript.Prim
 
 import Data.Data
 import Data.Maybe
@@ -84,20 +85,10 @@ data Environment = Environment {
   } deriving (Show)
 
 -- |
--- The basic types existing in the external javascript environment
---
-jsTypes ::M.Map (Qualified ProperName) Kind
-jsTypes = M.fromList [ (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Function"), FunKind Star (FunKind Star Star))
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array"), FunKind Star Star)
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "String"), Star)
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Number"), Star)
-                     , (Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Boolean"), Star) ]
-
--- |
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty jsTypes M.empty M.empty []
+initEnvironment = Environment M.empty primTypes M.empty M.empty []
 
 -- |
 -- Temporarily bind a collection of names to values

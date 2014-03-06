@@ -25,7 +25,7 @@ import Data.Data
 import Data.Graph
 import Data.Generics
 import Data.List (nub, intersect)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>), pure)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
@@ -36,13 +36,13 @@ import Language.PureScript.Types
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
 createBindingGroupsModule :: [Module] -> Either String [Module]
-createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups name ds
+createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> createBindingGroups name ds <*> pure exps
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule = map $ \(Module name ds) -> Module name (collapseBindingGroups ds)
+collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
 
 -- |
 -- Replace all sets of mutually-recursive declarations with binding groups

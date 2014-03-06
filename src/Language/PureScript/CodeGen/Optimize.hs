@@ -47,6 +47,7 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Types
+import Language.PureScript.Prim
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code

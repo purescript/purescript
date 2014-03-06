@@ -88,14 +88,14 @@ parseImportDeclaration = do
   reserved "import"
   indented
   moduleName' <- moduleName
-  idents <- P.optionMaybe $ parens $ commaSep1 parseExplicitImport
+  idents <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   return $ ImportDeclaration moduleName' idents
 
-parseExplicitImport :: P.Parsec String ParseState ImportType
-parseExplicitImport = NameImport <$> parseIdent
+parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
+parseDeclarationRef = ValueRef <$> parseIdent
                   <|> do name <- properName
                          dctors <- P.optionMaybe $ parens (Just <$> commaSep1 properName <|> lexeme (P.string "..") *> pure Nothing)
-                         return $ maybe (TypeClassImport name) (TypeImport name) dctors
+                         return $ maybe (TypeClassRef name) (TypeRef name) dctors
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
@@ -146,9 +146,10 @@ parseModule = do
   reserved "module"
   indented
   name <- moduleName
+  exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   _ <- lexeme $ P.string "where"
   decls <- mark (P.many (same *> parseDeclaration))
-  return $ Module name decls
+  return $ Module name decls exports
 
 -- |
 -- Parse a collection of modules

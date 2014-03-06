@@ -27,9 +27,10 @@ import Data.List (intercalate)
 
 -- |
 -- Generate foreign imports for all declarations in a module
+-- TODO: only expose items listed in "exps"
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module mn decls) env =
+moduleToPs (Module mn decls exps) env =
   "module " ++ runModuleName mn ++ " where\n" ++
   (intercalate "\n" . map ("  " ++) . concatMap (declToPs mn env) $ decls)
 

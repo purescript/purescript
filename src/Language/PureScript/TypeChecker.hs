@@ -37,6 +37,7 @@ import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 import Language.PureScript.Sugar.TypeClasses
+import Language.PureScript.Prim
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do

@@ -25,6 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.Values
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Prim
 
 import qualified Data.Map as M
 
@@ -47,7 +48,7 @@ desugarTypeClasses :: [Module] -> Either String [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
-desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl name) decls
+desugarModule (Module name decls exps) = Module name <$> concat <$> mapM (desugarDecl name) decls <*> pure exps
 
 -- |
 -- Desugar type class and type class instance declarations

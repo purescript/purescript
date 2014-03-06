@@ -33,7 +33,7 @@ import Language.PureScript.DeadCodeElimination as P
 import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
 import Control.Monad.State.Lazy
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>), pure)
 import qualified Data.Map as M
 
 -- |
@@ -59,9 +59,9 @@ compile :: Options -> [Module] -> Either String (String, String, Environment)
 compile opts ms = do
   sorted <- sortModules ms
   desugared <- desugar sorted
-  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName' decls) -> do
+  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName' decls exps) -> do
     modify (\s -> s { checkCurrentModule = Just moduleName' })
-    Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls
+    Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls <*> pure exps
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
