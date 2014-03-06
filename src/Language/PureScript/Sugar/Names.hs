@@ -131,12 +131,25 @@ addExport exports name =
 --
 desugarImports :: [Module] -> Either String [Module]
 desugarImports modules = do
-  exports <- findExports modules
-  mapM (renameInModule' exports) modules
+  unfilteredExports <- findExports modules
+  exports <- foldM filterModuleExports unfilteredExports modules
+  mapM (renameInModule' unfilteredExports exports) modules
   where
-  renameInModule' exports m = rethrowForModule m $ do
-    imports <- resolveImports exports m
-    renameInModule imports exports m
+
+  -- Filters the exports for a module in the global exports environment so that only explicitly
+  -- exported members remain. If the module does not explicitly export anything, everything is
+  -- exported.
+  filterModuleExports :: ExportEnvironment -> Module -> Either String ExportEnvironment
+  filterModuleExports env (Module mn _ (Just exps)) = filterExports mn exps env
+  filterModuleExports env _ = return env
+
+  -- Rename and check all the names within a module. We tweak the global exports environment so
+  -- the module has access to an unfiltered list of its own members.
+  renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either String Module
+  renameInModule' unfilteredExports exports m@(Module mn _ _) = rethrowForModule m $ do
+    let exports' = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
+    imports <- resolveImports exports' m
+    renameInModule imports exports' m
 
 -- |
 -- Rethrow an error with the name of the current module in the case of a failure
@@ -229,10 +242,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 
   -- Add all of the exported declarations from a module to the global export environment
   addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
-  addModule env m@(Module mn ds Nothing) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
-  addModule env m@(Module mn ds (Just exps)) = rethrowForModule m $ do
-    env' <- foldM (addDecl mn) (addEmptyModule env mn) ds
-    filterExports mn exps env'
+  addModule env m@(Module mn ds _) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
 
   -- Add a declaration from a module to the global export environment
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
@@ -330,9 +340,7 @@ resolveImports env (Module currentModule decls _) =
 -- Extends the local environment for a module by resolving an import of another module.
 --
 resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ExplicitImports -> Either String ImportEnvironment
-resolveImport currentModule importModule exps imps i = case i of
-  Nothing -> importAll
-  Just expl -> foldM importExplicit imps expl
+resolveImport currentModule importModule exps imps = maybe importAll (foldM importExplicit imps)
   where
 
   -- Import everything from a module
