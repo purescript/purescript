@@ -2,7 +2,8 @@ module M1 (X(X), Z(..), foo) where
 
   data X = X | Y
   data Z = Z
-  
+
+  foo :: Number  
   foo = 0
 
 module Main where
