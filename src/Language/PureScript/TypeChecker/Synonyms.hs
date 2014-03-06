@@ -20,7 +20,6 @@ module Language.PureScript.TypeChecker.Synonyms (
 
 import Language.PureScript.Types
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad (Environment(..))
 
 import Control.Applicative ((<$>))
 import Data.Maybe (fromMaybe)
@@ -33,8 +32,8 @@ import Control.Monad.Error
 -- |
 -- Build a type substitution for a type synonym
 --
-buildTypeSubstitution :: Environment -> ModuleName -> Qualified ProperName -> Int -> Type -> Either String (Maybe Type)
-buildTypeSubstitution env moduleName name n = go n []
+buildTypeSubstitution :: Qualified ProperName -> Int -> Type -> Either String (Maybe Type)
+buildTypeSubstitution name n = go n []
   where
   go :: Int -> [Type] -> Type -> Either String (Maybe Type)
   go 0 args (TypeConstructor ctor) | name == ctor = return (Just $ SaturatedTypeSynonym ctor args)
@@ -45,16 +44,16 @@ buildTypeSubstitution env moduleName name n = go n []
 -- |
 -- Replace all instances of a specific type synonym with the @SaturatedTypeSynonym@ data constructor
 --
-saturateTypeSynonym :: (Data d) => Environment -> ModuleName -> Qualified ProperName -> Int -> d -> Either String d
-saturateTypeSynonym env moduleName name n = everywhereM' (mkM replace)
+saturateTypeSynonym :: (Data d) => Qualified ProperName -> Int -> d -> Either String d
+saturateTypeSynonym name n = everywhereM' (mkM replace)
   where
-  replace t = fromMaybe t <$> buildTypeSubstitution env moduleName name n t
+  replace t = fromMaybe t <$> buildTypeSubstitution name n t
 
 -- |
 -- Replace all type synonyms with the @SaturatedTypeSynonym@ data constructor
 --
-saturateAllTypeSynonyms :: (Data d) => Environment -> ModuleName -> [(Qualified ProperName, Int)] -> d -> Either String d
-saturateAllTypeSynonyms env moduleName syns d = foldM (\result (name, n) -> saturateTypeSynonym env moduleName name n result) d syns
+saturateAllTypeSynonyms :: (Data d) => [(Qualified ProperName, Int)] -> d -> Either String d
+saturateAllTypeSynonyms syns d = foldM (\result (name, n) -> saturateTypeSynonym name n result) d syns
 
 
 

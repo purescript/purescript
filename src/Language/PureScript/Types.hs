@@ -146,6 +146,7 @@ replaceTypeVars = replaceTypeVars' []
     go _ ty = ty
   genName orig inUse = try 0
     where
+    try :: Integer -> String
     try n | (orig ++ show n) `elem` inUse = try (n + 1)
           | otherwise = orig ++ show n
 

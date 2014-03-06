@@ -64,7 +64,7 @@ compile opts ms = do
     Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls <*> pure exps
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
-  let elim = if null entryPoints then regrouped else eliminateDeadCode env entryPoints regrouped
+  let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let js = mapMaybe (flip (moduleToJs opts) env) elim
   let exts = intercalate "\n" . map (`moduleToPs` env) $ elim
   js' <- case mainModuleIdent of

@@ -34,8 +34,6 @@ desugarDo = everywhereM (mkM replace)
   where
   prelude :: ModuleName
   prelude = ModuleName [ProperName "Prelude"]
-  ret :: Value
-  ret = Var (Qualified (Just prelude) (Ident "ret"))
   bind :: Value
   bind = Var (Qualified (Just prelude) (Op ">>="))
   replace :: Value -> Either String Value

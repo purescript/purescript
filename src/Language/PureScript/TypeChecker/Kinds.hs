@@ -132,7 +132,6 @@ infer (TypeVar v) = do
   UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
 infer (TypeConstructor v) = do
   env <- liftCheck getEnv
-  Just moduleName <- checkCurrentModule <$> get
   case M.lookup v (types env) of
     Nothing -> UnifyT . lift . throwError $ "Unknown type constructor '" ++ show v ++ "'" ++ show (M.keys (types env))
     Just kind -> return kind

@@ -24,8 +24,6 @@ module Language.PureScript.CodeGen.JS (
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
-import Data.Data (Data)
-import Data.Generics (mkQ, everything)
 
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
@@ -50,7 +48,7 @@ import Language.PureScript.Prim
 -- module.
 --
 moduleToJs :: Options -> Module -> Environment -> Maybe JS
-moduleToJs opts (Module name decls exps) env =
+moduleToJs opts (Module name decls _) env =
   case jsDecls of
     [] -> Nothing
     _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar "_ps")) $
@@ -73,6 +71,7 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
     export (Escaped ctor) $ JSVariableIntroduction ctor (Just (go pn 0 tys []))
     where
+    go :: ProperName -> Integer -> [Type] -> [JS] -> JS
     go pn _ [] values =
       JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))), ("values", JSArrayLiteral $ reverse values) ]
     go pn index (_ : tys') values =

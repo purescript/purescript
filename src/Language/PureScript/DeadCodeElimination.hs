@@ -25,22 +25,21 @@ import Data.Maybe (mapMaybe)
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Declarations
-import Language.PureScript.TypeChecker.Monad
 
 -- |
 -- Eliminate all declarations which are not a transitive dependency of the entry point module
 --
-eliminateDeadCode :: Environment -> [ModuleName] -> [Module] -> [Module]
-eliminateDeadCode env entryPoints ms =
-  let declarations = concatMap (declarationsByModule env) ms
+eliminateDeadCode :: [ModuleName] -> [Module] -> [Module]
+eliminateDeadCode entryPoints ms =
+  let declarations = concatMap declarationsByModule ms
       (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
       entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
   in flip map ms $ \(Module moduleName ds exps) -> Module moduleName (filter (isUsed moduleName graph vertexFor entryPointVertices) ds) exps
 
 type Key = (ModuleName, Either Ident ProperName)
 
-declarationsByModule :: Environment -> Module -> [(Key, [Key])]
-declarationsByModule env (Module moduleName ds _) = concatMap go ds
+declarationsByModule :: Module -> [(Key, [Key])]
+declarationsByModule (Module moduleName ds _) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
   go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies moduleName d)]

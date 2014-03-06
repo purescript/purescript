@@ -18,7 +18,6 @@
 module Data.Generics.Extras where
 
 import Data.Data
-import Data.Maybe (fromMaybe)
 
 -- |
 -- Apply a top-down monadic transformation everywhere

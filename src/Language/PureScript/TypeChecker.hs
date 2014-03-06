@@ -29,14 +29,12 @@ import Data.Maybe
 import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.Error
-import Data.Either (rights, lefts)
 
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
-import Language.PureScript.Sugar.TypeClasses
 import Language.PureScript.Prim
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
@@ -79,7 +77,7 @@ addTypeClassDictionaries entries =
 
 checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
-checkTypeClassInstance m (TypeConstructor ctor) = do
+checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
   when (ctor `M.member` typeSynonyms env) $ throwError "Type synonym instances are disallowed"
   return ()
@@ -170,7 +168,7 @@ typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = d
   env <- getEnv
   guardWith ("Fixity declaration with no binding: " ++ name) $ M.member (moduleName, Op name) $ names env
   return $ d : ds
-typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName idents) : rest) = do
+typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _) : rest) = do
   env <- getEnv
   let instances = filter (\tcd ->
                     let Qualified (Just mn) _ = tcdName tcd in
@@ -182,11 +180,9 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName ident
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@TypeClassDeclaration{} : rest) = do
-  env <- getEnv
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(TypeInstanceDeclaration dictName deps className tys _) : rest) = do
-  env <- getEnv
   mapM_ (checkTypeClassInstance moduleName) tys
   forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
   addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular]

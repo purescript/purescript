@@ -30,7 +30,7 @@ import Data.List (intercalate)
 -- TODO: only expose items listed in "exps"
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module mn decls exps) env =
+moduleToPs (Module mn decls _) env =
   "module " ++ runModuleName mn ++ " where\n" ++
   (intercalate "\n" . map ("  " ++) . concatMap (declToPs mn env) $ decls)
 

@@ -25,9 +25,7 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.Prim
 
-import Data.Data
 import Data.Maybe
-import Data.Generics (mkT, everywhere)
 
 import Control.Applicative
 import Control.Monad.State

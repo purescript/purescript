@@ -107,9 +107,7 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (Object row1) (Object row2) = row1 =?= row2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
-  unifyTypes' (TypeConstructor c1) (TypeConstructor c2) = do
-    env <- getEnv
-    Just moduleName <- checkCurrentModule <$> get
+  unifyTypes' (TypeConstructor c1) (TypeConstructor c2) =
     guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (c1 == c2)
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
@@ -307,10 +305,10 @@ typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String
 typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ (TypeVar v) t = Just [(v, t)]
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
-typeHeadsAreEqual m e (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
 typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
-typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e m name args of
+typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual _ _ _ _ = Nothing
@@ -408,8 +406,6 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
-   env <- getEnv
-   Just moduleName <- checkCurrentModule <$> get
    dicts <- getTypeClassDictionaries
    (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
    return (foldl App val (map (flip TypeClassDictionary dicts) constraints), ty')
@@ -427,18 +423,17 @@ replaceVarWithUnknown ident ty = do
 -- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
 -- better error messages during unification.
 --
-replaceAllTypeSynonyms' :: (D.Data d) => Environment -> ModuleName -> d -> Either String d
-replaceAllTypeSynonyms' env moduleName d =
+replaceAllTypeSynonyms' :: (D.Data d) => Environment -> d -> Either String d
+replaceAllTypeSynonyms' env d =
   let
     syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
   in
-    saturateAllTypeSynonyms env moduleName syns d
+    saturateAllTypeSynonyms syns d
 
 replaceAllTypeSynonyms :: (Functor m, Monad m, MonadState CheckState m, MonadError String m) => (D.Data d) => d -> m d
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
-  either throwError return $ replaceAllTypeSynonyms' env moduleName d
+  either throwError return $ replaceAllTypeSynonyms' env d
 
 -- |
 -- \"Desaturate\" @SaturatedTypeSynonym@s
@@ -452,19 +447,18 @@ desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
 -- |
 -- Replace a type synonym and its arguments with the aliased type
 --
-expandTypeSynonym' :: Environment -> ModuleName -> Qualified ProperName -> [Type] -> Either String Type
-expandTypeSynonym' env moduleName name args =
+expandTypeSynonym' :: Environment -> Qualified ProperName -> [Type] -> Either String Type
+expandTypeSynonym' env name args =
   case M.lookup name (typeSynonyms env) of
     Just (synArgs, body) -> do
       let repl = replaceAllTypeVars (zip synArgs args) body
-      replaceAllTypeSynonyms' env moduleName repl
+      replaceAllTypeSynonyms' env repl
     Nothing -> error "Type synonym was not defined"
 
 expandTypeSynonym :: (Functor m, Monad m, MonadState CheckState m, MonadError String m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
-  either throwError return $ expandTypeSynonym' env moduleName name args
+  either throwError return $ expandTypeSynonym' env name args
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
@@ -531,13 +525,11 @@ infer' (Var var) = do
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
   case ty of
     ConstrainedType constraints ty' -> do
-      env <- getEnv
       dicts <- getTypeClassDictionaries
       return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
@@ -588,14 +580,13 @@ inferBinder val (BooleanBinder _) = val =?= tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
   case M.lookup ctor (dataConstructors env) of
     Just ty -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
       go binders fn
         where
         go [] ty' = do
-          subsumes Nothing val ty'
+          _ <- subsumes Nothing val ty'
           return M.empty
         go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
           M.union <$> inferBinder obj binder <*> go binders' ret
@@ -649,17 +640,6 @@ checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
   return $ r : rs
 
 -- |
--- Check that a local variable name is not already used
---
-assignVariable :: Ident -> UnifyT Type Check ()
-assignVariable name = do
-  env <- checkEnv <$> get
-  Just moduleName <- checkCurrentModule <$> get
-  case M.lookup (moduleName, name) (names env) of
-    Just _ -> UnifyT . lift . throwError $ "Variable with name " ++ show name ++ " already exists."
-    _ -> return ()
-
--- |
 -- Generate a new skolem constant
 --
 newSkolemConstant :: UnifyT Type Check Int
@@ -711,8 +691,6 @@ check' val (ForAll ident ty _) = do
   val' <- check val sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
 check' val t@(ConstrainedType constraints ty) = do
-  env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
   dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
@@ -747,7 +725,7 @@ check' (Abs (Right _) _) _ = error "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (ret', app) <- checkFunctionApplication f' ft arg
-  subsumes Nothing ret' ret
+  _ <- subsumes Nothing ret' ret
   return $ TypedValue True app ret
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
@@ -797,7 +775,6 @@ check' (Accessor prop val) ty = do
   return $ TypedValue True (Accessor prop val') ty
 check' (Constructor c) ty = do
   env <- getEnv
-  Just moduleName <- checkCurrentModule <$> get
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError $ "Constructor " ++ show c ++ " is undefined"
     Just ty1 -> do
@@ -875,9 +852,7 @@ checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   checkFunctionApplication fn ty arg
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
-  env <- getEnv
   dicts <- getTypeClassDictionaries
-  Just moduleName <- checkCurrentModule <$> get
   checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg
 checkFunctionApplication' _ fnTy arg = throwError $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
@@ -910,8 +885,8 @@ subsumes' val ty1 (ForAll ident ty2 sco) =
       subsumes val ty1 sk
     Nothing -> throwError "Skolem variable scope is unspecified"
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
-  subsumes Nothing arg2 arg1
-  subsumes Nothing ret1 ret2
+  _ <- subsumes Nothing arg2 arg1
+  _ <- subsumes Nothing ret1 ret2
   return val
 subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
   ty1 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
@@ -920,9 +895,7 @@ subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
   ty2 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
-  env <- getEnv
   dicts <- getTypeClassDictionaries
-  Just moduleName <- checkCurrentModule <$> get
   _ <- subsumes' Nothing ty1 ty2
   return . Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)
 subsumes' val (Object r1) (Object r2) = do
@@ -937,14 +910,14 @@ subsumes' val (Object r1) (Object r2) = do
   go [] ts2 r1' r2' = r1' =?= rowFromList (ts2, r2')
   go ts1 [] r1' r2' = r2' =?= rowFromList (ts1, r1')
   go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
-    | p1 == p2 = do subsumes Nothing ty1 ty2
+    | p1 == p2 = do _ <- subsumes Nothing ty1 ty2
                     go ts1 ts2 r1' r2'
     | p1 < p2 = do rest <- fresh
                    r2' =?= RCons p1 ty1 rest
                    go ts1 ((p2, ty2) : ts2) r1' rest
-    | p1 > p2 = do rest <- fresh
-                   r1' =?= RCons p2 ty2 rest
-                   go ((p1, ty1) : ts1) ts2 rest r2'
+    | otherwise = do rest <- fresh
+                     r1' =?= RCons p2 ty2 rest
+                     go ((p1, ty1) : ts1) ts2 rest r2'
 subsumes' val ty1 ty2@(Object _) = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2

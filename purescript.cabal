@@ -74,6 +74,7 @@ library
     buildable: True
     hs-source-dirs: src
     other-modules:
+    ghc-options: -Wall -O2
 
 executable psc
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,

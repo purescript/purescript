@@ -33,8 +33,7 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Arrow (second)
 
-import Data.List (intercalate)
-import Language.PureScript.CodeGen.Common (identToJs, moduleNameToJs)
+import Language.PureScript.CodeGen.Common (identToJs)
 
 type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
 
@@ -154,9 +153,6 @@ typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclarat
   lookupTypeClass m = maybe (Left $ "Type class " ++ show className ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (qualify mn className) m
   lookupIdent members = maybe (Left $ "Type class " ++ show className ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ _ = error "Invalid declaration in type instance definition"
-
-qualifiedToString :: ModuleName -> Qualified ProperName -> String
-qualifiedToString mn (Qualified _ pn) = moduleNameToJs mn ++ "_" ++ runProperName pn
 
 -- |
 -- Generate a name for a type class dictionary member, based on the module name, class name, type name and
