@@ -6,6 +6,9 @@ module M1 (X(X), Z(..), foo) where
   foo :: Number  
   foo = 0
 
+  bar :: Number
+  bar = 1
+
 module Main where
 
   import M1

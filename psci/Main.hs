@@ -172,13 +172,18 @@ completion = completeWord Nothing " \t\n\r" findCompletions
     files <- listFiles str
     let matches = filter (isPrefixOf str) (names ms)
     return $ sortBy sorter $ map simpleCompletion matches ++ files
-  getDeclName :: P.Declaration -> Maybe P.Ident
-  getDeclName (P.ValueDeclaration ident _ _ _) = Just ident
-  getDeclName _ = Nothing
+  getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
+  getDeclName Nothing (P.ValueDeclaration ident _ _ _) = Just ident
+  getDeclName (Just exts) (P.ValueDeclaration ident _ _ _) | isExported = Just ident
+    where
+    isExported = flip any exts $ \e -> case e of
+      P.ValueRef ident' -> ident == ident'
+      _ -> False
+  getDeclName _ _ = Nothing
   names :: [P.Module] -> [String]
   names ms = nub [ show qual
-              | P.Module moduleName ds _ <- ms
-              , ident <- mapMaybe getDeclName ds
+              | P.Module moduleName ds exts <- ms
+              , ident <- mapMaybe (getDeclName exts) ds
               , qual <- [ P.Qualified Nothing ident
                         , P.Qualified (Just moduleName) ident]
               ]
