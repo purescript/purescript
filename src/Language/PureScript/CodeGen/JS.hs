@@ -144,11 +144,11 @@ extendObj obj sts = iife
   objAssign = JSVariableIntroduction newObj (Just $ JSObjectLiteral [])
   copy = JSForIn key obj test
   (newObj, key) = runGen ["newObj", "key"] ((,) <$> fresh <*> fresh)
-  --(newObj, key) = runGen (map identToJs (unusedNames obj)) ((,) <$> fresh <*> fresh)
+  --(newObj, key) = runGen (map identToJs (unusedNames block)) ((,) <$> fresh <*> fresh)
   test = JSBlock [JSIfElse cond assign Nothing]
   cond = JSApp (JSAccessor "hasOwnProperty" obj) [JSVar key]
   assign = JSBlock [JSAssignment (JSIndexer (JSVar key) (JSVar newObj)) (JSIndexer (JSVar key) obj)]
-  extensions = map (uncurry JSAssignment . first ((`JSIndexer` JSVar newObj) . JSVar)) sts
+  extensions = map (uncurry JSAssignment . first (`JSAccessor` JSVar newObj)) sts
   ret = [JSReturn (JSVar newObj)]
 
 -- |
