@@ -57,6 +57,7 @@ import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Pretty
 import Language.PureScript.Prim
+import qualified Language.PureScript.Constants as C
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -197,7 +198,7 @@ typesOf mainModuleName moduleName vals = do
           ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
           return (ident, (TypedValue True val'' ty, ty))
       -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
-      when (Just moduleName == mainModuleName && fst e == Ident "main") $ do
+      when (Just moduleName == mainModuleName && fst e == Ident C.main) $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
       -- Make sure unification variables do not escape

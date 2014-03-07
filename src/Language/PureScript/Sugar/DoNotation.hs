@@ -25,6 +25,8 @@ import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
 -- and all @DoNotationLet@ constructors with let expressions.
@@ -33,9 +35,9 @@ desugarDo :: (Data d) => d -> Either String d
 desugarDo = everywhereM (mkM replace)
   where
   prelude :: ModuleName
-  prelude = ModuleName [ProperName "Prelude"]
+  prelude = ModuleName [ProperName C.prelude]
   bind :: Value
-  bind = Var (Qualified (Just prelude) (Op ">>="))
+  bind = Var (Qualified (Just prelude) (Op (C.>>=)))
   replace :: Value -> Either String Value
   replace (Do els) = go els
   replace other = return other

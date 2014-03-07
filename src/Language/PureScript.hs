@@ -30,6 +30,8 @@ import Language.PureScript.Options as P
 import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.DeadCodeElimination as P
 
+import qualified Language.PureScript.Constants as C
+
 import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
 import Control.Monad.State.Lazy
@@ -69,9 +71,9 @@ compile opts ms = do
   let exts = intercalate "\n" . map (`moduleToPs` env) $ elim
   js' <- case mainModuleIdent of
     Just mmi -> do
-      when ((mmi, Ident "main") `M.notMember` names env) $
-        Left $ show mmi ++ ".main is undefined"
-      return $ js ++ [JSApp (JSAccessor "main" (JSAccessor (moduleNameToJs mmi) (JSVar "_ps"))) []]
+      when ((mmi, Ident C.main) `M.notMember` names env) $
+        Left $ show mmi ++ "." ++ C.main ++ " is undefined"
+      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar C._ps))) []]
     _ -> return js
   return (prettyPrintJS [wrapExportsContainer opts js'], exts, env)
   where

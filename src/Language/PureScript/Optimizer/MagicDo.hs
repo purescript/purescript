@@ -27,6 +27,8 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Names
 
+import qualified Language.PureScript.Constants as C
+
 magicDo :: Options -> JS -> JS
 magicDo opts | optionsMagicDo opts = inlineST . magicDo'
              | otherwise = id
@@ -63,10 +65,10 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
     JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
   -- Desugar untilE
-  convert (JSApp (JSApp f [arg]) []) | isEffFunc "untilE" f =
+  convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn (JSObjectLiteral []) ])) []
   -- Desugar whileE
-  convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc "whileE" f =
+  convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn (JSObjectLiteral []) ])) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
@@ -76,21 +78,31 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
   isReturn _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) | prop == identToJs (Op ">>=") = True
-  isBindPoly (JSIndexer (JSStringLiteral ">>=") (JSAccessor "Prelude" (JSVar "_ps"))) = True
+  isBindPoly (JSAccessor prop (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                  _ps == C._ps &&
+                                                                  prop == identToJs (Op (C.>>=)) = True
+  isBindPoly (JSIndexer (JSStringLiteral bind) (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                                   _ps == C._ps &&
+                                                                                   bind == (C.>>=) = True
   isBindPoly _ = False
   -- Check if an expression represents the polymorphic return function
-  isRetPoly (JSAccessor "$return" (JSAccessor "Prelude" (JSVar "_ps"))) = True
-  isRetPoly (JSIndexer (JSStringLiteral "return") (JSAccessor "Prelude" (JSVar "_ps"))) = True
+  isRetPoly (JSAccessor returnEscaped (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                          _ps == C._ps &&
+                                                                          returnEscaped == C.returnEscaped = True
+  isRetPoly (JSIndexer (JSStringLiteral return') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                                    _ps == C._ps &&
+                                                                                    return' == C.return = True
   isRetPoly _ = False
   -- Check if an expression represents a function in the Ef module
-  isEffFunc name (JSAccessor name' (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) | name == name' = True
+  isEffFunc name (JSAccessor name' (JSAccessor eff (JSVar _ps))) | eff == C.eff &&
+                                                                   _ps == C._ps &&
+                                                                   name == name' = True
   isEffFunc _ _ = False
-  -- The name of the type class dictionary for the Monad Eff instance
-  effDictName = "monadEff"
   -- Check if an expression represents the Monad Eff dictionary
-  isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == effDictName = True
-  isEffDict (JSApp (JSAccessor prop (JSAccessor "Control_Monad_Eff" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == effDictName = True
+  isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == C.monadEffDictionary = True
+  isEffDict (JSApp (JSAccessor prop (JSAccessor eff (JSVar _ps))) [JSObjectLiteral []]) | eff == C.eff &&
+                                                                                          _ps == C._ps &&
+                                                                                          prop == C.monadEffDictionary = True
   isEffDict _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
@@ -106,7 +118,7 @@ inlineST = everywhere (mkT convertBlock)
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
-  convertBlock (JSApp f [arg]) | isSTFunc "runST" f || isSTFunc "runSTArray" f =
+  convertBlock (JSApp f [arg]) | isSTFunc C.runST f || isSTFunc C.runSTArray f =
     let refs = nub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
@@ -116,32 +128,34 @@ inlineST = everywhere (mkT convertBlock)
   -- Convert a block in a safe way, preserving object wrappers of references,
   -- or in a more aggressive way, turning wrappers into local variables depending on the
   -- agg(ressive) parameter.
-  convert agg (JSApp (JSApp f [arg]) []) | isSTFunc "newSTRef" f =
-    if agg then arg else JSObjectLiteral [("value", arg)]
-  convert agg (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f =
-    if agg then ref else JSAccessor "value" ref
-  convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc "writeSTRef" f =
-    if agg then JSAssignment ref arg else JSAssignment (JSAccessor "value" ref) arg
-  convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc "modifySTRef" f =
-    if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor "value" ref) (JSApp func [JSAccessor "value" ref])
-  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc "peekSTArray" f =
+  convert agg (JSApp (JSApp f [arg]) []) | isSTFunc C.newSTRef f =
+    if agg then arg else JSObjectLiteral [(C.stRefValue, arg)]
+  convert agg (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f =
+    if agg then ref else JSAccessor C.stRefValue ref
+  convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =
+    if agg then JSAssignment ref arg else JSAssignment (JSAccessor C.stRefValue ref) arg
+  convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
+    if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor C.stRefValue ref) (JSApp func [JSAccessor C.stRefValue ref])
+  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc C.peekSTArray f =
     JSIndexer i arr
-  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc "pokeSTArray" f =
+  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc C.pokeSTArray f =
     JSAssignment (JSIndexer i arr) val
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (JSAccessor name' (JSAccessor "Control_Monad_ST" (JSVar "_ps"))) | name == name' = True
+  isSTFunc name (JSAccessor name' (JSAccessor st (JSVar _ps))) | st == C.st &&
+                                                                   _ps == C._ps &&
+                                                                   name == name' = True
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) (mkQ [] isSTRef)
     where
-    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [_]) []))) | isSTFunc "newSTRef" f = [ident]
+    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [_]) []))) | isSTFunc C.newSTRef f = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
   findAllSTUsagesIn = everything (++) (mkQ [] isSTUsage)
     where
-    isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc "readSTRef" f = [ref]
-    isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc "writeSTRef" f || isSTFunc "modifySTRef" f = [ref]
+    isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f = [ref]
+    isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc C.writeSTRef f || isSTFunc C.modifySTRef f = [ref]
     isSTUsage _ = []
   -- Find all uses of a variable
   appearingIn ref = everything (++) (mkQ [] isVar)

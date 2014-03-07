@@ -26,6 +26,7 @@ library
         build-depends: unix -any
     exposed-modules: Data.Generics.Extras
                      Language.PureScript
+                     Language.PureScript.Constants
                      Language.PureScript.Options
                      Language.PureScript.Declarations
                      Language.PureScript.Kinds

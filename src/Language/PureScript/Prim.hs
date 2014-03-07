@@ -18,37 +18,51 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Types
 
+import qualified Language.PureScript.Constants as C
+
 import qualified Data.Map as M
+
+-- |
+-- Construct a ProperName in the Prim module
+--
+primName :: String -> Qualified ProperName
+primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
+
+-- |
+-- Construct a type in the Prim module
+--
+primTy :: String -> Type
+primTy = TypeConstructor . primName
 
 -- |
 -- Type constructor for functions
 --
 tyFunction :: Type
-tyFunction = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) (ProperName "Function")
+tyFunction = primTy "Function"
 
 -- |
 -- Type constructor for strings
 --
 tyString :: Type
-tyString = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) (ProperName "String")
+tyString = primTy "String"
 
 -- |
 -- Type constructor for numbers
 --
 tyNumber :: Type
-tyNumber = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) (ProperName "Number")
+tyNumber = primTy "Number"
 
 -- |
 -- Type constructor for booleans
 --
 tyBoolean :: Type
-tyBoolean = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) (ProperName "Boolean")
+tyBoolean = primTy "Boolean"
 
 -- |
 -- Type constructor for arrays
 --
 tyArray :: Type
-tyArray = TypeConstructor $ (Qualified $ Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
+tyArray = primTy "Array"
 
 -- |
 -- Smart constructor for function types
@@ -65,5 +79,3 @@ primTypes = M.fromList [ (primName "Function" , FunKind Star (FunKind Star Star)
                        , (primName "String"   , Star)
                        , (primName "Number"   , Star)
                        , (primName "Boolean"  , Star) ]
-  where
-  primName name = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName name)

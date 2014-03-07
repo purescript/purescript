@@ -39,6 +39,7 @@ module Language.PureScript.Optimizer (
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
+import qualified Language.PureScript.Constants as C
 
 import Language.PureScript.Optimizer.Common
 import Language.PureScript.Optimizer.TCO
@@ -60,10 +61,10 @@ optimize opts | optionsNoOptimizations opts = id
   , unThunk
   , etaConvert
   , inlineVariables
-  , inlineOperator "$" $ \f x -> JSApp f [x]
-  , inlineOperator "#" $ \x f -> JSApp f [x]
-  , inlineOperator "!!" $ flip JSIndexer
-  , inlineOperator "++" $ JSBinary Add
+  , inlineOperator (C.$) $ \f x -> JSApp f [x]
+  , inlineOperator (C.#) $ \x f -> JSApp f [x]
+  , inlineOperator (C.!!) $ flip JSIndexer
+  , inlineOperator (C.++) $ JSBinary Add
   , inlineCommonOperators ]
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a

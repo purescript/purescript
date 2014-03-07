@@ -28,6 +28,8 @@ import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Optimizer.Common
 import Language.PureScript.Names
 
+import qualified Language.PureScript.Constants as C
+
 shouldInline :: JS -> Bool
 shouldInline (JSVar _) = True
 shouldInline (JSNumericLiteral _) = True
@@ -71,42 +73,46 @@ inlineOperator op f = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar "_ps"))) | longForm == identToJs (Op op) = True
-  isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | op == op' = True
+  isOp (JSAccessor longForm (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                _ps == C._ps &&
+                                                                longForm == identToJs (Op op) = True
+  isOp (JSIndexer (JSStringLiteral op') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                            _ps == C._ps &&
+                                                                            op == op' = True
   isOp _ = False
 
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll
-  [ binary "numNumber" "+" Add
-  , binary "numNumber" "-" Subtract
-  , binary "numNumber" "*" Multiply
-  , binary "numNumber" "/" Divide
-  , binary "numNumber" "%" Modulus
-  , unary  "numNumber" "negate" Negate
+  [ binary C.numNumber (C.+) Add
+  , binary C.numNumber (C.-) Subtract
+  , binary C.numNumber (C.*) Multiply
+  , binary C.numNumber (C./) Divide
+  , binary C.numNumber (C.%) Modulus
+  , unary  C.numNumber C.negate Negate
 
-  , binary "ordNumber" "<" LessThan
-  , binary "ordNumber" ">" GreaterThan
-  , binary "ordNumber" "<=" LessThanOrEqualTo
-  , binary "ordNumber" ">=" GreaterThanOrEqualTo
+  , binary C.ordNumber (C.<) LessThan
+  , binary C.ordNumber (C.>) GreaterThan
+  , binary C.ordNumber (C.<=) LessThanOrEqualTo
+  , binary C.ordNumber (C.>=) GreaterThanOrEqualTo
 
-  , binary "eqNumber" "==" EqualTo
-  , binary "eqNumber" "/=" NotEqualTo
-  , binary "eqString" "==" EqualTo
-  , binary "eqString" "/=" NotEqualTo
-  , binary "eqBoolean" "==" EqualTo
-  , binary "eqBoolean" "/=" NotEqualTo
+  , binary C.eqNumber (C.==) EqualTo
+  , binary C.eqNumber (C./=) NotEqualTo
+  , binary C.eqString (C.==) EqualTo
+  , binary C.eqString (C./=) NotEqualTo
+  , binary C.eqBoolean (C.==) EqualTo
+  , binary C.eqBoolean (C./=) NotEqualTo
 
-  , binaryFunction "bitsNumber" "shl" ShiftLeft
-  , binaryFunction "bitsNumber" "shr" ShiftRight
-  , binaryFunction "bitsNumber" "zshr" ZeroFillShiftRight
-  , binary         "bitsNumber" "&" BitwiseAnd
-  , binary         "bitsNumber" "|" BitwiseOr
-  , binary         "bitsNumber" "^" BitwiseXor
-  , unary          "bitsNumber" "complement" BitwiseNot
+  , binaryFunction C.bitsNumber C.shl ShiftLeft
+  , binaryFunction C.bitsNumber C.shr ShiftRight
+  , binaryFunction C.bitsNumber C.zshr ZeroFillShiftRight
+  , binary         C.bitsNumber (C.&) BitwiseAnd
+  , binary         C.bitsNumber C.bar BitwiseOr
+  , binary         C.bitsNumber (C.^) BitwiseXor
+  , unary          C.bitsNumber C.complement BitwiseNot
 
-  , binary "boolLikeBoolean" "&&" And
-  , binary "boolLikeBoolean" "||" Or
-  , unary  "boolLikeBoolean" "not" Not
+  , binary C.boolLikeBoolean (C.&&) And
+  , binary C.boolLikeBoolean (C.||) Or
+  , unary  C.boolLikeBoolean C.not Not
   ]
   where
   binary :: String -> String -> BinaryOperator -> JS -> JS
@@ -115,8 +121,11 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor longForm (JSAccessor "Prelude" (JSVar _))) | longForm == identToJs (Op opString) = True
-    isOp (JSIndexer (JSStringLiteral op') (JSAccessor "Prelude" (JSVar "_ps"))) | opString == op' = True
+    isOp (JSAccessor longForm (JSAccessor prelude (JSVar _))) | prelude == C.prelude &&
+                                                                longForm == identToJs (Op opString) = True
+    isOp (JSIndexer (JSStringLiteral op') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                              _ps == C._ps &&
+                                                                              opString == op' = True
     isOp _ = False
   binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
   binaryFunction dictName fnName op = everywhere (mkT convert)
@@ -124,7 +133,9 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName == fnName' = True
+    isOp (JSAccessor fnName' (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                 _ps == C._ps &&
+                                                                 fnName == fnName' = True
     isOp _ = False
   unary :: String -> String -> UnaryOperator -> JS -> JS
   unary dictName fnName op = everywhere (mkT convert)
@@ -132,7 +143,11 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict dictName dict = JSUnary op x
     convert other = other
-    isOp (JSAccessor fnName' (JSAccessor "Prelude" (JSVar "_ps"))) | fnName' == fnName = True
+    isOp (JSAccessor fnName' (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
+                                                                 _ps == C._ps &&
+                                                                 fnName' == fnName = True
     isOp _ = False
-  isOpDict dictName (JSApp (JSAccessor prop (JSAccessor "Prelude" (JSVar "_ps"))) [JSObjectLiteral []]) | prop == dictName = True
+  isOpDict dictName (JSApp (JSAccessor prop (JSAccessor prelude (JSVar _ps))) [JSObjectLiteral []]) | prelude == C.prelude &&
+                                                                                                      _ps == C._ps &&
+                                                                                                      prop == dictName = True
   isOpDict _ _ = False
