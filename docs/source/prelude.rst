@@ -75,39 +75,39 @@ Type Class Instances
 
 ::
 
-    (Monad ((m))) => instance applicativeFromMonad :: Applicative (m)
+    instance applicativeFromMonad :: (Monad m) => Applicative m
 
-    instance bitsNumber :: Bits (Prim.Number)
+    instance bitsNumber :: Bits Prim.Number
 
-    instance boolLikeBoolean :: BoolLike (Prim.Boolean)
+    instance boolLikeBoolean :: BoolLike Prim.Boolean
 
-    instance categoryArr :: Category (Prim.Function)
+    instance categoryArr :: Category Prim.Function
 
-    (Eq ((a))) => instance eqArray :: Eq ([a])
+    instance eqArray :: (Eq a) => Eq [a]
 
-    instance eqBoolean :: Eq (Prim.Boolean)
+    instance eqBoolean :: Eq Prim.Boolean
 
-    instance eqNumber :: Eq (Prim.Number)
+    instance eqNumber :: Eq Prim.Number
 
-    instance eqString :: Eq (Prim.String)
+    instance eqString :: Eq Prim.String
 
-    (Applicative ((f))) => instance functorFromApplicative :: Functor (f)
+    instance functorFromApplicative :: (Applicative f) => Functor f
 
-    instance numNumber :: Num (Prim.Number)
+    instance numNumber :: Num Prim.Number
 
-    instance ordNumber :: Ord (Prim.Number)
+    instance ordNumber :: Ord Prim.Number
 
-    instance readBoolean :: Read (Prim.Boolean)
+    instance readBoolean :: Read Prim.Boolean
 
-    instance readNumber :: Read (Prim.Number)
+    instance readNumber :: Read Prim.Number
 
-    instance readString :: Read (Prim.String)
+    instance readString :: Read Prim.String
 
-    instance showBoolean :: Show (Prim.Boolean)
+    instance showBoolean :: Show Prim.Boolean
 
-    instance showNumber :: Show (Prim.Number)
+    instance showNumber :: Show Prim.Number
 
-    instance showString :: Show (Prim.String)
+    instance showString :: Show Prim.String
 
 Values
 ~~~~~~
@@ -194,9 +194,9 @@ Type Class Instances
 
 ::
 
-    instance monoidArray :: Monoid ([a])
+    instance monoidArray :: Monoid [a]
 
-    instance monoidString :: Monoid (Prim.String)
+    instance monoidString :: Monoid Prim.String
 
 Values
 ~~~~~~
@@ -260,13 +260,13 @@ Type Class Instances
 
 ::
 
-    instance applicativeMaybe :: Applicative (Maybe)
+    instance applicativeMaybe :: Applicative Maybe
 
-    instance functorMaybe :: Functor (Maybe)
+    instance functorMaybe :: Functor Maybe
 
-    instance monadMaybe :: Monad (Maybe)
+    instance monadMaybe :: Monad Maybe
 
-    (Show ((a))) => instance showMaybe :: Show (Maybe a)
+    instance showMaybe :: (Show a) => Show (Maybe a)
 
 Values
 ~~~~~~
@@ -303,7 +303,7 @@ Type Class Instances
 
     instance monadEither :: Monad (Either e)
 
-    (Show ((a)),Show ((b))) => instance showEither :: Show (Either a b)
+    instance showEither :: (Show a, Show b) => Show (Either a b)
 
 Values
 ~~~~~~
@@ -326,13 +326,13 @@ Type Class Instances
 
 ::
 
-    instance alternativeArray :: Alternative (Prim.Array)
+    instance alternativeArray :: Alternative Prim.Array
 
-    instance functorArray :: Functor (Prim.Array)
+    instance functorArray :: Functor Prim.Array
 
-    instance monadArray :: Monad (Prim.Array)
+    instance monadArray :: Monad Prim.Array
 
-    (Show ((a))) => instance showArray :: Show ([a])
+    instance showArray :: (Show a) => Show [a]
 
 Values
 ~~~~~~
@@ -473,7 +473,7 @@ Type Class Instances
 
 ::
 
-    (Show ((a)),Show ((b))) => instance showTuple :: Show (Tuple a b)
+    instance showTuple :: (Show a, Show b) => Show (Tuple a b)
 
 Values
 ~~~~~~

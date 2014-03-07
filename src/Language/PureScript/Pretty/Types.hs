@@ -15,6 +15,7 @@
 
 module Language.PureScript.Pretty.Types (
     prettyPrintType,
+    prettyPrintTypeAtom,
     prettyPrintRow
 ) where
 

@@ -128,8 +128,8 @@ renderDeclaration n exps (P.TypeClassDeclaration name args ds) = do
 renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
-                          cs -> "(" ++ intercalate "," (map (\(pn, tys') -> show pn ++ " (" ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys') ++ ")") cs) ++ ") => "
-  atIndent n $ constraintsText ++ "instance " ++ show name ++ " :: " ++ show className ++ " " ++ unwords (map (("(" ++) . (++ ")") . P.prettyPrintType) tys)
+                          cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
+  atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration _ _ _ = return ()
 
 getName :: P.Declaration -> String
