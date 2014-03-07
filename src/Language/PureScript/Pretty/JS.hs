@@ -110,6 +110,12 @@ literals = mkPattern' match
     , return $ "; " ++ ident ++ "++) "
     , prettyPrintJS' sts
     ]
+  match (JSForIn ident obj sts) = fmap concat $ sequence
+    [ return $ "for (var " ++ ident ++ " in "
+    , prettyPrintJS' obj
+    , return ") "
+    , prettyPrintJS' sts
+    ]
   match (JSIfElse cond thens elses) = fmap concat $ sequence
     [ return "if ("
     , prettyPrintJS' cond

@@ -200,6 +200,10 @@ data JS
   --
   | JSFor String JS JS JS
   -- |
+  -- ForIn loop
+  --
+  | JSForIn String JS JS
+  -- |
   -- If-then-else statement
   --
   | JSIfElse JS JS (Maybe JS)

@@ -47,6 +47,7 @@ usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesB `extQ` namesJ
   namesJS (JSFunction Nothing args _) = Ident <$> args
   namesJS (JSVariableIntroduction name _) = [Ident name]
   namesJS (JSFor name _ _ _) = [Ident name]
+  namesJS (JSForIn name _ _) = [Ident name]
   namesJS _ = []
 
 -- |
