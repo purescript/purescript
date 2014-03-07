@@ -39,7 +39,7 @@ import Language.PureScript.CodeGen.Monad
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
-import Language.PureScript.CodeGen.Optimize
+import Language.PureScript.Optimizer
 import Language.PureScript.CodeGen.Common
 import Language.PureScript.Prim
 
