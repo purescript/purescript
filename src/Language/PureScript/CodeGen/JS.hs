@@ -125,7 +125,7 @@ valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
 valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
 valueToJs opts m e (TypedValue _ (Abs (Left arg) val) ty) | optionsPerformRuntimeTypeChecks opts = let arg' = identToJs arg in JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn (valueToJs opts m e val)])
-valueToJs _ m e (Var ident) = varToJs m e ident
+valueToJs _ m _ (Var ident) = varToJs m ident
 valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
@@ -182,16 +182,9 @@ runtimeTypeChecks arg ty =
 -- Generate code in the simplified Javascript intermediate representation for a reference to a
 -- variable.
 --
-varToJs :: ModuleName -> Environment -> Qualified Ident -> JS
-varToJs m e qual@(Qualified _ ident) = go qual
-  where
-  go qual' = case M.lookup (qualify m qual') (names e) of
-    Just (_, ty) | isExtern ty -> var ident
-    _ -> case qual' of
-           Qualified Nothing _ -> var ident
-           _ -> qualifiedToJS m id qual'
-  isExtern (Extern ForeignImport) = True
-  isExtern _ = False
+varToJs :: ModuleName -> Qualified Ident -> JS
+varToJs _ (Qualified Nothing ident) = var ident
+varToJs m qual = qualifiedToJS m id qual
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a reference to a
