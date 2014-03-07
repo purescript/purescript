@@ -170,8 +170,8 @@ renameInModule imports exports (Module mn decls exps) =
   updateDecl d = return d
 
   updateVars :: Declaration -> Either String Declaration
-  updateVars (ValueDeclaration name [] Nothing val) =
-    ValueDeclaration name [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
+  updateVars (ValueDeclaration name nameKind [] Nothing val) =
+    ValueDeclaration name nameKind [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
     bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName name')
@@ -179,7 +179,7 @@ renameInModule imports exports (Module mn decls exps) =
     bindFunctionArgs bound other = return (bound, other)
     bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
     bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
-  updateVars (ValueDeclaration name _ _ _) = error $ "Binders should have been desugared in " ++ show name
+  updateVars (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
   updateVars other = return other
   updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
   updateValue v = return v
@@ -252,7 +252,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
   addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
-  addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
+  addDecl mn env (ValueDeclaration name _ _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
   addDecl _  env _ = return env
 

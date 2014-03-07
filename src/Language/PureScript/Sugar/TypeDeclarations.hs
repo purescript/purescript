@@ -36,8 +36,8 @@ desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds exps) -> Module na
 -- Replace all top level type declarations with type annotations
 --
 desugarTypeDeclarations :: [Declaration] -> Either String [Declaration]
-desugarTypeDeclarations (TypeDeclaration name ty : ValueDeclaration name' [] Nothing val : rest) | name == name' =
-  desugarTypeDeclarations (ValueDeclaration name [] Nothing (TypedValue True val ty) : rest)
+desugarTypeDeclarations (TypeDeclaration name ty : ValueDeclaration name' nameKind [] Nothing val : rest) | name == name' =
+  desugarTypeDeclarations (ValueDeclaration name nameKind [] Nothing (TypedValue True val ty) : rest)
 desugarTypeDeclarations (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
 desugarTypeDeclarations (d:ds) = (:) d <$> desugarTypeDeclarations ds
 desugarTypeDeclarations [] = return []

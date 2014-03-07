@@ -60,12 +60,12 @@ desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
     desugarRest [] = pure []
 
 inSameGroup :: Declaration -> Declaration -> Bool
-inSameGroup (ValueDeclaration ident1 _ _ _) (ValueDeclaration ident2 _ _ _) = ident1 == ident2
+inSameGroup (ValueDeclaration ident1 _ _ _ _) (ValueDeclaration ident2 _ _ _ _) = ident1 == ident2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> Either String [Declaration]
-toDecls d@[ValueDeclaration _ [] Nothing _] = return d
-toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
+toDecls d@[ValueDeclaration _ _ [] Nothing _] = return d
+toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
@@ -73,7 +73,7 @@ toDecls ds@(ValueDeclaration ident bs _ _ : _) = do
 toDecls ds = return ds
 
 toTuple :: Declaration -> ([Binder], (Maybe Guard, Value))
-toTuple (ValueDeclaration _ bs g val) = (bs, (g, val))
+toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
 toTuple _ = error "Not a value declaration"
 
 makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Value))] -> Declaration
@@ -85,5 +85,5 @@ makeCaseDeclaration ident alternatives =
     binders = [ CaseAlternative bs g val | (bs, (g, val)) <- alternatives ]
     value = foldr (\arg ret -> Abs (Left arg) ret) (Case vars binders) args
   in
-    ValueDeclaration ident [] Nothing value
+    ValueDeclaration ident Value [] Nothing value
 

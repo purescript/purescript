@@ -42,10 +42,10 @@ declarationsByModule :: Module -> [(Key, [Key])]
 declarationsByModule (Module moduleName ds _) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
-  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
+  go d@(ValueDeclaration name _ _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
   go (DataDeclaration _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
-  go d@(BindingGroupDeclaration names') = map (\(name, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
+  go d@(BindingGroupDeclaration names') = map (\(name, _, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
   go (DataBindingGroupDeclaration ds') = concatMap go ds'
   go _ = []
 
@@ -59,7 +59,7 @@ dependencies moduleName = nub . everything (++) (mkQ [] values)
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaration -> Bool
-isUsed moduleName graph vertexFor entryPointVertices (ValueDeclaration name _ _ _) =
+isUsed moduleName graph vertexFor entryPointVertices (ValueDeclaration name _ _ _ _) =
   let Just v' = vertexFor (moduleName, Left name)
   in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (DataDeclaration _ _ dctors) =
@@ -69,8 +69,8 @@ isUsed moduleName graph vertexFor entryPointVertices (ExternDeclaration _ name _
   let Just v' = vertexFor (moduleName, Left name)
   in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (BindingGroupDeclaration ds) =
-  any (\(name, _) -> let Just v' = vertexFor (moduleName, Left name)
-                     in any (\v -> path graph v v') entryPointVertices) ds
+  any (\(name, _, _) -> let Just v' = vertexFor (moduleName, Left name)
+                        in any (\v -> path graph v v') entryPointVertices) ds
 isUsed moduleName graph vertexFor entryPointVertices (DataBindingGroupDeclaration ds) =
   any (isUsed moduleName graph vertexFor entryPointVertices) ds
 isUsed _ _ _ _ _ = True

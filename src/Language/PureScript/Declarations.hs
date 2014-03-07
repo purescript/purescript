@@ -46,27 +46,6 @@ data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable
 data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
 
 -- |
--- The type of a foreign import
---
-data ForeignImportType
-  -- |
-  -- A regular foreign import
-  --
-  = ForeignImport
-  -- |
-  -- A foreign import which contains inline Javascript as a string literal
-  --
-  | InlineJavascript
-  -- |
-  -- A type class dictionary import, generated during desugaring of type class declarations
-  --
-  | TypeClassDictionaryImport
-  -- |
-  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
-  --
-  | TypeClassAccessorImport deriving (Show, Eq, D.Data, D.Typeable)
-
--- |
 -- An item in a list of explicit imports or exports
 --
 data DeclarationRef
@@ -107,11 +86,11 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident [Binder] (Maybe Guard) Value
+  | ValueDeclaration Ident NameKind [Binder] (Maybe Guard) Value
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration [(Ident, Value)]
+  | BindingGroupDeclaration [(Ident, NameKind, Value)]
   -- |
   -- A foreign import declaration (type, name, optional inline Javascript, type)
   --

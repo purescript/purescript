@@ -72,7 +72,7 @@ collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups = concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
-  go (BindingGroupDeclaration ds) = map (\(ident, val) -> ValueDeclaration ident [] Nothing val) ds
+  go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
   go other = [other]
 
 usedIdents :: (Data d) => ModuleName -> d -> [Ident]
@@ -91,7 +91,7 @@ usedProperNames moduleName = nub . everything (++) (mkQ [] names)
   names _ = []
 
 getIdent :: Declaration -> Ident
-getIdent (ValueDeclaration ident _ _ _) = ident
+getIdent (ValueDeclaration ident _ _ _ _) = ident
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
@@ -115,7 +115,7 @@ toDataBindingGroup (CyclicSCC ds')
   isTypeSynonym TypeSynonymDeclaration{} = True
   isTypeSynonym _ = False
 
-fromValueDecl :: Declaration -> (Ident, Value)
-fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
+fromValueDecl :: Declaration -> (Ident, NameKind, Value)
+fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
 fromValueDecl _ = error "Expected ValueDeclaration"

@@ -30,7 +30,7 @@ import Control.Monad (replicateM, forM)
 
 import qualified Data.Map as M
 
-import Language.PureScript.TypeChecker (Environment(..), NameKind(..))
+import Language.PureScript.TypeChecker (Environment(..))
 import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
@@ -62,10 +62,10 @@ moduleToJs opts (Module name decls _) env =
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
-declToJs opts mp (ValueDeclaration ident _ _ val) e =
+declToJs opts mp (ValueDeclaration ident _ _ _ val) e =
   Just $ export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
 declToJs opts mp (BindingGroupDeclaration vals) e =
-  Just $ concatMap (\(ident, val) ->
+  Just $ concatMap (\(ident, _, val) ->
            export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
          ) vals
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
@@ -231,7 +231,7 @@ binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
 binderToJs m e varName done (ConstructorBinder ctor bs) = do
   js <- go 0 done bs
-  if isOnlyConstructor m e ctor
+  if isOnlyConstructor e ctor
   then
     return js
   else
@@ -284,17 +284,14 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 -- Checks whether a data constructor is the only constructor for that type, used to simplify the
 -- check when generating code for binders.
 --
-isOnlyConstructor :: ModuleName -> Environment -> Qualified ProperName -> Bool
-isOnlyConstructor m e ctor =
+isOnlyConstructor :: Environment -> Qualified ProperName -> Bool
+isOnlyConstructor e ctor =
   let ty = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
-  in numConstructors ty == 1
+  in numConstructors (ctor, ty) == 1
   where
-  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.elems $ dataConstructors e
-  typeConstructor (TypeConstructor qual) = qualify m qual
-  typeConstructor (ForAll _ ty _) = typeConstructor ty
-  typeConstructor (TypeApp (TypeApp t _) ty) | t == tyFunction = typeConstructor ty
-  typeConstructor (TypeApp ty _) = typeConstructor ty
-  typeConstructor fn = error $ "Invalid arguments to typeConstructor: " ++ show fn
+  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
+  typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
+  typeConstructor _ = error "Invalid argument to isOnlyConstructor"
 
 wrapExportsContainer :: Options -> [JS] -> JS
 wrapExportsContainer opts modules = JSApp (JSFunction Nothing [C._ps] $ JSBlock $ JSStringLiteral "use strict" : modules) [exportSelector]

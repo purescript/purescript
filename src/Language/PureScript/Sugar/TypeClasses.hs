@@ -122,7 +122,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
   let entryName = Escaped (show name)
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
-  return $ ValueDeclaration entryName [] Nothing
+  return $ ValueDeclaration entryName TypeInstanceDictionaryValue [] Nothing
     (TypedValue True
       (foldr (Abs . (\n -> Left . Ident $ '_' : show n)) (ObjectLiteral memberNames) [1..max 1 (length deps)])
       (quantify (if null deps then
@@ -132,7 +132,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
     )
   where
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
-  memberToNameAndValue tys' (ValueDeclaration ident _ _ _) = do
+  memberToNameAndValue tys' (ValueDeclaration ident _ _ _ _) = do
     memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys'
     memberName <- mkDictionaryEntryName name ident
     return (identToJs ident, TypedValue False
@@ -141,13 +141,13 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> Declaration -> Desugar Declaration
-typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclaration ident [] _ val) = do
+typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclaration ident _ [] _ val) = do
   m <- get
   valTy <- lift $ do (args, members) <- lookupTypeClass m
                      ty' <- lookupIdent members
                      return $ replaceAllTypeVars (zip args tys) ty'
   entryName <- mkDictionaryEntryName name ident
-  return $ ValueDeclaration entryName [] Nothing
+  return $ ValueDeclaration entryName TypeInstanceMember [] Nothing
     (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
   where
   lookupTypeClass m = maybe (Left $ "Type class " ++ show className ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (qualify mn className) m

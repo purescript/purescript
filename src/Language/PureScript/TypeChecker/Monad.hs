@@ -22,7 +22,6 @@ import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Values
 import Language.PureScript.Names
-import Language.PureScript.Declarations
 import Language.PureScript.Prim
 
 import Data.Maybe
@@ -34,27 +33,6 @@ import Control.Monad.Unify
 import Control.Arrow (first)
 
 import qualified Data.Map as M
-
--- |
--- The type of a name in the @Environment@
---
-data NameKind
-  -- |
-  -- A value introduced as a binding in a module
-  --
-  = Value
-  -- |
-  -- A foreign import
-  --
-  | Extern ForeignImportType
-  -- |
-  -- A local name introduced using a lambda abstraction, variable introduction or binder
-  --
-  | LocalVariable
-  -- |
-  -- A data constructor
-  --
-  | DataConstructor deriving Show
 
 -- |
 -- The @Environment@ defines all values and types which are currently in scope:
@@ -71,7 +49,7 @@ data Environment = Environment {
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
-  , dataConstructors :: M.Map (Qualified ProperName) Type
+  , dataConstructors :: M.Map (Qualified ProperName) (ProperName, Type)
   -- |
   -- Type synonyms currently in scope
   --

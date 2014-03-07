@@ -86,7 +86,11 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintArray Type deriving (Show, Eq, Data, Typeable)
+  | PrettyPrintArray Type
+  -- |
+  -- A placeholder used in pretty printing
+  --
+  | PrettyPrintForAll [String] Type deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- Convert a row to a list of pairs of labels and types

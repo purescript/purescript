@@ -51,7 +51,7 @@ addDataConstructor moduleName name args dctor tys = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) polyType (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (name, polyType) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -66,10 +66,10 @@ valueIsNotDefined moduleName name = do
     Just _ -> throwError $ show name ++ " is already defined"
     Nothing -> return ()
 
-addValue :: ModuleName -> Ident -> Type -> Check ()
-addValue moduleName name ty = do
+addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
+addValue moduleName name ty nameKind = do
   env <- getEnv
-  putEnv (env { names = M.insert (moduleName, name) (ty, Value) (names env) })
+  putEnv (env { names = M.insert (moduleName, name) (ty, nameKind) (names env) })
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
@@ -128,23 +128,23 @@ typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) 
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll _ _ (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
-typeCheckAll mainModuleName moduleName (ValueDeclaration name [] Nothing val : rest) = do
+typeCheckAll mainModuleName moduleName (ValueDeclaration name nameKind [] Nothing val : rest) = do
   d <- rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
     valueIsNotDefined moduleName name
     [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
-    addValue moduleName name ty
-    return $ ValueDeclaration name [] Nothing val'
+    addValue moduleName name ty nameKind
+    return $ ValueDeclaration name nameKind [] Nothing val'
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll _ _ (ValueDeclaration{} : _) = error "Binders were not desugared"
 typeCheckAll mainModuleName moduleName (BindingGroupDeclaration vals : rest) = do
-  d <- rethrow (("Error in binding group " ++ show (map fst vals) ++ ":\n") ++) $ do
-    forM_ (map fst vals) $ \name ->
+  d <- rethrow (("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals) ++ ":\n") ++) $ do
+    forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
       valueIsNotDefined moduleName name
-    tys <- typesOf mainModuleName moduleName vals
-    vals' <- forM (zip (map fst vals) (map snd tys)) $ \(name, (val, ty)) -> do
-      addValue moduleName name ty
-      return (name, val)
+    tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
+    vals' <- forM (zipWith (\(name, nameKind, _) (_, (val, ty)) -> (name, val, nameKind, ty)) vals tys) $ \(name, val, nameKind, ty) -> do
+      addValue moduleName name ty nameKind
+      return (name, nameKind, val)
     return $ BindingGroupDeclaration vals'
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds

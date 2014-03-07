@@ -29,6 +29,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
+import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
@@ -55,6 +56,7 @@ parseTypeSynonymDeclaration =
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration =
   ValueDeclaration <$> parseIdent
+                   <*> pure Value
                    <*> P.many parseBinderNoParens
                    <*> P.optionMaybe parseGuard
                    <*> (lexeme (indented *> P.char '=') *> parseValue)

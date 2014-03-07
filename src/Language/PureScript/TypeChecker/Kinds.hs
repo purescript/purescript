@@ -74,7 +74,7 @@ kindsOf moduleName name args ts = fmap tidyUp . liftUnify $ do
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
   where
-  tidyUp (k, sub) = sub $? k
+  tidyUp (k, sub) = starIfUnknown $ sub $? k
 
 -- |
 -- Simultaneously infer the kinds of several mutually recursive type constructors

@@ -17,36 +17,55 @@ module Language.PureScript.CodeGen.Externs (
     moduleToPs
 ) where
 
-import Data.Maybe (maybeToList, mapMaybe)
+import Data.List (intercalate)
+
 import qualified Data.Map as M
+
+import Control.Monad.Writer
+
 import Language.PureScript.Declarations
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 import Language.PureScript.Names
-import Data.List (intercalate)
+import Language.PureScript.Types
+import Language.PureScript.Kinds
 
 -- |
 -- Generate foreign imports for all declarations in a module
--- TODO: only expose items listed in "exps"
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module mn decls _) env =
-  "module " ++ runModuleName mn ++ " where\n" ++
-  (intercalate "\n" . map ("  " ++) . concatMap (declToPs mn env) $ decls)
+moduleToPs (Module moduleName _ exts) env = intercalate "\n" . execWriter $ do
+  tell ["module " ++ runModuleName moduleName ++ " where"]
+  let typesExported = getTypesExportedFrom moduleName exts env
+  forM_ typesExported $ \(pn, kind) ->
+    tell ["foreign import data " ++ show pn ++ " :: " ++ prettyPrintKind kind]
+  let namesExported = getNamesExportedFrom moduleName exts env
+  forM_ namesExported $ \(ident, ty) ->
+    tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
 
-declToPs :: ModuleName -> Environment -> Declaration -> [String]
-declToPs path env (ValueDeclaration name _ _ _) = maybeToList $ do
-  (ty, _) <- M.lookup (path, name) $ names env
-  return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
-declToPs path env (BindingGroupDeclaration vals) =
-  flip mapMaybe vals $ \(name, _) -> do
-    (ty, _) <- M.lookup (path, name) $ names env
-    return $ "foreign import " ++ show name ++ " :: " ++ prettyPrintType ty
-declToPs path env (DataDeclaration name _ _) = maybeToList $ do
-  kind <- M.lookup (Qualified (Just path) name) $ types env
-  return $ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
-declToPs _ _ (ExternDataDeclaration name kind) =
-  return $ "foreign import data " ++ show name ++ " :: " ++ prettyPrintKind kind
-declToPs _ _ (TypeSynonymDeclaration name args ty) =
-  return $ "type " ++ show name ++ " " ++ unwords args ++ " = " ++ prettyPrintType ty
-declToPs _ _ _ = []
+getNamesExportedFrom :: ModuleName -> Maybe [DeclarationRef] -> Environment -> [(Ident, Type)]
+getNamesExportedFrom moduleName exps env =
+  [ (ident, ty)
+  | ((moduleName', ident), (ty, nameKind)) <- M.toList . names $ env
+  , moduleName == moduleName'
+  , nameKind `elem` [Value, Extern ForeignImport]
+  , isExported ident exps
+  ]
+  where
+  isExported :: Ident -> Maybe [DeclarationRef] -> Bool
+  isExported _ Nothing = True
+  isExported ident (Just exps') = ValueRef ident `elem` exps'
+
+getTypesExportedFrom :: ModuleName -> Maybe [DeclarationRef] -> Environment -> [(ProperName, Kind)]
+getTypesExportedFrom moduleName exps env =
+  [ (pn, kind)
+  | ((Qualified (Just moduleName') pn), kind) <- M.toList . types $ env
+  , moduleName == moduleName'
+  , isExported pn exps
+  ]
+  where
+  isExported :: ProperName -> Maybe [DeclarationRef] -> Bool
+  isExported _ Nothing = True
+  isExported pn (Just exps') = flip any exps' $ \e -> case e of
+    TypeRef pn' _ | pn == pn' -> True
+    _ -> False

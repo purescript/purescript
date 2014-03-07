@@ -22,6 +22,52 @@ import Data.Data
 import Data.Function (on)
 
 -- |
+-- The type of a foreign import
+--
+data ForeignImportType
+  -- |
+  -- A regular foreign import
+  --
+  = ForeignImport
+  -- |
+  -- A foreign import which contains inline Javascript as a string literal
+  --
+  | InlineJavascript
+  -- |
+  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
+  --
+  | TypeClassAccessorImport deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- The type of a name
+--
+data NameKind
+  -- |
+  -- A value introduced as a binding in a module
+  --
+  = Value
+  -- |
+  -- A foreign import
+  --
+  | Extern ForeignImportType
+  -- |
+  -- A local name introduced using a lambda abstraction, variable introduction or binder
+  --
+  | LocalVariable
+  -- |
+  -- A data constructor
+  --
+  | DataConstructor
+  -- |
+  -- A type class dictionary, generated during desugaring of type class declarations
+  --
+  | TypeInstanceDictionaryValue
+  -- |
+  -- A type instance member, generated during desugaring of type class declarations
+  --
+  | TypeInstanceMember deriving (Show, Eq, Data, Typeable)
+
+-- |
 -- Names for value identifiers
 --
 data Ident

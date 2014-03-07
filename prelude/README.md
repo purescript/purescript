@@ -12,7 +12,7 @@
 
     class Applicative f where
       pure :: forall a. a -> f a
-      (<*>) :: forall b. forall a. f (a -> b) -> f a -> f b
+      (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
     class Bits b where
       (&) :: b -> b -> b
@@ -30,19 +30,19 @@
 
     class Category a where
       id :: forall t. a t t
-      (<<<) :: forall d. forall c. forall b. a c d -> a b c -> a b d
-      (>>>) :: forall d. forall c. forall b. a b c -> a c d -> a b d
+      (<<<) :: forall b c d. a c d -> a b c -> a b d
+      (>>>) :: forall b c d. a b c -> a c d -> a b d
 
     class Eq a where
       (==) :: a -> a -> Prim.Boolean
       (/=) :: a -> a -> Prim.Boolean
 
     class Functor f where
-      (<$>) :: forall b. forall a. (a -> b) -> f a -> f b
+      (<$>) :: forall a b. (a -> b) -> f a -> f b
 
     class Monad m where
       return :: forall a. a -> m a
-      (>>=) :: forall b. forall a. m a -> (a -> m b) -> m b
+      (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
     class Num a where
       (+) :: a -> a -> a
@@ -106,9 +106,9 @@
 
     (!!) :: forall a. [a] -> Prim.Number -> a
 
-    (#) :: forall b. forall a. a -> (a -> b) -> b
+    (#) :: forall a b. a -> (a -> b) -> b
 
-    ($) :: forall b. forall a. (a -> b) -> a -> b
+    ($) :: forall a b. (a -> b) -> a -> b
 
     (++) :: Prim.String -> Prim.String -> Prim.String
 
@@ -118,9 +118,9 @@
 
     boolOr :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
 
-    const :: forall b. forall a. a -> b -> a
+    const :: forall a b. a -> b -> a
 
-    flip :: forall c. forall b. forall a. (a -> b -> c) -> b -> a -> c
+    flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
     numAdd :: Prim.Number -> Prim.Number -> Prim.Number
 
@@ -186,7 +186,7 @@
 
 ### Values
 
-    mconcat :: forall m. (Monoid (m)) => [m] -> m
+    mconcat :: forall m. (Monoid m) => [m] -> m
 
 
 ## Module Control.Monad
@@ -202,23 +202,23 @@
 
 ### Values
 
-    (<=<) :: forall c. forall b. forall a. forall m. (Monad (m)) => (b -> m c) -> (a -> m b) -> a -> m c
+    (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c
 
-    (>=>) :: forall c. forall b. forall a. forall m. (Monad (m)) => (a -> m b) -> (b -> m c) -> a -> m c
+    (>=>) :: forall m a b c. (Monad m) => (a -> m b) -> (b -> m c) -> a -> m c
 
-    foldM :: forall b. forall a. forall m. (Monad (m)) => (a -> b -> m a) -> a -> [b] -> m a
+    foldM :: forall m a b. (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 
-    join :: forall a. forall m. (Monad (m)) => m (m a) -> m a
+    join :: forall m a. (Monad m) => m (m a) -> m a
 
-    mapM :: forall b. forall a. forall m. (Monad (m)) => (a -> m b) -> [a] -> m [b]
+    mapM :: forall m a b. (Monad m) => (a -> m b) -> [a] -> m [b]
 
-    replicateM :: forall a. forall m. (Monad (m)) => Prim.Number -> m a -> m [a]
+    replicateM :: forall m a. (Monad m) => Prim.Number -> m a -> m [a]
 
-    sequence :: forall a. forall m. (Monad (m)) => [m a] -> m [a]
+    sequence :: forall m a. (Monad m) => [m a] -> m [a]
 
-    when :: forall m. (Monad (m)) => Prim.Boolean -> m {  } -> m {  }
+    when :: forall m. (Monad m) => Prim.Boolean -> m {  } -> m {  }
 
-    zipWithM :: forall c. forall b. forall a. forall m. (Monad (m)) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+    zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 
 
 ## Module Data.Maybe
@@ -248,7 +248,7 @@
 
     fromMaybe :: forall a. a -> Maybe a -> a
 
-    maybe :: forall b. forall a. b -> (a -> b) -> Maybe a -> b
+    maybe :: forall a b. b -> (a -> b) -> Maybe a -> b
 
 
 ## Module Data.Either
@@ -276,7 +276,7 @@
 
 ### Values
 
-    either :: forall c. forall b. forall a. (a -> c) -> (b -> c) -> Either a b -> c
+    either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
 
 
 ## Module Data.Array
@@ -308,7 +308,7 @@
 
     concat :: forall a. [a] -> [a] -> [a]
 
-    concatMap :: forall b. forall a. [a] -> (a -> [b]) -> [b]
+    concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
 
     deleteAt :: forall a. Prim.Number -> Prim.Number -> [a] -> [a]
 
@@ -318,9 +318,9 @@
 
     find :: forall a. (a -> Prim.Boolean) -> [a] -> Maybe a
 
-    foldl :: forall b. forall a. (b -> a -> b) -> b -> [a] -> b
+    foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 
-    foldr :: forall b. forall a. (a -> b -> a) -> a -> [b] -> a
+    foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
 
     head :: forall a. [a] -> Maybe a
 
@@ -338,7 +338,7 @@
 
     length :: forall a. [a] -> Prim.Number
 
-    map :: forall b. forall a. (a -> b) -> [a] -> [b]
+    map :: forall a b. (a -> b) -> [a] -> [b]
 
     push :: forall a. [a] -> a -> [a]
 
@@ -360,7 +360,7 @@
 
     updateAt :: forall a. Prim.Number -> a -> [a] -> [a]
 
-    zipWith :: forall c. forall b. forall a. (a -> b -> c) -> [a] -> [b] -> [c]
+    zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
 
 
 ## Module Data.Eq
@@ -381,7 +381,7 @@
 
 ### Values
 
-    liftRef :: forall b. forall a. (a -> a -> b) -> Ref a -> Ref a -> b
+    liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
 
     refEq :: forall a. Ref a -> Ref a -> Prim.Boolean
 
@@ -424,13 +424,13 @@
 
 ### Values
 
-    curry :: forall c. forall b. forall a. (Tuple a b -> c) -> a -> b -> c
+    curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
 
-    uncurry :: forall c. forall b. forall a. (a -> b -> c) -> Tuple a b -> c
+    uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c
 
-    unzip :: forall b. forall a. [Tuple a b] -> Tuple [a] [b]
+    unzip :: forall a b. [Tuple a b] -> Tuple [a] [b]
 
-    zip :: forall b. forall a. [a] -> [b] -> [Tuple a b]
+    zip :: forall a b. [a] -> [b] -> [Tuple a b]
 
 
 ## Module Data.String
@@ -582,13 +582,13 @@
 
     log2e :: Prim.Number
 
-    max :: Prim.Number -> Prim.Number
+    max :: Prim.Number -> Prim.Number -> Prim.Number
 
-    min :: Prim.Number -> Prim.Number
+    min :: Prim.Number -> Prim.Number -> Prim.Number
 
     pi :: Prim.Number
 
-    pow :: Prim.Number -> Prim.Number
+    pow :: Prim.Number -> Prim.Number -> Prim.Number
 
     round :: Prim.Number -> Prim.Number
 
@@ -622,19 +622,19 @@
 
 ### Values
 
-    bindEff :: forall b. forall a. forall e. Eff e a -> (a -> Eff e b) -> Eff e b
+    bindEff :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
     forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e {  }) -> Eff e {  }
 
-    foreachE :: forall a. forall e. [a] -> (a -> Eff e {  }) -> Eff e {  }
+    foreachE :: forall e a. [a] -> (a -> Eff e {  }) -> Eff e {  }
 
-    retEff :: forall a. forall e. a -> Eff e a
+    retEff :: forall e a. a -> Eff e a
 
     runPure :: forall a. Pure a -> a
 
     untilE :: forall e. Eff e Prim.Boolean -> Eff e {  }
 
-    whileE :: forall a. forall e. Eff e Prim.Boolean -> Eff e a -> Eff e {  }
+    whileE :: forall e a. Eff e Prim.Boolean -> Eff e a -> Eff e {  }
 
 
 ## Module Control.Monad.Eff.Unsafe
@@ -650,7 +650,7 @@
 
 ### Values
 
-    unsafeInterleaveEff :: forall a. forall eff2. forall eff1. Eff eff1 a -> Eff eff2 a
+    unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 
 
 ## Module Random
@@ -686,9 +686,9 @@
 
 ### Values
 
-    catchError :: forall a. forall r. forall e. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
+    catchError :: forall e r a. (e -> Eff r a) -> Eff (err :: Error e | r) a -> Eff r a
 
-    throwError :: forall r. forall e. forall a. e -> Eff (err :: Error e | r) a
+    throwError :: forall a e r. e -> Eff (err :: Error e | r) a
 
 
 ## Module Data.IORef
@@ -708,15 +708,15 @@
 
 ### Values
 
-    modifyIORef :: forall r. forall s. IORef s -> (s -> s) -> Eff (ref :: Ref | r) {  }
+    modifyIORef :: forall s r. IORef s -> (s -> s) -> Eff (ref :: Ref | r) {  }
 
-    newIORef :: forall r. forall s. s -> Eff (ref :: Ref | r) (IORef s)
+    newIORef :: forall s r. s -> Eff (ref :: Ref | r) (IORef s)
 
-    readIORef :: forall r. forall s. IORef s -> Eff (ref :: Ref | r) s
+    readIORef :: forall s r. IORef s -> Eff (ref :: Ref | r) s
 
-    unsafeRunIORef :: forall a. forall eff. Eff (ref :: Ref | eff) a -> Eff eff a
+    unsafeRunIORef :: forall eff a. Eff (ref :: Ref | eff) a -> Eff eff a
 
-    writeIORef :: forall r. forall s. IORef s -> s -> Eff (ref :: Ref | r) {  }
+    writeIORef :: forall s r. IORef s -> s -> Eff (ref :: Ref | r) {  }
 
 
 ## Module Debug.Trace
@@ -734,7 +734,7 @@
 
 ### Values
 
-    print :: forall r. forall a. (Show (a)) => a -> Eff (trace :: Trace | r) {  }
+    print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) {  }
 
     trace :: forall r. Prim.String -> Eff (trace :: Trace | r) {  }
 
@@ -758,23 +758,23 @@
 
 ### Values
 
-    modifySTRef :: forall r. forall h. forall a. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
+    modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
-    newSTArray :: forall r. forall h. forall a. Prim.Number -> a -> Eff (st :: ST h | r) (STArray h a)
+    newSTArray :: forall a h r. Prim.Number -> a -> Eff (st :: ST h | r) (STArray h a)
 
-    newSTRef :: forall r. forall h. forall a. a -> Eff (st :: ST h | r) (STRef h a)
+    newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
-    peekSTArray :: forall r. forall h. forall a. STArray h a -> Eff (st :: ST h | r) a
+    peekSTArray :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
 
-    pokeSTArray :: forall r. forall h. forall a. STArray h a -> Prim.Number -> a -> Eff (st :: ST h | r) a
+    pokeSTArray :: forall a h r. STArray h a -> Prim.Number -> a -> Eff (st :: ST h | r) a
 
-    readSTRef :: forall r. forall h. forall a. STRef h a -> Eff (st :: ST h | r) a
+    readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 
-    runST :: forall r. forall a. forall h. Eff (st :: ST h | r) a -> Eff r a
+    runST :: forall a r. forall h. Eff (st :: ST h | r) a -> Eff r a
 
-    runSTArray :: forall r. forall a. forall h. Eff (st :: ST h | r) (STArray h a) -> Eff r [a]
+    runSTArray :: forall a r. forall h. Eff (st :: ST h | r) (STArray h a) -> Eff r [a]
 
-    writeSTRef :: forall r. forall h. forall a. STRef h a -> a -> Eff (st :: ST h | r) a
+    writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 
 
 ## Module Data.Enum
