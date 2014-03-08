@@ -61,6 +61,10 @@ data DeclarationRef
   -- A type class
   --
   | TypeClassRef ProperName
+    -- |
+  -- A type class instance, created during typeclass desugaring (name, class name, instance types)
+  --
+  | TypeInstanceRef Ident (Qualified ProperName) [Type]
   deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
@@ -112,7 +116,8 @@ data Declaration
   --
   | TypeClassDeclaration ProperName [String] [Declaration]
   -- |
-  -- A type instance declaration (dependencies, class name, instance type, member declarations)
+  -- A type instance declaration (name, dependencies, class name, instance types, member
+  -- declarations)
   --
   | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
   deriving (Show, D.Data, D.Typeable)
