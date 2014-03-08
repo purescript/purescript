@@ -75,7 +75,7 @@ As an introductory example, here is the usual "Hello World" written in PureScrip
 
   module Main where
   
-  import Trace
+  import Debug.Trace
   
   main = trace "Hello, World!"
 
@@ -89,7 +89,7 @@ which compiles to the following Javascript, ignoring the Prelude::
 
 The following command will compile and execute the PureScript code above::
 
-  psc input.purs --run-main | nodejs
+  psc input.purs --main | nodejs
 
 Another Example
 ---------------
