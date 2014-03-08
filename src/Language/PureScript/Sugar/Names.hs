@@ -147,15 +147,26 @@ desugarImports modules = do
   -- the module has access to an unfiltered list of its own members.
   renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either String Module
   renameInModule' unfilteredExports exports m@(Module mn _ _) = rethrowForModule m $ do
-    let exports' = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
-    imports <- resolveImports exports' m
-    renameInModule imports exports' m
+    let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
+    let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports 
+    imports <- resolveImports env m
+    renameInModule imports env (elaborateExports exps m)
 
 -- |
 -- Rethrow an error with the name of the current module in the case of a failure
 --
 rethrowForModule :: Module -> Either String a -> Either String a
 rethrowForModule (Module mn _ _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
+
+-- |
+-- Make all exports for a module explicit. This may still effect modules that have an exports list,
+-- as it will also make all data constructor exports explicit. 
+--
+elaborateExports :: Exports -> Module -> Module
+elaborateExports exps (Module mn decls _) = Module mn decls (Just $
+  map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (exportedTypes exps) ++
+  map TypeClassRef (exportedTypeClasses exps) ++
+  map ValueRef (exportedValues exps))
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
