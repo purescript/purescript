@@ -64,13 +64,20 @@ inSameGroup (ValueDeclaration ident1 _ _ _ _) (ValueDeclaration ident2 _ _ _ _) 
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> Either String [Declaration]
-toDecls d@[ValueDeclaration _ _ [] Nothing _] = return d
+toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = do
+  let args = map (\(VarBinder arg) -> arg) bs
+      body = foldr (Abs . Left) val args
+  return [ValueDeclaration ident nameKind [] Nothing body]
 toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
   return [makeCaseDeclaration ident tuples]
 toDecls ds = return ds
+
+isVarBinder :: Binder -> Bool
+isVarBinder (VarBinder _) = True
+isVarBinder _ = False
 
 toTuple :: Declaration -> ([Binder], (Maybe Guard, Value))
 toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
@@ -83,7 +90,7 @@ makeCaseDeclaration ident alternatives =
     args = take argPattern $ unusedNames (ident, alternatives)
     vars = map (Var . Qualified Nothing) args
     binders = [ CaseAlternative bs g val | (bs, (g, val)) <- alternatives ]
-    value = foldr (\arg ret -> Abs (Left arg) ret) (Case vars binders) args
+    value = foldr (Abs . Left) (Case vars binders) args
   in
     ValueDeclaration ident Value [] Nothing value
 
