@@ -25,8 +25,7 @@ module Language.PureScript.CodeGen.JS (
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Arrow (first, second)
+import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
 
 import qualified Data.Map as M
@@ -136,20 +135,18 @@ valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 -- Shallow copy an object.
 --
 extendObj :: JS -> [(String, JS)] -> JS
-extendObj obj sts = iife
+extendObj obj sts = JSApp (JSFunction Nothing [] block) []
   where
-  iife = JSApp fun []
-  fun = JSFunction Nothing [] block
-  block = JSBlock ([objAssign, copy] ++ extensions ++ ret)
+  [newObj, key] = take 2 . map identToJs . unusedNames $ (obj, sts)
+  jsKey = JSVar key
+  jsNewObj = JSVar newObj
+  block = JSBlock (objAssign:copy:extend ++ [JSReturn jsNewObj])
   objAssign = JSVariableIntroduction newObj (Just $ JSObjectLiteral [])
-  copy = JSForIn key obj test
-  (newObj, key) = runGen ["newObj", "key"] ((,) <$> fresh <*> fresh)
-  --(newObj, key) = runGen (map identToJs (unusedNames block)) ((,) <$> fresh <*> fresh)
-  test = JSBlock [JSIfElse cond assign Nothing]
-  cond = JSApp (JSAccessor "hasOwnProperty" obj) [JSVar key]
-  assign = JSBlock [JSAssignment (JSIndexer (JSVar key) (JSVar newObj)) (JSIndexer (JSVar key) obj)]
-  extensions = map (uncurry JSAssignment . first (`JSAccessor` JSVar newObj)) sts
-  ret = [JSReturn (JSVar newObj)]
+  copy = JSForIn key obj $ JSBlock [JSIfElse cond assign Nothing]
+  cond = JSApp (JSAccessor "hasOwnProperty" obj) [jsKey]
+  assign = JSBlock [JSAssignment (JSIndexer jsKey jsNewObj) (JSIndexer jsKey obj)]
+  stToAssign (s, js) = JSAssignment (JSAccessor s jsNewObj) js
+  extend = map stToAssign sts
 
 -- |
 -- Temporarily extends the environment with a single local variable name
