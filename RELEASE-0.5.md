@@ -31,6 +31,8 @@
 - Type class instances are now named, to enable easier interop with Javascript (paf31)
 - Class names no longer need to be qualified in instance declarations (garyb)
 - Module exports can now be specified explicitly (garyb)
+- Let bindings can now define functions with binders (paf31)
+- Case statements and functions which do not pattern match on their arguments now generate smaller code (paf31)
 
 ### Bug Fixes
 
@@ -38,6 +40,7 @@
 - `sort` no longer mutates arrays (joneshf)
 - PSCI now evaluates expressions (joneshf)
 - Overlapping variables in typeclass instances are rejected (paf31)
+- A bug in the optimizer related to inlining was fixed (paf31)
 
 ### Libraries
 
