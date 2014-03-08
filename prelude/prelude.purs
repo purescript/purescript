@@ -45,23 +45,6 @@ module Prelude where
   instance showNumber :: Show Number where
     show = showNumberImpl
 
-  class Read a where
-    read :: String -> a
-
-  instance readString :: Read String where
-    read s = s
-
-  instance readBoolean :: Read Boolean where
-    read "true" = true
-    read _ = false
-
-  foreign import readNumberImpl "function readNumberImpl(n) {\
-                                \  return parseFloat(n);\
-                                \}" :: String -> Number
-
-  instance readNumber :: Read Number where
-    read = readNumberImpl
-
   infixl 4 <$>
 
   class Functor f where
@@ -1207,3 +1190,20 @@ module Data.Enum where
   class Enum a where
     toEnum :: Number -> Maybe a
     fromEnum :: a -> Number
+    
+module Text.Parsing.Read where
+
+  class Read a where
+    read :: String -> a
+
+  instance readString :: Read String where
+    read s = s
+
+  instance readBoolean :: Read Boolean where
+    read "true" = true
+    read _ = false
+
+  foreign import readNumberImpl "var readNumberImpl = parseFloat;" :: String -> Number
+
+  instance readNumber :: Read Number where
+    read = readNumberImpl
