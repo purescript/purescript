@@ -26,14 +26,14 @@ import Language.PureScript.Values
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Prim
-
-import qualified Data.Map as M
+import Language.PureScript.CodeGen.Common (identToJs)
 
 import Control.Applicative
 import Control.Monad.State
 import Control.Arrow (second)
+import Data.Maybe (catMaybes)
 
-import Language.PureScript.CodeGen.Common (identToJs)
+import qualified Data.Map as M
 
 type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
 
@@ -47,7 +47,10 @@ desugarTypeClasses :: [Module] -> Either String [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
-desugarModule (Module name decls exps) = Module name <$> concat <$> mapM (desugarDecl name) decls <*> pure exps
+desugarModule (Module name decls (Just exps)) = do
+  (newExpss, declss) <- unzip <$> mapM (desugarDecl name) decls
+  return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
+desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
 -- |
 -- Desugar type class and type class instance declarations
@@ -87,17 +90,17 @@ desugarModule (Module name decls exps) = Module name <$> concat <$> mapM (desuga
 --   __Test_Foo_array :: forall a. Foo a -> Foo [a]
 --   __Test_Foo_array _1 = { foo: __Test_Foo_array_foo _1 :: [a] -> [a] (unchecked) }
 --
-desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
+desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args members) = do
   let tys = map memberToNameAndType members
   modify (M.insert (mn, name) (args, tys))
-  return $ d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members
+  return $ (Nothing, d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members)
 desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration name mn deps className ty) desugared
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
-  return $ d : entries ++ [dictDecl]
-desugarDecl _ other = return [other]
+  return $ (Just $ TypeInstanceRef name className ty, d : entries ++ [dictDecl])
+desugarDecl _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (String, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (identToJs ident, ty)
