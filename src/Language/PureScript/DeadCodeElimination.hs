@@ -30,11 +30,33 @@ import Language.PureScript.Declarations
 -- Eliminate all declarations which are not a transitive dependency of the entry point module
 --
 eliminateDeadCode :: [ModuleName] -> [Module] -> [Module]
-eliminateDeadCode entryPoints ms =
-  let declarations = concatMap declarationsByModule ms
-      (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
-      entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
-  in flip map ms $ \(Module moduleName ds exps) -> Module moduleName (filter (isUsed moduleName graph vertexFor entryPointVertices) ds) exps
+eliminateDeadCode entryPoints ms = map go ms
+  where
+  go (Module moduleName ds (Just exps)) = Module moduleName ds' (Just exps')
+    where
+    ds' = filter (isUsed moduleName graph vertexFor entryPointVertices) ds
+    exps' = mapMaybe (filterExport ds') exps
+  go _ = error "Exports should have been elaborated in name desugaring"
+  declarations = concatMap declarationsByModule ms
+  (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
+  entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
+
+  filterExport :: [Declaration] -> DeclarationRef -> Maybe DeclarationRef
+  filterExport decls r@(TypeRef name _) | (any $ typeExists name) decls = Just r
+  filterExport decls r@(ValueRef name) | (any $ valueExists name) decls = Just r
+  filterExport decls r@(TypeInstanceRef name _ _) | (any $ valueExists name) decls = Just r
+  filterExport _ _ = Nothing
+
+  valueExists :: Ident -> Declaration -> Bool
+  valueExists name (ValueDeclaration name' _ _ _ _) = name == name'
+  valueExists name (ExternDeclaration _ name' _ _) = name == name'
+  valueExists name (BindingGroupDeclaration decls) = any (\(name', _, _) -> name == name') decls
+  valueExists _ _ = False
+
+  typeExists :: ProperName -> Declaration -> Bool
+  typeExists name (DataDeclaration name' _ _) = name == name'
+  typeExists name (DataBindingGroupDeclaration decls) = any (typeExists name) decls
+  typeExists _ _ = False 
 
 type Key = (ModuleName, Either Ident ProperName)
 
