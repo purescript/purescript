@@ -425,6 +425,12 @@ module Data.Maybe where
     show (Just x) = "Just " ++ (show x)
     show Nothing = "Nothing"
 
+  instance eqMaybe :: (Eq a) => Eq (Maybe a) where
+    (==) Nothing Nothing = true
+    (==) (Just a1) (Just a2) = a1 == a2
+    (==) _ _ = false
+    (/=) a b = not (a == b)
+
 module Data.Either where
 
   import Prelude
@@ -451,6 +457,12 @@ module Data.Either where
   instance showEither :: (Show a, Show b) => Show (Either a b) where
     show (Left x) = "Left " ++ (show x)
     show (Right y) = "Right " ++ (show y)
+
+  instance eqEither :: (Eq a, Eq b) => Eq (Either a b) where
+    (==) (Left a1) (Left a2) = a1 == a2
+    (==) (Right b1) (Right b2) = b1 == b2
+    (==) _ _ = false
+    (/=) a b = not (a == b)
 
 module Data.Array where
 
