@@ -102,6 +102,10 @@ The following code defines a `Person` data type and a function to generate a str
   
   showPerson :: Person -> String
   showPerson (Person o) = o.name ++ ", aged " ++ numberToString(o.age)
+  
+  examplePerson :: Person
+  examplePerson = Person {name: "Bonnie", age: 26}
+
 
 Line by line, this reads as follows:
 
@@ -110,6 +114,7 @@ Line by line, this reads as follows:
 - The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
 - The `showPerson` function takes a `Person` and returns a `String`
 - `showPerson` works by case analysis on its argument, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
+- `examplePerson` is a Person object, made with the Person constructor and given the String "Bonnie" for the name value and the Number 26 for the age value.
 
 The generated Javascript looks like this::
 
@@ -120,6 +125,12 @@ The generated Javascript looks like this::
   function showPerson(_1) {
       return _1.values[0].name + ", aged " + numberToString(_1.values[0].age); 
   };
+  
+  var examplePerson = Person({
+    name: "Bonnie", 
+    age: 26
+  });
+
 
 Related Projects
 ----------------
