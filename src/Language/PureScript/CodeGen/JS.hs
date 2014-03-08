@@ -49,28 +49,29 @@ import qualified Language.PureScript.Constants as C
 -- module.
 --
 moduleToJs :: Options -> Module -> Environment -> Maybe JS
-moduleToJs opts (Module name decls _) env =
+moduleToJs opts (Module name decls (Just exps)) env =
   case jsDecls of
     [] -> Nothing
     _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar C._ps)) $
            JSApp (JSFunction Nothing ["module"] (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
                  [JSBinary Or (JSAccessor (moduleNameToJs name) (JSVar C._ps)) (JSObjectLiteral [])]
   where
-  jsDecls = concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) decls
+  jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) decls)
+          ++ concatMap exportToJs exps
+moduleToJs _ _ _ = error "Exports should have been elaborated in name desugaring"
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
 declToJs :: Options -> ModuleName -> Declaration -> Environment -> Maybe [JS]
 declToJs opts mp (ValueDeclaration ident _ _ _ val) e =
-  Just $ export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
+  Just [JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))]
 declToJs opts mp (BindingGroupDeclaration vals) e =
-  Just $ concatMap (\(ident, _, val) ->
-           export ident $ JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))
-         ) vals
+  Just $ flip concatMap vals $ \(ident, _, val) ->
+    [JSVariableIntroduction (identToJs ident) (Just (valueToJs opts mp e val))]
 declToJs _ mp (DataDeclaration _ _ ctors) _ =
   Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    export (Escaped ctor) $ JSVariableIntroduction ctor (Just (go pn 0 tys []))
+    [JSVariableIntroduction ctor (Just (go pn 0 tys []))]
     where
     go :: ProperName -> Integer -> [Type] -> [JS] -> JS
     go pn _ [] values =
@@ -78,18 +79,26 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
     go pn index (_ : tys') values =
       JSFunction Nothing ["value" ++ show index]
         (JSBlock [JSReturn (go pn (index + 1) tys' (JSVar ("value" ++ show index) : values))])
-declToJs opts mp (DataBindingGroupDeclaration ds) e =
-  Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
-declToJs _ _ (ExternDeclaration _ ident (Just js) _) _ =
-  Just $ export ident js
+declToJs opts mp (DataBindingGroupDeclaration ds) e = Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
+declToJs _ _ (ExternDeclaration _ _ (Just js) _) _ = Just [js]
 declToJs _ _ _ _ = Nothing
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for exporting a
--- declaration from a module.
+-- Generate code in the simplified Javascript intermediate representation for an export from a
+-- module.
 --
-export :: Ident -> JS -> [JS]
-export ident value = [ value, JSAssignment (accessor ident (JSVar "module")) (var ident) ]
+exportToJs :: DeclarationRef -> [JS]
+exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Escaped . runProperName)
+exportToJs (ValueRef name) = [export name]
+exportToJs (TypeInstanceRef name _ _) = [export name]
+exportToJs _ = []
+
+-- |
+-- Generate code in the simplified Javascript intermediate representation for assigning an exported
+-- value to the current module object.
+--
+export :: Ident -> JS
+export ident = JSAssignment (accessor ident (JSVar "module")) (var ident)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
