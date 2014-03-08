@@ -89,7 +89,8 @@ parseLet :: P.Parsec String ParseState Value
 parseLet = do
   C.reserved "let"
   C.indented
-  binder <- parseBinder
+  binder <- P.try (Right <$> ((,) <$> C.parseIdent <*> P.many (Left <$> P.try C.parseIdent <|> Right <$> parseBinderNoParens)))
+            <|> (Left <$> parseBinder)
   C.indented
   C.reservedOp "="
   C.indented

@@ -34,7 +34,7 @@ import qualified Language.PureScript as P
 -- we actually want the normal @let@.
 --
 psciLet :: Parsec String P.ParseState Command
-psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> P.parseBinder)
+psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> (Left <$> P.parseBinder))
                          <*> (P.indented *> P.reservedOp "=" *> P.parseValue))
 
 -- |

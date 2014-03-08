@@ -102,7 +102,7 @@ data Value
   -- |
   -- A let binding
   --
-  | Let Binder Value Value
+  | Let (Either Binder (Ident, [Either Ident Binder])) Value Value
   -- |
   -- A do-notation block
   --

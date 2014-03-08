@@ -51,9 +51,9 @@ import Language.PureScript.Sugar.Names as S
 desugar :: [Module] -> Either String [Module]
 desugar = rebracket
           >=> desugarDo
-          >=> desugarCasesModule
           >=> desugarLetBindings
-          >>> desugarImports
+          >>> desugarCasesModule
+          >=> desugarImports
           >=> desugarTypeDeclarationsModule
           >=> desugarTypeClasses
           >=> createBindingGroupsModule

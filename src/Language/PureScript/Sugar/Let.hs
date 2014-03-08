@@ -28,6 +28,7 @@ import Language.PureScript.Declarations
 desugarLetBindings :: [Module] -> [Module]
 desugarLetBindings = everywhere (mkT go)
   where
-  go (Let (VarBinder ident) value result) = App (Abs (Left ident) result) value
-  go (Let binder value result) = Case [value] [CaseAlternative [binder] Nothing result]
+  go (Let (Left (VarBinder ident)) value result) = App (Abs (Left ident) result) value
+  go (Let (Left binder) value result) = Case [value] [CaseAlternative [binder] Nothing result]
+  go (Let (Right (ident, binders)) value result) = App (Abs (Left ident) result) (foldr Abs value binders)
   go other = other
