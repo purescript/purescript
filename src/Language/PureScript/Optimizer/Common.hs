@@ -43,6 +43,7 @@ isReassigned var1 = everything (||) (mkQ False check)
   check (JSVariableIntroduction arg _) | var1 == arg = True
   check (JSAssignment (JSVar arg) _) | var1 == arg = True
   check (JSFor arg _ _ _) | var1 == arg = True
+  check (JSForIn arg _ _) | var1 == arg = True
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
