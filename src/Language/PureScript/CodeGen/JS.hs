@@ -117,7 +117,7 @@ valueToJs _ _ _ (StringLiteral s) = JSStringLiteral s
 valueToJs _ _ _ (BooleanLiteral b) = JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral (map (valueToJs opts m e) xs)
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral (map (second (valueToJs opts m e)) ps)
-valueToJs opts m e (ObjectUpdate o ps) = JSApp (JSAccessor "extend" (JSVar "Object")) [ valueToJs opts m e o, JSObjectLiteral (map (second (valueToJs opts m e)) ps)]
+valueToJs opts m e (ObjectUpdate o ps) = extendObj (valueToJs opts m e o) (map (second (valueToJs opts m e)) ps)
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
@@ -129,6 +129,23 @@ valueToJs _ m _ (Var ident) = varToJs m ident
 valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
+
+-- |
+-- Shallow copy an object.
+--
+extendObj :: JS -> [(String, JS)] -> JS
+extendObj obj sts = JSApp (JSFunction Nothing [] block) []
+  where
+  [newObj, key] = take 2 . map identToJs . unusedNames $ (obj, sts)
+  jsKey = JSVar key
+  jsNewObj = JSVar newObj
+  block = JSBlock (objAssign:copy:extend ++ [JSReturn jsNewObj])
+  objAssign = JSVariableIntroduction newObj (Just $ JSObjectLiteral [])
+  copy = JSForIn key obj $ JSBlock [JSIfElse cond assign Nothing]
+  cond = JSApp (JSAccessor "hasOwnProperty" obj) [jsKey]
+  assign = JSBlock [JSAssignment (JSIndexer jsKey jsNewObj) (JSIndexer jsKey obj)]
+  stToAssign (s, js) = JSAssignment (JSAccessor s jsNewObj) js
+  extend = map stToAssign sts
 
 -- |
 -- Temporarily extends the environment with a single local variable name
