@@ -256,7 +256,7 @@ entails :: ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, 
 entails moduleName context goal@(className, tys) = do
   env <- getEnv
   case go env goal of
-    [] -> throwError $ "No " ++ show className ++ " instance found for " ++ intercalate ", " (map prettyPrintType tys)
+    [] -> throwError $ "No " ++ show className ++ " instance found for " ++ intercalate ", " (map prettyPrintType tys) ++ show (typeClassDictionaries env)
     (dict : _) -> return dict
   where
   go env (className', tys') =

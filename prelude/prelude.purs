@@ -706,6 +706,10 @@ module Data.Tuple where
     Tuple as bs -> Tuple (a : as) (b : bs)
   unzip [] = Tuple [] []
 
+  instance eqTuple :: (Eq a, Eq b) => Eq (Tuple a b) where
+    (==) (Tuple a1 b1) (Tuple a2 b2) = a1 == a2 && b1 == b2
+    (/=) t1 t2 = not (t1 == t2)
+
 module Data.String where
 
   foreign import lengthS "function lengthS(s) {\

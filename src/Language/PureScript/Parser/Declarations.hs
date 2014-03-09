@@ -64,11 +64,21 @@ parseValueDeclaration =
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
-                             <*> (lexeme (indented *> P.string "::") *> parseKind)
-   <|> do ident <- parseIdent
-          js <- P.optionMaybe (JSRaw <$> stringLiteral)
-          ty <- lexeme (indented *> P.string "::") *> parsePolyType
-          return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty)
+                          <*> (lexeme (indented *> P.string "::") *> parseKind)
+   <|> (do reserved "instance"
+           name <- parseIdent <* lexeme (indented *> P.string "::")
+           deps <- P.option [] $ do
+             deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
+             indented
+             reservedOp "=>"
+             return deps
+           className <- indented *> parseQualified properName
+           tys <- P.many (indented *> parseTypeAtom)
+           return $ ExternInstanceDeclaration name deps className tys)
+   <|> (do ident <- parseIdent
+           js <- P.optionMaybe (JSRaw <$> stringLiteral)
+           ty <- lexeme (indented *> P.string "::") *> parsePolyType
+           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty))
 
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =

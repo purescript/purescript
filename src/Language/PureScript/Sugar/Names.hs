@@ -148,7 +148,7 @@ desugarImports modules = do
   renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either String Module
   renameInModule' unfilteredExports exports m@(Module mn _ _) = rethrowForModule m $ do
     let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
-    let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports 
+    let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
     imports <- resolveImports env m
     renameInModule imports env (elaborateExports exps m)
 
@@ -160,7 +160,7 @@ rethrowForModule (Module mn _ _) = flip catchError $ \e -> throwError ("Error in
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that have an exports list,
--- as it will also make all data constructor exports explicit. 
+-- as it will also make all data constructor exports explicit.
 --
 elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module mn decls _) = Module mn decls (Just $
@@ -178,6 +178,8 @@ renameInModule imports exports (Module mn decls exps) =
   where
   updateDecl (TypeInstanceDeclaration name cs cn ts ds) =
       TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
+  updateDecl (ExternInstanceDeclaration name cs cn ts) =
+      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts
   updateDecl d = return d
 
   updateVars :: Declaration -> Either String Declaration
@@ -378,6 +380,7 @@ resolveImport currentModule importModule exps imps = maybe importAll (foldM impo
     _ <- checkImportExists "type class" classes name
     typeClasses' <- updateImports (importedTypeClasses imp) name
     return $ imp { importedTypeClasses = typeClasses' }
+  importExplicit _ _ = error "Invalid argument to importExplicit"
 
   -- Find all exported data constructors for a given type
   allExportedDataConstructors :: ProperName -> [ProperName]

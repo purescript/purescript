@@ -59,6 +59,7 @@ createBindingGroups moduleName ds = do
       bindingGroupDecls = map toBindingGroup $ stronglyConnComp valueVerts
   return $ filter isImportDecl ds ++
            filter isExternDataDecl ds ++
+           filter isExternInstanceDecl ds ++
            dataBindingGroupDecls ++
            filter isTypeClassDeclaration ds ++
            filter isFixityDecl ds ++

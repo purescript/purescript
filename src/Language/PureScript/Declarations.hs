@@ -104,6 +104,10 @@ data Declaration
   --
   | ExternDataDeclaration ProperName Kind
   -- |
+  -- A type class instance foreign import
+  --
+  | ExternInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type]
+  -- |
   -- A fixity declaration (fixity data, operator name)
   --
   | FixityDeclaration Fixity String
@@ -150,6 +154,13 @@ isImportDecl _ = False
 isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl _ = False
+
+-- |
+-- Test if a declaration is a type class instance foreign import
+--
+isExternInstanceDecl :: Declaration -> Bool
+isExternInstanceDecl ExternInstanceDeclaration{} = True
+isExternInstanceDecl _ = False
 
 -- |
 -- Test if a declaration is a fixity declaration
