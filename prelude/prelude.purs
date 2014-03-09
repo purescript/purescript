@@ -862,7 +862,9 @@ module Global where
 
   foreign import decodeURI :: String -> String
 
-  foreign import isNaN :: Number -> Boolean
+  foreign import isNaN "function isNaNImpl(n) {\
+                       \  return n !== n;\
+                       \}" :: Number -> Boolean
 
 module Math where
 
