@@ -583,8 +583,9 @@ inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
     Just (_, ty) -> do
-      (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contains constraints") ty
-      go binders fn
+      (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contain constraints") ty
+      fn' <- replaceAllTypeSynonyms fn
+      go binders fn'
         where
         go [] ty' = do
           _ <- subsumes Nothing val ty'
