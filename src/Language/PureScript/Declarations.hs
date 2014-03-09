@@ -33,7 +33,11 @@ type Precedence = Integer
 -- |
 -- Associativity for infix operators
 --
-data Associativity = Infixl | Infixr deriving (Show, D.Data, D.Typeable)
+data Associativity = Infixl | Infixr deriving (D.Data, D.Typeable)
+
+instance Show Associativity where
+  show Infixl = "infixl"
+  show Infixr = "infixr"
 
 -- |
 -- Fixity data for infix operators

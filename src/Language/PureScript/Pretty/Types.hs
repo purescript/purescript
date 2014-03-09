@@ -42,7 +42,6 @@ typeLiterals = mkPattern match
   match (Skolem s _) = Just $ 's' : show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
-  match (PrettyPrintForAll idents ty) = Just $ "forall " ++ unwords idents ++ ". " ++ prettyPrintType ty
   match REmpty = Just "()"
   match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
@@ -100,7 +99,14 @@ matchType = buildPrettyPrinter operators matchTypeAtom
     OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
                   , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
                     ]
+                  , [ Wrap forall_ $ \idents ty -> "forall " ++ unwords idents ++ ". " ++ ty ]
                   ]
+
+forall_ :: Pattern () Type ([String], Type)
+forall_ = mkPattern match
+  where
+  match (PrettyPrintForAll idents ty) = Just (idents, ty)
+  match _ = Nothing
 
 -- |
 -- Generate a pretty-printed string representing a Type, as it should appear inside parentheses

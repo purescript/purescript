@@ -35,10 +35,16 @@ import Language.PureScript.Environment
 --
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
-moduleToPs (Module moduleName _ (Just exts)) env = intercalate "\n" . execWriter $ do
+moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
   tell ["module " ++ runModuleName moduleName ++ " where"]
+  mapM_ fixityToPs ds
   mapM_ exportToPs exts
   where
+
+    fixityToPs :: Declaration -> Writer [String] ()
+    fixityToPs (FixityDeclaration (Fixity assoc prec) ident) =
+      tell [ unwords [ show assoc, show prec, ident ] ]
+    fixityToPs _ = return ()
 
     exportToPs :: DeclarationRef -> Writer [String] ()
     exportToPs (TypeRef pn dctors) = do
@@ -62,15 +68,15 @@ moduleToPs (Module moduleName _ (Just exts)) env = intercalate "\n" . execWriter
     exportToPs (ValueRef ident) =
       case (moduleName, ident) `M.lookup` names env of
         Nothing -> error $ show ident ++ " has no type in exportToPs"
-        Just (ty, nameKind) | nameKind == Value || nameKind == Extern ForeignImport ->
+        Just (ty, nameKind) | nameKind == Value || nameKind == Extern ForeignImport || nameKind == Extern InlineJavascript ->
           tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
         _ -> return ()
     exportToPs (TypeClassRef className) =
       case Qualified (Just moduleName) className `M.lookup` typeClasses env of
         Nothing -> error $ show className ++ " has no type class definition in exportToPs"
-        Just (args, ds) -> do
+        Just (args, members) -> do
           tell ["class " ++ show className ++ " " ++ unwords args ++ " where"]
-          forM_ (filter (isValueExported . fst) ds) $ \(member ,ty) ->
+          forM_ (filter (isValueExported . fst) members) $ \(member ,ty) ->
             tell [ "  " ++ show member ++ " :: " ++ prettyPrintType ty ]
     exportToPs (TypeInstanceRef ident) = do
       let TypeClassDictionaryInScope { tcdClassName = className, tcdInstanceTypes = tys, tcdDependencies = deps} =
