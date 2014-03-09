@@ -89,7 +89,7 @@ which compiles to the following Javascript, ignoring the Prelude::
 
 The following command will compile and execute the PureScript code above::
 
-  psc input.purs --main | nodejs
+  psc input.purs --main | node
 
 Another Example
 ---------------
