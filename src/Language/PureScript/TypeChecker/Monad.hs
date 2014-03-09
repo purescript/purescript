@@ -22,7 +22,7 @@ import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Values
 import Language.PureScript.Names
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 
 import Data.Maybe
 
@@ -30,41 +30,8 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
 import Control.Monad.Unify
-import Control.Arrow (first)
 
 import qualified Data.Map as M
-
--- |
--- The @Environment@ defines all values and types which are currently in scope:
---
-data Environment = Environment {
-  -- |
-  -- Value names currently in scope
-  --
-    names :: M.Map (ModuleName, Ident) (Type, NameKind)
-  -- |
-  -- Type names currently in scope
-  --
-  , types :: M.Map (Qualified ProperName) Kind
-  -- |
-  -- Data constructors currently in scope, along with their associated data type constructors
-  --
-  , dataConstructors :: M.Map (Qualified ProperName) (ProperName, Type)
-  -- |
-  -- Type synonyms currently in scope
-  --
-  , typeSynonyms :: M.Map (Qualified ProperName) ([String], Type)
-  -- |
-  -- Available type class dictionaries
-  --
-  , typeClassDictionaries :: [TypeClassDictionaryInScope]
-  } deriving (Show)
-
--- |
--- The initial environment with no values and only the default javascript types defined
---
-initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty []
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -80,7 +47,7 @@ bindNames newNames action = do
 -- |
 -- Temporarily bind a collection of names to types
 --
-bindTypes :: (MonadState CheckState m) => M.Map (Qualified ProperName) Kind -> m a -> m a
+bindTypes :: (MonadState CheckState m) => M.Map (Qualified ProperName) (Kind, TypeKind) -> m a -> m a
 bindTypes newNames action = do
   orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { types = newNames `M.union` (types . checkEnv $ st) } }
@@ -117,7 +84,7 @@ bindLocalVariables moduleName bindings =
 --
 bindLocalTypeVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(ProperName, Kind)] -> m a -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ first $ Qualified (Just moduleName))
+  bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
 
 -- |
 -- Lookup the type of a value by name in the @Environment@
@@ -137,7 +104,7 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
     Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
-    Just k -> return k
+    Just (k, _) -> return k
 
 -- |
 -- State required for type checking:

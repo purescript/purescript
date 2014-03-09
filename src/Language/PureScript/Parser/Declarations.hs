@@ -29,8 +29,8 @@ import Language.PureScript.Declarations
 import Language.PureScript.Parser.Values
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
-import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.Environment
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do

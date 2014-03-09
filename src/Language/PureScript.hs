@@ -28,6 +28,7 @@ import Language.PureScript.Pretty as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 import Language.PureScript.ModuleDependencies as P
+import Language.PureScript.Environment as P
 import Language.PureScript.DeadCodeElimination as P
 
 import qualified Language.PureScript.Constants as C

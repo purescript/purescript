@@ -44,7 +44,7 @@ eliminateDeadCode entryPoints ms = map go ms
   filterExport :: [Declaration] -> DeclarationRef -> Maybe DeclarationRef
   filterExport decls r@(TypeRef name _) | (any $ typeExists name) decls = Just r
   filterExport decls r@(ValueRef name) | (any $ valueExists name) decls = Just r
-  filterExport decls r@(TypeInstanceRef name _ _) | (any $ valueExists name) decls = Just r
+  filterExport decls r@(TypeInstanceRef name) | (any $ valueExists name) decls = Just r
   filterExport _ _ = Nothing
 
   valueExists :: Ident -> Declaration -> Bool
@@ -56,7 +56,7 @@ eliminateDeadCode entryPoints ms = map go ms
   typeExists :: ProperName -> Declaration -> Bool
   typeExists name (DataDeclaration name' _ _) = name == name'
   typeExists name (DataBindingGroupDeclaration decls) = any (typeExists name) decls
-  typeExists _ _ = False 
+  typeExists _ _ = False
 
 type Key = (ModuleName, Either Ident ProperName)
 

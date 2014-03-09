@@ -30,7 +30,6 @@ import Control.Monad (replicateM, forM)
 
 import qualified Data.Map as M
 
-import Language.PureScript.TypeChecker (Environment(..))
 import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
@@ -41,7 +40,7 @@ import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Types
 import Language.PureScript.Optimizer
 import Language.PureScript.CodeGen.Common
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 import qualified Language.PureScript.Constants as C
 
 -- |
@@ -90,7 +89,7 @@ declToJs _ _ _ _ = Nothing
 exportToJs :: DeclarationRef -> [JS]
 exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Escaped . runProperName)
 exportToJs (ValueRef name) = [export name]
-exportToJs (TypeInstanceRef name _ _) = [export name]
+exportToJs (TypeInstanceRef name) = [export name]
 exportToJs _ = []
 
 -- |

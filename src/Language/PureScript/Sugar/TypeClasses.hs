@@ -25,7 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.Values
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 import Language.PureScript.CodeGen.Common (identToJs)
 
 import Control.Applicative
@@ -99,7 +99,7 @@ desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration name mn deps className ty) desugared
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
-  return $ (Just $ TypeInstanceRef name className ty, d : entries ++ [dictDecl])
+  return $ (Just $ TypeInstanceRef name, d : entries ++ [dictDecl])
 desugarDecl _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (String, Type)

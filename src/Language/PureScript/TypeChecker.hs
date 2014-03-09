@@ -35,12 +35,12 @@ import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) ctorKind (types env) }
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
     rethrow (("Error in data constructor " ++ show dctor ++ ":\n") ++) $
       addDataConstructor moduleName name args dctor tys
@@ -56,7 +56,7 @@ addDataConstructor moduleName name args dctor tys = do
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) kind (types env)
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
 valueIsNotDefined :: ModuleName -> Ident -> Check ()
@@ -70,6 +70,11 @@ addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
 addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind) (names env) })
+
+addTypeClass :: ModuleName -> ProperName -> [String] -> [Declaration] -> Check ()
+addTypeClass moduleName pn args ds =
+  let members = map (\(TypeDeclaration ident ty) -> (ident, ty)) ds in
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members) (typeClasses . checkEnv $ st) } }
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
@@ -150,7 +155,7 @@ typeCheckAll mainModuleName moduleName (BindingGroupDeclaration vals : rest) = d
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(ExternDataDeclaration name kind) : rest) = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) kind (types env) }
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(ExternDeclaration importTy name _ ty) : rest) = do
@@ -179,7 +184,8 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _) : 
     addTypeClassDictionaries [tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (tcdName tcd) }]
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
-typeCheckAll mainModuleName moduleName (d@TypeClassDeclaration{} : rest) = do
+typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args tys) : rest) = do
+  addTypeClass moduleName pn args tys
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (TypeInstanceDeclaration dictName deps className tys _ : rest) = do

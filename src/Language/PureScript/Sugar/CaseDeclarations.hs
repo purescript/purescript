@@ -30,6 +30,7 @@ import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Declarations
 import Language.PureScript.Scope
+import Language.PureScript.Environment
 
 -- |
 -- Replace all top-level binders in a module with case expressions.

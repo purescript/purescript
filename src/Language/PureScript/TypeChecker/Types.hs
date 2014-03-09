@@ -56,7 +56,7 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Pretty
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 import qualified Language.PureScript.Constants as C
 
 import Control.Monad.State

@@ -29,7 +29,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Values
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 
 -- |
 -- The global export environment - every declaration exported from every module.
@@ -97,8 +97,8 @@ addEmptyModule env name = M.insert name (Exports [] [] []) env
 --
 addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either String ExportEnvironment
 addType env mn name dctors = updateExportedModule env mn $ \m -> do
-  types <- addExport (exportedTypes m) (name, dctors)
-  return $ m { exportedTypes = types }
+  types' <- addExport (exportedTypes m) (name, dctors)
+  return $ m { exportedTypes = types' }
 
 -- |
 -- Adds a class to the export environment.
@@ -283,10 +283,10 @@ filterExports mn exps env = do
   -- Filter the exports for the specific module
   filterModule :: Exports -> Either String Exports
   filterModule exported = do
-    types <- foldM (filterTypes $ exportedTypes exported) [] exps
+    types' <- foldM (filterTypes $ exportedTypes exported) [] exps
     values <- foldM (filterValues $ exportedValues exported) [] exps
     classes <- foldM (filterClasses $ exportedTypeClasses exported) [] exps
-    return exported { exportedTypes = types, exportedTypeClasses = classes, exportedValues = values }
+    return exported { exportedTypes = types', exportedTypeClasses = classes, exportedValues = values }
 
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
@@ -370,7 +370,7 @@ resolveImport currentModule importModule exps imps = maybe importAll (foldM impo
     values' <- updateImports (importedValues imp) name
     return $ imp { importedValues = values' }
   importExplicit imp (TypeRef name dctors) = do
-    _ <- checkImportExists "type" types name
+    _ <- checkImportExists "type" availableTypes name
     types' <- updateImports (importedTypes imp) name
     let allDctors = allExportedDataConstructors name
     dctors' <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
@@ -398,7 +398,7 @@ resolveImport currentModule importModule exps imps = maybe importAll (foldM impo
 
   -- The available values, types, and classes in the module being imported
   values = exportedValues exps
-  types = fst `map` exportedTypes exps
+  availableTypes = fst `map` exportedTypes exps
   classes = exportedTypeClasses exps
 
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported

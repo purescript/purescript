@@ -25,7 +25,7 @@ import Control.Monad (when, unless)
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
-import Language.PureScript.Prim
+import Language.PureScript.Environment
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P

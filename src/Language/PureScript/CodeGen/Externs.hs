@@ -17,55 +17,69 @@ module Language.PureScript.CodeGen.Externs (
     moduleToPs
 ) where
 
-import Data.List (intercalate)
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (intercalate, find)
 
 import qualified Data.Map as M
 
 import Control.Monad.Writer
 
 import Language.PureScript.Declarations
-import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 import Language.PureScript.Names
-import Language.PureScript.Types
-import Language.PureScript.Kinds
+import Language.PureScript.Values
+import Language.PureScript.Environment
 
 -- |
 -- Generate foreign imports for all declarations in a module
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module moduleName _ exts) env = intercalate "\n" . execWriter $ do
+moduleToPs (Module _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
+moduleToPs (Module moduleName _ (Just exts)) env = intercalate "\n" . execWriter $ do
   tell ["module " ++ runModuleName moduleName ++ " where"]
-  let typesExported = getTypesExportedFrom moduleName exts env
-  forM_ typesExported $ \(pn, kind) ->
-    tell ["foreign import data " ++ show pn ++ " :: " ++ prettyPrintKind kind]
-  let namesExported = getNamesExportedFrom moduleName exts env
-  forM_ namesExported $ \(ident, ty) ->
-    tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
-
-getNamesExportedFrom :: ModuleName -> Maybe [DeclarationRef] -> Environment -> [(Ident, Type)]
-getNamesExportedFrom moduleName exps env =
-  [ (ident, ty)
-  | ((moduleName', ident), (ty, nameKind)) <- M.toList . names $ env
-  , moduleName == moduleName'
-  , nameKind `elem` [Value, Extern ForeignImport]
-  , isExported ident exps
-  ]
+  mapM_ exportToPs exts
   where
-  isExported :: Ident -> Maybe [DeclarationRef] -> Bool
-  isExported _ Nothing = True
-  isExported ident (Just exps') = ValueRef ident `elem` exps'
 
-getTypesExportedFrom :: ModuleName -> Maybe [DeclarationRef] -> Environment -> [(ProperName, Kind)]
-getTypesExportedFrom moduleName exps env =
-  [ (pn, kind)
-  | ((Qualified (Just moduleName') pn), kind) <- M.toList . types $ env
-  , moduleName == moduleName'
-  , isExported pn exps
-  ]
-  where
-  isExported :: ProperName -> Maybe [DeclarationRef] -> Bool
-  isExported _ Nothing = True
-  isExported pn (Just exps') = flip any exps' $ \e -> case e of
-    TypeRef pn' _ | pn == pn' -> True
-    _ -> False
+    exportToPs :: DeclarationRef -> Writer [String] ()
+    exportToPs (TypeRef pn dctors) = do
+      case Qualified (Just moduleName) pn `M.lookup` types env of
+        Nothing -> error $ show pn ++ " has no kind in exportToPs"
+        Just (kind, ExternData) ->
+          tell ["foreign import data " ++ show pn ++ " :: " ++ prettyPrintKind kind]
+        Just (_, DataType args tys) -> do
+          let dctors' = fromMaybe (map fst tys) dctors
+              printDctor dctor = case dctor `lookup` tys of
+                                   Nothing -> Nothing
+                                   Just tyArgs -> Just $ show dctor ++ " " ++ unwords (map prettyPrintTypeAtom tyArgs)
+          tell ["data " ++ show pn ++ " " ++ unwords args ++ " = " ++ intercalate " | " (mapMaybe printDctor dctors')]
+        Just (_, TypeSynonym) ->
+          case Qualified (Just moduleName) pn `M.lookup` typeSynonyms env of
+            Nothing -> error $ show pn ++ " has no type synonym info in exportToPs"
+            Just (args, synTy) ->
+              tell ["type " ++ show pn ++ " " ++ unwords args ++ " = " ++ prettyPrintType synTy]
+        _ -> error "Invalid input in exportToPs"
+
+    exportToPs (ValueRef ident) =
+      case (moduleName, ident) `M.lookup` names env of
+        Nothing -> error $ show ident ++ " has no type in exportToPs"
+        Just (ty, nameKind) | nameKind == Value || nameKind == Extern ForeignImport ->
+          tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
+        _ -> return ()
+    exportToPs (TypeClassRef className) =
+      case Qualified (Just moduleName) className `M.lookup` typeClasses env of
+        Nothing -> error $ show className ++ " has no type class definition in exportToPs"
+        Just (args, ds) -> do
+          tell ["class " ++ show className ++ " " ++ unwords args ++ " where"]
+          forM_ (filter (isValueExported . fst) ds) $ \(member ,ty) ->
+            tell [ "  " ++ show member ++ " :: " ++ prettyPrintType ty ]
+    exportToPs (TypeInstanceRef ident) = do
+      let TypeClassDictionaryInScope { tcdClassName = className, tcdInstanceTypes = tys, tcdDependencies = deps} =
+            fromMaybe (error $ "Type class instance has no dictionary in exportToPs") . find ((== Qualified (Just moduleName) ident) . tcdName) $ typeClassDictionaries env
+      let constraintsText = case fromMaybe [] deps of
+                              [] -> ""
+                              cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "
+      tell ["foreign import instance " ++ show ident ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)]
+
+    isValueExported :: Ident -> Bool
+    isValueExported ident = ValueRef ident `elem` exts
+

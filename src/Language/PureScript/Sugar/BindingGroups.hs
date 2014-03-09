@@ -31,6 +31,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Values
 import Language.PureScript.Types
+import Language.PureScript.Environment
 
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
@@ -77,19 +78,19 @@ collapseBindingGroups = concatMap go
   go other = [other]
 
 usedIdents :: (Data d) => ModuleName -> d -> [Ident]
-usedIdents moduleName = nub . everything (++) (mkQ [] names)
+usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
   where
-  names :: Value -> [Ident]
-  names (Var (Qualified Nothing name)) = [name]
-  names (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
-  names _ = []
+  usedNames :: Value -> [Ident]
+  usedNames (Var (Qualified Nothing name)) = [name]
+  usedNames (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
+  usedNames _ = []
 
 usedProperNames :: (Data d) => ModuleName -> d -> [ProperName]
-usedProperNames moduleName = nub . everything (++) (mkQ [] names)
+usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
   where
-  names :: Type -> [ProperName]
-  names (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
-  names _ = []
+  usedNames :: Type -> [ProperName]
+  usedNames (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
+  usedNames _ = []
 
 getIdent :: Declaration -> Ident
 getIdent (ValueDeclaration ident _ _ _ _) = ident

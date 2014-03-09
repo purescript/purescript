@@ -29,6 +29,7 @@ library
                      Language.PureScript.Constants
                      Language.PureScript.Options
                      Language.PureScript.Declarations
+                     Language.PureScript.Environment
                      Language.PureScript.Kinds
                      Language.PureScript.Names
                      Language.PureScript.Types
@@ -71,7 +72,6 @@ library
                      Language.PureScript.Pretty.Kinds
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
-                     Language.PureScript.Prim
                      Language.PureScript.TypeChecker
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad

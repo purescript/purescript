@@ -21,6 +21,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.Environment
 
 import qualified Data.Data as D
 
@@ -64,7 +65,7 @@ data DeclarationRef
     -- |
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
-  | TypeInstanceRef Ident (Qualified ProperName) [Type]
+  | TypeInstanceRef Ident
   deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |

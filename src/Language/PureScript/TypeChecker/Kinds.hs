@@ -27,6 +27,7 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
+import Language.PureScript.Environment
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -70,7 +71,7 @@ kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
 kindsOf moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
-  let dict = (name, tyCon) : zip (map ProperName args) kargs
+  let dict = (name, tyCon) : zipWith (\arg kind -> (arg, kind)) (map ProperName args) kargs
   bindLocalTypeVariables moduleName dict $
     solveTypes ts kargs tyCon
   where
@@ -134,7 +135,7 @@ infer (TypeConstructor v) = do
   env <- liftCheck getEnv
   case M.lookup v (types env) of
     Nothing -> UnifyT . lift . throwError $ "Unknown type constructor '" ++ show v ++ "'" ++ show (M.keys (types env))
-    Just kind -> return kind
+    Just (kind, _) -> return kind
 infer (TypeApp t1 t2) = do
   k0 <- fresh
   k1 <- infer t1
