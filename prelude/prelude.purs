@@ -323,7 +323,6 @@ module Prelude where
 module Data.Monoid where
 
   import Prelude
-  import Data.Array (foldl)
 
   infixr 6 <>
 
@@ -338,9 +337,6 @@ module Data.Monoid where
   instance monoidArray :: Monoid [a] where
     mempty = []
     (<>) = Data.Array.concat
-
-  mconcat :: forall m. (Monoid m) => [m] -> m
-  mconcat = foldl (<>) mempty
 
 module Control.Applicative where
 
@@ -365,6 +361,7 @@ module Control.Monad where
 
   import Prelude
   import Data.Array
+  import Data.Traversable
 
   replicateM :: forall m a. (Monad m) => Number -> m a -> m [a]
   replicateM 0 _ = return []
@@ -372,13 +369,6 @@ module Control.Monad where
     a <- m
     as <- replicateM (n - 1) m
     return (a : as)
-
-  mapM :: forall m a b. (Monad m) => (a -> m b) -> [a] -> m [b]
-  mapM _ [] = return []
-  mapM f (a:as) = do
-    b <- f a
-    bs <- mapM f as
-    return (b : bs)
 
   infixr 1 >=>
   infixr 1 <=<
@@ -390,13 +380,6 @@ module Control.Monad where
 
   (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c
   (<=<) = flip (>=>)
-
-  sequence :: forall m a. (Monad m) => [m a] -> m [a]
-  sequence [] = return []
-  sequence (m:ms) = do
-    a <- m
-    as <- sequence ms
-    return (a : as)
 
   join :: forall m a. (Monad m) => m (m a) -> m a
   join mm = do
@@ -411,8 +394,8 @@ module Control.Monad where
   when true m = m
   when false _ = return {}
 
-  zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
-  zipWithM f xs ys = sequence $ zipWith f xs ys
+  zipWithA :: forall m a b c. (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+  zipWithA f xs ys = sequence (zipWith f xs ys)
 
 module Data.Maybe where
 
@@ -499,14 +482,6 @@ module Data.Array where
   map :: forall a b. (a -> b) -> [a] -> [b]
   map _ [] = []
   map f (x:xs) = f x : map f xs
-
-  foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
-  foldr f a (b : bs) = f (foldr f a bs) b
-  foldr _ a [] = a
-
-  foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
-  foldl _ b [] = b
-  foldl f b (a:as) = foldl f (f b a) as
 
   foreign import length "function length(xs) {\
                         \  return xs.length;\
@@ -1316,6 +1291,9 @@ module Data.Foldable where
 
   sequence_ :: forall a f m. (Applicative m, Foldable f) => f (m a) -> m {}
   sequence_ = traverse_ id
+
+  mconcat :: forall f m. (Foldable f, Monoid m) => f m -> m
+  mconcat = foldl (<>) mempty
 
 module Data.Traversable where
 
