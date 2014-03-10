@@ -342,6 +342,25 @@ module Data.Monoid where
   mconcat :: forall m. (Monoid m) => [m] -> m
   mconcat = foldl (<>) mempty
 
+module Control.Applicative where
+
+  import Prelude
+
+  infixl 4 <*
+  infixl 4 *>
+
+  (<*) :: forall a b f. (Applicative f) => f a -> f b -> f a
+  (<*) x y = const <$> x <*> y
+
+  (*>) :: forall a b f. (Applicative f) => f a -> f b -> f b
+  (*>) x y = const id <$> x <*> y
+
+  lift2 :: forall a b c f. (Applicative f) => (a -> b -> c) -> f a -> f b -> f c
+  lift2 f x y = f <$> x <*> y
+
+  lift3 :: forall a b c d f. (Applicative f) => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
+  lift3 f x y z = f <$> x <*> y <*> z
+
 module Control.Monad where
 
   import Prelude
@@ -1227,6 +1246,7 @@ module Text.Parsing.Read where
 module Data.Foldable where
 
   import Prelude
+  import Control.Applicative
   import Data.Either
   import Data.Eq
   import Data.Maybe
@@ -1281,3 +1301,15 @@ module Data.Foldable where
     foldl f z (Tuple _ x) = z `f` x
 
     foldMap f (Tuple _ x) = f x
+
+  fold :: forall f m. (Foldable f, Monoid m) => f m -> m
+  fold = foldMap id
+
+  traverse_ :: forall a b f m. (Applicative m, Foldable f) => (a -> m b) -> f a -> m {}
+  traverse_ f = foldr ((*>) <<< f) (pure {})
+
+  for_ :: forall a b f m. (Applicative m, Foldable f) => f a -> (a -> m b) -> m {}
+  for_ = flip traverse_
+
+  sequence_ :: forall a f m. (Applicative m, Foldable f) => f (m a) -> m {}
+  sequence_ = traverse_ id
