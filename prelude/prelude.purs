@@ -729,6 +729,9 @@ module Data.Tuple where
     (==) (Tuple a1 b1) (Tuple a2 b2) = a1 == a2 && b1 == b2
     (/=) t1 t2 = not (t1 == t2)
 
+  instance functorTuple :: Functor (Tuple a) where
+    (<$>) f (Tuple x y) = Tuple x (f y)
+
 module Data.String where
 
   foreign import lengthS "function lengthS(s) {\
@@ -1313,3 +1316,51 @@ module Data.Foldable where
 
   sequence_ :: forall a f m. (Applicative m, Foldable f) => f (m a) -> m {}
   sequence_ = traverse_ id
+
+module Data.Traversable where
+
+  import Prelude
+  import Data.Array ((:))
+  import Data.Either
+  import Data.Eq
+  import Data.Foldable
+  import Data.Maybe
+  import Data.Tuple
+
+  class Traversable t where
+    traverse :: forall a b m. (Applicative m) => (a -> m b) -> t a -> m (t b)
+    sequence :: forall a m. (Applicative m) => t (m a) -> m (t a)
+
+  instance traversableArray :: Traversable [] where
+    traverse _ []     = pure []
+    traverse f (x:xs) = (:) <$> (f x) <*> traverse f xs
+
+    sequence []     = pure []
+    sequence (x:xs) = (:) <$> x <*> sequence xs
+
+  instance traversableEither :: Traversable (Either a) where
+    traverse _ (Left x)  = pure (Left x)
+    traverse f (Right x) = Right <$> f x
+
+    sequence (Left x) = pure (Left x)
+    sequence (Right x)  = Right <$> x
+
+  instance traversableRef :: Traversable Ref where
+    traverse f (Ref x) = Ref <$> f x
+
+    sequence (Ref x) = Ref <$> x
+
+  instance traversableMaybe :: Traversable Maybe where
+    traverse _ Nothing  = pure Nothing
+    traverse f (Just x) = Just <$> f x
+
+    sequence Nothing  = pure Nothing
+    sequence (Just x) = Just <$> x
+
+  instance traversableTuple :: Traversable (Tuple a) where
+    traverse f (Tuple x y) = Tuple x <$> f y
+
+    sequence (Tuple x y) = Tuple x <$> y
+
+  for :: forall a b m t. (Applicative m, Traversable t) => t a -> (a -> m b) -> m (t b)
+  for x f = traverse f x
