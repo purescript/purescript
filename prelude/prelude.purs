@@ -909,19 +909,19 @@ module Math where
                      \}" :: Number -> Number
 
   foreign import max "function max(n1){\
-                     \  return function(n2) {\ 
+                     \  return function(n2) {\
                      \    return Math.max(n1, n2);\
                      \  }\
                      \}" :: Number -> Number -> Number
 
   foreign import min "function min(n1){\
-                     \  return function(n2) {\ 
+                     \  return function(n2) {\
                      \    return Math.min(n1, n2);\
                      \  }\
                      \}" :: Number -> Number -> Number
 
   foreign import pow "function pow(n){\
-                     \  return function(p) {\ 
+                     \  return function(p) {\
                      \    return Math.pow(n, p);\
                      \  }\
                      \}" :: Number -> Number -> Number
@@ -1206,7 +1206,7 @@ module Data.Enum where
   class Enum a where
     toEnum :: Number -> Maybe a
     fromEnum :: a -> Number
-    
+
 module Text.Parsing.Read where
 
   class Read a where
@@ -1223,3 +1223,61 @@ module Text.Parsing.Read where
 
   instance readNumber :: Read Number where
     read = readNumberImpl
+
+module Data.Foldable where
+
+  import Prelude
+  import Data.Either
+  import Data.Eq
+  import Data.Maybe
+  import Data.Monoid
+  import Data.Tuple
+
+  class Foldable f where
+    foldr :: forall a b. (a -> b -> b) -> b -> f a -> b
+    foldl :: forall a b. (b -> a -> b) -> b -> f a -> b
+    foldMap :: forall a m. (Monoid m) => (a -> m) -> f a -> m
+
+  instance foldableArray :: Foldable [] where
+    foldr _ z []     = z
+    foldr f z (x:xs) = x `f` (foldr f z xs)
+
+    foldl _ z []     = z
+    foldl f z (x:xs) = foldl f (z `f` x) xs
+
+    foldMap _ []     = mempty
+    foldMap f (x:xs) = f x <> foldMap f xs
+
+  instance foldableEither :: Foldable (Either a) where
+    foldr _ z (Left _)  = z
+    foldr f z (Right x) = x `f` z
+
+    foldl _ z (Left _)  = z
+    foldl f z (Right x) = z `f` x
+
+    foldMap f (Left _)  = mempty
+    foldMap f (Right x) = f x
+
+  instance foldableMaybe :: Foldable Maybe where
+    foldr _ z Nothing  = z
+    foldr f z (Just x) = x `f` z
+
+    foldl _ z Nothing  = z
+    foldl f z (Just x) = z `f` x
+
+    foldMap f Nothing  = mempty
+    foldMap f (Just x) = f x
+
+  instance foldableRef :: Foldable Ref where
+    foldr f z (Ref x) = x `f` z
+
+    foldl f z (Ref x) = z `f` x
+
+    foldMap f (Ref x) = f x
+
+  instance foldableTuple :: Foldable (Tuple a) where
+    foldr f z (Tuple _ x) = x `f` z
+
+    foldl f z (Tuple _ x) = z `f` x
+
+    foldMap f (Tuple _ x) = f x
