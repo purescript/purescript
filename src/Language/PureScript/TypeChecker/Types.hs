@@ -519,7 +519,7 @@ infer' (Abs (Left arg) ret) = do
 infer' (Abs (Right _) _) = error "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
-  (ret, app) <- checkFunctionApplication f' ft arg
+  (ret, app) <- checkFunctionApplication f' ft arg Nothing
   return $ TypedValue True app ret
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
@@ -726,8 +726,7 @@ check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFuncti
 check' (Abs (Right _) _) _ = error "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
-  (ret', app) <- checkFunctionApplication f' ft arg
-  _ <- subsumes Nothing ret' ret
+  (_, app) <- checkFunctionApplication f' ft arg (Just ret)
   return $ TypedValue True app ret
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
@@ -822,8 +821,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> Value -> UnifyT Type Check (Type, Value)
-checkFunctionApplication fn fnTy arg = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg
+checkFunctionApplication :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
+checkFunctionApplication fn fnTy arg ret = rethrow errorMessage $ checkFunctionApplication' fn fnTy arg ret
   where
   errorMessage msg = "Error applying function of type "
     ++ prettyPrintType fnTy
@@ -833,30 +832,32 @@ checkFunctionApplication fn fnTy arg = rethrow errorMessage $ checkFunctionAppli
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> Value -> UnifyT Type Check (Type, Value)
-checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg = do
+checkFunctionApplication' :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
+checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
   tyFunction' =?= tyFunction
-  arg' <- check arg argTy
+  _ <- maybe (return Nothing) (subsumes Nothing retTy) ret
+  subst <- unifyCurrentSubstitution <$> UnifyT get
+  arg' <- check arg (subst $? argTy)
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll ident ty _) arg = do
+checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication fn replaced arg
-checkFunctionApplication' fn u@(TUnknown _) arg = do
+  checkFunctionApplication fn replaced arg ret
+checkFunctionApplication' fn u@(TUnknown _) arg ret = do
   arg' <- do
     TypedValue _ arg' t <- infer arg
     (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
     return $ TypedValue True arg'' t'
   let ty = (\(TypedValue _ _ t) -> t) arg'
-  ret <- fresh
-  u =?= function ty ret
-  return (ret, App fn arg')
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg = do
+  ret' <- maybe fresh return ret
+  u =?= function ty ret'
+  return (ret', App fn arg')
+checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  checkFunctionApplication fn ty arg
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
+  checkFunctionApplication fn ty arg ret
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
-  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg
-checkFunctionApplication' _ fnTy arg = throwError $ "Cannot apply a function of type "
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg ret
+checkFunctionApplication' _ fnTy arg _ = throwError $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument " ++ prettyPrintValue arg
 
