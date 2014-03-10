@@ -716,7 +716,8 @@ check' v@(StringLiteral _) t | t == tyString =
   return $ TypedValue True v t
 check' v@(BooleanLiteral _) t | t == tyBoolean =
   return $ TypedValue True v t
-check' (ArrayLiteral vals) t@(TypeApp a ty) | a == tyArray = do
+check' (ArrayLiteral vals) t@(TypeApp a ty) = do
+  a =?= tyArray
   array <- ArrayLiteral <$> forM vals (`check` ty)
   return $ TypedValue True array t
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
