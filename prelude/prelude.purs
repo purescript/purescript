@@ -323,7 +323,6 @@ module Prelude where
 module Data.Monoid where
 
   import Prelude
-  import Data.Array (foldl)
 
   infixr 6 <>
 
@@ -339,13 +338,30 @@ module Data.Monoid where
     mempty = []
     (<>) = Data.Array.concat
 
-  mconcat :: forall m. (Monoid m) => [m] -> m
-  mconcat = foldl (<>) mempty
+module Control.Applicative where
+
+  import Prelude
+
+  infixl 4 <*
+  infixl 4 *>
+
+  (<*) :: forall a b f. (Applicative f) => f a -> f b -> f a
+  (<*) x y = const <$> x <*> y
+
+  (*>) :: forall a b f. (Applicative f) => f a -> f b -> f b
+  (*>) x y = const id <$> x <*> y
+
+  lift2 :: forall a b c f. (Applicative f) => (a -> b -> c) -> f a -> f b -> f c
+  lift2 f x y = f <$> x <*> y
+
+  lift3 :: forall a b c d f. (Applicative f) => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
+  lift3 f x y z = f <$> x <*> y <*> z
 
 module Control.Monad where
 
   import Prelude
   import Data.Array
+  import Data.Traversable
 
   replicateM :: forall m a. (Monad m) => Number -> m a -> m [a]
   replicateM 0 _ = return []
@@ -353,13 +369,6 @@ module Control.Monad where
     a <- m
     as <- replicateM (n - 1) m
     return (a : as)
-
-  mapM :: forall m a b. (Monad m) => (a -> m b) -> [a] -> m [b]
-  mapM _ [] = return []
-  mapM f (a:as) = do
-    b <- f a
-    bs <- mapM f as
-    return (b : bs)
 
   infixr 1 >=>
   infixr 1 <=<
@@ -371,13 +380,6 @@ module Control.Monad where
 
   (<=<) :: forall m a b c. (Monad m) => (b -> m c) -> (a -> m b) -> a -> m c
   (<=<) = flip (>=>)
-
-  sequence :: forall m a. (Monad m) => [m a] -> m [a]
-  sequence [] = return []
-  sequence (m:ms) = do
-    a <- m
-    as <- sequence ms
-    return (a : as)
 
   join :: forall m a. (Monad m) => m (m a) -> m a
   join mm = do
@@ -392,8 +394,8 @@ module Control.Monad where
   when true m = m
   when false _ = return {}
 
-  zipWithM :: forall m a b c. (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
-  zipWithM f xs ys = sequence $ zipWith f xs ys
+  zipWithA :: forall m a b c. (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+  zipWithA f xs ys = sequence (zipWith f xs ys)
 
 module Data.Maybe where
 
@@ -480,14 +482,6 @@ module Data.Array where
   map :: forall a b. (a -> b) -> [a] -> [b]
   map _ [] = []
   map f (x:xs) = f x : map f xs
-
-  foldr :: forall a b. (a -> b -> a) -> a -> [b] -> a
-  foldr f a (b : bs) = f (foldr f a bs) b
-  foldr _ a [] = a
-
-  foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
-  foldl _ b [] = b
-  foldl f b (a:as) = foldl f (f b a) as
 
   foreign import length "function length(xs) {\
                         \  return xs.length;\
@@ -605,11 +599,6 @@ module Data.Array where
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
 
-  find :: forall a. (a -> Boolean) -> [a] -> Maybe a
-  find _ [] = Nothing
-  find p (x:xs) | p x = Just x
-  find p (_:xs) = find p xs
-
   isEmpty :: forall a. [a] -> Boolean
   isEmpty [] = true
   isEmpty _ = false
@@ -621,14 +610,6 @@ module Data.Array where
   zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
   zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
   zipWith _ _ _ = []
-
-  any :: forall a. (a -> Boolean) -> [a] -> Boolean
-  any _ [] = false
-  any p (a:as) = p a || any p as
-
-  all :: forall a. (a -> Boolean) -> [a] -> Boolean
-  all _ [] = true
-  all p (a:as) = p a && all p as
 
   drop :: forall a. Number -> [a] -> [a]
   drop 0 xs = xs
@@ -709,6 +690,9 @@ module Data.Tuple where
   instance eqTuple :: (Eq a, Eq b) => Eq (Tuple a b) where
     (==) (Tuple a1 b1) (Tuple a2 b2) = a1 == a2 && b1 == b2
     (/=) t1 t2 = not (t1 == t2)
+
+  instance functorTuple :: Functor (Tuple a) where
+    (<$>) f (Tuple x y) = Tuple x (f y)
 
 module Data.String where
 
@@ -909,19 +893,19 @@ module Math where
                      \}" :: Number -> Number
 
   foreign import max "function max(n1){\
-                     \  return function(n2) {\ 
+                     \  return function(n2) {\
                      \    return Math.max(n1, n2);\
                      \  }\
                      \}" :: Number -> Number -> Number
 
   foreign import min "function min(n1){\
-                     \  return function(n2) {\ 
+                     \  return function(n2) {\
                      \    return Math.min(n1, n2);\
                      \  }\
                      \}" :: Number -> Number -> Number
 
   foreign import pow "function pow(n){\
-                     \  return function(p) {\ 
+                     \  return function(p) {\
                      \    return Math.pow(n, p);\
                      \  }\
                      \}" :: Number -> Number -> Number
@@ -1206,7 +1190,7 @@ module Data.Enum where
   class Enum a where
     toEnum :: Number -> Maybe a
     fromEnum :: a -> Number
-    
+
 module Text.Parsing.Read where
 
   class Read a where
@@ -1223,3 +1207,154 @@ module Text.Parsing.Read where
 
   instance readNumber :: Read Number where
     read = readNumberImpl
+
+module Data.Foldable where
+
+  import Prelude
+  import Control.Applicative
+  import Data.Either
+  import Data.Eq
+  import Data.Maybe
+  import Data.Monoid
+  import Data.Tuple
+
+  class Foldable f where
+    foldr :: forall a b. (a -> b -> b) -> b -> f a -> b
+    foldl :: forall a b. (b -> a -> b) -> b -> f a -> b
+    foldMap :: forall a m. (Monoid m) => (a -> m) -> f a -> m
+
+  instance foldableArray :: Foldable [] where
+    foldr _ z []     = z
+    foldr f z (x:xs) = x `f` (foldr f z xs)
+
+    foldl _ z []     = z
+    foldl f z (x:xs) = foldl f (z `f` x) xs
+
+    foldMap _ []     = mempty
+    foldMap f (x:xs) = f x <> foldMap f xs
+
+  instance foldableEither :: Foldable (Either a) where
+    foldr _ z (Left _)  = z
+    foldr f z (Right x) = x `f` z
+
+    foldl _ z (Left _)  = z
+    foldl f z (Right x) = z `f` x
+
+    foldMap f (Left _)  = mempty
+    foldMap f (Right x) = f x
+
+  instance foldableMaybe :: Foldable Maybe where
+    foldr _ z Nothing  = z
+    foldr f z (Just x) = x `f` z
+
+    foldl _ z Nothing  = z
+    foldl f z (Just x) = z `f` x
+
+    foldMap f Nothing  = mempty
+    foldMap f (Just x) = f x
+
+  instance foldableRef :: Foldable Ref where
+    foldr f z (Ref x) = x `f` z
+
+    foldl f z (Ref x) = z `f` x
+
+    foldMap f (Ref x) = f x
+
+  instance foldableTuple :: Foldable (Tuple a) where
+    foldr f z (Tuple _ x) = x `f` z
+
+    foldl f z (Tuple _ x) = z `f` x
+
+    foldMap f (Tuple _ x) = f x
+
+  fold :: forall f m. (Foldable f, Monoid m) => f m -> m
+  fold = foldMap id
+
+  traverse_ :: forall a b f m. (Applicative m, Foldable f) => (a -> m b) -> f a -> m {}
+  traverse_ f = foldr ((*>) <<< f) (pure {})
+
+  for_ :: forall a b f m. (Applicative m, Foldable f) => f a -> (a -> m b) -> m {}
+  for_ = flip traverse_
+
+  sequence_ :: forall a f m. (Applicative m, Foldable f) => f (m a) -> m {}
+  sequence_ = traverse_ id
+
+  mconcat :: forall f m. (Foldable f, Monoid m) => f m -> m
+  mconcat = foldl (<>) mempty
+
+  and :: forall f. (Foldable f) => f Boolean -> Boolean
+  and = foldl (&&) true
+
+  or :: forall f. (Foldable f) => f Boolean -> Boolean
+  or = foldl (||) false
+
+  any :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Boolean
+  any p = or <<< foldMap (\x -> [p x])
+
+  all :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Boolean
+  all p = and <<< foldMap (\x -> [p x])
+
+  sum :: forall f. (Foldable f) => f Number -> Number
+  sum = foldl (+) 0
+
+  product :: forall f. (Foldable f) => f Number -> Number
+  product = foldl (*) 1
+
+  elem :: forall a f. (Eq a, Foldable f) => a -> f a -> Boolean
+  elem = any  <<< (==)
+
+  notElem :: forall a f. (Eq a, Foldable f) => a -> f a -> Boolean
+  notElem x = not <<< elem x
+
+  find :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Maybe a
+  find p f = case foldMap (\x -> if p x then [x] else []) f of
+    (x:_) -> Just x
+    []    -> Nothing
+
+module Data.Traversable where
+
+  import Prelude
+  import Data.Array ((:))
+  import Data.Either
+  import Data.Eq
+  import Data.Foldable
+  import Data.Maybe
+  import Data.Tuple
+
+  class Traversable t where
+    traverse :: forall a b m. (Applicative m) => (a -> m b) -> t a -> m (t b)
+    sequence :: forall a m. (Applicative m) => t (m a) -> m (t a)
+
+  instance traversableArray :: Traversable [] where
+    traverse _ []     = pure []
+    traverse f (x:xs) = (:) <$> (f x) <*> traverse f xs
+
+    sequence []     = pure []
+    sequence (x:xs) = (:) <$> x <*> sequence xs
+
+  instance traversableEither :: Traversable (Either a) where
+    traverse _ (Left x)  = pure (Left x)
+    traverse f (Right x) = Right <$> f x
+
+    sequence (Left x) = pure (Left x)
+    sequence (Right x)  = Right <$> x
+
+  instance traversableRef :: Traversable Ref where
+    traverse f (Ref x) = Ref <$> f x
+
+    sequence (Ref x) = Ref <$> x
+
+  instance traversableMaybe :: Traversable Maybe where
+    traverse _ Nothing  = pure Nothing
+    traverse f (Just x) = Just <$> f x
+
+    sequence Nothing  = pure Nothing
+    sequence (Just x) = Just <$> x
+
+  instance traversableTuple :: Traversable (Tuple a) where
+    traverse f (Tuple x y) = Tuple x <$> f y
+
+    sequence (Tuple x y) = Tuple x <$> y
+
+  for :: forall a b m t. (Applicative m, Traversable t) => t a -> (a -> m b) -> m (t b)
+  for x f = traverse f x
