@@ -41,6 +41,8 @@
 - PSCI now evaluates expressions (joneshf)
 - Overlapping variables in typeclass instances are rejected (paf31)
 - A bug in the optimizer related to inlining was fixed (paf31)
+- A type checker bug related to array literals was fixed (paf31)
+- Externs files (`--externs`) are now working again (paf31)
 
 ### Libraries
 
