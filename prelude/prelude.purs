@@ -599,11 +599,6 @@ module Data.Array where
   filter p (x:xs) | p x = x : filter p xs
   filter p (_:xs) = filter p xs
 
-  find :: forall a. (a -> Boolean) -> [a] -> Maybe a
-  find _ [] = Nothing
-  find p (x:xs) | p x = Just x
-  find p (_:xs) = find p xs
-
   isEmpty :: forall a. [a] -> Boolean
   isEmpty [] = true
   isEmpty _ = false
@@ -615,14 +610,6 @@ module Data.Array where
   zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
   zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
   zipWith _ _ _ = []
-
-  any :: forall a. (a -> Boolean) -> [a] -> Boolean
-  any _ [] = false
-  any p (a:as) = p a || any p as
-
-  all :: forall a. (a -> Boolean) -> [a] -> Boolean
-  all _ [] = true
-  all p (a:as) = p a && all p as
 
   drop :: forall a. Number -> [a] -> [a]
   drop 0 xs = xs
@@ -1294,6 +1281,35 @@ module Data.Foldable where
 
   mconcat :: forall f m. (Foldable f, Monoid m) => f m -> m
   mconcat = foldl (<>) mempty
+
+  and :: forall f. (Foldable f) => f Boolean -> Boolean
+  and = foldl (&&) true
+
+  or :: forall f. (Foldable f) => f Boolean -> Boolean
+  or = foldl (||) false
+
+  any :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Boolean
+  any p = or <<< foldMap (\x -> [p x])
+
+  all :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Boolean
+  all p = and <<< foldMap (\x -> [p x])
+
+  sum :: forall f. (Foldable f) => f Number -> Number
+  sum = foldl (+) 0
+
+  product :: forall f. (Foldable f) => f Number -> Number
+  product = foldl (*) 1
+
+  elem :: forall a f. (Eq a, Foldable f) => a -> f a -> Boolean
+  elem = any  <<< (==)
+
+  notElem :: forall a f. (Eq a, Foldable f) => a -> f a -> Boolean
+  notElem x = not <<< elem x
+
+  find :: forall a f. (Foldable f) => (a -> Boolean) -> f a -> Maybe a
+  find p f = case foldMap (\x -> if p x then [x] else []) f of
+    (x:_) -> Just x
+    []    -> Nothing
 
 module Data.Traversable where
 
