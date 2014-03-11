@@ -31,4 +31,4 @@ main = do
   let y = sort x
   if x == [3,2,1]
     then Debug.Trace.trace "Done"
-    else Control.Monad.Error.throwError "Not done"
+    else Control.Monad.Eff.Error.throwError "Not done"

@@ -17,4 +17,4 @@ cons x (Array xs) = Array $ x : xs
 main = let (Array xs) = cons 1 $ cons 2 $ cons 3 nil
        in if xs == [1, 2, 3] 
           then Debug.Trace.trace "Done"
-          else Control.Monad.Error.throwError "Failed"
+          else Control.Monad.Eff.Error.throwError "Failed"
