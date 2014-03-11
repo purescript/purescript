@@ -100,7 +100,7 @@ parseImportDeclaration = do
   reserved "import"
   indented
   moduleName' <- moduleName
-  idents <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
+  idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
   return $ ImportDeclaration moduleName' idents
 
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
