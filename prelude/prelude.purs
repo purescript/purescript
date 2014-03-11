@@ -12,12 +12,13 @@ module Prelude where
   class Category a where
     id :: forall t. a t t
     (<<<) :: forall b c d. a c d -> a b c -> a b d
-    (>>>) :: forall b c d. a b c -> a c d -> a b d
+  
+  (>>>) :: forall a b c d. (Category a) => a b c -> a c d -> a b d
+  (>>>) f g = g <<< f
 
   instance categoryArr :: Category (->) where
     id x = x
     (<<<) f g x = f (g x)
-    (>>>) f g x = g (f x)
 
   infixr 0 $
   infixl 0 #
