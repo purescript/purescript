@@ -141,7 +141,7 @@ For convenience, it is possible to declare a synonym for a type using the ``type
 
 For example::
 
-  type Foo = { foo :: Number, bar Number }
+  type Foo = { foo :: Number, bar :: Number }
   
   addFoo :: Foo -> Number
   addFoo = \o -> o.foo + o.bar
