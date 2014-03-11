@@ -172,46 +172,53 @@ module Prelude where
     (==) _ _ = false
     (/=) xs ys = not (xs == ys)
 
+  data Ordering = LT | GT | EQ
+
+  instance showOrdering :: Show Ordering where
+    show LT = "LT"
+    show GT = "GT"
+    show EQ = "EQ"
+ 
+  class Ord a where
+    compare :: a -> a -> Ordering
+
   infixl 4 <
+
+  (<) :: forall a. (Ord a) => a -> a -> Boolean
+  (<) a1 a2 = case a1 `compare` a2 of
+    LT -> true
+    _ -> false
+
   infixl 4 >
+  
+  (>) :: forall a. (Ord a) => a -> a -> Boolean
+  (>) a1 a2 = case a1 `compare` a2 of
+    GT -> true
+    _ -> false
+  
   infixl 4 <=
+
+  (<=) :: forall a. (Ord a) => a -> a -> Boolean
+  (<=) a1 a2 = case a1 `compare` a2 of
+    GT -> false
+    _ -> true
+  
   infixl 4 >=
 
-  class Ord a where
-    (<) :: a -> a -> Boolean
-    (>) :: a -> a -> Boolean
-    (<=) :: a -> a -> Boolean
-    (>=) :: a -> a -> Boolean
+  (>=) :: forall a. (Ord a) => a -> a -> Boolean
+  (>=) a1 a2 = case a1 `compare` a2 of
+    LT -> false
+    _ -> true
 
-  foreign import numLess "function numLess(n1) {\
-                         \  return function(n2) {\
-                         \    return n1 < n2;\
-                         \  };\
-                         \}" :: Number -> Number -> Boolean
-
-  foreign import numLessEq "function numLessEq(n1) {\
-                           \  return function(n2) {\
-                           \    return n1 <= n2;\
-                           \  };\
-                           \}" :: Number -> Number -> Boolean
-
-  foreign import numGreater "function numGreater(n1) {\
-                            \  return function(n2) {\
-                            \    return n1 > n2;\
-                            \  };\
-                            \}" :: Number -> Number -> Boolean
-
-  foreign import numGreaterEq "function numGreaterEq(n1) {\
-                              \  return function(n2) {\
-                              \    return n1 >= n2;\
-                              \  };\
-                              \}" :: Number -> Number -> Boolean
+  foreign import numCompare
+    "function numCompare(n1) {\
+    \  return function(n2) {\
+    \    return n1 < n2 ? module.LT : n1 > n2 ? module.GT : module.EQ;\
+    \  };\
+    \}" :: Number -> Number -> Ordering
 
   instance ordNumber :: Ord Number where
-    (<) = numLess
-    (>) = numGreater
-    (<=) = numLessEq
-    (>=) = numGreaterEq
+    compare = numCompare
 
   infixl 10 &
   infixl 10 |

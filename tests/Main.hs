@@ -63,7 +63,7 @@ assertCompiles :: FilePath -> IO ()
 assertCompiles inputFile = do
   putStrLn $ "assert " ++ inputFile ++ " compiles successfully"
   prelude <- preludeFilename
-  assert (P.defaultOptions { P.optionsMain = Just "Main", P.optionsNoOptimizations = True, P.optionsModules = ["Main"] }) [prelude, inputFile] $ either (return . Just) $ \js -> do
+  assert (P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"] }) [prelude, inputFile] $ either (return . Just) $ \js -> do
     process <- findNodeProcess
     result <- traverse (\node -> readProcessWithExitCode node [] js) process
     case result of

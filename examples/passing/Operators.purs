@@ -54,6 +54,9 @@ module Operators2 where
   
   test13 = \(<%>) a b -> a <%> b
 
+  test14 :: Number -> Number -> Boolean
+  test14 a b = a < b
+
 module Main where
 
 import Operators1
@@ -79,4 +82,5 @@ main =
         , show test11
         , show (test12 k 1 2)
         , show (test13 k 1 2)
+        , show (test14 1 2)
         ]
