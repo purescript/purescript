@@ -749,7 +749,7 @@ module Data.String where
 
   foreign import split "function split(sep) {\
                        \  return function(s) {\
-                       \    return s.split(s);\
+                       \    return s.split(sep);\
                        \  };\
                        \}" :: String -> String -> [String]
 
