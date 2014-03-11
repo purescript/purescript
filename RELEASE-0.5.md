@@ -8,6 +8,9 @@
         instance showNumber :: Show Number where
           ...
 
+- Prelude modules now follow a naming scheme similar to haskell (e.g. `Data.Maybe`, `Control.Monad`) (garyb)
+- Multiple modules with the same name are now disallowed rather than merged (garyb)
+
 ### New Features
 
 - `let ... in` syntax for bindings (paf31)
@@ -18,7 +21,6 @@
 
 - Pretty printing for row types was improved (garyb)
 - Module names can now contain `.` (garyb)
-- Prelude modules now follow a naming scheme similar to haskell (e.g. `Data.Maybe`, `Control.Monad`) (garyb)
 - New optimizer rules have been added for code in the ST monad, to reproduce the functionality of the blocks feature, which has been removed (paf31)
 - Pattern binders are now usable in lambda expression arguments (paf31)
 - PSCI now has a `:t` command for checking the type of a value (paf31)
