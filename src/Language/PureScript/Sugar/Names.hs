@@ -89,8 +89,11 @@ updateExportedModule env mn update = do
 -- |
 -- Adds an empty module to an ExportEnvironment.
 --
-addEmptyModule :: ExportEnvironment -> ModuleName -> ExportEnvironment
-addEmptyModule env name = M.insert name (Exports [] [] []) env
+addEmptyModule :: ExportEnvironment -> ModuleName -> Either String ExportEnvironment
+addEmptyModule env name =
+  if name `M.member` env
+    then throwError $ "Module '" ++ show name ++ "' has been defined more than once"
+    else return $ M.insert name (Exports [] [] []) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
@@ -255,7 +258,9 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 
   -- Add all of the exported declarations from a module to the global export environment
   addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
-  addModule env m@(Module mn ds _) = rethrowForModule m $ foldM (addDecl mn) (addEmptyModule env mn) ds
+  addModule env m@(Module mn ds _) = do
+    env' <- addEmptyModule env mn
+    rethrowForModule m $ foldM (addDecl mn) env' ds
 
   -- Add a declaration from a module to the global export environment
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either String ExportEnvironment

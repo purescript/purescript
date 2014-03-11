@@ -3,7 +3,7 @@ module TestEff where
 import Prelude
 import Control.Monad.Eff
 import Control.Monad.ST
-import Control.Monad.Error
+import Control.Monad.Eff.Error
 import Debug.Trace
 
 test1 = catchError (\s -> return 0) $ do

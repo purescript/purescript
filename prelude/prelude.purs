@@ -1031,7 +1031,7 @@ module Random where
                         \  return Math.random();\
                         \}" :: forall e. Eff (random :: Random | e) Number
 
-module Control.Monad.Error where
+module Control.Monad.Eff.Error where
 
   import Control.Monad.Eff
 
