@@ -52,11 +52,14 @@ moduleToJs opts (Module name decls (Just exps)) env =
   case jsDecls of
     [] -> Nothing
     _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar C._ps)) $
-           JSApp (JSFunction Nothing ["module"] (JSBlock $ jsDecls ++ [JSReturn $ JSVar "module"]))
-                 [JSBinary Or (JSAccessor (moduleNameToJs name) (JSVar C._ps)) (JSObjectLiteral [])]
+           JSApp (JSFunction Nothing [] (JSBlock $
+            JSVariableIntroduction "module" (Just $ JSObjectLiteral []) :
+            jsDecls ++
+            jsExports ++
+            [JSReturn $ JSVar "module"])) []
   where
   jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) decls)
-          ++ concatMap exportToJs exps
+  jsExports = concatMap exportToJs exps
 moduleToJs _ _ _ = error "Exports should have been elaborated in name desugaring"
 
 -- |
