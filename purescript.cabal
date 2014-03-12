@@ -95,7 +95,7 @@ executable psc
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, parsec -any, haskeline <=0.7.1.1, purescript -any,
+                   mtl -any, parsec -any, haskeline -any, purescript -any,
                    syb -any, transformers -any, utf8-string -any, process -any,
                    xdg-basedir -any, cmdtheline -any
     main-is: Main.hs
