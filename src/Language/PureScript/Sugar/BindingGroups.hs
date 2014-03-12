@@ -25,6 +25,7 @@ import Data.Data
 import Data.Graph
 import Data.Generics
 import Data.List (nub, intersect)
+import Data.Maybe (mapMaybe)
 import Control.Applicative ((<$>), (<*>), pure)
 
 import Language.PureScript.Declarations
@@ -89,6 +90,10 @@ usedProperNames :: (Data d) => ModuleName -> d -> [ProperName]
 usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
   where
   usedNames :: Type -> [ProperName]
+  usedNames (ConstrainedType constraints _) = flip mapMaybe constraints $ \qual ->
+    case qual of
+      (Qualified (Just moduleName') name, _) | moduleName == moduleName' -> Just name
+      _ -> Nothing
   usedNames (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   usedNames _ = []
 
