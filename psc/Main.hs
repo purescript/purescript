@@ -14,15 +14,21 @@
 
 module Main where
 
-import qualified Language.PureScript as P
-import System.Console.CmdTheLine
 import Control.Applicative
 import Control.Monad (forM)
-import System.Exit (exitSuccess, exitFailure)
-import qualified System.IO.UTF8 as U
-import Text.Parsec (ParseError)
-import qualified Paths_purescript as Paths
+
 import Data.Version (showVersion)
+
+import System.Console.CmdTheLine
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory)
+import System.Exit (exitSuccess, exitFailure)
+
+import Text.Parsec (ParseError)
+
+import qualified Language.PureScript as P
+import qualified Paths_purescript as Paths
+import qualified System.IO.UTF8 as U
 
 preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
@@ -47,12 +53,15 @@ compile opts input output externs = do
           exitFailure
         Right (js, exts, _) -> do
           case output of
-            Just path -> U.writeFile path js
+            Just path -> mkdirp path >> U.writeFile path js
             Nothing -> U.putStrLn js
           case externs of
+            Just path -> mkdirp path >> U.writeFile path exts
             Nothing -> return ()
-            Just filePath -> U.writeFile filePath exts
           exitSuccess
+  where
+  mkdirp :: FilePath -> IO ()
+  mkdirp = createDirectoryIfMissing True . takeDirectory
 
 useStdIn :: Term Bool
 useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
