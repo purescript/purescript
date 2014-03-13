@@ -45,6 +45,7 @@
 - A bug in the optimizer related to inlining was fixed (paf31)
 - A type checker bug related to array literals was fixed (paf31)
 - Externs files (`--externs`) are now working again (paf31)
+- Precedence of backticked infix functions have been corrected (paf31)
 
 ### Libraries
 
