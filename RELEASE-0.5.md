@@ -17,6 +17,7 @@
 - `let ... in` syntax for bindings (paf31)
 - Multi parameter typeclasses (paf31)
 - Empty data declarations and empty type classes are now supported (paf31)
+- A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
 
 ### Enhancements
 
