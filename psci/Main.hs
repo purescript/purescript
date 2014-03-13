@@ -195,7 +195,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options
-options = P.Options True True (Just "Main") True "PS" []
+options = P.Options True True (Just "Main") True "PS" [] []
 
 -- |
 -- Makes a volatile module to execute the current expression.

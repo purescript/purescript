@@ -68,8 +68,10 @@ compile opts ms = do
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
-  let js = mapMaybe (flip (moduleToJs opts) env) elim
-  let exts = intercalate "\n" . map (`moduleToPs` env) $ elim
+  let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
+  let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
+  let js = mapMaybe (flip (moduleToJs opts) env) modulesToCodeGen
+  let exts = intercalate "\n" . map (`moduleToPs` env) $ modulesToCodeGen
   js' <- case mainModuleIdent of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $

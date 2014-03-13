@@ -45,10 +45,14 @@ data Options = Options {
     -- The modules to keep while enabling dead code elimination
     --
   , optionsModules :: [String]
+    -- |
+    -- The modules to code gen
+    --
+  , optionsCodeGenModules :: [String]
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False "PS" []
+defaultOptions = Options False False Nothing False "PS" [] []

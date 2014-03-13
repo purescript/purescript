@@ -107,8 +107,12 @@ dceModules :: Term [String]
 dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
      { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
 
+codeGenModules :: Term [String]
+codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
+     { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
+
 options :: Term P.Options
-options = P.Options <$> tco <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules
+options = P.Options <$> tco <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
