@@ -12,7 +12,7 @@ module Prelude where
   class Category a where
     id :: forall t. a t t
     (<<<) :: forall b c d. a c d -> a b c -> a b d
-  
+
   (>>>) :: forall a b c d. (Category a) => a b c -> a c d -> a b d
   (>>>) f g = g <<< f
 
@@ -179,7 +179,7 @@ module Prelude where
     show LT = "LT"
     show GT = "GT"
     show EQ = "EQ"
- 
+
   class Ord a where
     compare :: a -> a -> Ordering
 
@@ -191,19 +191,19 @@ module Prelude where
     _ -> false
 
   infixl 4 >
-  
+
   (>) :: forall a. (Ord a) => a -> a -> Boolean
   (>) a1 a2 = case a1 `compare` a2 of
     GT -> true
     _ -> false
-  
+
   infixl 4 <=
 
   (<=) :: forall a. (Ord a) => a -> a -> Boolean
   (<=) a1 a2 = case a1 `compare` a2 of
     GT -> false
     _ -> true
-  
+
   infixl 4 >=
 
   (>=) :: forall a. (Ord a) => a -> a -> Boolean
@@ -418,6 +418,12 @@ module Data.Maybe where
   fromMaybe :: forall a. a -> Maybe a -> a
   fromMaybe a = maybe a (id :: forall a. a -> a)
 
+  isJust :: forall a. Maybe a -> Boolean
+  isJust = maybe false (const true)
+
+  isNothing :: forall a. Maybe a -> Boolean
+  isNothing = maybe true (const false)
+
   instance monadMaybe :: Monad Maybe where
     return = Just
     (>>=) m f = maybe Nothing f m
@@ -450,6 +456,12 @@ module Data.Either where
   either :: forall a b c. (a -> c) -> (b -> c) -> Either a b -> c
   either f _ (Left a) = f a
   either _ g (Right b) = g b
+
+  isLeft :: forall a b. Either a b -> Boolean
+  isLeft = either (const true) (const false)
+
+  isRight :: forall a b. Either a b -> Boolean
+  isRight = either (const false) (const true)
 
   instance monadEither :: Monad (Either e) where
     return = Right
