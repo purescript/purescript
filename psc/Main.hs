@@ -83,10 +83,6 @@ tco :: Term Bool
 tco = value $ flag $ (optInfo [ "tco" ])
      { optDoc = "Perform tail call optimizations" }
 
-performRuntimeTypeChecks :: Term Bool
-performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
-     { optDoc = "Generate runtime type checks" }
-
 noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
@@ -112,7 +108,7 @@ dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
      { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
 
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules
+options = P.Options <$> tco <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

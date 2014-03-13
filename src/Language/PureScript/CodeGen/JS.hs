@@ -135,7 +135,6 @@ valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e c
 valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
 valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
-valueToJs opts m e (TypedValue _ (Abs (Left arg) val) ty) | optionsPerformRuntimeTypeChecks opts = let arg' = identToJs arg in JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn (valueToJs opts m e val)])
 valueToJs _ m _ (Var ident) = varToJs m ident
 valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
@@ -172,39 +171,6 @@ bindNames :: ModuleName -> [Ident] -> Environment -> Environment
 bindNames m idents env = env { names = M.fromList [ ((m, ident), (noType, LocalVariable)) | ident <- idents ] `M.union` names env }
   where
   noType = error "Temporary lambda variable type was read"
-
-
--- |
--- Generate code in the simplified Javascript intermediate representation for runtime type checks.
---
-runtimeTypeChecks :: String -> Type -> [JS]
-runtimeTypeChecks arg ty =
-  let
-    argTy = getFunctionArgumentType ty
-  in
-    maybe [] (argumentCheck (JSVar arg)) argTy
-  where
-  getFunctionArgumentType :: Type -> Maybe Type
-  getFunctionArgumentType (TypeApp (TypeApp t funArg) _) | t == tyFunction = Just funArg
-  getFunctionArgumentType (ForAll _ ty' _) = getFunctionArgumentType ty'
-  getFunctionArgumentType _ = Nothing
-  argumentCheck :: JS -> Type -> [JS]
-  argumentCheck val t | t == tyNumber = [typeCheck val "number"]
-  argumentCheck val t | t == tyString = [typeCheck val "string"]
-  argumentCheck val t | t == tyBoolean = [typeCheck val "boolean"]
-  argumentCheck val (TypeApp t _) | t == tyArray = [arrayCheck val]
-  argumentCheck val (Object row) =
-    let
-      (pairs, _) = rowToList row
-    in
-      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor prop val) ty') pairs
-  argumentCheck val (TypeApp (TypeApp t _) _) | t == tyFunction = [typeCheck val "function"]
-  argumentCheck val (ForAll _ ty' _) = argumentCheck val ty'
-  argumentCheck _ _ = []
-  typeCheck :: JS -> String -> JS
-  typeCheck js ty' = JSIfElse (JSBinary NotEqualTo (JSTypeOf js) (JSStringLiteral ty')) (JSBlock [JSThrow (JSStringLiteral $ ty' ++ " expected")]) Nothing
-  arrayCheck :: JS -> JS
-  arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor "isArray" (JSVar "Array")) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a reference to a
