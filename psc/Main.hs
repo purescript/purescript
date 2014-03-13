@@ -83,6 +83,10 @@ tco :: Term Bool
 tco = value $ flag $ (optInfo [ "tco" ])
      { optDoc = "Perform tail call optimizations" }
 
+performRuntimeTypeChecks :: Term Bool
+performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
+     { optDoc = "Generate runtime type checks" }
+
 noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
@@ -112,7 +116,7 @@ codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
      { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
 
 options :: Term P.Options
-options = P.Options <$> tco <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

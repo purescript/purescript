@@ -24,6 +24,10 @@ data Options = Options {
     --
     optionsTco :: Bool
     -- |
+    -- Perform type checks at runtime
+    --
+  , optionsPerformRuntimeTypeChecks :: Bool
+    -- |
     -- Inline calls to ret and bind for the Eff monad
     --
   , optionsMagicDo :: Bool
@@ -55,4 +59,4 @@ data Options = Options {
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False "PS" [] []
+defaultOptions = Options False False False Nothing False "PS" [] []
