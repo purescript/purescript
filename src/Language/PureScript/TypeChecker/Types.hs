@@ -288,9 +288,6 @@ entails moduleName context goal@(className, tys) = do
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
   filterModule _ = False
-  canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
-  canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
-  canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
   -- Ensure that a substitution is valid
   verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
   verifySubstitution subst = do
