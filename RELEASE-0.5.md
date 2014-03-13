@@ -35,6 +35,7 @@
 - Module exports can now be specified explicitly (garyb)
 - Let bindings can now define functions with binders (paf31)
 - Case statements and functions which do not pattern match on their arguments now generate smaller code (paf31)
+- Imported type class instances are now exported (paf31)
 
 ### Bug Fixes
 
