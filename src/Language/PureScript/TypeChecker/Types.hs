@@ -118,6 +118,9 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
+  unifyTypes' t@(ConstrainedType _ _) _ = throwError $ "Attempted to unify a constrained type " ++ prettyPrintType t ++
+                                                       " with another type."
+  unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
   unifyTypes' t3 t4 = throwError $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
 
 -- |
@@ -321,7 +324,7 @@ escapeCheck value ty = do
   let allUnknowns = findAllTypes value
   forM_ allUnknowns $ \t -> do
     let unsolvedUnknowns = nub . unknowns $ subst $? t
-    guardWith "Escape check fails" $ null $ unsolvedUnknowns \\ visibleUnknowns
+    guardWith "An unsolved type variable disappeared during type checking." $ null $ unsolvedUnknowns \\ visibleUnknowns
 
 -- |
 -- Find all type annotations occuring inside a value
