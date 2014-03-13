@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, FlexibleContexts #-}
 
 module Language.PureScript.Sugar.Operators (
   rebracket
@@ -32,6 +32,7 @@ import Control.Arrow (first)
 import Control.Monad.State
 
 import Data.Function (on)
+import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
 
 import qualified Data.Map as M
@@ -86,18 +87,31 @@ matchOperators moduleName ops = G.everywhereM' (G.mkM parseChains)
   extendChain other = [Left other]
   bracketChain :: Chain -> Either String Value
   bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
-  opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
-    ++ [[P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]]
+  opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
+            : map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
+            ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]
 
 toAssoc :: Associativity -> P.Assoc
 toAssoc Infixl = P.AssocLeft
 toAssoc Infixr = P.AssocRight
 
+token :: (P.Stream s Identity t, Show t) => (t -> Maybe a) -> P.Parsec s u a
+token = P.token show (const (P.initialPos ""))
+
 parseValue :: P.Parsec Chain () Value
-parseValue = P.token show (const (P.initialPos "")) (either Just (const Nothing)) P.<?> "expression"
+parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp :: P.Parsec Chain () (Qualified Ident)
-parseOp = P.token show (const (P.initialPos "")) (either (const Nothing) Just) P.<?> "operator"
+parseOp = token (either (const Nothing) fromOp) P.<?> "operator"
+  where
+  fromOp q@(Qualified _ (Op _)) = Just q
+  fromOp _ = Nothing
+
+parseTicks :: P.Parsec Chain () (Qualified Ident)
+parseTicks = token (either (const Nothing) fromOp) P.<?> "infix function"
+  where
+  fromOp q@(Qualified _ (Ident _)) = Just q
+  fromOp _ = Nothing
 
 matchOp :: ModuleName -> Qualified Ident -> P.Parsec Chain () ()
 matchOp moduleName op = do

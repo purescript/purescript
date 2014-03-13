@@ -57,6 +57,9 @@ module Operators2 where
   test14 :: Number -> Number -> Boolean
   test14 a b = a < b
 
+  test15 :: Number -> Number -> Boolean
+  test15 a b = const false $ a `test14` b
+
 module Main where
 
 import Operators1
@@ -83,4 +86,5 @@ main =
         , show (test12 k 1 2)
         , show (test13 k 1 2)
         , show (test14 1 2)
+        , show (test15 1 2)
         ]
