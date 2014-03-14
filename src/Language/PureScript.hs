@@ -119,54 +119,65 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> m ()
+make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> m ()
 make opts ms = do
   let filePathMap = M.fromList (map (\(fp, (Module mn _ _)) -> (mn, fp)) ms)
 
-  desugared <- liftError $ do
-    sorted <- sortModules (map snd ms)
-    desugar sorted
-  go initEnvironment filePathMap desugared
+  sorted <- liftError $ sortModules (map snd ms)
 
-  where
-  go :: (Monad m, MonadMake m) => Environment -> M.Map ModuleName FilePath -> [Module] -> m ()
-  go _ _ [] = return ()
-  go env filePathMap (Module moduleName' decls exps : ms') = do
+  marked <- forM sorted $ \m@(Module moduleName' _ _) -> do
     let filePath = toFileName moduleName'
-    let jsFile = "js" ++ pathSeparator : filePath ++ ".js"
+
+        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
         externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+        inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
 
     jsTimestamp <- getTimestamp jsFile
     externsTimestamp <- getTimestamp externsFile
-
-    let inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
     inputTimestamp <- getTimestamp inputFile
 
-    env' <- case () of
-      _ | inputTimestamp < min jsTimestamp externsTimestamp -> do
-            externs <- readTextFile externsFile
-            externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
-            case externsModules of
-              [m@(Module moduleName'' _ _)] | moduleName' == moduleName'' -> do
-                [Module _ typings _] <- liftError $ desugar [m]
-                (_, env') <- liftError . runCheck' env $ do
-                  modify (\s -> s { checkCurrentModule = Just moduleName' })
-                  typeCheckAll Nothing moduleName' typings
-                return env'
-              _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
-        | otherwise -> do
-            (elaborated, env') <- liftError . runCheck' env $ do
-              modify (\s -> s { checkCurrentModule = Just moduleName' })
-              typeCheckAll Nothing moduleName' decls
-            regrouped <- liftError . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
-            let mod' = Module moduleName' regrouped exps
-                js = moduleToJs opts mod' env'
-                exts = moduleToPs mod' env'
-                js' = maybe "" (prettyPrintJS . return . wrapExportsContainer opts . return) js
-            writeTextFile jsFile js'
-            writeTextFile externsFile exts
-            return env'
-    go env' filePathMap ms'
+    case inputTimestamp < min jsTimestamp externsTimestamp of
+      True -> do
+        externs <- readTextFile externsFile
+        externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+        case externsModules of
+          [m'@(Module moduleName'' _ _)] | moduleName' == moduleName'' -> return (True, m')
+          _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
+      False -> return (False, m)
+
+  desugared <- liftError $ zip (map fst marked) <$> desugar (map snd marked)
+
+  go initEnvironment desugared
+
+  where
+  go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
+  go _ [] = return ()
+  go env ((True, Module moduleName' typings _) : ms') = do
+    (_, env') <- liftError . runCheck' env $ do
+      modify (\s -> s { checkCurrentModule = Just moduleName' })
+      typeCheckAll Nothing moduleName' typings
+
+    go env' ms'
+  go env ((False, Module moduleName' decls exps) : ms') = do
+    let filePath = toFileName moduleName'
+        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
+        externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+
+    (elaborated, env') <- liftError . runCheck' env $ do
+      modify (\s -> s { checkCurrentModule = Just moduleName' })
+      typeCheckAll Nothing moduleName' decls
+
+    regrouped <- liftError . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+
+    let mod' = Module moduleName' regrouped exps
+        js = moduleToJs opts mod' env'
+        exts = moduleToPs mod' env'
+        js' = maybe "" (prettyPrintJS . return . wrapExportsContainer opts . return) js
+
+    writeTextFile jsFile js'
+    writeTextFile externsFile exts
+
+    go env' ms'
 
   toFileName :: ModuleName -> FilePath
   toFileName (ModuleName ps) = intercalate [pathSeparator] . map runProperName $ ps
