@@ -147,7 +147,8 @@ make opts ms = do
             externs <- readTextFile externsFile
             externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
             case externsModules of
-              [Module moduleName'' typings _] | moduleName' == moduleName'' -> do
+              [m@(Module moduleName'' _ _)] | moduleName' == moduleName'' -> do
+                [Module _ typings _] <- liftError $ desugar [m]
                 (_, env') <- liftError . runCheck' env $ do
                   modify (\s -> s { checkCurrentModule = Just moduleName' })
                   typeCheckAll Nothing moduleName' typings
