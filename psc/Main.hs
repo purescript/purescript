@@ -12,17 +12,21 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Main where
 
 import Control.Applicative
-import Control.Monad (forM)
+import Control.Monad.Error
 
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
-import System.Directory (createDirectoryIfMissing)
+import System.Directory
+       (doesFileExist, getModificationTime, createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
+import System.IO.Error (tryIOError)
 
 import Text.Parsec (ParseError)
 
@@ -33,35 +37,73 @@ import qualified System.IO.UTF8 as U
 preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
-readInput :: Maybe [FilePath] -> IO (Either ParseError [P.Module])
-readInput Nothing = P.runIndentParser "" P.parseModules <$> getContents
-readInput (Just input) = fmap (fmap concat . sequence) $ forM input $ \inputFile -> do
+readInput :: Maybe [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
+readInput Nothing = do
+  text <- getContents
+  return $ map ((,) undefined) <$> P.runIndentParser "" P.parseModules text
+readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
   text <- U.readFile inputFile
-  return $ P.runIndentParser inputFile P.parseModules text
+  return $ (inputFile, P.runIndentParser inputFile P.parseModules text)
+  where
+  collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
+  collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
 
-compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile opts input output externs = do
+newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Monad, MonadIO, MonadError String)
+
+runMake :: Make a -> IO (Either String a)
+runMake = runErrorT . unMake
+
+makeIO :: IO a -> Make a
+makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
+
+instance P.MonadMake Make where
+  getTimestamp path = makeIO $ do
+    exists <- doesFileExist path
+    case exists of
+      True -> Just <$> getModificationTime path
+      False -> return Nothing
+  readTextFile path = makeIO $ do
+    U.putStrLn $ "Reading " ++ path
+    U.readFile path
+  writeTextFile path text = makeIO $ do
+    mkdirp path
+    U.putStrLn $ "Writing " ++ path
+    U.writeFile path text
+  liftError = either throwError return
+
+compile :: Bool -> P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+compile makeMode opts input output externs = do
   modules <- readInput input
   case modules of
     Left err -> do
       U.print err
       exitFailure
     Right ms ->
-      case P.compile opts ms of
-        Left err -> do
-          U.putStrLn err
-          exitFailure
-        Right (js, exts, _) -> do
-          case output of
-            Just path -> mkdirp path >> U.writeFile path js
-            Nothing -> U.putStrLn js
-          case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
-            Nothing -> return ()
-          exitSuccess
-  where
-  mkdirp :: FilePath -> IO ()
-  mkdirp = createDirectoryIfMissing True . takeDirectory
+      case makeMode of
+        True -> do
+          e <- runMake $ P.make opts ms
+          case e of
+            Left err -> do
+              U.putStrLn err
+              exitFailure
+            Right _ -> do
+              exitSuccess
+        False ->
+          case P.compile opts (map snd ms) of
+            Left err -> do
+              U.putStrLn err
+              exitFailure
+            Right (js, exts, _) -> do
+              case output of
+                Just path -> mkdirp path >> U.writeFile path js
+                Nothing -> U.putStrLn js
+              case externs of
+                Just path -> mkdirp path >> U.writeFile path exts
+                Nothing -> return ()
+              exitSuccess
+
+mkdirp :: FilePath -> IO ()
+mkdirp = createDirectoryIfMissing True . takeDirectory
 
 useStdIn :: Term Bool
 useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
@@ -103,6 +145,10 @@ noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
      { optDoc = "Skip the optimization phase." }
 
+make :: Term Bool
+make = value $ flag $ (optInfo [ "make" ])
+     { optDoc = "Run in make mode" }
+
 browserNamespace :: Term String
 browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
@@ -119,14 +165,15 @@ options :: Term P.Options
 options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
-stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
+stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles <*> make
   where
-  combine False True input = Just (prelude : input)
-  combine False False input = Just input
-  combine True _ _ = Nothing
+  combine _ _ input True = Just input
+  combine False True input _ = Just (prelude : input)
+  combine False False input _ = Just input
+  combine True _ _ _ = Nothing
 
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
+term prelude = compile <$> make <*> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
