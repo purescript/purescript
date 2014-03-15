@@ -746,7 +746,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   case val' of
     Nothing -> throwError "Unable to check type subsumption"
     Just val'' -> do
-      val''' <- if checkType then check val'' ty1 else return val''
+      val''' <- if checkType then check val'' ty1' else return val''
       return $ TypedValue checkType (TypedValue True val''' ty1) ty2
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
