@@ -6,6 +6,9 @@ module Prelude where
   const :: forall a b. a -> b -> a
   const a _ = a
 
+  on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
+  on f g x y = g x `f` g y
+
   infixr 9 >>>
   infixr 9 <<<
 
