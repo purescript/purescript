@@ -165,12 +165,11 @@ options :: Term P.Options
 options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
-stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles <*> make
+stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
   where
-  combine _ _ input True = Just input
-  combine False True input _ = Just (prelude : input)
-  combine False False input _ = Just input
-  combine True _ _ _ = Nothing
+  combine False True input = Just (prelude : input)
+  combine False False input = Just input
+  combine True _ _ = Nothing
 
 term :: FilePath -> Term (IO ())
 term prelude = compile <$> make <*> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
