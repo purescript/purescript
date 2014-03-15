@@ -153,11 +153,17 @@ modifyEnv :: (MonadState CheckState m) => (Environment -> Environment) -> m ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 -- |
--- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
+-- Run a computation in the Check monad, starting with an empty @Environment@
 --
 runCheck :: Check a -> Either String (a, Environment)
-runCheck c = do
-  (a, s) <- flip runStateT (CheckState initEnvironment 0 0 Nothing) $ unCheck c
+runCheck = runCheck' initEnvironment
+
+-- |
+-- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
+--
+runCheck' :: Environment -> Check a -> Either String (a, Environment)
+runCheck' env c = do
+  (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
 -- |
