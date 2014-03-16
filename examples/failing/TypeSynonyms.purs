@@ -1,4 +1,4 @@
-module TypeSynonyms where
+module Main where
 
 type T1 = [T2]
 

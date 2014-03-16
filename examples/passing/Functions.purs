@@ -1,4 +1,4 @@
-module Functions where
+module Main where
 
   import Prelude
 
@@ -11,7 +11,5 @@ module Functions where
   test4 = \(%%) -> 1 %% 2
 
   test5 = \(+++) (***) -> 1 +++ 2 *** 3
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

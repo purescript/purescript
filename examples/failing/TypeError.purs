@@ -1,4 +1,4 @@
-module TypeError where
+module Main where
 
   import Prelude
 

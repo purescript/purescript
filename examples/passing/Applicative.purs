@@ -1,4 +1,4 @@
-module Applicative where
+module Main where
 
 class Applicative f where
   pure :: forall a. a -> f a
@@ -10,7 +10,5 @@ instance applicativeMaybe :: Applicative Maybe where
   pure = Just
   (<*>) (Just f) (Just a) = Just (f a)
   (<*>) _ _ = Nothing
-
-module Main where
 
 main = Debug.Trace.trace "Done"

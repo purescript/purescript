@@ -1,4 +1,4 @@
-module Do where
+module Main where
 
 test1 = do let x = 1
 

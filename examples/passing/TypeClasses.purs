@@ -1,4 +1,4 @@
-module TypeClasses where
+module Main where
 
 import Prelude
 
@@ -37,11 +37,6 @@ test4 = \_ -> return 1
 
 test5 = \_ -> Just 1 >>= \n -> return (n + 1)
 
-module TypeClasses2 where
-
-import Prelude
-import TypeClasses
-
 instance showArray :: (Prelude.Show a) => Prelude.Show [a] where
   show [] = "[]"
   show (x:xs) = show x ++ ", " ++ show xs
@@ -60,10 +55,5 @@ test9 _ = runReader 0 $ do
   n <- ask
   return $ n + 1
     
-module Main where
-
-import Prelude
-import TypeClasses
-
 main = Debug.Trace.trace (test7 "Done")
 

@@ -1,5 +1,8 @@
-module MultipleConstructorArgs where
+module Main where
 
+import Prelude
+import Global
+import Control.Monad.Eff
 import Data.Array
 
 data P a b = P a b
@@ -14,14 +17,6 @@ testCase = \p -> case p of
   P _ _ -> []
 
 test1 = testCase (P [1, 2, 3] [4, 5, 6])
-
-module Main where
-
-import Prelude
-import MultipleConstructorArgs
-import Global
-import Control.Monad.Eff
-import Data.Array
 
 main = do
   Debug.Trace.trace (runP (\s n -> s ++ show n) (P "Test" 1))

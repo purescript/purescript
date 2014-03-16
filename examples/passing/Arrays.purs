@@ -1,6 +1,7 @@
-module Data.ArrayTests where
+module Main where
 
 import Prelude
+import Data.Array
 
 test1 arr = arr !! 0 + arr !! 1 + 1
 
@@ -20,11 +21,6 @@ test4 = \arr -> case arr of
   [] -> 0
   [_] -> 0
   x : y : xs -> x * y + test4 xs
-
-module Main where
-
-import Data.Array
-import Prelude
 
 main = do
   let x = [3,2,1]

@@ -25,7 +25,7 @@ import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
-import System.Directory (getCurrentDirectory, getDirectoryContents, findExecutable)
+import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
@@ -38,62 +38,66 @@ readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputF
   text <- U.readFile inputFile
   return $ P.runIndentParser inputFile P.parseModules text
 
-compile :: P.Options -> [FilePath] -> IO (Either String String)
+compile :: P.Options -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
   modules <- readInput inputFiles
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms ->
-      case P.compile opts ms of
-        Left typeError ->
-          return (Left typeError)
-        Right (js, _, _) ->
-          return (Right js)
+    Right ms -> return $ P.compile opts ms
 
-assert :: P.Options -> [FilePath] -> (Either String String -> IO (Maybe String)) -> IO ()
-assert opts inputFiles f = do
-  e <- compile opts inputFiles
+assert :: FilePath -> P.Options -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
+assert preludeExterns opts inputFile f = do
+  e <- compile opts [preludeExterns, inputFile]
   maybeErr <- f e
   case maybeErr of
     Just err -> putStrLn err >> exitFailure
     Nothing -> return ()
 
-assertCompiles :: FilePath -> IO ()
-assertCompiles inputFile = do
-  putStrLn $ "assert " ++ inputFile ++ " compiles successfully"
-  prelude <- preludeFilename
-  assert (P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"] }) [prelude, inputFile] $ either (return . Just) $ \js -> do
+assertCompiles :: FilePath -> FilePath -> FilePath -> IO ()
+assertCompiles preludeJs preludeExterns inputFile = do
+  putStrLn $ "Assert " ++ inputFile ++ " compiles successfully"
+  let options = P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"], P.optionsCodeGenModules = ["Main"] }
+  assert preludeExterns options inputFile $ either (return . Just) $ \(js, _, _) -> do
     process <- findNodeProcess
-    result <- traverse (\node -> readProcessWithExitCode node [] js) process
+    result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
     case result of
       Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
       Just (ExitFailure _, _, err) -> return $ Just err
       Nothing -> return $ Just "Couldn't find node.js executable"
 
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
-
-assertDoesNotCompile :: FilePath -> IO ()
-assertDoesNotCompile inputFile = do
-  putStrLn $ "assert " ++ inputFile ++ " does not compile"
-  assert P.defaultOptions [inputFile] $ \e ->
+assertDoesNotCompile :: FilePath -> FilePath -> IO ()
+assertDoesNotCompile preludeExterns inputFile = do
+  putStrLn $ "Assert " ++ inputFile ++ " does not compile"
+  assert preludeExterns P.defaultOptions inputFile $ \e ->
     case e of
       Left _ -> return Nothing
       Right _ -> return $ Just "Should not have compiled"
 
+findNodeProcess :: IO (Maybe String)
+findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+    where names = ["nodejs", "node"]
+
 main :: IO ()
 main = do
-  cd <- getCurrentDirectory
-  putStrLn cd
-  let examples = cd ++ pathSeparator : "examples"
-  let passing = examples ++ pathSeparator : "passing"
-  passingTestCases <- getDirectoryContents passing
-  forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertCompiles (passing ++ pathSeparator : inputFile)
-  let failing = examples ++ pathSeparator : "failing"
-  failingTestCases <- getDirectoryContents failing
-  forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertDoesNotCompile (failing ++ pathSeparator : inputFile)
-  exitSuccess
+  prelude <- preludeFilename
+  putStrLn "Compiling Prelude"
+  preludeResult <- compile P.defaultOptions [prelude]
+  case preludeResult of
+    Left err -> putStrLn err >> exitFailure
+    Right (preludeJs, exts, _) -> do
+      tmp <- getTemporaryDirectory
+      let preludeExterns = tmp ++ pathSeparator : "prelude.externs"
+      writeFile preludeExterns exts
+      putStrLn $ "Wrote " ++ preludeExterns
+      cd <- getCurrentDirectory
+      let examples = cd ++ pathSeparator : "examples"
+      let passing = examples ++ pathSeparator : "passing"
+      passingTestCases <- getDirectoryContents passing
+      forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
+        assertCompiles preludeJs preludeExterns (passing ++ pathSeparator : inputFile)
+      let failing = examples ++ pathSeparator : "failing"
+      failingTestCases <- getDirectoryContents failing
+      forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
+        assertDoesNotCompile preludeExterns (failing ++ pathSeparator : inputFile)
+      exitSuccess

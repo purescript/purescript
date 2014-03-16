@@ -1,4 +1,4 @@
-module Objects where
+module Main where
 
   import Prelude
 
@@ -15,6 +15,4 @@ module Objects where
   typed :: { foo :: Number }
   typed = { foo: 0 }
     
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

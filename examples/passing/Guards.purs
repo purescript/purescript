@@ -1,4 +1,4 @@
-module Guards where
+module Main where
 
   import Prelude
 
@@ -10,7 +10,5 @@ module Guards where
   collatz2 = \x y -> case x of
     z | y > 0 -> z / 2
     z -> z * 3 + 1
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

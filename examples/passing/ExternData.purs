@@ -1,19 +1,13 @@
-module ExternData where
+module Main where
 
   foreign import data IO :: * -> *
 
-  foreign import fmap :: forall a b. IO a -> (a -> b) -> IO b
+  foreign import bind "function bind() {}" :: forall a b. IO a -> (a -> IO b) -> IO b
 
-  foreign import return :: forall a. a -> IO a
+  foreign import showMessage "function showMessage() {}" :: String -> IO { }
 
-  foreign import bind :: forall a b. IO a -> (a -> IO b) -> IO b
+  foreign import prompt "function prompt() {}" :: IO String
 
-  foreign import showMessage :: String -> IO { }
+  test _ = prompt `bind` \s -> showMessage s
 
-  foreign import prompt :: IO String
-
-  main = \_ -> prompt `bind` \s -> showMessage s
-    
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

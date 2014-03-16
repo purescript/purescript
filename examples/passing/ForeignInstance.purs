@@ -1,18 +1,11 @@
-module Foo where
+module Main where
 
 class Foo a where
   foo :: a -> String
 
 foreign import instance fooArray :: (Foo a) => Foo [a]
 
-module M1 where
-
-foreign import instance fooNumber :: Foo.Foo Number
-
-module Main where
-
-import M1
-import Foo
+foreign import instance fooNumber :: Foo Number
 
 foreign import instance fooString :: Foo String
 

@@ -1,25 +1,14 @@
-module Rank2Types where
+module Main where
 
   import Prelude
+  import Data.Array
 
   test1 :: (forall a. (a -> a)) -> Number
   test1 = \f -> f 0
 
-  foreign import data ST :: * -> * -> *
-
-  foreign import runST :: forall a. (forall s. ST s a) -> a
-
-  foreign import exampleST :: forall s. ST s Number
-
-  testST = \_ -> runST exampleST
-
-  foreign import push :: forall el. el -> [el] -> [el]
-
   replicateM :: forall m a. (forall a. a -> m a) -> (forall a b. m a -> (a -> m b) -> m b) -> Number -> m a -> m [a]
   replicateM = \return bind n m -> case n of
     0 -> return []
-    n -> bind m (\x -> bind (replicateM return bind (n - 1) m) (\xs -> return (push x xs)))
+    n -> bind m (\x -> bind (replicateM return bind (n - 1) m) (\xs -> return (x : xs)))
     
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

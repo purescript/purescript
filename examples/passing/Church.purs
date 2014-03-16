@@ -1,4 +1,4 @@
-module Church where
+module Main where
 
   type List a = forall r. r -> (a -> r -> r) -> r
 
@@ -12,7 +12,5 @@ module Church where
   append = \l1 l2 r f -> l2 (l1 r f) f
 
   test = append (cons 1 empty) (cons 2 empty)
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

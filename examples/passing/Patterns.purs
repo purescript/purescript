@@ -1,4 +1,4 @@
-module Patterns where
+module Main where
 
   import Prelude
 
@@ -25,6 +25,4 @@ module Patterns where
   isDesc [x, y] | x > y = true
   isDesc _ = false
     
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

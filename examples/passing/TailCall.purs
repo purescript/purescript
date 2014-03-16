@@ -1,4 +1,4 @@
-module TailCall where
+module Main where
 
 import Prelude
 
@@ -12,9 +12,4 @@ loop x = loop (x + 1)
 notATailCall = \x -> 
   (\notATailCall -> notATailCall x) (\x -> x)
     
-module Main where
-
-import Prelude
-import TailCall
-
 main = Debug.Trace.print (test 0 [1, 2, 3])

@@ -1,6 +1,7 @@
-module JSReserved where
+module Main where
 
   import Prelude
+  import Data.Array
 
   yield = 0
   member = 1
@@ -8,12 +9,6 @@ module JSReserved where
   public = \return -> return
   
   this catch = catch
-
-module Main where
-
-  import Prelude
-  import Data.Array
-  import JSReserved
 
   main = Debug.Trace.print [ yield
                      , member

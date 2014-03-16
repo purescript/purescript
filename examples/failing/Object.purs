@@ -1,4 +1,4 @@
-module Object where
+module Main where
 
 test o = o.foo
 

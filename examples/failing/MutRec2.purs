@@ -1,3 +1,3 @@
-module MutRec2 where
+module Main where
 
 x = x

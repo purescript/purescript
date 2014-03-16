@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript (module P, compile, MonadMake(..), make) where
+module Language.PureScript (module P, compile, compile', MonadMake(..), make) where
 
 import Language.PureScript.Values as P
 import Language.PureScript.Types as P
@@ -61,10 +61,13 @@ import System.FilePath (pathSeparator)
 --  * Pretty-print the generated Javascript
 --
 compile :: Options -> [Module] -> Either String (String, String, Environment)
-compile opts ms = do
+compile = compile' initEnvironment
+
+compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
+compile' env opts ms = do
   sorted <- sortModules ms
   desugared <- desugar sorted
-  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName' decls exps) -> do
+  (elaborated, env') <- runCheck' env $ forM desugared $ \(Module moduleName' decls exps) -> do
     modify (\s -> s { checkCurrentModule = Just moduleName' })
     Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls <*> pure exps
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
@@ -72,10 +75,10 @@ compile opts ms = do
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let js = mapMaybe (flip (moduleToJs opts) env) modulesToCodeGen
-  let exts = intercalate "\n" . map (`moduleToPs` env) $ modulesToCodeGen
-  js' <- generateMain env opts js
-  return (prettyPrintJS [wrapExportsContainer opts js'], exts, env)
+  let js = mapMaybe (flip (moduleToJs opts) env') modulesToCodeGen
+  let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
+  js' <- generateMain env' opts js
+  return (prettyPrintJS [wrapExportsContainer opts js'], exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
 

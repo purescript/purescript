@@ -1,4 +1,4 @@
-module ObjectSynonym where
+module Main where
 
 type Inner = Number
 
@@ -9,7 +9,5 @@ type Outer = { inner :: Inner }
 
 outer :: Outer
 outer = { inner: inner }
-
-module Main where
 
 main = Debug.Trace.trace "Done"  

@@ -1,21 +1,12 @@
-module Operators1 where
-
-  import Prelude ((++))
-
-  (@@) :: forall a b. (a -> b) -> a -> b
-  (@@) = \f x -> f x
-
-  foo :: String -> String
-  foo = \s -> s
- 
-  test8 = foo @@ "Hello World"
-
-  bar = \s1 s2 -> s1 ++ s2
-
-module Operators2 where
+module Main where
 
   import Prelude
-  import Operators1 ((@@))
+  import Control.Monad.Eff
+  import Debug.Trace
+  import Global
+  import Data.Array
+
+  bar = \s1 s2 -> s1 ++ s2
 
   test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
   test1 x y z = x * y + z x y
@@ -41,9 +32,17 @@ module Operators2 where
 
   test7 = "Hello" <> "World!"
 
-  test9 = Operators1.foo @@ "Hello World"
+  (@@) :: forall a b. (a -> b) -> a -> b
+  (@@) = \f x -> f x
 
-  test10 = "Hello" `Operators1.bar` "World"
+  foo :: String -> String
+  foo = \s -> s
+ 
+  test8 = foo @@ "Hello World"
+
+  test9 = Main.foo @@ "Hello World"
+
+  test10 = "Hello" `Main.bar` "World"
 
   (...) :: forall a. [a] -> [a] -> [a]
   (...) = \as -> \bs -> as
@@ -60,19 +59,7 @@ module Operators2 where
   test15 :: Number -> Number -> Boolean
   test15 a b = const false $ a `test14` b
 
-module Main where
-
-import Operators1
-import Operators2
-
-import Prelude
-import Control.Monad.Eff
-import Debug.Trace
-import Global
-import Data.Array
-
-main = 
-  print [ show $ test1 1 2 $ \x y -> x + y
+  main = print [ show $ test1 1 2 $ \x y -> x + y
         , show test2
         , show test3
         , show test4

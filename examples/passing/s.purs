@@ -1,7 +1,5 @@
-module S where
+module Main where
 
   s = \x y z -> x z (y z)
     
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

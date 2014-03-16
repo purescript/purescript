@@ -1,4 +1,6 @@
-module NestedTypeSynonyms where
+module Main where
+
+  import Prelude
 
   type X = String
   type Y = X -> X
@@ -6,8 +8,4 @@ module NestedTypeSynonyms where
   fn :: Y
   fn a = a
 
-module Main where
-
-  import Prelude
-
-  main = Debug.Trace.print (NestedTypeSynonyms.fn "Done")
+  main = Debug.Trace.print (fn "Done")

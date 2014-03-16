@@ -1,14 +1,9 @@
-module FunctionScope where
+module Main where
 
   import Prelude
 
   mkValue :: Number -> Number
   mkValue id = id
-  
-module Main where
-
-  import Prelude
-  import FunctionScope
 
   main = do
     let value = mkValue 1

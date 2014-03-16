@@ -1,4 +1,4 @@
-module TypeSynonyms where
+module Main where
 
   type Lens a b = 
     { get :: a -> b
@@ -34,7 +34,5 @@ module TypeSynonyms where
 
   test2 :: forall a b c. Lens (Pair [Pair a b] c) a
   test2 = composeLenses fst (composeLenses headLens fst)
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

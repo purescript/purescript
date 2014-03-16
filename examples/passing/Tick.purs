@@ -1,7 +1,5 @@
-module Tick where
+module Main where
 
 test' x = x
-
-module Main where
 
 main = Debug.Trace.trace "Done"

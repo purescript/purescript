@@ -1,4 +1,4 @@
-module Cons where
+module Main where
 
   import Prelude
   import Data.Array
@@ -6,7 +6,5 @@ module Cons where
   test1 = \xs -> 1 : xs
 
   test2 = 1 : 2 : 3 : []
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

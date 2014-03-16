@@ -1,4 +1,4 @@
-module Do where
+module Main where
 
 import Prelude
 
@@ -43,7 +43,5 @@ test8 = \_ -> do
     Just 1)
 
 test9 = \_ -> (+) <$> Just 1 <*> Just 2
-    
-module Main where
 
 main = Debug.Trace.trace "Done"

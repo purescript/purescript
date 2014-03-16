@@ -1,4 +1,4 @@
-module Foo where
+module Main where
 
   import Prelude
 
@@ -6,6 +6,4 @@ module Foo where
 
   foo _ = Data.Array.length ([] :: Foo Number)
 
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

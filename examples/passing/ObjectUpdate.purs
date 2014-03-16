@@ -1,4 +1,4 @@
-module ObjectUpdate where
+module Main where
 
   update1 = \o -> o { foo = "Foo" }
 
@@ -15,8 +15,4 @@ module ObjectUpdate where
 
   inferPolyUpdate = \o -> o { foo = "Foo" }
 
-module Main where
-
-import ObjectUpdate
-
-main = Debug.Trace.trace ((update1 {foo: ""}).foo)
+  main = Debug.Trace.trace ((update1 {foo: ""}).foo)

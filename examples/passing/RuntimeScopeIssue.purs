@@ -1,4 +1,4 @@
-module RuntimeScopeIssue where
+module Main where
 
 import Prelude
 
@@ -15,11 +15,5 @@ instance aNumber :: A Number where
 instance bNumber :: B Number where
   b 0 = false
   b n = a (n - 1)
-
-module Main where
-
-import RuntimeScopeIssue
-
-import Prelude
 
 main = Debug.Trace.print $ a 10

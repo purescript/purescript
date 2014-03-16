@@ -1,4 +1,4 @@
-module TypeDecl where
+module Main where
 
   import Prelude
 
@@ -9,6 +9,4 @@ module TypeDecl where
   iterate 0 f a = a
   iterate n f a = iterate (n - 1) f (f a)
     
-module Main where
-
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

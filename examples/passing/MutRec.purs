@@ -1,4 +1,4 @@
-module MutRec where 
+module Main where 
 
   import Prelude
 
@@ -15,7 +15,5 @@ module MutRec where
   evenToNumber (Even n) = oddToNumber n + 1
 
   oddToNumber (Odd n) = evenToNumber n + 1
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

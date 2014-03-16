@@ -1,4 +1,4 @@
-module Auto where
+module Main where
 
   data Auto s i o = Auto { state :: s, step :: s -> i -> o }
 
@@ -9,7 +9,5 @@ module Auto where
 
   run :: forall i o. SomeAuto i o -> i -> o
   run = \s i -> s (\a -> case a of Auto a -> a.step a.state i)
-    
-module Main where
 
-main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done"
