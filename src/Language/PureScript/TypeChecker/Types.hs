@@ -182,7 +182,7 @@ typesOf mainModuleName moduleName vals = do
       -- If the declaration is a function, it has access to other values in the binding group.
       -- If not, the generated code might fail at runtime since those values might be undefined.
       let dict' = if isFunction val then dict else M.empty
-      triple@(_, (val', ty)) <- case e of
+      triple@(_, (_, ty)) <- case e of
         -- Typed declarations
         (ident, (val', Just (ty, checkType))) -> do
           -- Kind check
@@ -204,8 +204,6 @@ typesOf mainModuleName moduleName vals = do
       when (Just moduleName == mainModuleName && fst e == Ident C.main) $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
-      -- Make sure unification variables do not escape
-      escapeCheck val' ty
       return triple
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
@@ -313,27 +311,6 @@ typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynon
   Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual _ _ _ _ = Nothing
-
--- |
--- Ensure unsolved unification variables do not escape
---
-escapeCheck :: Value -> Type -> UnifyT Type Check ()
-escapeCheck value ty = do
-  subst <- unifyCurrentSubstitution <$> UnifyT get
-  let visibleUnknowns = nub $ unknowns $ subst $? ty
-  let allUnknowns = findAllTypes value
-  forM_ allUnknowns $ \t -> do
-    let unsolvedUnknowns = nub . unknowns $ subst $? t
-    guardWith "An unsolved type variable disappeared during type checking." $ null $ unsolvedUnknowns \\ visibleUnknowns
-
--- |
--- Find all type annotations occuring inside a value
---
-findAllTypes :: Value -> [Type]
-findAllTypes = everything (++) (mkQ [] go)
-  where
-  go (TypedValue _ _ ty) = [ty]
-  go _ = []
 
 -- |
 -- Ensure skolem variables do not escape their scope
