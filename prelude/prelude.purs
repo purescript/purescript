@@ -700,6 +700,12 @@ module Data.Tuple where
 
   data Tuple a b = Tuple a b
 
+  fst :: forall a b. Tuple a b -> a
+  fst (Tuple a _) = a
+
+  snd :: forall a b. Tuple a b -> b
+  snd (Tuple _ b) = b
+
   instance showTuple :: (Show a, Show b) => Show (Tuple a b) where
     show (Tuple a b) = "Tuple(" ++ show a ++ ", " ++ show b ++ ")"
 
