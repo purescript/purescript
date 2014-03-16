@@ -613,9 +613,9 @@ module Data.Array where
   singleton :: forall a. a -> [a]
   singleton a = [a]
 
-  concatMap :: forall a b. [a] -> (a -> [b]) -> [b]
-  concatMap [] f = []
-  concatMap (a:as) f = f a `concat` concatMap as f
+  concatMap :: forall a b. (a -> [b]) -> [a] -> [b]
+  concatMap _ [] = []
+  concatMap f (a:as) = f a `concat` concatMap f as
 
   filter :: forall a. (a -> Boolean) -> [a] -> [a]
   filter _ [] = []
@@ -656,7 +656,7 @@ module Data.Array where
 
   instance monadArray :: Monad [] where
     return = singleton
-    (>>=) = concatMap
+    (>>=) = flip concatMap
 
   instance functorArray :: Functor [] where
     (<$>) = map
