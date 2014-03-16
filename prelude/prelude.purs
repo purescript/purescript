@@ -651,14 +651,6 @@ module Data.Array where
   nubBy _ [] = []
   nubBy (==) (x:xs) = x : nubBy (==) (filter (\y -> not (x == y)) xs)
 
-  elem :: forall a. (Eq a) => a -> [a] -> Boolean
-  elem a (a' : as) | a == a' = true
-  elem a (_ : as) = a `elem` as
-  elem _ _ = false
-
-  notElem :: forall a. (Eq a) => a -> [a] -> Boolean
-  notElem a as = not (a `elem` as)
-
   instance showArray :: (Show a) => Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
