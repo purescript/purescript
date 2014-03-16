@@ -1394,3 +1394,58 @@ module Data.Traversable where
 
   for :: forall a b m t. (Applicative m, Traversable t) => t a -> (a -> m b) -> m (t b)
   for x f = traverse f x
+
+module Data.Lazy where
+
+  import Prelude
+
+  foreign import data  Lazy :: * -> *
+  foreign import lazy "function Lazy(thunk) {\
+                      \    this.thunk = thunk;\
+                      \}\
+                      \Lazy.prototype.force = function () {\
+                      \    var value = this.thunk();\
+                      \    delete this.thunk;\
+                      \    this.force = function () {\
+                      \        return value;\
+                      \    };\
+                      \    return value;\
+                      \};\
+                      \Lazy.prototype.withoutCaching = function (f) {\
+                      \    var force = Lazy.prototype.force;\
+                      \    Lazy.prototype.force = function () {\
+                      \        return (isForced(this))\
+                      \               ? force.call(this) : this.thunk();\
+                      \    };\
+                      \    try {\
+                      \        var result = f(this);\
+                      \    } finally {\
+                      \        Lazy.prototype.force = force;\
+                      \    }\
+                      \    return result;\
+                      \};\
+                      \function lazy(thunk) {\
+                      \    return new Lazy(thunk);\
+                      \}" :: forall a. ({} -> a) -> Lazy a
+  foreign import force "function force(s) {\
+                       \    return s.force();\
+                       \}" :: forall a. (Lazy a) -> a
+  -- impure, for debugging
+  foreign import isForced "function isForced(s) {\
+                          \    return !('thunk' in s)\
+                          \}" :: forall a. (Lazy a) -> Boolean
+  -- for debugging
+  foreign import withoutCaching "function withoutCaching(f) {\
+                                \    return function (s) {\
+                                \        return s.withoutCaching(f);\
+                                \    };\
+                                \}" :: forall a b. ((Lazy a) -> b) -> Lazy a -> b
+
+  instance showLazy :: (Show a) => Show (Lazy a) where
+    show s =
+      if isForced s
+      then show (force s)
+      else "(Lazy " ++ (show $ force s) ++ ")"
+
+  debugShowLazy :: forall a. (Show a) => Lazy a -> String
+  debugShowLazy s = withoutCaching show s
