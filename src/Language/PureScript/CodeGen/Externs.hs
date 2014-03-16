@@ -57,7 +57,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
               printDctor dctor = case dctor `lookup` tys of
                                    Nothing -> Nothing
                                    Just tyArgs -> Just $ show dctor ++ " " ++ unwords (map prettyPrintTypeAtom tyArgs)
-          tell ["data " ++ show pn ++ " " ++ unwords args ++ " = " ++ intercalate " | " (mapMaybe printDctor dctors')]
+          tell ["data " ++ show pn ++ " " ++ unwords args ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
         Just (_, TypeSynonym) ->
           case Qualified (Just moduleName) pn `M.lookup` typeSynonyms env of
             Nothing -> error $ show pn ++ " has no type synonym info in exportToPs"
