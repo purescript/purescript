@@ -644,6 +644,21 @@ module Data.Array where
   take _ [] = []
   take n (x:xs) = x : take (n - 1) xs
 
+  nub :: forall a. (Eq a) => [a] -> [a]
+  nub = nubBy (==)
+
+  nubBy :: forall a. (a -> a -> Boolean) -> [a] -> [a]
+  nubBy _ [] = []
+  nubBy (==) (x:xs) = x : nubBy (==) (filter (\y -> not (x == y)) xs)
+
+  elem :: forall a. (Eq a) => a -> [a] -> Boolean
+  elem a (a' : as) | a == a' = true
+  elem a (_ : as) = a `elem` as
+  elem _ _ = false
+
+  notElem :: forall a. (Eq a) => a -> [a] -> Boolean
+  notElem a as = not (a `elem` as)
+
   instance showArray :: (Show a) => Show [a] where
     show xs = "[" ++ joinWith (map show xs) "," ++ "]"
 
