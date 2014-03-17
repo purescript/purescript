@@ -16,7 +16,7 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
@@ -61,19 +61,19 @@ data ImportEnvironment = ImportEnvironment
   -- |
   -- Local names for types within a module mapped to to their qualified names
   --
-  { importedTypes :: M.Map ProperName (Qualified ProperName)
+  { importedTypes :: M.Map (Qualified ProperName) (Qualified ProperName)
   -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --
-  , importedDataConstructors :: M.Map ProperName (Qualified ProperName)
+  , importedDataConstructors :: M.Map (Qualified ProperName) (Qualified ProperName)
   -- |
   -- Local names for classes within a module mapped to to their qualified names
   --
-  , importedTypeClasses :: M.Map ProperName (Qualified ProperName)
+  , importedTypeClasses :: M.Map (Qualified ProperName) (Qualified ProperName)
   -- |
   -- Local names for values within a module mapped to to their qualified names
   --
-  , importedValues :: M.Map Ident (Qualified Ident)
+  , importedValues :: M.Map (Qualified Ident) (Qualified Ident)
   } deriving (Show)
 
 -- |
@@ -207,38 +207,26 @@ renameInModule imports exports (Module mn decls exps) =
   updateType t = return t
   updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
 
-  updateTypeName (Qualified Nothing name) = update "type" importedTypes name
-  updateTypeName (Qualified (Just mn') name) = do
-    modExports <- getExports mn'
-    case name `lookup` exportedTypes modExports of
-      Nothing -> throwError $ "Unknown type '" ++ show (Qualified (Just mn') name) ++ "'"
-      _ -> return $ Qualified (Just mn') name
+  updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` (exportedTypes mes)))
+  updateClassName = update "type class" importedTypeClasses (flip elem . exportedTypeClasses)
+  updateValueName = update "value" importedValues (flip elem . exportedValues)
+  updateDataConstructorName = update "data constructor" importedDataConstructors (\mes -> flip elem (join $ snd `map` exportedTypes mes))
 
-  updateDataConstructorName (Qualified Nothing name) = update "data constructor" importedDataConstructors name
-  updateDataConstructorName (Qualified (Just mn') name) = do
-    modExports <- getExports mn'
-    let allDcons = join $ snd `map` exportedTypes modExports
-    if name `elem` allDcons
-      then return $ Qualified (Just mn') name
-      else throwError $ "Unknown data constructor '" ++ show (Qualified (Just mn') name) ++ "'"
-
-  updateClassName (Qualified Nothing name) = update "type class" importedTypeClasses name
-  updateClassName (Qualified (Just mn') name) = check "type class" exportedTypeClasses mn' name
-
-  updateValueName (Qualified Nothing name) = update "value" importedValues name
-  updateValueName (Qualified (Just mn') name) = check "value" exportedValues mn' name
-
-  -- Replace an unqualified name with a qualified
-  update :: (Ord a, Show a) => String -> (ImportEnvironment -> M.Map a (Qualified a)) -> a -> Either String (Qualified a)
-  update t get name = maybe (throwError $ "Unknown " ++ t ++ " '" ++ show name ++ "'") return $ M.lookup name (get imports)
-
-  -- Check that a qualified name is valid
-  check :: (Show a, Eq a) => String -> (Exports -> [a]) -> ModuleName -> a -> Either String (Qualified a)
-  check t get mn' name = do
-    modExports <- getExports mn'
-    if name `elem` get modExports
-      then return $ Qualified (Just mn') name
-      else throwError $ "Unknown " ++ t ++ " '" ++ show (Qualified (Just mn') name) ++ "'"
+  -- Update names so unqualified references become qualified, and locally qualified references
+  -- are replaced with their canoncial qualified names (e.g. M.Map -> Data.Map.Map)
+  update :: (Ord a, Show a) => String
+                            -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
+                            -> (Exports -> a -> Bool)
+                            -> (Qualified a)
+                            -> Either String (Qualified a)
+  update t getI checkE qname@(Qualified mn' name) = case (M.lookup qname (getI imports), mn') of
+    (Just qname', _) -> return qname'
+    (Nothing, Just mn'') -> do
+      modExports <- getExports mn''
+      if checkE modExports name
+        then return qname
+        else throwError $ "Unknown " ++ t ++ " '" ++ show (qname) ++ "'"
+    _ -> throwError $ "Unknown " ++ t ++ " '" ++ show name ++ "'"
 
   -- Gets the exports for a module, or an error message if the module doesn't exist
   getExports :: ModuleName -> Either String Exports
@@ -334,10 +322,10 @@ type ExplicitImports = [DeclarationRef]
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports)
+findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
 findImports = foldl findImports' M.empty
   where
-  findImports' result (ImportDeclaration mn expl) = M.insert mn expl result
+  findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
   findImports' result _ = result
 
 -- |
@@ -348,17 +336,17 @@ resolveImports env (Module currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
   -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported
-  scope :: M.Map ModuleName (Maybe ExplicitImports)
-  scope = M.insert currentModule Nothing (findImports decls)
-  resolveImport' imp (mn, i) = do
-      m <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
-      resolveImport currentModule mn m imp i
+  scope :: M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
+  scope = M.insert currentModule (Nothing, Nothing) (findImports decls)
+  resolveImport' imp (mn, (explImports, impQual)) = do
+      modExports <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
+      resolveImport currentModule mn modExports imp impQual explImports
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
 --
-resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ExplicitImports -> Either String ImportEnvironment
-resolveImport currentModule importModule exps imps = maybe importAll (foldM importExplicit imps)
+resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports-> Either String ImportEnvironment
+resolveImport currentModule importModule exps imps impQual = maybe importAll (foldM importExplicit imps)
   where
 
   -- Import everything from a module
@@ -392,9 +380,9 @@ resolveImport currentModule importModule exps imps = maybe importAll (foldM impo
   allExportedDataConstructors name = fromMaybe [] $ name `lookup` exportedTypes exps
 
   -- Add something to the ImportEnvironment if it does not already exist there
-  updateImports :: (Ord a, Show a) => M.Map a (Qualified a) -> a -> Either String (M.Map a (Qualified a))
-  updateImports m name = case M.lookup name m of
-    Nothing -> return $ M.insert name (Qualified (Just importModule) name) m
+  updateImports :: (Ord a, Show a) => M.Map (Qualified a) (Qualified a) -> a -> Either String (M.Map (Qualified a) (Qualified a))
+  updateImports m name = case M.lookup (Qualified impQual name) m of
+    Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
     Just x@(Qualified (Just mn) _) -> throwError $
       if mn == currentModule || importModule == currentModule
