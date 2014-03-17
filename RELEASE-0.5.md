@@ -39,6 +39,7 @@
 - Case statements and functions which do not pattern match on their arguments now generate smaller code (paf31)
 - Imported type class instances are now exported (paf31)
 - Some error messages were improved (paf31)
+- Qualfied module imports are now supported as `import qualified M as X` (garyb).
 
 ### Bug Fixes
 
@@ -53,7 +54,8 @@
 
 ### Libraries
 
-- The [purescript-date](https://github.com/purescript/purescript-date) library provides basic date/time functions
+- Purescript libraries are now [distributed via Bower](http://bower.io/search/?q=purescript)
+- The [purescript-datetime](https://github.com/purescript/purescript-datetime) library provides basic date/time functions
 - The [purescript-reactive](https://github.com/purescript/purescript-reactive) and [purescript-reactive-jquery]() libraries provide reactive variables, and bindings to jQuery properties.
 - The [purescript-generics](https://github.com/purescript/purescript-generics) library provides generic programming capabilities.
 
