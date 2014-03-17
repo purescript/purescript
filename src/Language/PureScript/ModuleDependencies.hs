@@ -47,7 +47,7 @@ usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProp
   qualifiedProperNames (Qualified (Just mn) _) = [mn]
   qualifiedProperNames _ = []
   imports :: Declaration -> [ModuleName]
-  imports (ImportDeclaration mn _) = [mn]
+  imports (ImportDeclaration mn _ _) = [mn]
   imports _ = []
 
 getModuleName :: Module -> ModuleName
