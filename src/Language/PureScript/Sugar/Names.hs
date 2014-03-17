@@ -322,10 +322,10 @@ type ExplicitImports = [DeclarationRef]
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports)
+findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
 findImports = foldl findImports' M.empty
   where
-  findImports' result (ImportDeclaration mn expl _) = M.insert mn expl result
+  findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
   findImports' result _ = result
 
 -- |
@@ -336,17 +336,17 @@ resolveImports env (Module currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
   -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported
-  scope :: M.Map ModuleName (Maybe ExplicitImports)
-  scope = M.insert currentModule Nothing (findImports decls)
-  resolveImport' imp (mn, i) = do
-      m <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
-      resolveImport currentModule mn m imp i
+  scope :: M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
+  scope = M.insert currentModule (Nothing, Nothing) (findImports decls)
+  resolveImport' imp (mn, (explImports, impQual)) = do
+      modExports <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
+      resolveImport currentModule mn modExports imp impQual explImports
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
 --
-resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ExplicitImports -> Either String ImportEnvironment
-resolveImport currentModule importModule exps imps = maybe importAll (foldM importExplicit imps)
+resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports-> Either String ImportEnvironment
+resolveImport currentModule importModule exps imps impQual = maybe importAll (foldM importExplicit imps)
   where
 
   -- Import everything from a module
@@ -381,8 +381,8 @@ resolveImport currentModule importModule exps imps = maybe importAll (foldM impo
 
   -- Add something to the ImportEnvironment if it does not already exist there
   updateImports :: (Ord a, Show a) => M.Map (Qualified a) (Qualified a) -> a -> Either String (M.Map (Qualified a) (Qualified a))
-  updateImports m name = case M.lookup (Qualified Nothing name) m of
-    Nothing -> return $ M.insert (Qualified Nothing name) (Qualified (Just importModule) name) m
+  updateImports m name = case M.lookup (Qualified impQual name) m of
+    Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
     Just x@(Qualified (Just mn) _) -> throwError $
       if mn == currentModule || importModule == currentModule
