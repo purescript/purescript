@@ -99,10 +99,20 @@ parseImportDeclaration :: P.Parsec String ParseState Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
-  moduleName' <- moduleName
-  idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
-  asQ <- P.optionMaybe $ reserved "as" *> moduleName
-  return $ ImportDeclaration moduleName' idents asQ
+  qualImport <|> stdImport
+  where
+  stdImport = do
+    moduleName' <- moduleName
+    idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
+    return $ ImportDeclaration moduleName' idents Nothing
+  qualImport = do
+    reserved "qualified"
+    indented
+    moduleName' <- moduleName
+    idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
+    reserved "as"
+    asQ <- moduleName
+    return $ ImportDeclaration moduleName' idents (Just asQ)
 
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
 parseDeclarationRef = ValueRef <$> parseIdent
