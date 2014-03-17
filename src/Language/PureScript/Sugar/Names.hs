@@ -323,7 +323,7 @@ type ExplicitImports = [DeclarationRef]
 -- explicitly imported declarations.
 --
 findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
-findImports = foldl findImports' M.empty
+findImports = M.insertWith (flip const) (ModuleName [ProperName "Prelude"]) (Nothing, Nothing) . foldl findImports' M.empty
   where
   findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
   findImports' result _ = result
