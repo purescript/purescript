@@ -246,21 +246,22 @@ overTypes f = everywhere (mkT f)
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
 replaceTypeClassDictionaries mn = everywhereM' (mkM go)
   where
-  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
+  go (TypeClassDictionary constraint dicts) = do
+    env <- getEnv
+    entails env mn dicts constraint
   go other = return other
 
 -- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
-entails moduleName context goal@(className, tys) = do
-  env <- getEnv
-  case go env goal of
+entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
+entails env moduleName context goal@(className, tys) = do
+  case go goal of
     [] -> throwError $ "No " ++ show className ++ " instance found for " ++ intercalate ", " (map prettyPrintType tys)
     (dict : _) -> return dict
   where
-  go env (className', tys') =
+  go (className', tys') =
     [ mkDictionary (canonicalizeDictionary tcd) args
     | tcd <- context
     -- Choose type class dictionaries in scope in the current module
@@ -270,14 +271,14 @@ entails moduleName context goal@(className, tys) = do
     -- Make sure the type unifies with the type in the type instance definition
     , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
     -- Solve any necessary subgoals
-    , args <- solveSubgoals env subst (tcdDependencies tcd) ]
+    , args <- solveSubgoals subst (tcdDependencies tcd) ]
   -- Create dictionaries for subgoals which still need to be solved by calling go recursively
   -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
   -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-  solveSubgoals :: Environment -> [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [Value]]
-  solveSubgoals _ _ Nothing = return Nothing
-  solveSubgoals env subst (Just subgoals) = do
-    dict <- mapM (go env . second (map (replaceAllTypeVars subst))) subgoals
+  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [Value]]
+  solveSubgoals _ Nothing = return Nothing
+  solveSubgoals subst (Just subgoals) = do
+    dict <- mapM (go . second (map (replaceAllTypeVars subst))) subgoals
     return $ Just dict
   -- Make a dictionary from subgoal dictionaries by applying the correct function
   mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
@@ -293,8 +294,33 @@ entails moduleName context goal@(className, tys) = do
   verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
   verifySubstitution subst = do
     let grps = groupBy ((==) `on` fst) subst
-    guard (all ((==) 1 . length . nubBy ((==) `on` snd)) grps)
+    guard (all (pairwise (unifiesWith env) . map snd) grps)
     return $ map head grps
+
+-- |
+-- Check all values in a list pairwise match a predicate
+--
+pairwise :: (a -> a -> Bool) -> [a] -> Bool
+pairwise _ [] = True
+pairwise _ [_] = True
+pairwise p (x : xs) = all (p x) xs && pairwise p xs
+
+-- |
+-- Check that two types unify
+--
+unifiesWith :: Environment -> Type -> Type -> Bool
+unifiesWith _ (TUnknown _) _ = True
+unifiesWith _ _ (TUnknown _) = True
+unifiesWith _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = True
+unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
+unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
+unifiesWith e (TypeApp h1 t1) (TypeApp h2 t2) = unifiesWith e h1 h2 && unifiesWith e t1 t2
+unifiesWith e (SaturatedTypeSynonym name args) t2 =
+  case expandTypeSynonym' e name args of
+    Left  _  -> False
+    Right t1 -> unifiesWith e t1 t2
+unifiesWith e t1 t2@(SaturatedTypeSynonym _ _) = unifiesWith e t2 t1
+unifiesWith _ _ _ = False
 
 -- |
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
@@ -302,11 +328,9 @@ entails moduleName context goal@(className, tys) = do
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
-typeHeadsAreEqual _ _ (TypeVar v) t = Just [(v, t)]
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual m e (TypeApp h1 (TypeVar v)) (TypeApp h2 arg) = (:) (v, arg) <$> typeHeadsAreEqual m e h1 h2
-typeHeadsAreEqual m e t1@(TypeApp _ _) t2@(TypeApp _ (TypeVar _)) = typeHeadsAreEqual m e t2 t1
+typeHeadsAreEqual m e (TypeApp h1 t1) (TypeApp h2 t2) = (++) <$> typeHeadsAreEqual m e h1 h2 <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
