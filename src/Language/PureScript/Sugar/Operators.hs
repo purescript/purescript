@@ -31,7 +31,6 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error.Class
 
-import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (sort, groupBy, sortBy)
@@ -130,5 +129,5 @@ parseTicks = token (either (const Nothing) fromOp) P.<?> "infix function"
 matchOp :: Qualified Ident -> P.Parsec Chain () ()
 matchOp op = do
   ident <- parseOp
-  guard (qualify moduleName ident == qualify moduleName op)
+  guard $ ident == op
 
