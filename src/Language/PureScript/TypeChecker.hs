@@ -36,6 +36,7 @@ import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 import Language.PureScript.Environment
+import Language.PureScript.Pretty.Types
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do
@@ -86,8 +87,8 @@ checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
   when (ctor `M.member` typeSynonyms env) $ throwError "Type synonym instances are disallowed"
   return ()
-checkTypeClassInstance m (TypeApp ty (TypeVar _)) = checkTypeClassInstance m ty
-checkTypeClassInstance _ _ = throwError "Type class instance must be of the form T a1 ... an"
+checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
+checkTypeClassInstance _ ty = throwError $ "Type class instance head is invalid: " ++ prettyPrintType ty
 
 -- |
 -- Type check all declarations in a module

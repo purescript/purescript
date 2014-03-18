@@ -28,15 +28,15 @@ import Language.PureScript.Declarations
 import Language.PureScript.Values
 
 import Control.Applicative
-import Control.Arrow (first)
 import Control.Monad.State
+import Control.Monad.Error.Class
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 import Data.Functor.Identity
-import Data.List (groupBy, sortBy)
+import Data.List (sort, groupBy, sortBy)
 
-import qualified Data.Map as M
+import qualified Data.Data as D
 import qualified Data.Generics as G
 import qualified Data.Generics.Extras as G
 
@@ -48,28 +48,41 @@ import qualified Text.Parsec.Expr as P
 -- Remove explicit parentheses and reorder binary operator applications
 --
 rebracket :: [Module] -> Either String [Module]
-rebracket = go M.empty []
+rebracket ms = do
+  let fixities = concatMap collectFixities ms
+  ensureNoDuplicates $ map fst fixities
+  let opTable = customOperatorTable fixities
+  mapM (rebracketModule opTable) ms
+
+rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either String Module
+rebracketModule opTable (Module mn ds exts) = Module mn <$> (removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
+
+removeParens :: (D.Data d) => d -> d
+removeParens = G.everywhere (G.mkT go)
   where
-  go _ rb [] = return . reverse $ rb
-  go m rb (Module name ds exps : ms) = do
-    m' <- M.union m <$> collectFixities m name ds
-    let opTable = customOperatorTable m'
-    ds' <- G.everywhereM' (G.mkM (matchOperators name opTable)) ds
-    go m' (Module name (G.everywhere (G.mkT removeParens) ds') exps : rb) ms
+  go (Parens val) = val
+  go val = val
 
-removeParens :: Value -> Value
-removeParens (Parens val) = val
-removeParens val = val
+collectFixities :: Module -> [(Qualified Ident, Fixity)]
+collectFixities (Module moduleName ds _) = concatMap collect ds
+  where
+  collect :: Declaration -> [(Qualified Ident, Fixity)]
+  collect (FixityDeclaration fixity name) = [(Qualified (Just moduleName) (Op name), fixity)]
+  collect _ = []
 
-customOperatorTable :: M.Map (Qualified Ident) Fixity -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
+ensureNoDuplicates :: [Qualified Ident] -> Either String ()
+ensureNoDuplicates m = go $ sort m
+  where
+  go [] = return ()
+  go [_] = return ()
+  go (x : y : _) | x == y = throwError $ "Redefined fixity for " ++ show x
+  go (_ : rest) = go rest
+
+customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
 customOperatorTable fixities =
   let
-    -- We make the assumption here that infix operators are not qualified. The parser currently enforces this.
-    -- The fixity map can therefore map from module name/ident pairs to fixities, where the module name is the name
-    -- of the module imported into, not from. This is useful in matchOp, but here we have to discard the module name to
-    -- make sure that the generated code is correct.
-    applyUserOp (Qualified _ name) t1 = App (App (Var (Qualified Nothing name)) t1)
-    userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
+    applyUserOp ident t1 = App (App (Var ident) t1)
+    userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) fixities
     sorted = sortBy (flip compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
   in
@@ -77,8 +90,8 @@ customOperatorTable fixities =
 
 type Chain = [Either Value (Qualified Ident)]
 
-matchOperators :: ModuleName -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
-matchOperators moduleName ops = G.everywhereM' (G.mkM parseChains)
+matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
+matchOperators ops = parseChains
   where
   parseChains :: Value -> Either String Value
   parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
@@ -89,7 +102,7 @@ matchOperators moduleName ops = G.everywhereM' (G.mkM parseChains)
   bracketChain :: Chain -> Either String Value
   bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
-            : map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
+            : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]
 
 toAssoc :: Associativity -> P.Assoc
@@ -114,27 +127,8 @@ parseTicks = token (either (const Nothing) fromOp) P.<?> "infix function"
   fromOp q@(Qualified _ (Ident _)) = Just q
   fromOp _ = Nothing
 
-matchOp :: ModuleName -> Qualified Ident -> P.Parsec Chain () ()
-matchOp moduleName op = do
+matchOp :: Qualified Ident -> P.Parsec Chain () ()
+matchOp op = do
   ident <- parseOp
   guard (qualify moduleName ident == qualify moduleName op)
-
-collectFixities :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-collectFixities m _ [] = return m
-collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
-  let qual = Qualified (Just moduleName) (Op name)
-  when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
-  collectFixities (M.insert qual fixity m) moduleName rest
-collectFixities m moduleName (ImportDeclaration importedModule explImports qual : rest) = do
-  let qualName = fromMaybe moduleName qual
-  let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule && isImported explImports i ]
-  let m' = M.fromList (map (first (Qualified (Just qualName))) fs)
-  collectFixities (m' `M.union` m) moduleName rest
-  where
-  isImported Nothing     _ = True
-  isImported (Just imps) i = i `elem` (mapMaybe getExportedValue imps)
-  getExportedValue (ValueRef name) = Just name
-  getExportedValue _               = Nothing
-
-collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
 
