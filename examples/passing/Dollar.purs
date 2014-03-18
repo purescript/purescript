@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude ()
+
 ($) :: forall a b. (a -> b) -> a -> b
 ($) f x = f x
 

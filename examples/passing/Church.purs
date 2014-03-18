@@ -1,5 +1,7 @@
 module Main where
 
+  import Prelude ()
+
   type List a = forall r. r -> (a -> r -> r) -> r
 
   empty :: forall a. List a
