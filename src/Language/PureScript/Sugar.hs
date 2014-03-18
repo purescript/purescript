@@ -49,11 +49,11 @@ import Language.PureScript.Sugar.Names as S
 --  * Qualify any unqualified names and types
 --
 desugar :: [Module] -> Either String [Module]
-desugar = rebracket
-          >=> desugarDo
+desugar = desugarDo
           >=> desugarLetBindings
           >>> desugarCasesModule
           >=> desugarImports
+          >=> rebracket
           >=> desugarTypeDeclarationsModule
           >=> desugarTypeClasses
           >=> createBindingGroupsModule
