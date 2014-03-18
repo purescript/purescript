@@ -40,6 +40,8 @@
 - Imported type class instances are now exported (paf31)
 - Some error messages were improved (paf31)
 - Qualfied module imports are now supported as `import qualified M as X` (garyb).
+- The escape check was removed, since it was too restrictive (paf31)
+- The binary operator reordering step was greatly simplified (paf31)
 
 ### Bug Fixes
 
@@ -51,6 +53,7 @@
 - A type checker bug related to array literals was fixed (paf31)
 - Externs files (`--externs`) are now working again (paf31)
 - Precedence of backticked infix functions have been corrected (paf31)
+- A bug which allowed some incorrect type class instances to pass the type checker was fixed (paf31)
 
 ### Libraries
 
