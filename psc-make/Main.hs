@@ -22,9 +22,11 @@ import Control.Monad.Error
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
-import System.Directory (createDirectoryIfMissing)
+import System.Directory
+       (doesFileExist, getModificationTime, createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
+import System.IO.Error (tryIOError)
 
 import Text.Parsec (ParseError)
 
@@ -35,56 +37,59 @@ import qualified System.IO.UTF8 as U
 preludeFilename :: IO FilePath
 preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
-readInput :: Maybe [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
-readInput Nothing = do
-  text <- getContents
-  return $ map ((,) undefined) <$> P.runIndentParser "" P.parseModules text
-readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
+readInput :: [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
+readInput input = fmap collect $ forM input $ \inputFile -> do
   text <- U.readFile inputFile
   return $ (inputFile, P.runIndentParser inputFile P.parseModules text)
   where
   collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
   collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
 
-compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile opts input output externs = do
+newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Monad, MonadIO, MonadError String)
+
+runMake :: Make a -> IO (Either String a)
+runMake = runErrorT . unMake
+
+makeIO :: IO a -> Make a
+makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
+
+instance P.MonadMake Make where
+  getTimestamp path = makeIO $ do
+    exists <- doesFileExist path
+    case exists of
+      True -> Just <$> getModificationTime path
+      False -> return Nothing
+  readTextFile path = makeIO $ do
+    U.putStrLn $ "Reading " ++ path
+    U.readFile path
+  writeTextFile path text = makeIO $ do
+    mkdirp path
+    U.putStrLn $ "Writing " ++ path
+    U.writeFile path text
+  liftError = either throwError return
+
+compile :: P.Options -> [FilePath] -> IO ()
+compile opts input = do
   modules <- readInput input
   case modules of
     Left err -> do
       U.print err
       exitFailure
     Right ms -> do
-      case P.compile opts (map snd ms) of
+      e <- runMake $ P.make opts ms
+      case e of
         Left err -> do
           U.putStrLn err
           exitFailure
-        Right (js, exts, _) -> do
-          case output of
-            Just path -> mkdirp path >> U.writeFile path js
-            Nothing -> U.putStrLn js
-          case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
-            Nothing -> return ()
+        Right _ -> do
           exitSuccess
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
-useStdIn :: Term Bool
-useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
-     { optDoc = "Read from standard input" }
-
 inputFiles :: Term [FilePath]
 inputFiles = value $ posAny [] $ posInfo
      { posDoc = "The input .ps files" }
-
-outputFile :: Term (Maybe FilePath)
-outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
-     { optDoc = "The output .js file" }
-
-externsFile :: Term (Maybe FilePath)
-externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
-     { optDoc = "The output .e.ps file" }
 
 tco :: Term Bool
 tco = value $ flag $ (optInfo [ "tco" ])
@@ -102,10 +107,6 @@ magicDo :: Term Bool
 magicDo = value $ flag $ (optInfo [ "magic-do" ])
      { optDoc = "Overload the do keyword to generate efficient code specifically for the Eff monad." }
 
-runMain :: Term (Maybe String)
-runMain = value $ defaultOpt (Just "Main") Nothing $ (optInfo [ "main" ])
-     { optDoc = "Generate code to run the main method in the specified module." }
-
 noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
      { optDoc = "Skip the optimization phase." }
@@ -114,30 +115,21 @@ browserNamespace :: Term String
 browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
 
-dceModules :: Term [String]
-dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
-     { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
-
-codeGenModules :: Term [String]
-codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
-     { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
-
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
+options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure []
 
-stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
-stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
+inputFilesAndPrelude :: FilePath -> Term [FilePath]
+inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
   where
-  combine False True input = Just (prelude : input)
-  combine False False input = Just input
-  combine True _ _ = Nothing
+  combine True input = prelude : input
+  combine False input = input
 
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
+term prelude = compile <$> options <*> inputFilesAndPrelude prelude
 
 termInfo :: TermInfo
 termInfo = defTI
-  { termName = "psc"
+  { termName = "psc-make"
   , version  = showVersion Paths.version
   , termDoc  = "Compiles PureScript to Javascript"
   }
