@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude ()
+
 class Applicative f where
   pure :: forall a. a -> f a
   (<*>) :: forall a b. f (a -> b) -> f a -> f b

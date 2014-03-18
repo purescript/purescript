@@ -134,9 +134,10 @@ addExport exports name =
 --
 desugarImports :: [Module] -> Either String [Module]
 desugarImports modules = do
-  unfilteredExports <- findExports modules
-  exports <- foldM filterModuleExports unfilteredExports modules
-  mapM (renameInModule' unfilteredExports exports) modules
+  let modules' = importPrelude `map` modules
+  unfilteredExports <- findExports modules'
+  exports <- foldM filterModuleExports unfilteredExports modules'
+  mapM (renameInModule' unfilteredExports exports) modules'
   where
 
   -- Filters the exports for a module in the global exports environment so that only explicitly
@@ -154,6 +155,19 @@ desugarImports modules = do
     let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
     imports <- resolveImports env m
     renameInModule imports env (elaborateExports exps m)
+
+-- |
+-- Add an import declaration for the Prelude to a module if it does not already explicitly import
+-- it.
+--
+importPrelude :: Module -> Module
+importPrelude m@(Module mn decls exps)  =
+  if isPreludeImport `any` decls then m
+  else Module mn (preludeImport : decls) exps
+  where
+  isPreludeImport (ImportDeclaration (ModuleName [ProperName "Prelude"]) _ _) = True
+  isPreludeImport _ = False
+  preludeImport = ImportDeclaration (ModuleName [ProperName "Prelude"]) Nothing Nothing
 
 -- |
 -- Rethrow an error with the name of the current module in the case of a failure
@@ -329,7 +343,7 @@ type ExplicitImports = [DeclarationRef]
 -- explicitly imported declarations.
 --
 findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
-findImports = M.insertWith (flip const) (ModuleName [ProperName "Prelude"]) (Nothing, Nothing) . foldl findImports' M.empty
+findImports = foldl findImports' M.empty
   where
   findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
   findImports' result _ = result
