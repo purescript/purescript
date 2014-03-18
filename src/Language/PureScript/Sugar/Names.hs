@@ -190,8 +190,14 @@ renameInModule imports exports (Module mn decls exps) =
     ValueDeclaration name nameKind [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
-    bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound = (,) bound <$> (Var <$> updateValueName name')
-    bindFunctionArgs bound (Var name'@(Qualified (Just _) _)) = (,) bound <$> (Var <$> updateValueName name')
+    bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
+      (,) bound <$> (Var <$> updateValueName name')
+    bindFunctionArgs bound (Var name'@(Qualified (Just _) _)) =
+      (,) bound <$> (Var <$> updateValueName name')
+    bindFunctionArgs bound (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
+      (,) bound <$> (BinaryNoParens <$> updateValueName name' <*> pure v1 <*> pure v2)
+    bindFunctionArgs bound (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
+      (,) bound <$> (BinaryNoParens <$> updateValueName name' <*> pure v1 <*> pure v2)
     bindFunctionArgs bound other = return (bound, other)
     bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
     bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
