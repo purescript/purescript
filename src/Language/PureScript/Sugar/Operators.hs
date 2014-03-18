@@ -31,6 +31,7 @@ import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad.State
 
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
@@ -124,9 +125,16 @@ collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
   let qual = Qualified (Just moduleName) (Op name)
   when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
   collectFixities (M.insert qual fixity m) moduleName rest
-collectFixities m moduleName (ImportDeclaration importedModule _ _ : rest) = do
-  let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule ]
-  let m' = M.fromList (map (first (Qualified (Just moduleName))) fs)
+collectFixities m moduleName (ImportDeclaration importedModule explImports qual : rest) = do
+  let qualName = fromMaybe moduleName qual
+  let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule && isImported explImports i ]
+  let m' = M.fromList (map (first (Qualified (Just qualName))) fs)
   collectFixities (m' `M.union` m) moduleName rest
+  where
+  isImported Nothing     _ = True
+  isImported (Just imps) i = i `elem` (mapMaybe getExportedValue imps)
+  getExportedValue (ValueRef name) = Just name
+  getExportedValue _               = Nothing
+
 collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
 
