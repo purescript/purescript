@@ -33,12 +33,15 @@ import Language.PureScript.DeadCodeElimination as P
 
 import qualified Language.PureScript.Constants as C
 
-import Data.List (intercalate)
+import Data.List (sortBy, groupBy, intercalate)
 import Data.Time.Clock
+import Data.Function (on)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Control.Monad.State.Lazy
+import Control.Arrow ((&&&))
 import Control.Applicative ((<$>), (<*>), pure)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import System.FilePath (pathSeparator)
 
 -- |
@@ -65,7 +68,7 @@ compile = compile' initEnvironment
 
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
-  sorted <- sortModules ms
+  (sorted, _) <- sortModules ms
   desugared <- desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ \(Module moduleName' decls exps) -> do
     modify (\s -> s { checkCurrentModule = Just moduleName' })
@@ -126,9 +129,9 @@ make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> 
 make opts ms = do
   let filePathMap = M.fromList (map (\(fp, (Module mn _ _)) -> (mn, fp)) ms)
 
-  sorted <- liftError $ sortModules (map snd ms)
+  (sorted, graph) <- liftError $ sortModules (map snd ms)
 
-  marked <- forM sorted $ \m@(Module moduleName' _ _) -> do
+  toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = toFileName moduleName'
 
         jsFile = "js" ++ pathSeparator : filePath ++ ".js"
@@ -139,14 +142,11 @@ make opts ms = do
     externsTimestamp <- getTimestamp externsFile
     inputTimestamp <- getTimestamp inputFile
 
-    case inputTimestamp < min jsTimestamp externsTimestamp of
-      True -> do
-        externs <- readTextFile externsFile
-        externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
-        case externsModules of
-          [m'@(Module moduleName'' _ _)] | moduleName' == moduleName'' -> return (True, m')
-          _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
-      False -> return (False, m)
+    return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
+      (Just t1, Just t2, Just t3) | t1 < min t2 t3 -> s
+      _ -> S.insert moduleName' s) S.empty sorted
+
+  marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
   desugared <- liftError $ zip (map fst marked) <$> desugar (map snd marked)
 
@@ -155,13 +155,13 @@ make opts ms = do
   where
   go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
   go _ [] = return ()
-  go env ((True, Module moduleName' typings _) : ms') = do
+  go env ((False, Module moduleName' typings _) : ms') = do
     (_, env') <- liftError . runCheck' env $ do
       modify (\s -> s { checkCurrentModule = Just moduleName' })
       typeCheckAll Nothing moduleName' typings
 
     go env' ms'
-  go env ((False, Module moduleName' decls exps) : ms') = do
+  go env ((True, Module moduleName' decls exps) : ms') = do
     let filePath = toFileName moduleName'
         jsFile = "js" ++ pathSeparator : filePath ++ ".js"
         externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
@@ -182,5 +182,25 @@ make opts ms = do
 
     go env' ms'
 
-  toFileName :: ModuleName -> FilePath
-  toFileName (ModuleName ps) = intercalate [pathSeparator] . map runProperName $ ps
+toFileName :: ModuleName -> FilePath
+toFileName (ModuleName ps) = intercalate [pathSeparator] . map runProperName $ ps
+
+rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
+rebuildIfNecessary _ _ [] = return []
+rebuildIfNecessary graph toRebuild (m@(Module moduleName' _ _) : ms) | moduleName' `S.member` toRebuild = do
+  let deps = fromMaybe [] $ moduleName' `M.lookup` graph
+      toRebuild' = toRebuild `S.union` S.fromList deps
+  (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms
+rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms) = do
+  let externsFile = "externs" ++ pathSeparator : toFileName moduleName' ++ ".externs"
+  externs <- readTextFile externsFile
+  externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+  case externsModules of
+    [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms
+    _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
+
+reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
+reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
+  where
+  combine :: (Ord a) => [(a, b)] -> M.Map a [b]
+  combine = M.fromList . map ((fst . head) &&& map snd) . groupBy ((==) `on` fst) . sortBy (compare `on` fst)

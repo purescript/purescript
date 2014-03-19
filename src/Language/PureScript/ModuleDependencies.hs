@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.ModuleDependencies (
-  sortModules
+  sortModules,
+  ModuleGraph
 ) where
 
 import Data.Data
@@ -25,14 +26,21 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 
 -- |
+-- A list of modules with their dependencies
+--
+type ModuleGraph = [(ModuleName, [ModuleName])]
+
+-- |
 -- Sort a collection of modules based on module dependencies.
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: [Module] -> Either String [Module]
+sortModules :: [Module] -> Either String ([Module], ModuleGraph)
 sortModules ms = do
   let verts = map (\m -> (m, getModuleName m, usedModules m)) ms
-  mapM toModule $ stronglyConnComp verts
+  ms' <- mapM toModule $ stronglyConnComp verts
+  let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
+  return (ms', moduleGraph)
 
 -- |
 -- Calculate a list of used modules based on explicit imports and qualified names
