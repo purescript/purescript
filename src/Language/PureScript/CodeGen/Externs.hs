@@ -36,7 +36,8 @@ import Language.PureScript.Environment
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
 moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
-  tell ["module " ++ runModuleName moduleName ++ " where"]
+  tell [ "module " ++ runModuleName moduleName ++ " where"
+       , "import Prelude ()" ]
   mapM_ fixityToPs ds
   mapM_ exportToPs exts
   where
