@@ -11,6 +11,7 @@
 - Prelude modules now follow a naming scheme similar to haskell (e.g. `Data.Maybe`, `Control.Monad`) (garyb)
 - Multiple modules with the same name are now disallowed rather than merged (garyb)
 - The `--runtime-type-checks` flag has been removed. Runtime type checks have been superceded by the `purescript-foreign` library (paf31)
+- The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or a specific import list. (garyb/paf31)
 
 ### New Features
 
