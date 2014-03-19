@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude ()
 import Data.Array
 
 test :: [] Number

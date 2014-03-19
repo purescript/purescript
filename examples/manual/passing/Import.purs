@@ -1,5 +1,7 @@
 module M1 where
 
+  import Prelude ()
+
   id :: forall a. a -> a
   id = \x -> x
 
@@ -7,6 +9,7 @@ module M1 where
 
 module M2 where
 
+  import Prelude ()
   import M1
 
   main = \_ -> foo 42
