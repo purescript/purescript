@@ -83,7 +83,10 @@ inlineOperator op f = everywhere (mkT convert)
 
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll
-  [ binary C.numNumber (C.+) Add
+  [ binary C.semigroupString (C.++) Add
+  , binary C.semigroupString (C.<>) Add
+
+  , binary C.numNumber (C.+) Add
   , binary C.numNumber (C.-) Subtract
   , binary C.numNumber (C.*) Multiply
   , binary C.numNumber (C./) Divide
