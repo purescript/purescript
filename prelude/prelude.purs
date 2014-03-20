@@ -325,25 +325,13 @@ module Prelude where
     (||) = boolOr
     not = boolNot
 
-  infixr 6 <>
-
-  class Semigroup s where
-    (<>) :: s -> s -> s
-
   infixr 5 ++
 
-  (++) :: forall s. (Semigroup s) => s -> s -> s
-  (++) = (<>)
-
-  foreign import concatString
-    "function concatString(s1) {\
-    \  return function(s2) {\
-    \    return s1 + s2;\
-    \  };\
-    \}" :: String -> String -> String
-
-  instance semigroupString :: Semigroup String where
-    (<>) = concatString 
+  foreign import (++) "function $plus$plus(s1) {\
+                      \  return function(s2) {\
+                      \    return s1 + s2;\
+                      \  };\
+                      \}" :: String -> String -> String
 
 module Data.Eq where
 

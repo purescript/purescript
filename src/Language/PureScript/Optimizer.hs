@@ -64,6 +64,7 @@ optimize opts | optionsNoOptimizations opts = id
   , inlineOperator (C.$) $ \f x -> JSApp f [x]
   , inlineOperator (C.#) $ \x f -> JSApp f [x]
   , inlineOperator (C.!!) $ flip JSIndexer
+  , inlineOperator (C.++) $ JSBinary Add
   , inlineCommonOperators ]
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a

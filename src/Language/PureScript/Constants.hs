@@ -29,9 +29,6 @@ module Language.PureScript.Constants where
 (++) :: String
 (++) = "++"
 
-(<>) :: String
-(<>) = "<>"
-
 (>>=) :: String
 (>>=) = ">>="
 
@@ -148,9 +145,6 @@ pokeSTArray = "pokeSTArray"
 
 monadEffDictionary :: String
 monadEffDictionary = "monadEff"
-
-semigroupString :: String
-semigroupString = "semigroupString"
 
 numNumber :: String
 numNumber = "numNumber"
