@@ -67,4 +67,4 @@ getModuleName (Module mn _ _) = mn
 toModule :: SCC Module -> Either String Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC _) = Left "Cycle in module dependencies"
+toModule (CyclicSCC ms) = Left $ "Cycle in module dependencies: " ++ show (map getModuleName ms)

@@ -68,7 +68,7 @@ compile = compile' initEnvironment
 
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
-  (sorted, _) <- sortModules ms
+  (sorted, _) <- sortModules (map importPrelude ms)
   desugared <- desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ \(Module moduleName' decls exps) -> do
     modify (\s -> s { checkCurrentModule = Just moduleName' })
@@ -129,7 +129,7 @@ make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> 
 make opts ms = do
   let filePathMap = M.fromList (map (\(fp, (Module mn _ _)) -> (mn, fp)) ms)
 
-  (sorted, graph) <- liftError $ sortModules (map snd ms)
+  (sorted, graph) <- liftError $ sortModules (map (importPrelude . snd) ms)
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = toFileName moduleName'
@@ -204,3 +204,17 @@ reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
   where
   combine :: (Ord a) => [(a, b)] -> M.Map a [b]
   combine = M.fromList . map ((fst . head) &&& map snd) . groupBy ((==) `on` fst) . sortBy (compare `on` fst)
+
+-- |
+-- Add an import declaration for the Prelude to a module if it does not already explicitly import
+-- it.
+--
+importPrelude :: Module -> Module
+importPrelude m@(Module mn decls exps)  =
+  if isPreludeImport `any` decls || mn == prelude then m
+  else Module mn (preludeImport : decls) exps
+  where
+  prelude = ModuleName [ProperName C.prelude]
+  isPreludeImport (ImportDeclaration (ModuleName [ProperName mn']) _ _) | mn' == C.prelude = True
+  isPreludeImport _ = False
+  preludeImport = ImportDeclaration prelude Nothing Nothing

@@ -146,17 +146,31 @@ module Prelude where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
 
+  foreign import refEq
+    "function refEq(r1) {\
+    \  return function(r2) {\
+    \    return r1 === r2;\
+    \  };\
+    \}" :: forall a. a -> a -> Boolean
+
+  foreign import refIneq
+    "function refIneq(r1) {\
+    \  return function(r2) {\
+    \    return r1 !== r2;\
+    \  };\
+    \}" :: forall a. a -> a -> Boolean
+
   instance eqString :: Eq String where
-    (==) = Data.Eq.Unsafe.refEq
-    (/=) = Data.Eq.Unsafe.refIneq
+    (==) = refEq
+    (/=) = refIneq
 
   instance eqNumber :: Eq Number where
-    (==) = Data.Eq.Unsafe.refEq
-    (/=) = Data.Eq.Unsafe.refIneq
+    (==) = refEq
+    (/=) = refIneq
 
   instance eqBoolean :: Eq Boolean where
-    (==) = Data.Eq.Unsafe.refEq
-    (/=) = Data.Eq.Unsafe.refIneq
+    (==) = refEq
+    (/=) = refIneq
 
   instance eqArray :: (Eq a) => Eq [a] where
     (==) [] [] = true
@@ -321,39 +335,15 @@ module Prelude where
 
 module Data.Eq where
 
-  import qualified Data.Eq.Unsafe as Unsafe
-
   data Ref a = Ref a
 
   liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
   liftRef f (Ref x) (Ref y) = f x y
 
-  refEq :: forall a. Ref a -> Ref a -> Boolean
-  refEq = liftRef Unsafe.refEq
-
-  refIneq :: forall a. Ref a -> Ref a -> Boolean
-  refIneq = liftRef Unsafe.refIneq
-
   instance eqRef :: Eq (Ref a) where
-    (==) = refEq
-    (/=) = refIneq
+    (==) = liftRef refEq
+    (/=) = liftRef refIneq
     
-module Data.Eq.Unsafe where
-
-  foreign import refEq
-    "function refEq(r1) {\
-    \  return function(r2) {\
-    \    return r1 === r2;\
-    \  };\
-    \}" :: forall a. a -> a -> Boolean
-
-  foreign import refIneq
-    "function refIneq(r1) {\
-    \  return function(r2) {\
-    \    return r1 !== r2;\
-    \  };\
-    \}" :: forall a. a -> a -> Boolean
-
 module Control.Monad.Eff where
 
   foreign import data Eff :: # ! -> * -> *
