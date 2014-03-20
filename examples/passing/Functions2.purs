@@ -5,8 +5,13 @@ module Main where
   test :: forall a b. a -> b -> a
   test = \const _ -> const
 
+  foreign import error
+    "function error(msg) {\
+    \  throw msg;\
+    \}" :: forall a. String -> a
+
   main = do
     let value = test "Done" {}
     if value == "Done"
       then Debug.Trace.trace "Done"
-      else Control.Monad.Eff.Error.throwError "Not done"
+      else error "Not done"

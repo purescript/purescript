@@ -1,7 +1,8 @@
 module Main where
 
   import Prelude
-  import Data.Either
+
+  data Either a b = Left a | Right b
 
   instance functorEither :: Prelude.Functor (Either a) where
     (<$>) _ (Left x) = Left x

@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-import Data.Array
 
 test1 arr = arr !! 0 + arr !! 1 + 1
 
@@ -22,9 +21,4 @@ test4 = \arr -> case arr of
   [_] -> 0
   x : y : xs -> x * y + test4 xs
 
-main = do
-  let x = [3,2,1]
-  let y = sort x
-  if x == [3,2,1]
-    then Debug.Trace.trace "Done"
-    else Control.Monad.Eff.Error.throwError "Not done"
+main = Debug.Trace.trace "Done"

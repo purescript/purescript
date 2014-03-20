@@ -1,9 +1,7 @@
 module Main where
 
 import Prelude
-import Global
 import Control.Monad.Eff
-import Data.Array
 
 data P a b = P a b
 
@@ -13,8 +11,8 @@ runP f (P a b) = f a b
 idP = runP P
 
 testCase = \p -> case p of
-  P (x:xs) (y:ys) -> x : y : testCase (P xs ys)
-  P _ _ -> []
+  P (x:xs) (y:ys) -> x + y
+  P _ _ -> 0
 
 test1 = testCase (P [1, 2, 3] [4, 5, 6])
 

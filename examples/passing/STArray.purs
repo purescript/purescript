@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff
 import Control.Monad.ST
-import Data.Array
+import Debug.Trace
 
 test = runSTArray (do
   a <- newSTArray 2 0
@@ -20,4 +20,6 @@ fromTo lo hi = runSTArray (do
   arr <- newSTArray (hi - lo + 1) 0
   fromTo' lo hi 0 arr)
 
-main = Debug.Trace.print $ runPure (fromTo 10 20)
+main = do
+  let t1 = runPure (fromTo 10 20)
+  trace "Done"

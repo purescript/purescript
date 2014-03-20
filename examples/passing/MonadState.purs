@@ -1,7 +1,8 @@
 module Main where
 
 import Prelude
-import Data.Tuple
+
+data Tuple a b = Tuple a b
 
 class MonadState s m where
   get :: m s
@@ -31,5 +32,7 @@ test = runState "" $ do
   modify $ (++) "Hello, "
   get
 
-main = Debug.Trace.print test
+main = do
+  let t1 = test
+  Debug.Trace.trace "Done"
 

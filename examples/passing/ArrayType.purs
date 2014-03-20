@@ -1,16 +1,9 @@
 module Main where
 
-import Prelude ()
-import Data.Array
+class Pointed p where
+  point :: forall a. a -> p a
 
-test :: [] Number
-test = [1, 2, 3]
-
-class Functor f where
-  fmap :: forall a b. (a -> b) -> f a -> f b
-
-instance functorArray :: Functor [] where
-  fmap _ [] = []
-  fmap f (x:xs) = f x : fmap f xs
+instance pointedArray :: Pointed [] where
+  point a = [a]
 
 main = Debug.Trace.trace "Done"

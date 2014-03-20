@@ -4,6 +4,11 @@ module Main where
 
   type Foo a = [a]  
 
-  foo _ = Data.Array.length ([] :: Foo Number)
+  foreign import length
+    "function length(a) {\
+    \  return a.length;\
+    \}" :: forall a. [a] -> Number
+
+  foo _ = length ([] :: Foo Number)
 
   main = Debug.Trace.trace "Done"

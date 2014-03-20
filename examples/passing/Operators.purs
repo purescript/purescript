@@ -3,8 +3,6 @@ module Main where
   import Prelude
   import Control.Monad.Eff
   import Debug.Trace
-  import Global
-  import Data.Array
 
   bar = \s1 s2 -> s1 ++ s2
 
@@ -59,19 +57,20 @@ module Main where
   test15 :: Number -> Number -> Boolean
   test15 a b = const false $ a `test14` b
 
-  main = print [ show $ test1 1 2 $ \x y -> x + y
-        , show test2
-        , show test3
-        , show test4
-        , show test5
-        , show test6
-        , show test7
-        , show test8
-        , show test9
-        , show test10
-        , show test11
-        , show (test12 k 1 2)
-        , show (test13 k 1 2)
-        , show (test14 1 2)
-        , show (test15 1 2)
-        ]
+  main = do
+    let t1 = test1 1 2 (\x y -> x + y)
+    let t2 = test2
+    let t3 = test3
+    let t4 = test4
+    let t5 = test5
+    let t6 = test6
+    let t7 = test7
+    let t8 = test8
+    let t9 = test9
+    let t10 = test10
+    let t11 = test11
+    let t12 = test12 k 1 2
+    let t13 = test13 k 1 2
+    let t14 = test14 1 2
+    let t15 = test15 1 2
+    trace "Done"

@@ -22,17 +22,4 @@ module Main where
   test1 :: forall a b c. Lens (Pair (Pair a b) c) a
   test1 = composeLenses fst fst
 
-  import Data.Array ((:))
-  import Data.Array.Unsafe
-
-  headLens :: forall a. Lens [a] a
-  headLens =
-    { get: \l -> head l
-    , set: \l a -> case l of
-        _:xs -> a : xs
-    }
-
-  test2 :: forall a b c. Lens (Pair [Pair a b] c) a
-  test2 = composeLenses fst (composeLenses headLens fst)
-
   main = Debug.Trace.trace "Done"

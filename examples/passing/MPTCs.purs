@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-import Data.Array
 
 class NullaryTypeClass where
   greeting :: String
@@ -18,7 +17,4 @@ instance coerceRefl :: Coerce a a where
 instance coerceShow :: (Prelude.Show a) => Coerce a String where
   coerce = show
 
-instance coerceArray :: (Coerce a b) => Coerce [a] [b] where
-  coerce = map coerce
-
-main = Debug.Trace.print $ coerce [greeting] :: [String]
+main = Debug.Trace.trace "Done"

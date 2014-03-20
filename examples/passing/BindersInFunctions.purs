@@ -1,12 +1,16 @@
 module Main where
 
 import Prelude
-import Data.Array
 
-tails = map (\(_:xs) -> xs)
+tail = \(_:xs) -> xs
+
+foreign import error
+  "function error(msg) {\
+  \  throw msg;\
+  \}" :: forall a. String -> a
 
 main = 
-  let ts = tails [[1, 2, 3], [4, 5], [6]] in
-  if ts == [[2, 3], [5], []] 
+  let ts = tail [1, 2, 3] in
+  if ts == [2, 3] 
   then Debug.Trace.trace "Done"
-  else Control.Monad.Eff.Error.throwError "Incorrect result from 'tails'."
+  else error "Incorrect result from 'tails'."
