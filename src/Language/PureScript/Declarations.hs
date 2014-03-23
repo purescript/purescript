@@ -16,14 +16,15 @@
 
 module Language.PureScript.Declarations where
 
-import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
 import qualified Data.Data as D
+import Data.Generics (mkQ, everything)
 
 -- |
 -- A precedence level for an infix operator
@@ -190,3 +191,193 @@ isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration _ = False
+
+-- |
+-- A guard is just a boolean-valued expression that appears alongside a set of binders
+--
+type Guard = Value
+
+-- |
+-- Data type for values
+--
+data Value
+  -- |
+  -- A numeric literal
+  --
+  = NumericLiteral (Either Integer Double)
+  -- |
+  -- A string literal
+  --
+  | StringLiteral String
+  -- |
+  -- A boolean literal
+  --
+  | BooleanLiteral Bool
+  -- |
+  -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
+  -- will be removed.
+  --
+  | BinaryNoParens (Qualified Ident) Value Value
+  -- |
+  -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
+  -- will be removed.
+  --
+  | Parens Value
+  -- |
+  -- An array literal
+  --
+  | ArrayLiteral [Value]
+  -- |
+  -- An object literal
+  --
+  | ObjectLiteral [(String, Value)]
+  -- |
+  -- An record property accessor expression
+  --
+  | Accessor String Value
+  -- |
+  -- Partial record update
+  --
+  | ObjectUpdate Value [(String, Value)]
+  -- |
+  -- Function introduction
+  --
+  | Abs (Either Ident Binder) Value
+  -- |
+  -- Function application
+  --
+  | App Value Value
+  -- |
+  -- Variable
+  --
+  | Var (Qualified Ident)
+  -- |
+  -- Conditional (if-then-else expression)
+  --
+  | IfThenElse Value Value Value
+  -- |
+  -- A data constructor
+  --
+  | Constructor (Qualified ProperName)
+  -- |
+  -- A case expression. During the case expansion phase of desugaring, top-level binders will get
+  -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
+  --
+  | Case [Value] [CaseAlternative]
+  -- |
+  -- A value with a type annotation
+  --
+  | TypedValue Bool Value Type
+  -- |
+  -- A let binding
+  --
+  | Let [Declaration] Value
+  -- |
+  -- A do-notation block
+  --
+  | Do [DoNotationElement]
+  -- |
+  -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
+  -- placeholders will be replaced with actual expressions representing type classes dictionaries which
+  -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
+  -- instance type, and the type class dictionaries in scope.
+  --
+  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- An alternative in a case statement
+--
+data CaseAlternative = CaseAlternative
+  { -- |
+    -- A collection of binders with which to match the inputs
+    --
+    caseAlternativeBinders :: [Binder]
+    -- |
+    -- An optional guard
+    --
+  , caseAlternativeGuard :: Maybe Guard
+    -- |
+    -- The result expression
+    --
+  , caseAlternativeResult :: Value
+  } deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- Find the original dictionary which a type class dictionary in scope refers to
+--
+canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
+canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
+canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm
+
+-- |
+-- A statement in a do-notation block
+--
+data DoNotationElement
+  -- |
+  -- A monadic value without a binder
+  --
+  = DoNotationValue Value
+  -- |
+  -- A monadic value with a binder
+  --
+  | DoNotationBind Binder Value
+  -- |
+  -- A let statement, i.e. a pure value with a binder
+  --
+  | DoNotationLet Binder Value deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- Data type for binders
+--
+data Binder
+  -- |
+  -- Wildcard binder
+  --
+  = NullBinder
+  -- |
+  -- A binder which matches a boolean literal
+  --
+  | BooleanBinder Bool
+  -- |
+  -- A binder which matches a string literal
+  --
+  | StringBinder String
+  -- |
+  -- A binder which matches a numeric literal
+  --
+  | NumberBinder (Either Integer Double)
+  -- |
+  -- A binder which binds an identifier
+  --
+  | VarBinder Ident
+  -- |
+  -- A binder which matches a data constructor
+  --
+  | ConstructorBinder (Qualified ProperName) [Binder]
+  -- |
+  -- A binder which matches a record and binds its properties
+  --
+  | ObjectBinder [(String, Binder)]
+  -- |
+  -- A binder which matches an array and binds its elements
+  --
+  | ArrayBinder [Binder]
+  -- |
+  -- A binder which matches an array and binds its head and tail
+  --
+  | ConsBinder Binder Binder
+  -- |
+  -- A binder which binds its input to an identifier
+  --
+  | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)
+
+
+-- |
+-- Collect all names introduced in binders in an expression
+--
+binderNames :: (D.Data d) => d -> [Ident]
+binderNames = everything (++) (mkQ [] go)
+  where
+  go (VarBinder ident) = [ident]
+  go (NamedBinder ident _) = [ident]
+  go _ = []

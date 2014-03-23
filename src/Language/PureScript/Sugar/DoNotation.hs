@@ -21,9 +21,9 @@ module Language.PureScript.Sugar.DoNotation (
 import Data.Data
 import Data.Generics
 
-import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Scope
+import Language.PureScript.Declarations
 
 import qualified Language.PureScript.Constants as C
 

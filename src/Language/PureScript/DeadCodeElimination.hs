@@ -23,7 +23,6 @@ import Data.Generics
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Declarations
 
 -- |

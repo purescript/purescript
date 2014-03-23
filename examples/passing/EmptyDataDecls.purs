@@ -25,7 +25,6 @@ foreign import error
     \  throw msg;\
     \}" :: forall a. String -> a
 
-main = let (Array xs) = cons 1 $ cons 2 $ cons 3 nil
-       in if xs == [1, 2, 3] 
-          then Debug.Trace.trace "Done"
-          else error "Failed"
+main = case cons 1 $ cons 2 $ cons 3 nil of
+         Array [1, 2, 3] -> Debug.Trace.trace "Done"
+         _ -> error "Failed"

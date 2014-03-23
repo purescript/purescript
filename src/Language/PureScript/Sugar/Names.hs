@@ -28,7 +28,6 @@ import qualified Data.Map as M
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.Values
 import Language.PureScript.Environment
 
 -- |
@@ -177,7 +176,7 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
 --
 renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either String Module
 renameInModule imports exports (Module mn decls exps) =
-  Module mn <$> (mapM updateDecl decls >>= everywhereM (mkM updateType `extM` updateValue `extM` updateBinder `extM` updateVars)) <*> pure exps
+  Module mn <$> (mapM updateDecl decls >>= (mapM updateVars >=> everywhereM (mkM updateType `extM` updateValue `extM` updateBinder))) <*> pure exps
   where
   updateDecl (TypeInstanceDeclaration name cs cn ts ds) =
       TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
@@ -190,6 +189,8 @@ renameInModule imports exports (Module mn decls exps) =
     ValueDeclaration name nameKind [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
+    bindFunctionArgs bound (Let ds val') = let args = map letBoundVariable ds in
+                                           return (args ++ bound, Let ds val')
     bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
       (,) bound <$> (Var <$> updateValueName name')
     bindFunctionArgs bound (Var name'@(Qualified (Just _) _)) =
@@ -201,7 +202,12 @@ renameInModule imports exports (Module mn decls exps) =
     bindFunctionArgs bound other = return (bound, other)
     bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
     bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
+
+    letBoundVariable :: Declaration -> Ident
+    letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
+    letBoundVariable _ = error "Invalid argument to letBoundVariable"
   updateVars (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
+  updateVars (TypeInstanceDeclaration name deps className tys ds) = TypeInstanceDeclaration name deps className tys <$> mapM updateVars ds
   updateVars other = return other
   updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
   updateValue v = return v

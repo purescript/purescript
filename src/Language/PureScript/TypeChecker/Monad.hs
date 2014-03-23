@@ -20,9 +20,9 @@ module Language.PureScript.TypeChecker.Monad where
 
 import Language.PureScript.Types
 import Language.PureScript.Kinds
-import Language.PureScript.Values
 import Language.PureScript.Names
 import Language.PureScript.Environment
+import Language.PureScript.TypeClassDictionaries
 
 import Data.Maybe
 

@@ -24,7 +24,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows
 
 import Language.PureScript.Types
-import Language.PureScript.Values
+import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types
 
@@ -40,6 +40,7 @@ literals = mkPattern match
   match (Constructor name) = Just $ show name
   match (Case values binders) = Just $ "case " ++ unwords (map prettyPrintValue values) ++
     " of { " ++ intercalate " ; " (map prettyPrintCaseAlternative binders) ++ " }"
+  match (Let _ val) = Just $ "let ... in " ++ prettyPrintValue val
   match (Var ident) = Just $ show ident
   match (Do els) = Just $ " do { " ++ intercalate "; " (map prettyPrintDoNotationElement els) ++ " }"
   match (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
