@@ -107,6 +107,7 @@ matchOperators ops = parseChains
 toAssoc :: Associativity -> P.Assoc
 toAssoc Infixl = P.AssocLeft
 toAssoc Infixr = P.AssocRight
+toAssoc Infix  = P.AssocNone
 
 token :: (P.Stream s Identity t, Show t) => (t -> Maybe a) -> P.Parsec s u a
 token = P.token show (const (P.initialPos ""))

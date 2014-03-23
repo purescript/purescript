@@ -139,8 +139,8 @@ module Prelude where
     (%) = numMod
     negate = numNegate
 
-  infixl 4 ==
-  infixl 4 /=
+  infix 4 ==
+  infix 4 /=
 
   class Eq a where
     (==) :: a -> a -> Boolean
@@ -343,7 +343,7 @@ module Data.Eq where
   instance eqRef :: Eq (Ref a) where
     (==) = liftRef refEq
     (/=) = liftRef refIneq
-    
+
 module Control.Monad.Eff where
 
   foreign import data Eff :: # ! -> * -> *

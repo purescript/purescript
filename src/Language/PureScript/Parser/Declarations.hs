@@ -32,6 +32,11 @@ import Language.PureScript.Parser.Kinds
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
+import qualified Text.Parsec.Expr as P
+
+import qualified Language.PureScript.Parser.Common as C
+import qualified Text.Parsec as P
+
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
   reserved "data"
@@ -83,7 +88,8 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
 parseAssociativity :: P.Parsec String ParseState Associativity
 parseAssociativity =
   (P.try (reserved "infixl") >> return Infixl) <|>
-  (P.try (reserved "infixr") >> return Infixr)
+  (P.try (reserved "infixr") >> return Infixr) <|>
+  (P.try (reserved "infix") >>  return Infix)
 
 parseFixity :: P.Parsec String ParseState Fixity
 parseFixity = Fixity <$> parseAssociativity <*> (indented *> natural)
