@@ -166,7 +166,14 @@ parseDeclaration = P.choice
                    , parseFixityDeclaration
                    , parseImportDeclaration
                    , parseTypeClassDeclaration
-                   , parseTypeInstanceDeclaration ] P.<?> "declaration"
+                   , parseTypeInstanceDeclaration
+                   ] P.<?> "declaration"
+
+parseLocalDeclaration :: P.Parsec String ParseState Declaration
+parseLocalDeclaration = P.choice
+                   [ parseTypeDeclaration
+                   , parseValueDeclaration
+                   ] P.<?> "local declaration"
 
 -- |
 -- Parse a module header and a collection of declarations
@@ -245,7 +252,7 @@ parseLet :: P.Parsec String ParseState Value
 parseLet = do
   C.reserved "let"
   C.indented
-  ds <- C.mark $ P.many1 (C.same *> parseDeclaration)
+  ds <- C.mark $ P.many1 (C.same *> parseLocalDeclaration)
   C.indented
   C.reserved "in"
   result <- parseValue
