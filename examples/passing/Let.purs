@@ -41,6 +41,12 @@ test7 = let
           f x = x
         in if f true then f 1 else f 2
 
+test8 :: Number -> Number
+test8 x = let 
+            go y | (x - 0.1 < y * y) && (y * y < x + 0.1) = y
+            go y = go $ (y + x / y) / 2
+          in go x
+
 main = do
   Debug.Trace.print (test1 1)
   Debug.Trace.print (test2 1 2)
@@ -49,3 +55,4 @@ main = do
   Debug.Trace.print test5
   Debug.Trace.print test6
   Debug.Trace.print test7
+  Debug.Trace.print (test8 100)
