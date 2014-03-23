@@ -48,10 +48,11 @@ import Data.Generics
         something, everywhere, mkQ)
 import Data.Generics.Extras
 
-import Language.PureScript.Values
+import Language.PureScript.Declarations
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
@@ -163,48 +164,15 @@ unifyRows r1 r2 =
 typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
 typesOf mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
-    let
-    -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
-      es = map isTyped vals
-    -- Filter the typed and untyped declarations
-      typed = filter (isJust . snd . snd) es
-      untyped = filter (isNothing . snd . snd) es
-    -- Make a map of names to typed declarations
-      typedDict = map (\(ident, (_, Just (ty, _))) -> (ident, ty)) typed
-    -- Create fresh unification variables for the types of untyped declarations
-    untypedNames <- replicateM (length untyped) fresh
-    let
-    -- Make a map of names to the unification variables of untyped declarations
-      untypedDict = zip (map fst untyped) untypedNames
-    -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
-      dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
-    forM es $ \e@(_, (val, _)) -> do
-      -- If the declaration is a function, it has access to other values in the binding group.
-      -- If not, the generated code might fail at runtime since those values might be undefined.
-      let dict' = if isFunction val then dict else M.empty
-      triple@(_, (_, ty)) <- case e of
-        -- Typed declarations
-        (ident, (val', Just (ty, checkType))) -> do
-          -- Kind check
-          kind <- liftCheck $ kindOf moduleName ty
-          guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-          -- Check the type with the new names in scope
-          ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-          val'' <- bindNames dict' $ if checkType
-                                   then TypedValue True <$> check val' ty' <*> pure ty'
-                                   else return (TypedValue False val' ty')
-          return (ident, (val'', ty'))
-        -- Untyped declarations
-        (ident, (val', Nothing)) -> do
-          -- Infer the type with the new names in scope
-          TypedValue _ val'' ty <- bindNames dict' $ infer val'
-          ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-          return (ident, (TypedValue True val'' ty, ty))
+    (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
+    forM es $ \e -> do
+      triple@(_, (_, ty)) <- typeForBindingGroupElement moduleName e dict untypedDict
       -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
       when (Just moduleName == mainModuleName && fst e == Ident C.main) $ do
         [eff, a] <- replicateM 2 fresh
         ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
       return triple
+
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     val' <- replaceTypeClassDictionaries moduleName val
@@ -218,6 +186,51 @@ typesOf mainModuleName moduleName vals = do
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
+
+typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Value)] -> UnifyT Type Check ([(Ident, (Value, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind), [(Ident, Type)])
+typeDictionaryForBindingGroup moduleName vals = do
+  let
+    -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
+    es = map isTyped vals
+    -- Filter the typed and untyped declarations
+    typed = filter (isJust . snd . snd) es
+    untyped = filter (isNothing . snd . snd) es
+    -- Make a map of names to typed declarations
+    typedDict = map (\(ident, (_, Just (ty, _))) -> (ident, ty)) typed
+
+  -- Create fresh unification variables for the types of untyped declarations
+  untypedNames <- replicateM (length untyped) fresh
+
+  let
+    -- Make a map of names to the unification variables of untyped declarations
+    untypedDict = zip (map fst untyped) untypedNames
+    -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
+    dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+  return (es, dict, untypedDict)
+
+typeForBindingGroupElement :: ModuleName -> (Ident, (Value, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Value, Type))
+typeForBindingGroupElement moduleName e@(_, (val, _)) dict untypedDict = do
+  -- If the declaration is a function, it has access to other values in the binding group.
+  -- If not, the generated code might fail at runtime since those values might be undefined.
+  let dict' = if isFunction val then dict else M.empty
+  case e of
+    -- Typed declarations
+    (ident, (val', Just (ty, checkType))) -> do
+      -- Kind check
+      kind <- liftCheck $ kindOf moduleName ty
+      guardWith ("Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+      -- Check the type with the new names in scope
+      ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+      val'' <- bindNames dict' $ if checkType
+                               then TypedValue True <$> check val' ty' <*> pure ty'
+                               else return (TypedValue False val' ty')
+      return (ident, (val'', ty'))
+    -- Untyped declarations
+    (ident, (val', Nothing)) -> do
+      -- Infer the type with the new names in scope
+      TypedValue _ val'' ty <- bindNames dict' $ infer val'
+      ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+      return (ident, (TypedValue True val'' ty, ty))
 
 -- |
 -- Check if a value introduces a function
@@ -547,6 +560,9 @@ infer' (IfThenElse cond th el) = do
   v3@(TypedValue _ _ t3) <- infer el
   t2 =?= t3
   return $ TypedValue True (IfThenElse cond' v2 v3) t2
+infer' (Let ds val) = do
+  (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
+  return $ TypedValue True (Let ds' val') valTy
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
@@ -555,6 +571,23 @@ infer' (TypedValue checkType val ty) = do
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
 infer' _ = error "Invalid argument to infer"
+
+inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
+inferLetBinding seen [] ret j = (,) seen <$> j ret
+inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
+  valTy <- fresh
+  Just moduleName <- checkCurrentModule <$> get
+  TypedValue _ val' valTy' <- bindNames (M.singleton (moduleName, ident) (valTy, nameKind)) $ infer val
+  valTy =?= valTy'
+  bindNames (M.singleton (moduleName, ident) (valTy', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
+inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
+  Just moduleName <- checkCurrentModule <$> get
+  (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
+  ds' <- forM es $ \e -> do
+    (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
+    return $ (ident, LocalVariable, val')
+  bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
+inferLetBinding _ _ _ _ = error "Invalid argument to fromValueDeclaration"
 
 -- |
 -- Infer the type of a property inside a record with a given type
@@ -784,6 +817,9 @@ check' (Constructor c) ty = do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
+check' (Let ds val) ty = do
+  (ds', val') <- inferLetBinding [] ds val (flip check ty)
+  return $ TypedValue True (Let ds' val') ty
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
 
 -- |

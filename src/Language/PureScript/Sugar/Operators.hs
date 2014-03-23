@@ -25,7 +25,6 @@ module Language.PureScript.Sugar.Operators (
 
 import Language.PureScript.Names
 import Language.PureScript.Declarations
-import Language.PureScript.Values
 
 import Control.Applicative
 import Control.Monad.State

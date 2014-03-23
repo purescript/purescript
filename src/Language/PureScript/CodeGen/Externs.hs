@@ -24,10 +24,10 @@ import qualified Data.Map as M
 
 import Control.Monad.Writer
 
+import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Environment
 
 -- |

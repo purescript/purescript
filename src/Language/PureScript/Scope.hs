@@ -24,7 +24,7 @@ import Data.Data
 import Data.List ((\\), nub)
 import Data.Generics (extQ, mkQ, everything)
 
-import Language.PureScript.Values
+import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 

@@ -161,7 +161,6 @@ quitMessage = "See ya!"
 
 -- |
 -- Loads module, function, and file completions.
--- TODO: filter names to only include exported decls
 --
 completion :: CompletionFunc (StateT PSCiState IO)
 completion = completeWord Nothing " \t\n\r" findCompletions

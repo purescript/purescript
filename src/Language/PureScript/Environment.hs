@@ -21,7 +21,7 @@ import Data.Data
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Kinds
-import Language.PureScript.Values
+import Language.PureScript.TypeClassDictionaries
 import qualified Language.PureScript.Constants as C
 
 import qualified Data.Map as M

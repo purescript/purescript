@@ -20,14 +20,14 @@ module Language.PureScript.Sugar.CaseDeclarations (
 ) where
 
 import Data.List (groupBy)
-import Data.Generics (mkT, everywhere)
+import Data.Generics (mkM, mkT, everywhere)
+import Data.Generics.Extras
 
 import Control.Applicative
 import Control.Monad ((<=<), forM, join, unless)
 import Control.Monad.Error.Class
 
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Declarations
 import Language.PureScript.Scope
 import Language.PureScript.Environment
@@ -57,6 +57,11 @@ desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
     desugarRest :: [Declaration] -> Either String [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
+    desugarRest (ValueDeclaration name nameKind bs g val : rest) = do
+      (:) <$> (ValueDeclaration name nameKind bs g <$> everywhereM' (mkM go) val) <*> desugarRest rest
+      where
+      go (Let ds val') = Let <$> desugarCases ds <*> pure val'
+      go other = return other
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
 

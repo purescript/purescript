@@ -15,7 +15,6 @@
 
 module Language.PureScript (module P, compile, compile', MonadMake(..), make) where
 
-import Language.PureScript.Values as P
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
 import Language.PureScript.Declarations as P

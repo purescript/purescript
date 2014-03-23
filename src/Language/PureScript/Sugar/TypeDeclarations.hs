@@ -19,12 +19,14 @@ module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarationsModule
 ) where
 
+import Data.Generics (mkM)
+import Data.Generics.Extras
+
 import Control.Applicative
 import Control.Monad.Error.Class
 import Control.Monad (forM)
 
 import Language.PureScript.Declarations
-import Language.PureScript.Values
 
 -- |
 -- Replace all top level type declarations in a module with type annotations
@@ -39,5 +41,10 @@ desugarTypeDeclarations :: [Declaration] -> Either String [Declaration]
 desugarTypeDeclarations (TypeDeclaration name ty : ValueDeclaration name' nameKind [] Nothing val : rest) | name == name' =
   desugarTypeDeclarations (ValueDeclaration name nameKind [] Nothing (TypedValue True val ty) : rest)
 desugarTypeDeclarations (TypeDeclaration name _ : _) = throwError $ "Orphan type declaration for " ++ show name
+desugarTypeDeclarations (ValueDeclaration name nameKind bs g val : rest) = do
+  (:) <$> (ValueDeclaration name nameKind bs g <$> everywhereM' (mkM go) val) <*> desugarTypeDeclarations rest
+  where
+  go (Let ds val') = Let <$> desugarTypeDeclarations ds <*> pure val'
+  go other = return other
 desugarTypeDeclarations (d:ds) = (:) d <$> desugarTypeDeclarations ds
 desugarTypeDeclarations [] = return []

@@ -33,8 +33,8 @@ library
                      Language.PureScript.Kinds
                      Language.PureScript.Names
                      Language.PureScript.Types
-                     Language.PureScript.Values
                      Language.PureScript.Scope
+                     Language.PureScript.TypeClassDictionaries
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Sugar
                      Language.PureScript.ModuleDependencies
@@ -44,7 +44,6 @@ library
                      Language.PureScript.Sugar.BindingGroups
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
-                     Language.PureScript.Sugar.Let
                      Language.PureScript.Sugar.Names
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
@@ -65,7 +64,6 @@ library
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
-                     Language.PureScript.Parser.Values
                      Language.PureScript.Pretty
                      Language.PureScript.Pretty.Common
                      Language.PureScript.Pretty.JS

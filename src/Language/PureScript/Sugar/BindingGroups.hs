@@ -24,13 +24,13 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Data
 import Data.Graph
 import Data.Generics
+import Data.Generics.Extras
 import Data.List (nub, intersect)
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<$>), (<*>), pure)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Types
 import Language.PureScript.Environment
 
@@ -51,8 +51,8 @@ collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (colla
 --
 createBindingGroups :: ModuleName -> [Declaration] -> Either String [Declaration]
 createBindingGroups moduleName ds = do
-  let values = filter isValueDecl ds
-      dataDecls = filter isDataDecl ds
+  values <- mapM (createBindingGroupsForValue moduleName) $ filter isValueDecl ds
+  let dataDecls = filter isDataDecl ds
       allProperNames = map getProperName dataDecls
       dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
   dataBindingGroupDecls <- mapM toDataBindingGroup $ stronglyConnComp dataVerts
@@ -68,15 +68,25 @@ createBindingGroups moduleName ds = do
            filter isExternDecl ds ++
            bindingGroupDecls
 
+createBindingGroupsForValue :: ModuleName -> Declaration -> Either String Declaration
+createBindingGroupsForValue moduleName = everywhereM' (mkM go)
+  where
+  go (Let ds val) = Let <$> createBindingGroups moduleName ds <*> pure val
+  go other = return other
+
 -- |
 -- Collapse all binding groups to individual declarations
 --
 collapseBindingGroups :: [Declaration] -> [Declaration]
-collapseBindingGroups = concatMap go
+collapseBindingGroups = everywhere (mkT collapseBindingGroupsForValue) . concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
   go other = [other]
+
+collapseBindingGroupsForValue :: Value -> Value
+collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
+collapseBindingGroupsForValue other = other
 
 usedIdents :: (Data d) => ModuleName -> d -> [Ident]
 usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)

@@ -32,9 +32,9 @@ import Control.Monad.Error
 
 import Language.PureScript.Types
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Kinds
 import Language.PureScript.Declarations
+import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Pretty.Types
 

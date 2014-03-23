@@ -58,12 +58,14 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   convert :: JS -> JS
   -- Desugar return
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
-  -- Desugae >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock [JSReturn ret])]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock [ JSApp m [], JSReturn (JSApp ret []) ]
+  -- Desugar >>
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
+    let JSReturn ret = last js in
+    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : init js ++ [JSReturn (JSApp ret [])] )
   -- Desugar >>=
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock [JSReturn ret])]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock [ JSVariableIntroduction arg (Just (JSApp m [])), JSReturn (JSApp ret []) ]
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
+    let JSReturn ret = last js in
+    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : init js ++ [JSReturn (JSApp ret [])] )
   -- Desugar untilE
   convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn (JSObjectLiteral []) ])) []
@@ -109,6 +111,9 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
 
+  isJSReturn (JSReturn _) = True
+  isJSReturn _ = False
+
 -- |
 -- Inline functions in the ST module
 --
@@ -128,8 +133,8 @@ inlineST = everywhere (mkT convertBlock)
   -- Convert a block in a safe way, preserving object wrappers of references,
   -- or in a more aggressive way, turning wrappers into local variables depending on the
   -- agg(ressive) parameter.
-  convert agg (JSApp (JSApp f [arg]) []) | isSTFunc C.newSTRef f =
-    if agg then arg else JSObjectLiteral [(C.stRefValue, arg)]
+  convert agg (JSApp f [arg]) | isSTFunc C.newSTRef f =
+   JSFunction Nothing [] (JSBlock [JSReturn $ if agg then arg else JSObjectLiteral [(C.stRefValue, arg)]])
   convert agg (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f =
     if agg then ref else JSAccessor C.stRefValue ref
   convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =
