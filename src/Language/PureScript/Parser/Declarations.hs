@@ -60,12 +60,17 @@ parseTypeSynonymDeclaration =
                          <*> (lexeme (indented *> P.char '=') *> parsePolyType)
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
-parseValueDeclaration =
-  ValueDeclaration <$> parseIdent
-                   <*> pure Value
-                   <*> P.many parseBinderNoParens
-                   <*> P.optionMaybe parseGuard
-                   <*> (lexeme (indented *> P.char '=') *> parseValue)
+parseValueDeclaration = do
+  name <- parseIdent
+  binders <- P.many parseBinderNoParens
+  guard <- P.optionMaybe parseGuard
+  value <- lexeme (indented *> P.char '=') *> parseValue
+  whereClause <- P.optionMaybe $ do
+    C.indented
+    reserved "where"
+    C.indented
+    C.mark $ P.many1 (C.same *> parseLocalDeclaration)
+  return $ ValueDeclaration name Value binders guard (maybe value (`Let` value) whereClause)
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
