@@ -19,7 +19,7 @@
 - Multi parameter typeclasses (paf31)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
-- `where` clauses are now supported (garyb)
+- `where` clauses are now supported in value declarations (garyb)
 
 ### Enhancements
 
