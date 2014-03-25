@@ -227,8 +227,14 @@ parseQualified parser = part []
 -- Parse an integer or floating point value
 --
 integerOrFloat :: P.Parsec String u (Either Integer Double)
-integerOrFloat = (Right <$> P.try (PT.float tokenParser) <|>
-                  Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
+integerOrFloat = (Right <$> P.try (signed PT.float) <|>
+                  Left <$> P.try (signed PT.natural)) P.<?> "number"
+  where
+  signed p = do
+    let sign = (P.char '-' >> return negate) <|> (optional (P.char '+') >> return id)
+    f <- sign
+    n <- p tokenParser
+    return (f n)
 
 -- |
 -- Parse an identifier or parenthesized operator
