@@ -185,13 +185,19 @@ renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either Str
 renameInModule imports exports (Module mn decls exps) =
   Module mn <$> mapM go decls <*> pure exps
   where
+  go (DataDeclaration name args dctors) =
+      rethrowFor "data declaration" name $ DataDeclaration <$> pure name <*> pure args <*> updateAll dctors
+  go (DataBindingGroupDeclaration decls') =
+      DataBindingGroupDeclaration <$> mapM go decls'
+  go (TypeSynonymDeclaration name ps ty) =
+      rethrowFor "type synonym" name $ TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
   go (TypeInstanceDeclaration name cs cn ts ds) =
-      TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> everywhereM (mkM updateType) ts <*> mapM go ds
+      TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts <*> mapM go ds
   go (ExternInstanceDeclaration name cs cn ts) =
-      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> everywhereM (mkM updateType) ts
+      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts
   go (ValueDeclaration name nameKind [] Nothing val) = do
     val' <- everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
-    rethrowForDecl name $ ValueDeclaration name nameKind [] Nothing <$> updateAll val'
+    rethrowFor "declaration" name $ ValueDeclaration name nameKind [] Nothing <$> updateAll val'
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
     bindFunctionArgs bound (Let ds val') = let args = map letBoundVariable ds in
@@ -212,10 +218,15 @@ renameInModule imports exports (Module mn decls exps) =
     letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
     letBoundVariable _ = error "Invalid argument to letBoundVariable"
   go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
+  go (ExternDeclaration fit name js ty) =
+      rethrowFor "declaration" name $ ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
+  go (BindingGroupDeclaration decls') = do
+      BindingGroupDeclaration <$> mapM go' decls'
+      where go' = \(name, nk, value) -> rethrowFor "declaration" name $ (,,) <$> pure name <*> pure nk <*> updateAll value
   go d = updateAll d
 
-  rethrowForDecl :: Ident -> Either String a -> Either String a
-  rethrowForDecl name = rethrow $ "Error in declaration '" ++ show name ++ "'"
+  rethrowFor :: (Show a) => String -> a -> Either String b -> Either String b
+  rethrowFor what name = rethrow $ "Error in " ++ what ++ "  '" ++ show name ++ "'"
 
   updateAll :: Data d => d -> Either String d
   updateAll = everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
@@ -230,6 +241,8 @@ renameInModule imports exports (Module mn decls exps) =
   updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
   updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
   updateType t = return t
+  updateType' :: Data d => d -> Either String d
+  updateType' = everywhereM (mkM updateType)
   
   updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
 
