@@ -15,7 +15,7 @@
 
 ### New Features
 
-- `let ... in` syntax for bindings (paf31)
+- Let bindings are now supported. The `let` keyword can introduce several local (possibly mutually recursive) bindings, along with optional type signatures. (paf31)
 - Multi parameter typeclasses (paf31)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
@@ -43,6 +43,7 @@
 - Qualfied module imports are now supported as `import qualified M as X` (garyb).
 - The escape check was removed, since it was too restrictive (paf31)
 - The binary operator reordering step was greatly simplified (paf31)
+- The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
 
 ### Bug Fixes
 
@@ -55,6 +56,7 @@
 - Externs files (`--externs`) are now working again (paf31)
 - Precedence of backticked infix functions have been corrected (paf31)
 - A bug which allowed some incorrect type class instances to pass the type checker was fixed (paf31)
+- Type synonyms are no longer restricted to kind `*` (paf31)
 
 ### Libraries
 
