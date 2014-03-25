@@ -107,7 +107,7 @@ memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args members =
-  TypeSynonymDeclaration name args (Object $ rowFromList (map memberToNameAndType members, REmpty))
+  TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (map memberToNameAndType members, REmpty))
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
@@ -133,6 +133,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
                    foldr (function . (\(pn, tys') -> foldl TypeApp (TypeConstructor pn) tys')) (foldl TypeApp (TypeConstructor className) tys) deps))
     )
   where
+  unit :: Type
+  unit = TypeApp tyObject REmpty
+
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
   memberToNameAndValue tys' (ValueDeclaration ident _ _ _ _) = do
     memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys'

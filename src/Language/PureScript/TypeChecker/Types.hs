@@ -107,7 +107,6 @@ unifyTypes t1 t2 = rethrow (\e -> "Error unifying type " ++ prettyPrintType t1 +
     sk `unifyTypes` ty2
   unifyTypes' ForAll{} _ = throwError "Skolem variable scope is unspecified"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
-  unifyTypes' (Object row1) (Object row2) = row1 =?= row2
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' (TypeConstructor c1) (TypeConstructor c2) =
     guardWith ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".") (c1 == c2)
@@ -475,6 +474,12 @@ expandTypeSynonym name args = do
   env <- getEnv
   either throwError return $ expandTypeSynonym' env name args
 
+expandAllTypeSynonyms :: (Functor m, Monad m, MonadState CheckState m, MonadError String m) => Type -> m Type
+expandAllTypeSynonyms = everywhereM' (mkM go)
+  where
+  go (SaturatedTypeSynonym name args) = expandTypeSynonym name args
+  go other = return other
+
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
@@ -503,7 +508,7 @@ infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   ts <- mapM (infer . snd) ps
   let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
-      ty = Object $ rowFromList (fields, REmpty)
+      ty = TypeApp tyObject $ rowFromList (fields, REmpty)
   return $ TypedValue True (ObjectLiteral (zip (map fst ps) ts)) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
@@ -511,9 +516,9 @@ infer' (ObjectUpdate o ps) = do
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
   let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
-  let oldTy = Object $ rowFromList (oldTys, row)
+  let oldTy = TypeApp tyObject $ rowFromList (oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
-  return $ TypedValue True (ObjectUpdate o' newVals) $ Object $ rowFromList (newTys, row)
+  return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyObject $ rowFromList (newTys, row)
 infer' (Accessor prop val) = do
   typed@(TypedValue _ _ objTy) <- infer val
   propTy <- inferProperty objTy prop
@@ -521,7 +526,7 @@ infer' (Accessor prop val) = do
     Nothing -> do
       field <- fresh
       rest <- fresh
-      _ <- subsumes Nothing objTy (Object (RCons prop field rest))
+      _ <- subsumes Nothing objTy (TypeApp tyObject (RCons prop field rest))
       return $ TypedValue True (Accessor prop typed) field
     Just ty -> return $ TypedValue True (Accessor prop typed) ty
 infer' (Abs (Left arg) ret) = do
@@ -593,7 +598,7 @@ inferLetBinding _ _ _ _ = error "Invalid argument to fromValueDeclaration"
 -- Infer the type of a property inside a record with a given type
 --
 inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
-inferProperty (Object row) prop = do
+inferProperty (TypeApp obj row) prop | obj == tyObject = do
   let (props, _) = rowToList row
   return $ lookup prop props
 inferProperty (SaturatedTypeSynonym name args) prop = do
@@ -632,7 +637,7 @@ inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
   m1 <- inferRowProperties row rest props
-  val =?= Object row
+  val =?= TypeApp tyObject row
   return m1
   where
   inferRowProperties :: Type -> Type -> [(String, Binder)] -> UnifyT Type Check (M.Map Ident Type)
@@ -736,8 +741,7 @@ check' val t@(ConstrainedType constraints ty) = do
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
 check' val (SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  val' <- check val ty
-  return $ TypedValue True val' ty
+  check val ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -792,22 +796,22 @@ check' (IfThenElse cond th el) ty = do
   th' <- check th ty
   el' <- check el ty
   return $ TypedValue True (IfThenElse cond' th' el') ty
-check' (ObjectLiteral ps) t@(Object row) = do
+check' (ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
   return $ TypedValue True (ObjectLiteral ps') t
-check' (ObjectUpdate obj ps) t@(Object row) = do
+check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh
   let (propsToCheck, rest) = rowToList row
       propsToRemove = map fst ps
       remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
-  obj' <- check obj (Object (rowFromList (us ++ remainingProps, rest)))
+  obj' <- check obj (TypeApp tyObject (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = do
   rest <- fresh
-  val' <- check val (Object (RCons prop ty rest))
+  val' <- check val (TypeApp tyObject (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
 check' (Constructor c) ty = do
   env <- getEnv
@@ -820,7 +824,15 @@ check' (Constructor c) ty = do
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (flip check ty)
   return $ TypedValue True (Let ds' val') ty
+check' val ty | containsTypeSynonyms ty = do
+  ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
+  check val ty'
 check' val ty = throwError $ prettyPrintValue val ++ " does not have type " ++ prettyPrintType ty
+
+containsTypeSynonyms :: Type -> Bool
+containsTypeSynonyms = everything (||) (mkQ False go) where
+  go (SaturatedTypeSynonym _ _) = True
+  go _ = False
 
 -- |
 -- Check the type of a collection of named record fields
@@ -854,7 +866,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (Object row)
+  go _ _ _ = throwError $ prettyPrintValue (ObjectLiteral ps) ++ " does not have type " ++ prettyPrintType (TypeApp tyObject row)
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
@@ -939,7 +951,7 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   _ <- subsumes' Nothing ty1 ty2
   return . Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)
-subsumes' val (Object r1) (Object r2) = do
+subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
   let
     (ts1, r1') = rowToList r1
     (ts2, r2') = rowToList r2
@@ -959,7 +971,7 @@ subsumes' val (Object r1) (Object r2) = do
     | otherwise = do rest <- fresh
                      r1' =?= RCons p2 ty2 rest
                      go ((p1, ty1) : ts1) ts2 rest r2'
-subsumes' val ty1 ty2@(Object _) = subsumes val ty2 ty1
+subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val

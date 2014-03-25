@@ -67,13 +67,13 @@ kindOf _ ty =
 -- |
 -- Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 --
-kindsOf :: ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
-kindsOf moduleName name args ts = fmap tidyUp . liftUnify $ do
+kindsOf :: Bool -> ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
+kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   let dict = (name, tyCon) : zipWith (\arg kind -> (arg, kind)) (map ProperName args) kargs
   bindLocalTypeVariables moduleName dict $
-    solveTypes ts kargs tyCon
+    solveTypes isData ts kargs tyCon
   where
   tidyUp (k, sub) = starIfUnknown $ sub $? k
 
@@ -92,12 +92,12 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
         kargs <- replicateM (length args) fresh
         let argDict = zip (map ProperName args) kargs
         bindLocalTypeVariables moduleName argDict $
-          solveTypes ts kargs tyCon) tyCons tys
+          solveTypes True ts kargs tyCon) tyCons tys
       syn_ks <- zipWithM (\synVar (_, args, ty) -> do
         kargs <- replicateM (length args) fresh
         let argDict = zip (map ProperName args) kargs
         bindLocalTypeVariables moduleName argDict $
-          solveTypes [ty] kargs synVar) synVars syns
+          solveTypes False [ty] kargs synVar) synVars syns
       return (syn_ks, data_ks)
   where
   tidyUp ((ks1, ks2), sub) = (map (starIfUnknown . (sub $?)) ks1, map (starIfUnknown . (sub $?)) ks2)
@@ -105,11 +105,14 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 -- |
 -- Solve the set of kind constraints associated with the data constructors for a type constructor
 --
-solveTypes :: [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
-solveTypes ts kargs tyCon = do
+solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
+solveTypes isData ts kargs tyCon = do
   ks <- mapM infer ts
-  tyCon =?= foldr FunKind Star kargs
-  forM_ ks $ \k -> k =?= Star
+  when isData $ do
+    tyCon =?= foldr FunKind Star kargs
+    forM_ ks $ \k -> k =?= Star
+  when (not isData) $ do
+    tyCon =?= foldr FunKind (head ks) kargs
   return tyCon
 
 -- |
@@ -117,6 +120,7 @@ solveTypes ts kargs tyCon = do
 --
 starIfUnknown :: Kind -> Kind
 starIfUnknown (KUnknown _) = Star
+starIfUnknown (Row k) = Row (starIfUnknown k)
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
 
@@ -124,10 +128,6 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Kind Check Kind
-infer (Object row) = do
-  k <- infer row
-  k =?= Row Star
-  return Star
 infer (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get
   UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

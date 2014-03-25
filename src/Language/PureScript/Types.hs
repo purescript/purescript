@@ -40,10 +40,6 @@ data Type
   --
   = TUnknown Unknown
   -- |
-  -- Javascript numbers
-  --
-  | Object Type
-  -- |
   -- A named type variable
   --
   | TypeVar String
@@ -90,6 +86,10 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
+  | PrettyPrintObject Type
+  -- |
+  -- A placeholder used in pretty printing
+  --
   | PrettyPrintForAll [String] Type deriving (Show, Eq, Data, Typeable)
 
 -- |
@@ -121,12 +121,6 @@ mkForAll :: [String] -> Type -> Type
 mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
 
 -- |
--- The empty record type
---
-unit :: Type
-unit = Object REmpty
-
--- |
 -- Replace a type variable, taking into account variable shadowing
 --
 replaceTypeVars :: String -> Type -> Type -> Type
@@ -135,7 +129,6 @@ replaceTypeVars = replaceTypeVars' []
   replaceTypeVars' bound name replacement = go bound
     where
     go :: [String] -> Type -> Type
-    go bs (Object r) = Object $ go bs r
     go _  (TypeVar v) | v == name = replacement
     go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
     go bs (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs) ts
@@ -176,7 +169,6 @@ freeTypeVariables :: Type -> [String]
 freeTypeVariables = nub . go []
   where
   go :: [String] -> Type -> [String]
-  go bound (Object r) = go bound r
   go bound (TypeVar v) | v `notElem` bound = [v]
   go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
   go bound (SaturatedTypeSynonym _ ts) = concatMap (go bound) ts

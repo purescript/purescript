@@ -172,6 +172,12 @@ tyArray :: Type
 tyArray = primTy "Array"
 
 -- |
+-- Type constructor for objects
+--
+tyObject :: Type
+tyObject = primTy "Object"
+
+-- |
 -- Smart constructor for function types
 --
 function :: Type -> Type -> Type
@@ -183,6 +189,7 @@ function t1 = TypeApp (TypeApp tyFunction t1)
 primTypes :: M.Map (Qualified ProperName) (Kind, TypeKind)
 primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star), ExternData))
                        , (primName "Array"    , (FunKind Star Star, ExternData))
+                       , (primName "Object"   , (FunKind (Row Star) Star, ExternData))
                        , (primName "String"   , (Star, ExternData))
                        , (primName "Number"   , (Star, ExternData))
                        , (primName "Boolean"  , (Star, ExternData)) ]

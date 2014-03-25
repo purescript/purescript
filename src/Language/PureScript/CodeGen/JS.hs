@@ -193,7 +193,7 @@ runtimeTypeChecks arg ty =
   argumentCheck val t | t == tyString = [typeCheck val "string"]
   argumentCheck val t | t == tyBoolean = [typeCheck val "boolean"]
   argumentCheck val (TypeApp t _) | t == tyArray = [arrayCheck val]
-  argumentCheck val (Object row) =
+  argumentCheck val (TypeApp t row) | t == tyObject =
     let
       (pairs, _) = rowToList row
     in

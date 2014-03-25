@@ -49,7 +49,7 @@ parseFunction :: P.Parsec String ParseState Type
 parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
-parseObject = braces $ Object <$> parseRow False
+parseObject = braces $ TypeApp tyObject <$> parseRow False
 
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do

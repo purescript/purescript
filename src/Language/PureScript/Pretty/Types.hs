@@ -34,8 +34,8 @@ import Language.PureScript.Environment
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
-  match (Object row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (TypeVar var) = Just var
+  match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
   match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
@@ -56,10 +56,7 @@ prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Type -> String
   tailToPs REmpty = ""
-  tailToPs (TUnknown (Unknown u)) = " | u" ++ show u
-  tailToPs (TypeVar var) = " | " ++ var
-  tailToPs (Skolem s _) = " | s" ++ show s
-  tailToPs _ = error "Invalid row tail"
+  tailToPs other = " | " ++ prettyPrintType other
   toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)
@@ -81,6 +78,7 @@ insertPlaceholders = everywhere' (mkT convertForAlls) . everywhere (mkT convert)
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
+  convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
   convert other = other
   convertForAlls (ForAll ident ty _) = go [ident] ty
     where

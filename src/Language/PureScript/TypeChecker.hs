@@ -107,7 +107,7 @@ typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declar
 typeCheckAll _ _ [] = return []
 typeCheckAll mainModuleName moduleName (d@(DataDeclaration name args dctors) : rest) = do
   rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do
-    ctorKind <- kindsOf moduleName name args (concatMap snd dctors)
+    ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
     addDataType moduleName name args dctors ctorKind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
@@ -129,7 +129,7 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
   rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
-    kind <- kindsOf moduleName name args [ty]
+    kind <- kindsOf False moduleName name args [ty]
     addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
