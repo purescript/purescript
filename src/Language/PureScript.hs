@@ -32,13 +32,15 @@ import Language.PureScript.DeadCodeElimination as P
 
 import qualified Language.PureScript.Constants as C
 
-import Data.List (sortBy, groupBy, intercalate)
+import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
+import Data.Generics (mkQ, everything)
 import Data.Maybe (fromMaybe, mapMaybe)
+import Control.Monad.Error
 import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
-import Control.Applicative ((<$>), (<*>), pure)
+import Control.Applicative ((<$>))
 import qualified Data.Map as M
 import qualified Data.Set as S
 import System.FilePath (pathSeparator)
@@ -69,9 +71,7 @@ compile' :: Environment -> Options -> [Module] -> Either String (String, String,
 compile' env opts ms = do
   (sorted, _) <- sortModules (map importPrelude ms)
   desugared <- desugar sorted
-  (elaborated, env') <- runCheck' env $ forM desugared $ \(Module moduleName' decls exps) -> do
-    modify (\s -> s { checkCurrentModule = Just moduleName' })
-    Module moduleName' <$> typeCheckAll mainModuleIdent moduleName' decls <*> pure exps
+  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
@@ -83,6 +83,42 @@ compile' env opts ms = do
   return (prettyPrintJS [wrapExportsContainer opts js'], exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
+
+typeCheckModule :: Maybe ModuleName -> Module -> Check Module
+typeCheckModule mainModuleName (Module mn decls exps) = do
+  modify (\s -> s { checkCurrentModule = Just mn })
+  decls' <- typeCheckAll mainModuleName mn decls
+  mapM_ checkTypesAreExported exps'
+  return $ Module mn decls' exps
+  where
+
+  exps' = fromMaybe (error "exports should have been elaborated") exps
+
+  -- Check that all the type constructors defined in the current module that appear in member types
+  -- have also been exported from the module
+  checkTypesAreExported :: DeclarationRef -> Check ()
+  checkTypesAreExported (ValueRef name) = do
+    ty <- lookupVariable mn (Qualified (Just mn) name)
+    case find isTconHidden (findTcons ty) of
+      Just hiddenType -> throwError $ "Error in module '" ++ show mn ++ "':\n\
+                                      \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
+      Nothing -> return ()
+  checkTypesAreExported _ = return ()
+
+  -- Find the type constructors exported from the current module used in a type
+  findTcons :: Type -> [ProperName]
+  findTcons = everything (++) (mkQ [] go)
+    where
+    go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+    go _ = []
+
+  -- Checks whether a type constructor is not being exported from the current module
+  isTconHidden :: ProperName -> Bool
+  isTconHidden tyName = all go exps'
+    where
+    go (TypeRef tyName' _) = tyName' /= tyName
+    go _ = True
+    
 
 generateMain :: Environment -> Options -> [JS] -> Either String [JS]
 generateMain env opts js =
@@ -126,7 +162,7 @@ class MonadMake m where
 --
 make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> m ()
 make opts ms = do
-  let filePathMap = M.fromList (map (\(fp, (Module mn _ _)) -> (mn, fp)) ms)
+  let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
   (sorted, graph) <- liftError $ sortModules (map (importPrelude . snd) ms)
 
@@ -154,20 +190,16 @@ make opts ms = do
   where
   go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
   go _ [] = return ()
-  go env ((False, Module moduleName' typings _) : ms') = do
-    (_, env') <- liftError . runCheck' env $ do
-      modify (\s -> s { checkCurrentModule = Just moduleName' })
-      typeCheckAll Nothing moduleName' typings
+  go env ((False, m) : ms') = do
+    (_, env') <- liftError . runCheck' env $ typeCheckModule Nothing m
 
     go env' ms'
-  go env ((True, Module moduleName' decls exps) : ms') = do
+  go env ((True, m@(Module moduleName' _ exps)) : ms') = do
     let filePath = toFileName moduleName'
         jsFile = "js" ++ pathSeparator : filePath ++ ".js"
         externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
 
-    (elaborated, env') <- liftError . runCheck' env $ do
-      modify (\s -> s { checkCurrentModule = Just moduleName' })
-      typeCheckAll Nothing moduleName' decls
+    (Module _ elaborated _, env') <- liftError . runCheck' env $ typeCheckModule Nothing m
 
     regrouped <- liftError . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
