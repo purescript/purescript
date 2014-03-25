@@ -19,6 +19,7 @@
 - Multi parameter typeclasses (paf31)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
+- `where` clauses are now supported (garyb)
 
 ### Enhancements
 
@@ -57,6 +58,9 @@
 - Precedence of backticked infix functions have been corrected (paf31)
 - A bug which allowed some incorrect type class instances to pass the type checker was fixed (paf31)
 - Type synonyms are no longer restricted to kind `*` (paf31)
+- Negative number literals have been restored (garyb)
+- If a type defined in a module appears in an exported declaration it must also be exported from the module (garyb)
+- Error messages for unresolvable types or values include the declaration name again (garyb)
 
 ### Libraries
 
