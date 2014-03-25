@@ -16,6 +16,7 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
+import Data.Data
 import Data.Maybe (fromMaybe, isJust)
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
@@ -155,10 +156,16 @@ desugarImports modules = do
     renameInModule imports env (elaborateExports exps m)
 
 -- |
--- Rethrow an error with the name of the current module in the case of a failure
+-- Rethrow an error with an extra message line prepended
+--
+rethrow :: String -> Either String a -> Either String a
+rethrow msg = flip catchError $ \e -> throwError (msg ++ ":\n" ++  e)
+
+-- |
+-- Rethrow an error with details of the current module prepended to the message
 --
 rethrowForModule :: Module -> Either String a -> Either String a
-rethrowForModule (Module mn _ _) = flip catchError $ \e -> throwError ("Error in module '" ++ show mn ++ "':\n" ++  e)
+rethrowForModule (Module mn _ _) = rethrow $ "Error in module '" ++ show mn ++ "'"
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that have an exports list,
@@ -176,17 +183,15 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
 --
 renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either String Module
 renameInModule imports exports (Module mn decls exps) =
-  Module mn <$> (mapM updateDecl decls >>= (mapM updateVars >=> everywhereM (mkM updateType `extM` updateValue `extM` updateBinder))) <*> pure exps
+  Module mn <$> mapM go decls <*> pure exps
   where
-  updateDecl (TypeInstanceDeclaration name cs cn ts ds) =
-      TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts <*> pure ds
-  updateDecl (ExternInstanceDeclaration name cs cn ts) =
-      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> pure ts
-  updateDecl d = return d
-
-  updateVars :: Declaration -> Either String Declaration
-  updateVars (ValueDeclaration name nameKind [] Nothing val) =
-    ValueDeclaration name nameKind [] Nothing <$> everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
+  go (TypeInstanceDeclaration name cs cn ts ds) =
+      TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> everywhereM (mkM updateType) ts <*> mapM go ds
+  go (ExternInstanceDeclaration name cs cn ts) =
+      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> everywhereM (mkM updateType) ts
+  go (ValueDeclaration name nameKind [] Nothing val) = do
+    val' <- everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
+    rethrowForDecl name $ ValueDeclaration name nameKind [] Nothing <$> updateAll val'
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
     bindFunctionArgs bound (Let ds val') = let args = map letBoundVariable ds in
@@ -206,17 +211,26 @@ renameInModule imports exports (Module mn decls exps) =
     letBoundVariable :: Declaration -> Ident
     letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
     letBoundVariable _ = error "Invalid argument to letBoundVariable"
-  updateVars (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
-  updateVars (TypeInstanceDeclaration name deps className tys ds) = TypeInstanceDeclaration name deps className tys <$> mapM updateVars ds
-  updateVars other = return other
+  go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
+  go d = updateAll d
+
+  rethrowForDecl :: Ident -> Either String a -> Either String a
+  rethrowForDecl name = rethrow $ "Error in declaration '" ++ show name ++ "'"
+
+  updateAll :: Data d => d -> Either String d
+  updateAll = everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
+  
   updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
   updateValue v = return v
+  
   updateBinder (ConstructorBinder name b) = ConstructorBinder <$> updateDataConstructorName name <*> pure b
   updateBinder v = return v
+  
   updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name
   updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
   updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
   updateType t = return t
+  
   updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
 
   updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` (exportedTypes mes)))
