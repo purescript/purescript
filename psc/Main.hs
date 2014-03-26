@@ -123,7 +123,7 @@ codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
      { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
 
 options :: Term P.Options
-options = P.Options <$> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles

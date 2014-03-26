@@ -69,7 +69,7 @@ compile = compile' initEnvironment
 
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
-  (sorted, _) <- sortModules (map importPrelude ms)
+  (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   desugared <- desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
@@ -164,7 +164,7 @@ make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> 
 make opts ms = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
-  (sorted, graph) <- liftError $ sortModules (map (importPrelude . snd) ms)
+  (sorted, graph) <- liftError $ sortModules $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = toFileName moduleName'
