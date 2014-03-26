@@ -30,8 +30,8 @@ import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
 magicDo :: Options -> JS -> JS
-magicDo opts | optionsMagicDo opts = inlineST . magicDo'
-             | otherwise = id
+magicDo opts | optionsNoMagicDo opts = id
+             | otherwise = inlineST . magicDo'
 
 -- |
 -- Inline type class dictionaries for >>= and return for the Eff monad

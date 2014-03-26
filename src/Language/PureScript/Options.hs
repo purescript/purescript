@@ -20,17 +20,17 @@ module Language.PureScript.Options where
 --
 data Options = Options {
     -- |
-    -- Perform tail-call elimination
+    -- Disable tail-call elimination
     --
-    optionsTco :: Bool
+    optionsNoTco :: Bool
     -- |
     -- Perform type checks at runtime
     --
   , optionsPerformRuntimeTypeChecks :: Bool
     -- |
-    -- Inline calls to ret and bind for the Eff monad
+    -- Disable inlining of calls to return and bind for the Eff monad
     --
-  , optionsMagicDo :: Bool
+  , optionsNoMagicDo :: Bool
     -- |
     -- When specified, checks the type of `main` in the module, and generate a call to run main
     -- after the module definitions.

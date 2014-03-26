@@ -24,8 +24,8 @@ import Language.PureScript.CodeGen.JS.AST
 -- Eliminate tail calls
 --
 tco :: Options -> JS -> JS
-tco opts | optionsTco opts = tco'
-         | otherwise = id
+tco opts | optionsNoTco opts = id
+         | otherwise = tco'
 
 tco' :: JS -> JS
 tco' = everywhere (mkT convert)

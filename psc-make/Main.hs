@@ -91,9 +91,9 @@ inputFiles :: Term [FilePath]
 inputFiles = value $ posAny [] $ posInfo
      { posDoc = "The input .ps files" }
 
-tco :: Term Bool
-tco = value $ flag $ (optInfo [ "tco" ])
-     { optDoc = "Perform tail call optimizations" }
+noTco :: Term Bool
+noTco = value $ flag $ (optInfo [ "no-tco" ])
+     { optDoc = "Disable tail call optimizations" }
 
 performRuntimeTypeChecks :: Term Bool
 performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
@@ -103,9 +103,9 @@ noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
 
-magicDo :: Term Bool
-magicDo = value $ flag $ (optInfo [ "magic-do" ])
-     { optDoc = "Overload the do keyword to generate efficient code specifically for the Eff monad." }
+noMagicDo :: Term Bool
+noMagicDo = value $ flag $ (optInfo [ "no-magic-do" ])
+     { optDoc = "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad." }
 
 noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
@@ -116,7 +116,7 @@ browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
 
 options :: Term P.Options
-options = P.Options <$> tco <*> performRuntimeTypeChecks <*> magicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure []
+options = P.Options <$> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure []
 
 inputFilesAndPrelude :: FilePath -> Term [FilePath]
 inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
