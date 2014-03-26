@@ -45,6 +45,7 @@
 - The escape check was removed, since it was too restrictive (paf31)
 - The binary operator reordering step was greatly simplified (paf31)
 - The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
+- Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb) 
 
 ### Bug Fixes
 
