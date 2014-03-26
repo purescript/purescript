@@ -20,9 +20,13 @@ module Language.PureScript.Options where
 --
 data Options = Options {
     -- |
+    -- Disable inclusion of the built in Prelude
+    --
+    optionsNoPrelude :: Bool
+    -- |
     -- Disable tail-call elimination
     --
-    optionsNoTco :: Bool
+  , optionsNoTco :: Bool
     -- |
     -- Perform type checks at runtime
     --
@@ -59,4 +63,4 @@ data Options = Options {
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False Nothing False "PS" [] []
+defaultOptions = Options False False False False Nothing False "PS" [] []

@@ -116,7 +116,7 @@ browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
      { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
 
 options :: Term P.Options
-options = P.Options <$> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure []
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure []
 
 inputFilesAndPrelude :: FilePath -> Term [FilePath]
 inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
