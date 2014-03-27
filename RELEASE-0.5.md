@@ -46,7 +46,8 @@
 - The binary operator reordering step was greatly simplified (paf31)
 - The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
 - Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb) 
-
+- Unary minus and signed numeric literals are now supported again (paf31, garyb)
+ 
 ### Bug Fixes
 
 - The subsumes relation has been fixed for object types (paf31)
@@ -62,6 +63,7 @@
 - Negative number literals have been restored (garyb)
 - If a type defined in a module appears in an exported declaration it must also be exported from the module (garyb)
 - Error messages for unresolvable types or values include the declaration name again (garyb)
+- Characters in string literals are now properly escaped (garyb)
 
 ### Libraries
 
