@@ -20,7 +20,8 @@
 {-# LANGUAGE Rank2Types, FlexibleContexts #-}
 
 module Language.PureScript.Sugar.Operators (
-  rebracket
+  rebracket,
+  removeSignedLiterals
 ) where
 
 import Language.PureScript.Names
@@ -42,6 +43,8 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- Remove explicit parentheses and reorder binary operator applications
 --
@@ -51,6 +54,14 @@ rebracket ms = do
   ensureNoDuplicates $ map fst fixities
   let opTable = customOperatorTable fixities
   mapM (rebracketModule opTable) ms
+
+removeSignedLiterals :: (D.Data d) => d -> d
+removeSignedLiterals = G.everywhere (G.mkT go)
+  where
+  go (UnaryMinus (NumericLiteral (Left n))) = NumericLiteral (Left $ negate n)
+  go (UnaryMinus (NumericLiteral (Right n))) = NumericLiteral (Right $ negate n)
+  go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
+  go other = other
 
 rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either String Module
 rebracketModule opTable (Module mn ds exts) = Module mn <$> (removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts

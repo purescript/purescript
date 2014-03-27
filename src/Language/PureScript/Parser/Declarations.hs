@@ -324,8 +324,11 @@ parseValue =
   postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.lexeme (C.indented *> P.string "::")) *> parsePolyType) <*> pure v
                   ]
-  operators = [ [ P.Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
-                    return (BinaryNoParens ident))) P.AssocRight ]
+  operators = [ [ P.Prefix (C.lexeme (P.try (C.indented *> P.char '-') >> return UnaryMinus))
+                ]
+              , [ P.Infix (C.lexeme (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
+                    return (BinaryNoParens ident))) P.AssocRight
+                ]
               ]
 
 parseStringBinder :: P.Parsec String ParseState Binder

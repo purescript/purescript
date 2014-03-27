@@ -214,6 +214,10 @@ data Value
   --
   | BooleanLiteral Bool
   -- |
+  -- A prefix -, will be desugared
+  --
+  | UnaryMinus Value
+  -- |
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --

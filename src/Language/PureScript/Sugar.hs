@@ -27,6 +27,8 @@ import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.Names as S
 
+import Control.Category ((>>>))
+
 -- |
 -- The desugaring pipeline proceeds as follows:
 --
@@ -45,7 +47,8 @@ import Language.PureScript.Sugar.Names as S
 --  * Qualify any unqualified names and types
 --
 desugar :: [Module] -> Either String [Module]
-desugar = desugarDo
+desugar = removeSignedLiterals
+          >>> desugarDo
           >=> desugarCasesModule
           >=> desugarTypeDeclarationsModule
           >=> desugarImports
