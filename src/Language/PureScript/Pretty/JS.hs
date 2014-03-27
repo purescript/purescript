@@ -60,7 +60,7 @@ literals = mkPattern' match
   where
   match :: JS -> StateT PrinterState Maybe String
   match (JSNumericLiteral n) = return $ either show show n
-  match (JSStringLiteral s) = return $ '"' : concatMap encodeChar s ++ "\""
+  match (JSStringLiteral s) = return $ string s
   match (JSBooleanLiteral True) = return "true"
   match (JSBooleanLiteral False) = return "false"
   match (JSArrayLiteral xs) = fmap concat $ sequence
@@ -141,6 +141,9 @@ literals = mkPattern' match
   match (JSRaw js) = return js
   match _ = mzero
 
+string :: String -> String
+string s = '"' : concatMap encodeChar s ++ "\""
+  where
   encodeChar :: Char -> String
   encodeChar '\b' = "\\b"
   encodeChar '\t' = "\\t"
