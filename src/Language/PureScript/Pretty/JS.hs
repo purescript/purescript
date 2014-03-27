@@ -142,6 +142,8 @@ literals = mkPattern' match
   match _ = mzero
 
   encodeChar :: Char -> String
+  encodeChar '"' = "\\\""
+  encodeChar '\\' = "\\\\"
   encodeChar '\r' = "\\r"
   encodeChar '\n' = "\\n"
   encodeChar c | fromEnum c > 0xFFF = "\\u" ++ showHex (fromEnum c) ""
