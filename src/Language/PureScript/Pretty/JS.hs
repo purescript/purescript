@@ -27,6 +27,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows
 import Control.Applicative
 import Control.Monad.State
+import Numeric
 
 newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
 
@@ -59,7 +60,7 @@ literals = mkPattern' match
   where
   match :: JS -> StateT PrinterState Maybe String
   match (JSNumericLiteral n) = return $ either show show n
-  match (JSStringLiteral s) = return $ show s
+  match (JSStringLiteral s) = return $ '"' : concatMap encodeChar s ++ "\""
   match (JSBooleanLiteral True) = return "true"
   match (JSBooleanLiteral False) = return "false"
   match (JSArrayLiteral xs) = fmap concat $ sequence
@@ -139,6 +140,13 @@ literals = mkPattern' match
     ]
   match (JSRaw js) = return js
   match _ = mzero
+
+  encodeChar :: Char -> String
+  encodeChar '\r' = "\\r"
+  encodeChar '\n' = "\\n"
+  encodeChar c | fromEnum c > 0xFFF = "\\u" ++ showHex (fromEnum c) ""
+  encodeChar c | fromEnum c > 0xFF = "\\u0" ++ showHex (fromEnum c) ""
+  encodeChar c = [c]
 
 conditional :: Pattern PrinterState JS ((JS, JS), JS)
 conditional = mkPattern match
