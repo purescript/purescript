@@ -1,7 +1,5 @@
 module Main where
 
-import Prelude ()
-
 class Show a where
   show :: a -> String
 

@@ -57,14 +57,10 @@ data Options = Options {
     -- The modules to code gen
     --
   , optionsCodeGenModules :: [String]
-    -- |
-    -- Verbose error message
-    --
-  , optionsVerboseErrors :: Bool
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False Nothing False "PS" [] [] False
+defaultOptions = Options False False False False Nothing False "PS" [] []
