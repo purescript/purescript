@@ -29,32 +29,6 @@ import Control.Applicative
 import Control.Monad.State
 import Numeric
 
-newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
-
--- |
--- Number of characters per identation level
---
-blockIndent :: Int
-blockIndent = 4
-
--- |
--- Pretty print with a new indentation level
---
-withIndent :: StateT PrinterState Maybe String -> StateT PrinterState Maybe String
-withIndent action = do
-  modify $ \st -> st { indent = indent st + blockIndent }
-  result <- action
-  modify $ \st -> st { indent = indent st - blockIndent }
-  return result
-
--- |
--- Get the current indentation level
---
-currentIndent :: StateT PrinterState Maybe String
-currentIndent = do
-  current <- get
-  return $ replicate (indent current) ' '
-
 literals :: Pattern PrinterState JS String
 literals = mkPattern' match
   where

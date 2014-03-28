@@ -118,8 +118,8 @@ isErrorNonEmpty = not . null . unifyErrorMessage
 
 showError :: UnifyError -> String
 showError (UnifyError msg Nothing _) = msg
-showError (UnifyError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ ": \n" ++ msg
-showError (UnifyError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ": \n" ++ msg
+showError (UnifyError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ "\n" ++ msg
+showError (UnifyError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ "\n" ++ msg
 
 mkUnifyErrorStack :: String -> Maybe UnifyErrorSource -> UnifyErrorStack
 mkUnifyErrorStack msg t = UnifyErrorStack [UnifyError msg t Nothing]
