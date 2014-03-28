@@ -194,3 +194,5 @@ typeCheckAll mainModuleName moduleName (d@(ExternInstanceDeclaration dictName de
   addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular]
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
+typeCheckAll mainModuleName moduleName (PositionedDeclaration pos d : rest) =
+  rethrowWithPosition pos $ typeCheckAll mainModuleName moduleName (d : rest)

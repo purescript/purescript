@@ -99,10 +99,14 @@ desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   entries <- mapM (typeInstanceDictionaryEntryDeclaration name mn deps className ty) desugared
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
   return $ (Just $ TypeInstanceRef name, d : entries ++ [dictDecl])
+desugarDecl mn (PositionedDeclaration pos d) = do
+  (dr, ds) <- desugarDecl mn d
+  return (dr, map (PositionedDeclaration pos) ds)
 desugarDecl _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (String, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (identToJs ident, ty)
+memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Declaration
@@ -114,6 +118,8 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
     (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
+typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
+  PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
@@ -143,6 +149,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
     return (identToJs ident, TypedValue False
                                (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                                (quantify memberType))
+  memberToNameAndValue tys' (PositionedDeclaration pos d) = do
+    (ident, val) <- memberToNameAndValue tys' d
+    return (ident, PositionedValue pos val)
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
 typeInstanceDictionaryEntryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> Declaration -> Desugar Declaration
@@ -157,6 +166,8 @@ typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclarat
   where
   lookupTypeClass m = maybe (Left $ "Type class " ++ show className ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (qualify mn className) m
   lookupIdent members = maybe (Left $ "Type class " ++ show className ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
+typeInstanceDictionaryEntryDeclaration name mn deps className tys (PositionedDeclaration pos d) =
+  PositionedDeclaration pos <$> typeInstanceDictionaryEntryDeclaration name mn deps className tys d
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
 -- |

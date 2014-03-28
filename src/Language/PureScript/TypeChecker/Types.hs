@@ -576,6 +576,7 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $  ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
+infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
@@ -662,6 +663,8 @@ inferBinder val (ConsBinder headBinder tailBinder) = do
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
+inferBinder val (PositionedBinder pos binder) =
+  rethrowWithPosition pos $ inferBinder val binder
 
 -- |
 -- Check the types of the return values in a set of binders in a case statement
@@ -826,6 +829,8 @@ check' (Let ds val) ty = do
 check' val ty | containsTypeSynonyms ty = do
   ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
   check val ty'
+check' (PositionedValue pos val) ty =
+  rethrowWithPosition pos $ check val ty
 check' val ty = throwError $ mkUnifyErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
 
 containsTypeSynonyms :: Type -> Bool

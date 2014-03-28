@@ -26,7 +26,7 @@ import Data.Graph
 import Data.Generics
 import Data.Generics.Extras
 import Data.List (nub, intersect)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (isJust, mapMaybe)
 import Control.Applicative ((<$>), (<*>), pure)
 
 import Language.PureScript.Declarations
@@ -82,6 +82,7 @@ collapseBindingGroups = everywhere (mkT collapseBindingGroupsForValue) . concatM
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
+  go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
   go other = [other]
 
 collapseBindingGroupsForValue :: Value -> Value
@@ -109,11 +110,13 @@ usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
 
 getIdent :: Declaration -> Ident
 getIdent (ValueDeclaration ident _ _ _ _) = ident
+getIdent (PositionedDeclaration _ d) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
 getProperName (DataDeclaration pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
+getProperName (PositionedDeclaration _ d) = getProperName d
 getProperName _ = error "Expected DataDeclaration"
 
 toBindingGroup :: SCC Declaration -> Declaration
@@ -123,16 +126,20 @@ toBindingGroup (CyclicSCC ds') = BindingGroupDeclaration $ map fromValueDecl ds'
 
 toDataBindingGroup :: SCC Declaration -> Either String Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
-toDataBindingGroup (CyclicSCC [TypeSynonymDeclaration pn _ _]) = Left $ "Cycle in type synonym " ++ show pn
-toDataBindingGroup (CyclicSCC [d]) = return d
+toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
+  Just pn -> Left $ "Cycle in type synonym " ++ show pn
+  _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all isTypeSynonym ds' = Left "Cycle in type synonyms"
+  | all (isJust . isTypeSynonym) ds' = Left "Cycle in type synonyms"
   | otherwise = return $ DataBindingGroupDeclaration ds'
-  where
-  isTypeSynonym TypeSynonymDeclaration{} = True
-  isTypeSynonym _ = False
+
+isTypeSynonym :: Declaration -> Maybe ProperName
+isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
+isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
+isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Value)
 fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
+fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d
 fromValueDecl _ = error "Expected ValueDeclaration"

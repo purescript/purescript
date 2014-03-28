@@ -84,6 +84,7 @@ renderModule (P.Module moduleName ds exps) =
 isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
 isExported Nothing _ = True
 isExported _ (P.TypeInstanceDeclaration _ _ _ _ _) = True
+isExported exps (P.PositionedDeclaration _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
   matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
@@ -130,6 +131,8 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
                           [] -> ""
                           cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
+renderDeclaration n exps (P.PositionedDeclaration _ d) =
+  renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
 
 getName :: P.Declaration -> String

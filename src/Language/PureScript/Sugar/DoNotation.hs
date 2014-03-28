@@ -27,6 +27,8 @@ import Language.PureScript.Declarations
 
 import qualified Language.PureScript.Constants as C
 
+import Control.Applicative
+
 -- |
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
 -- and all @DoNotationLet@ constructors with let expressions.
@@ -60,3 +62,4 @@ desugarDo = everywhereM (mkM replace)
   go (DoNotationLet binder val : rest) = do
     rest' <- go rest
     return $ Case [val] [CaseAlternative [binder] Nothing rest']
+  go (PositionedDoNotationElement pos el : rest) = PositionedValue pos <$> go (el : rest)

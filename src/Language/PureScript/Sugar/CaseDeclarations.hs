@@ -62,11 +62,16 @@ desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
       go other = return other
+    desugarRest (PositionedDeclaration pos d : ds) = do
+      (d' : ds') <- desugarRest (d : ds)
+      return (PositionedDeclaration pos d' : ds')
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
 
 inSameGroup :: Declaration -> Declaration -> Bool
 inSameGroup (ValueDeclaration ident1 _ _ _ _) (ValueDeclaration ident2 _ _ _ _) = ident1 == ident2
+inSameGroup (PositionedDeclaration _ d1) d2 = inSameGroup d1 d2
+inSameGroup d1 (PositionedDeclaration _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> Either String [Declaration]
@@ -79,6 +84,9 @@ toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ "Argument list lengths differ in declaration " ++ show ident
   return [makeCaseDeclaration ident tuples]
+toDecls (PositionedDeclaration pos d : ds) = do
+  (d' : ds') <- toDecls (d : ds)
+  return (PositionedDeclaration pos d' : ds')
 toDecls ds = return ds
 
 isVarBinder :: Binder -> Bool
@@ -87,6 +95,7 @@ isVarBinder _ = False
 
 toTuple :: Declaration -> ([Binder], (Maybe Guard, Value))
 toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
+toTuple (PositionedDeclaration _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
 makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Value))] -> Declaration

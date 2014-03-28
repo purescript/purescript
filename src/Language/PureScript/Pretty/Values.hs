@@ -44,6 +44,7 @@ literals = mkPattern match
   match (Var ident) = Just $ show ident
   match (Do els) = Just $ " do { " ++ intercalate "; " (map prettyPrintDoNotationElement els) ++ " }"
   match (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
+  match (PositionedValue _ val) = Just $ prettyPrintValue val
   match _ = Nothing
 
 prettyPrintCaseAlternative :: CaseAlternative -> String
@@ -91,6 +92,7 @@ prettyPrintDoNotationElement :: DoNotationElement -> String
 prettyPrintDoNotationElement (DoNotationValue val) = prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationBind binder val) = prettyPrintBinder binder ++ " <- " ++ prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationLet binder val) = "let " ++ prettyPrintBinder binder ++ " = " ++ prettyPrintValue val
+prettyPrintDoNotationElement (PositionedDoNotationElement _ el) = prettyPrintDoNotationElement el
 
 -- |
 -- Generate a pretty-printed string representing a Value
@@ -124,6 +126,7 @@ prettyPrintBinderAtom = mkPattern match
   match (ObjectBinder bs) = Just $ "{ " ++ intercalate ", " (map (uncurry prettyPrintObjectPropertyBinder) bs) ++ " }"
   match (ArrayBinder bs) = Just $ "[ " ++ intercalate ", " (map prettyPrintBinder bs) ++ " ]"
   match (NamedBinder ident binder) = Just $ show ident ++ "@" ++ prettyPrintBinder binder
+  match (PositionedBinder _ binder) = Just $ prettyPrintBinder binder
   match _ = Nothing
 
 -- |

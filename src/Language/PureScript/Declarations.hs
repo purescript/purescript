@@ -42,6 +42,24 @@ instance Show Associativity where
   show Infix  = "infix"
 
 -- |
+-- Source position information
+--
+data SourcePos = SourcePos
+  {
+    -- |
+    -- Line number
+    --
+    sourcePosLine :: Int
+    -- |
+    -- Column number
+    --
+  , sourcePosColumn :: Int
+  } deriving (D.Data, D.Typeable)
+
+instance Show SourcePos where
+  show sp = "line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
+
+-- |
 -- Fixity data for infix operators
 --
 data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
@@ -132,6 +150,10 @@ data Declaration
   -- declarations)
   --
   | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
+  -- |
+  -- A declaration with source position information
+  --
+  | PositionedDeclaration SourcePos Declaration
   deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -139,6 +161,7 @@ data Declaration
 --
 isValueDecl :: Declaration -> Bool
 isValueDecl ValueDeclaration{} = True
+isValueDecl (PositionedDeclaration _ d) = isValueDecl d
 isValueDecl _ = False
 
 -- |
@@ -147,6 +170,7 @@ isValueDecl _ = False
 isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
 isDataDecl TypeSynonymDeclaration{} = True
+isDataDecl (PositionedDeclaration _ d) = isDataDecl d
 isDataDecl _ = False
 
 -- |
@@ -154,6 +178,7 @@ isDataDecl _ = False
 --
 isImportDecl :: Declaration -> Bool
 isImportDecl ImportDeclaration{} = True
+isImportDecl (PositionedDeclaration _ d) = isImportDecl d
 isImportDecl _ = False
 
 -- |
@@ -161,6 +186,7 @@ isImportDecl _ = False
 --
 isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
+isExternDataDecl (PositionedDeclaration _ d) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
@@ -168,6 +194,7 @@ isExternDataDecl _ = False
 --
 isExternInstanceDecl :: Declaration -> Bool
 isExternInstanceDecl ExternInstanceDeclaration{} = True
+isExternInstanceDecl (PositionedDeclaration _ d) = isExternInstanceDecl d
 isExternInstanceDecl _ = False
 
 -- |
@@ -175,6 +202,7 @@ isExternInstanceDecl _ = False
 --
 isFixityDecl :: Declaration -> Bool
 isFixityDecl FixityDeclaration{} = True
+isFixityDecl (PositionedDeclaration _ d) = isFixityDecl d
 isFixityDecl _ = False
 
 -- |
@@ -182,6 +210,7 @@ isFixityDecl _ = False
 --
 isExternDecl :: Declaration -> Bool
 isExternDecl ExternDeclaration{} = True
+isExternDecl (PositionedDeclaration _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
@@ -190,6 +219,7 @@ isExternDecl _ = False
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
+isTypeClassDeclaration (PositionedDeclaration _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 -- |
@@ -286,7 +316,11 @@ data Value
   -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope] deriving (Show, D.Data, D.Typeable)
+  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  -- |
+  -- A value with source position information
+  --
+  | PositionedValue SourcePos Value deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- An alternative in a case statement
@@ -328,7 +362,11 @@ data DoNotationElement
   -- |
   -- A let statement, i.e. a pure value with a binder
   --
-  | DoNotationLet Binder Value deriving (Show, D.Data, D.Typeable)
+  | DoNotationLet Binder Value
+  -- |
+  -- A do notation element with source position information
+  --
+  | PositionedDoNotationElement SourcePos DoNotationElement deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- Data type for binders
@@ -373,8 +411,11 @@ data Binder
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)
-
+  | NamedBinder Ident Binder
+  -- |
+  -- A binder with source position information
+  --
+  | PositionedBinder SourcePos Binder deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- Collect all names introduced in binders in an expression

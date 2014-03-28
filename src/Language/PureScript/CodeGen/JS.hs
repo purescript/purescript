@@ -82,6 +82,7 @@ declToJs _ mp (DataDeclaration _ _ ctors) _ =
         (JSBlock [JSReturn (go pn (index + 1) tys' (JSVar ("value" ++ show index) : values))])
 declToJs opts mp (DataBindingGroupDeclaration ds) e = Just $ concat $ mapMaybe (flip (declToJs opts mp) e) ds
 declToJs _ _ (ExternDeclaration _ _ (Just js) _) _ = Just [js]
+declToJs opts mp (PositionedDeclaration _ d) e = declToJs opts mp d e
 declToJs _ _ _ _ = Nothing
 
 -- |
@@ -307,6 +308,8 @@ binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
+binderToJs m e varName done (PositionedBinder _ binder) =
+  binderToJs m e varName done binder
 
 -- |
 -- Checks whether a data constructor is the only constructor for that type, used to simplify the
