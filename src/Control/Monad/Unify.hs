@@ -30,7 +30,7 @@ import Data.Generics (mkT, mkQ, everywhere, everything)
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Error.Class
 
 import Data.HashMap.Strict as M
 
@@ -104,12 +104,16 @@ defaultUnifyState = UnifyState 0 mempty
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype UnifyT t m a = UnifyT { unUnify :: StateT (UnifyState t) (ErrorT String m) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadError String)
+newtype UnifyT t m a = UnifyT { unUnify :: StateT (UnifyState t) m a }
+  deriving (Functor, Monad, Applicative, MonadPlus)
 
 instance (MonadState s m) => MonadState s (UnifyT t m) where
   get = UnifyT . lift $ get
   put = UnifyT . lift . put
+
+instance (MonadError e m) => MonadError e (UnifyT t m) where
+  throwError = UnifyT . throwError
+  catchError e f = UnifyT $ catchError (unUnify e) (unUnify . f)
 
 -- |
 -- Collect all unknowns occurring inside a value
@@ -122,8 +126,8 @@ unknowns = everything (++) (mkQ [] collect)
 -- |
 -- Run a computation in the Unify monad, failing with an error, or succeeding with a return value and the new next unification variable
 --
-runUnify :: UnifyState t -> UnifyT t m a -> m (Either String (a, UnifyState t))
-runUnify s = runErrorT . flip runStateT s . unUnify
+runUnify :: UnifyState t -> UnifyT t m a -> m (a, UnifyState t)
+runUnify s = flip runStateT s . unUnify
 
 -- |
 -- Substitute a single unification variable
@@ -134,7 +138,7 @@ substituteOne (Unknown u) t = Substitution $ M.singleton u t
 -- |
 -- Replace a unification variable with the specified value in the current substitution
 --
-(=:=) :: (Monad m, Unifiable m t) => Unknown -> t -> UnifyT t m ()
+(=:=) :: (Error e, Monad m, MonadError e m, Unifiable m t) => Unknown -> t -> UnifyT t m ()
 (=:=) u t' = do
   st <- UnifyT get
   let sub = unifyCurrentSubstitution st
@@ -149,10 +153,10 @@ substituteOne (Unknown u) t = Substitution $ M.singleton u t
 -- |
 -- Perform the occurs check, to make sure a unification variable does not occur inside a value
 --
-occursCheck :: (Monad m, Partial t) => Unknown -> t -> UnifyT t m ()
+occursCheck :: (Error e, Monad m, MonadError e m, Partial t) => Unknown -> t -> UnifyT t m ()
 occursCheck u t =
   case isUnknown t of
-    Nothing -> when (u `elem` unknowns t) $ UnifyT . lift $ throwError "Occurs check fails"
+    Nothing -> when (u `elem` unknowns t) $ UnifyT . lift . throwError . strMsg $ "Occurs check fails"
     _ -> return ()
 
 -- |
@@ -171,4 +175,5 @@ fresh :: (Monad m, Partial t) => UnifyT t m t
 fresh = do
   u <- fresh'
   return $ unknown u
+
 
