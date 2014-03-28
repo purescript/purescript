@@ -1,5 +1,5 @@
 name: monad-unify
-version: 0.2.0.1
+version: 0.2.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
