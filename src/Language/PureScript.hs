@@ -71,7 +71,7 @@ compile' :: Environment -> Options -> [Module] -> Either String (String, String,
 compile' env opts ms = do
   (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   desugared <- desugar sorted
-  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
+  (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
@@ -100,8 +100,9 @@ typeCheckModule mainModuleName (Module mn decls exps) = do
   checkTypesAreExported (ValueRef name) = do
     ty <- lookupVariable mn (Qualified (Just mn) name)
     case find isTconHidden (findTcons ty) of
-      Just hiddenType -> throwError $ "Error in module '" ++ show mn ++ "':\n\
-                                      \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
+      Just hiddenType -> throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
       Nothing -> return ()
   checkTypesAreExported _ = return ()
 
@@ -118,7 +119,7 @@ typeCheckModule mainModuleName (Module mn decls exps) = do
     where
     go (TypeRef tyName' _) = tyName' /= tyName
     go _ = True
-    
+
 
 generateMain :: Environment -> Options -> [JS] -> Either String [JS]
 generateMain env opts js =
@@ -191,7 +192,7 @@ make opts ms = do
   go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
   go _ [] = return ()
   go env ((False, m) : ms') = do
-    (_, env') <- liftError . runCheck' env $ typeCheckModule Nothing m
+    (_, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
 
     go env' ms'
   go env ((True, m@(Module moduleName' _ exps)) : ms') = do
@@ -199,7 +200,7 @@ make opts ms = do
         jsFile = "js" ++ pathSeparator : filePath ++ ".js"
         externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
 
-    (Module _ elaborated _, env') <- liftError . runCheck' env $ typeCheckModule Nothing m
+    (Module _ elaborated _, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
 
     regrouped <- liftError . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 

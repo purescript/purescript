@@ -26,6 +26,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
+import Data.Monoid ((<>))
 import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.Error
@@ -36,14 +37,13 @@ import Language.PureScript.Kinds
 import Language.PureScript.Declarations
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
-import Language.PureScript.Pretty.Types
 
 addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
-    rethrow (("Error in data constructor " ++ show dctor ++ ":\n") ++) $
+    rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
       addDataConstructor moduleName name args dctor tys
 
 addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
@@ -64,7 +64,7 @@ valueIsNotDefined :: ModuleName -> Ident -> Check ()
 valueIsNotDefined moduleName name = do
   env <- getEnv
   case M.lookup (moduleName, name) (names env) of
-    Just _ -> throwError $ show name ++ " is already defined"
+    Just _ -> throwError . strMsg $ show name ++ " is already defined"
     Nothing -> return ()
 
 addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
@@ -85,10 +85,10 @@ checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
-  when (ctor `M.member` typeSynonyms env) $ throwError "Type synonym instances are disallowed"
+  when (ctor `M.member` typeSynonyms env) . throwError . strMsg $ "Type synonym instances are disallowed"
   return ()
 checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError $ "Type class instance head is invalid: " ++ prettyPrintType ty
+checkTypeClassInstance _ ty = throwError $ mkUnifyErrorStack "Type class instance head is invalid." (Just (TypeError ty))
 
 -- |
 -- Type check all declarations in a module
@@ -106,13 +106,13 @@ checkTypeClassInstance _ ty = throwError $ "Type class instance head is invalid:
 typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ _ [] = return []
 typeCheckAll mainModuleName moduleName (d@(DataDeclaration name args dctors) : rest) = do
-  rethrow (("Error in type constructor " ++ show name ++ ":\n") ++) $ do
+  rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
     ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
     addDataType moduleName name args dctors ctorKind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
-  rethrow ("Error in data binding group:\n" ++) $ do
+  rethrow (strMsg "Error in data binding group" <>) $ do
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
     (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
@@ -128,14 +128,14 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   toDataDecl (DataDeclaration nm args dctors) = Just (nm, args, dctors)
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
-  rethrow (("Error in type synonym " ++ show name ++ ":\n") ++) $ do
+  rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
     kind <- kindsOf False moduleName name args [ty]
     addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll _ _ (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
 typeCheckAll mainModuleName moduleName (ValueDeclaration name nameKind [] Nothing val : rest) = do
-  d <- rethrow (("Error in declaration " ++ show name ++ ":\n") ++) $ do
+  d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
     valueIsNotDefined moduleName name
     [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
     addValue moduleName name ty nameKind
@@ -144,7 +144,7 @@ typeCheckAll mainModuleName moduleName (ValueDeclaration name nameKind [] Nothin
   return $ d : ds
 typeCheckAll _ _ (ValueDeclaration{} : _) = error "Binders were not desugared"
 typeCheckAll mainModuleName moduleName (BindingGroupDeclaration vals : rest) = do
-  d <- rethrow (("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals) ++ ":\n") ++) $ do
+  d <- rethrow (strMsg ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) <>) $ do
     forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
       valueIsNotDefined moduleName name
     tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
@@ -160,19 +160,19 @@ typeCheckAll mainModuleName moduleName (d@(ExternDataDeclaration name kind) : re
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(ExternDeclaration importTy name _ ty) : rest) = do
-  rethrow (("Error in foreign import declaration " ++ show name ++ ":\n") ++) $ do
+  rethrow (strMsg ("Error in foreign import declaration " ++ show name) <>) $ do
     env <- getEnv
     kind <- kindOf moduleName ty
-    guardWith "Expected kind *" $ kind == Star
+    guardWith (strMsg "Expected kind *") $ kind == Star
     case M.lookup (moduleName, name) (names env) of
-      Just _ -> throwError $ show name ++ " is already defined"
+      Just _ -> throwError . strMsg $ show name ++ " is already defined"
       Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy) (names env) })
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = do
   ds <- typeCheckAll mainModuleName moduleName rest
   env <- getEnv
-  guardWith ("Fixity declaration with no binding: " ++ name) $ M.member (moduleName, Op name) $ names env
+  guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
   return $ d : ds
 typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) : rest) = do
   env <- getEnv

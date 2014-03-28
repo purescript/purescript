@@ -21,10 +21,14 @@ module Language.PureScript.TypeChecker.Monad where
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Pretty
+import Language.PureScript.Options
 
 import Data.Maybe
+import Data.Monoid
 
 import Control.Applicative
 import Control.Monad.State
@@ -32,6 +36,77 @@ import Control.Monad.Error
 import Control.Monad.Unify
 
 import qualified Data.Map as M
+import Data.List (intercalate)
+
+-- |
+-- Type for sources of type checking errors
+--
+data UnifyErrorSource
+  -- |
+  -- An error which originated at a Value
+  --
+  = ValueError Value
+  -- |
+  -- An error which originated at a Type
+  --
+  | TypeError Type deriving (Show)
+
+-- |
+-- Unification errors
+--
+data UnifyError = UnifyError {
+    -- |
+    -- Error message
+    --
+    unifyErrorMessage :: String
+    -- |
+    -- The value where the error occurred
+    --
+  , unifyErrorValue :: Maybe UnifyErrorSource
+  } deriving (Show)
+
+-- |
+-- A stack trace for an error
+--
+newtype UnifyErrorStack = UnifyErrorStack { runUnifyErrorStack :: [UnifyError] } deriving (Show, Monoid)
+
+instance Error UnifyErrorStack where
+  strMsg s = UnifyErrorStack [UnifyError s Nothing]
+  noMsg = UnifyErrorStack []
+
+prettyPrintUnifyErrorStack :: Options -> UnifyErrorStack -> String
+prettyPrintUnifyErrorStack opts (UnifyErrorStack es) | optionsVerboseErrors opts = intercalate "\n" (map showError es)
+prettyPrintUnifyErrorStack _ (UnifyErrorStack es) =
+  let
+    errorsWithValues = filter (isJust . unifyErrorValue) es
+    mostSpecificError = last es
+  in case (length errorsWithValues, isJust (unifyErrorValue mostSpecificError)) of
+    (0, _) -> showError mostSpecificError
+    (1, True) -> showError mostSpecificError
+    (1, False) ->
+      let errorWithValue = head errorsWithValues
+      in showError errorWithValue ++ "\n" ++
+         showError mostSpecificError
+    (_, True) ->
+      let errorWithValue = head errorsWithValues
+      in showError errorWithValue ++ "\n" ++
+         showError mostSpecificError
+    (_, False) ->
+      let
+        leastSpecificErrorWithValue = head errorsWithValues
+        mostSpecificErrorWithValue = last errorsWithValues
+      in
+        showError leastSpecificErrorWithValue ++ "\n" ++
+        showError mostSpecificErrorWithValue ++ "\n" ++
+        showError mostSpecificError
+
+showError :: UnifyError -> String
+showError (UnifyError msg Nothing) = msg
+showError (UnifyError msg (Just (ValueError val))) = "Error in value " ++ prettyPrintValue val ++ ": \n" ++ msg
+showError (UnifyError msg (Just (TypeError ty))) = "Error in type " ++ prettyPrintType ty ++ ": \n" ++ msg
+
+mkUnifyErrorStack :: String -> Maybe UnifyErrorSource -> UnifyErrorStack
+mkUnifyErrorStack msg t = UnifyErrorStack [UnifyError msg t]
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -89,21 +164,21 @@ bindLocalTypeVariables moduleName bindings =
 -- |
 -- Lookup the type of a value by name in the @Environment@
 --
-lookupVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified Ident -> m Type
+lookupVariable :: (Error e, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m Type
 lookupVariable currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
-    Nothing -> throwError $ show var ++ " is undefined"
+    Nothing -> throwError . strMsg $ show var ++ " is undefined"
     Just (ty, _) -> return ty
 
 -- |
 -- Lookup the kind of a type by name in the @Environment@
 --
-lookupTypeVariable :: (Functor m, MonadState CheckState m, MonadError String m) => ModuleName -> Qualified ProperName -> m Kind
+lookupTypeVariable :: (Error e, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified ProperName -> m Kind
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
-    Nothing -> throwError $ "Type variable " ++ show name ++ " is undefined"
+    Nothing -> throwError . strMsg $ "Type variable " ++ show name ++ " is undefined"
     Just (k, _) -> return k
 
 -- |
@@ -131,8 +206,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either String) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError String)
+newtype Check a = Check { unCheck :: StateT CheckState (Either UnifyErrorStack) a }
+  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError UnifyErrorStack)
 
 -- |
 -- Get the current @Environment@
@@ -155,14 +230,14 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: Check a -> Either String (a, Environment)
-runCheck = runCheck' initEnvironment
+runCheck :: Options -> Check a -> Either String (a, Environment)
+runCheck opts = runCheck' opts initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: Environment -> Check a -> Either String (a, Environment)
-runCheck' env c = do
+runCheck' :: Options -> Environment -> Check a -> Either String (a, Environment)
+runCheck' opts env c = either (Left . prettyPrintUnifyErrorStack opts) Right $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
@@ -192,7 +267,7 @@ freshDictionaryName = do
 -- Lift a computation in the @Check@ monad into the substitution monad.
 --
 liftCheck :: Check a -> UnifyT t Check a
-liftCheck = UnifyT . lift . lift
+liftCheck = UnifyT . lift
 
 -- |
 -- Run a computation in the substitution monad, generating a return value and the final substitution.
@@ -200,9 +275,7 @@ liftCheck = UnifyT . lift . lift
 liftUnify :: (Partial t) => UnifyT t Check a -> Check (a, Substitution t)
 liftUnify unify = do
   st <- get
-  e <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
-  case e of
-    Left err -> throwError err
-    Right (a, ust) -> do
-      modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
-      return (a, unifyCurrentSubstitution ust)
+  (a, ust) <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
+  modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
+  return (a, unifyCurrentSubstitution ust)
+
