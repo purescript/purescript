@@ -17,7 +17,7 @@ module Language.PureScript.Sugar.Names (
 ) where
 
 import Data.Data
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
@@ -200,7 +200,7 @@ renameInModule imports exports (Module mn decls exps) =
     rethrowFor "declaration" name $ ValueDeclaration name nameKind [] Nothing <$> updateAll val'
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
-    bindFunctionArgs bound (Let ds val') = let args = map letBoundVariable ds in
+    bindFunctionArgs bound (Let ds val') = let args = mapMaybe letBoundVariable ds in
                                            return (args ++ bound, Let ds val')
     bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
       (,) bound <$> (Var <$> updateValueName name')
@@ -214,10 +214,10 @@ renameInModule imports exports (Module mn decls exps) =
     bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
     bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
 
-    letBoundVariable :: Declaration -> Ident
-    letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
+    letBoundVariable :: Declaration -> Maybe Ident
+    letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
     letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
-    letBoundVariable _ = error "Invalid argument to letBoundVariable"
+    letBoundVariable _ = Nothing
   go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
   go (ExternDeclaration fit name js ty) =
       rethrowFor "declaration" name $ ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
@@ -448,4 +448,5 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
       if item `elem` exports
       then return item
       else throwError $ "Unable to find " ++ t ++  " '" ++ show (Qualified (Just importModule) item) ++ "'"
+
 
