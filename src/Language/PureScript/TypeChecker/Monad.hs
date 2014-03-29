@@ -91,27 +91,9 @@ prettyPrintUnifyErrorStack opts (UnifyErrorStack es) =
     | otherwise =
       let
         es' = filter isErrorNonEmpty es
-        errorsWithValues = filter (isJust . unifyErrorValue) es'
-        mostSpecificError = last es'
-      in case (length errorsWithValues, isJust (unifyErrorValue mostSpecificError)) of
-        (0, _) -> showError mostSpecificError
-        (1, True) -> showError mostSpecificError
-        (1, False) ->
-          let errorWithValue = head errorsWithValues
-          in showError errorWithValue ++ "\n" ++
-             showError mostSpecificError
-        (_, True) ->
-          let errorWithValue = head errorsWithValues
-          in showError errorWithValue ++ "\n" ++
-             showError mostSpecificError
-        (_, False) ->
-          let
-            leastSpecificErrorWithValue = head errorsWithValues
-            mostSpecificErrorWithValue = last errorsWithValues
-          in
-            showError leastSpecificErrorWithValue ++ "\n" ++
-            showError mostSpecificErrorWithValue ++ "\n" ++
-            showError mostSpecificError
+      in case length es' of
+        1 -> showError (head es')
+        _ -> showError (head es') ++ "\n" ++ showError (last es')
 
 isErrorNonEmpty :: UnifyError -> Bool
 isErrorNonEmpty = not . null . unifyErrorMessage

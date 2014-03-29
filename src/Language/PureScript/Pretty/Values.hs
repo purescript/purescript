@@ -26,10 +26,9 @@ import Control.PatternArrows
 import Control.Monad.State
 import Control.Applicative
 
-import Language.PureScript.Types
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types
+import Language.PureScript.Pretty.Types (prettyPrintType)
 
 literals :: Pattern PrinterState Value String
 literals = mkPattern' match
@@ -44,6 +43,7 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintValue' xs
     , return " ]"
     ]
+  match (ObjectLiteral []) = return "{}"
   match (ObjectLiteral ps) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ prettyPrintMany prettyPrintObjectProperty ps
@@ -58,8 +58,12 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintCaseAlternative binders
     , currentIndent
     ]
-  match (Let _ val) = fmap concat $ sequence
-    [ return "let ... in " -- TODO
+  match (Let ds val) = fmap concat $ sequence
+    [ return "let\n"
+    , withIndent $ prettyPrintMany prettyPrintDeclaration ds
+    , return "\n"
+    , currentIndent
+    , return "in "
     , prettyPrintValue' val
     ]
   match (Var ident) = return $ show ident
@@ -69,8 +73,18 @@ literals = mkPattern' match
     , currentIndent
     ]
   match (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
+  match (TypedValue _ val _) = prettyPrintValue' val
   match (PositionedValue _ val) = prettyPrintValue' val
   match _ = mzero
+
+prettyPrintDeclaration :: Declaration -> StateT PrinterState Maybe String
+prettyPrintDeclaration (TypeDeclaration ident ty) = return $ show ident ++ " :: " ++ prettyPrintType ty
+prettyPrintDeclaration (ValueDeclaration ident _ [] Nothing val) = fmap concat $ sequence
+  [ return $ show ident ++ " = "
+  , prettyPrintValue' val
+  ]
+prettyPrintDeclaration (PositionedDeclaration _ d) = prettyPrintDeclaration d
+prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
 prettyPrintCaseAlternative (CaseAlternative binders grd val) =
@@ -129,12 +143,6 @@ lam = mkPattern match
   match (Abs (Left arg) val) = Just (show arg, val)
   match _ = Nothing
 
-typed :: Pattern PrinterState Value (Type, Value)
-typed = mkPattern match
-  where
-  match (TypedValue _ val ty) = Just (ty, val)
-  match _ = Nothing
-
 -- |
 -- Generate a pretty-printed string representing an expression
 --
@@ -153,7 +161,6 @@ prettyPrintValue' = runKleisli $ runPattern matchValue
                   , [ Wrap app $ \arg val -> val ++ "(" ++ arg ++ ")" ]
                   , [ Split lam $ \arg val -> "\\" ++ arg ++ " -> " ++ prettyPrintValue val ]
                   , [ Wrap ifThenElse $ \(th, el) cond -> "if " ++ cond ++ " then " ++ prettyPrintValue th ++ " else " ++ prettyPrintValue el ]
-                  , [ Wrap typed $ \ty val -> val ++ " :: " ++ prettyPrintType ty ]
                   ]
 
 prettyPrintBinderAtom :: Pattern PrinterState Binder String
