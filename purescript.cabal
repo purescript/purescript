@@ -1,5 +1,5 @@
 name: purescript
-version: 0.4.10.1
+version: 0.4.10.2
 cabal-version: >=1.8
 build-type: Custom
 license: MIT
@@ -20,7 +20,9 @@ data-dir: ""
 library
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
                    directory -any, filepath -any, mtl -any, parsec -any, syb -any,
-                   transformers -any, utf8-string -any, pattern-arrows -any, monad-unify >= 0.2.1 && < 0.3,
+                   transformers -any, utf8-string -any, 
+                   pattern-arrows >= 0.0.2 && < 0.1, 
+                   monad-unify >= 0.2.1 && < 0.3,
                    xdg-basedir -any, time -any
     if (!os(windows))
         build-depends: unix -any
