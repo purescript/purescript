@@ -135,8 +135,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either UnifyErrorStack) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError UnifyErrorStack)
+newtype Check a = Check { unCheck :: StateT CheckState (Either ErrorStack) a }
+  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError ErrorStack)
 
 -- |
 -- Get the current @Environment@
@@ -166,7 +166,7 @@ runCheck opts = runCheck' opts initEnvironment
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
 runCheck' :: Options -> Environment -> Check a -> Either String (a, Environment)
-runCheck' opts env c = either (Left . prettyPrintUnifyErrorStack opts) Right $ do
+runCheck' opts env c = either (Left . prettyPrintErrorStack (optionsVerboseErrors opts)) Right $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
@@ -186,7 +186,7 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- |
 -- Rethrow an error with source position information
 --
-rethrowWithPosition :: (MonadError UnifyErrorStack m) => SourcePos -> m a -> m a
+rethrowWithPosition :: (MonadError ErrorStack m) => SourcePos -> m a -> m a
 rethrowWithPosition pos = rethrow (positionError pos <>)
 
 -- |
