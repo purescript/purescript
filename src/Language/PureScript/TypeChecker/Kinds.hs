@@ -28,6 +28,7 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 import Control.Monad.State
 import Control.Monad.Error
