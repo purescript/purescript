@@ -14,7 +14,8 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Optimizer.Unused (
-  removeUnusedVariables
+  removeUnusedVariables,
+  removeCodeAfterReturnStatements
 ) where
 
 import Data.Generics
@@ -29,3 +30,12 @@ removeUnusedVariables = everywhere (mkT $ removeFromBlock go)
   go [] = []
   go (JSVariableIntroduction var _ : sts) | not (isUsed var sts) = go sts
   go (s:sts) = s : go sts
+
+removeCodeAfterReturnStatements :: JS -> JS
+removeCodeAfterReturnStatements = everywhere (mkT $ removeFromBlock go)
+  where
+  go :: [JS] -> [JS]
+  go jss | not (any isJSReturn jss) = jss
+         | otherwise = let (body, ret : _) = span (not . isJSReturn) jss in body ++ [ret]
+  isJSReturn (JSReturn _) = True
+  isJSReturn _ = False

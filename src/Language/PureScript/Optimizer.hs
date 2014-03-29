@@ -53,19 +53,21 @@ import Language.PureScript.Optimizer.Blocks
 --
 optimize :: Options -> JS -> JS
 optimize opts | optionsNoOptimizations opts = id
-              | otherwise = untilFixedPoint $ applyAll
+              | otherwise = untilFixedPoint (applyAll
   [ collapseNestedBlocks
   , tco opts
   , magicDo opts
   , removeUnusedVariables
+  , removeCodeAfterReturnStatements
   , unThunk
   , etaConvert
+  , evaluateIifes
   , inlineVariables
   , inlineOperator (C.$) $ \f x -> JSApp f [x]
   , inlineOperator (C.#) $ \x f -> JSApp f [x]
   , inlineOperator (C.!!) $ flip JSIndexer
   , inlineOperator (C.++) $ JSBinary Add
-  , inlineCommonOperators ]
+  , inlineCommonOperators ])
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
 untilFixedPoint f = go

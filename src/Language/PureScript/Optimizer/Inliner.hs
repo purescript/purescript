@@ -18,7 +18,8 @@ module Language.PureScript.Optimizer.Inliner (
   inlineOperator,
   inlineCommonOperators,
   etaConvert,
-  unThunk
+  unThunk,
+  evaluateIifes
 ) where
 
 import Data.Generics
@@ -55,6 +56,13 @@ unThunk = everywhere (mkT convert)
   where
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) [])]) = JSBlock body
+  convert js = js
+
+evaluateIifes :: JS -> JS
+evaluateIifes = everywhere (mkT convert)
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSFunction Nothing [] (JSBlock [JSReturn ret])) []) = ret
   convert js = js
 
 inlineVariables :: JS -> JS
