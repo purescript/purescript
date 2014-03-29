@@ -47,7 +47,7 @@ isReassigned var1 = everything (||) (mkQ False check)
   check _ = False
 
 isRebound :: (Data d) => JS -> d -> Bool
-isRebound js d = any (`isReassigned` d) (everything (++) (mkQ [] variablesOf) js)
+isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everything (++) (mkQ [] variablesOf) js)
   where
   variablesOf (JSVar var) = [var]
   variablesOf _ = []

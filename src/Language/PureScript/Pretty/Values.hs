@@ -72,7 +72,7 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
-  match (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
+  match (TypeClassDictionary _ _) = return "<<dict>>"
   match (TypedValue _ val _) = prettyPrintValue' val
   match (PositionedValue _ val) = prettyPrintValue' val
   match _ = mzero
