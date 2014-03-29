@@ -99,7 +99,7 @@ typeInstanceDictionaryDeclarations mn deps name ty decls = do
   classDeclaration ((name, arg), instanceTys) = do
     let memberTypes = map (replaceTypeVars arg ty) instanceTys
     entryName <- lift $ mkDictionaryValueName mn name ty
-    memberNames <- mapM (memberToNameAndValue decls) memberTypes
+    memberNames <- mapM (memberToNameAndValue name decls) memberTypes
     return $ ValueDeclaration entryName [] Nothing
       (TypedValue True
         (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..length deps]))
@@ -107,10 +107,10 @@ typeInstanceDictionaryDeclarations mn deps name ty decls = do
       )
   declarationIdent (ValueDeclaration ident _ _ _) = ident
   declarationIdent _ = error "Type class instance contained invalid declaration"
-  memberToNameAndValue :: [Declaration] -> (String, Type) -> Desugar (String, Value)
-  memberToNameAndValue decls (mangled, memberType) = do
+  memberToNameAndValue :: Qualified ProperName -> [Declaration] -> (String, Type) -> Desugar (String, Value)
+  memberToNameAndValue className decls (mangled, memberType) = do
     memberIdent <- lift . maybe (Left $ "Could not find method " ++ mangled) Right . find ((== mangled) . identToJs) $ map declarationIdent decls
-    memberName <- mkDictionaryEntryName mn name ty memberIdent
+    memberName <- mkDictionaryEntryName mn className ty memberIdent
     return (mangled, TypedValue False
                        (if null deps then Var (Qualified Nothing memberName)
                         else foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
