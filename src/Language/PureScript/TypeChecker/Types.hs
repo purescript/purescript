@@ -585,7 +585,8 @@ inferLetBinding seen [] ret j = (,) seen <$> j ret
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  TypedValue _ val' valTy' <- bindNames (M.singleton (moduleName, ident) (valTy, nameKind)) $ infer val
+  let dict = if isFunction val then M.singleton (moduleName, ident) (valTy, nameKind) else M.empty
+  TypedValue _ val' valTy' <- bindNames dict $ infer val
   valTy =?= valTy'
   bindNames (M.singleton (moduleName, ident) (valTy', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
