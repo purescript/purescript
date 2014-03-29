@@ -30,6 +30,7 @@ library
                      Language.PureScript.Options
                      Language.PureScript.Declarations
                      Language.PureScript.Environment
+                     Language.PureScript.Errors
                      Language.PureScript.Kinds
                      Language.PureScript.Names
                      Language.PureScript.Types

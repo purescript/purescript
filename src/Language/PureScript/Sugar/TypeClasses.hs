@@ -25,6 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 import Language.PureScript.CodeGen.Common (identToJs)
 
 import Control.Applicative
@@ -36,13 +37,13 @@ import qualified Data.Map as M
 
 type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
 
-type Desugar = StateT MemberMap (Either String)
+type Desugar = StateT MemberMap (Either ErrorStack)
 
 -- |
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: [Module] -> Either String [Module]
+desugarTypeClasses :: [Module] -> Either ErrorStack [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
@@ -125,7 +126,7 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   m <- get
-  (args, instanceTys) <- lift $ maybe (Left $ "Type class " ++ show className ++ " is undefined. Type class names must be qualified.") Right
+  (args, instanceTys) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
                         $ M.lookup (qualify mn className) m
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
   let entryName = Escaped (show name)
@@ -144,7 +145,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
 
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
   memberToNameAndValue tys' (ValueDeclaration ident _ _ _ _) = do
-    memberType <- lift . maybe (Left "Type class member type not found") Right $ lookup (identToJs ident) tys'
+    memberType <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup (identToJs ident) tys'
     memberName <- mkDictionaryEntryName name ident
     return (identToJs ident, TypedValue False
                                (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
@@ -164,8 +165,8 @@ typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclarat
   return $ ValueDeclaration entryName TypeInstanceMember [] Nothing
     (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
   where
-  lookupTypeClass m = maybe (Left $ "Type class " ++ show className ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (qualify mn className) m
-  lookupIdent members = maybe (Left $ "Type class " ++ show className ++ " does not have method " ++ show ident) Right $ lookup (identToJs ident) members
+  lookupTypeClass m = maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $ M.lookup (qualify mn className) m
+  lookupIdent members = maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " does not have method " ++ show ident) Nothing) Right $ lookup (identToJs ident) members
 typeInstanceDictionaryEntryDeclaration name mn deps className tys (PositionedDeclaration pos d) =
   PositionedDeclaration pos <$> typeInstanceDictionaryEntryDeclaration name mn deps className tys d
 typeInstanceDictionaryEntryDeclaration _ _ _ _ _ _ = error "Invalid declaration in type instance definition"

@@ -44,7 +44,7 @@ import qualified Text.Parsec.Expr as P
 sourcePos :: P.Parsec s u SourcePos
 sourcePos = toSourcePos <$> P.getPosition
   where
-  toSourcePos p = SourcePos (P.sourceLine p) (P.sourceColumn p)
+  toSourcePos p = SourcePos (P.sourceName p) (P.sourceLine p) (P.sourceColumn p)
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do

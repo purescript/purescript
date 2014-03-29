@@ -59,6 +59,7 @@ import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Pretty
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 import qualified Language.PureScript.Constants as C
 
 import Control.Monad.State
@@ -85,7 +86,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (mkUnifyErrorStack ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing <>) $
+unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing <>) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
@@ -364,7 +365,7 @@ skolemEscapeCheck root@TypedValue{} =
   -- an escaped skolem variable.
   case everythingWithContext [] (++) (mkQ ((,) []) go) root of
     [] -> return ()
-    ((binding, val) : _) -> throwError $ mkUnifyErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ValueError val))
+    ((binding, val) : _) -> throwError $ mkErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ValueError val))
   where
   go :: Value -> [(SkolemScope, Value)] -> ([(Maybe Value, Value)], [(SkolemScope, Value)])
   go val@(TypedValue _ _ (ForAll _ _ (Just sco))) scos = ([], (sco, val) : scos)
@@ -383,7 +384,7 @@ skolemEscapeCheck root@TypedValue{} =
     where
     go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
     go' _ = Nothing
-skolemEscapeCheck val = throwError $ mkUnifyErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ValueError val))
+skolemEscapeCheck val = throwError $ mkErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ValueError val))
 
 -- |
 -- Ensure a row contains no duplicate labels
@@ -492,7 +493,7 @@ ensureNoDuplicateProperties ps = guardWith (strMsg "Duplicate property names") $
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
 infer :: Value -> UnifyT Type Check Value
-infer val = rethrow (mkUnifyErrorStack "Error inferring type of value" (Just (ValueError val)) <>) $ infer' val
+infer val = rethrow (mkErrorStack "Error inferring type of value" (Just (ValueError val)) <>) $ infer' val
 
 -- |
 -- Infer a type for a value
@@ -720,7 +721,7 @@ introduceSkolemScope = everywhereM (mkM go)
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
 check :: Value -> Type -> UnifyT Type Check Value
-check val ty = rethrow (mkUnifyErrorStack errorMessage (Just (ValueError val)) <>) $ check' val ty
+check val ty = rethrow (mkErrorStack errorMessage (Just (ValueError val)) <>) $ check' val ty
   where
   errorMessage =
     "Error checking type of term " ++
@@ -836,7 +837,7 @@ check' val ty | containsTypeSynonyms ty = do
   check val ty'
 check' (PositionedValue pos val) ty =
   rethrowWithPosition pos $ check val ty
-check' val ty = throwError $ mkUnifyErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
+check' val ty = throwError $ mkErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everything (||) (mkQ False go) where
@@ -855,8 +856,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                                return []
   go [] [] (Skolem _ _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError $ mkUnifyErrorStack ("Object does not have property " ++ p) (Just (ValueError (ObjectLiteral ps)))
-  go ((p,_):_) [] REmpty = throwError $ mkUnifyErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ValueError (ObjectLiteral ps)))
+                      | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ValueError (ObjectLiteral ps)))
+  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ValueError (ObjectLiteral ps)))
   go ((p,v):ps') [] u@(TUnknown _) = do
     v'@(TypedValue _ _ ty) <- infer v
     rest <- fresh
@@ -875,13 +876,13 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError $ mkUnifyErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ValueError (ObjectLiteral ps)))
+  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ValueError (ObjectLiteral ps)))
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
-checkFunctionApplication fn fnTy arg ret = rethrow (mkUnifyErrorStack errorMessage (Just (ValueError fn)) <>) $ checkFunctionApplication' fn fnTy arg ret
+checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ValueError fn)) <>) $ checkFunctionApplication' fn fnTy arg ret
   where
   errorMessage = "Error applying function of type "
     ++ prettyPrintType fnTy
@@ -923,7 +924,7 @@ checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a f
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
 subsumes :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
-subsumes val ty1 ty2 = rethrow (mkUnifyErrorStack errorMessage (ValueError <$> val) <>) $ subsumes' val ty1 ty2
+subsumes val ty1 ty2 = rethrow (mkErrorStack errorMessage (ValueError <$> val) <>) $ subsumes' val ty1 ty2
   where
   errorMessage = "Error checking that type "
     ++ prettyPrintType ty1

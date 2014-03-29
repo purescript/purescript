@@ -28,6 +28,7 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Pretty
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 import Control.Monad.State
 import Control.Monad.Error
@@ -60,7 +61,7 @@ instance Unifiable Check Kind where
 --
 kindOf :: ModuleName -> Type -> Check Kind
 kindOf _ ty =
-  rethrow (mkUnifyErrorStack "Error checking kind" (Just (TypeError ty)) <>) $
+  rethrow (mkErrorStack "Error checking kind" (Just (TypeError ty)) <>) $
     fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
   where
   tidyUp (k, sub) = sub $? k
@@ -129,7 +130,7 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Kind Check Kind
-infer ty = rethrow (mkUnifyErrorStack "Error inferring type of value" (Just (TypeError ty)) <>) $ infer' ty
+infer ty = rethrow (mkErrorStack "Error inferring type of value" (Just (TypeError ty)) <>) $ infer' ty
 
 infer' :: Type -> UnifyT Kind Check Kind
 infer' (TypeVar v) = do
@@ -138,7 +139,7 @@ infer' (TypeVar v) = do
 infer' c@(TypeConstructor v) = do
   env <- liftCheck getEnv
   case M.lookup v (types env) of
-    Nothing -> UnifyT . lift . throwError $ mkUnifyErrorStack "Unknown type constructor" (Just (TypeError c))
+    Nothing -> UnifyT . lift . throwError $ mkErrorStack "Unknown type constructor" (Just (TypeError c))
     Just (kind, _) -> return kind
 infer' (TypeApp t1 t2) = do
   k0 <- fresh

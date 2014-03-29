@@ -21,14 +21,12 @@ module Language.PureScript.TypeChecker.Monad where
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Pretty
 import Language.PureScript.Options
+import Language.PureScript.Errors
 
 import Data.Maybe
-import Data.Monoid
 
 import Control.Applicative
 import Control.Monad.State
@@ -36,78 +34,6 @@ import Control.Monad.Error
 import Control.Monad.Unify
 
 import qualified Data.Map as M
-import Data.List (intercalate)
-
--- |
--- Type for sources of type checking errors
---
-data UnifyErrorSource
-  -- |
-  -- An error which originated at a Value
-  --
-  = ValueError Value
-  -- |
-  -- An error which originated at a Type
-  --
-  | TypeError Type deriving (Show)
-
--- |
--- Unification errors
---
-data UnifyError = UnifyError {
-    -- |
-    -- Error message
-    --
-    unifyErrorMessage :: String
-    -- |
-    -- The value where the error occurred
-    --
-  , unifyErrorValue :: Maybe UnifyErrorSource
-    -- |
-    -- Optional source position information
-    --
-  , unifyErrorPosition :: Maybe SourcePos
-  } deriving (Show)
-
--- |
--- A stack trace for an error
---
-newtype UnifyErrorStack = UnifyErrorStack { runUnifyErrorStack :: [UnifyError] } deriving (Show, Monoid)
-
-instance Error UnifyErrorStack where
-  strMsg s = UnifyErrorStack [UnifyError s Nothing Nothing]
-  noMsg = UnifyErrorStack []
-
-prettyPrintUnifyErrorStack :: Options -> UnifyErrorStack -> String
-prettyPrintUnifyErrorStack opts (UnifyErrorStack es) =
-  case mconcat $ map (Last . unifyErrorPosition) es of
-    Last (Just sourcePos) -> "Error at " ++ show sourcePos ++ ": \n" ++ prettyPrintUnifyErrorStack'
-    _ -> prettyPrintUnifyErrorStack'
-  where
-  prettyPrintUnifyErrorStack' :: String
-  prettyPrintUnifyErrorStack'
-    | optionsVerboseErrors opts =
-      intercalate "\n" (map showError (filter isErrorNonEmpty es))
-    | otherwise =
-      let
-        es' = filter isErrorNonEmpty es
-      in case length es' of
-        1 -> showError (head es')
-        _ -> showError (head es') ++ "\n" ++ showError (last es')
-
-isErrorNonEmpty :: UnifyError -> Bool
-isErrorNonEmpty = not . null . unifyErrorMessage
-
-showError :: UnifyError -> String
-showError (UnifyError msg Nothing _) = msg
-showError (UnifyError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ "\n" ++ msg
-showError (UnifyError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ "\n" ++ msg
-
-mkUnifyErrorStack :: String -> Maybe UnifyErrorSource -> UnifyErrorStack
-mkUnifyErrorStack msg t = UnifyErrorStack [UnifyError msg t Nothing]
-
-positionError :: SourcePos -> UnifyErrorStack
-positionError pos = UnifyErrorStack [UnifyError "" Nothing (Just pos)]
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -207,8 +133,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either UnifyErrorStack) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError UnifyErrorStack)
+newtype Check a = Check { unCheck :: StateT CheckState (Either ErrorStack) a }
+  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError ErrorStack)
 
 -- |
 -- Get the current @Environment@
@@ -238,7 +164,7 @@ runCheck opts = runCheck' opts initEnvironment
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
 runCheck' :: Options -> Environment -> Check a -> Either String (a, Environment)
-runCheck' opts env c = either (Left . prettyPrintUnifyErrorStack opts) Right $ do
+runCheck' opts env c = stringifyErrorStack (optionsVerboseErrors opts) $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
@@ -248,18 +174,6 @@ runCheck' opts env c = either (Left . prettyPrintUnifyErrorStack opts) Right $ d
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()
 guardWith e False = throwError e
-
--- |
--- Rethrow an error with a more detailed error message in the case of failure
---
-rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
-rethrow f = flip catchError $ \e -> throwError (f e)
-
--- |
--- Rethrow an error with source position information
---
-rethrowWithPosition :: (MonadError UnifyErrorStack m) => SourcePos -> m a -> m a
-rethrowWithPosition pos = rethrow (positionError pos <>)
 
 -- |
 -- Generate new type class dictionary name

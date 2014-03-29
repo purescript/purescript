@@ -11,7 +11,7 @@
 - Prelude modules now follow a naming scheme similar to haskell (e.g. `Data.Maybe`, `Control.Monad`) (garyb)
 - Multiple modules with the same name are now disallowed rather than merged (garyb)
 - The `--runtime-type-checks` flag has been removed. Runtime type checks have been superceded by the `purescript-foreign` library (paf31)
-- The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or a specific import list. (garyb/paf31)
+- The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or a specific import list. (garyb, paf31)
 
 ### New Features
 
@@ -47,6 +47,8 @@
 - The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
 - Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb) 
 - Unary minus and signed numeric literals are now supported again (paf31, garyb)
+- Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
+- Error messages now display source positions (paf31, garyb)
  
 ### Bug Fixes
 
@@ -64,6 +66,7 @@
 - If a type defined in a module appears in an exported declaration it must also be exported from the module (garyb)
 - Error messages for unresolvable types or values include the declaration name again (garyb)
 - Characters in string literals are now properly escaped (garyb)
+- A module containing a single orphan type declaration and no other declarations now fails to compile (garyb)
 
 ### Libraries
 

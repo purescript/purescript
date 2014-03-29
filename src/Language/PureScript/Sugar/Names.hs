@@ -18,6 +18,7 @@ module Language.PureScript.Sugar.Names (
 
 import Data.Data
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
+import Data.Monoid ((<>))
 import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
@@ -30,6 +31,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 -- |
 -- The global export environment - every declaration exported from every module.
@@ -80,7 +82,7 @@ data ImportEnvironment = ImportEnvironment
 -- Updates the exports for a module from the global environment. If the module was not previously
 -- present in the global environment, it is created.
 --
-updateExportedModule :: ExportEnvironment -> ModuleName -> (Exports -> Either String Exports) -> Either String ExportEnvironment
+updateExportedModule :: ExportEnvironment -> ModuleName -> (Exports -> Either ErrorStack Exports) -> Either ErrorStack ExportEnvironment
 updateExportedModule env mn update = do
   let exports = fromMaybe (error "Module was undefined in updateExportedModule") $ mn `M.lookup` env
   exports' <- update exports
@@ -89,16 +91,16 @@ updateExportedModule env mn update = do
 -- |
 -- Adds an empty module to an ExportEnvironment.
 --
-addEmptyModule :: ExportEnvironment -> ModuleName -> Either String ExportEnvironment
+addEmptyModule :: ExportEnvironment -> ModuleName -> Either ErrorStack ExportEnvironment
 addEmptyModule env name =
   if name `M.member` env
-    then throwError $ "Module '" ++ show name ++ "' has been defined more than once"
+    then throwError $ mkErrorStack ("Module '" ++ show name ++ "' has been defined more than once") Nothing
     else return $ M.insert name (Exports [] [] []) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
 --
-addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either String ExportEnvironment
+addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either ErrorStack ExportEnvironment
 addType env mn name dctors = updateExportedModule env mn $ \m -> do
   types' <- addExport (exportedTypes m) (name, dctors)
   return $ m { exportedTypes = types' }
@@ -106,7 +108,7 @@ addType env mn name dctors = updateExportedModule env mn $ \m -> do
 -- |
 -- Adds a class to the export environment.
 --
-addTypeClass :: ExportEnvironment -> ModuleName -> ProperName -> Either String ExportEnvironment
+addTypeClass :: ExportEnvironment -> ModuleName -> ProperName -> Either ErrorStack ExportEnvironment
 addTypeClass env mn name = updateExportedModule env mn $ \m -> do
   classes <- addExport (exportedTypeClasses m) name
   return $ m { exportedTypeClasses = classes }
@@ -114,7 +116,7 @@ addTypeClass env mn name = updateExportedModule env mn $ \m -> do
 -- |
 -- Adds a class to the export environment.
 --
-addValue :: ExportEnvironment -> ModuleName -> Ident -> Either String ExportEnvironment
+addValue :: ExportEnvironment -> ModuleName -> Ident -> Either ErrorStack ExportEnvironment
 addValue env mn name = updateExportedModule env mn $ \m -> do
   values <- addExport (exportedValues m) name
   return $ m { exportedValues = values }
@@ -123,16 +125,16 @@ addValue env mn name = updateExportedModule env mn $ \m -> do
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (Eq a, Show a) => [a] -> a -> Either String [a]
+addExport :: (Eq a, Show a) => [a] -> a -> Either ErrorStack [a]
 addExport exports name =
   if name `elem` exports
-  then throwError $ "Multiple definitions for '" ++ show name ++ "'"
+  then throwError $ mkErrorStack ("Multiple definitions for '" ++ show name ++ "'") Nothing
   else return $ name : exports
 
 -- |
 -- Replaces all local names with qualified names within a set of modules.
 --
-desugarImports :: [Module] -> Either String [Module]
+desugarImports :: [Module] -> Either ErrorStack [Module]
 desugarImports modules = do
   unfilteredExports <- findExports modules
   exports <- foldM filterModuleExports unfilteredExports modules
@@ -142,30 +144,19 @@ desugarImports modules = do
   -- Filters the exports for a module in the global exports environment so that only explicitly
   -- exported members remain. If the module does not explicitly export anything, everything is
   -- exported.
-  filterModuleExports :: ExportEnvironment -> Module -> Either String ExportEnvironment
+  filterModuleExports :: ExportEnvironment -> Module -> Either ErrorStack ExportEnvironment
   filterModuleExports env (Module mn _ (Just exps)) = filterExports mn exps env
   filterModuleExports env _ = return env
 
   -- Rename and check all the names within a module. We tweak the global exports environment so
   -- the module has access to an unfiltered list of its own members.
-  renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either String Module
-  renameInModule' unfilteredExports exports m@(Module mn _ _) = rethrowForModule m $ do
-    let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
-    let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
-    imports <- resolveImports env m
-    renameInModule imports env (elaborateExports exps m)
-
--- |
--- Rethrow an error with an extra message line prepended
---
-rethrow :: String -> Either String a -> Either String a
-rethrow msg = flip catchError $ \e -> throwError (msg ++ ":\n" ++  e)
-
--- |
--- Rethrow an error with details of the current module prepended to the message
---
-rethrowForModule :: Module -> Either String a -> Either String a
-rethrowForModule (Module mn _ _) = rethrow $ "Error in module '" ++ show mn ++ "'"
+  renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either ErrorStack Module
+  renameInModule' unfilteredExports exports m@(Module mn _ _) =
+    rethrow (strMsg ("Error in module " ++ show mn) <>) $ do
+      let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
+      let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
+      imports <- resolveImports env m
+      renameInModule imports env (elaborateExports exps m)
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that have an exports list,
@@ -181,23 +172,27 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
 -- Replaces all local names with qualified names within a module and checks that all existing
 -- qualified names are valid.
 --
-renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either String Module
+renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either ErrorStack Module
 renameInModule imports exports (Module mn decls exps) =
   Module mn <$> mapM go decls <*> pure exps
   where
+  go :: Declaration -> Either ErrorStack Declaration
   go (DataDeclaration name args dctors) =
-      rethrowFor "data declaration" name $ DataDeclaration <$> pure name <*> pure args <*> updateAll dctors
+      rethrow (strMsg ("Error in data declaration " ++ show name) <>) $
+        DataDeclaration <$> pure name <*> pure args <*> updateAll dctors
   go (DataBindingGroupDeclaration decls') =
       DataBindingGroupDeclaration <$> mapM go decls'
   go (TypeSynonymDeclaration name ps ty) =
-      rethrowFor "type synonym" name $ TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
+      rethrow (strMsg ("Error in type synonym " ++ show name) <>) $
+        TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
   go (TypeInstanceDeclaration name cs cn ts ds) =
       TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts <*> mapM go ds
   go (ExternInstanceDeclaration name cs cn ts) =
       ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts
   go (ValueDeclaration name nameKind [] Nothing val) = do
     val' <- everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
-    rethrowFor "declaration" name $ ValueDeclaration name nameKind [] Nothing <$> updateAll val'
+    rethrow (strMsg ("Error in declaration " ++ show name) <>) $
+      ValueDeclaration name nameKind [] Nothing <$> updateAll val'
     where
     bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
     bindFunctionArgs bound (Let ds val') = let args = mapMaybe letBoundVariable ds in
@@ -211,7 +206,7 @@ renameInModule imports exports (Module mn decls exps) =
     bindFunctionArgs bound (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
       (,) bound <$> (BinaryNoParens <$> updateValueName name' <*> pure v1 <*> pure v2)
     bindFunctionArgs bound other = return (bound, other)
-    bindBinders :: [Ident] -> CaseAlternative -> Either String ([Ident], CaseAlternative)
+    bindBinders :: [Ident] -> CaseAlternative -> Either ErrorStack ([Ident], CaseAlternative)
     bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
 
     letBoundVariable :: Declaration -> Maybe Ident
@@ -220,17 +215,18 @@ renameInModule imports exports (Module mn decls exps) =
     letBoundVariable _ = Nothing
   go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
   go (ExternDeclaration fit name js ty) =
-      rethrowFor "declaration" name $ ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
+      rethrow (strMsg ("Error in declaration " ++ show name) <>) $
+        ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
   go (BindingGroupDeclaration decls') = do
       BindingGroupDeclaration <$> mapM go' decls'
-      where go' = \(name, nk, value) -> rethrowFor "declaration" name $ (,,) <$> pure name <*> pure nk <*> updateAll value
+      where
+      go' = \(name, nk, value) ->
+        rethrow (strMsg ("Error in declaration " ++ show name) <>) $
+          (,,) <$> pure name <*> pure nk <*> updateAll value
   go (PositionedDeclaration pos d) = PositionedDeclaration pos <$> go d
   go d = updateAll d
 
-  rethrowFor :: (Show a) => String -> a -> Either String b -> Either String b
-  rethrowFor what name = rethrow $ "Error in " ++ what ++ "  '" ++ show name ++ "'"
-
-  updateAll :: Data d => d -> Either String d
+  updateAll :: Data d => d -> Either ErrorStack d
   updateAll = everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
 
   updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
@@ -243,7 +239,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
   updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
   updateType t = return t
-  updateType' :: Data d => d -> Either String d
+  updateType' :: Data d => d -> Either ErrorStack d
   updateType' = everywhereM (mkM updateType)
 
   updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
@@ -259,24 +255,24 @@ renameInModule imports exports (Module mn decls exps) =
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
                             -> (Qualified a)
-                            -> Either String (Qualified a)
+                            -> Either ErrorStack (Qualified a)
   update t getI checkE qname@(Qualified mn' name) = case (M.lookup qname (getI imports), mn') of
     (Just qname', _) -> return qname'
     (Nothing, Just mn'') -> do
       modExports <- getExports mn''
       if checkE modExports name
         then return qname
-        else throwError $ "Unknown " ++ t ++ " '" ++ show (qname) ++ "'"
-    _ -> throwError $ "Unknown " ++ t ++ " '" ++ show name ++ "'"
+        else throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show (qname) ++ "'") Nothing
+    _ -> throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show name ++ "'") Nothing
 
   -- Gets the exports for a module, or an error message if the module doesn't exist
-  getExports :: ModuleName -> Either String Exports
-  getExports mn' = maybe (throwError $ "Unknown module '" ++ show mn' ++ "'") return $ M.lookup mn' exports
+  getExports :: ModuleName -> Either ErrorStack Exports
+  getExports mn' = maybe (throwError $ mkErrorStack ("Unknown module '" ++ show mn' ++ "'") Nothing) return $ M.lookup mn' exports
 
 -- |
 -- Finds all exported declarations in a set of modules.
 --
-findExports :: [Module] -> Either String ExportEnvironment
+findExports :: [Module] -> Either ErrorStack ExportEnvironment
 findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) primExports
   where
 
@@ -286,13 +282,13 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
     mkTypeEntry (Qualified _ name) = (name, [])
 
   -- Add all of the exported declarations from a module to the global export environment
-  addModule :: ExportEnvironment -> Module -> Either String ExportEnvironment
+  addModule :: ExportEnvironment -> Module -> Either ErrorStack ExportEnvironment
   addModule env m@(Module mn ds _) = do
     env' <- addEmptyModule env mn
-    rethrowForModule m $ foldM (addDecl mn) env' ds
+    rethrow (strMsg ("Error in module " ++ show mn) <>) $ foldM (addDecl mn) env' ds
 
   -- Add a declaration from a module to the global export environment
-  addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either String ExportEnvironment
+  addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either ErrorStack ExportEnvironment
   addDecl mn env (TypeClassDeclaration tcn _ ds) = do
     env' <- addTypeClass env mn tcn
     foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
@@ -308,7 +304,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 -- Filters the exports for a module to ensure only explicit exports are kept in the global exports
 -- environment.
 --
-filterExports :: ModuleName -> [DeclarationRef] -> ExportEnvironment -> Either String ExportEnvironment
+filterExports :: ModuleName -> [DeclarationRef] -> ExportEnvironment -> Either ErrorStack ExportEnvironment
 filterExports mn exps env = do
   let moduleExports = fromMaybe (error "Module is missing") (mn `M.lookup` env)
   moduleExports' <- filterModule moduleExports
@@ -316,7 +312,7 @@ filterExports mn exps env = do
   where
 
   -- Filter the exports for the specific module
-  filterModule :: Exports -> Either String Exports
+  filterModule :: Exports -> Either ErrorStack Exports
   filterModule exported = do
     types' <- foldM (filterTypes $ exportedTypes exported) [] exps
     values <- foldM (filterValues $ exportedValues exported) [] exps
@@ -325,34 +321,34 @@ filterExports mn exps env = do
 
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
-  filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> Either String [(ProperName, [ProperName])]
+  filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> Either ErrorStack [(ProperName, [ProperName])]
   filterTypes expTys result (TypeRef name expDcons) = do
-    dcons <- maybe (throwError $ "Cannot export undefined type '" ++ show name ++ "'") return $ name `lookup` expTys
+    dcons <- maybe (throwError $ mkErrorStack ("Cannot export undefined type '" ++ show name ++ "'") Nothing) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
     return $ (name, dcons') : result
   filterTypes _ result _ = return result
 
   -- Ensure the exported data constructors exists for a type and add them to the list of exports
-  filterDcons :: ProperName -> [ProperName] -> [ProperName] -> ProperName -> Either String [ProperName]
+  filterDcons :: ProperName -> [ProperName] -> [ProperName] -> ProperName -> Either ErrorStack [ProperName]
   filterDcons tcon exps' result name =
     if name `elem` exps'
     then return $ name : result
-    else throwError $ "Cannot export undefined data constructor '" ++ show name ++ "' for type '" ++ show tcon ++ "'"
+    else throwError $ mkErrorStack ("Cannot export undefined data constructor '" ++ show name ++ "' for type '" ++ show tcon ++ "'") Nothing
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
-  filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> Either String [ProperName]
+  filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> Either ErrorStack [ProperName]
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError $ "Cannot export undefined type class '" ++ show name ++ "'"
+    else throwError $ mkErrorStack ("Cannot export undefined type class '" ++ show name ++ "'") Nothing
   filterClasses _ result _ = return result
 
   -- Ensure the exported values exist in the module and add them to the set of exports
-  filterValues :: [Ident] -> [Ident] -> DeclarationRef -> Either String [Ident]
+  filterValues :: [Ident] -> [Ident] -> DeclarationRef -> Either ErrorStack [Ident]
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError $ "Cannot export undefined value '" ++ show name ++ "'"
+    else throwError $ mkErrorStack ("Cannot export undefined value '" ++ show name ++ "'") Nothing
   filterValues _ result _ = return result
 
 -- |
@@ -374,7 +370,7 @@ findImports = foldl findImports' M.empty
 -- |
 -- Constructs a local environment for a module.
 --
-resolveImports :: ExportEnvironment -> Module -> Either String ImportEnvironment
+resolveImports :: ExportEnvironment -> Module -> Either ErrorStack ImportEnvironment
 resolveImports env (Module currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
@@ -382,25 +378,25 @@ resolveImports env (Module currentModule decls _) =
   scope :: M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
   scope = M.insert currentModule (Nothing, Nothing) (findImports decls)
   resolveImport' imp (mn, (explImports, impQual)) = do
-      modExports <- maybe (throwError $ "Cannot import unknown module '" ++ show mn ++ "'") return $ mn `M.lookup` env
+      modExports <- maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
       resolveImport currentModule mn modExports imp impQual explImports
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
 --
-resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports-> Either String ImportEnvironment
+resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports-> Either ErrorStack ImportEnvironment
 resolveImport currentModule importModule exps imps impQual = maybe importAll (foldM importExplicit imps)
   where
 
   -- Import everything from a module
-  importAll :: Either String ImportEnvironment
+  importAll :: Either ErrorStack ImportEnvironment
   importAll = do
     imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeRef name (Just dctors))) imps (exportedTypes exps)
     imp'' <- foldM (\m name -> importExplicit m (ValueRef name)) imp' (exportedValues exps)
     foldM (\m name -> importExplicit m (TypeClassRef name)) imp'' (exportedTypeClasses exps)
 
   -- Import something explicitly
-  importExplicit :: ImportEnvironment -> DeclarationRef -> Either String ImportEnvironment
+  importExplicit :: ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
   importExplicit imp (ValueRef name) = do
     _ <- checkImportExists "value" values name
     values' <- updateImports (importedValues imp) name
@@ -423,14 +419,15 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
   allExportedDataConstructors name = fromMaybe [] $ name `lookup` exportedTypes exps
 
   -- Add something to the ImportEnvironment if it does not already exist there
-  updateImports :: (Ord a, Show a) => M.Map (Qualified a) (Qualified a) -> a -> Either String (M.Map (Qualified a) (Qualified a))
+  updateImports :: (Ord a, Show a) => M.Map (Qualified a) (Qualified a) -> a -> Either ErrorStack (M.Map (Qualified a) (Qualified a))
   updateImports m name = case M.lookup (Qualified impQual name) m of
     Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
-    Just x@(Qualified (Just mn) _) -> throwError $
-      if mn == currentModule || importModule == currentModule
-      then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just importModule) name) ++ "'"
-      else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just importModule) name) ++ "'"
+    Just x@(Qualified (Just mn) _) -> throwError $ mkErrorStack err Nothing
+      where
+      err = if mn == currentModule || importModule == currentModule
+            then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just importModule) name) ++ "'"
+            else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just importModule) name) ++ "'"
 
   -- The available values, types, and classes in the module being imported
   values = exportedValues exps
@@ -439,14 +436,14 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
 
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
-  checkDctorExists :: [ProperName] -> ProperName -> Either String ProperName
+  checkDctorExists :: [ProperName] -> ProperName -> Either ErrorStack ProperName
   checkDctorExists = checkImportExists "data constructor"
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => String -> [a] -> a -> Either String a
+  checkImportExists :: (Eq a, Show a) => String -> [a] -> a -> Either ErrorStack a
   checkImportExists t exports item =
       if item `elem` exports
       then return item
-      else throwError $ "Unable to find " ++ t ++  " '" ++ show (Qualified (Just importModule) item) ++ "'"
+      else throwError $ mkErrorStack ("Unable to find " ++ t ++  " '" ++ show (Qualified (Just importModule) item) ++ "'") Nothing
 
 

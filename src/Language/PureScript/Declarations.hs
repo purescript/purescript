@@ -45,11 +45,14 @@ instance Show Associativity where
 -- Source position information
 --
 data SourcePos = SourcePos
-  {
+  { -- |
+    -- Source name
+    --
+    sourceName :: String
     -- |
     -- Line number
     --
-    sourcePosLine :: Int
+  , sourcePosLine :: Int
     -- |
     -- Column number
     --
@@ -57,7 +60,7 @@ data SourcePos = SourcePos
   } deriving (D.Data, D.Typeable)
 
 instance Show SourcePos where
-  show sp = "line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
+  show sp = (sourceName sp) ++ " line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
 
 -- |
 -- Fixity data for infix operators
