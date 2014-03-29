@@ -22,6 +22,7 @@ import Data.Monoid
 import Control.Monad.Error
 
 import Language.PureScript.Declarations
+import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 
@@ -30,9 +31,17 @@ import Language.PureScript.Types
 --
 data ErrorSource
   -- |
+  -- An error which originated in a module
+  --
+  = ModuleError ModuleName
+  -- |
+  -- An error which originated at a Declaration
+  --
+  | DeclarationError (Either ProperName Ident)
+  -- |
   -- An error which originated at a Value
   --
-  = ValueError Value
+  | ValueError Value
   -- |
   -- An error which originated at a Type
   --
@@ -86,8 +95,11 @@ isErrorNonEmpty = not . null . compileErrorMessage
 
 showError :: CompileError -> String
 showError (CompileError msg Nothing _) = msg
-showError (CompileError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ "\n" ++ msg
-showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ "\n" ++ msg
+showError (CompileError msg (Just (ModuleError mn)) _) = "Error in module " ++ runModuleName mn ++ ":\n" ++ msg
+showError (CompileError msg (Just (DeclarationError (Left pn))) _) = "Error in declaration " ++ show pn ++ ":\n" ++ msg
+showError (CompileError msg (Just (DeclarationError (Right i))) _) = "Error in declaration " ++ show i ++ ":\n" ++ msg
+showError (CompileError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ ":\n" ++ msg
+showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ":\n" ++ msg
 
 mkUnifyErrorStack :: String -> Maybe ErrorSource -> ErrorStack
 mkUnifyErrorStack msg t = ErrorStack [CompileError msg t Nothing]
