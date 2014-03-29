@@ -33,11 +33,12 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
-createBindingGroupsModule :: [Module] -> Either String [Module]
+createBindingGroupsModule :: [Module] -> Either ErrorStack [Module]
 createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> createBindingGroups name ds <*> pure exps
 
 -- |
@@ -49,7 +50,7 @@ collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (colla
 -- |
 -- Replace all sets of mutually-recursive declarations with binding groups
 --
-createBindingGroups :: ModuleName -> [Declaration] -> Either String [Declaration]
+createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
 createBindingGroups moduleName ds = do
   values <- mapM (createBindingGroupsForValue moduleName) $ filter isValueDecl ds
   let dataDecls = filter isDataDecl ds
@@ -68,7 +69,7 @@ createBindingGroups moduleName ds = do
            filter isExternDecl ds ++
            bindingGroupDecls
 
-createBindingGroupsForValue :: ModuleName -> Declaration -> Either String Declaration
+createBindingGroupsForValue :: ModuleName -> Declaration -> Either ErrorStack Declaration
 createBindingGroupsForValue moduleName = everywhereM' (mkM go)
   where
   go (Let ds val) = Let <$> createBindingGroups moduleName ds <*> pure val
@@ -124,13 +125,13 @@ toBindingGroup (AcyclicSCC d) = d
 toBindingGroup (CyclicSCC [d]) = d
 toBindingGroup (CyclicSCC ds') = BindingGroupDeclaration $ map fromValueDecl ds'
 
-toDataBindingGroup :: SCC Declaration -> Either String Declaration
+toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> Left $ "Cycle in type synonym " ++ show pn
+  Just pn -> Left $ mkErrorStack ("Cycle in type synonym " ++ show pn) Nothing
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = Left "Cycle in type synonyms"
+  | all (isJust . isTypeSynonym) ds' = Left $ mkErrorStack "Cycle in type synonyms" Nothing
   | otherwise = return $ DataBindingGroupDeclaration ds'
 
 isTypeSynonym :: Declaration -> Maybe ProperName

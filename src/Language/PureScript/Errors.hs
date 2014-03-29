@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleContexts #-}
 
 module Language.PureScript.Errors where
 
@@ -22,7 +22,6 @@ import Data.Monoid
 import Control.Monad.Error
 
 import Language.PureScript.Declarations
-import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 
@@ -31,17 +30,9 @@ import Language.PureScript.Types
 --
 data ErrorSource
   -- |
-  -- An error which originated in a module
-  --
-  = ModuleError ModuleName
-  -- |
-  -- An error which originated at a Declaration
-  --
-  | DeclarationError (Either ProperName Ident)
-  -- |
   -- An error which originated at a Value
   --
-  | ValueError Value
+  = ValueError Value
   -- |
   -- An error which originated at a Type
   --
@@ -68,21 +59,21 @@ data CompileError = CompileError {
 -- |
 -- A stack trace for an error
 --
-newtype ErrorStack = ErrorStack { runUnifyErrorStack :: [CompileError] } deriving (Show, Monoid)
+newtype ErrorStack = ErrorStack { runErrorStack :: [CompileError] } deriving (Show, Monoid)
 
 instance Error ErrorStack where
   strMsg s = ErrorStack [CompileError s Nothing Nothing]
   noMsg = ErrorStack []
 
 prettyPrintErrorStack :: Bool -> ErrorStack -> String
-prettyPrintErrorStack printAll (ErrorStack es) =
+prettyPrintErrorStack printFullStack (ErrorStack es) =
   case mconcat $ map (Last . compileErrorPosition) es of
-    Last (Just sourcePos) -> "Error at " ++ show sourcePos ++ ": \n" ++ prettyPrintUnifyErrorStack'
-    _ -> prettyPrintUnifyErrorStack'
+    Last (Just sourcePos) -> "Error at " ++ show sourcePos ++ ": \n" ++ prettyPrintErrorStack'
+    _ -> prettyPrintErrorStack'
   where
-  prettyPrintUnifyErrorStack' :: String
-  prettyPrintUnifyErrorStack'
-    | printAll = intercalate "\n" (map showError (filter isErrorNonEmpty es))
+  prettyPrintErrorStack' :: String
+  prettyPrintErrorStack'
+    | printFullStack = intercalate "\n" (map showError (filter isErrorNonEmpty es))
     | otherwise =
       let
         es' = filter isErrorNonEmpty es
@@ -90,19 +81,31 @@ prettyPrintErrorStack printAll (ErrorStack es) =
         1 -> showError (head es')
         _ -> showError (head es') ++ "\n" ++ showError (last es')
 
+stringifyErrorStack :: Bool -> Either ErrorStack a -> Either String a
+stringifyErrorStack printFullStack = either (Left . prettyPrintErrorStack printFullStack) Right
+
 isErrorNonEmpty :: CompileError -> Bool
 isErrorNonEmpty = not . null . compileErrorMessage
 
 showError :: CompileError -> String
 showError (CompileError msg Nothing _) = msg
-showError (CompileError msg (Just (ModuleError mn)) _) = "Error in module " ++ runModuleName mn ++ ":\n" ++ msg
-showError (CompileError msg (Just (DeclarationError (Left pn))) _) = "Error in declaration " ++ show pn ++ ":\n" ++ msg
-showError (CompileError msg (Just (DeclarationError (Right i))) _) = "Error in declaration " ++ show i ++ ":\n" ++ msg
 showError (CompileError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ ":\n" ++ msg
 showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ":\n" ++ msg
 
-mkUnifyErrorStack :: String -> Maybe ErrorSource -> ErrorStack
-mkUnifyErrorStack msg t = ErrorStack [CompileError msg t Nothing]
+mkErrorStack :: String -> Maybe ErrorSource -> ErrorStack
+mkErrorStack msg t = ErrorStack [CompileError msg t Nothing]
 
 positionError :: SourcePos -> ErrorStack
 positionError pos = ErrorStack [CompileError "" Nothing (Just pos)]
+
+-- |
+-- Rethrow an error with a more detailed error message in the case of failure
+--
+rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
+rethrow f = flip catchError $ \e -> throwError (f e)
+
+-- |
+-- Rethrow an error with source position information
+--
+rethrowWithPosition :: (MonadError ErrorStack m) => SourcePos -> m a -> m a
+rethrowWithPosition pos = rethrow (positionError pos <>)

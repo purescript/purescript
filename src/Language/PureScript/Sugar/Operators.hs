@@ -26,6 +26,7 @@ module Language.PureScript.Sugar.Operators (
 
 import Language.PureScript.Names
 import Language.PureScript.Declarations
+import Language.PureScript.Errors
 
 import Control.Applicative
 import Control.Monad.State
@@ -48,7 +49,7 @@ import qualified Language.PureScript.Constants as C
 -- |
 -- Remove explicit parentheses and reorder binary operator applications
 --
-rebracket :: [Module] -> Either String [Module]
+rebracket :: [Module] -> Either ErrorStack [Module]
 rebracket ms = do
   let fixities = concatMap collectFixities ms
   ensureNoDuplicates $ map fst fixities
@@ -63,7 +64,7 @@ removeSignedLiterals = G.everywhere (G.mkT go)
   go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
   go other = other
 
-rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either String Module
+rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either ErrorStack Module
 rebracketModule opTable (Module mn ds exts) = Module mn <$> (removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
 
 removeParens :: (D.Data d) => d -> d
@@ -80,12 +81,12 @@ collectFixities (Module moduleName ds _) = concatMap collect ds
   collect (FixityDeclaration fixity name) = [(Qualified (Just moduleName) (Op name), fixity)]
   collect _ = []
 
-ensureNoDuplicates :: [Qualified Ident] -> Either String ()
+ensureNoDuplicates :: [Qualified Ident] -> Either ErrorStack ()
 ensureNoDuplicates m = go $ sort m
   where
   go [] = return ()
   go [_] = return ()
-  go (x : y : _) | x == y = throwError $ "Redefined fixity for " ++ show x
+  go (x : y : _) | x == y = throwError $ mkErrorStack ("Redefined fixity for " ++ show x) Nothing
   go (_ : rest) = go rest
 
 customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
@@ -100,17 +101,17 @@ customOperatorTable fixities =
 
 type Chain = [Either Value (Qualified Ident)]
 
-matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
+matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either ErrorStack Value
 matchOperators ops = parseChains
   where
-  parseChains :: Value -> Either String Value
+  parseChains :: Value -> Either ErrorStack Value
   parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
   parseChains other = return other
   extendChain :: Value -> Chain
   extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
   extendChain other = [Left other]
-  bracketChain :: Chain -> Either String Value
-  bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
+  bracketChain :: Chain -> Either ErrorStack Value
+  bracketChain = either (Left . (`mkErrorStack` Nothing) . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]

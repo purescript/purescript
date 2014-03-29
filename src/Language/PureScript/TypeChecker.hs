@@ -89,7 +89,7 @@ checkTypeClassInstance _ (TypeConstructor ctor) = do
   when (ctor `M.member` typeSynonyms env) . throwError . strMsg $ "Type synonym instances are disallowed"
   return ()
 checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError $ mkUnifyErrorStack "Type class instance head is invalid." (Just (TypeError ty))
+checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance head is invalid." (Just (TypeError ty))
 
 -- |
 -- Type check all declarations in a module

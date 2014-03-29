@@ -31,11 +31,12 @@ import Language.PureScript.Names
 import Language.PureScript.Declarations
 import Language.PureScript.Scope
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: [Module] -> Either String [Module]
+desugarCasesModule :: [Module] -> Either ErrorStack [Module]
 desugarCasesModule ms = forM ms $ \(Module name ds exps) -> Module name <$> (desugarCases . desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> [Declaration]
@@ -51,10 +52,10 @@ desugarAbs = everywhere (mkT replace)
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: [Declaration] -> Either String [Declaration]
+desugarCases :: [Declaration] -> Either ErrorStack [Declaration]
 desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
   where
-    desugarRest :: [Declaration] -> Either String [Declaration]
+    desugarRest :: [Declaration] -> Either ErrorStack [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs g val : rest) = do
@@ -74,7 +75,7 @@ inSameGroup (PositionedDeclaration _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: [Declaration] -> Either String [Declaration]
+toDecls :: [Declaration] -> Either ErrorStack [Declaration]
 toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
@@ -82,7 +83,7 @@ toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = 
 toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
-      throwError $ "Argument list lengths differ in declaration " ++ show ident
+      throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
   return [makeCaseDeclaration ident tuples]
 toDecls (PositionedDeclaration pos d : ds) = do
   (d' : ds') <- toDecls (d : ds)

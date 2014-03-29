@@ -28,6 +28,7 @@ import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.Environment as P
+import Language.PureScript.Errors as P
 import Language.PureScript.DeadCodeElimination as P
 
 import qualified Language.PureScript.Constants as C
@@ -70,9 +71,9 @@ compile = compile' initEnvironment
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
   (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
-  desugared <- desugar sorted
+  desugared <- stringifyErrorStack True $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
-  regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
@@ -184,7 +185,7 @@ make opts ms = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  desugared <- liftError $ zip (map fst marked) <$> desugar (map snd marked)
+  desugared <- liftError $ stringifyErrorStack True $ zip (map fst marked) <$> desugar (map snd marked)
 
   go initEnvironment desugared
 
@@ -202,7 +203,7 @@ make opts ms = do
 
     (Module _ elaborated _, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
 
-    regrouped <- liftError . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
         js = moduleToJs opts mod' env'

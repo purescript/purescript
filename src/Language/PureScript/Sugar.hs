@@ -18,6 +18,7 @@ module Language.PureScript.Sugar (desugar, module S) where
 import Control.Monad
 
 import Language.PureScript.Declarations
+import Language.PureScript.Errors
 
 import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -46,7 +47,7 @@ import Control.Category ((>>>))
 --
 --  * Qualify any unqualified names and types
 --
-desugar :: [Module] -> Either String [Module]
+desugar :: [Module] -> Either ErrorStack [Module]
 desugar = removeSignedLiterals
           >>> desugarDo
           >=> desugarCasesModule

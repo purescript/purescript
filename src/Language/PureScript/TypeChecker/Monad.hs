@@ -21,14 +21,12 @@ module Language.PureScript.TypeChecker.Monad where
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Options
 import Language.PureScript.Errors
 
 import Data.Maybe
-import Data.Monoid
 
 import Control.Applicative
 import Control.Monad.State
@@ -166,7 +164,7 @@ runCheck opts = runCheck' opts initEnvironment
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
 runCheck' :: Options -> Environment -> Check a -> Either String (a, Environment)
-runCheck' opts env c = either (Left . prettyPrintErrorStack (optionsVerboseErrors opts)) Right $ do
+runCheck' opts env c = stringifyErrorStack (optionsVerboseErrors opts) $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
@@ -176,18 +174,6 @@ runCheck' opts env c = either (Left . prettyPrintErrorStack (optionsVerboseError
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()
 guardWith e False = throwError e
-
--- |
--- Rethrow an error with a more detailed error message in the case of failure
---
-rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
-rethrow f = flip catchError $ \e -> throwError (f e)
-
--- |
--- Rethrow an error with source position information
---
-rethrowWithPosition :: (MonadError ErrorStack m) => SourcePos -> m a -> m a
-rethrowWithPosition pos = rethrow (positionError pos <>)
 
 -- |
 -- Generate new type class dictionary name

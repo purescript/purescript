@@ -24,6 +24,7 @@ import Data.Generics
 import Language.PureScript.Names
 import Language.PureScript.Scope
 import Language.PureScript.Declarations
+import Language.PureScript.Errors
 
 import qualified Language.PureScript.Constants as C
 
@@ -33,23 +34,23 @@ import Control.Applicative
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
 -- and all @DoNotationLet@ constructors with let expressions.
 --
-desugarDo :: (Data d) => d -> Either String d
+desugarDo :: (Data d) => d -> Either ErrorStack d
 desugarDo = everywhereM (mkM replace)
   where
   prelude :: ModuleName
   prelude = ModuleName [ProperName C.prelude]
   bind :: Value
   bind = Var (Qualified (Just prelude) (Op (C.>>=)))
-  replace :: Value -> Either String Value
+  replace :: Value -> Either ErrorStack Value
   replace (Do els) = go els
   replace other = return other
-  go :: [DoNotationElement] -> Either String Value
+  go :: [DoNotationElement] -> Either ErrorStack Value
   go [] = error "The impossible happened in desugarDo"
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left (Ident "_")) rest')
-  go [DoNotationBind _ _] = Left "Bind statement cannot be the last statement in a do block"
+  go [DoNotationBind _ _] = Left $ mkErrorStack "Bind statement cannot be the last statement in a do block" Nothing
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
@@ -58,7 +59,7 @@ desugarDo = everywhereM (mkM replace)
     rest' <- go rest
     let ident = head $ unusedNames rest'
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing rest']))
-  go [DoNotationLet _ _] = Left "Let statement cannot be the last statement in a do block"
+  go [DoNotationLet _ _] = Left $ mkErrorStack "Let statement cannot be the last statement in a do block" Nothing
   go (DoNotationLet binder val : rest) = do
     rest' <- go rest
     return $ Case [val] [CaseAlternative [binder] Nothing rest']
