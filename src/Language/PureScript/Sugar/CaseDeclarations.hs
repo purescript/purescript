@@ -19,6 +19,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
+import Data.Monoid ((<>))
 import Data.List (groupBy)
 import Data.Generics (mkM, mkT, everywhere)
 import Data.Generics.Extras
@@ -37,7 +38,9 @@ import Language.PureScript.Errors
 -- Replace all top-level binders in a module with case expressions.
 --
 desugarCasesModule :: [Module] -> Either ErrorStack [Module]
-desugarCasesModule ms = forM ms $ \(Module name ds exps) -> Module name <$> (desugarCases . desugarAbs $ ds) <*> pure exps
+desugarCasesModule ms = forM ms $ \(Module name ds exps) ->
+  rethrow (strMsg ("Error in module " ++ show name) <>) $
+    Module name <$> (desugarCases . desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> [Declaration]
 desugarAbs = everywhere (mkT replace)
@@ -86,7 +89,7 @@ toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
       throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
   return [makeCaseDeclaration ident tuples]
 toDecls (PositionedDeclaration pos d : ds) = do
-  (d' : ds') <- toDecls (d : ds)
+  (d' : ds') <- rethrowWithPosition pos $ toDecls (d : ds)
   return (PositionedDeclaration pos d' : ds')
 toDecls ds = return ds
 

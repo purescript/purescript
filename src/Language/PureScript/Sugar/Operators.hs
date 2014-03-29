@@ -32,9 +32,10 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error.Class
 
+import Data.Monoid ((<>))
 import Data.Function (on)
 import Data.Functor.Identity
-import Data.List (sort, groupBy, sortBy)
+import Data.List (groupBy, sortBy)
 
 import qualified Data.Data as D
 import qualified Data.Generics as G
@@ -52,8 +53,8 @@ import qualified Language.PureScript.Constants as C
 rebracket :: [Module] -> Either ErrorStack [Module]
 rebracket ms = do
   let fixities = concatMap collectFixities ms
-  ensureNoDuplicates $ map fst fixities
-  let opTable = customOperatorTable fixities
+  ensureNoDuplicates $ map (\(i, pos, _) -> (i, pos)) fixities
+  let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
   mapM (rebracketModule opTable) ms
 
 removeSignedLiterals :: (D.Data d) => d -> d
@@ -73,20 +74,23 @@ removeParens = G.everywhere (G.mkT go)
   go (Parens val) = val
   go val = val
 
-collectFixities :: Module -> [(Qualified Ident, Fixity)]
+collectFixities :: Module -> [(Qualified Ident, SourcePos, Fixity)]
 collectFixities (Module moduleName ds _) = concatMap collect ds
   where
-  collect :: Declaration -> [(Qualified Ident, Fixity)]
-  collect (PositionedDeclaration _ d) = collect d
-  collect (FixityDeclaration fixity name) = [(Qualified (Just moduleName) (Op name), fixity)]
+  collect :: Declaration -> [(Qualified Ident, SourcePos, Fixity)]
+  collect (PositionedDeclaration pos (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
+  collect FixityDeclaration{} = error "Fixity without srcpos info"
   collect _ = []
 
-ensureNoDuplicates :: [Qualified Ident] -> Either ErrorStack ()
-ensureNoDuplicates m = go $ sort m
+ensureNoDuplicates :: [(Qualified Ident, SourcePos)] -> Either ErrorStack ()
+ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
   where
   go [] = return ()
   go [_] = return ()
-  go (x : y : _) | x == y = throwError $ mkErrorStack ("Redefined fixity for " ++ show x) Nothing
+  go ((x@(Qualified (Just mn) name), _) : (y, pos) : _) | x == y =
+    rethrow (strMsg ("Error in module " ++ show mn) <>) $
+      rethrowWithPosition pos $
+        throwError $ mkErrorStack ("Redefined fixity for " ++ show name) Nothing
   go (_ : rest) = go rest
 
 customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
