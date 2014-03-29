@@ -124,8 +124,10 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   return $ d : ds
   where
   toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
+  toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
   toTypeSynonym _ = Nothing
   toDataDecl (DataDeclaration nm args dctors) = Just (nm, args, dctors)
+  toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
   rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
@@ -195,4 +197,6 @@ typeCheckAll mainModuleName moduleName (d@(ExternInstanceDeclaration dictName de
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (PositionedDeclaration pos d : rest) =
-  rethrowWithPosition pos $ typeCheckAll mainModuleName moduleName (d : rest)
+  rethrowWithPosition pos $ do
+    (d' : rest') <- typeCheckAll mainModuleName moduleName (d : rest)
+    return (PositionedDeclaration pos d' : rest')

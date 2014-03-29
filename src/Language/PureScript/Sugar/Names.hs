@@ -216,6 +216,7 @@ renameInModule imports exports (Module mn decls exps) =
 
     letBoundVariable :: Declaration -> Ident
     letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
+    letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
     letBoundVariable _ = error "Invalid argument to letBoundVariable"
   go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
   go (ExternDeclaration fit name js ty) =

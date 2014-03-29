@@ -238,6 +238,7 @@ typeForBindingGroupElement moduleName e@(_, (val, _)) dict untypedDict = do
 isFunction :: Value -> Bool
 isFunction (Abs _ _) = True
 isFunction (TypedValue _ val _) = isFunction val
+isFunction (PositionedValue _ val) = isFunction val
 isFunction _ = False
 
 -- |
@@ -594,7 +595,10 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
     (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
     return $ (ident, LocalVariable, val')
   bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding _ _ _ _ = error "Invalid argument to fromValueDeclaration"
+inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = do
+  ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
+  return (PositionedDeclaration pos d' : ds', val')
+inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
 
 -- |
 -- Infer the type of a property inside a record with a given type
