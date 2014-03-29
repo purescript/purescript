@@ -216,6 +216,7 @@ renameInModule imports exports (Module mn decls exps) =
 
     letBoundVariable :: Declaration -> Ident
     letBoundVariable (ValueDeclaration ident _ _ _ _) = ident
+    letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
     letBoundVariable _ = error "Invalid argument to letBoundVariable"
   go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
   go (ExternDeclaration fit name js ty) =
@@ -223,6 +224,7 @@ renameInModule imports exports (Module mn decls exps) =
   go (BindingGroupDeclaration decls') = do
       BindingGroupDeclaration <$> mapM go' decls'
       where go' = \(name, nk, value) -> rethrowFor "declaration" name $ (,,) <$> pure name <*> pure nk <*> updateAll value
+  go (PositionedDeclaration pos d) = PositionedDeclaration pos <$> go d
   go d = updateAll d
 
   rethrowFor :: (Show a) => String -> a -> Either String b -> Either String b
@@ -230,20 +232,20 @@ renameInModule imports exports (Module mn decls exps) =
 
   updateAll :: Data d => d -> Either String d
   updateAll = everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
-  
+
   updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
   updateValue v = return v
-  
+
   updateBinder (ConstructorBinder name b) = ConstructorBinder <$> updateDataConstructorName name <*> pure b
   updateBinder v = return v
-  
+
   updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name
   updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
   updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
   updateType t = return t
   updateType' :: Data d => d -> Either String d
   updateType' = everywhereM (mkM updateType)
-  
+
   updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
 
   updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` (exportedTypes mes)))
@@ -299,6 +301,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
+  addDecl mn env (PositionedDeclaration _ d) = addDecl mn env d
   addDecl _  env _ = return env
 
 -- |
@@ -365,6 +368,7 @@ findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe M
 findImports = foldl findImports' M.empty
   where
   findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
+  findImports' result (PositionedDeclaration _ d) = findImports' result d
   findImports' result _ = result
 
 -- |

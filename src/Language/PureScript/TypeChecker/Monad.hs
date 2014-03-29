@@ -63,6 +63,10 @@ data UnifyError = UnifyError {
     -- The value where the error occurred
     --
   , unifyErrorValue :: Maybe UnifyErrorSource
+    -- |
+    -- Optional source position information
+    --
+  , unifyErrorPosition :: Maybe SourcePos
   } deriving (Show)
 
 -- |
@@ -71,42 +75,39 @@ data UnifyError = UnifyError {
 newtype UnifyErrorStack = UnifyErrorStack { runUnifyErrorStack :: [UnifyError] } deriving (Show, Monoid)
 
 instance Error UnifyErrorStack where
-  strMsg s = UnifyErrorStack [UnifyError s Nothing]
+  strMsg s = UnifyErrorStack [UnifyError s Nothing Nothing]
   noMsg = UnifyErrorStack []
 
 prettyPrintUnifyErrorStack :: Options -> UnifyErrorStack -> String
-prettyPrintUnifyErrorStack opts (UnifyErrorStack es) | optionsVerboseErrors opts = intercalate "\n" (map showError es)
-prettyPrintUnifyErrorStack _ (UnifyErrorStack es) =
-  let
-    errorsWithValues = filter (isJust . unifyErrorValue) es
-    mostSpecificError = last es
-  in case (length errorsWithValues, isJust (unifyErrorValue mostSpecificError)) of
-    (0, _) -> showError mostSpecificError
-    (1, True) -> showError mostSpecificError
-    (1, False) ->
-      let errorWithValue = head errorsWithValues
-      in showError errorWithValue ++ "\n" ++
-         showError mostSpecificError
-    (_, True) ->
-      let errorWithValue = head errorsWithValues
-      in showError errorWithValue ++ "\n" ++
-         showError mostSpecificError
-    (_, False) ->
+prettyPrintUnifyErrorStack opts (UnifyErrorStack es) =
+  case mconcat $ map (Last . unifyErrorPosition) es of
+    Last (Just sourcePos) -> "Error at " ++ show sourcePos ++ ": \n" ++ prettyPrintUnifyErrorStack'
+    _ -> prettyPrintUnifyErrorStack'
+  where
+  prettyPrintUnifyErrorStack' :: String
+  prettyPrintUnifyErrorStack'
+    | optionsVerboseErrors opts =
+      intercalate "\n" (map showError (filter isErrorNonEmpty es))
+    | otherwise =
       let
-        leastSpecificErrorWithValue = head errorsWithValues
-        mostSpecificErrorWithValue = last errorsWithValues
-      in
-        showError leastSpecificErrorWithValue ++ "\n" ++
-        showError mostSpecificErrorWithValue ++ "\n" ++
-        showError mostSpecificError
+        es' = filter isErrorNonEmpty es
+      in case length es' of
+        1 -> showError (head es')
+        _ -> showError (head es') ++ "\n" ++ showError (last es')
+
+isErrorNonEmpty :: UnifyError -> Bool
+isErrorNonEmpty = not . null . unifyErrorMessage
 
 showError :: UnifyError -> String
-showError (UnifyError msg Nothing) = msg
-showError (UnifyError msg (Just (ValueError val))) = "Error in value " ++ prettyPrintValue val ++ ": \n" ++ msg
-showError (UnifyError msg (Just (TypeError ty))) = "Error in type " ++ prettyPrintType ty ++ ": \n" ++ msg
+showError (UnifyError msg Nothing _) = msg
+showError (UnifyError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ "\n" ++ msg
+showError (UnifyError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ "\n" ++ msg
 
 mkUnifyErrorStack :: String -> Maybe UnifyErrorSource -> UnifyErrorStack
-mkUnifyErrorStack msg t = UnifyErrorStack [UnifyError msg t]
+mkUnifyErrorStack msg t = UnifyErrorStack [UnifyError msg t Nothing]
+
+positionError :: SourcePos -> UnifyErrorStack
+positionError pos = UnifyErrorStack [UnifyError "" Nothing (Just pos)]
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -253,6 +254,12 @@ guardWith e False = throwError e
 --
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
+
+-- |
+-- Rethrow an error with source position information
+--
+rethrowWithPosition :: (MonadError UnifyErrorStack m) => SourcePos -> m a -> m a
+rethrowWithPosition pos = rethrow (positionError pos <>)
 
 -- |
 -- Generate new type class dictionary name

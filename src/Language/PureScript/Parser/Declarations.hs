@@ -38,6 +38,14 @@ import qualified Language.PureScript.Parser.Common as C
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
+-- |
+-- Read source position information
+--
+sourcePos :: P.Parsec s u SourcePos
+sourcePos = toSourcePos <$> P.getPosition
+  where
+  toSourcePos p = SourcePos (P.sourceLine p) (P.sourceColumn p)
+
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
   reserved "data"
@@ -162,7 +170,7 @@ parseTypeInstanceDeclaration = do
 -- Parse a single declaration
 --
 parseDeclaration :: P.Parsec String ParseState Declaration
-parseDeclaration = P.choice
+parseDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice
                    [ parseDataDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
@@ -175,7 +183,7 @@ parseDeclaration = P.choice
                    ] P.<?> "declaration"
 
 parseLocalDeclaration :: P.Parsec String ParseState Declaration
-parseLocalDeclaration = P.choice
+parseLocalDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice
                    [ parseTypeDeclaration
                    , parseValueDeclaration
                    ] P.<?> "local declaration"
@@ -313,7 +321,7 @@ parseDoNotationElement = P.choice
 -- Parse a value
 --
 parseValue :: P.Parsec String ParseState Value
-parseValue =
+parseValue = PositionedValue <$> sourcePos <*>
   (P.buildExpressionParser operators
    . C.buildPostfixParser postfixTable2
    $ indexersAndAccessors) P.<?> "expression"
@@ -373,7 +381,8 @@ parseIdentifierAndBinder = do
 -- Parse a binder
 --
 parseBinder :: P.Parsec String ParseState Binder
-parseBinder = P.buildExpressionParser operators parseBinderAtom P.<?> "expression"
+parseBinder = PositionedBinder <$> sourcePos <*>
+    P.buildExpressionParser operators parseBinderAtom P.<?> "expression"
   where
   operators = [ [ P.Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) P.AssocRight ] ]
   parseBinderAtom :: P.Parsec String ParseState Binder

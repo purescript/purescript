@@ -76,6 +76,7 @@ collectFixities :: Module -> [(Qualified Ident, Fixity)]
 collectFixities (Module moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [(Qualified Ident, Fixity)]
+  collect (PositionedDeclaration _ d) = collect d
   collect (FixityDeclaration fixity name) = [(Qualified (Just moduleName) (Op name), fixity)]
   collect _ = []
 

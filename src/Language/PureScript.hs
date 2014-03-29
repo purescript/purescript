@@ -248,5 +248,6 @@ importPrelude m@(Module mn decls exps)  =
   where
   prelude = ModuleName [ProperName C.prelude]
   isPreludeImport (ImportDeclaration (ModuleName [ProperName mn']) _ _) | mn' == C.prelude = True
+  isPreludeImport (PositionedDeclaration _ d) = isPreludeImport d
   isPreludeImport _ = False
   preludeImport = ImportDeclaration prelude Nothing Nothing

@@ -238,6 +238,7 @@ typeForBindingGroupElement moduleName e@(_, (val, _)) dict untypedDict = do
 isFunction :: Value -> Bool
 isFunction (Abs _ _) = True
 isFunction (TypedValue _ val _) = isFunction val
+isFunction (PositionedValue _ val) = isFunction val
 isFunction _ = False
 
 -- |
@@ -576,6 +577,7 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $  ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
+infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
@@ -593,7 +595,10 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
     (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
     return $ (ident, LocalVariable, val')
   bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding _ _ _ _ = error "Invalid argument to fromValueDeclaration"
+inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = do
+  ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
+  return (PositionedDeclaration pos d' : ds', val')
+inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
 
 -- |
 -- Infer the type of a property inside a record with a given type
@@ -662,6 +667,8 @@ inferBinder val (ConsBinder headBinder tailBinder) = do
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
+inferBinder val (PositionedBinder pos binder) =
+  rethrowWithPosition pos $ inferBinder val binder
 
 -- |
 -- Check the types of the return values in a set of binders in a case statement
@@ -826,6 +833,8 @@ check' (Let ds val) ty = do
 check' val ty | containsTypeSynonyms ty = do
   ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
   check val ty'
+check' (PositionedValue pos val) ty =
+  rethrowWithPosition pos $ check val ty
 check' val ty = throwError $ mkUnifyErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
 
 containsTypeSynonyms :: Type -> Bool
