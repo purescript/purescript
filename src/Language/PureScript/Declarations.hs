@@ -69,7 +69,7 @@ data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable
 
 -- |
 -- A module declaration, consisting of a module name, a list of declarations, and a list of the
--- declarations that are explicitly imported. If the export list is Nothing, everything is exported.
+-- declarations that are explicitly exported. If the export list is Nothing, everything is exported.
 --
 data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
 
