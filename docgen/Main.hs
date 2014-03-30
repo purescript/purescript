@@ -99,7 +99,7 @@ renderDeclaration n (P.ExternDataDeclaration name kind) =
 renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do
   let typeName = P.runProperName name ++ " " ++ intercalate " " args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
-renderDeclaration n (P.TypeClassDeclaration name arg ds) = do
+renderDeclaration n (P.TypeClassDeclaration name arg _ ds) = do
   atIndent n $ "class " ++ P.runProperName name ++ " " ++ arg ++ " where"
   mapM_ (renderDeclaration (n + 2)) ds
 renderDeclaration n (P.TypeInstanceDeclaration constraints name ty _) = do
@@ -115,7 +115,7 @@ getName (P.ExternDeclaration _ ident _ _) = show ident
 getName (P.DataDeclaration name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
-getName (P.TypeClassDeclaration name _ _) = P.runProperName name
+getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration _ name _ _) = show name
 getName _ = error "Invalid argument to getName"
 
@@ -131,7 +131,7 @@ isTypeDeclaration (P.TypeSynonymDeclaration _ _ _) = True
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
-isTypeClassDeclaration (P.TypeClassDeclaration _ _ _) = True
+isTypeClassDeclaration (P.TypeClassDeclaration _ _ _ _) = True
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool

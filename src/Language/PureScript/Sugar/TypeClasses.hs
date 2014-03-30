@@ -37,6 +37,7 @@ import Data.Traversable (traverse)
 import Data.Generics (mkQ, everything)
 import Language.PureScript.CodeGen.Common (identToJs)
 
+-- module name * proper name |- class name * implies * methods
 type MemberMap = M.Map (ModuleName, ProperName) (String, [(Qualified ProperName, Type)], [(String, Type)])
 
 type Desugar = StateT MemberMap (Either String)
@@ -54,12 +55,9 @@ desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl
 desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
 desugarDecl mn d@(TypeClassDeclaration name arg implies members) = do
   let tys = map memberToNameAndType members
-      impliedToInstanceDeclaration (iname, iarg) = TypeInstanceDeclaration [(Qualified (Just mn) name, TypeVar arg)] iname iarg []
-
-  impliedInstances <- fmap concat $ mapM (desugarDecl mn . impliedToInstanceDeclaration) implies
 
   modify (M.insert (mn, name) (arg, implies, tys))
-  return $ d : typeClassDictionaryDeclaration name arg tys : map (typeClassMemberToDictionaryAccessor name arg) members ++ impliedInstances
+  return $ d : typeClassDictionaryDeclaration name arg tys : map (typeClassMemberToDictionaryAccessor name arg) members
 desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
   desugared <- lift $ desugarCases members
   entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) desugared
@@ -83,18 +81,25 @@ typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
 typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
 
 typeInstanceDictionaryDeclarations :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar [Declaration]
-typeInstanceDictionaryDeclarations mn deps name ty decls = do
-  methods <- traverse findMethod decls
-  mapM classDeclaration $ groupKeys methods
+typeInstanceDictionaryDeclarations mn deps qn@(Qualified mn' pn) ty decls = do
+  m <- get
+  (tv, implies, classMethods) <- lift $ maybe (Left $ "Can't find type class " ++ show qn) Right $ M.lookup (fromMaybe mn mn', pn) m
+  let declarationJsNames = map (identToJs . declarationIdent) decls
+  lift $ mapM_ (\(methodName, _) -> if methodName `elem` declarationJsNames
+                                    then Right ()
+                                    else Left $ "Type class member type not found: " ++ methodName) classMethods
+  foundMethods <- traverse (findMethod m) decls
+  dicts <- mapM classDeclaration $ groupKeys foundMethods
+  return $ map (instanceDecl tv) implies ++ dicts
   where
-  findMethod (ValueDeclaration ident _ _ _) = do
-    m <- get
-    maybeMethod <- findImpliedMethod mn name ident' m
+  findMethod m (ValueDeclaration ident _ _ _) = do
+    maybeMethod <- findImpliedMethod mn qn ident' m
     lift $ maybe (Left $ "Could not find method " ++ show ident) (Right . assoc) maybeMethod
     where
     assoc (qn, arg, valTy) = ((qn, arg), [(ident', valTy)])
     ident' = identToJs ident
   groupKeys = M.toList . M.fromListWith (++)
+  instanceDecl tv (name, ty') = TypeInstanceDeclaration deps name (replaceTypeVars tv ty ty') []
   classDeclaration :: ((Qualified ProperName, String), [(String, Type)]) -> Desugar Declaration
   classDeclaration ((name, arg), instanceTys) = do
     let memberTypes = map (replaceTypeVars arg ty) instanceTys
