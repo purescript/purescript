@@ -19,7 +19,6 @@ module Language.PureScript.Sugar.Names (
 import Data.Data
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Monoid ((<>))
-import Data.Generics (extM, mkM, everywhereM)
 import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
@@ -177,6 +176,7 @@ renameInModule imports exports (Module mn decls exps) =
   Module mn <$> mapM go decls <*> pure exps
   where
   go :: Declaration -> Either ErrorStack Declaration
+  go (PositionedDeclaration pos d) = rethrowWithPosition pos $ PositionedDeclaration pos <$> go d
   go (DataDeclaration name args dctors) =
       rethrow (strMsg ("Error in data declaration " ++ show name) <>) $
         DataDeclaration <$> pure name <*> pure args <*> updateAll dctors
@@ -186,28 +186,32 @@ renameInModule imports exports (Module mn decls exps) =
       rethrow (strMsg ("Error in type synonym " ++ show name) <>) $
         TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
   go (TypeInstanceDeclaration name cs cn ts ds) =
-      TypeInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts <*> mapM go ds
+      TypeInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts <*> mapM go ds
   go (ExternInstanceDeclaration name cs cn ts) =
-      ExternInstanceDeclaration name <$> updateConstraints cs <*> updateClassName cn <*> updateType' ts
+      ExternInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts
   go (ValueDeclaration name nameKind [] Nothing val) = do
-    val' <- everywhereWithContextM' [] (mkS bindFunctionArgs `extS` bindBinders) val
+    val' <- everywhereWithContextM' (Nothing, []) (mkS bindFunctionArgs `extS` bindBinders) val
     rethrow (strMsg ("Error in declaration " ++ show name) <>) $
       ValueDeclaration name nameKind [] Nothing <$> updateAll val'
     where
-    bindFunctionArgs bound (Abs (Left arg) val') = return (arg : bound, Abs (Left arg) val')
-    bindFunctionArgs bound (Let ds val') = let args = mapMaybe letBoundVariable ds in
-                                           return (args ++ bound, Let ds val')
-    bindFunctionArgs bound (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
-      (,) bound <$> (Var <$> updateValueName name')
-    bindFunctionArgs bound (Var name'@(Qualified (Just _) _)) =
-      (,) bound <$> (Var <$> updateValueName name')
-    bindFunctionArgs bound (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
-      (,) bound <$> (BinaryNoParens <$> updateValueName name' <*> pure v1 <*> pure v2)
-    bindFunctionArgs bound (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
-      (,) bound <$> (BinaryNoParens <$> updateValueName name' <*> pure v1 <*> pure v2)
-    bindFunctionArgs bound other = return (bound, other)
-    bindBinders :: [Ident] -> CaseAlternative -> Either ErrorStack ([Ident], CaseAlternative)
-    bindBinders bound c@(CaseAlternative bs _ _) = return (binderNames bs ++ bound, c)
+    bindFunctionArgs :: (Maybe SourcePos, [Ident]) -> Value -> Either ErrorStack ((Maybe SourcePos, [Ident]), Value)
+    bindFunctionArgs (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
+    bindFunctionArgs (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
+    bindFunctionArgs (pos, bound) (Let ds val') =
+      let args = mapMaybe letBoundVariable ds
+      in return ((pos, args ++ bound), Let ds val')
+    bindFunctionArgs (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
+      (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
+    bindFunctionArgs (pos, bound) (Var name'@(Qualified (Just _) _)) =
+      (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
+    bindFunctionArgs (pos, bound) (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
+      (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
+    bindFunctionArgs (pos, bound) (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
+      (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
+    bindFunctionArgs pb other = return (pb, other)
+    
+    bindBinders :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
+    bindBinders (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, binderNames bs ++ bound), c)
 
     letBoundVariable :: Declaration -> Maybe Ident
     letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
@@ -217,34 +221,37 @@ renameInModule imports exports (Module mn decls exps) =
   go (ExternDeclaration fit name js ty) =
       rethrow (strMsg ("Error in declaration " ++ show name) <>) $
         ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
-  go (BindingGroupDeclaration decls') = do
-      BindingGroupDeclaration <$> mapM go' decls'
+  go (BindingGroupDeclaration decls') = BindingGroupDeclaration <$> mapM go' decls'
       where
-      go' = \(name, nk, value) ->
-        rethrow (strMsg ("Error in declaration " ++ show name) <>) $
-          (,,) <$> pure name <*> pure nk <*> updateAll value
-  go (PositionedDeclaration pos d) = PositionedDeclaration pos <$> go d
+      go' (name, nk, value) = rethrow (strMsg ("Error in declaration " ++ show name) <>) $
+                                (,,) <$> pure name <*> pure nk <*> updateAll value
   go d = updateAll d
 
   updateAll :: Data d => d -> Either ErrorStack d
-  updateAll = everywhereM (mkM updateType `extM` updateValue `extM` updateBinder)
+  updateAll = everywhereWithContextM' Nothing (mkS updateType `extS` updateValue `extS` updateBinder)
 
-  updateValue (Constructor name) = Constructor <$> updateDataConstructorName name
-  updateValue v = return v
+  updateValue :: Maybe SourcePos -> Value -> Either ErrorStack (Maybe SourcePos, Value)
+  updateValue _ v@(PositionedValue pos _) = return (Just pos, v)
+  updateValue pos (Constructor name) = (,) <$> pure pos <*> (Constructor <$> updateDataConstructorName name pos)
+  updateValue pos v = return (pos, v)
 
-  updateBinder (ConstructorBinder name b) = ConstructorBinder <$> updateDataConstructorName name <*> pure b
-  updateBinder v = return v
+  updateBinder :: Maybe SourcePos -> Binder -> Either ErrorStack (Maybe SourcePos, Binder)
+  updateBinder _ v@(PositionedBinder pos _) = return (Just pos, v)
+  updateBinder pos (ConstructorBinder name b) = (,) <$> pure pos <*> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder pos v = return (pos, v)
 
-  updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name
-  updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name <*> mapM updateType tys
-  updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints cs <*> pure t
-  updateType t = return t
+  updateType :: Maybe SourcePos -> Type -> Either ErrorStack (Maybe SourcePos, Type)
+  updateType pos (TypeConstructor name) = (,) <$> pure pos <*> (TypeConstructor <$> updateTypeName name pos)
+  updateType pos (SaturatedTypeSynonym name tys) = (,) <$> pure pos <*> (SaturatedTypeSynonym <$> updateTypeName name pos <*> updateType' tys)
+  updateType pos (ConstrainedType cs t) = (,) <$> pure pos <*> (ConstrainedType <$> updateConstraints pos cs <*> pure t)
+  updateType pos t = return (pos, t)
+  
   updateType' :: Data d => d -> Either ErrorStack d
-  updateType' = everywhereM (mkM updateType)
+  updateType' = everywhereWithContextM' Nothing (mkS updateType)
 
-  updateConstraints = mapM (\(name, ts) -> (,) <$> updateClassName name <*> pure ts)
+  updateConstraints pos = mapM (\(name, ts) -> (,) <$> updateClassName name pos <*> pure ts)
 
-  updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` (exportedTypes mes)))
+  updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` exportedTypes mes))
   updateClassName = update "type class" importedTypeClasses (flip elem . exportedTypeClasses)
   updateValueName = update "value" importedValues (flip elem . exportedValues)
   updateDataConstructorName = update "data constructor" importedDataConstructors (\mes -> flip elem (join $ snd `map` exportedTypes mes))
@@ -254,16 +261,21 @@ renameInModule imports exports (Module mn decls exps) =
   update :: (Ord a, Show a) => String
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
-                            -> (Qualified a)
+                            -> Qualified a
+                            -> Maybe SourcePos
                             -> Either ErrorStack (Qualified a)
-  update t getI checkE qname@(Qualified mn' name) = case (M.lookup qname (getI imports), mn') of
+  update t getI checkE qname@(Qualified mn' name) pos = case (M.lookup qname (getI imports), mn') of
     (Just qname', _) -> return qname'
     (Nothing, Just mn'') -> do
       modExports <- getExports mn''
       if checkE modExports name
         then return qname
-        else throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show (qname) ++ "'") Nothing
-    _ -> throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show name ++ "'") Nothing
+        else positioned $ throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show qname ++ "'") Nothing
+    _ -> positioned $ throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show name ++ "'") Nothing
+    where
+    positioned err = case pos of
+      Nothing -> err
+      Just pos' -> rethrowWithPosition pos' err
 
   -- Gets the exports for a module, or an error message if the module doesn't exist
   getExports :: ModuleName -> Either ErrorStack Exports
@@ -283,7 +295,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 
   -- Add all of the exported declarations from a module to the global export environment
   addModule :: ExportEnvironment -> Module -> Either ErrorStack ExportEnvironment
-  addModule env m@(Module mn ds _) = do
+  addModule env (Module mn ds _) = do
     env' <- addEmptyModule env mn
     rethrow (strMsg ("Error in module " ++ show mn) <>) $ foldM (addDecl mn) env' ds
 
@@ -307,7 +319,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 filterExports :: ModuleName -> [DeclarationRef] -> ExportEnvironment -> Either ErrorStack ExportEnvironment
 filterExports mn exps env = do
   let moduleExports = fromMaybe (error "Module is missing") (mn `M.lookup` env)
-  moduleExports' <- filterModule moduleExports
+  moduleExports' <- rethrow (strMsg ("Error in module " ++ show mn) <>) $ filterModule moduleExports
   return $ M.insert mn moduleExports' env
   where
 
@@ -322,6 +334,7 @@ filterExports mn exps env = do
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
   filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> Either ErrorStack [(ProperName, [ProperName])]
+  filterTypes expTys result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterTypes expTys result r
   filterTypes expTys result (TypeRef name expDcons) = do
     dcons <- maybe (throwError $ mkErrorStack ("Cannot export undefined type '" ++ show name ++ "'") Nothing) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
@@ -337,6 +350,7 @@ filterExports mn exps env = do
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
   filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> Either ErrorStack [ProperName]
+  filterClasses exps' result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterClasses exps' result r
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
@@ -345,6 +359,7 @@ filterExports mn exps env = do
 
   -- Ensure the exported values exist in the module and add them to the set of exports
   filterValues :: [Ident] -> [Ident] -> DeclarationRef -> Either ErrorStack [Ident]
+  filterValues exps' result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterValues exps' result r
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
@@ -360,12 +375,12 @@ type ExplicitImports = [DeclarationRef]
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
-findImports = foldl findImports' M.empty
+findImports :: [Declaration] -> M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
+findImports = foldl (findImports' Nothing) M.empty
   where
-  findImports' result (ImportDeclaration mn expl qual) = M.insert mn (expl, qual) result
-  findImports' result (PositionedDeclaration _ d) = findImports' result d
-  findImports' result _ = result
+  findImports' pos result (ImportDeclaration mn expl qual) = M.insert mn (pos, expl, qual) result
+  findImports' _ result (PositionedDeclaration pos d) = findImports' (Just pos) result d
+  findImports' _ result _ = result
 
 -- |
 -- Constructs a local environment for a module.
@@ -374,12 +389,21 @@ resolveImports :: ExportEnvironment -> Module -> Either ErrorStack ImportEnviron
 resolveImports env (Module currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
-  -- A Map from module name to imports from that module, where Nothing indicates everything is to be imported
-  scope :: M.Map ModuleName (Maybe ExplicitImports, Maybe ModuleName)
-  scope = M.insert currentModule (Nothing, Nothing) (findImports decls)
-  resolveImport' imp (mn, (explImports, impQual)) = do
-      modExports <- maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
-      resolveImport currentModule mn modExports imp impQual explImports
+  
+  -- A Map from module name to the source position for the import, the list of imports from that
+  -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
+  -- for the module
+  scope :: M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
+  scope = M.insert currentModule (Nothing, Nothing, Nothing) (findImports decls)
+
+  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment  
+  resolveImport' imp (mn, (pos, explImports, impQual)) = do
+    modExports <- positioned $ maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
+    positioned $ resolveImport currentModule mn modExports imp impQual explImports
+    where
+    positioned err = case pos of
+      Nothing -> err
+      Just pos' -> rethrowWithPosition pos' err
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
@@ -397,6 +421,7 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
 
   -- Import something explicitly
   importExplicit :: ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
+  importExplicit imp (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ importExplicit imp r
   importExplicit imp (ValueRef name) = do
     _ <- checkImportExists "value" values name
     values' <- updateImports (importedValues imp) name
@@ -444,6 +469,6 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
   checkImportExists t exports item =
       if item `elem` exports
       then return item
-      else throwError $ mkErrorStack ("Unable to find " ++ t ++  " '" ++ show (Qualified (Just importModule) item) ++ "'") Nothing
+      else throwError $ mkErrorStack ("Cannot import unknown " ++ t ++  " '" ++ show item ++ "' from '" ++ show importModule ++ "'") Nothing
 
 

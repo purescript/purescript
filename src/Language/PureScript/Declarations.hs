@@ -93,7 +93,20 @@ data DeclarationRef
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
   | TypeInstanceRef Ident
-  deriving (Show, Eq, D.Data, D.Typeable)
+  -- |
+  -- A declaration reference with source position information
+  --
+  | PositionedDeclarationRef SourcePos DeclarationRef
+  deriving (Show, D.Data, D.Typeable)
+
+instance Eq DeclarationRef where
+  (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
+  (ValueRef name)        == (ValueRef name')        = name == name'
+  (TypeClassRef name)    == (TypeClassRef name')    = name == name'
+  (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
+  (PositionedDeclarationRef _ r) == r' = r == r'
+  r == (PositionedDeclarationRef _ r') = r == r'
+  _ == _ = False
 
 -- |
 -- The data type of declarations

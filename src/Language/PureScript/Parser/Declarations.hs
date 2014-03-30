@@ -135,10 +135,11 @@ parseImportDeclaration = do
     return $ ImportDeclaration moduleName' idents (Just asQ)
 
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
-parseDeclarationRef = ValueRef <$> parseIdent
-                  <|> do name <- properName
-                         dctors <- P.optionMaybe $ parens (lexeme (P.string "..") *> pure Nothing <|> Just <$> commaSep properName)
-                         return $ maybe (TypeClassRef name) (TypeRef name) dctors
+parseDeclarationRef = PositionedDeclarationRef <$> sourcePos <*>
+  (ValueRef <$> parseIdent
+   <|> do name <- properName
+          dctors <- P.optionMaybe $ parens (lexeme (P.string "..") *> pure Nothing <|> Just <$> commaSep properName)
+          return $ maybe (TypeClassRef name) (TypeRef name) dctors)
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do

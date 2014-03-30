@@ -49,6 +49,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
     fixityToPs _ = return ()
 
     exportToPs :: DeclarationRef -> Writer [String] ()
+    exportToPs (PositionedDeclarationRef _ r) = exportToPs r
     exportToPs (TypeRef pn dctors) = do
       case Qualified (Just moduleName) pn `M.lookup` types env of
         Nothing -> error $ show pn ++ " has no kind in exportToPs"
