@@ -67,6 +67,7 @@
 - Error messages for unresolvable types or values include the declaration name again (garyb)
 - Characters in string literals are now properly escaped (garyb)
 - A module containing a single orphan type declaration and no other declarations now fails to compile (garyb)
+- An error involving ordering of type class instances was fixed (garyb, paf31)
 
 ### Libraries
 
