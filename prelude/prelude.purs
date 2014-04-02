@@ -71,7 +71,8 @@ module Prelude where
 
   infixl 1 >>=
 
-  class (Prelude.Functor m) <= Bind m where
+  class Monad m where
+    return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
   instance applicativeFromMonad :: (Monad m) => Applicative m where
