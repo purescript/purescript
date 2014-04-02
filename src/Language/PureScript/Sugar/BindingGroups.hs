@@ -24,79 +24,100 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Data
 import Data.Graph
 import Data.Generics
+import Data.Generics.Extras
 import Data.List (nub, intersect)
-import Control.Applicative ((<$>))
+import Data.Maybe (isJust, mapMaybe)
+import Control.Applicative ((<$>), (<*>), pure)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
-import Language.PureScript.Values
 import Language.PureScript.Types
+import Language.PureScript.Environment
+import Language.PureScript.Errors
 
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
-createBindingGroupsModule :: [Module] -> Either String [Module]
-createBindingGroupsModule = mapM $ \(Module name ds) -> Module name <$> createBindingGroups (ModuleName name) ds
+createBindingGroupsModule :: [Module] -> Either ErrorStack [Module]
+createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> createBindingGroups name ds <*> pure exps
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule = map $ \(Module name ds) -> Module name (collapseBindingGroups ds)
+collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
 
 -- |
 -- Replace all sets of mutually-recursive declarations with binding groups
 --
-createBindingGroups :: ModuleName -> [Declaration] -> Either String [Declaration]
+createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
 createBindingGroups moduleName ds = do
-  let values = filter isValueDecl ds
-      dataDecls = filter isDataDecl ds
+  values <- mapM (createBindingGroupsForValue moduleName) $ filter isValueDecl ds
+  let dataDecls = filter isDataDecl ds
       allProperNames = map getProperName dataDecls
-      dataVerts = map (\d -> (d, getProperName d, usedProperNames d `intersect` allProperNames)) dataDecls
+      dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
   dataBindingGroupDecls <- mapM toDataBindingGroup $ stronglyConnComp dataVerts
   let allIdents = map getIdent values
       valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
       bindingGroupDecls = map toBindingGroup $ stronglyConnComp valueVerts
   return $ filter isImportDecl ds ++
            filter isExternDataDecl ds ++
+           filter isExternInstanceDecl ds ++
            dataBindingGroupDecls ++
            filter isTypeClassDeclaration ds ++
            filter isFixityDecl ds ++
            filter isExternDecl ds ++
            bindingGroupDecls
 
+createBindingGroupsForValue :: ModuleName -> Declaration -> Either ErrorStack Declaration
+createBindingGroupsForValue moduleName = everywhereM' (mkM go)
+  where
+  go (Let ds val) = Let <$> createBindingGroups moduleName ds <*> pure val
+  go other = return other
+
 -- |
 -- Collapse all binding groups to individual declarations
 --
 collapseBindingGroups :: [Declaration] -> [Declaration]
-collapseBindingGroups ds = concatMap go ds
+collapseBindingGroups = everywhere (mkT collapseBindingGroupsForValue) . concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
-  go (BindingGroupDeclaration ds) = map (\(ident, val) -> ValueDeclaration ident [] Nothing val) ds
+  go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
+  go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
   go other = [other]
 
-usedIdents :: (Data d) => ModuleName -> d -> [Ident]
-usedIdents moduleName = nub . everything (++) (mkQ [] names)
-  where
-  names :: Value -> [Ident]
-  names (Var (Qualified Nothing name)) = [name]
-  names (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
-  names _ = []
+collapseBindingGroupsForValue :: Value -> Value
+collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
+collapseBindingGroupsForValue other = other
 
-usedProperNames :: (Data d) => d -> [ProperName]
-usedProperNames = nub . everything (++) (mkQ [] names)
+usedIdents :: (Data d) => ModuleName -> d -> [Ident]
+usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
   where
-  names :: Type -> [ProperName]
-  names (TypeConstructor (Qualified Nothing name)) = [name]
-  names _ = []
+  usedNames :: Value -> [Ident]
+  usedNames (Var (Qualified Nothing name)) = [name]
+  usedNames (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
+  usedNames _ = []
+
+usedProperNames :: (Data d) => ModuleName -> d -> [ProperName]
+usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
+  where
+  usedNames :: Type -> [ProperName]
+  usedNames (ConstrainedType constraints _) = flip mapMaybe constraints $ \qual ->
+    case qual of
+      (Qualified (Just moduleName') name, _) | moduleName == moduleName' -> Just name
+      _ -> Nothing
+  usedNames (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
+  usedNames _ = []
 
 getIdent :: Declaration -> Ident
-getIdent (ValueDeclaration ident _ _ _) = ident
+getIdent (ValueDeclaration ident _ _ _ _) = ident
+getIdent (PositionedDeclaration _ d) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
 getProperName (DataDeclaration pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
+getProperName (PositionedDeclaration _ d) = getProperName d
 getProperName _ = error "Expected DataDeclaration"
 
 toBindingGroup :: SCC Declaration -> Declaration
@@ -104,18 +125,22 @@ toBindingGroup (AcyclicSCC d) = d
 toBindingGroup (CyclicSCC [d]) = d
 toBindingGroup (CyclicSCC ds') = BindingGroupDeclaration $ map fromValueDecl ds'
 
-toDataBindingGroup :: SCC Declaration -> Either String Declaration
+toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
-toDataBindingGroup (CyclicSCC [TypeSynonymDeclaration pn _ _]) = Left $ "Cycle in type synonym " ++ show pn
-toDataBindingGroup (CyclicSCC [d]) = return d
+toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
+  Just pn -> Left $ mkErrorStack ("Cycle in type synonym " ++ show pn) Nothing
+  _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all isTypeSynonym ds' = Left "Cycle in type synonyms"
+  | all (isJust . isTypeSynonym) ds' = Left $ mkErrorStack "Cycle in type synonyms" Nothing
   | otherwise = return $ DataBindingGroupDeclaration ds'
-  where
-  isTypeSynonym (TypeSynonymDeclaration _ _ _) = True
-  isTypeSynonym _ = False
 
-fromValueDecl :: Declaration -> (Ident, Value)
-fromValueDecl (ValueDeclaration ident [] Nothing val) = (ident, val)
-fromValueDecl (ValueDeclaration _ _ _ _) = error "Binders should have been desugared"
+isTypeSynonym :: Declaration -> Maybe ProperName
+isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
+isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
+isTypeSynonym _ = Nothing
+
+fromValueDecl :: Declaration -> (Ident, NameKind, Value)
+fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
+fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
+fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d
 fromValueDecl _ = error "Expected ValueDeclaration"

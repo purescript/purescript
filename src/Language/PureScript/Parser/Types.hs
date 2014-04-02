@@ -15,16 +15,20 @@
 
 module Language.PureScript.Parser.Types (
     parseType,
-    parsePolyType
+    parsePolyType,
+    parseTypeAtom
 ) where
+
+import Control.Applicative
+import Control.Monad (when, unless)
 
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
-import Control.Applicative
+import Language.PureScript.Environment
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
-import Control.Monad (when, unless)
 
 parseNumber :: P.Parsec String ParseState Type
 parseNumber = const tyNumber <$> reserved "Number"
@@ -45,21 +49,24 @@ parseFunction :: P.Parsec String ParseState Type
 parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
-parseObject = braces $ Object <$> parseRow False
+parseObject = braces $ TypeApp tyObject <$> parseRow False
 
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do
   ident <- identifier
-  when (ident `elem` reservedTypeNames) $ P.unexpected $ ident
+  when (ident `elem` reservedTypeNames) $ P.unexpected ident
   return $ TypeVar ident
 
 parseTypeConstructor :: P.Parsec String ParseState Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: P.Parsec String ParseState Type
-parseForAll = (mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
-                        <*> parseConstrainedType)
+parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
+                       <*> parseConstrainedType
 
+-- |
+-- Parse a type as it appears in e.g. a data constructor
+--
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try
             [ parseNumber
@@ -81,7 +88,7 @@ parseConstrainedType = do
     constraints <- parens . commaSep1 $ do
       className <- parseQualified properName
       indented
-      ty <- parseType
+      ty <- P.many parseTypeAtom
       return (className, ty)
     _ <- lexeme $ P.string "=>"
     return constraints
@@ -90,7 +97,7 @@ parseConstrainedType = do
   return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
-parseAnyType = (P.buildExpressionParser operators $ parseTypeAtom) P.<?> "type"
+parseAnyType = P.buildExpressionParser operators parseTypeAtom P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
@@ -108,9 +115,7 @@ parseType = do
 -- Parse a polytype
 --
 parsePolyType :: P.Parsec String ParseState Type
-parsePolyType = do
-  ty <- parseAnyType
-  return ty
+parsePolyType = parseAnyType
 
 parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
 parseNameAndType p = (,) <$> (indented *> identifier <* indented <* lexeme (P.string "::")) <*> p
@@ -119,5 +124,5 @@ parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
 parseRow :: Bool -> P.Parsec String ParseState Type
-parseRow nonEmpty = (curry rowFromList <$> (many $ parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
-  where many = if nonEmpty then commaSep1 else commaSep
+parseRow nonEmpty = (curry rowFromList <$> many' (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
+  where many' = if nonEmpty then commaSep1 else commaSep

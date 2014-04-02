@@ -1,3 +1,3 @@
-module NullaryAbs where
+module Main where
 
   func = \ -> "no"

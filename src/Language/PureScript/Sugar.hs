@@ -18,6 +18,7 @@ module Language.PureScript.Sugar (desugar, module S) where
 import Control.Monad
 
 import Language.PureScript.Declarations
+import Language.PureScript.Errors
 
 import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -25,6 +26,9 @@ import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.Names as S
+
+import Control.Category ((>>>))
 
 -- |
 -- The desugaring pipeline proceeds as follows:
@@ -41,10 +45,14 @@ import Language.PureScript.Sugar.TypeClasses as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
-desugar :: [Module] -> Either String [Module]
-desugar = desugarTypeClasses
-          >=> rebracket
-          >=> desugarDo
+--  * Qualify any unqualified names and types
+--
+desugar :: [Module] -> Either ErrorStack [Module]
+desugar = removeSignedLiterals
+          >>> desugarDo
           >=> desugarCasesModule
           >=> desugarTypeDeclarationsModule
+          >=> desugarImports
+          >=> rebracket
+          >=> desugarTypeClasses
           >=> createBindingGroupsModule

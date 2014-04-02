@@ -13,48 +13,54 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.ModuleDependencies (
-  sortModules
+  sortModules,
+  ModuleGraph
 ) where
 
 import Data.Data
 import Data.Graph
 import Data.Generics
-import Data.List (nub, intersect)
-import Control.Applicative ((<$>))
+import Data.List (nub)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
-import Language.PureScript.Values
-import Language.PureScript.Types
+
+-- |
+-- A list of modules with their dependencies
+--
+type ModuleGraph = [(ModuleName, [ModuleName])]
 
 -- |
 -- Sort a collection of modules based on module dependencies.
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: [Module] -> Either String [Module]
+sortModules :: [Module] -> Either String ([Module], ModuleGraph)
 sortModules ms = do
   let verts = map (\m -> (m, getModuleName m, usedModules m)) ms
-  mapM toModule $ stronglyConnComp verts
+  ms' <- mapM toModule $ stronglyConnComp verts
+  let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
+  return (ms', moduleGraph)
 
 -- |
 -- Calculate a list of used modules based on explicit imports and qualified names
 --
-usedModules :: (Data d) => d -> [ProperName]
+usedModules :: (Data d) => d -> [ModuleName]
 usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProperNames `extQ` imports)
   where
-  qualifiedIdents :: Qualified Ident -> [ProperName]
-  qualifiedIdents (Qualified (Just (ModuleName pn)) _) = [pn]
+  qualifiedIdents :: Qualified Ident -> [ModuleName]
+  qualifiedIdents (Qualified (Just mn) _) = [mn]
   qualifiedIdents _ = []
-  qualifiedProperNames :: Qualified ProperName -> [ProperName]
-  qualifiedProperNames (Qualified (Just (ModuleName pn)) _) = [pn]
+  qualifiedProperNames :: Qualified ProperName -> [ModuleName]
+  qualifiedProperNames (Qualified (Just mn) _) = [mn]
   qualifiedProperNames _ = []
-  imports :: Declaration -> [ProperName]
-  imports (ImportDeclaration (ModuleName pn) _) = [pn]
+  imports :: Declaration -> [ModuleName]
+  imports (ImportDeclaration mn _ _) = [mn]
+  imports (PositionedDeclaration _ d) = imports d
   imports _ = []
 
-getModuleName :: Module -> ProperName
-getModuleName (Module pn _) = pn
+getModuleName :: Module -> ModuleName
+getModuleName (Module mn _ _) = mn
 
 -- |
 -- Convert a strongly connected component of the module graph to a module
@@ -62,4 +68,4 @@ getModuleName (Module pn _) = pn
 toModule :: SCC Module -> Either String Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC _) = Left "Cycle in module dependencies"
+toModule (CyclicSCC ms) = Left $ "Cycle in module dependencies: " ++ show (map getModuleName ms)

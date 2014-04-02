@@ -1,8 +1,8 @@
-module SkolemEscape where
+module Main where
 
 import Prelude
-import Eff
-import ST
+import Control.Monad.Eff
+import Control.Monad.ST
 
 test _ = do
   r <- runST (newSTRef 0)

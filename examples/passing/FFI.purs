@@ -1,16 +1,11 @@
-module FFI where
+module Main where
 
-foreign import foo :: String -> String
+foreign import foo 
+  "function foo(s) {\
+  \  return s;\
+  \}" :: String -> String
 
 bar :: String -> String
 bar _ = foo "test"
 
-module FFIModuleTest where
-
-import FFI
-
-baz _ = foo "test"
-    
-module Main where
-
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

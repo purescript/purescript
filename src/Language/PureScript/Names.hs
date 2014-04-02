@@ -17,7 +17,9 @@
 
 module Language.PureScript.Names where
 
+import Data.List
 import Data.Data
+import Data.Function (on)
 
 -- |
 -- Names for value identifiers
@@ -34,12 +36,23 @@ data Ident
   -- |
   -- An escaped name
   --
-  | Escaped String deriving (Eq, Ord, Data, Typeable)
+  | Escaped String deriving (Data, Typeable)
 
 instance Show Ident where
   show (Ident s) = s
   show (Op op) = '(':op ++ ")"
   show (Escaped s) = s
+
+instance Eq Ident where
+  Ident s1   == Ident s2   = s1 == s2
+  Op s1      == Op s2      = s1 == s2
+  Escaped s1 == Escaped s2 = s1 == s2
+  Ident s1   == Escaped s2 = s1 == s2
+  Escaped s1 == Ident s2   = s1 == s2
+  _          == _          = False
+
+instance Ord Ident where
+  compare = compare `on` show
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
@@ -52,10 +65,21 @@ instance Show ProperName where
 -- |
 -- Module names
 --
-data ModuleName = ModuleName { runModuleName :: ProperName } deriving (Eq, Ord, Data, Typeable)
+data ModuleName = ModuleName [ProperName] deriving (Eq, Ord, Data, Typeable)
+
+runModuleName :: ModuleName -> String
+runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
+
+moduleNameFromString :: String -> ModuleName
+moduleNameFromString = ModuleName . splitProperNames
+  where
+  splitProperNames s = case dropWhile (== '.') s of
+    "" -> []
+    s' -> ProperName w : splitProperNames s''
+      where (w, s'') = break (== '.') s'
 
 instance Show ModuleName where
-  show (ModuleName name) = show name
+  show = runModuleName
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -64,7 +88,7 @@ data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typea
 
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
-  show (Qualified (Just (ModuleName name)) a) = show name ++ "." ++ show a
+  show (Qualified (Just name) a) = show name ++ "." ++ show a
 
 -- |
 -- Provide a default module name, if a name is unqualified

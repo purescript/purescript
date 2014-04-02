@@ -25,6 +25,7 @@ The following pattern types are supported:
 - Variable pattern
 - Array patterns
 - Cons patterns
+- Constructor patterns
 - Record patterns
 - Named patterns
 - Guards
@@ -84,6 +85,17 @@ The head and tail of a non-empty array can be matched by using a cons pattern::
 
   addPairs (x : y : xs) = x * y + addPairs xs
   addPairs _ = 0
+
+
+Constructor patterns
+--------------------
+
+Constructor patterns match a data constructor and its arguments::
+
+  data Foo = Foo String | Bar Number Boolean
+
+  foo (Foo s) = true
+  foo (Bar _ b) = b
 
 Record Patterns
 ---------------

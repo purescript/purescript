@@ -1,4 +1,4 @@
-module TypeSynonyms2 where
+module Main where
 
 class Foo a where
   foo :: a -> String

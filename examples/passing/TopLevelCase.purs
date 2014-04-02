@@ -1,4 +1,4 @@
-module TopLevelCase where
+module Main where
 
   import Prelude
 
@@ -15,6 +15,4 @@ module TopLevelCase where
 
   parseTest A 0 = 0
     
-module Main where
-
-main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

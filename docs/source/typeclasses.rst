@@ -12,14 +12,14 @@ Here is an example of the `Show` typeclass, with instances for Strings, Booleans
   class Show a where
     show :: a -> String
   
-  instance Show String where
+  instance showString :: Show String where
     show s = s
   
-  instance Show Boolean where
+  instance showBoolean :: Show Boolean where
     show true = "true"
     show false = "false"
   
-  instance (Show a) => Show [a] where
+  instance showArray :: (Show a) => Show [a] where
     show [] = "[]"
     show (x:xs) = show x ++ " : " ++ showArray xs
   

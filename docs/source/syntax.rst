@@ -215,8 +215,3 @@ For example, the following function increments the ``foo`` property on its argum
 
   incr o = o { foo = o.foo + 1 }
 
-The generated Javascript assumes the existence of a method called ``Object.extend`` such that ``Object.extend(o, p)`` takes an object ``o`` and generates a shallow copy of ``o`` including the properties of ``p``. A simple JQuery implementation of this specification is::
-
-  Object.prototype.extend = function(o, p) {
-    return $.extend({}, o, p);
-  };

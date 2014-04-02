@@ -1,4 +1,6 @@
-module MonadTest where
+module Main where
+
+  import Prelude ()
 
   type Monad m = { return :: forall a. a -> m a
 		 , bind :: forall a b. m a -> (a -> m b) -> m b }
@@ -26,7 +28,5 @@ module MonadTest where
   test1 = test id
 
   test2 = test maybe
-    
-module Main where
 
-main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

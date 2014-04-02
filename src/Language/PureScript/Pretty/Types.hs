@@ -15,12 +15,13 @@
 
 module Language.PureScript.Pretty.Types (
     prettyPrintType,
+    prettyPrintTypeAtom,
     prettyPrintRow
 ) where
 
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
-import Data.Generics (mkT, everywhere)
+import Data.Generics (mkT, everywhere, everywhere')
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows
@@ -28,21 +29,21 @@ import Control.Monad.Unify
 
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Environment
 
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
-  match (Object row) = Just $ "{ " ++ prettyPrintType row ++ " }"
   match (TypeVar var) = Just var
+  match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
-  match ty@(TypeConstructor ctor) = Just $ show ctor
+  match (TypeConstructor ctor) = Just $ show ctor
   match (TUnknown (Unknown u)) = Just $ 'u' : show u
   match (Skolem s _) = Just $ 's' : show s
-  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ prettyPrintType ty' ++ ")") deps) ++ ") => " ++ prettyPrintType ty
-  match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintType args) ++ ">"
-  match (ForAll ident ty _) = Just $ "forall " ++ ident ++ ". " ++ prettyPrintType ty
-  match REmpty = Just $ prettyPrintRow REmpty
-  match row@(RCons _ _ _) = Just $ prettyPrintRow row
+  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
+  match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
+  match REmpty = Just "()"
+  match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
 
 -- |
@@ -55,10 +56,7 @@ prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs
   nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Type -> String
   tailToPs REmpty = ""
-  tailToPs (TUnknown (Unknown u)) = " | u" ++ show u
-  tailToPs (TypeVar var) = " | " ++ var
-  tailToPs (Skolem s _) = " | s" ++ show s
-  tailToPs _ = error "Invalid row tail"
+  tailToPs other = " | " ++ prettyPrintType other
   toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (tys, r)
@@ -76,23 +74,47 @@ appliedFunction = mkPattern match
   match _ = Nothing
 
 insertPlaceholders :: Type -> Type
-insertPlaceholders = everywhere (mkT convert)
+insertPlaceholders = everywhere' (mkT convertForAlls) . everywhere (mkT convert)
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
+  convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
   convert other = other
+  convertForAlls (ForAll ident ty _) = go [ident] ty
+    where
+    go idents (ForAll ident' ty' _) = go (ident' : idents) ty'
+    go idents other = PrettyPrintForAll idents other
+  convertForAlls other = other
+
+matchTypeAtom :: Pattern () Type String
+matchTypeAtom = typeLiterals <+> fmap parens matchType
+
+matchType :: Pattern () Type String
+matchType = buildPrettyPrinter operators matchTypeAtom
+  where
+  operators :: OperatorTable () Type String
+  operators =
+    OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
+                  , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
+                    ]
+                  , [ Wrap forall_ $ \idents ty -> "forall " ++ unwords idents ++ ". " ++ ty ]
+                  ]
+
+forall_ :: Pattern () Type ([String], Type)
+forall_ = mkPattern match
+  where
+  match (PrettyPrintForAll idents ty) = Just (idents, ty)
+  match _ = Nothing
+
+-- |
+-- Generate a pretty-printed string representing a Type, as it should appear inside parentheses
+--
+prettyPrintTypeAtom :: Type -> String
+prettyPrintTypeAtom = fromMaybe (error "Incomplete pattern") . pattern matchTypeAtom () . insertPlaceholders
+
 
 -- |
 -- Generate a pretty-printed string representing a Type
 --
 prettyPrintType :: Type -> String
 prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
-  where
-  matchType :: Pattern () Type String
-  matchType = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchType)
-  operators :: OperatorTable () Type String
-  operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> f ++ " " ++ x ]
-                  , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
-                    ]
-                  ]

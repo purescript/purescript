@@ -16,123 +16,186 @@
 
 module Language.PureScript.Sugar.TypeClasses (
   desugarTypeClasses,
-  mkDictionaryValueName,
   mkDictionaryEntryName
 ) where
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.Values
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.CodeGen.Common (identToJs)
+
+import Control.Applicative
+import Control.Arrow (second)
+import Control.Monad.State
+import Data.Maybe (fromMaybe, catMaybes)
+import Data.List (find)
+import Data.Traversable (traverse)
 
 import qualified Data.Map as M
 
-import Control.Applicative
-import Control.Monad.State
-import Data.Maybe (fromMaybe)
-import Data.List (find, nub)
-import Data.Traversable (traverse)
-import Data.Generics (mkQ, everything)
-import Language.PureScript.CodeGen.Common (identToJs)
+-- module name * proper name |- class names * implies * methods
+type MemberMap = M.Map (ModuleName, ProperName) ([String], [(Qualified ProperName, Type)], [(String, Type)])
 
--- module name * proper name |- class name * implies * methods
-type MemberMap = M.Map (ModuleName, ProperName) (String, [(Qualified ProperName, Type)], [(String, Type)])
-
-type Desugar = StateT MemberMap (Either String)
+type Desugar = StateT MemberMap (Either ErrorStack)
 
 -- |
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: [Module] -> Either String [Module]
+desugarTypeClasses :: [Module] -> Either ErrorStack [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
-desugarModule (Module name decls) = Module name <$> concat <$> mapM (desugarDecl (ModuleName name)) decls
+desugarModule (Module name decls (Just exps)) = do
+  (newExpss, declss) <- unzip <$> mapM (desugarDecl name) decls
+  return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
+desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
-desugarDecl :: ModuleName -> Declaration -> Desugar [Declaration]
-desugarDecl mn d@(TypeClassDeclaration name arg implies members) = do
+-- |
+-- Desugar type class and type class instance declarations
+--
+-- Type classes become type synonyms for their dictionaries, and type instances become dictionary declarations.
+-- Additional values are generated to access individual members of a dictionary, with the appropriate type.
+--
+-- E.g. the following
+--
+--   module Test where
+--
+--   class Foo a where
+--     foo :: a -> a
+--
+--   instance Foo String where
+--     foo s = s ++ s
+--
+--   instance (Foo a) => Foo [a] where
+--     foo = map foo
+--
+-- becomes
+--
+--   type Foo a = { foo :: a -> a }
+--
+--   foreign import foo "function foo(dict) {\
+--                      \  return dict.foo;\
+--                      \}" :: forall a. (Foo a) => a -> a
+--
+--   __Test_Foo_string_foo = (\s -> s ++ s) :: String -> String
+--
+--   __Test_Foo_string :: {} -> Foo String
+--   __Test_Foo_string = { foo: __Test_Foo_string_foo :: String -> String (unchecked) }
+--
+--   __Test_Foo_array_foo :: forall a. (Foo a) => [a] -> [a]
+--   __Test_Foo_array_foo _1 = map (foo _1)
+--
+--   __Test_Foo_array :: forall a. Foo a -> Foo [a]
+--   __Test_Foo_array _1 = { foo: __Test_Foo_array_foo _1 :: [a] -> [a] (unchecked) }
+--
+desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
+desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
   let tys = map memberToNameAndType members
-
-  modify (M.insert (mn, name) (arg, implies, tys))
-  return $ d : typeClassDictionaryDeclaration name arg tys : map (typeClassMemberToDictionaryAccessor name arg) members
-desugarDecl mn d@(TypeInstanceDeclaration deps name ty members) = do
+  modify (M.insert (mn, name) (args, implies, tys))
+  return $ (Nothing, d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
-  entries <- mapM (typeInstanceDictionaryEntryDeclaration mn deps name ty) desugared
-  dictDecls <- typeInstanceDictionaryDeclarations mn deps name ty desugared
-  return $ d : entries ++ dictDecls
-desugarDecl _ other = return [other]
+  entries <- mapM (typeInstanceDictionaryEntryDeclaration name mn deps className ty) desugared
+  dictDecls <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
+  return $ (Just $ TypeInstanceRef name, d : entries ++ dictDecls)
+desugarDecl mn (PositionedDeclaration pos d) = do
+  (dr, ds) <- desugarDecl mn d
+  return (dr, map (PositionedDeclaration pos) ds)
+desugarDecl _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (String, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (identToJs ident, ty)
+memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration :: ProperName -> String -> [(String, Type)] -> Declaration
-typeClassDictionaryDeclaration name arg tys =
-  TypeSynonymDeclaration name [arg] (Object $ rowFromList (tys, REmpty))
+typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration name args members =
+  TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (map memberToNameAndType members, REmpty))
 
-typeClassMemberToDictionaryAccessor :: ProperName -> String -> Declaration -> Declaration
-typeClassMemberToDictionaryAccessor name arg (TypeDeclaration ident ty) =
+typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
+typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSAccessor (identToJs ident) (JSVar "dict"))])))
-    (ForAll arg (ConstrainedType [(Qualified Nothing name, TypeVar arg)] ty) Nothing)
-typeClassMemberToDictionaryAccessor _ _ _ = error "Invalid declaration in type class definition"
+    (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
+typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
+  PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
+typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
-typeInstanceDictionaryDeclarations :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> [Declaration] -> Desugar [Declaration]
-typeInstanceDictionaryDeclarations mn deps qn@(Qualified mn' pn) ty decls = do
+typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar [Declaration]
+typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   m <- get
-  (tv, implies, classMethods) <- lift $ maybe (Left $ "Can't find type class " ++ show qn) Right $ M.lookup (fromMaybe mn mn', pn) m
+  (_, _, instanceTys) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
+                        $ M.lookup (qualify mn className) m
   let declarationJsNames = map (identToJs . declarationIdent) decls
   lift $ mapM_ (\(methodName, _) -> if methodName `elem` declarationJsNames
                                     then Right ()
-                                    else Left $ "Type class member type not found: " ++ methodName) classMethods
-  foundMethods <- traverse (findMethod m) decls
-  dicts <- mapM classDeclaration $ groupKeys foundMethods
-  return $ map (instanceDecl tv) implies ++ dicts
+                                    else Left $ mkErrorStack ("Type class member type not found: " ++ methodName) Nothing) instanceTys
+  foundMethods <- fmap groupKeys $ traverse (findMethod m) decls
+  dicts <- mapM classDeclaration foundMethods
+  return $ join dicts
   where
-  findMethod m (ValueDeclaration ident _ _ _) = do
-    maybeMethod <- findImpliedMethod mn qn ident' m
-    lift $ maybe (Left $ "Could not find method " ++ show ident) (Right . assoc) maybeMethod
+  unit :: Type
+  unit = TypeApp tyObject REmpty
+  groupKeys :: Ord k => [(k, [a])] -> [(k, [a])]
+  groupKeys = M.toList . M.fromListWith (++)
+
+  findMethod :: MemberMap -> Declaration -> Desugar ((Qualified ProperName, [String]), [(String, Type)])
+  findMethod m (ValueDeclaration ident _ _ _ _) = do
+    maybeMethod <- findImpliedMethod mn className ident' m
+    lift $ maybe (Left $ mkErrorStack ("Could not find method " ++ show ident) Nothing) (Right . assoc) maybeMethod
     where
     assoc (qn, arg, valTy) = ((qn, arg), [(ident', valTy)])
     ident' = identToJs ident
-  groupKeys = M.toList . M.fromListWith (++)
-  instanceDecl tv (name, ty') = TypeInstanceDeclaration deps name (replaceTypeVars tv ty ty') []
-  classDeclaration :: ((Qualified ProperName, String), [(String, Type)]) -> Desugar Declaration
-  classDeclaration ((name, arg), instanceTys) = do
-    let memberTypes = map (replaceTypeVars arg ty) instanceTys
-    entryName <- lift $ mkDictionaryValueName mn name ty
-    memberNames <- mapM (memberToNameAndValue name decls) memberTypes
-    return $ ValueDeclaration entryName [] Nothing
-      (TypedValue True
-        (foldr Abs (ObjectLiteral memberNames) (map (\n -> Ident ('_' : show n)) [1..length deps]))
-        (quantify (foldr function (TypeApp (TypeConstructor name) ty) (map (\(pn, ty') -> TypeApp (TypeConstructor pn) ty') deps)))
-      )
-  declarationIdent (ValueDeclaration ident _ _ _) = ident
-  declarationIdent _ = error "Type class instance contained invalid declaration"
-  memberToNameAndValue :: Qualified ProperName -> [Declaration] -> (String, Type) -> Desugar (String, Value)
-  memberToNameAndValue className decls (mangled, memberType) = do
-    memberIdent <- lift . maybe (Left $ "Could not find method " ++ mangled) Right . find ((== mangled) . identToJs) $ map declarationIdent decls
-    memberName <- mkDictionaryEntryName mn className ty memberIdent
+  findMethod m (PositionedDeclaration _ val) = findMethod m val
+  findMethod _ _ = error "Invalid declaration in type instance definition"
+  classDeclaration :: ((Qualified ProperName, [String]), [(String, Type)]) -> Desugar [Declaration]
+  classDeclaration ((className', args), instanceTys) = do
+    let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
+    let entryName = if className' == className then name else mkDictionaryEntryName (Escaped $ show name) (Ident $ show className')
+    memberNames <- mapM (memberToNameAndValue decls) memberTypes
+    return [
+      TypeInstanceDeclaration entryName deps className' (map (replaceAllTypeVars (zip args tys) . TypeVar) args) [],
+      ValueDeclaration entryName TypeInstanceDictionaryValue [] Nothing
+        (TypedValue True
+          (foldr (Abs . (\n -> Left . Ident $ '_' : show n)) (ObjectLiteral memberNames) [1..max 1 (length deps)])
+          (quantify (if null deps then
+                       function unit (foldl TypeApp (TypeConstructor className') tys)
+                     else
+                       foldr (function . (\(pn, tys') -> foldl TypeApp (TypeConstructor pn) tys')) (foldl TypeApp (TypeConstructor className') tys) deps))
+        )
+      ]
+  memberToNameAndValue :: [Declaration] -> (String, Type) -> Desugar (String, Value)
+  memberToNameAndValue decls' (mangled, memberType) = do
+    memberIdent <- lift . maybe (Left $ mkErrorStack ("Type class member not found") Nothing) Right . find ((== mangled) . identToJs) $ map declarationIdent decls'
+    let memberName = mkDictionaryEntryName name memberIdent
     return (mangled, TypedValue False
-                       (if null deps then Var (Qualified Nothing memberName)
-                        else foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
+                       (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
                        (quantify memberType))
+  declarationIdent :: Declaration -> Ident
+  declarationIdent (ValueDeclaration ident _ _ _ _) = ident
+  declarationIdent (PositionedDeclaration _ val) = declarationIdent val
+  declarationIdent _ = error "Invalid declaration in type instance definition"
 
-typeInstanceDictionaryEntryDeclaration :: ModuleName -> [(Qualified ProperName, Type)] -> Qualified ProperName -> Type -> Declaration -> Desugar Declaration
-typeInstanceDictionaryEntryDeclaration mn deps name ty (ValueDeclaration ident [] _ val) = do
+typeInstanceDictionaryEntryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> Declaration -> Desugar Declaration
+typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclaration ident _ [] _ val) = do
   m <- get
-  maybeMethod <- findImpliedMethod mn name (identToJs ident) m
-  (name, arg, valTy') <- lift $ maybe (Left $ "Type class " ++ show name ++ " does not have method " ++ show ident) Right maybeMethod
-  let valTy = replaceTypeVars arg ty valTy'
-  entryName <- mkDictionaryEntryName mn name ty ident
-  return $ ValueDeclaration entryName [] Nothing
+  valTy <- do (_, args, ty') <- lookupIdent m
+              return $ replaceAllTypeVars (zip args tys) ty'
+  let entryName = mkDictionaryEntryName name ident
+  return $ ValueDeclaration entryName TypeInstanceMember [] Nothing
     (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
-typeInstanceDictionaryEntryDeclaration _ _ _ _ _ = error "Invalid declaration in type instance definition"
+  where
+  lookupIdent m = findImpliedMethod mn className (identToJs ident) m >>= lift . maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " does not have method " ++ show ident) Nothing) Right
+typeInstanceDictionaryEntryDeclaration name mn deps className tys (PositionedDeclaration pos d) =
+  PositionedDeclaration pos <$> typeInstanceDictionaryEntryDeclaration name mn deps className tys d
+typeInstanceDictionaryEntryDeclaration _ _ _ _ _ _ = error "Invalid declaration in type instance definition"
 
-findImpliedMethod :: ModuleName -> Qualified ProperName -> String -> MemberMap -> Desugar (Maybe (Qualified ProperName, String, Type))
+findImpliedMethod :: ModuleName -> Qualified ProperName -> String -> MemberMap -> Desugar (Maybe (Qualified ProperName, [String], Type))
 findImpliedMethod mn className name m = fmap (fmap discardName) maybeClassMethod
   where
   discardName (mn', arg, (_, valTy)) = (mn', arg, valTy)
@@ -140,42 +203,15 @@ findImpliedMethod mn className name m = fmap (fmap discardName) maybeClassMethod
   checkClass (qn, arg, methods) = find sameName $ map (\method -> (qn, arg, method)) methods
   sameName (_, _, (name', _)) = name' == name
 
-allImpliedClasses :: ModuleName -> Qualified ProperName -> MemberMap -> Desugar [(Qualified ProperName, String, [(String, Type)])]
+allImpliedClasses :: ModuleName -> Qualified ProperName -> MemberMap -> Desugar [(Qualified ProperName, [String], [(String, Type)])]
 allImpliedClasses mn qn@(Qualified mn' pn) m = do
-  (name, implies, methods) <- lift $ maybe (Left $ "Type class " ++ show qn ++ " is undefined. Type class names must be qualified.") Right $ M.lookup (fromMaybe mn mn', pn) m
+  (name, implies, methods) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show qn ++ " is undefined") Nothing) Right $ M.lookup (fromMaybe mn mn', pn) m
   rest <- mapM (\(superName, _) -> allImpliedClasses mn superName m) implies
   return $ (qn, name, methods) : concat rest
-
-qualifiedToString :: ModuleName -> Qualified ProperName -> String
-qualifiedToString mn (Qualified Nothing pn) = qualifiedToString mn (Qualified (Just mn) pn)
-qualifiedToString _ (Qualified (Just (ModuleName mn)) pn) = runProperName mn ++ "_" ++ runProperName pn
-
-quantify :: Type -> Type
-quantify ty' = foldr (\arg t -> ForAll arg t Nothing) ty' tyVars
-  where
-  tyVars = nub $ everything (++) (mkQ [] collect) ty'
-  collect (TypeVar v) = [v]
-  collect _ = []
-
--- |
--- Generate a name for a type class dictionary, based on the module name, class name and type name
---
-mkDictionaryValueName :: ModuleName -> Qualified ProperName -> Type -> Either String Ident
-mkDictionaryValueName mn cl ty = do
-  tyStr <- typeToString mn ty
-  return $ Ident $ "__" ++ qualifiedToString mn cl ++ "_" ++ tyStr
-
-typeToString :: ModuleName -> Type -> Either String String
-typeToString _ (TypeVar _) = return "var"
-typeToString mn (TypeConstructor ty') = return $ qualifiedToString mn ty'
-typeToString mn (TypeApp ty' (TypeVar _)) = typeToString mn ty'
-typeToString _ _ = Left "Type class instance must be of the form T a1 ... an"
 
 -- |
 -- Generate a name for a type class dictionary member, based on the module name, class name, type name and
 -- member name
 --
-mkDictionaryEntryName :: ModuleName -> Qualified ProperName -> Type -> Ident -> Desugar Ident
-mkDictionaryEntryName mn name ty ident = do
-  Ident dictName <- lift $ mkDictionaryValueName mn name ty
-  return $ Escaped $ dictName ++ "_" ++ identToJs ident
+mkDictionaryEntryName :: Ident -> Ident -> Ident
+mkDictionaryEntryName dictName ident = Escaped $ show dictName ++ "_" ++ identToJs ident

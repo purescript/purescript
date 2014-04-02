@@ -1,4 +1,4 @@
-module Rank2Types where
+module Main where
 
   import Prelude
 

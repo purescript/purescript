@@ -1,4 +1,4 @@
-module TypeSynonyms where
+module Main where
 
   type Lens a b = 
     { get :: a -> b
@@ -8,12 +8,7 @@ module TypeSynonyms where
   composeLenses :: forall a b c. Lens a b -> Lens b c -> Lens a c
   composeLenses = \l1 -> \l2 ->
     { get: \a -> l2.get (l1.get a)
-    , set: \a -> \c -> 
-      {
-	var b = l1.get a;
-	var b1 = l2.set b c;
-	return l1.set a b1;
-      }
+    , set: \a c -> l1.set a (l2.set (l1.get a) c)
     }
 
   type Pair a b = { fst :: a, snd :: b }
@@ -21,24 +16,10 @@ module TypeSynonyms where
   fst :: forall a b. Lens (Pair a b) a
   fst = 
     { get: \p -> p.fst
-    , set: \p -> \a -> { fst: a, snd: p.snd }
+    , set: \p a -> { fst: a, snd: p.snd }
     }
 
   test1 :: forall a b c. Lens (Pair (Pair a b) c) a
   test1 = composeLenses fst fst
 
-  import Arrays
-
-  headLens :: forall a. Lens [a] a
-  headLens =
-    { get: \l -> head l
-    , set: \l a -> case l of
-        _:xs -> a : xs
-    }
-
-  test2 :: forall a b c. Lens (Pair [Pair a b] c) a
-  test2 = composeLenses fst (composeLenses headLens fst)
-    
-module Main where
-
-main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

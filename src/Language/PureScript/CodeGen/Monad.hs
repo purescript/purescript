@@ -21,7 +21,6 @@ module Language.PureScript.CodeGen.Monad where
 
 import Control.Monad.State
 import Control.Applicative
-import Language.PureScript.Names
 
 -- |
 -- Code generation monad data type

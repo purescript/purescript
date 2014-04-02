@@ -1,4 +1,4 @@
-module Recursion where
+module Main where
 
   import Prelude
 
@@ -6,7 +6,5 @@ module Recursion where
     0 -> 1
     1 -> 1
     n -> fib (n - 1) + fib (n - 2)
-    
-module Main where
-
-main = Trace.trace "Done"
+   
+  main = Debug.Trace.trace "Done"

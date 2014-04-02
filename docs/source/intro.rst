@@ -8,7 +8,7 @@ PureScript is a small strongly, statically typed compile-to-JS language with a n
 - Support for basic Javascript types
 - Extensible records
 - Extensible effects
-- Type-safe blocks with for/while/assignment etc.
+- Optimizer rules for generation of efficient Javascript
 - Pattern matching
 - Simple FFI
 - Modules
@@ -47,7 +47,9 @@ The following options are supported:
 --tco                  Perform tail-call elimination on the generated Javascript.
 --no-prelude           Do not include the Prelude in the generated Javascript.
 --magic-do             Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
---run-main             Generate a call to `Main.main` after all other generated Javascript.
+--main                 Generate a call to `main` in the specified module after all other generated Javascript. Defaults to `Main` if the option is used but no value is provided.
+--module               If specified, any code which is not referenced transitively from this module will be removed. This argument can be used multiple times.
+--browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
 
 Motivation
 ----------
@@ -62,7 +64,7 @@ I was looking for a simple functional language which would compile to JavaScript
 
 I didn't find exactly what I was looking for, so I wrote PureScript. It doesn't have everything right now, but it should serve as a simple core on which to develop new ideas.
 
-PureScript is *not* designed to be a general-purpose programming language. The primary use case is as a generator for purely-functional core libraries, with the main application code written in another language.
+PureScript was originally designed to implement purely functional core logic. However, recent additions to the compiler and libraries now also make it a good option for general-purpose programming.
 
 PureScript can also be seen as a trade-off between a theoretically ideal language and one which generates reasonably high performance code.
 
@@ -73,7 +75,7 @@ As an introductory example, here is the usual "Hello World" written in PureScrip
 
   module Main where
   
-  import Trace
+  import Debug.Trace
   
   main = trace "Hello, World!"
 
@@ -87,7 +89,7 @@ which compiles to the following Javascript, ignoring the Prelude::
 
 The following command will compile and execute the PureScript code above::
 
-  psc input.purs --run-main | nodejs
+  psc input.purs --main | node
 
 Another Example
 ---------------
@@ -100,6 +102,10 @@ The following code defines a `Person` data type and a function to generate a str
   
   showPerson :: Person -> String
   showPerson (Person o) = o.name ++ ", aged " ++ numberToString(o.age)
+  
+  examplePerson :: Person
+  examplePerson = Person {name: "Bonnie", age: 26}
+
 
 Line by line, this reads as follows:
 
@@ -108,16 +114,23 @@ Line by line, this reads as follows:
 - The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
 - The `showPerson` function takes a `Person` and returns a `String`
 - `showPerson` works by case analysis on its argument, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
+- `examplePerson` is a Person object, made with the Person constructor and given the String "Bonnie" for the name value and the Number 26 for the age value.
 
 The generated Javascript looks like this::
 
   var Person = function (value) { 
-      return { ctor: 'Person', value: value }; 
+      return { ctor: 'Person', values: [value] }; 
   };
   
   function showPerson(_1) {
-      return _1.value.name + ", aged " + numberToString(_1.value.age); 
+      return _1.values[0].name + ", aged " + numberToString(_1.values[0].age); 
   };
+  
+  var examplePerson = Person({
+    name: "Bonnie", 
+    age: 26
+  });
+
 
 Related Projects
 ----------------

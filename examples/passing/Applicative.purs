@@ -1,4 +1,6 @@
-module Applicative where
+module Main where
+
+import Prelude ()
 
 class Applicative f where
   pure :: forall a. a -> f a
@@ -6,11 +8,9 @@ class Applicative f where
 
 data Maybe a = Nothing | Just a
 
-instance Applicative Maybe where
+instance applicativeMaybe :: Applicative Maybe where
   pure = Just
   (<*>) (Just f) (Just a) = Just (f a)
   (<*>) _ _ = Nothing
 
-module Main where
-
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

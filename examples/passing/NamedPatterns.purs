@@ -1,9 +1,7 @@
-module NamedPatterns where
+module Main where
 
   foo = \x -> case x of 
     y@{ foo = "Foo" } -> y
     y -> y
-    
-module Main where
 
-main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

@@ -18,11 +18,13 @@ module Language.PureScript.Scope (
     unusedNames
 ) where
 
+import Control.Applicative ((<$>))
+
 import Data.Data
 import Data.List ((\\), nub)
 import Data.Generics (extQ, mkQ, everything)
 
-import Language.PureScript.Values
+import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 
@@ -30,25 +32,22 @@ import Language.PureScript.CodeGen.JS.AST
 -- Gather all used names appearing inside a value
 --
 usedNames :: (Data d) => d -> [Ident]
-usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesS `extQ` namesB `extQ` namesJS) val
+usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesB `extQ` namesJS) val
   where
   namesV :: Value -> [Ident]
-  namesV (Abs arg _) = [arg]
+  namesV (Abs (Left arg) _) = [arg]
   namesV (Var (Qualified Nothing name)) = [name]
   namesV _ = []
-  namesS :: Statement -> [Ident]
-  namesS (VariableIntroduction name _) = [name]
-  namesS (For name _ _ _) = [name]
-  namesS _ = []
   namesB :: Binder -> [Ident]
   namesB (VarBinder name) = [name]
   namesB _ = []
   namesJS :: JS -> [Ident]
   namesJS (JSVar name) = [Ident name]
-  namesJS (JSFunction (Just name) args _) = (Ident name) : (Ident `map` args)
-  namesJS (JSFunction Nothing args _) = (Ident `map` args)
+  namesJS (JSFunction (Just name) args _) = Ident name : (Ident <$> args)
+  namesJS (JSFunction Nothing args _) = Ident <$> args
   namesJS (JSVariableIntroduction name _) = [Ident name]
   namesJS (JSFor name _ _ _) = [Ident name]
+  namesJS (JSForIn name _ _) = [Ident name]
   namesJS _ = []
 
 -- |

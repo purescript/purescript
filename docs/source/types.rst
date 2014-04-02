@@ -31,7 +31,7 @@ PureScript records correspond to Javascript objects. They may have zero or more 
 Tagged Unions
 -------------
 
-Tagged unions consist of one or more constructors, each of which takes zero or one arguments.
+Tagged unions consist of one or more constructors, each of which takes zero or more arguments.
 
 Tagged unions can only be created using their constructors, and deconstructed through pattern matching (see later).
 
@@ -141,7 +141,7 @@ For convenience, it is possible to declare a synonym for a type using the ``type
 
 For example::
 
-  type Foo = { foo :: Number, bar Number }
+  type Foo = { foo :: Number, bar :: Number }
   
   addFoo :: Foo -> Number
   addFoo = \o -> o.foo + o.bar

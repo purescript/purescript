@@ -1,10 +1,10 @@
-module Do where
+module Main where
 
 import Prelude
 
 data Maybe a = Nothing | Just a
 
-instance Prelude.Monad Maybe where
+instance monadMaybe :: Prelude.Monad Maybe where
   return = Just
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
@@ -43,7 +43,5 @@ test8 = \_ -> do
     Just 1)
 
 test9 = \_ -> (+) <$> Just 1 <*> Just 2
-    
-module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

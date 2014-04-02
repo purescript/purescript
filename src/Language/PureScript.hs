@@ -13,26 +13,38 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript (module P, compile) where
+module Language.PureScript (module P, compile, compile', MonadMake(..), make) where
 
-import Language.PureScript.Values as P
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
 import Language.PureScript.Declarations as P
 import Language.PureScript.Names as P
 import Language.PureScript.Parser as P
 import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen.Common as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.Options as P
 import Language.PureScript.ModuleDependencies as P
+import Language.PureScript.Environment as P
+import Language.PureScript.Errors as P
+import Language.PureScript.DeadCodeElimination as P
 
-import Data.List (intercalate)
-import Control.Monad (when, forM)
+import qualified Language.PureScript.Constants as C
+
+import Data.List (find, sortBy, groupBy, intercalate)
+import Data.Time.Clock
+import Data.Function (on)
+import Data.Generics (mkQ, everything)
+import Data.Maybe (fromMaybe, mapMaybe)
+import Control.Monad.Error
 import Control.Monad.State.Lazy
+import Control.Arrow ((&&&))
 import Control.Applicative ((<$>))
 import qualified Data.Map as M
+import qualified Data.Set as S
+import System.FilePath (pathSeparator)
 
 -- |
 -- Compile a collection of modules
@@ -45,26 +57,198 @@ import qualified Data.Map as M
 --
 --  * Type check, and elaborate values to include type annotations and type class dictionaries.
 --
---  * Regroup values to take into account new value dependencies introduced by elaboration
+--  * Regroup values to take into account new value dependencies introduced by elaboration.
+--
+--  * Eliminate dead code.
 --
 --  * Generate Javascript, and perform optimization passes.
 --
 --  * Pretty-print the generated Javascript
 --
 compile :: Options -> [Module] -> Either String (String, String, Environment)
-compile opts ms = do
-  sorted <- sortModules ms
-  desugared <- desugar sorted
-  (elaborated, env) <- runCheck $ forM desugared $ \(Module moduleName decls) -> do
-    modify (\s -> s { checkCurrentModule = Just (ModuleName moduleName) })
-    Module moduleName <$> typeCheckAll (ModuleName moduleName) decls
-  regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let js = concatMap (flip (moduleToJs opts) env) $ regrouped
-  let exts = intercalate "\n" . map (flip moduleToPs env) $ regrouped
-  js' <- case () of
-              _ | optionsRunMain opts -> do
-                    when ((ModuleName (ProperName "Main"), Ident "main") `M.notMember` (names env)) $
-                      Left "Main.main is undefined"
-                    return $ js ++ [JSApp (JSAccessor "main" (JSVar "Main")) []]
-                | otherwise -> return js
-  return (prettyPrintJS js', exts, env)
+compile = compile' initEnvironment
+
+compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
+compile' env opts ms = do
+  (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
+  desugared <- stringifyErrorStack True $ desugar sorted
+  (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
+  regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  let entryPoints = moduleNameFromString `map` optionsModules opts
+  let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
+  let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
+  let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
+  let js = mapMaybe (flip (moduleToJs opts) env') modulesToCodeGen
+  let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
+  js' <- generateMain env' opts js
+  return (prettyPrintJS [wrapExportsContainer opts js'], exts, env')
+  where
+  mainModuleIdent = moduleNameFromString <$> optionsMain opts
+
+typeCheckModule :: Maybe ModuleName -> Module -> Check Module
+typeCheckModule mainModuleName (Module mn decls exps) = do
+  modify (\s -> s { checkCurrentModule = Just mn })
+  decls' <- typeCheckAll mainModuleName mn decls
+  mapM_ checkTypesAreExported exps'
+  return $ Module mn decls' exps
+  where
+
+  exps' = fromMaybe (error "exports should have been elaborated") exps
+
+  -- Check that all the type constructors defined in the current module that appear in member types
+  -- have also been exported from the module
+  checkTypesAreExported :: DeclarationRef -> Check ()
+  checkTypesAreExported (ValueRef name) = do
+    ty <- lookupVariable mn (Qualified (Just mn) name)
+    case find isTconHidden (findTcons ty) of
+      Just hiddenType -> throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
+      Nothing -> return ()
+  checkTypesAreExported _ = return ()
+
+  -- Find the type constructors exported from the current module used in a type
+  findTcons :: Type -> [ProperName]
+  findTcons = everything (++) (mkQ [] go)
+    where
+    go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+    go _ = []
+
+  -- Checks whether a type constructor is not being exported from the current module
+  isTconHidden :: ProperName -> Bool
+  isTconHidden tyName = all go exps'
+    where
+    go (TypeRef tyName' _) = tyName' /= tyName
+    go _ = True
+
+
+generateMain :: Environment -> Options -> [JS] -> Either String [JS]
+generateMain env opts js =
+  case moduleNameFromString <$> optionsMain opts of
+    Just mmi -> do
+      when ((mmi, Ident C.main) `M.notMember` names env) $
+        Left $ show mmi ++ "." ++ C.main ++ " is undefined"
+      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar C._ps))) []]
+    _ -> return js
+
+-- |
+-- A type class which collects the IO actions we need to be able to run in "make" mode
+--
+class MonadMake m where
+  -- |
+  -- Get a file timestamp
+  --
+  getTimestamp :: FilePath -> m (Maybe UTCTime)
+
+  -- |
+  -- Read a file as a string
+  --
+  readTextFile :: FilePath -> m String
+
+  -- |
+  -- Write a text file
+  --
+  writeTextFile :: FilePath -> String -> m ()
+
+  -- |
+  -- Report an error
+  --
+  liftError :: Either String a -> m a
+
+
+-- |
+-- Compiles in "make" mode, compiling each module separately to a js files and an externs file
+--
+-- If timestamps have not changed, the externs file can be used to provide the module's types without
+-- having to typecheck the module again.
+--
+make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> m ()
+make opts ms = do
+  let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
+
+  (sorted, graph) <- liftError $ sortModules $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
+
+  toRebuild <- foldM (\s (Module moduleName' _ _) -> do
+    let filePath = toFileName moduleName'
+
+        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
+        externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+        inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
+
+    jsTimestamp <- getTimestamp jsFile
+    externsTimestamp <- getTimestamp externsFile
+    inputTimestamp <- getTimestamp inputFile
+
+    return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
+      (Just t1, Just t2, Just t3) | t1 < min t2 t3 -> s
+      _ -> S.insert moduleName' s) S.empty sorted
+
+  marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
+
+  desugared <- liftError $ stringifyErrorStack True $ zip (map fst marked) <$> desugar (map snd marked)
+
+  go initEnvironment desugared
+
+  where
+  go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
+  go _ [] = return ()
+  go env ((False, m) : ms') = do
+    (_, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
+
+    go env' ms'
+  go env ((True, m@(Module moduleName' _ exps)) : ms') = do
+    let filePath = toFileName moduleName'
+        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
+        externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+
+    (Module _ elaborated _, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
+
+    regrouped <- liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+
+    let mod' = Module moduleName' regrouped exps
+        js = moduleToJs opts mod' env'
+        exts = moduleToPs mod' env'
+        js' = maybe "" (prettyPrintJS . return . wrapExportsContainer opts . return) js
+
+    writeTextFile jsFile js'
+    writeTextFile externsFile exts
+
+    go env' ms'
+
+toFileName :: ModuleName -> FilePath
+toFileName (ModuleName ps) = intercalate [pathSeparator] . map runProperName $ ps
+
+rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
+rebuildIfNecessary _ _ [] = return []
+rebuildIfNecessary graph toRebuild (m@(Module moduleName' _ _) : ms) | moduleName' `S.member` toRebuild = do
+  let deps = fromMaybe [] $ moduleName' `M.lookup` graph
+      toRebuild' = toRebuild `S.union` S.fromList deps
+  (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms
+rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms) = do
+  let externsFile = "externs" ++ pathSeparator : toFileName moduleName' ++ ".externs"
+  externs <- readTextFile externsFile
+  externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+  case externsModules of
+    [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms
+    _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
+
+reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
+reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
+  where
+  combine :: (Ord a) => [(a, b)] -> M.Map a [b]
+  combine = M.fromList . map ((fst . head) &&& map snd) . groupBy ((==) `on` fst) . sortBy (compare `on` fst)
+
+-- |
+-- Add an import declaration for the Prelude to a module if it does not already explicitly import
+-- it.
+--
+importPrelude :: Module -> Module
+importPrelude m@(Module mn decls exps)  =
+  if isPreludeImport `any` decls || mn == prelude then m
+  else Module mn (preludeImport : decls) exps
+  where
+  prelude = ModuleName [ProperName C.prelude]
+  isPreludeImport (ImportDeclaration (ModuleName [ProperName mn']) _ _) | mn' == C.prelude = True
+  isPreludeImport (PositionedDeclaration _ d) = isPreludeImport d
+  isPreludeImport _ = False
+  preludeImport = ImportDeclaration prelude Nothing Nothing

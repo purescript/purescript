@@ -1,4 +1,4 @@
-module ExternRaw where
+module Main where
 
 foreign import first "function first(xs) { return xs[0]; }" :: forall a. [a] -> a
 
@@ -9,7 +9,5 @@ foreign import concat "function concat(xs) { \
                       \    return xs.concat(ys); \
                       \  };\
                       \}" :: forall a. [a] -> [a] -> [a]
-    
-module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

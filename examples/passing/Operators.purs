@@ -1,20 +1,10 @@
-module Operators1 where
-
-  import Prelude ((++))
-
-  (@@) :: forall a b. (a -> b) -> a -> b
-  (@@) = \f x -> f x
-
-  foo :: String -> String
-  foo = \s -> s
- 
-  test8 = foo @@ "Hello World"
-
-  bar = \s1 s2 -> s1 ++ s2
-
-module Operators2 where
+module Main where
 
   import Prelude
+  import Control.Monad.Eff
+  import Debug.Trace
+
+  bar = \s1 s2 -> s1 ++ s2
 
   test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
   test1 x y z = x * y + z x y
@@ -40,9 +30,17 @@ module Operators2 where
 
   test7 = "Hello" <> "World!"
 
-  test9 = Operators1.foo Operators1.@@ "Hello World"
+  (@@) :: forall a b. (a -> b) -> a -> b
+  (@@) = \f x -> f x
 
-  test10 = "Hello" `Operators1.bar` "World"
+  foo :: String -> String
+  foo = \s -> s
+ 
+  test8 = foo @@ "Hello World"
+
+  test9 = Main.foo @@ "Hello World"
+
+  test10 = "Hello" `Main.bar` "World"
 
   (...) :: forall a. [a] -> [a] -> [a]
   (...) = \as -> \bs -> as
@@ -53,29 +51,26 @@ module Operators2 where
   
   test13 = \(<%>) a b -> a <%> b
 
-module Main where
+  test14 :: Number -> Number -> Boolean
+  test14 a b = a < b
 
-import Operators1
-import Operators2
+  test15 :: Number -> Number -> Boolean
+  test15 a b = const false $ a `test14` b
 
-import Prelude
-import Eff
-import Trace
-import Global
-import Arrays
-
-main = 
-  print [ show $ test1 1 2 $ \x y -> x + y
-        , show test2
-        , show test3
-        , show test4
-        , show test5
-        , show test6
-        , show test7
-        , show test8
-        , show test9
-        , show test10
-        , show test11
-        , show (test12 k 1 2)
-        , show (test13 k 1 2)
-        ]
+  main = do
+    let t1 = test1 1 2 (\x y -> x + y)
+    let t2 = test2
+    let t3 = test3
+    let t4 = test4
+    let t5 = test5
+    let t6 = test6
+    let t7 = test7
+    let t8 = test8
+    let t9 = test9
+    let t10 = test10
+    let t11 = test11
+    let t12 = test12 k 1 2
+    let t13 = test13 k 1 2
+    let t14 = test14 1 2
+    let t15 = test15 1 2
+    trace "Done"

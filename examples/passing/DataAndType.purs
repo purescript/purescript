@@ -1,9 +1,7 @@
-module DataAndType where
+module Main where
 
 data A = A B
 
 type B = A
-    
-module Main where
 
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

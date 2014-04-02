@@ -1,27 +1,19 @@
-module TestEff where
+module Main where
 
 import Prelude
-import Eff
-import ST
-import Errors
-import Trace
+import Control.Monad.Eff
+import Control.Monad.ST
+import Debug.Trace
 
-test1 = catchError (\s -> return 0) $ do
-          trace "Testing"
-          throwError "Error!"
+test1 = do
+  trace "Line 1"
+  trace "Line 2"
 
 test2 = runPure (runST (do
           ref <- newSTRef 0
           modifySTRef ref $ \n -> n + 1
           readSTRef ref))
 
-module Main where
-
-import Prelude
-import Eff
-import TestEff
-
 main = do
-  n <- test1
-  Trace.print n
-  Trace.print test2
+  test1
+  Debug.Trace.print test2

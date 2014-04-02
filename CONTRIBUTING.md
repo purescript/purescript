@@ -2,8 +2,11 @@ Pull requests are encouraged.
 
 Please follow the following guidelines:
 
-- Add at least a test to `examples/passing/` and possibly to `examples/failing`
-- Run `cabal test`
+- Add at least a test to `examples/passing/` and possibly to `examples/failing`.
+- Build the binaries and libs with `cabal build`
+- Install the binaries and libs with `cabal install`.
+- Run `cabal test` to build the test suite.
+- Run `./execTests.sh` to execute the test suite.
 - Please run `hlint`.
 
 If you would like to contribute, please consider the issues in the current milestone first.

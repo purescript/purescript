@@ -17,97 +17,134 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, FlexibleContexts #-}
 
 module Language.PureScript.Sugar.Operators (
-  rebracket
+  rebracket,
+  removeSignedLiterals
 ) where
 
 import Language.PureScript.Names
 import Language.PureScript.Declarations
-import Language.PureScript.Values
+import Language.PureScript.Errors
 
+import Control.Applicative
+import Control.Monad.State
+import Control.Monad.Error.Class
+
+import Data.Monoid ((<>))
 import Data.Function (on)
+import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
-import qualified Data.Map as M
+
+import qualified Data.Data as D
 import qualified Data.Generics as G
 import qualified Data.Generics.Extras as G
-import Control.Monad.State
-import Control.Applicative
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- Remove explicit parentheses and reorder binary operator applications
 --
-rebracket :: [Module] -> Either String [Module]
-rebracket = go M.empty []
+rebracket :: [Module] -> Either ErrorStack [Module]
+rebracket ms = do
+  let fixities = concatMap collectFixities ms
+  ensureNoDuplicates $ map (\(i, pos, _) -> (i, pos)) fixities
+  let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
+  mapM (rebracketModule opTable) ms
+
+removeSignedLiterals :: (D.Data d) => d -> d
+removeSignedLiterals = G.everywhere (G.mkT go)
   where
-  go _ rb [] = return . reverse $ rb
-  go m rb (Module name ds : ms) = do
-    m' <- M.union m <$> collectFixities m (ModuleName name) ds
-    let opTable = customOperatorTable m'
-    ds' <- G.everywhereM' (G.mkM (matchOperators (ModuleName name) opTable)) ds
-    go m' (Module name (G.everywhere (G.mkT removeParens) ds') : rb) ms
+  go (UnaryMinus (NumericLiteral (Left n))) = NumericLiteral (Left $ negate n)
+  go (UnaryMinus (NumericLiteral (Right n))) = NumericLiteral (Right $ negate n)
+  go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
+  go other = other
 
-removeParens :: Value -> Value
-removeParens (Parens val) = val
-removeParens val = val
+rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either ErrorStack Module
+rebracketModule opTable (Module mn ds exts) = Module mn <$> (removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
 
-customOperatorTable :: M.Map (Qualified Ident) Fixity -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
+removeParens :: (D.Data d) => d -> d
+removeParens = G.everywhere (G.mkT go)
+  where
+  go (Parens val) = val
+  go val = val
+
+collectFixities :: Module -> [(Qualified Ident, SourcePos, Fixity)]
+collectFixities (Module moduleName ds _) = concatMap collect ds
+  where
+  collect :: Declaration -> [(Qualified Ident, SourcePos, Fixity)]
+  collect (PositionedDeclaration pos (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
+  collect FixityDeclaration{} = error "Fixity without srcpos info"
+  collect _ = []
+
+ensureNoDuplicates :: [(Qualified Ident, SourcePos)] -> Either ErrorStack ()
+ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
+  where
+  go [] = return ()
+  go [_] = return ()
+  go ((x@(Qualified (Just mn) name), _) : (y, pos) : _) | x == y =
+    rethrow (strMsg ("Error in module " ++ show mn) <>) $
+      rethrowWithPosition pos $
+        throwError $ mkErrorStack ("Redefined fixity for " ++ show name) Nothing
+  go (_ : rest) = go rest
+
+customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
 customOperatorTable fixities =
   let
-    applyUserOp name t1 t2 = App (App (Var name) t1) t2
-    userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) . M.toList $ fixities
-    sorted = reverse $ sortBy (compare `on` (\(_, _, p, _) -> p)) userOps
+    applyUserOp ident t1 = App (App (Var ident) t1)
+    userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) fixities
+    sorted = sortBy (flip compare `on` (\(_, _, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups
 
 type Chain = [Either Value (Qualified Ident)]
 
-matchOperators :: ModuleName -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either String Value
-matchOperators moduleName ops val = G.everywhereM' (G.mkM parseChains) val
+matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either ErrorStack Value
+matchOperators ops = parseChains
   where
-  parseChains :: Value -> Either String Value
-  parseChains b@(BinaryNoParens _ _ _) = bracketChain (extendChain b)
+  parseChains :: Value -> Either ErrorStack Value
+  parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
   parseChains other = return other
   extendChain :: Value -> Chain
   extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
   extendChain other = [Left other]
-  bracketChain :: Chain -> Either String Value
-  bracketChain = either (Left . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
-  opTable = map (map (\(name, f, a) -> P.Infix (P.try (matchOp moduleName name) >> return f) (toAssoc a))) ops
-    ++ [[P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]]
+  bracketChain :: Chain -> Either ErrorStack Value
+  bracketChain = either (Left . (`mkErrorStack` Nothing) . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
+  opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
+            : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
+            ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]
 
 toAssoc :: Associativity -> P.Assoc
 toAssoc Infixl = P.AssocLeft
 toAssoc Infixr = P.AssocRight
+toAssoc Infix  = P.AssocNone
+
+token :: (P.Stream s Identity t, Show t) => (t -> Maybe a) -> P.Parsec s u a
+token = P.token show (const (P.initialPos ""))
 
 parseValue :: P.Parsec Chain () Value
-parseValue = P.token show (const (P.initialPos "")) (either Just (const Nothing)) P.<?> "expression"
+parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp :: P.Parsec Chain () (Qualified Ident)
-parseOp = P.token show (const (P.initialPos "")) (either (const Nothing) Just) P.<?> "operator"
+parseOp = token (either (const Nothing) fromOp) P.<?> "operator"
+  where
+  fromOp q@(Qualified _ (Op _)) = Just q
+  fromOp _ = Nothing
 
-matchOp :: ModuleName -> Qualified Ident -> P.Parsec Chain () ()
-matchOp moduleName op = do
+parseTicks :: P.Parsec Chain () (Qualified Ident)
+parseTicks = token (either (const Nothing) fromOp) P.<?> "infix function"
+  where
+  fromOp q@(Qualified _ (Ident _)) = Just q
+  fromOp _ = Nothing
+
+matchOp :: Qualified Ident -> P.Parsec Chain () ()
+matchOp op = do
   ident <- parseOp
-  guard (qualify moduleName ident == qualify moduleName op)
-
-collectFixities :: M.Map (Qualified Ident) Fixity -> ModuleName -> [Declaration] -> Either String (M.Map (Qualified Ident) Fixity)
-collectFixities m _ [] = return m
-collectFixities m moduleName (FixityDeclaration fixity name : rest) = do
-  let qual = Qualified (Just moduleName) (Op name)
-  when (qual `M.member` m) (Left $ "redefined fixity for " ++ show name)
-  collectFixities (M.insert qual fixity m) moduleName rest
-collectFixities m moduleName (ImportDeclaration importedModule _ : rest) = do
-  let fs = [ (i, fixity) | (Qualified mn i, fixity) <- M.toList m, mn == Just importedModule ]
-  let m' = M.fromList (map (\(i, fixity) -> (Qualified (Just moduleName) i, fixity)) fs)
-  collectFixities (M.union m' m) moduleName rest
-collectFixities m moduleName (_:ds) = collectFixities m moduleName ds
-
-globalOp :: String -> Qualified Ident
-globalOp = Qualified Nothing . Op
+  guard $ ident == op
 

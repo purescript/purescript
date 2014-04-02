@@ -1,15 +1,16 @@
-module Person where
+module Main where
 
   import Prelude ((++))
 
-  data Person = MkPerson { name :: String, age :: Number }
+  data Person = Person { name :: String, age :: Number }
 
-  foreign import itoa :: Number -> String
+  foreign import itoa 
+    "function itoa(n) {\
+    \  return n.toString();\
+    \}" :: Number -> String
 	  
   showPerson :: Person -> String
   showPerson = \p -> case p of
-    MkPerson o -> o.name ++ ", aged " ++ itoa(o.age)
+    Person o -> o.name ++ ", aged " ++ itoa(o.age)
     
-module Main where
-
-main = Trace.trace "Done"
+  main = Debug.Trace.trace "Done"

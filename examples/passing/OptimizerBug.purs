@@ -1,11 +1,9 @@
-module OptimizerBug where
+module Main where
 
 import Prelude
 
-x = 1 + y
+x a = 1 + y a
 
-y = x
+y a = x a
     
-module Main where
-
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

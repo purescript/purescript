@@ -1,4 +1,4 @@
-module TypeClassInstances where
+module Main where
 
 class A a where
   a :: a -> String

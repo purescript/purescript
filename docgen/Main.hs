@@ -59,55 +59,81 @@ renderModules ms = do
   mapM_ renderModule ms
 
 renderModule :: P.Module -> Docs
-renderModule (P.Module (P.ProperName moduleName) ds) = do
-  headerLevel 2 $ "Module " ++ moduleName
-  spacer
-  headerLevel 3 "Types"
-  spacer
-  renderTopLevel (filter isTypeDeclaration ds)
-  spacer
-  headerLevel 3 "Type Classes"
-  spacer
-  renderTopLevel (filter isTypeClassDeclaration ds)
-  spacer
-  headerLevel 3 "Type Class Instances"
-  spacer
-  renderTopLevel (filter isTypeInstanceDeclaration ds)
-  spacer
-  headerLevel 3 "Values"
-  spacer
-  renderTopLevel (filter isValueDeclaration ds)
+renderModule (P.Module moduleName ds exps) =
+  let exported = filter (isExported exps) ds
+  in do
+    headerLevel 2 $ "Module " ++ P.runModuleName moduleName
+    spacer
+    headerLevel 3 "Types"
+    spacer
+    renderTopLevel exps (filter isTypeDeclaration exported)
+    spacer
+    headerLevel 3 "Type Classes"
+    spacer
+    renderTopLevel exps (filter isTypeClassDeclaration exported)
+    spacer
+    headerLevel 3 "Type Class Instances"
+    spacer
+    renderTopLevel exps (filter isTypeInstanceDeclaration ds)
+    spacer
+    headerLevel 3 "Values"
+    spacer
+    renderTopLevel exps (filter isValueDeclaration exported)
+    spacer
+
+isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
+isExported Nothing _ = True
+isExported _ (P.TypeInstanceDeclaration _ _ _ _ _) = True
+isExported exps (P.PositionedDeclaration _ d) = isExported exps d
+isExported (Just exps) decl = any (matches decl) exps
+  where
+  matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
+  matches (P.ExternDeclaration _ ident _ _) (P.ValueRef ident') = ident == ident'
+  matches (P.DataDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
+  matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
+  matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
+  matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
+  matches _ _ = False
+
+isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
+isDctorExported _ Nothing _ = True
+isDctorExported ident (Just exps) ctor = flip any exps $ \e -> case e of
+  P.TypeRef ident' Nothing -> ident == ident'
+  P.TypeRef ident' (Just ctors) -> ident == ident' && ctor `elem` ctors
+  _ -> False
+
+renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
+renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
+  renderDeclaration 4 exps decl
   spacer
 
-renderTopLevel :: [P.Declaration] -> Docs
-renderTopLevel decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
-  renderDeclaration 4 decl
-  spacer
-
-renderDeclaration :: Int -> P.Declaration -> Docs
-renderDeclaration n (P.TypeDeclaration ident ty) =
+renderDeclaration :: Int -> Maybe [P.DeclarationRef] -> P.Declaration -> Docs
+renderDeclaration n _ (P.TypeDeclaration ident ty) =
   atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
-renderDeclaration n (P.ExternDeclaration _ ident _ ty) =
+renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
-renderDeclaration n (P.DataDeclaration name args ctors) = do
-  let typeName = P.runProperName name ++ " " ++ intercalate " " args
+renderDeclaration n exps (P.DataDeclaration name args ctors) = do
+  let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "data " ++ typeName ++ " where"
-  forM_ ctors $ \(ctor, ty) -> do
-    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ maybe "" ((++ " -> ") . P.prettyPrintType) ty ++ typeName
-renderDeclaration n (P.ExternDataDeclaration name kind) =
+  let exported = filter (isDctorExported name exps . fst) ctors
+  forM_ exported $ \(ctor, tys) ->
+    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> P.prettyPrintType ty ++ " -> ") tys ++ typeName
+renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
-renderDeclaration n (P.TypeSynonymDeclaration name args ty) = do
-  let typeName = P.runProperName name ++ " " ++ intercalate " " args
+renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
+  let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
-renderDeclaration n (P.TypeClassDeclaration name arg _ ds) = do
-  atIndent n $ "class " ++ P.runProperName name ++ " " ++ arg ++ " where"
-  mapM_ (renderDeclaration (n + 2)) ds
-renderDeclaration n (P.TypeInstanceDeclaration constraints name ty _) = do
+renderDeclaration n exps (P.TypeClassDeclaration name args _ ds) = do
+  atIndent n $ "class " ++ P.runProperName name ++ " " ++ unwords args ++ " where"
+  mapM_ (renderDeclaration (n + 2) exps) ds
+renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
-                          cs -> "(" ++ intercalate "," (map (\(pn, ty') -> show pn ++ " (" ++ P.prettyPrintType ty' ++ ")") cs) ++ ") => "
-  atIndent n $ constraintsText ++ "instance " ++ show name ++ " " ++ P.prettyPrintType ty
-renderDeclaration _ _ = return ()
+                          cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
+  atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
+renderDeclaration n exps (P.PositionedDeclaration _ d) =
+  renderDeclaration n exps d
+renderDeclaration _ _ _ = return ()
 
 getName :: P.Declaration -> String
 getName (P.TypeDeclaration ident _) = show ident
@@ -116,26 +142,26 @@ getName (P.DataDeclaration name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
-getName (P.TypeInstanceDeclaration _ name _ _) = show name
+getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool
-isValueDeclaration (P.TypeDeclaration _ _) = True
-isValueDeclaration (P.ExternDeclaration _ _ _ _) = True
+isValueDeclaration P.TypeDeclaration{} = True
+isValueDeclaration P.ExternDeclaration{} = True
 isValueDeclaration _ = False
 
 isTypeDeclaration :: P.Declaration -> Bool
-isTypeDeclaration (P.DataDeclaration _ _ _) = True
-isTypeDeclaration (P.ExternDataDeclaration _ _) = True
-isTypeDeclaration (P.TypeSynonymDeclaration _ _ _) = True
+isTypeDeclaration P.DataDeclaration{} = True
+isTypeDeclaration P.ExternDataDeclaration{} = True
+isTypeDeclaration P.TypeSynonymDeclaration{} = True
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
-isTypeClassDeclaration (P.TypeClassDeclaration _ _ _ _) = True
+isTypeClassDeclaration P.TypeClassDeclaration{} = True
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool
-isTypeInstanceDeclaration (P.TypeInstanceDeclaration _ _ _ _) = True
+isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration _ = False
 
 inputFile :: Term FilePath
@@ -147,7 +173,7 @@ term = docgen <$> inputFile
 termInfo :: TermInfo
 termInfo = defTI
   { termName = "docgen"
-  , version  = showVersion $ Paths.version
+  , version  = showVersion Paths.version
   , termDoc  = "Generate Markdown documentation from PureScript extern files"
   }
 

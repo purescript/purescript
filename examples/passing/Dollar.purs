@@ -1,4 +1,6 @@
-module Dollar where
+module Main where
+
+import Prelude ()
 
 ($) :: forall a b. (a -> b) -> a -> b
 ($) f x = f x
@@ -11,6 +13,4 @@ test1 x = id $ id $ id $ id $ x
 
 test2 x = id id $ id x
     
-module Main where
-
-main = Trace.trace "Done"
+main = Debug.Trace.trace "Done"

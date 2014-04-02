@@ -15,7 +15,6 @@ Contents:
    types
    kinds
    syntax
-   blocks
    typeclasses
    patterns
    modules
