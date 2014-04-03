@@ -27,13 +27,14 @@ import Control.Monad.Trans.State.Strict
 
 import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
+import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
 
 import Parser
 
 import System.Console.Haskeline
-import System.Directory (doesFileExist, findExecutable, getHomeDirectory)
+import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
 import System.Environment.XDG.BaseDir
 import System.FilePath ((</>), isPathSeparator)
@@ -45,7 +46,7 @@ import Text.Parsec (ParseError)
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U (readFile)
+import qualified System.IO.UTF8 as U (print, readFile)
 
 -- |
 -- The PSCI state.
@@ -289,11 +290,25 @@ inputFiles :: Cmd.Term [FilePath]
 inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
                                                      , Cmd.posDoc = "Optional .purs files to load on start" }
 
+loadUserConfig :: IO (Maybe [Command])
+loadUserConfig = do
+  configFile <- (</> ".psci") <$> getCurrentDirectory
+  exists <- doesFileExist configFile
+  if exists
+  then do
+    ls <- lines <$> U.readFile configFile
+    case mapM parseCommand ls of
+      Left err -> U.print err >> exitFailure
+      Right cs -> return $ Just cs
+  else
+    return Nothing
+
 -- |
 -- The PSCI main loop.
 --
 loop :: [FilePath] -> IO ()
 loop files = do
+  config <- loadUserConfig
   preludeFilename <- getPreludeFilename
   modulesOrFirstError <- fmap concat . sequence <$> mapM loadModule (preludeFilename : files)
   case modulesOrFirstError of
@@ -303,6 +318,7 @@ loop files = do
       let settings = defaultSettings {historyFile = Just historyFilename}
       flip evalStateT (PSCiState (preludeFilename : files) defaultImports modules []) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
+        traverse_ (mapM_ handleCommand) config
         go
       where
         go :: InputT (StateT PSCiState IO) ()
