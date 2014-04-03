@@ -36,17 +36,17 @@ import Language.PureScript.Environment
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
 moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
-  tell [ "module " ++ runModuleName moduleName ++ " where"
-       , "import Prelude ()" ]
-  mapM_ fixityToPs ds
+  tell [ "module " ++ runModuleName moduleName ++ " where"]
+  mapM_ declToPs ds
   mapM_ exportToPs exts
   where
 
-    fixityToPs :: Declaration -> Writer [String] ()
-    fixityToPs (FixityDeclaration (Fixity assoc prec) ident) =
+    declToPs :: Declaration -> Writer [String] ()
+    declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
+    declToPs (FixityDeclaration (Fixity assoc prec) ident) =
       tell [ unwords [ show assoc, show prec, ident ] ]
-    fixityToPs (PositionedDeclaration _ d) = fixityToPs d
-    fixityToPs _ = return ()
+    declToPs (PositionedDeclaration _ d) = declToPs d
+    declToPs _ = return ()
 
     exportToPs :: DeclarationRef -> Writer [String] ()
     exportToPs (PositionedDeclarationRef _ r) = exportToPs r
