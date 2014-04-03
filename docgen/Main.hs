@@ -93,6 +93,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeClassDeclaration ident _ _) (P.TypeClassRef ident') = ident == ident'
+  matches (P.PositionedDeclaration _ d) r = d `matches` r
   matches _ _ = False
 
 isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
@@ -143,25 +144,30 @@ getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
+getName (P.PositionedDeclaration _ d) = getName d
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool
 isValueDeclaration P.TypeDeclaration{} = True
 isValueDeclaration P.ExternDeclaration{} = True
+isValueDeclaration (P.PositionedDeclaration _ d) = isValueDeclaration d
 isValueDeclaration _ = False
 
 isTypeDeclaration :: P.Declaration -> Bool
 isTypeDeclaration P.DataDeclaration{} = True
 isTypeDeclaration P.ExternDataDeclaration{} = True
 isTypeDeclaration P.TypeSynonymDeclaration{} = True
+isTypeDeclaration (P.PositionedDeclaration _ d) = isTypeDeclaration d
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
 isTypeClassDeclaration P.TypeClassDeclaration{} = True
+isTypeClassDeclaration (P.PositionedDeclaration _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool
 isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
+isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
 inputFile :: Term FilePath
