@@ -60,8 +60,8 @@ module Prelude where
     pure :: forall a. a -> f a
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
-  instance functorFromApplicative :: (Applicative f) => Functor f where
-    (<$>) f a = pure f <*> a
+  liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
+  liftA1 f a = pure f <*> a
 
   infixl 3 <|>
 
@@ -75,12 +75,11 @@ module Prelude where
     return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
-  instance applicativeFromMonad :: (Monad m) => Applicative m where
-    pure = return
-    (<*>) f a = do
-      f' <- f
-      a' <- a
-      return (f' a')
+  ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
+  ap f a = do
+    f' <- f
+    a' <- a
+    return (f' a')
 
   infixl 7 *
   infixl 7 /
@@ -367,6 +366,13 @@ module Control.Monad.Eff where
   foreign import runPure "function runPure(f) {\
                          \  return f();\
                          \}" :: forall a. Pure a -> a
+
+  instance functorEff :: Functor (Eff e) where
+    (<$>) = liftA1
+
+  instance applicativeEff :: Applicative (Eff e) where
+    pure = return
+    (<*>) = ap
 
   instance monadEff :: Monad (Eff e) where
     return = retEff

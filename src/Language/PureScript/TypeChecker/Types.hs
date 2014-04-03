@@ -273,8 +273,9 @@ replaceTypeClassDictionaries mn = everywhereM' (mkM go)
 entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
 entails env moduleName context goal@(className, tys) = do
   case go goal of
-    [] -> throwError . strMsg $ "No " ++ show className ++ " instance found for " ++ intercalate ", " (map prettyPrintType tys)
-    (dict : _) -> return dict
+    [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++  unwords (map prettyPrintTypeAtom tys)
+    [dict] -> return dict
+    _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
   where
   go (className', tys') =
     [ mkDictionary (canonicalizeDictionary tcd) args
