@@ -176,9 +176,10 @@ completion = completeWord Nothing " \t\n\r" findCompletions
   getDeclName Nothing (P.ValueDeclaration ident _ _ _ _) = Just ident
   getDeclName (Just exts) (P.ValueDeclaration ident _ _ _ _) | isExported = Just ident
     where
-    isExported = flip any exts $ \e -> case e of
-      P.ValueRef ident' -> ident == ident'
-      _ -> False
+    isExported = any exports exts
+    exports (P.ValueRef ident') = ident == ident'
+    exports (P.PositionedDeclarationRef _ r) = exports r
+    exports _ = False
   getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
   getDeclName _ _ = Nothing
   names :: [P.Module] -> [String]
