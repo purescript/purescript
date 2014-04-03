@@ -186,7 +186,7 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) 
                            ]
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args tys) : rest) = do
+typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args _ tys) : rest) = do
   addTypeClass moduleName pn args tys
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds

@@ -301,7 +301,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 
   -- Add a declaration from a module to the global export environment
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either ErrorStack ExportEnvironment
-  addDecl mn env (TypeClassDeclaration tcn _ ds) = do
+  addDecl mn env (TypeClassDeclaration tcn _ _ ds) = do
     env' <- addTypeClass env mn tcn
     foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
   addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)

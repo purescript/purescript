@@ -158,9 +158,9 @@ data Declaration
   --
   | ImportDeclaration ModuleName (Maybe [DeclarationRef]) (Maybe ModuleName)
   -- |
-  -- A type class declaration (name, argument, member declarations)
+  -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [String] [Declaration]
+  | TypeClassDeclaration ProperName [String] [(Qualified ProperName, Type)] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)

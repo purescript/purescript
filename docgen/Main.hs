@@ -92,7 +92,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (P.DataDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeClassDeclaration ident _ _) (P.TypeClassRef ident') = ident == ident'
+  matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
   matches _ _ = False
 
 isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
@@ -123,7 +123,7 @@ renderDeclaration n _ (P.ExternDataDeclaration name kind) =
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
   let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
-renderDeclaration n exps (P.TypeClassDeclaration name args ds) = do
+renderDeclaration n exps (P.TypeClassDeclaration name args _ ds) = do
   atIndent n $ "class " ++ P.runProperName name ++ " " ++ unwords args ++ " where"
   mapM_ (renderDeclaration (n + 2) exps) ds
 renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
@@ -141,7 +141,7 @@ getName (P.ExternDeclaration _ ident _ _) = show ident
 getName (P.DataDeclaration name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
-getName (P.TypeClassDeclaration name _ _) = P.runProperName name
+getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName _ = error "Invalid argument to getName"
 
