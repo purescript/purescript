@@ -86,6 +86,9 @@ isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaratio
 isUsed moduleName graph vertexFor entryPointVertices (ValueDeclaration name _ _ _ _) =
   let Just v' = vertexFor (moduleName, Left name)
   in any (\v -> path graph v v') entryPointVertices
+isUsed moduleName graph vertexFor entryPointVertices (FixityDeclaration _ name) =
+  let Just v' = vertexFor (moduleName, Left $ Op name)
+  in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (DataDeclaration _ _ dctors) =
   any (\(pn, _) -> let Just v' = vertexFor (moduleName, Right pn)
                    in any (\v -> path graph v v') entryPointVertices) dctors
