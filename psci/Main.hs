@@ -178,6 +178,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
     isExported = flip any exts $ \e -> case e of
       P.ValueRef ident' -> ident == ident'
       _ -> False
+  getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
   getDeclName _ _ = Nothing
   names :: [P.Module] -> [String]
   names ms = nub [ show qual
