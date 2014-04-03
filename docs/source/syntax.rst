@@ -143,7 +143,7 @@ For example::
 Do Notation
 -----------
 
-The `do` keyword introduces simple syntactic sugar for monadic expressions.
+The ``do`` keyword introduces simple syntactic sugar for monadic expressions.
 
 Here is an example, using the maybe monad::
 
@@ -166,7 +166,7 @@ Here is an example, using the maybe monad::
 
 ``isEven`` adds two values of type ``Maybe Number`` and returns their sum, if the sum is even. If the sum is odd, ``evenSum`` returns ``Nothing``.
 
-When using `do` notation, the corresponding type constructor must be an instance of the `Prelude.Monad` type class, which defines the ``ret`` and ``>>=`` functions.
+When using ``do`` notation, the corresponding type constructor must be an instance of the ``Prelude.Monad`` type class, which defines the ``ret`` and ``>>=`` functions.
 
 Statements can have the following form:
 
@@ -214,4 +214,27 @@ Properties on records can be updated using the following syntax::
 For example, the following function increments the ``foo`` property on its argument::
 
   incr o = o { foo = o.foo + 1 }
+
+Let Bindings
+------------
+
+The ``let`` keywords a collection of local declarations, which may be mutually recursive, and which may include type declarations::
+
+  factorial :: Number -> Number
+  factorial = 
+    let
+      go :: Number -> Number -> Number
+      go acc 1 = acc
+      go acc n = go (acc * n) (n - 1)
+    in
+      go 1
+
+The ``where`` keyword can also be used to introduce local declarations `at the end of a value declaration`::
+
+  factorial :: Number -> Number
+  factorial = go 1
+    where
+    go :: Number -> Number -> Number
+    go acc 1 = acc
+    go acc n = go (acc * n) (n - 1)
 

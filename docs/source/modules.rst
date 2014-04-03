@@ -26,4 +26,19 @@ Alternatively, a list of names to import can be provided in parentheses::
 
   module B where
   
-  import A (id)
+  import A (runFoo)
+
+Values, type constructors and data constructors can all be explicitly imported. A type constructor should be followed by a list of associated data constructors to import in parentheses. A double dot (``..``) can be used to import all data constructors for a given type constructor::
+
+  module B where
+
+  import A (runFoo, Foo(..), Bar(Bar))
+
+Module Exports
+--------------
+
+Module exports can be restricted to a set of names by providing that set in parentheses in the module declaration::
+
+  module A (runFoo, Foo(..)) where
+
+The types of names which can be exported is the same as for module imports.

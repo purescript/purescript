@@ -1,13 +1,13 @@
 Type Classes
 ============
 
-PureScript has basic support for type classes via the `class` and `instance` keywords. 
+PureScript has basic support for type classes via the ``class`` and ``instance`` keywords. 
 
-Type class instances must be of the form `String`, `Number`, `Boolean`, `[t]` or `C t1 ... tn`, and only a single type class parameter is supported.
+Types appearing in class instances are must be of the form ``String``, ``Number``, ``Boolean``, or ``C t1 ... tn`` where ``C`` is a type constructor (including ``[]`` and ``->`` and ``t_i`` are types of the same form).
 
 Type class instances are resolved based on the order in which they appeared in the source files. In particular, overlapping instances are permitted.
 
-Here is an example of the `Show` typeclass, with instances for Strings, Booleans and arrays::
+Here is an example of the ``Show`` typeclass, with instances for ``String``, ``Booleans`` and ``[]``::
 
   class Show a where
     show :: a -> String

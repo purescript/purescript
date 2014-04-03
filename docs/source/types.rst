@@ -44,9 +44,9 @@ For example::
   
   test = runFoo Foo ++ runFoo (Bar "Test")
 
-In the example, Foo is a tagged union type which has two constructors. It's first constructor `Foo` takes no argument, and it's second ``Bar`` takes one, which must be a String.
+In the example, Foo is a tagged union type which has two constructors. It's first constructor ``Foo`` takes no argument, and it's second ``Bar`` takes one, which must be a String.
 
-``runFoo`` is an example of pattern matching on a tagged union type to discover its constructor, and the last line shows how ``Foo``s are constructed.
+``runFoo`` is an example of pattern matching on a tagged union type to discover its constructor, and the last line shows how to construct values of type ``Foo``.
 
 Functions
 ---------
@@ -62,7 +62,7 @@ Here is an example::
 
   identity x = x
 
-`identity` is inferred to have (polymorphic) type ``forall t0. t0 -> t0``. This means that for any type ``t0``, ``identity`` can be given a value of type ``t0`` and will give back a value of the same type.
+``identity`` is inferred to have (polymorphic) type ``forall t0. t0 -> t0``. This means that for any type ``t0``, ``identity`` can be given a value of type ``t0`` and will give back a value of the same type.
 
 A type annotation can also be provided::
 
@@ -78,9 +78,8 @@ For example, the following function accesses two properties on a record::
 
   addProps o = o.foo + o.bar
     
-The inferred type of `addProps` is
+The inferred type of ``addProps`` is::
 
-::
   forall r. { foo :: Number, bar :: Number | r } -> Number
   
 Here, the type variable ``r`` has kind ``# *`` - it represents a `row` of `types`. It can be instantiated with any row of named types.
@@ -95,7 +94,7 @@ even though the type of ``addProps`` does not mention the property ``baz``. Howe
 
   addProps { foo: 1 }
     
-since the `bar` property is missing.
+since the ``bar`` property is missing.
 
 Rank N Types
 ------------
@@ -109,7 +108,7 @@ As an example, we can pass a polymorphic function as an argument to another func
   poly :: (forall a. a -> a) -> Boolean
   poly f = (f 0 < 1) == f true
 
-Notice that the polymorphic function's type argument is instantiated to both `Number` and `Boolean`.
+Notice that the polymorphic function's type argument is instantiated to both ``Number`` and ``Boolean``.
 
 An argument to ``poly`` must indeed be polymorphic. For example, the following fails::
 

@@ -14,7 +14,7 @@ PureScript is a small strongly, statically typed compile-to-JS language with a n
 - Modules
 - Rank N Types
 - Do Notation
-- Optional tail-call elimination
+- Tail-call elimination
 - Type Classes
 
 Installation
@@ -44,12 +44,15 @@ The following options are supported:
 --output               Write the generated Javascript to the specified file
 --externs              Write a list of foreign imports declarations to the specified file in addition to generating Javascript output
 --runtime-type-checks  Generate simple runtime type checks for function arguments with simple types.
---tco                  Perform tail-call elimination on the generated Javascript.
+--no-tco               Turn off tail-call elimination.
 --no-prelude           Do not include the Prelude in the generated Javascript.
---magic-do             Overload the `do` keyword to inline calls to `bind` for the `Eff` monad, to generate more efficient code.
+--no-magic-do          Turn off optimizations which inline calls to `>>=` for the `Eff` monad.
+--no-opts              Disable all optimizations.
 --main                 Generate a call to `main` in the specified module after all other generated Javascript. Defaults to `Main` if the option is used but no value is provided.
 --module               If specified, any code which is not referenced transitively from this module will be removed. This argument can be used multiple times.
+--codegen              A list of modules for which Javascript and externs should be generated. This argument can be used multiple times.
 --browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
+--verbose-errors       Generate verbose error messages
 
 Motivation
 ----------
@@ -98,23 +101,19 @@ The following code defines a `Person` data type and a function to generate a str
 
   data Person = Person { name :: String, age :: Number }
   
-  foreign import numberToString :: Number -> String
-  
   showPerson :: Person -> String
-  showPerson (Person o) = o.name ++ ", aged " ++ numberToString(o.age)
+  showPerson (Person o) = o.name ++ ", aged " ++ show o.age
   
   examplePerson :: Person
-  examplePerson = Person {name: "Bonnie", age: 26}
-
+  examplePerson = Person { name: "Bonnie", age: 26 }
 
 Line by line, this reads as follows:
 
-- `Person` is a data type with one constructor, also called `Person`
-- The `Person` constructor takes an object with two properties, `name` which is a `String`, and `age` which is a `Number`
-- The `numberToString` function is written in Javascript, and converts a `Number` to its `String` representation
-- The `showPerson` function takes a `Person` and returns a `String`
-- `showPerson` works by case analysis on its argument, first matching the constructor `Person` and then using string concatenation and object accessors to return its result.
-- `examplePerson` is a Person object, made with the Person constructor and given the String "Bonnie" for the name value and the Number 26 for the age value.
+- ``Person`` is a data type with one constructor, also called ``Person``
+- The ``Person`` constructor takes an object with two properties, ``name`` which is a ``String``, and ``age`` which is a ``Number``
+- The ``showPerson`` function takes a ``Person`` and returns a ``String``
+- ``showPerson`` works by case analysis on its argument, first matching the constructor ``Person`` and then using string concatenation and object accessors to return its result.
+- ``examplePerson`` is a Person object, made with the ``Person`` constructor and given the String "Bonnie" for the name value and the Number 26 for the age value.
 
 The generated Javascript looks like this::
 
@@ -130,7 +129,6 @@ The generated Javascript looks like this::
     name: "Bonnie", 
     age: 26
   });
-
 
 Related Projects
 ----------------
