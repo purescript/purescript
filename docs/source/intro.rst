@@ -46,9 +46,9 @@ The following options are supported:
 --runtime-type-checks  Generate simple runtime type checks for function arguments with simple types.
 --no-tco               Turn off tail-call elimination.
 --no-prelude           Do not include the Prelude in the generated Javascript.
---no-magic-do          Turn off optimizations which inline calls to `>>=` for the `Eff` monad.
+--no-magic-do          Turn off optimizations which inline calls to ``>>=`` for the ``Eff`` monad.
 --no-opts              Disable all optimizations.
---main                 Generate a call to `main` in the specified module after all other generated Javascript. Defaults to `Main` if the option is used but no value is provided.
+--main                 Generate a call to ``main`` in the specified module after all other generated Javascript. Defaults to ``Main`` if the option is used but no value is provided.
 --module               If specified, any code which is not referenced transitively from this module will be removed. This argument can be used multiple times.
 --codegen              A list of modules for which Javascript and externs should be generated. This argument can be used multiple times.
 --browser-namespace    Specify the namespace that PureScript modules will be exported to when running in the browser.
@@ -97,7 +97,7 @@ The following command will compile and execute the PureScript code above::
 Another Example
 ---------------
 
-The following code defines a `Person` data type and a function to generate a string representation for a `Person`::
+The following code defines a ``Person`` data type and a function to generate a string representation for a ``Person``::
 
   data Person = Person { name :: String, age :: Number }
   
