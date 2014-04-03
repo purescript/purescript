@@ -4,6 +4,15 @@ import Prelude
 
 data Maybe a = Nothing | Just a
 
+instance functorMaybe :: Functor Maybe where
+  (<$>) f Nothing = Nothing
+  (<$>) f (Just x) = Just (f x)
+
+instance applicativeMaybe :: Applicative Maybe where
+  pure = Just
+  (<*>) (Just f) (Just x) = Just (f x)
+  (<*>) _ _ = Nothing
+
 instance monadMaybe :: Prelude.Monad Maybe where
   return = Just
   (>>=) Nothing _ = Nothing

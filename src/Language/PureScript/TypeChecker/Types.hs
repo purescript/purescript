@@ -267,14 +267,33 @@ replaceTypeClassDictionaries mn = everywhereM' (mkM go)
   go other = return other
 
 -- |
+-- A simplified representation of expressions which are used to represent type
+-- class dictionaries at runtime, which can be compared for equality
+--
+data DictionaryValue
+  -- |
+  -- A dictionary which is brought into scope by a local constraint
+  --
+  = LocalDictionaryValue (Qualified Ident)
+  -- |
+  -- A dictionary which is brought into scope by an instance declaration
+  --
+  | GlobalDictionaryValue (Qualified Ident)
+  -- |
+  -- A dictionary which depends on other dictionaries
+  --
+  | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
+  deriving (Show, Eq)
+
+-- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
 entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
 entails env moduleName context goal@(className, tys) = do
-  case go goal of
+  case nub (go goal) of
     [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++  unwords (map prettyPrintTypeAtom tys)
-    [dict] -> return dict
+    [dict] -> return (dictionaryValueToValue dict)
     _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
   where
   go (className', tys') =
@@ -291,16 +310,21 @@ entails env moduleName context goal@(className, tys) = do
   -- Create dictionaries for subgoals which still need to be solved by calling go recursively
   -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
   -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [Value]]
+  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [DictionaryValue]]
   solveSubgoals _ Nothing = return Nothing
   solveSubgoals subst (Just subgoals) = do
     dict <- mapM (go . second (map (replaceAllTypeVars subst))) subgoals
     return $ Just dict
   -- Make a dictionary from subgoal dictionaries by applying the correct function
-  mkDictionary :: Qualified Ident -> Maybe [Value] -> Value
-  mkDictionary fnName Nothing = Var fnName
-  mkDictionary fnName (Just []) = App (Var fnName) (ObjectLiteral [])
-  mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
+  mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
+  mkDictionary fnName Nothing = LocalDictionaryValue fnName
+  mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
+  mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
+  -- Turn a DictionaryValue into a Value
+  dictionaryValueToValue :: DictionaryValue -> Value
+  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
+  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
+  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
   -- Filter out type dictionaries which are in scope in the current module
   filterModule :: TypeClassDictionaryInScope -> Bool
   filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
