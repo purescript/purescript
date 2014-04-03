@@ -35,13 +35,21 @@ test5 mx my mz = do
   Just (z + sum + 1)
 
 test6 mx = \_ -> do 
-  let Just x = mx
-  Just x
+  let 
+    f :: forall a. Maybe a -> a
+    f (Just x) = x
+  Just (f mx)
 
 test8 = \_ -> do 
   Just (do 
     Just 1)
 
 test9 = \_ -> (+) <$> Just 1 <*> Just 2
+
+test10 _ = do
+  let
+    f x = g x * 3
+    g x = f x / 2
+  Just (f 10)
 
 main = Debug.Trace.trace "Done"

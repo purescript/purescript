@@ -306,8 +306,7 @@ parseDo = do
   Do <$> C.mark (P.many (C.same *> C.mark parseDoNotationElement))
 
 parseDoNotationLet :: P.Parsec String ParseState DoNotationElement
-parseDoNotationLet = DoNotationLet <$> (C.reserved "let" *> C.indented *> parseBinder)
-                                   <*> (C.indented *> C.reservedOp "=" *> parseValue)
+parseDoNotationLet = DoNotationLet <$> (C.reserved "let" *> C.indented *> C.mark (P.many1 (C.same *> parseLocalDeclaration)))
 
 parseDoNotationBind :: P.Parsec String ParseState DoNotationElement
 parseDoNotationBind = DoNotationBind <$> parseBinder <*> (C.indented *> C.reservedOp "<-" *> parseValue)

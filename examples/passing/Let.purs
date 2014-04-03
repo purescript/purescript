@@ -24,7 +24,7 @@ test5 = let
           f x | x > 0 = g (x / 2) + 1
           f x = 0
           g x = f (x - 1) + 1
-        in g 10
+        in f 10
 
 test6 = runPure (runST (do
           r <- newSTRef 0
@@ -46,6 +46,12 @@ test8 x = let
             go y | (x - 0.1 < y * y) && (y * y < x + 0.1) = y
             go y = go $ (y + x / y) / 2
           in go x
+
+test10 _ = 
+  let
+    f x = g x * 3
+    g x = f x / 2
+  in f 10
 
 main = do
   Debug.Trace.print (test1 1)

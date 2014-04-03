@@ -104,12 +104,10 @@ prettyPrintDoNotationElement (DoNotationBind binder val) =
     , return " <- "
     , prettyPrintValue' val
     ]
-prettyPrintDoNotationElement (DoNotationLet binder val) =
+prettyPrintDoNotationElement (DoNotationLet ds) =
   fmap concat $ sequence
     [ return "let "
-    , prettyPrintBinder' binder
-    , return " = "
-    , prettyPrintValue' val
+    , withIndent $ prettyPrintMany prettyPrintDeclaration ds
     ]
 prettyPrintDoNotationElement (PositionedDoNotationElement _ el) = prettyPrintDoNotationElement el
 

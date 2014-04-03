@@ -59,8 +59,8 @@ desugarDo = everywhereM (mkM replace)
     rest' <- go rest
     let ident = head $ unusedNames rest'
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing rest']))
-  go [DoNotationLet _ _] = Left $ mkErrorStack "Let statement cannot be the last statement in a do block" Nothing
-  go (DoNotationLet binder val : rest) = do
+  go [DoNotationLet _] = Left $ mkErrorStack "Let statement cannot be the last statement in a do block" Nothing
+  go (DoNotationLet ds : rest) = do
     rest' <- go rest
-    return $ Case [val] [CaseAlternative [binder] Nothing rest']
+    return $ Let ds rest'
   go (PositionedDoNotationElement pos el : rest) = PositionedValue pos <$> go (el : rest)

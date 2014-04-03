@@ -378,7 +378,7 @@ data DoNotationElement
   -- |
   -- A let statement, i.e. a pure value with a binder
   --
-  | DoNotationLet Binder Value
+  | DoNotationLet [Declaration]
   -- |
   -- A do notation element with source position information
   --

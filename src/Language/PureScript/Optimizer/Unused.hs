@@ -24,12 +24,14 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Optimizer.Common
 
 removeUnusedVariables :: JS -> JS
-removeUnusedVariables = everywhere (mkT $ removeFromBlock go)
+removeUnusedVariables = everywhere (mkT $ removeFromBlock withBlock)
   where
-  go :: [JS] -> [JS]
-  go [] = []
-  go (JSVariableIntroduction var _ : sts) | not (isUsed var sts) = go sts
-  go (s:sts) = s : go sts
+  withBlock :: [JS] -> [JS]
+  withBlock sts = go sts sts
+  go :: [JS] -> [JS] -> [JS]
+  go _ [] = []
+  go sts (JSVariableIntroduction var _ : rest) | not (isUsed var sts) = go sts rest
+  go sts (s : rest) = s : go sts rest
 
 removeCodeAfterReturnStatements :: JS -> JS
 removeCodeAfterReturnStatements = everywhere (mkT $ removeFromBlock go)
