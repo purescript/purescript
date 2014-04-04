@@ -12,6 +12,7 @@
 - Multiple modules with the same name are now disallowed rather than merged (garyb)
 - The `--runtime-type-checks` flag has been removed. Runtime type checks have been superceded by the `purescript-foreign` library (paf31)
 - The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or a specific import list. (garyb, paf31)
+- Overlapping instances are no longer allowed. The `Prelude` and core liblaries have been updated accordingly. (paf31)
 
 ### New Features
 
