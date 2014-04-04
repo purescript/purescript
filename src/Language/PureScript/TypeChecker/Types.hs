@@ -291,14 +291,14 @@ data DictionaryValue
 --
 entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
 entails env moduleName context goal@(className, tys) = do
-  case nub (go goal) of
+  case go goal of
     [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++  unwords (map prettyPrintTypeAtom tys)
     [dict] -> return (dictionaryValueToValue dict)
     _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
   where
   go (className', tys') =
     [ mkDictionary (canonicalizeDictionary tcd) args
-    | tcd <- context
+    | tcd <- nubBy ((==) `on` canonicalizeDictionary) context
     -- Choose type class dictionaries in scope in the current module
     , filterModule tcd
     -- Make sure the type class name matches the one we are trying to satisfy
