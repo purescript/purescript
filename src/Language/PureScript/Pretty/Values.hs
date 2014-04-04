@@ -47,6 +47,7 @@ literals = mkPattern' match
   match (ObjectLiteral ps) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ prettyPrintMany prettyPrintObjectProperty ps
+    , return "\n"
     , currentIndent
     , return "}"
     ]

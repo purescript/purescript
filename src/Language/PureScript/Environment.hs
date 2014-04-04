@@ -102,11 +102,7 @@ data NameKind
   -- |
   -- A type class dictionary, generated during desugaring of type class declarations
   --
-  | TypeInstanceDictionaryValue
-  -- |
-  -- A type instance member, generated during desugaring of type class declarations
-  --
-  | TypeInstanceMember deriving (Show, Eq, Data, Typeable)
+  | TypeInstanceDictionaryValue deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The kinds of a type

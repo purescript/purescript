@@ -139,6 +139,7 @@ valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JS
 valueToJs opts m e (TypedValue _ (Abs (Left arg) val) ty) | optionsPerformRuntimeTypeChecks opts = let arg' = identToJs arg in JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn (valueToJs opts m e val)])
 valueToJs _ m _ (Var ident) = varToJs m ident
 valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
+valueToJs opts m e (PositionedValue _ val) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 

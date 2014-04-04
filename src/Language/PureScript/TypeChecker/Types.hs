@@ -270,7 +270,7 @@ replaceTypeClassDictionaries mn = everywhereM' (mkM go)
 -- A simplified representation of expressions which are used to represent type
 -- class dictionaries at runtime, which can be compared for equality
 --
-data DictionaryValue 
+data DictionaryValue
   -- |
   -- A dictionary which is brought into scope by a local constraint
   --
@@ -296,8 +296,8 @@ entails env moduleName context = solve (nubBy ((==) `on` canonicalizeDictionary)
     filterModule :: TypeClassDictionaryInScope -> Bool
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
-    filterModule _ = False 
-	 
+    filterModule _ = False
+	
     solve context' goal@(className, tys) =
       case go goal of
         [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
@@ -336,7 +336,7 @@ entails env moduleName context = solve (nubBy ((==) `on` canonicalizeDictionary)
 	  verifySubstitution subst = do
 	    let grps = groupBy ((==) `on` fst) subst
 	    guard (all (pairwise (unifiesWith env) . map snd) grps)
-	    return $ map head grps 
+	    return $ map head grps
 
 -- |
 -- Check all values in a list pairwise match a predicate

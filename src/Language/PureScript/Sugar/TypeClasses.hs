@@ -15,8 +15,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Sugar.TypeClasses (
-  desugarTypeClasses,
-  mkDictionaryEntryName
+  desugarTypeClasses
 ) where
 
 import Language.PureScript.Declarations
@@ -65,10 +64,10 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   class Foo a where
 --     foo :: a -> a
 --
---   instance Foo String where
+--   instance fooString :: Foo String where
 --     foo s = s ++ s
 --
---   instance (Foo a) => Foo [a] where
+--   instance fooArray :: (Foo a) => Foo [a] where
 --     foo = map foo
 --
 -- becomes
@@ -79,7 +78,8 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --                      \  return dict.foo;\
 --                      \}" :: forall a. (Foo a) => a -> a
 --
---   __Test_Foo_string_foo = (\s -> s ++ s) :: String -> String
+--   :: String -> String
+--   fooString = (\s -> s ++ s)
 --
 --   __Test_Foo_string :: {} -> Foo String
 --   __Test_Foo_string = { foo: __Test_Foo_string_foo :: String -> String (unchecked) }
@@ -97,9 +97,8 @@ desugarDecl mn d@(TypeClassDeclaration name args members) = do
   return $ (Nothing, d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members)
 desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
-  entries <- mapM (typeInstanceDictionaryEntryDeclaration name mn deps className ty) desugared
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
-  return $ (Just $ TypeInstanceRef name, d : entries ++ [dictDecl])
+  return $ (Just $ TypeInstanceRef name, [d, dictDecl])
 desugarDecl mn (PositionedDeclaration pos d) = do
   (dr, ds) <- desugarDecl mn d
   return (dr, map (PositionedDeclaration pos) ds)
@@ -126,54 +125,39 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   m <- get
+
+  -- Lookup the type arguments and member types for the type class
   (args, instanceTys) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
                         $ M.lookup (qualify mn className) m
+
+  -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
-  let entryName = Escaped (show name)
+  -- Create values for the type instance members
   memberNames <- mapM (memberToNameAndValue memberTypes) decls
-  return $ ValueDeclaration entryName TypeInstanceDictionaryValue [] Nothing
-    (TypedValue True
-      (foldr (Abs . (\n -> Left . Ident $ '_' : show n)) (ObjectLiteral memberNames) [1..max 1 (length deps)])
-      (quantify (if null deps then
-                   function unit (foldl TypeApp (TypeConstructor className) tys)
-                 else
-                   foldr (function . (\(pn, tys') -> foldl TypeApp (TypeConstructor pn) tys')) (foldl TypeApp (TypeConstructor className) tys) deps))
-    )
+  -- Create the type of the dictionary
+  -- The type is an object type, but depending on type instance dependencies, may be constrained.
+  -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
+  -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
+  -- dependencies, we introduce an unnamed function parameter.
+  let dictTy = TypeApp tyObject (rowFromList (memberTypes, REmpty))
+      constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
+      dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames) else ObjectLiteral memberNames
+  return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
   where
   unit :: Type
   unit = TypeApp tyObject REmpty
 
   memberToNameAndValue :: [(String, Type)] -> Declaration -> Desugar (String, Value)
-  memberToNameAndValue tys' (ValueDeclaration ident _ _ _ _) = do
-    memberType <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup (identToJs ident) tys'
-    memberName <- mkDictionaryEntryName name ident
-    return (identToJs ident, TypedValue False
-                               (foldl App (Var (Qualified Nothing memberName)) (map (\n -> Var (Qualified Nothing (Ident ('_' : show n)))) [1..length deps]))
-                               (quantify memberType))
+  memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
+    _ <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup (identToJs ident) tys'
+    let memberValue = typeInstanceDictionaryEntryValue d
+    return (identToJs ident, memberValue)
   memberToNameAndValue tys' (PositionedDeclaration pos d) = do
     (ident, val) <- memberToNameAndValue tys' d
     return (ident, PositionedValue pos val)
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
-typeInstanceDictionaryEntryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> Declaration -> Desugar Declaration
-typeInstanceDictionaryEntryDeclaration name mn deps className tys (ValueDeclaration ident _ [] _ val) = do
-  m <- get
-  valTy <- lift $ do (args, members) <- lookupTypeClass m
-                     ty' <- lookupIdent members
-                     return $ replaceAllTypeVars (zip args tys) ty'
-  entryName <- mkDictionaryEntryName name ident
-  return $ ValueDeclaration entryName TypeInstanceMember [] Nothing
-    (TypedValue True val (quantify (if null deps then valTy else ConstrainedType deps valTy)))
-  where
-  lookupTypeClass m = maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $ M.lookup (qualify mn className) m
-  lookupIdent members = maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " does not have method " ++ show ident) Nothing) Right $ lookup (identToJs ident) members
-typeInstanceDictionaryEntryDeclaration name mn deps className tys (PositionedDeclaration pos d) =
-  PositionedDeclaration pos <$> typeInstanceDictionaryEntryDeclaration name mn deps className tys d
-typeInstanceDictionaryEntryDeclaration _ _ _ _ _ _ = error "Invalid declaration in type instance definition"
-
--- |
--- Generate a name for a type class dictionary member, based on the module name, class name, type name and
--- member name
---
-mkDictionaryEntryName :: Ident -> Ident -> Desugar Ident
-mkDictionaryEntryName dictName ident = return $ Escaped $ show dictName ++ "_" ++ identToJs ident
+  typeInstanceDictionaryEntryValue :: Declaration -> Value
+  typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] _ val) = val
+  typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
+  typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"
