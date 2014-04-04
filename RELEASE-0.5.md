@@ -51,6 +51,7 @@
 - Unary minus and signed numeric literals are now supported again (paf31, garyb)
 - Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
 - Error messages now display source positions (paf31, garyb)
+- The type classes implementation and code generation was greatly simplified. (paf31)
  
 ### Bug Fixes
 
