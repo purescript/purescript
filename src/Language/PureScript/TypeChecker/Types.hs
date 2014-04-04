@@ -290,52 +290,53 @@ data DictionaryValue
 -- return a type class dictionary reference.
 --
 entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
-entails env moduleName context goal@(className, tys) = do
-  case go goal of
-    [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++  unwords (map prettyPrintTypeAtom tys)
-    [dict] -> return (dictionaryValueToValue dict)
-    _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+entails env moduleName context = solve (nubBy ((==) `on` canonicalizeDictionary) (filter filterModule context))
   where
-  go (className', tys') =
-    [ mkDictionary (canonicalizeDictionary tcd) args
-    | tcd <- nubBy ((==) `on` canonicalizeDictionary) context
-    -- Choose type class dictionaries in scope in the current module
-    , filterModule tcd
-    -- Make sure the type class name matches the one we are trying to satisfy
-    , className' == tcdClassName tcd
-    -- Make sure the type unifies with the type in the type instance definition
-    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
-    -- Solve any necessary subgoals
-    , args <- solveSubgoals subst (tcdDependencies tcd) ]
-  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
-  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
-  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [DictionaryValue]]
-  solveSubgoals _ Nothing = return Nothing
-  solveSubgoals subst (Just subgoals) = do
-    dict <- mapM (go . second (map (replaceAllTypeVars subst))) subgoals
-    return $ Just dict
-  -- Make a dictionary from subgoal dictionaries by applying the correct function
-  mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
-  mkDictionary fnName Nothing = LocalDictionaryValue fnName
-  mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
-  mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
-  -- Turn a DictionaryValue into a Value
-  dictionaryValueToValue :: DictionaryValue -> Value
-  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
-  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
-  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
-  -- Filter out type dictionaries which are in scope in the current module
-  filterModule :: TypeClassDictionaryInScope -> Bool
-  filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
-  filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
-  filterModule _ = False
-  -- Ensure that a substitution is valid
-  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
-  verifySubstitution subst = do
-    let grps = groupBy ((==) `on` fst) subst
-    guard (all (pairwise (unifiesWith env) . map snd) grps)
-    return $ map head grps
+    -- Filter out type dictionaries which are in scope in the current module
+    filterModule :: TypeClassDictionaryInScope -> Bool
+    filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
+    filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
+    filterModule _ = False 
+	 
+    solve context' goal@(className, tys) =
+      case go goal of
+        [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+        [dict] -> return (dictionaryValueToValue dict)
+        _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+      where
+	  go (className', tys') =
+	    [ mkDictionary (canonicalizeDictionary tcd) args
+	    | tcd <- context'
+	    -- Make sure the type class name matches the one we are trying to satisfy
+	    , className' == tcdClassName tcd
+	    -- Make sure the type unifies with the type in the type instance definition
+	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
+	    -- Solve any necessary subgoals
+	    , args <- solveSubgoals subst (tcdDependencies tcd) ]
+	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
+	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
+	  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
+	  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [DictionaryValue]]
+	  solveSubgoals _ Nothing = return Nothing
+	  solveSubgoals subst (Just subgoals) = do
+	    dict <- mapM (go . second (map (replaceAllTypeVars subst))) subgoals
+	    return $ Just dict
+	  -- Make a dictionary from subgoal dictionaries by applying the correct function
+	  mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
+	  mkDictionary fnName Nothing = LocalDictionaryValue fnName
+	  mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
+	  mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
+	  -- Turn a DictionaryValue into a Value
+	  dictionaryValueToValue :: DictionaryValue -> Value
+	  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
+	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
+	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
+	  -- Ensure that a substitution is valid
+	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
+	  verifySubstitution subst = do
+	    let grps = groupBy ((==) `on` fst) subst
+	    guard (all (pairwise (unifiesWith env) . map snd) grps)
+	    return $ map head grps 
 
 -- |
 -- Check all values in a list pairwise match a predicate
