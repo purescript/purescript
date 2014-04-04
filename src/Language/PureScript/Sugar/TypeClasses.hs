@@ -78,17 +78,11 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --                      \  return dict.foo;\
 --                      \}" :: forall a. (Foo a) => a -> a
 --
---   :: String -> String
---   fooString = (\s -> s ++ s)
+--   fooString :: {} -> Foo String
+--   fooString _ = { foo: \s -> s ++ s }
 --
---   __Test_Foo_string :: {} -> Foo String
---   __Test_Foo_string = { foo: __Test_Foo_string_foo :: String -> String (unchecked) }
---
---   __Test_Foo_array_foo :: forall a. (Foo a) => [a] -> [a]
---   __Test_Foo_array_foo _1 = map (foo _1)
---
---   __Test_Foo_array :: forall a. Foo a -> Foo [a]
---   __Test_Foo_array _1 = { foo: __Test_Foo_array_foo _1 :: [a] -> [a] (unchecked) }
+--   fooArray :: forall a. (Foo a) => Foo [a]
+--   fooArray = { foo: map foo }
 --
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args members) = do
