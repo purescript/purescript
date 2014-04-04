@@ -270,7 +270,7 @@ replaceTypeClassDictionaries mn = everywhereM' (mkM go)
 -- A simplified representation of expressions which are used to represent type
 -- class dictionaries at runtime, which can be compared for equality
 --
-data DictionaryValue
+data DictionaryValue 
   -- |
   -- A dictionary which is brought into scope by a local constraint
   --
@@ -1008,5 +1008,6 @@ subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
+
 
 

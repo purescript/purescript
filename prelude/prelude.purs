@@ -75,6 +75,11 @@ module Prelude where
     return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
+  liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
+  liftM1 f a = do
+    a' <- a
+    return (f a')
+
   ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
   ap f a = do
     f' <- f
