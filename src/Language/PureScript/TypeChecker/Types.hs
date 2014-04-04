@@ -283,15 +283,18 @@ data DictionaryValue
   -- A dictionary which depends on other dictionaries
   --
   | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
-  deriving (Show, Eq)
+  deriving (Show, Ord, Eq)
 
 -- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
 entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
-entails env moduleName context = solve (nubBy ((==) `on` canonicalizeDictionary) (filter filterModule context))
+entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
+    sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
+    sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
+
     -- Filter out type dictionaries which are in scope in the current module
     filterModule :: TypeClassDictionaryInScope -> Bool
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
