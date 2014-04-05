@@ -19,7 +19,8 @@ module Language.PureScript.CodeGen.JS (
     module AST,
     declToJs,
     moduleToJs,
-    wrapExportsContainer
+    wrapExportsContainer,
+    isIdent
 ) where
 
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -90,7 +91,7 @@ declToJs _ _ _ _ = Nothing
 -- module.
 --
 exportToJs :: DeclarationRef -> [JS]
-exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Escaped . runProperName)
+exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Ident . runProperName)
 exportToJs (ValueRef name) = [export name]
 exportToJs (TypeInstanceRef name) = [export name]
 exportToJs _ = []
@@ -115,9 +116,12 @@ var = JSVar . identToJs
 -- indexer is returned.
 --
 accessor :: Ident -> JS -> JS
-accessor (Ident name) | nameIsJsReserved name = JSIndexer (JSStringLiteral name)
+accessor (Ident prop) = accessorString prop
 accessor (Op op) = JSIndexer (JSStringLiteral op)
-accessor ident = JSAccessor (identToJs ident)
+
+accessorString :: String -> JS -> JS
+accessorString prop | isIdent prop = JSAccessor prop
+                    | otherwise = JSIndexer (JSStringLiteral prop)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a value or expression.
@@ -132,7 +136,7 @@ valueToJs opts m e (ObjectUpdate o ps) = extendObj (valueToJs opts m e o) (map (
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
-valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
+valueToJs opts m e (Accessor prop val) = accessorString prop (valueToJs opts m e val)
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
 valueToJs opts m e (Let ds val) = JSApp (JSFunction Nothing [] (JSBlock (concat (mapMaybe (flip (declToJs opts m) e) ds) ++ [JSReturn $ valueToJs opts m e val]))) []
 valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
@@ -199,7 +203,7 @@ runtimeTypeChecks arg ty =
     let
       (pairs, _) = rowToList row
     in
-      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (JSAccessor prop val) ty') pairs
+      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (accessorString prop val) ty') pairs
   argumentCheck val (TypeApp (TypeApp t _) _) | t == tyFunction = [typeCheck val "function"]
   argumentCheck val (ForAll _ ty' _) = argumentCheck val ty'
   argumentCheck _ _ = []
@@ -284,7 +288,7 @@ binderToJs m e varName done (ObjectBinder bs) = go done bs
     propVar <- fresh
     done'' <- go done' bs'
     js <- binderToJs m e propVar done'' binder
-    return (JSVariableIntroduction propVar (Just (JSAccessor prop (JSVar varName))) : js)
+    return (JSVariableIntroduction propVar (Just (accessorString prop (JSVar varName))) : js)
 binderToJs m e varName done (ArrayBinder bs) = do
   js <- go done 0 bs
   return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]

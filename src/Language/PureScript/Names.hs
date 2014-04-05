@@ -19,7 +19,6 @@ module Language.PureScript.Names where
 
 import Data.List
 import Data.Data
-import Data.Function (on)
 
 -- |
 -- Names for value identifiers
@@ -32,27 +31,11 @@ data Ident
   -- |
   -- A symbolic name for an infix operator
   --
-  | Op String
-  -- |
-  -- An escaped name
-  --
-  | Escaped String deriving (Data, Typeable)
+  | Op String deriving (Eq, Ord, Data, Typeable)
 
 instance Show Ident where
   show (Ident s) = s
   show (Op op) = '(':op ++ ")"
-  show (Escaped s) = s
-
-instance Eq Ident where
-  Ident s1   == Ident s2   = s1 == s2
-  Op s1      == Op s2      = s1 == s2
-  Escaped s1 == Escaped s2 = s1 == s2
-  Ident s1   == Escaped s2 = s1 == s2
-  Escaped s1 == Ident s2   = s1 == s2
-  _          == _          = False
-
-instance Ord Ident where
-  compare = compare `on` show
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.

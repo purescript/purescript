@@ -14,5 +14,17 @@ module Main where
 
   typed :: { foo :: Number }
   typed = { foo: 0 }
+
+  test2 = \x -> x."!@#"
+
+  test3 = typed."foo"
+
+  test4 = test2 weirdObj
+    where
+    weirdObj :: { "!@#" :: Number }
+    weirdObj = { "!@#": 1 }
+
+  test5 = case { "***": 1 } of
+    { "***" = n } -> n
     
   main = Debug.Trace.trace "Done"
