@@ -8,6 +8,9 @@ module Prelude where
 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
+  
+  asTypeOf :: forall a. a -> a -> a
+  asTypeOf x _ = x
 
   infixr 9 >>>
   infixr 9 <<<
