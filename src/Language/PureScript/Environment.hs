@@ -53,7 +53,7 @@ data Environment = Environment {
   -- |
   -- Type classes
   --
-  , typeClasses :: M.Map (Qualified ProperName) ([String], [(Ident, Type)])
+  , typeClasses :: M.Map (Qualified ProperName) ([String], [(Ident, Type)], [(Qualified ProperName, [Type])])
   } deriving (Show)
 
 -- |

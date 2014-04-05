@@ -34,7 +34,7 @@ import Data.Maybe (catMaybes)
 
 import qualified Data.Map as M
 
-type MemberMap = M.Map (ModuleName, ProperName) ([String], [(String, Type)])
+type MemberMap = M.Map (ModuleName, ProperName) Declaration
 
 type Desugar = StateT MemberMap (Either ErrorStack)
 
@@ -85,9 +85,8 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   fooArray = { foo: map foo }
 --
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
-desugarDecl mn d@(TypeClassDeclaration name args members) = do
-  let tys = map memberToNameAndType members
-  modify (M.insert (mn, name) (args, tys))
+desugarDecl mn d@(TypeClassDeclaration name args _ members) = do
+  modify (M.insert (mn, name) d)
   return $ (Nothing, d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members)
 desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
@@ -121,8 +120,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (args, instanceTys) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
+  (TypeClassDeclaration _ args implies tyDecls) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
                         $ M.lookup (qualify mn className) m
+  let instanceTys = map memberToNameAndType tyDecls
 
   -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys

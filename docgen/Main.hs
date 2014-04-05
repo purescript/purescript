@@ -92,7 +92,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (P.DataDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeClassDeclaration ident _ _) (P.TypeClassRef ident') = ident == ident'
+  matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
   matches (P.PositionedDeclaration _ d) r = d `matches` r
   matches _ _ = False
 
@@ -124,8 +124,11 @@ renderDeclaration n _ (P.ExternDataDeclaration name kind) =
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
   let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
-renderDeclaration n exps (P.TypeClassDeclaration name args ds) = do
-  atIndent n $ "class " ++ P.runProperName name ++ " " ++ unwords args ++ " where"
+renderDeclaration n exps (P.TypeClassDeclaration name args implies ds) = do
+  let impliesText = case implies of
+                      [] -> ""
+                      is -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) is) ++ ") <= "
+  atIndent n $ "class " ++ impliesText ++ P.runProperName name ++ " " ++ unwords args ++ " where"
   mapM_ (renderDeclaration (n + 2) exps) ds
 renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
@@ -142,7 +145,7 @@ getName (P.ExternDeclaration _ ident _ _) = show ident
 getName (P.DataDeclaration name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
-getName (P.TypeClassDeclaration name _ _) = P.runProperName name
+getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName (P.PositionedDeclaration _ d) = getName d
 getName _ = error "Invalid argument to getName"
