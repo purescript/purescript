@@ -14,5 +14,9 @@ module Main where
 
   typed :: { foo :: Number }
   typed = { foo: 0 }
+
+  test2 = \x -> x."!@#"
+
+  test3 = typed."foo"
     
   main = Debug.Trace.trace "Done"

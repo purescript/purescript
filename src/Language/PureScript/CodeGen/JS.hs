@@ -22,6 +22,7 @@ module Language.PureScript.CodeGen.JS (
     wrapExportsContainer
 ) where
 
+import Data.Char (isAlpha, isAlphaNum)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 
@@ -132,7 +133,8 @@ valueToJs opts m e (ObjectUpdate o ps) = extendObj (valueToJs opts m e o) (map (
 valueToJs _ m _ (Constructor name) = qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = bindersToJs opts m e binders (map (valueToJs opts m e) values)
 valueToJs opts m e (IfThenElse cond th el) = JSConditional (valueToJs opts m e cond) (valueToJs opts m e th) (valueToJs opts m e el)
-valueToJs opts m e (Accessor prop val) = JSAccessor prop (valueToJs opts m e val)
+valueToJs opts m e (Accessor prop val) | isIdent prop = JSAccessor prop (valueToJs opts m e val)
+                                       | otherwise = JSIndexer (JSStringLiteral prop) (valueToJs opts m e val)
 valueToJs opts m e (App val arg) = JSApp (valueToJs opts m e val) [valueToJs opts m e arg]
 valueToJs opts m e (Let ds val) = JSApp (JSFunction Nothing [] (JSBlock (concat (mapMaybe (flip (declToJs opts m) e) ds) ++ [JSReturn $ valueToJs opts m e val]))) []
 valueToJs opts m e (Abs (Left arg) val) = JSFunction Nothing [identToJs arg] (JSBlock [JSReturn (valueToJs opts m (bindName m arg e) val)])
@@ -142,6 +144,10 @@ valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs opts m e (PositionedValue _ val) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
+
+isIdent :: String -> Bool
+isIdent (first : rest) | isAlpha first && all isAlphaNum rest = True
+isIdent _ = False
 
 -- |
 -- Shallow copy an object.

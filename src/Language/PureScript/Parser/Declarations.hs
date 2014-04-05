@@ -297,7 +297,7 @@ parsePropertyUpdate = do
 
 parseAccessor :: Value -> P.Parsec String ParseState Value
 parseAccessor (Constructor _) = P.unexpected "constructor"
-parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> C.identifier) <*> pure obj
+parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> (C.identifier <|> C.stringLiteral)) <*> pure obj
 
 parseDo :: P.Parsec String ParseState Value
 parseDo = do
