@@ -52,6 +52,7 @@
 - Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
 - Error messages now display source positions (paf31, garyb)
 - The type classes implementation and code generation was greatly simplified. (paf31)
+- Object properties and row labels can now be accessed with arbitrary string names by using string literals. (paf31)
  
 ### Bug Fixes
 
