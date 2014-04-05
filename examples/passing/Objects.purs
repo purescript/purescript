@@ -23,5 +23,8 @@ module Main where
     where
     weirdObj :: { "!@#" :: Number }
     weirdObj = { "!@#": 1 }
+
+  test5 = case { "***": 1 } of
+    { "***" = n } -> n
     
   main = Debug.Trace.trace "Done"

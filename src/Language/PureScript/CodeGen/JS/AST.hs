@@ -19,8 +19,6 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Data.Data
 
-
-
 -- |
 -- Built-in unary operators
 --
