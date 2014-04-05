@@ -29,7 +29,7 @@ import Language.PureScript.CodeGen.Common (identToJs)
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Arrow (Arrow(..), second)
+import Control.Arrow (first, second)
 import Data.Maybe (catMaybes)
 
 import qualified Data.Map as M
