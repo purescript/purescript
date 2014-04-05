@@ -18,6 +18,7 @@ module Language.PureScript.Pretty.JS (
 ) where
 
 import Language.PureScript.Pretty.Common
+import Language.PureScript.CodeGen.JS (isIdent)
 import Language.PureScript.CodeGen.JS.AST
 
 import Data.List
@@ -46,13 +47,17 @@ literals = mkPattern' match
   match (JSObjectLiteral ps) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ do
-        jss <- forM ps $ \(key, value) -> fmap ((key ++ ": ") ++) . prettyPrintJS' $ value
+        jss <- forM ps $ \(key, value) -> fmap ((objectPropertyToString key ++ ": ") ++) . prettyPrintJS' $ value
         indentString <- currentIndent
         return $ intercalate ", \n" $ map (indentString ++) jss
     , return "\n"
     , currentIndent
     , return "}"
     ]
+    where
+    objectPropertyToString :: String -> String
+    objectPropertyToString s | isIdent s = s
+                             | otherwise = show s
   match (JSBlock sts) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ prettyStatements sts

@@ -18,5 +18,10 @@ module Main where
   test2 = \x -> x."!@#"
 
   test3 = typed."foo"
+
+  test4 = test2 weirdObj
+    where
+    weirdObj :: { "!@#" :: Number }
+    weirdObj = { "!@#": 1 }
     
   main = Debug.Trace.trace "Done"

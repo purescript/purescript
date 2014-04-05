@@ -227,7 +227,7 @@ parseObjectLiteral :: P.Parsec String ParseState Value
 parseObjectLiteral = ObjectLiteral <$> C.braces (C.commaSep parseIdentifierAndValue)
 
 parseIdentifierAndValue :: P.Parsec String ParseState (String, Value)
-parseIdentifierAndValue = (,) <$> (C.indented *> C.identifier <* C.indented <* C.colon)
+parseIdentifierAndValue = (,) <$> (C.indented *> (C.identifier <|> C.stringLiteral) <* C.indented <* C.colon)
                               <*> (C.indented *> parseValue)
 
 parseAbs :: P.Parsec String ParseState Value
@@ -290,7 +290,7 @@ parseValueAtom = P.choice
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
 parsePropertyUpdate = do
-  name <- C.lexeme C.identifier
+  name <- C.lexeme (C.identifier <|> C.stringLiteral)
   _ <- C.lexeme $ C.indented *> P.char '='
   value <- C.indented *> parseValue
   return (name, value)

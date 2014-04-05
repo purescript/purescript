@@ -19,10 +19,10 @@ module Language.PureScript.CodeGen.JS (
     module AST,
     declToJs,
     moduleToJs,
-    wrapExportsContainer
+    wrapExportsContainer,
+    isIdent
 ) where
 
-import Data.Char (isAlpha, isAlphaNum)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
 
@@ -144,10 +144,6 @@ valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
 valueToJs opts m e (PositionedValue _ val) = valueToJs opts m e val
 valueToJs _ _ _ (TypeClassDictionary _ _) = error "Type class dictionary was not replaced"
 valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
-
-isIdent :: String -> Bool
-isIdent (first : rest) | isAlpha first && all isAlphaNum rest = True
-isIdent _ = False
 
 -- |
 -- Shallow copy an object.
