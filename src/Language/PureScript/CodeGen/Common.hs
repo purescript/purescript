@@ -32,7 +32,6 @@ identToJs :: Ident -> String
 identToJs (Ident name) | nameIsJsReserved name = "$$" ++ name
 identToJs (Ident name) = concatMap identCharToString name
 identToJs (Op op) = concatMap identCharToString op
-identToJs (Escaped name) = name
 
 -- |
 -- Attempts to find a human-readable name for a symbol, if none has been specified returns the

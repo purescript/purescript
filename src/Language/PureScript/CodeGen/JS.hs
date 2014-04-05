@@ -91,7 +91,7 @@ declToJs _ _ _ _ = Nothing
 -- module.
 --
 exportToJs :: DeclarationRef -> [JS]
-exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Escaped . runProperName)
+exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Ident . runProperName)
 exportToJs (ValueRef name) = [export name]
 exportToJs (TypeInstanceRef name) = [export name]
 exportToJs _ = []
@@ -118,7 +118,6 @@ var = JSVar . identToJs
 accessor :: Ident -> JS -> JS
 accessor (Ident prop) = accessorString prop
 accessor (Op op) = JSIndexer (JSStringLiteral op)
-accessor (Escaped prop) = JSAccessor prop
 
 accessorString :: String -> JS -> JS
 accessorString prop | isIdent prop = JSAccessor prop
