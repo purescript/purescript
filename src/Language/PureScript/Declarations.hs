@@ -329,10 +329,11 @@ data Value
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
-  -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
+  -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
+  -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Qualified ProperName, [Type]) (Maybe [TypeClassDictionaryInScope])
+  | TypeClassDictionary Bool (Qualified ProperName, [Type]) (Maybe [TypeClassDictionaryInScope])
   -- |
   -- A value with source position information
   --
