@@ -3,6 +3,7 @@ module Main where
   import Control.Monad.Eff
   import Debug.Trace
 
+  bar :: String -> String -> String
   bar = \s1 s2 -> s1 ++ s2
 
   test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
@@ -25,6 +26,7 @@ module Main where
 
   test6 = ((\x -> x) `k` 2) 3
 
+  (<>) :: String -> String -> String 
   (<>) = \s1 s2 -> s1 ++ s2
 
   test7 = "Hello" <> "World!"
