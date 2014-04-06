@@ -185,6 +185,8 @@ renameInModule imports exports (Module mn decls exps) =
   go (TypeSynonymDeclaration name ps ty) =
       rethrow (strMsg ("Error in type synonym " ++ show name) <>) $
         TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
+  go (TypeClassDeclaration className args implies ds) =
+    TypeClassDeclaration className args <$> updateConstraints Nothing implies <*> mapM go ds
   go (TypeInstanceDeclaration name cs cn ts ds) =
       TypeInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts <*> mapM go ds
   go (ExternInstanceDeclaration name cs cn ts) =
@@ -209,7 +211,7 @@ renameInModule imports exports (Module mn decls exps) =
     bindFunctionArgs (pos, bound) (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
       (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
     bindFunctionArgs pb other = return (pb, other)
-    
+
     bindBinders :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
     bindBinders (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, binderNames bs ++ bound), c)
 
@@ -245,7 +247,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateType pos (SaturatedTypeSynonym name tys) = (,) <$> pure pos <*> (SaturatedTypeSynonym <$> updateTypeName name pos <*> updateType' tys)
   updateType pos (ConstrainedType cs t) = (,) <$> pure pos <*> (ConstrainedType <$> updateConstraints pos cs <*> pure t)
   updateType pos t = return (pos, t)
-  
+
   updateType' :: Data d => d -> Either ErrorStack d
   updateType' = everywhereWithContextM' Nothing (mkS updateType)
 
@@ -301,7 +303,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
 
   -- Add a declaration from a module to the global export environment
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either ErrorStack ExportEnvironment
-  addDecl mn env (TypeClassDeclaration tcn _ ds) = do
+  addDecl mn env (TypeClassDeclaration tcn _ _ ds) = do
     env' <- addTypeClass env mn tcn
     foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
   addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)
@@ -389,14 +391,14 @@ resolveImports :: ExportEnvironment -> Module -> Either ErrorStack ImportEnviron
 resolveImports env (Module currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
-  
+
   -- A Map from module name to the source position for the import, the list of imports from that
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
   scope :: M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
   scope = M.insert currentModule (Nothing, Nothing, Nothing) (findImports decls)
 
-  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment  
+  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
   resolveImport' imp (mn, (pos, explImports, impQual)) = do
     modExports <- positioned $ maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
     positioned $ resolveImport currentModule mn modExports imp impQual explImports

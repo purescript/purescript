@@ -158,9 +158,9 @@ data Declaration
   --
   | ImportDeclaration ModuleName (Maybe [DeclarationRef]) (Maybe ModuleName)
   -- |
-  -- A type class declaration (name, argument, member declarations)
+  -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [String] [Declaration]
+  | TypeClassDeclaration ProperName [String] [(Qualified ProperName, [Type])] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
@@ -329,10 +329,15 @@ data Value
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
-  -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
+  -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
+  -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  | TypeClassDictionary Bool (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  -- |
+  -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
+  --
+  | SuperClassDictionary (Qualified ProperName) [Type]
   -- |
   -- A value with source position information
   --

@@ -73,7 +73,8 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
-  match (TypeClassDictionary _ _) = return "<<dict>>"
+  match (TypeClassDictionary _ _ _) = return "<<dict>>"
+  match (SuperClassDictionary _ _) = return "<<superclass dict>>"
   match (TypedValue _ val _) = prettyPrintValue' val
   match (PositionedValue _ val) = prettyPrintValue' val
   match _ = mzero

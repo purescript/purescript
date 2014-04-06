@@ -8,7 +8,7 @@ module Prelude where
 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
-  
+
   asTypeOf :: forall a. a -> a -> a
   asTypeOf x _ = x
 
@@ -59,7 +59,7 @@ module Prelude where
 
   infixl 4 <*>
 
-  class Applicative f where
+  class (Functor f) <= Applicative f where
     pure :: forall a. a -> f a
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
@@ -74,7 +74,7 @@ module Prelude where
 
   infixl 1 >>=
 
-  class Monad m where
+  class (Applicative m) <= Monad m where
     return :: forall a. a -> m a
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
@@ -192,7 +192,7 @@ module Prelude where
     show GT = "GT"
     show EQ = "EQ"
 
-  class Ord a where
+  class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering
 
   infixl 4 <
@@ -332,13 +332,25 @@ module Prelude where
     (||) = boolOr
     not = boolNot
 
+  infixr 5 <>
+
+  class Semigroup a where
+    (<>) :: a -> a -> a
+
+  foreign import concatString
+    "function concatString(s1) {\
+    \  return function(s2) {\
+    \    return s1 + s2;\
+    \  };\
+    \}" :: String -> String -> String
+
+  instance semigroupString :: Semigroup String where
+    (<>) = concatString
+
   infixr 5 ++
 
-  foreign import (++) "function $plus$plus(s1) {\
-                      \  return function(s2) {\
-                      \    return s1 + s2;\
-                      \  };\
-                      \}" :: String -> String -> String
+  (++) :: forall s. (Semigroup s) => s -> s -> s
+  (++) = (<>)
 
 module Data.Eq where
 

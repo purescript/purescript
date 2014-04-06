@@ -167,6 +167,9 @@ bitsNumber = "bitsNumber"
 boolLikeBoolean :: String
 boolLikeBoolean = "boolLikeBoolean"
 
+semigroupString :: String
+semigroupString = "semigroupString"
+
 -- Main module
 
 main :: String
@@ -176,6 +179,9 @@ main = "main"
 
 _ps :: String
 _ps = "_ps"
+
+__superclasses :: String
+__superclasses = "__superclasses"
 
 -- Modules
 
