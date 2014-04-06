@@ -177,6 +177,9 @@ main = "main"
 _ps :: String
 _ps = "_ps"
 
+__superclasses :: String
+__superclasses = "__superclasses"
+
 -- Modules
 
 prim :: String

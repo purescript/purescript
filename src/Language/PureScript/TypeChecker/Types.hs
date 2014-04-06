@@ -357,7 +357,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
 	  dictionaryValueToValue (SubclassDictionaryValue dict index) =
 	    App (App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident (C.!!))))
-	             (Accessor "__superclasses" (dictionaryValueToValue dict)))
+	             (Accessor C.__superclasses (dictionaryValueToValue dict)))
 	        (NumericLiteral (Left index))
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]

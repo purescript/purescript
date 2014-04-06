@@ -27,6 +27,8 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.CodeGen.Common (identToJs)
 
+import qualified Language.PureScript.Constants as C
+
 import Control.Applicative
 import Control.Monad.State
 import Control.Arrow (first, second)
@@ -164,9 +166,12 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
   -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
   -- dependencies, we introduce an unnamed function parameter.
-  let dictTy = TypeApp tyObject (rowFromList (map (first identToProperty) memberTypes, RCons "__superclasses" (TypeApp tyArray unit) REmpty))
+  let (memberTypes', memberNames') =
+        if null implies
+        then (memberTypes, memberNames)
+        else ((Ident C.__superclasses, TypeApp tyArray unit) : memberTypes, (C.__superclasses, superclasses) : memberNames)
+      dictTy = TypeApp tyObject (rowFromList (map (first identToProperty) memberTypes', REmpty))
       constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
-      memberNames' = ("__superclasses", superclasses) : memberNames
       dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
   return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
   where
