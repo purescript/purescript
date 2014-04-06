@@ -283,6 +283,10 @@ data DictionaryValue
   -- A dictionary which depends on other dictionaries
   --
   | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
+  -- |
+  -- A subclass dictionary
+  --
+  | SubclassDictionaryValue DictionaryValue Integer
   deriving (Show, Ord, Eq)
 
 -- |
@@ -315,7 +319,21 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Make sure the type unifies with the type in the type instance definition
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
 	    -- Solve any necessary subgoals
-	    , args <- solveSubgoals subst (tcdDependencies tcd) ]
+	    , args <- solveSubgoals subst (tcdDependencies tcd) ] ++
+	
+	    -- Look for implementations via superclasses
+	    [ SubclassDictionaryValue suDict index
+	    | tcd <- context'
+	    , (_, _, implies) <- maybeToList $ M.lookup (tcdClassName tcd) (typeClasses env)
+	    -- Try each superclass
+	    , (index, (superclass, suTyArgs)) <- zip [0..] implies
+	    -- Make sure the types unify with the types in the superclass implication
+	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) suTyArgs (tcdInstanceTypes tcd)
+	    -- Make sure the type class name matches the superclass name
+	    , className' == superclass
+	    -- Finally, satisfy the subclass constraint
+	    , suDict <- go (tcdClassName tcd, tys') ]
+	
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
 	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
 	  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
@@ -334,6 +352,10 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
 	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
+	  dictionaryValueToValue (SubclassDictionaryValue dict index) =
+	    App (App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident (C.!!))))
+	             (Accessor "__superclasses" (dictionaryValueToValue dict)))
+	        (NumericLiteral (Left index))
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
 	  verifySubstitution subst = do

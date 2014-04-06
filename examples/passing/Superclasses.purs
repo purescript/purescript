@@ -6,7 +6,14 @@ class Su a where
 class (Su a) <= Cl a where
   cl :: a -> a -> a
 
+instance suNumber :: Su Number where
+  su n = n + 1
+
+instance clNumber :: Cl Number where
+  cl n m = n + m
+
 test :: forall a. (Cl a) => a -> a
 test a = su (cl a a)
 
-main = Debug.Trace.trace "Done"
+main = let n = test 10 in 
+       Debug.Trace.trace "Done"
