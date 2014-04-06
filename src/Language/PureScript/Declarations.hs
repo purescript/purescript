@@ -332,7 +332,7 @@ data Value
   -- can be evaluated at runtime. The constructor arguments represent (in order): the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  | TypeClassDictionary (Qualified ProperName, [Type]) (Maybe [TypeClassDictionaryInScope])
   -- |
   -- A value with source position information
   --

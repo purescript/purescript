@@ -185,6 +185,8 @@ renameInModule imports exports (Module mn decls exps) =
   go (TypeSynonymDeclaration name ps ty) =
       rethrow (strMsg ("Error in type synonym " ++ show name) <>) $
         TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
+  go (TypeClassDeclaration className args implies ds) =
+    TypeClassDeclaration className args <$> updateConstraints Nothing implies <*> mapM go ds
   go (TypeInstanceDeclaration name cs cn ts ds) =
       TypeInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts <*> mapM go ds
   go (ExternInstanceDeclaration name cs cn ts) =

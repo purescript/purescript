@@ -129,7 +129,8 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
       M.lookup (qualify mn className) m
   let instanceTys = map memberToNameAndType tyDecls
 
-  let superclasses = TypedValue False (ArrayLiteral [ TypeClassDictionary (superclass, tyArgs) [] | (superclass, tyArgs) <- implies ]) (TypeApp tyArray unit)
+  let superclasses = TypedValue False (ArrayLiteral [ TypeClassDictionary (superclass, tyArgs) Nothing
+                                                    | (superclass, tyArgs) <- implies ]) (TypeApp tyArray unit)
 
   -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
