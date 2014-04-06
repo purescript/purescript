@@ -332,10 +332,10 @@ module Prelude where
     (||) = boolOr
     not = boolNot
 
-  infixr 5 ++
+  infixr 5 <>
 
   class Semigroup a where
-    (++) :: a -> a -> a
+    (<>) :: a -> a -> a
 
   foreign import concatString
     "function concatString(s1) {\
@@ -345,7 +345,12 @@ module Prelude where
     \}" :: String -> String -> String
 
   instance semigroupString :: Semigroup String where
-    (++) = concatString
+    (<>) = concatString
+
+  infixr 5 ++
+
+  (++) :: forall s. (Semigroup s) => s -> s -> s
+  (++) = (<>)
 
 module Data.Eq where
 

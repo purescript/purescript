@@ -26,10 +26,10 @@ module Main where
 
   test6 = ((\x -> x) `k` 2) 3
 
-  (<>) :: String -> String -> String 
-  (<>) = \s1 s2 -> s1 ++ s2
+  (<+>) :: String -> String -> String 
+  (<+>) = \s1 s2 -> s1 ++ s2
 
-  test7 = "Hello" <> "World!"
+  test7 = "Hello" <+> "World!"
 
   (@@) :: forall a b. (a -> b) -> a -> b
   (@@) = \f x -> f x
