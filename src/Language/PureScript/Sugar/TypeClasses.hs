@@ -70,6 +70,14 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   instance fooArray :: (Foo a) => Foo [a] where
 --     foo = map foo
 --
+--   {- Superclasses -}
+--
+--   class (Foo a) <= Sub a where
+--     sub :: a
+--
+--   instance subString :: Sub String where
+--     sub = ""
+--
 -- becomes
 --
 --   type Foo a = { foo :: a -> a }
@@ -83,6 +91,19 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --
 --   fooArray :: forall a. (Foo a) => Foo [a]
 --   fooArray = { foo: map foo }
+--
+--   {- Superclasses -}
+--
+--   ...
+--
+--   subString :: {} -> { __superclasses :: [{}], sub :: String }
+--   subString _ = {
+--     __superclasses: [\<dictionary placeholder to be inserted during type checking\>]
+--     sub: ""
+--   }
+--
+--  Here, the __superclasses property is not typechecked (it is not even well-typed, since its
+--  entries might be dictionaries of different types).
 --
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args _ members) = do
