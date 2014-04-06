@@ -124,9 +124,12 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (TypeClassDeclaration _ args implies tyDecls) <- lift $ maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right
-                        $ M.lookup (qualify mn className) m
+  (TypeClassDeclaration _ args implies tyDecls) <- lift $
+    maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $
+      M.lookup (qualify mn className) m
   let instanceTys = map memberToNameAndType tyDecls
+
+  let superclasses = TypedValue False (ArrayLiteral [ TypeClassDictionary (superclass, tyArgs) [] | (superclass, tyArgs) <- implies ]) (TypeApp tyArray unit)
 
   -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
@@ -137,9 +140,10 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
   -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
   -- dependencies, we introduce an unnamed function parameter.
-  let dictTy = TypeApp tyObject (rowFromList (map (first identToProperty) memberTypes, REmpty))
+  let dictTy = TypeApp tyObject (rowFromList (map (first identToProperty) memberTypes, RCons "__superclasses" (TypeApp tyArray unit) REmpty))
       constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
-      dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames) else ObjectLiteral memberNames
+      memberNames' = ("__superclasses", superclasses) : memberNames
+      dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
   return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
   where
   unit :: Type
