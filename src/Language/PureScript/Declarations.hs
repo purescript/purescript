@@ -333,7 +333,11 @@ data Value
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Bool (Qualified ProperName, [Type]) (Maybe [TypeClassDictionaryInScope])
+  | TypeClassDictionary Bool (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  -- |
+  -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
+  --
+  | SuperClassDictionary (Qualified ProperName) [Type]
   -- |
   -- A value with source position information
   --

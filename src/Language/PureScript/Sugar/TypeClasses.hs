@@ -98,19 +98,18 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --
 --   ...
 --
---   subString :: {} -> { __superclasses :: [{}], sub :: String }
+--   subString :: {} -> { __superclasses :: { "Foo": {} -> Foo String }, sub :: String }
 --   subString _ = {
---     __superclasses: [\<dictionary placeholder to be inserted during type checking\>]
+--     __superclasses: {
+--       "Foo": \_ -> <dictionary placeholder to be inserted during type checking\>
+--     }
 --     sub: ""
 --   }
 --
---  Here, the __superclasses property is not typechecked (it is not even well-typed, since its
---  entries might be dictionaries of different types).
---
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
-desugarDecl mn d@(TypeClassDeclaration name args _ members) = do
+desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
   modify (M.insert (mn, name) d)
-  return $ (Nothing, d : typeClassDictionaryDeclaration name args members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+  return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
 desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   desugared <- lift $ desugarCases members
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
@@ -129,9 +128,15 @@ identToProperty :: Ident -> String
 identToProperty (Ident name) = name
 identToProperty (Op op) = op
 
-typeClassDictionaryDeclaration :: ProperName -> [String] -> [Declaration] -> Declaration
-typeClassDictionaryDeclaration name args members =
-  TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (map (first identToProperty . memberToNameAndType) members, REmpty))
+typeClassDictionaryDeclaration :: ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration name args implies members =
+  let superclassesType = TypeApp tyObject (rowFromList ([ (fieldName, function unit tySynApp)
+                                                        | (index, (superclass, tyArgs)) <- zip [0..] implies
+                                                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
+                                                        , let fieldName = mkSuperclassDictionaryName superclass index
+                                                        ], REmpty))
+
+  in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList ((C.__superclasses, superclassesType) : map (first identToProperty . memberToNameAndType) members, REmpty))
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
@@ -141,6 +146,12 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
+
+mkSuperclassDictionaryName :: Qualified ProperName -> Integer -> String
+mkSuperclassDictionaryName pn index = show pn ++ "_" ++ show index
+
+unit :: Type
+unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls = do
@@ -152,11 +163,6 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
       M.lookup (qualify mn className) m
   let instanceTys = map memberToNameAndType tyDecls
 
-  let superclasses = TypedValue False (ArrayLiteral [ Abs (Left (Ident "_")) (TypeClassDictionary False (superclass, tyArgs) Nothing)
-                                                    | (superclass, suTyArgs) <- implies
-                                                    , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
-                                                    ]) (TypeApp tyArray unit)
-
   -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
   -- Create values for the type instance members
@@ -166,17 +172,19 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
   -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
   -- dependencies, we introduce an unnamed function parameter.
-  let (memberTypes', memberNames') =
-        if null implies
-        then (memberTypes, memberNames)
-        else ((Ident C.__superclasses, TypeApp tyArray unit) : memberTypes, (C.__superclasses, superclasses) : memberNames)
-      dictTy = TypeApp tyObject (rowFromList (map (first identToProperty) memberTypes', REmpty))
+  let superclasses = ObjectLiteral
+        [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
+        | (index, (superclass, suTyArgs)) <- zip [0..] implies
+        , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
+        , let fieldName = mkSuperclassDictionaryName superclass index
+        ]
+
+  let memberNames' = (C.__superclasses, superclasses) : memberNames
+      dictTy = foldl TypeApp (TypeConstructor className) tys
       constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
       dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
   return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
   where
-  unit :: Type
-  unit = TypeApp tyObject REmpty
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
