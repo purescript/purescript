@@ -307,10 +307,10 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     filterModule _ = False
 	
     solve context' (className, tys) trySuperclasses =
-      case go className tys of
+      case chooseSimplestDictionaries (go className tys) of
         [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
-        (dict : _) -> return (dictionaryValueToValue dict)
-        --_ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+        [dict] -> return (dictionaryValueToValue dict)
+        _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
       where
 	  go className' tys' =
 	    -- Look for regular type instances
@@ -326,8 +326,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Look for implementations via superclasses
 	    [ SubclassDictionaryValue suDict index
 	    | trySuperclasses
-	    , tcd <- context'
-	    , let (_, _, implies) = fromMaybe (error "Type class was not defined") $ M.lookup (tcdClassName tcd) (typeClasses env)
+	    , (subclassName, (args, _, implies)) <- M.toList (typeClasses env)
 	    -- Try each superclass
 	    , (index, (superclass, suTyArgs)) <- zip [0..] implies
 	    -- Make sure the type class name matches the superclass name
@@ -335,7 +334,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Make sure the types unify with the types in the superclass implication
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
 	    -- Finally, satisfy the subclass constraint
-	    , suDict <- go (tcdClassName tcd) (map (applySubst subst) (tcdInstanceTypes tcd)) ]
+	    , suDict <- go subclassName (map (applySubst subst . TypeVar) args) ]
 	
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
 	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
@@ -371,6 +370,20 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    where
 	    replace t@(TypeVar v) = fromMaybe t $ lookup v subst
 	    replace other = other
+	  -- Choose the simplest DictionaryValues from a list of candidates
+	  -- The reason for this function is as follows:
+	  -- When considering overlapping instances, we don't want to consider the same dictionary
+	  -- to be an overlap of itself when obtained as a superclass of another class.
+	  -- Observing that we probably don't want to select a superclass instance when an instance
+	  -- is available directly, and that there is no way for a superclass instance to actually
+	  -- introduce an overlap that wouldn't have been there already, we simply remove dictionaries
+	  -- obtained as superclass instances if there are simpler instances available.
+	  chooseSimplestDictionaries :: [DictionaryValue] -> [DictionaryValue]
+	  chooseSimplestDictionaries ds = case filter isSimpleDictionaryValue ds of
+	                                    [] -> ds
+	                                    simple -> simple
+	  isSimpleDictionaryValue SubclassDictionaryValue{} = False
+	  isSimpleDictionaryValue _ = True
 
 -- |
 -- Check all values in a list pairwise match a predicate
