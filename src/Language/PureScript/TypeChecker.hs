@@ -75,8 +75,12 @@ addValue moduleName name ty nameKind = do
 
 addTypeClass :: ModuleName -> ProperName -> [String] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args ds =
-  let members = map (\(TypeDeclaration ident ty) -> (ident, ty)) ds in
+  let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members) (typeClasses . checkEnv $ st) } }
+  where
+  toPair (TypeDeclaration ident ty) = (ident, ty)
+  toPair (PositionedDeclaration _ d) = toPair d
+  toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =

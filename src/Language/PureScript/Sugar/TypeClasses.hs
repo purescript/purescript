@@ -150,7 +150,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
     _ <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
     return (ident, memberValue)
-  memberToNameAndValue tys' (PositionedDeclaration pos d) = do
+  memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
     (ident, val) <- memberToNameAndValue tys' d
     return (ident, PositionedValue pos val)
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"

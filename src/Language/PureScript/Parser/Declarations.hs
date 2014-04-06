@@ -148,7 +148,7 @@ parseTypeClassDeclaration = do
   idents <- P.many (indented *> identifier)
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
-    mark (P.many (same *> parseTypeDeclaration))
+    mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents members
 
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
@@ -164,14 +164,17 @@ parseTypeInstanceDeclaration = do
   ty <- P.many (indented *> parseTypeAtom)
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
-    mark (P.many (same *> parseValueDeclaration))
+    mark (P.many (same *> positioned parseValueDeclaration))
   return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty members
+
+positioned :: P.Parsec String ParseState Declaration -> P.Parsec String ParseState Declaration
+positioned d = PositionedDeclaration <$> sourcePos <*> d
 
 -- |
 -- Parse a single declaration
 --
 parseDeclaration :: P.Parsec String ParseState Declaration
-parseDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice
+parseDeclaration = positioned (P.choice
                    [ parseDataDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
@@ -181,7 +184,7 @@ parseDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice
                    , parseImportDeclaration
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration
-                   ] P.<?> "declaration"
+                   ]) P.<?> "declaration"
 
 parseLocalDeclaration :: P.Parsec String ParseState Declaration
 parseLocalDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice

@@ -303,7 +303,11 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) pri
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either ErrorStack ExportEnvironment
   addDecl mn env (TypeClassDeclaration tcn _ ds) = do
     env' <- addTypeClass env mn tcn
-    foldM (\env'' (TypeDeclaration name _) -> addValue env'' mn name) env' ds
+    foldM go env' ds
+    where
+    go env'' (TypeDeclaration name _) = addValue env'' mn name
+    go env'' (PositionedDeclaration pos d) = rethrowWithPosition pos $ go env'' d
+    go _ _ = error "Invalid declaration in TypeClassDeclaration"
   addDecl mn env (DataDeclaration tn _ dcs) = addType env mn tn (map fst dcs)
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
