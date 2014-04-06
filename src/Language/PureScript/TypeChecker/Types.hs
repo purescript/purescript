@@ -116,7 +116,7 @@ unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintT
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem s1 _) (Skolem s2 _) | s1 == s2 = return ()
+  unifyTypes' (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = return ()
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
@@ -155,7 +155,7 @@ unifyRows r1 r2 =
     unifyRows' row r others u'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem s1 _) [] (Skolem s2 _) | s1 == s2 = return ()
+  unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
   unifyRows' sd3 r3 sd4 r4 = throwError . strMsg $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")"
 
 -- |
@@ -333,7 +333,8 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Make sure the types unify with the types in the superclass implication
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
 	    -- Finally, satisfy the subclass constraint
-	    , suDict <- go trySuperclasses' subclassName (map (applySubst subst . TypeVar) args) ]
+	    , args' <- maybeToList $ mapM (applySubst subst . TypeVar) args
+	    , suDict <- go True subclassName args' ]
 	
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
 	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
@@ -364,11 +365,11 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    guard (all (pairwise (unifiesWith env) . map snd) grps)
 	    return $ map head grps
 	  -- Apply a substitution to a type
-	  applySubst :: [(String, Type)] -> Type -> Type
-	  applySubst subst = everywhere (mkT replace)
+	  applySubst :: [(String, Type)] -> Type -> Maybe Type
+	  applySubst subst = everywhereM (mkM replace)
 	    where
-	    replace t@(TypeVar v) = fromMaybe t $ lookup v subst
-	    replace other = other
+	    replace (TypeVar v) = lookup v subst
+	    replace other = Just other
 	  -- Choose the simplest DictionaryValues from a list of candidates
 	  -- The reason for this function is as follows:
 	  -- When considering overlapping instances, we don't want to consider the same dictionary
@@ -399,7 +400,7 @@ pairwise p (x : xs) = all (p x) xs && pairwise p xs
 unifiesWith :: Environment -> Type -> Type -> Bool
 unifiesWith _ (TUnknown _) _ = True
 unifiesWith _ _ (TUnknown _) = True
-unifiesWith _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = True
+unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
 unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
 unifiesWith e (TypeApp h1 t1) (TypeApp h2 t2) = unifiesWith e h1 h2 && unifiesWith e t1 t2
@@ -415,7 +416,7 @@ unifiesWith _ _ _ = False
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
+typeHeadsAreEqual _ _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1) (TypeApp h2 t2) = (++) <$> typeHeadsAreEqual m e h1 h2 <*> typeHeadsAreEqual m e t1 t2
@@ -449,7 +450,7 @@ skolemEscapeCheck root@TypedValue{} =
     collectSkolems :: Type -> [SkolemScope]
     collectSkolems = nub . everything (++) (mkQ [] collect)
       where
-      collect (Skolem _ scope) = [scope]
+      collect (Skolem _ _ scope) = [scope]
       collect _ = []
   go _ scos = ([], scos)
   findBindingScope :: SkolemScope -> Maybe Value
@@ -782,7 +783,7 @@ newSkolemScope = SkolemScope . runUnknown <$> fresh'
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
 skolemize :: String -> Int -> SkolemScope -> Type -> Type
-skolemize ident sko scope = replaceTypeVars ident (Skolem sko scope)
+skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
 
 -- |
 -- This function has one purpose - to skolemize type variables appearing in a
@@ -955,7 +956,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
-  go [] [] (Skolem _ _) | lax = return []
+  go [] [] (Skolem _ _ _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ValueError (ObjectLiteral ps)))
   go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ValueError (ObjectLiteral ps)))

@@ -66,7 +66,7 @@ data Type
   -- |
   -- A skolem constant
   --
-  | Skolem Int SkolemScope
+  | Skolem String Int SkolemScope
   -- |
   -- An empty row
   --
