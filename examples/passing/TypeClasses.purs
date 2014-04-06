@@ -21,11 +21,25 @@ instance showData :: (Prelude.Show a) => Prelude.Show (Data a) where
 
 test3 = \_ -> show (Data "testing")
 
+instance functorData :: Functor Data where
+  (<$>) = liftM1
+
+instance appData :: Applicative Data where
+  pure = return
+  (<*>) = ap
+
 instance monadData :: Prelude.Monad Data where
   return = Data
   (>>=) (Data a) f = f a
 
 data Maybe a = Nothing | Just a
+
+instance functorMaybe :: Functor Maybe where
+  (<$>) = liftM1
+
+instance appMaybe :: Applicative Maybe where
+  pure = return
+  (<*>) = ap
 
 instance monadMaybe :: Prelude.Monad Maybe where
   return = Just
@@ -42,6 +56,13 @@ instance showArray :: (Prelude.Show a) => Prelude.Show [a] where
   show (x:xs) = show x ++ ", " ++ show xs
 
 test6 = \_ -> show ["testing"]
+
+instance functorFunction :: Functor ((->) r) where
+  (<$>) = liftM1
+
+instance appFunction :: Applicative ((->) r) where
+  pure = return
+  (<*>) = ap
 
 instance monadFunction :: Prelude.Monad ((->) r) where
   return a r = a

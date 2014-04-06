@@ -12,6 +12,13 @@ data State s a = State (s -> Tuple s a)
 
 runState s (State f) = f s
 
+instance functorState :: Functor (State s) where
+  (<$>) = liftM1
+
+instance appState :: Applicative (State s) where
+  pure = return
+  (<*>) = ap
+
 instance monadState :: Prelude.Monad (State s) where
   return a = State $ \s -> Tuple s a
   (>>=) f g = State $ \s -> case runState s f of

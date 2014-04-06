@@ -355,9 +355,10 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
 	  dictionaryValueToValue (SubclassDictionaryValue dict index) =
-	    App (App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident (C.!!))))
-	             (Accessor C.__superclasses (dictionaryValueToValue dict)))
-	        (NumericLiteral (Left index))
+	    App (App (App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident (C.!!))))
+	                  (Accessor C.__superclasses (dictionaryValueToValue dict)))
+	             (NumericLiteral (Left index)))
+	        (ObjectLiteral [])
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
 	  verifySubstitution subst = do
@@ -383,6 +384,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	                                    [] -> ds
 	                                    simple -> simple
 	  isSimpleDictionaryValue SubclassDictionaryValue{} = False
+	  isSimpleDictionaryValue (DependentDictionaryValue _ ds) = all isSimpleDictionaryValue ds
 	  isSimpleDictionaryValue _ = True
 
 -- |
