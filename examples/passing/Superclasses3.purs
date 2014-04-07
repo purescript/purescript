@@ -24,9 +24,11 @@ runMTrace (MTrace a) = a
 instance functorMTrace :: Functor MTrace where
   (<$>) = liftM1
 
+instance applyMTrace :: Apply MTrace where
+  (<*>) = ap
+
 instance applicativeMTrace :: Applicative MTrace where
   pure = return
-  (<*>) = ap
 
 instance monadMTrace :: Monad MTrace where
   return = MTrace <<< return

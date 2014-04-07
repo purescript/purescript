@@ -59,9 +59,11 @@ module Prelude where
 
   infixl 4 <*>
 
-  class (Functor f) <= Applicative f where
-    pure :: forall a. a -> f a
+  class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
+
+  class (Apply f) <= Applicative f where
+    pure :: forall a. a -> f a
 
   liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
   liftA1 f a = pure f <*> a
@@ -390,9 +392,11 @@ module Control.Monad.Eff where
   instance functorEff :: Functor (Eff e) where
     (<$>) = liftA1
 
+  instance applyEff :: Apply (Eff e) where
+    (<*>) = ap
+
   instance applicativeEff :: Applicative (Eff e) where
     pure = return
-    (<*>) = ap
 
   instance monadEff :: Monad (Eff e) where
     return = retEff

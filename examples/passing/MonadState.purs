@@ -15,9 +15,11 @@ runState s (State f) = f s
 instance functorState :: Functor (State s) where
   (<$>) = liftM1
 
-instance appState :: Applicative (State s) where
-  pure = return
+instance applyState :: Apply (State s) where
   (<*>) = ap
+
+instance applicativeState :: Applicative (State s) where
+  pure = return
 
 instance monadState :: Prelude.Monad (State s) where
   return a = State $ \s -> Tuple s a
