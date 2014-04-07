@@ -81,7 +81,7 @@ The head and tail of a non-empty array can be matched by using a cons pattern::
   sum [] = 0
   sum (x : xs) = x + sum xs
 
-`:` associates to the right::
+``:`` associates to the right::
 
   addPairs (x : y : xs) = x * y + addPairs xs
   addPairs _ = 0
