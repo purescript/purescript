@@ -8,7 +8,7 @@ module Prelude where
 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
-  
+
   asTypeOf :: forall a. a -> a -> a
   asTypeOf x _ = x
 
@@ -186,6 +186,13 @@ module Prelude where
     (/=) xs ys = not (xs == ys)
 
   data Ordering = LT | GT | EQ
+
+  instance eqOrdering :: Eq Ordering where
+    (==) LT LT = true
+    (==) GT GT = true
+    (==) EQ EQ = true
+    (==) _  _  = false
+    (/=) x y = not (x == y)
 
   instance showOrdering :: Show Ordering where
     show LT = "LT"
