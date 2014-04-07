@@ -76,9 +76,11 @@ module Prelude where
 
   infixl 1 >>=
 
-  class (Applicative m) <= Monad m where
-    return :: forall a. a -> m a
+  class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
+  class (Applicative m, Bind m) <= Monad m where
+    return :: forall a. a -> m a
 
   liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
   liftM1 f a = do
@@ -398,9 +400,11 @@ module Control.Monad.Eff where
   instance applicativeEff :: Applicative (Eff e) where
     pure = return
 
+  instance bindEffInstance :: Bind (Eff e) where
+    (>>=) = bindEff
+
   instance monadEff :: Monad (Eff e) where
     return = retEff
-    (>>=) = bindEff
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\

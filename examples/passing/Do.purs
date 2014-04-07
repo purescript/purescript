@@ -15,10 +15,12 @@ instance applyMaybe :: Apply Maybe where
 instance applicativeMaybe :: Applicative Maybe where
   pure = Just
 
-instance monadMaybe :: Prelude.Monad Maybe where
-  return = Just
+instance bindMaybe :: Bind Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
+
+instance monadMaybe :: Prelude.Monad Maybe where
+  return = Just
 
 test1 = \_ -> do
   Just "abc"

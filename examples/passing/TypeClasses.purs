@@ -30,9 +30,11 @@ instance applyData :: Apply Data where
 instance applicativeData :: Applicative Data where
   pure = return
 
-instance monadData :: Prelude.Monad Data where
-  return = Data
+instance bindData :: Bind Data where
   (>>=) (Data a) f = f a
+
+instance monadData :: Monad Data where
+  return = Data
 
 data Maybe a = Nothing | Just a
 
@@ -45,10 +47,12 @@ instance applyMaybe :: Apply Maybe where
 instance applicativeMaybe :: Applicative Maybe where
   pure = return
 
-instance monadMaybe :: Prelude.Monad Maybe where
-  return = Just
+instance bindMaybe :: Bind Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
+
+instance monadMaybe :: Monad Maybe where
+  return = Just
 
 test4 :: forall a m. (Monad m) => a -> m Number
 test4 = \_ -> return 1
@@ -70,9 +74,11 @@ instance applyFunction :: Apply ((->) r) where
 instance applicativeFunction :: Applicative ((->) r) where
   pure = return
 
-instance monadFunction :: Prelude.Monad ((->) r) where
-  return a r = a
+instance bindFunction :: Bind ((->) r) where
   (>>=) f g r = g (f r) r
+
+instance monadFunction :: Monad ((->) r) where
+  return a r = a
 
 ask r = r
 
