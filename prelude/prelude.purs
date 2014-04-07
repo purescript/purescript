@@ -59,9 +59,11 @@ module Prelude where
 
   infixl 4 <*>
 
-  class (Functor f) <= Applicative f where
-    pure :: forall a. a -> f a
+  class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
+
+  class (Apply f) <= Applicative f where
+    pure :: forall a. a -> f a
 
   liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
   liftA1 f a = pure f <*> a
@@ -74,9 +76,11 @@ module Prelude where
 
   infixl 1 >>=
 
-  class (Applicative m) <= Monad m where
-    return :: forall a. a -> m a
+  class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
+  class (Applicative m, Bind m) <= Monad m where
+    return :: forall a. a -> m a
 
   liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
   liftM1 f a = do
@@ -390,13 +394,17 @@ module Control.Monad.Eff where
   instance functorEff :: Functor (Eff e) where
     (<$>) = liftA1
 
+  instance applyEff :: Apply (Eff e) where
+    (<*>) = ap
+
   instance applicativeEff :: Applicative (Eff e) where
     pure = return
-    (<*>) = ap
+
+  instance bindEffInstance :: Bind (Eff e) where
+    (>>=) = bindEff
 
   instance monadEff :: Monad (Eff e) where
     return = retEff
-    (>>=) = bindEff
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\

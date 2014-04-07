@@ -24,27 +24,35 @@ test3 = \_ -> show (Data "testing")
 instance functorData :: Functor Data where
   (<$>) = liftM1
 
-instance appData :: Applicative Data where
-  pure = return
+instance applyData :: Apply Data where
   (<*>) = ap
 
-instance monadData :: Prelude.Monad Data where
-  return = Data
+instance applicativeData :: Applicative Data where
+  pure = return
+
+instance bindData :: Bind Data where
   (>>=) (Data a) f = f a
+
+instance monadData :: Monad Data where
+  return = Data
 
 data Maybe a = Nothing | Just a
 
 instance functorMaybe :: Functor Maybe where
   (<$>) = liftM1
 
-instance appMaybe :: Applicative Maybe where
-  pure = return
+instance applyMaybe :: Apply Maybe where
   (<*>) = ap
 
-instance monadMaybe :: Prelude.Monad Maybe where
-  return = Just
+instance applicativeMaybe :: Applicative Maybe where
+  pure = return
+
+instance bindMaybe :: Bind Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
+
+instance monadMaybe :: Monad Maybe where
+  return = Just
 
 test4 :: forall a m. (Monad m) => a -> m Number
 test4 = \_ -> return 1
@@ -60,13 +68,17 @@ test6 = \_ -> show ["testing"]
 instance functorFunction :: Functor ((->) r) where
   (<$>) = liftM1
 
-instance appFunction :: Applicative ((->) r) where
-  pure = return
+instance applyFunction :: Apply ((->) r) where
   (<*>) = ap
 
-instance monadFunction :: Prelude.Monad ((->) r) where
-  return a r = a
+instance applicativeFunction :: Applicative ((->) r) where
+  pure = return
+
+instance bindFunction :: Bind ((->) r) where
   (>>=) f g r = g (f r) r
+
+instance monadFunction :: Monad ((->) r) where
+  return a r = a
 
 ask r = r
 
@@ -75,6 +87,6 @@ runReader r f = f r
 test9 _ = runReader 0 $ do
   n <- ask
   return $ n + 1
-    
+
 main = Debug.Trace.trace (test7 "Done")
 
