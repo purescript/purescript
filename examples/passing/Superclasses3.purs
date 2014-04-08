@@ -7,7 +7,7 @@ import Control.Monad.Eff
 class (Monad m) <= MonadWriter w m where
   tell :: w -> m {}
 
-testFunctor :: forall m. (Monad m) => m Number -> m Number
+testFunctor :: forall m. (Applicative m) => m Number -> m Number
 testFunctor n = (+) 1 <$> n
 
 test :: forall w m. (Monad m, MonadWriter w m) => w -> m {}

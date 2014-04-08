@@ -371,19 +371,19 @@ module Control.Monad.Eff where
 
   foreign import data Eff :: # ! -> * -> *
 
-  foreign import retEff "function retEff(a) {\
-                        \  return function() {\
-                        \    return a;\
-                        \  };\
-                        \}" :: forall e a. a -> Eff e a
-
-  foreign import bindEff "function bindEff(a) {\
-                         \  return function(f) {\
-                         \    return function() {\
-                         \      return f(a())();\
-                         \    };\
+  foreign import returnE "function returnE(a) {\
+                         \  return function() {\
+                         \    return a;\
                          \  };\
-                         \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
+                         \}" :: forall e a. a -> Eff e a
+
+  foreign import bindE "function bindE(a) {\
+                       \  return function(f) {\
+                       \    return function() {\
+                       \      return f(a())();\
+                       \    };\
+                       \  };\
+                       \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
   type Pure a = forall e. Eff e a
 
@@ -398,13 +398,13 @@ module Control.Monad.Eff where
     (<*>) = ap
 
   instance applicativeEff :: Applicative (Eff e) where
-    pure = return
+    pure = returnE
 
-  instance bindEffInstance :: Bind (Eff e) where
-    (>>=) = bindEff
+  instance bindEff :: Bind (Eff e) where
+    (>>=) = bindE
 
   instance monadEff :: Monad (Eff e) where
-    return = retEff
+    return = returnE
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\

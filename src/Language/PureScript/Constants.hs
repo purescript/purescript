@@ -146,6 +146,9 @@ pokeSTArray = "pokeSTArray"
 monadEffDictionary :: String
 monadEffDictionary = "monadEff"
 
+bindEffDictionary :: String
+bindEffDictionary = "bindEff"
+
 numNumber :: String
 numNumber = "numNumber"
 
