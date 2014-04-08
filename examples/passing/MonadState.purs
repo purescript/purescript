@@ -19,14 +19,13 @@ instance applyState :: Apply (State s) where
   (<*>) = ap
 
 instance applicativeState :: Applicative (State s) where
-  pure = return
+  pure a = State $ \s -> Tuple s a
 
 instance bindState :: Bind (State s) where
   (>>=) f g = State $ \s -> case runState s f of
                               Tuple s1 a -> runState s1 (g a)
 
-instance monadState :: Monad (State s) where
-  return a = State $ \s -> Tuple s a
+instance monadState :: Monad (State s)
 
 instance monadStateState :: MonadState s (State s) where
   get = State (\s -> Tuple s s)

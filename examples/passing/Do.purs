@@ -19,8 +19,7 @@ instance bindMaybe :: Bind Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
-instance monadMaybe :: Prelude.Monad Maybe where
-  return = Just
+instance monadMaybe :: Prelude.Monad Maybe
 
 test1 = \_ -> do
   Just "abc"

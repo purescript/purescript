@@ -28,13 +28,12 @@ instance applyMTrace :: Apply MTrace where
   (<*>) = ap
 
 instance applicativeMTrace :: Applicative MTrace where
-  pure = return
+  pure = MTrace <<< return
 
 instance bindMTrace :: Bind MTrace where
   (>>=) m f = MTrace (runMTrace m >>= (runMTrace <<< f))
 
-instance monadMTrace :: Monad MTrace where
-  return = MTrace <<< return
+instance monadMTrace :: Monad MTrace 
 
 instance writerMTrace :: MonadWriter String MTrace where
   tell s = MTrace (trace s)
