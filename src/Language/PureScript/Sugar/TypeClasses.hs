@@ -30,8 +30,10 @@ import Language.PureScript.CodeGen.Common (identToJs)
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
+import Control.Monad.Error
 import Control.Monad.State
 import Control.Arrow (first, second)
+import Data.Monoid ((<>))
 import Data.Maybe (catMaybes)
 
 import qualified Data.Map as M
@@ -166,7 +168,8 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
   -- Replace the type arguments with the appropriate types in the member types
   let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
   -- Create values for the type instance members
-  memberNames <- map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
+  memberNames <- rethrow (strMsg ("Error in type class " ++ show className ++ ":") <>) $
+                   map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
   -- Create the type of the dictionary
   -- The type is an object type, but depending on type instance dependencies, may be constrained.
   -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
@@ -188,7 +191,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls = do
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
-    _ <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup ident tys'
+    _ <- lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
     return (ident, memberValue)
   memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
