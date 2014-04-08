@@ -45,8 +45,8 @@ import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import qualified Data.Data as D
 import Data.Generics
-       (everythingWithContext, mkM, everywhereM, everything, mkT,
-        something, everywhere, mkQ)
+       (everythingWithContext, mkM, everywhereM,
+        everything, mkT, something, everywhere, mkQ)
 import Data.Generics.Extras
 
 import Language.PureScript.Declarations
@@ -253,7 +253,12 @@ isTyped (name, value) = (name, (value, Nothing))
 -- Map a function over type annotations appearing inside a value
 --
 overTypes :: (Type -> Type) -> Value -> Value
-overTypes f = everywhere (mkT f)
+overTypes f = everywhere (mkT g)
+  where
+  g :: Value -> Value
+  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
+  g (TypeClassDictionary b (nm, tys) sco) = TypeClassDictionary b (nm, map f tys) sco
+  g other = other
 
 -- |
 -- Replace type class dictionary placeholders with inferred type class dictionaries
