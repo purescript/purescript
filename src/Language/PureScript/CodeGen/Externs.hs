@@ -77,10 +77,12 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
     exportToPs (TypeClassRef className) =
       case Qualified (Just moduleName) className `M.lookup` typeClasses env of
         Nothing -> error $ show className ++ " has no type class definition in exportToPs"
-        Just (args, members) -> do
-          tell ["class " ++ show className ++ " " ++ unwords args ++ " where"]
+        Just (args, members, implies) -> do
+          let impliesString = if null implies then "" else "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
+          tell ["class " ++ impliesString ++ show className ++ " " ++ unwords args ++ " where"]
           forM_ (filter (isValueExported . fst) members) $ \(member ,ty) ->
             tell [ "  " ++ show member ++ " :: " ++ prettyPrintType ty ]
+
     exportToPs (TypeInstanceRef ident) = do
       let TypeClassDictionaryInScope { tcdClassName = className, tcdInstanceTypes = tys, tcdDependencies = deps} =
             fromMaybe (error $ "Type class instance has no dictionary in exportToPs") . find ((== Qualified (Just moduleName) ident) . tcdName) $ typeClassDictionaries env

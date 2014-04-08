@@ -8,17 +8,20 @@ instance functorMaybe :: Functor Maybe where
   (<$>) f Nothing = Nothing
   (<$>) f (Just x) = Just (f x)
 
-instance applicativeMaybe :: Applicative Maybe where
-  pure = Just
+instance applyMaybe :: Apply Maybe where
   (<*>) (Just f) (Just x) = Just (f x)
   (<*>) _ _ = Nothing
 
-instance monadMaybe :: Prelude.Monad Maybe where
-  return = Just
+instance applicativeMaybe :: Applicative Maybe where
+  pure = Just
+
+instance bindMaybe :: Bind Maybe where
   (>>=) Nothing _ = Nothing
   (>>=) (Just a) f = f a
 
-test1 = \_ -> do 
+instance monadMaybe :: Prelude.Monad Maybe
+
+test1 = \_ -> do
   Just "abc"
 
 test2 = \_ -> do
@@ -43,14 +46,14 @@ test5 mx my mz = do
   z <- mz
   Just (z + sum + 1)
 
-test6 mx = \_ -> do 
-  let 
+test6 mx = \_ -> do
+  let
     f :: forall a. Maybe a -> a
     f (Just x) = x
   Just (f mx)
 
-test8 = \_ -> do 
-  Just (do 
+test8 = \_ -> do
+  Just (do
     Just 1)
 
 test9 = \_ -> (+) <$> Just 1 <*> Just 2

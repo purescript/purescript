@@ -59,9 +59,11 @@ module Prelude where
 
   infixl 4 <*>
 
-  class Applicative f where
-    pure :: forall a. a -> f a
+  class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
+
+  class (Apply f) <= Applicative f where
+    pure :: forall a. a -> f a
 
   liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
   liftA1 f a = pure f <*> a
@@ -74,9 +76,13 @@ module Prelude where
 
   infixl 1 >>=
 
-  class Monad m where
-    return :: forall a. a -> m a
+  class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
+
+  class (Applicative m, Bind m) <= Monad m
+    
+  return :: forall m a. (Monad m) => a -> m a
+  return = pure
 
   liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
   liftM1 f a = do
@@ -199,7 +205,7 @@ module Prelude where
     show GT = "GT"
     show EQ = "EQ"
 
-  class Ord a where
+  class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering
 
   infixl 4 <
@@ -339,13 +345,25 @@ module Prelude where
     (||) = boolOr
     not = boolNot
 
+  infixr 5 <>
+
+  class Semigroup a where
+    (<>) :: a -> a -> a
+
+  foreign import concatString
+    "function concatString(s1) {\
+    \  return function(s2) {\
+    \    return s1 + s2;\
+    \  };\
+    \}" :: String -> String -> String
+
+  instance semigroupString :: Semigroup String where
+    (<>) = concatString
+
   infixr 5 ++
 
-  foreign import (++) "function $plus$plus(s1) {\
-                      \  return function(s2) {\
-                      \    return s1 + s2;\
-                      \  };\
-                      \}" :: String -> String -> String
+  (++) :: forall s. (Semigroup s) => s -> s -> s
+  (++) = (<>)
 
 module Data.Eq where
 
@@ -362,19 +380,19 @@ module Control.Monad.Eff where
 
   foreign import data Eff :: # ! -> * -> *
 
-  foreign import retEff "function retEff(a) {\
-                        \  return function() {\
-                        \    return a;\
-                        \  };\
-                        \}" :: forall e a. a -> Eff e a
-
-  foreign import bindEff "function bindEff(a) {\
-                         \  return function(f) {\
-                         \    return function() {\
-                         \      return f(a())();\
-                         \    };\
+  foreign import returnE "function returnE(a) {\
+                         \  return function() {\
+                         \    return a;\
                          \  };\
-                         \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
+                         \}" :: forall e a. a -> Eff e a
+
+  foreign import bindE "function bindE(a) {\
+                       \  return function(f) {\
+                       \    return function() {\
+                       \      return f(a())();\
+                       \    };\
+                       \  };\
+                       \}" :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
   type Pure a = forall e. Eff e a
 
@@ -385,13 +403,16 @@ module Control.Monad.Eff where
   instance functorEff :: Functor (Eff e) where
     (<$>) = liftA1
 
-  instance applicativeEff :: Applicative (Eff e) where
-    pure = return
+  instance applyEff :: Apply (Eff e) where
     (<*>) = ap
 
-  instance monadEff :: Monad (Eff e) where
-    return = retEff
-    (>>=) = bindEff
+  instance applicativeEff :: Applicative (Eff e) where
+    pure = returnE
+
+  instance bindEff :: Bind (Eff e) where
+    (>>=) = bindE
+
+  instance monadEff :: Monad (Eff e)
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\

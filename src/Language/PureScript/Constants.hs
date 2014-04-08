@@ -146,6 +146,9 @@ pokeSTArray = "pokeSTArray"
 monadEffDictionary :: String
 monadEffDictionary = "monadEff"
 
+bindEffDictionary :: String
+bindEffDictionary = "bindEff"
+
 numNumber :: String
 numNumber = "numNumber"
 
@@ -167,6 +170,9 @@ bitsNumber = "bitsNumber"
 boolLikeBoolean :: String
 boolLikeBoolean = "boolLikeBoolean"
 
+semigroupString :: String
+semigroupString = "semigroupString"
+
 -- Main module
 
 main :: String
@@ -176,6 +182,9 @@ main = "main"
 
 _ps :: String
 _ps = "_ps"
+
+__superclasses :: String
+__superclasses = "__superclasses"
 
 -- Modules
 

@@ -73,10 +73,10 @@ addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind) (names env) })
 
-addTypeClass :: ModuleName -> ProperName -> [String] -> [Declaration] -> Check ()
-addTypeClass moduleName pn args ds =
+addTypeClass :: ModuleName -> ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
+addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members) (typeClasses . checkEnv $ st) } }
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
   toPair (PositionedDeclaration _ d) = toPair d
@@ -190,8 +190,8 @@ typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) 
                            ]
   ds <- typeCheckAll mainModuleName currentModule rest
   return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args tys) : rest) = do
-  addTypeClass moduleName pn args tys
+typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args implies tys) : rest) = do
+  addTypeClass moduleName pn args implies tys
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (TypeInstanceDeclaration dictName deps className tys _ : rest) = do

@@ -116,7 +116,7 @@ unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintT
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem s1 _) (Skolem s2 _) | s1 == s2 = return ()
+  unifyTypes' (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = return ()
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
@@ -155,7 +155,7 @@ unifyRows r1 r2 =
     unifyRows' row r others u'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem s1 _) [] (Skolem s2 _) | s1 == s2 = return ()
+  unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
   unifyRows' sd3 r3 sd4 r4 = throwError . strMsg $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")"
 
 -- |
@@ -261,9 +261,9 @@ overTypes f = everywhere (mkT f)
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
 replaceTypeClassDictionaries mn = everywhereM' (mkM go)
   where
-  go (TypeClassDictionary constraint dicts) = do
+  go (TypeClassDictionary trySuperclasses constraint dicts) = do
     env <- getEnv
-    entails env mn dicts constraint
+    entails env mn dicts constraint trySuperclasses
   go other = return other
 
 -- |
@@ -283,13 +283,17 @@ data DictionaryValue
   -- A dictionary which depends on other dictionaries
   --
   | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
+  -- |
+  -- A subclass dictionary
+  --
+  | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
   deriving (Show, Ord, Eq)
 
 -- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Check Value
+entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Value
 entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
@@ -301,13 +305,16 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
     filterModule _ = False
 	
-    solve context' goal@(className, tys) =
-      case go goal of
-        [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
-        [dict] -> return (dictionaryValueToValue dict)
-        _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+    solve context' (className, tys) trySuperclasses =
+      let
+        dicts = go trySuperclasses className tys
+      in case sortedNubBy dictTrace (chooseSimplestDictionaries dicts) of
+           [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+           [_] -> return $ dictionaryValueToValue $ head dicts
+           _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
       where
-	  go (className', tys') =
+	  go trySuperclasses' className' tys' =
+	    -- Look for regular type instances
 	    [ mkDictionary (canonicalizeDictionary tcd) args
 	    | tcd <- context'
 	    -- Make sure the type class name matches the one we are trying to satisfy
@@ -315,14 +322,29 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Make sure the type unifies with the type in the type instance definition
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
 	    -- Solve any necessary subgoals
-	    , args <- solveSubgoals subst (tcdDependencies tcd) ]
+	    , args <- solveSubgoals subst (tcdDependencies tcd) ] ++
+	
+	    -- Look for implementations via superclasses
+	    [ SubclassDictionaryValue suDict superclass index
+	    | trySuperclasses'
+	    , (subclassName, (args, _, implies)) <- M.toList (typeClasses env)
+	    -- Try each superclass
+	    , (index, (superclass, suTyArgs)) <- zip [0..] implies
+	    -- Make sure the type class name matches the superclass name
+	    , className' == superclass
+	    -- Make sure the types unify with the types in the superclass implication
+	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
+	    -- Finally, satisfy the subclass constraint
+	    , args' <- maybeToList $ mapM (applySubst subst . TypeVar) args
+	    , suDict <- go True subclassName args' ]
+	
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
 	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
 	  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
 	  solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [DictionaryValue]]
 	  solveSubgoals _ Nothing = return Nothing
 	  solveSubgoals subst (Just subgoals) = do
-	    dict <- mapM (go . second (map (replaceAllTypeVars subst))) subgoals
+	    dict <- mapM (uncurry (go True) . second (map (replaceAllTypeVars subst))) subgoals
 	    return $ Just dict
 	  -- Make a dictionary from subgoal dictionaries by applying the correct function
 	  mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
@@ -334,12 +356,45 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
 	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
+	  dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
+	    App (Accessor (show superclassName ++ "_" ++ show index)
+	                  (Accessor C.__superclasses (dictionaryValueToValue dict)))
+	        (ObjectLiteral [])
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
 	  verifySubstitution subst = do
 	    let grps = groupBy ((==) `on` fst) subst
 	    guard (all (pairwise (unifiesWith env) . map snd) grps)
 	    return $ map head grps
+	  -- Apply a substitution to a type
+	  applySubst :: [(String, Type)] -> Type -> Maybe Type
+	  applySubst subst = everywhereM (mkM replace)
+	    where
+	    replace (TypeVar v) = lookup v subst
+	    replace other = Just other
+	  -- Choose the simplest DictionaryValues from a list of candidates
+	  -- The reason for this function is as follows:
+	  -- When considering overlapping instances, we don't want to consider the same dictionary
+	  -- to be an overlap of itself when obtained as a superclass of another class.
+	  -- Observing that we probably don't want to select a superclass instance when an instance
+	  -- is available directly, and that there is no way for a superclass instance to actually
+	  -- introduce an overlap that wouldn't have been there already, we simply remove dictionaries
+	  -- obtained as superclass instances if there are simpler instances available.
+	  chooseSimplestDictionaries :: [DictionaryValue] -> [DictionaryValue]
+	  chooseSimplestDictionaries ds = case filter isSimpleDictionaryValue ds of
+	                                    [] -> ds
+	                                    simple -> simple
+	  isSimpleDictionaryValue SubclassDictionaryValue{} = False
+	  isSimpleDictionaryValue (DependentDictionaryValue _ ds) = all isSimpleDictionaryValue ds
+	  isSimpleDictionaryValue _ = True
+	  -- |
+	  -- Get the "trace" of a DictionaryValue - that is, remove all SubclassDictionaryValue
+	  -- data constructors
+	  --
+	  dictTrace :: DictionaryValue -> DictionaryValue
+	  dictTrace (DependentDictionaryValue fnName dicts) = DependentDictionaryValue fnName $ map dictTrace dicts
+	  dictTrace (SubclassDictionaryValue dict _ _) = dictTrace dict
+	  dictTrace other = other
 
 -- |
 -- Check all values in a list pairwise match a predicate
@@ -355,7 +410,7 @@ pairwise p (x : xs) = all (p x) xs && pairwise p xs
 unifiesWith :: Environment -> Type -> Type -> Bool
 unifiesWith _ (TUnknown _) _ = True
 unifiesWith _ _ (TUnknown _) = True
-unifiesWith _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = True
+unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
 unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
 unifiesWith e (TypeApp h1 t1) (TypeApp h2 t2) = unifiesWith e h1 h2 && unifiesWith e t1 t2
@@ -371,7 +426,7 @@ unifiesWith _ _ _ = False
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem s1 _) (Skolem s2 _) | s1 == s2 = Just []
+typeHeadsAreEqual _ _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1) (TypeApp h2 t2) = (++) <$> typeHeadsAreEqual m e h1 h2 <*> typeHeadsAreEqual m e t1 t2
@@ -405,7 +460,7 @@ skolemEscapeCheck root@TypedValue{} =
     collectSkolems :: Type -> [SkolemScope]
     collectSkolems = nub . everything (++) (mkQ [] collect)
       where
-      collect (Skolem _ scope) = [scope]
+      collect (Skolem _ _ scope) = [scope]
       collect _ = []
   go _ scos = ([], scos)
   findBindingScope :: SkolemScope -> Maybe Value
@@ -454,7 +509,7 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    dicts <- getTypeClassDictionaries
    (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
-   return (foldl App val (map (flip TypeClassDictionary dicts) constraints), ty')
+   return (foldl App val (map (flip (TypeClassDictionary True) dicts) constraints), ty')
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- |
@@ -578,7 +633,7 @@ infer' (Var var) = do
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip (TypeClassDictionary True) dicts) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
@@ -600,6 +655,9 @@ infer' (IfThenElse cond th el) = do
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
+infer' (SuperClassDictionary className tys) = do
+  dicts <- getTypeClassDictionaries
+  return $ TypeClassDictionary False (className, tys) dicts
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
@@ -735,7 +793,18 @@ newSkolemScope = SkolemScope . runUnknown <$> fresh'
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
 skolemize :: String -> Int -> SkolemScope -> Type -> Type
-skolemize ident sko scope = replaceTypeVars ident (Skolem sko scope)
+skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
+
+-- |
+-- This function has one purpose - to skolemize type variables appearing in a
+-- SuperClassDictionary placeholder. These type variables are somewhat unique since they are the
+-- only example of scoped type variables.
+--
+skolemizeTypesInValue :: String -> Int -> SkolemScope -> Value -> Value
+skolemizeTypesInValue ident sko scope = everywhere (mkT go)
+  where
+  go (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
+  go other = other
 
 -- |
 -- Introduce skolem scope at every occurence of a ForAll
@@ -766,7 +835,8 @@ check' val (ForAll ident ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
   let sk = skolemize ident sko scope ty
-  val' <- check val sk
+  let skVal = skolemizeTypesInValue ident sko scope val
+  val' <- check skVal sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
 check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
@@ -812,6 +882,19 @@ check' v@(Var var) ty = do
   case v' of
     Nothing -> throwError . strMsg $ "Unable to check type subsumption"
     Just v'' -> return $ TypedValue True v'' ty'
+check' (SuperClassDictionary className tys) _ = do
+  -- |
+  -- Here, we replace a placeholder for a superclass dictionary with a regular
+  -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the
+  -- correct super instance dictionaries in scope, and these are not available when the type class
+  -- declaration gets desugared.
+  --
+  -- Note also that the first argument to TypeClassDictionary is False, meaning we _do not_ want
+  -- to consider superclass instances when searching for this dictionary - doing so might lead
+  -- to traversing a cycle in the instance graph.
+  --
+  dicts <- getTypeClassDictionaries
+  return $ TypeClassDictionary False (className, tys) dicts
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty1
@@ -883,7 +966,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
-  go [] [] (Skolem _ _) | lax = return []
+  go [] [] (Skolem _ _ _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ValueError (ObjectLiteral ps)))
   go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ValueError (ObjectLiteral ps)))
@@ -944,7 +1027,7 @@ checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
-  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg ret
+  checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
 checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument " ++ prettyPrintValue arg
@@ -987,7 +1070,7 @@ subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   _ <- subsumes' Nothing ty1 ty2
-  return . Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)
+  return . Just $ foldl App val (map (flip (TypeClassDictionary True) dicts) constraints)
 subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
   let
     (ts1, r1') = rowToList r1

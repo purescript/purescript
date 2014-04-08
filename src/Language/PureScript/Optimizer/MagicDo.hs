@@ -74,10 +74,10 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn (JSObjectLiteral []) ])) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
-  isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict effDict = True
+  isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict C.bindEffDictionary effDict = True
   isBind _ = False
   -- Check if an expression represents a monomorphic call to return for the Eff monad
-  isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict effDict = True
+  isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict C.monadEffDictionary effDict = True
   isReturn _ = False
   -- Check if an expression represents the polymorphic >>= function
   isBindPoly (JSAccessor prop (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
@@ -101,11 +101,11 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
                                                                    name == name' = True
   isEffFunc _ _ = False
   -- Check if an expression represents the Monad Eff dictionary
-  isEffDict (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == C.monadEffDictionary = True
-  isEffDict (JSApp (JSAccessor prop (JSAccessor eff (JSVar _ps))) [JSObjectLiteral []]) | eff == C.eff &&
-                                                                                          _ps == C._ps &&
-                                                                                          prop == C.monadEffDictionary = True
-  isEffDict _ = False
+  isEffDict name (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == name = True
+  isEffDict name (JSApp (JSAccessor prop (JSAccessor eff (JSVar _ps))) [JSObjectLiteral []]) | eff == C.eff &&
+                                                                                               _ps == C._ps &&
+                                                                                               prop == name = True
+  isEffDict _ _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body

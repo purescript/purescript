@@ -144,12 +144,17 @@ parseDeclarationRef = PositionedDeclarationRef <$> sourcePos <*>
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
   reserved "class"
+  implies <- P.option [] $ do
+    indented
+    implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
+    reservedOp "<="
+    return implies
   className <- indented *> properName
   idents <- P.many (indented *> identifier)
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseTypeDeclaration))
-  return $ TypeClassDeclaration className idents members
+  return $ TypeClassDeclaration className idents implies members
 
 parseTypeInstanceDeclaration :: P.Parsec String ParseState Declaration
 parseTypeInstanceDeclaration = do
