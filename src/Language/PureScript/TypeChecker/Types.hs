@@ -393,7 +393,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  --
 	  dictTrace :: DictionaryValue -> DictionaryValue
 	  dictTrace (DependentDictionaryValue fnName dicts) = DependentDictionaryValue fnName $ map dictTrace dicts
-	  dictTrace (SubclassDictionaryValue dict _ _) = dict
+	  dictTrace (SubclassDictionaryValue dict _ _) = dictTrace dict
 	  dictTrace other = other
 
 -- |
