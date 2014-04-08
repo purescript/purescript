@@ -306,10 +306,12 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     filterModule _ = False
 	
     solve context' (className, tys) trySuperclasses =
-      case chooseSimplestDictionaries (go trySuperclasses className tys) of
-        [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
-        [dict] -> return (dictionaryValueToValue dict)
-        _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+      let
+        dicts = go trySuperclasses className tys
+      in case sortedNubBy dictTrace (chooseSimplestDictionaries dicts) of
+           [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+           [_] -> return $ dictionaryValueToValue $ head dicts
+           _ -> throwError . strMsg $ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
       where
 	  go trySuperclasses' className' tys' =
 	    -- Look for regular type instances
@@ -385,6 +387,14 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  isSimpleDictionaryValue SubclassDictionaryValue{} = False
 	  isSimpleDictionaryValue (DependentDictionaryValue _ ds) = all isSimpleDictionaryValue ds
 	  isSimpleDictionaryValue _ = True
+	  -- |
+	  -- Get the "trace" of a DictionaryValue - that is, remove all SubclassDictionaryValue
+	  -- data constructors
+	  --
+	  dictTrace :: DictionaryValue -> DictionaryValue
+	  dictTrace (DependentDictionaryValue fnName dicts) = DependentDictionaryValue fnName $ map dictTrace dicts
+	  dictTrace (SubclassDictionaryValue dict _ _) = dict
+	  dictTrace other = other
 
 -- |
 -- Check all values in a list pairwise match a predicate
