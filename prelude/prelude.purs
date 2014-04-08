@@ -15,16 +15,20 @@ module Prelude where
   infixr 9 >>>
   infixr 9 <<<
 
-  class Category a where
-    id :: forall t. a t t
+  class Semigroupoid a where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
 
-  (>>>) :: forall a b c d. (Category a) => a b c -> a c d -> a b d
+  instance semigroupoidArr :: Semigroupoid (->) where
+    (<<<) f g x = f (g x)
+
+  (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
   (>>>) f g = g <<< f
+
+  class (Semigroupoid a) <= Category a where
+    id :: forall t. a t t
 
   instance categoryArr :: Category (->) where
     id x = x
-    (<<<) f g x = f (g x)
 
   infixr 0 $
   infixl 0 #
@@ -80,7 +84,7 @@ module Prelude where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
   class (Applicative m, Bind m) <= Monad m
-    
+
   return :: forall m a. (Monad m) => a -> m a
   return = pure
 
