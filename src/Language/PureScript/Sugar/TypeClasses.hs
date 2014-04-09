@@ -25,6 +25,7 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 import Language.PureScript.CodeGen.Common (identToJs)
 
 import qualified Language.PureScript.Constants as C
@@ -158,7 +159,7 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (strMsg ("Error in type class " ++ show className ++ ":") <>) $ do
+  rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
