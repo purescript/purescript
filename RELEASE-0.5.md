@@ -25,7 +25,6 @@
 - Let bindings are now supported. The `let` keyword can introduce several local (possibly mutually recursive) bindings, along with optional type signatures. (paf31)
 - `where` clauses are now supported in value declarations, with the same rules as `let` bindings (garyb)
 - Empty data declarations and empty type classes are now supported (paf31)
-- Records and record accessors now support string literals for names that are not valid identifiers, e.g. `{ "!prop?": true }`, `obj."!prop?"` (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
 
 ### Enhancements
