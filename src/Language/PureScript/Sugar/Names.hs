@@ -41,10 +41,11 @@ type ExportEnvironment = M.Map ModuleName Exports
 -- The exported declarations from a module.
 --
 data Exports = Exports
+  {
   -- |
   -- The types exported from each module
   --
-  { exportedTypes :: [(ProperName, [ProperName])]
+    exportedTypes :: [(ProperName, [ProperName])]
   -- |
   -- The classes exported from each module
   --
@@ -59,10 +60,11 @@ data Exports = Exports
 -- An imported environment for a particular module. This also contains the module's own members.
 --
 data ImportEnvironment = ImportEnvironment
+  {
   -- |
   -- Local names for types within a module mapped to to their qualified names
   --
-  { importedTypes :: M.Map (Qualified ProperName) (Qualified ProperName)
+    importedTypes :: M.Map (Qualified ProperName) (Qualified ProperName)
   -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --

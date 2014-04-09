@@ -888,7 +888,7 @@ check' v@(Var var) ty = do
     Nothing -> throwError . strMsg $ "Unable to check type subsumption"
     Just v'' -> return $ TypedValue True v'' ty'
 check' (SuperClassDictionary className tys) _ = do
-  -- |
+  {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
   -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the
   -- correct super instance dictionaries in scope, and these are not available when the type class
@@ -897,7 +897,7 @@ check' (SuperClassDictionary className tys) _ = do
   -- Note also that the first argument to TypeClassDictionary is False, meaning we _do not_ want
   -- to consider superclass instances when searching for this dictionary - doing so might lead
   -- to traversing a cycle in the instance graph.
-  --
+  -}
   dicts <- getTypeClassDictionaries
   return $ TypeClassDictionary False (className, tys) dicts
 check' (TypedValue checkType val ty1) ty2 = do
