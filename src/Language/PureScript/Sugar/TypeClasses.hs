@@ -25,14 +25,18 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 import Language.PureScript.CodeGen.Common (identToJs)
 
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
+import Control.Monad.Error
 import Control.Monad.State
 import Control.Arrow (first, second)
-import Data.Maybe (catMaybes)
+import Data.List ((\\))
+import Data.Monoid ((<>))
+import Data.Maybe (catMaybes, mapMaybe)
 
 import qualified Data.Map as M
 
@@ -115,7 +119,7 @@ desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
   return $ (Just $ TypeInstanceRef name, [d, dictDecl])
 desugarDecl mn (PositionedDeclaration pos d) = do
-  (dr, ds) <- desugarDecl mn d
+  (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn d
   return (dr, map (PositionedDeclaration pos) ds)
 desugarDecl _ other = return (Nothing, [other])
 
@@ -154,41 +158,55 @@ unit :: Type
 unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
-typeInstanceDictionaryDeclaration name mn deps className tys decls = do
+typeInstanceDictionaryDeclaration name mn deps className tys decls =
+  rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
   (TypeClassDeclaration _ args implies tyDecls) <- lift $
     maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $
       M.lookup (qualify mn className) m
-  let instanceTys = map memberToNameAndType tyDecls
 
-  -- Replace the type arguments with the appropriate types in the member types
-  let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
-  -- Create values for the type instance members
-  memberNames <- map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
-  -- Create the type of the dictionary
-  -- The type is an object type, but depending on type instance dependencies, may be constrained.
-  -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
-  -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
-  -- dependencies, we introduce an unnamed function parameter.
-  let superclasses = ObjectLiteral
-        [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
-        | (index, (superclass, suTyArgs)) <- zip [0..] implies
-        , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
-        , let fieldName = mkSuperclassDictionaryName superclass index
-        ]
+  case mapMaybe declName tyDecls \\ mapMaybe declName decls of
+    x : _ -> throwError $ mkErrorStack ("Member '" ++ show x ++ "' has not been implemented") Nothing
+    [] -> do
+    
+      let instanceTys = map memberToNameAndType tyDecls
 
-  let memberNames' = (C.__superclasses, superclasses) : memberNames
-      dictTy = foldl TypeApp (TypeConstructor className) tys
-      constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
-      dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
-  return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
+      -- Replace the type arguments with the appropriate types in the member types
+      let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
+      -- Create values for the type instance members
+      memberNames <- map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
+      -- Create the type of the dictionary
+      -- The type is an object type, but depending on type instance dependencies, may be constrained.
+      -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
+      -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
+      -- dependencies, we introduce an unnamed function parameter.
+      let superclasses = ObjectLiteral
+            [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
+            | (index, (superclass, suTyArgs)) <- zip [0..] implies
+            , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
+            , let fieldName = mkSuperclassDictionaryName superclass index
+            ]
+
+      let memberNames' = (C.__superclasses, superclasses) : memberNames
+          dictTy = foldl TypeApp (TypeConstructor className) tys
+          constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
+          dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
+          
+      return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
+  
   where
+
+  declName :: Declaration -> Maybe Ident
+  declName (PositionedDeclaration _ d) = declName d
+  declName (ValueDeclaration ident _ _ _ _) = Just ident
+  declName (TypeDeclaration ident _) = Just ident
+  declName _ = Nothing 
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
-    _ <- lift . maybe (Left $ mkErrorStack "Type class member type not found" Nothing) Right $ lookup ident tys'
+    _ <- lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
     return (ident, memberValue)
   memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
