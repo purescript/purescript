@@ -42,8 +42,13 @@ module Prelude where
   class Show a where
     show :: a -> String
 
+  foreign import showStringImpl
+    "function showStringImpl(s) {\
+    \  return JSON.stringify(s);\
+    \}" :: String -> String
+
   instance showString :: Show String where
-    show s = s
+    show = showStringImpl
 
   instance showBoolean :: Show Boolean where
     show true = "true"

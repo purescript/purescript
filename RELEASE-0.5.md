@@ -9,18 +9,23 @@
           ...
 
 - Prelude modules now follow a naming scheme similar to haskell (e.g. `Data.Maybe`, `Control.Monad`) (garyb)
+- Many modules that were previously part of the Prelude have been split into individual libraries, [now distributed via Bower](http://bower.io/search/?q=purescript) (garyb)
 - Multiple modules with the same name are now disallowed rather than merged (garyb)
 - The `--runtime-type-checks` flag has been removed. Runtime type checks have been superceded by the `purescript-foreign` library (paf31)
-- The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or a specific import list. (garyb, paf31)
-- Overlapping instances are no longer allowed. The `Prelude` and core liblaries have been updated accordingly. (paf31)
+- The `Prelude` module is now imported automatically. Conflicts can be avoided by using qualified imports or an explicit import list. (garyb, paf31)
+- Overlapping instances are no longer allowed. The `Prelude` and core libraries have been updated accordingly. (paf31)
+- `Functor`, `Applicative`, `Monad` are now part of a class heirarchy that include `Apply` and `Bind`. `return` is now an alias for `pure`. (joneshf, paf31, garyb)
+- `Semigroupoid` is now a superclass of `Category` (garyb)
 
 ### New Features
 
-- Let bindings are now supported. The `let` keyword can introduce several local (possibly mutually recursive) bindings, along with optional type signatures. (paf31)
 - Multi parameter typeclasses (paf31)
+- Superclasses (puffnfresh, paf31)
+- FlexibleInstances and FlexibleContexts (paf31)
+- Let bindings are now supported. The `let` keyword can introduce several local (possibly mutually recursive) bindings, along with optional type signatures. (paf31)
+- `where` clauses are now supported in value declarations, with the same rules as `let` bindings (garyb)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
-- `where` clauses are now supported in value declarations (garyb)
 
 ### Enhancements
 
@@ -43,7 +48,7 @@
 - Case statements and functions which do not pattern match on their arguments now generate smaller code (paf31)
 - Imported type class instances are now exported (paf31)
 - Some error messages were improved (paf31)
-- Qualfied module imports are now supported as `import qualified M as X` (garyb).
+- Qualfied module imports are now supported as `import qualified M as X` (garyb)
 - The escape check was removed, since it was too restrictive (paf31)
 - The binary operator reordering step was greatly simplified (paf31)
 - The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
@@ -51,8 +56,10 @@
 - Unary minus and signed numeric literals are now supported again (paf31, garyb)
 - Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
 - Error messages now display source positions (paf31, garyb)
-- The type classes implementation and code generation was greatly simplified. (paf31)
-- Object properties and row labels can now be accessed with arbitrary string names by using string literals. (paf31)
+- The type classes implementation and code generation was greatly simplified (paf31)
+- Object properties and row labels can now be accessed with arbitrary string names by using string literals (paf31)
+- `(++)` is now an alias for the Semigroup operator `(<>)` (paf31)
+- Error messages for classes with undefined or missing members have been improved (garyb)
  
 ### Bug Fixes
 
@@ -72,6 +79,7 @@
 - Characters in string literals are now properly escaped (garyb)
 - A module containing a single orphan type declaration and no other declarations now fails to compile (garyb)
 - An error involving ordering of type class instances was fixed (garyb, paf31)
+- Externs files no longer include fixity declarations for members that were removed as dead code (garyb)
 
 ### Libraries
 

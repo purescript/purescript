@@ -143,7 +143,7 @@ getEnv :: (Functor m, MonadState CheckState m) => m Environment
 getEnv = checkEnv <$> get
 
 -- |
--- Update the @Environment#
+-- Update the @Environment@
 --
 putEnv :: (MonadState CheckState m) => Environment -> m ()
 putEnv env = modify (\s -> s { checkEnv = env })

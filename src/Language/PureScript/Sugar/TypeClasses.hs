@@ -57,8 +57,7 @@ desugarModule (Module name decls (Just exps)) = do
   return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
--- |
--- Desugar type class and type class instance declarations
+{- Desugar type class and type class instance declarations
 --
 -- Type classes become type synonyms for their dictionaries, and type instances become dictionary declarations.
 -- Additional values are generated to access individual members of a dictionary, with the appropriate type.
@@ -109,7 +108,7 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --     }
 --     sub: ""
 --   }
---
+-}
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
   modify (M.insert (mn, name) d)
