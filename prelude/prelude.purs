@@ -38,6 +38,18 @@ module Prelude where
 
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
+  
+  infixr 6 :
+  
+  (:) :: forall a. a -> [a] -> [a]
+  (:) = cons
+
+  foreign import cons
+    "function cons(e) {\
+    \  return function (l) {\
+    \    return [e].concat(l);\
+    \  };\
+    \}" :: forall a. a -> [a] -> [a]
 
   class Show a where
     show :: a -> String
