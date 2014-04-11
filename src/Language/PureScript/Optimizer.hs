@@ -63,9 +63,9 @@ optimize opts | optionsNoOptimizations opts = id
   , etaConvert
   , evaluateIifes
   , inlineVariables
-  , inlineOperator (C.$) $ \f x -> JSApp f [x]
-  , inlineOperator (C.#) $ \x f -> JSApp f [x]
-  , inlineOperator (C.!!) $ flip JSIndexer
+  , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
+  , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
+  , inlineOperator (C.preludeUnsafe, C.unsafeIndex) $ flip JSIndexer
   , inlineCommonOperators ])
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
