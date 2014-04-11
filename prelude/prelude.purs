@@ -38,9 +38,9 @@ module Prelude where
 
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
-  
+
   infixr 6 :
-  
+
   (:) :: forall a. a -> [a] -> [a]
   (:) = cons
 
@@ -72,6 +72,20 @@ module Prelude where
 
   instance showNumber :: Show Number where
     show = showNumberImpl
+
+  foreign import showArrayImpl
+    "function showArrayImpl (f) {\
+    \  return function (xs) {\
+    \    var ss = [];\
+    \    for (var i = 0, l = xs.length; i < l; i++) {\
+    \      ss[i] = f(xs[i]);\
+    \    }\
+    \    return '[' + ss.join(',') + ']';\
+    \  };\
+    \}" :: forall a. (a -> String) -> [a] -> String
+
+  instance showArray :: (Show a) => Show [a] where
+    show = showArrayImpl show
 
   infixl 4 <$>
 
@@ -388,7 +402,7 @@ module Data.Eq where
   instance eqRef :: Eq (Ref a) where
     (==) = liftRef refEq
     (/=) = liftRef refIneq
-    
+
 module Prelude.Unsafe where
 
   foreign import unsafeIndex
