@@ -329,14 +329,6 @@ module Prelude where
     zshr = numZshr
     complement = numComplement
 
-  infixl 8 !!
-
-  foreign import (!!) "function $bang$bang(xs) {\
-                      \  return function(n) {\
-                      \    return xs[n];\
-                      \  };\
-                      \}" :: forall a. [a] -> Number -> a
-
   infixr 2 ||
   infixr 3 &&
 
@@ -396,6 +388,15 @@ module Data.Eq where
   instance eqRef :: Eq (Ref a) where
     (==) = liftRef refEq
     (/=) = liftRef refIneq
+    
+module Prelude.Unsafe where
+
+  foreign import unsafeIndex
+    "function unsafeIndex(xs) {\
+    \  return function(n) {\
+    \    return xs[n];\
+    \  };\
+    \}" :: forall a. [a] -> Number -> a
 
 module Control.Monad.Eff where
 
