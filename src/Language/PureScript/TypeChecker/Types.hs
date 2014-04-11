@@ -675,6 +675,11 @@ infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
 inferLetBinding seen [] ret j = (,) seen <$> j ret
+inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue checkType val ty) : rest) ret j = do
+  Just moduleName <- checkCurrentModule <$> get
+  let dict = if isFunction val then M.singleton (moduleName, ident) (ty, nameKind) else M.empty
+  TypedValue _ val' ty' <- if checkType then bindNames dict (check val ty) else return tv
+  bindNames (M.singleton (moduleName, ident) (ty', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty')]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
@@ -1100,6 +1105,7 @@ subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
+
 
 
 
