@@ -16,6 +16,8 @@
 - Overlapping instances are no longer allowed. The `Prelude` and core libraries have been updated accordingly. (paf31)
 - `Functor`, `Applicative`, `Monad` are now part of a class heirarchy that include `Apply` and `Bind`. `return` is now an alias for `pure`. (joneshf, paf31, garyb)
 - `Semigroupoid` is now a superclass of `Category` (garyb)
+- `(:)` is now part of Prelude (garyb)
+- `(!!)` has been renamed to `Prelude.Unsafe.unsafeIndex` and a safe version has been added to `Data.Array` (garyb)
 
 ### New Features
 
