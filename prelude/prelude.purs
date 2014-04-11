@@ -6,9 +6,6 @@ module Prelude where
   const :: forall a b. a -> b -> a
   const a _ = a
 
-  on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
-  on f g x y = g x `f` g y
-
   asTypeOf :: forall a. a -> a -> a
   asTypeOf x _ = x
 
@@ -391,6 +388,11 @@ module Prelude where
 
   (++) :: forall s. (Semigroup s) => s -> s -> s
   (++) = (<>)
+
+module Data.Function where
+
+  on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
+  on f g x y = g x `f` g y
 
 module Data.Eq where
 
