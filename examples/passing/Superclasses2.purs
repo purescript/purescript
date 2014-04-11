@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude.Unsafe (unsafeIndex)
+
 class Su a where
   su :: a -> a
 
@@ -18,4 +20,4 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> [a]
 test x = su [cl x x]
 
-main = Debug.Trace.print $ test 10 !! 0
+main = Debug.Trace.print $ test 10 `unsafeIndex` 0

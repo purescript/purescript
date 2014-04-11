@@ -57,12 +57,6 @@ test4 = \_ -> return 1
 
 test5 = \_ -> Just 1 >>= \n -> return (n + 1)
 
-instance showArray :: (Prelude.Show a) => Prelude.Show [a] where
-  show [] = "[]"
-  show (x:xs) = show x ++ ", " ++ show xs
-
-test6 = \_ -> show ["testing"]
-
 instance functorFunction :: Functor ((->) r) where
   (<$>) = liftM1
 

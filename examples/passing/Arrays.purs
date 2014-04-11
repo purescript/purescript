@@ -1,8 +1,8 @@
 module Main where
 
-import Prelude
+import Prelude.Unsafe (unsafeIndex)
 
-test1 arr = arr !! 0 + arr !! 1 + 1
+test1 arr = arr `unsafeIndex` 0 + arr `unsafeIndex` 1 + 1
 
 test2 = \arr -> case arr of
   [x, y] -> x + y
