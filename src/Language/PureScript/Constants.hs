@@ -23,9 +23,6 @@ module Language.PureScript.Constants where
 (#) :: String
 (#) = "#"
 
-(!!) :: String
-(!!) = "!!"
-
 (++) :: String
 (++) = "++"
 
@@ -79,6 +76,9 @@ bar = "|"
 
 (||) :: String
 (||) = "||"
+
+unsafeIndex :: String
+unsafeIndex = "unsafeIndex"
 
 -- Prelude Operator Functions
 
@@ -193,6 +193,9 @@ prim = "Prim"
 
 prelude :: String
 prelude = "Prelude"
+
+preludeUnsafe :: String
+preludeUnsafe = "Prelude_Unsafe"
 
 eff :: String
 eff = "Control_Monad_Eff"

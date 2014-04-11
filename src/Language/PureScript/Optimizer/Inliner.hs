@@ -75,15 +75,15 @@ inlineVariables = everywhere (mkT $ removeFromBlock go)
       go (replaceIdent var js sts)
   go (s:sts) = s : go sts
 
-inlineOperator :: String -> (JS -> JS -> JS) -> JS -> JS
-inlineOperator op f = everywhere (mkT convert)
+inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
+inlineOperator (m, op) f = everywhere (mkT convert)
   where
   convert :: JS -> JS
   convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor longForm (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                _ps == C._ps &&
-                                                                longForm == identToJs (Op op) = True
+  isOp (JSAccessor longForm (JSAccessor m' (JSVar _ps))) | m == m' &&
+                                                          _ps == C._ps &&
+                                                          longForm == identToJs (Op op) = True
   isOp (JSIndexer (JSStringLiteral op') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
                                                                             _ps == C._ps &&
                                                                             op == op' = True

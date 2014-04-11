@@ -39,6 +39,18 @@ module Prelude where
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
 
+  infixr 6 :
+
+  (:) :: forall a. a -> [a] -> [a]
+  (:) = cons
+
+  foreign import cons
+    "function cons(e) {\
+    \  return function (l) {\
+    \    return [e].concat(l);\
+    \  };\
+    \}" :: forall a. a -> [a] -> [a]
+
   class Show a where
     show :: a -> String
 
@@ -60,6 +72,20 @@ module Prelude where
 
   instance showNumber :: Show Number where
     show = showNumberImpl
+
+  foreign import showArrayImpl
+    "function showArrayImpl (f) {\
+    \  return function (xs) {\
+    \    var ss = [];\
+    \    for (var i = 0, l = xs.length; i < l; i++) {\
+    \      ss[i] = f(xs[i]);\
+    \    }\
+    \    return '[' + ss.join(',') + ']';\
+    \  };\
+    \}" :: forall a. (a -> String) -> [a] -> String
+
+  instance showArray :: (Show a) => Show [a] where
+    show = showArrayImpl show
 
   infixl 4 <$>
 
@@ -317,14 +343,6 @@ module Prelude where
     zshr = numZshr
     complement = numComplement
 
-  infixl 8 !!
-
-  foreign import (!!) "function $bang$bang(xs) {\
-                      \  return function(n) {\
-                      \    return xs[n];\
-                      \  };\
-                      \}" :: forall a. [a] -> Number -> a
-
   infixr 2 ||
   infixr 3 &&
 
@@ -384,6 +402,15 @@ module Data.Eq where
   instance eqRef :: Eq (Ref a) where
     (==) = liftRef refEq
     (/=) = liftRef refIneq
+
+module Prelude.Unsafe where
+
+  foreign import unsafeIndex
+    "function unsafeIndex(xs) {\
+    \  return function(n) {\
+    \    return xs[n];\
+    \  };\
+    \}" :: forall a. [a] -> Number -> a
 
 module Control.Monad.Eff where
 
