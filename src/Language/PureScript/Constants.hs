@@ -180,9 +180,6 @@ main = "main"
 
 -- Code Generation
 
-_ps :: String
-_ps = "_ps"
-
 __superclasses :: String
 __superclasses = "__superclasses"
 

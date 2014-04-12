@@ -67,16 +67,17 @@ instance P.MonadMake Make where
     U.putStrLn $ "Writing " ++ path
     U.writeFile path text
   liftError = either throwError return
+  progress = makeIO . U.putStrLn
 
-compile :: P.Options -> [FilePath] -> IO ()
-compile opts input = do
+compile :: FilePath -> P.Options -> [FilePath] -> IO ()
+compile outputDir opts input = do
   modules <- readInput input
   case modules of
     Left err -> do
       U.print err
       exitFailure
     Right ms -> do
-      e <- runMake $ P.make opts ms
+      e <- runMake $ P.make outputDir opts ms
       case e of
         Left err -> do
           U.putStrLn err
@@ -90,6 +91,10 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 inputFiles :: Term [FilePath]
 inputFiles = value $ posAny [] $ posInfo
      { posDoc = "The input .ps files" }
+
+outputDirectory :: Term FilePath
+outputDirectory = value $ opt "output" $ (optInfo [ "o", "output" ])
+     { optDoc = "The output directory" }
 
 noTco :: Term Bool
 noTco = value $ flag $ (optInfo [ "no-tco" ])
@@ -111,16 +116,12 @@ noOpts :: Term Bool
 noOpts = value $ flag $ (optInfo [ "no-opts" ])
      { optDoc = "Skip the optimization phase." }
 
-browserNamespace :: Term String
-browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
-     { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
-
 verboseErrors :: Term Bool
 verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
      { optDoc = "Display verbose error messages" }
 
 options :: Term P.Options
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> browserNamespace <*> pure [] <*> pure [] <*> verboseErrors
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> pure Nothing <*> pure [] <*> pure [] <*> verboseErrors
 
 inputFilesAndPrelude :: FilePath -> Term [FilePath]
 inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
@@ -129,7 +130,7 @@ inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
   combine False input = input
 
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> inputFilesAndPrelude prelude
+term prelude = compile <$> outputDirectory <*> options <*> inputFilesAndPrelude prelude
 
 termInfo :: TermInfo
 termInfo = defTI

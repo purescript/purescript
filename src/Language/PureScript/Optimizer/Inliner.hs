@@ -81,12 +81,8 @@ inlineOperator (m, op) f = everywhere (mkT convert)
   convert :: JS -> JS
   convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor longForm (JSAccessor m' (JSVar _ps))) | m == m' &&
-                                                          _ps == C._ps &&
-                                                          longForm == identToJs (Op op) = True
-  isOp (JSIndexer (JSStringLiteral op') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                            _ps == C._ps &&
-                                                                            op == op' = True
+  isOp (JSAccessor longForm (JSVar m')) = m == m' && longForm == identToJs (Op op)
+  isOp (JSIndexer (JSStringLiteral op') (JSVar m')) = m == m' && op == op'
   isOp _ = False
 
 inlineCommonOperators :: JS -> JS
@@ -131,11 +127,8 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor longForm (JSAccessor prelude (JSVar _))) | prelude == C.prelude &&
-                                                                longForm == identToJs (Op opString) = True
-    isOp (JSIndexer (JSStringLiteral op') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                              _ps == C._ps &&
-                                                                              opString == op' = True
+    isOp (JSAccessor longForm (JSAccessor prelude (JSVar _))) = prelude == C.prelude && longForm == identToJs (Op opString)
+    isOp (JSIndexer (JSStringLiteral op') (JSVar prelude)) = prelude == C.prelude && opString == op'
     isOp _ = False
   binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
   binaryFunction dictName fnName op = everywhere (mkT convert)
@@ -143,9 +136,7 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor fnName' (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                 _ps == C._ps &&
-                                                                 fnName == fnName' = True
+    isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName == fnName'
     isOp _ = False
   unary :: String -> String -> UnaryOperator -> JS -> JS
   unary dictName fnName op = everywhere (mkT convert)
@@ -153,11 +144,7 @@ inlineCommonOperators = applyAll
     convert :: JS -> JS
     convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict dictName dict = JSUnary op x
     convert other = other
-    isOp (JSAccessor fnName' (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                 _ps == C._ps &&
-                                                                 fnName' == fnName = True
+    isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
     isOp _ = False
-  isOpDict dictName (JSApp (JSAccessor prop (JSAccessor prelude (JSVar _ps))) [JSObjectLiteral []]) | prelude == C.prelude &&
-                                                                                                      _ps == C._ps &&
-                                                                                                      prop == dictName = True
+  isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) [JSObjectLiteral []]) = prelude == C.prelude && prop == dictName
   isOpDict _ _ = False

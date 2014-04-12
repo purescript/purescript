@@ -127,7 +127,7 @@ verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
      { optDoc = "Display verbose error messages" }
 
 options :: Term P.Options
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> browserNamespace <*> dceModules <*> codeGenModules <*> verboseErrors
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> (Just <$> browserNamespace) <*> dceModules <*> codeGenModules <*> verboseErrors
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
@@ -150,3 +150,4 @@ main :: IO ()
 main = do
   prelude <- preludeFilename
   run (term prelude, termInfo)
+
