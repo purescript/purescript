@@ -37,7 +37,7 @@ import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Generics (mkQ, everything)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Control.Monad.Error
 import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
@@ -78,10 +78,11 @@ compile' env opts ms = do
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let js = mapMaybe (flip (moduleToJs opts) env') modulesToCodeGen
+  let js = JSVariableIntroduction (optionsBrowserNamespace opts) (Just (JSObjectLiteral []))
+           : concatMap (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
-  return (prettyPrintJS [wrapExportsContainer opts js'], exts, env')
+  return (prettyPrintJS js', exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
 
@@ -128,7 +129,7 @@ generateMain env opts js =
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
         Left $ show mmi ++ "." ++ C.main ++ " is undefined"
-      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar C._ps))) []]
+      return $ js ++ [JSApp (JSAccessor C.main (JSVar (moduleNameToJs mmi))) []]
     _ -> return js
 
 -- |
@@ -206,11 +207,10 @@ make opts ms = do
     regrouped <- liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
-        js = moduleToJs opts mod' env'
+        js = prettyPrintJS $ moduleToJs CommonJS opts mod' env'
         exts = moduleToPs mod' env'
-        js' = maybe "" (prettyPrintJS . return . wrapExportsContainer opts . return) js
 
-    writeTextFile jsFile js'
+    writeTextFile jsFile js
     writeTextFile externsFile exts
 
     go env' ms'

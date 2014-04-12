@@ -17,14 +17,16 @@
 
 module Language.PureScript.CodeGen.JS (
     module AST,
+    ModuleType(..),
     declToJs,
     moduleToJs,
-    wrapExportsContainer,
     isIdent
 ) where
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Function (on)
+import Data.List (nub, (\\))
+import Data.Generics (mkQ, everything)
 
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
@@ -41,26 +43,45 @@ import Language.PureScript.Types
 import Language.PureScript.Optimizer
 import Language.PureScript.CodeGen.Common
 import Language.PureScript.Environment
-import qualified Language.PureScript.Constants as C
+
+-- |
+-- Different types of modules which are supported
+--
+data ModuleType = CommonJS | Globals
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: Options -> Module -> Environment -> Maybe JS
-moduleToJs opts (Module name decls (Just exps)) env =
-  case jsDecls of
-    [] -> Nothing
-    _ -> Just $ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar C._ps)) $
-           JSApp (JSFunction Nothing [] (JSBlock $
-            JSVariableIntroduction "module" (Just $ JSObjectLiteral []) :
-            jsDecls ++
-            jsExports ++
-            [JSReturn $ JSVar "module"])) []
+moduleToJs :: ModuleType -> Options -> Module -> Environment -> [JS]
+moduleToJs mt opts (Module name decls (Just exps)) env = case mt of
+  CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
+  Globals ->
+    [ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (optionsBrowserNamespace opts))) (
+       JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) []
+      )
+    ]
   where
+  moduleBody = JSStringLiteral "use strict" : jsImports ++ jsDecls
+  moduleExports = JSObjectLiteral $ concatMap exportToJs exps
   jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) decls)
-  jsExports = concatMap exportToJs exps
-moduleToJs _ _ _ = error "Exports should have been elaborated in name desugaring"
+  jsImports = map (importToJs mt opts) . (\\ [name]) . nub $ concatMap imports decls
+moduleToJs _ _ _ _ = error "Exports should have been elaborated in name desugaring"
+
+importToJs :: ModuleType -> Options -> ModuleName -> JS
+importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleBody)
+  where
+  moduleBody = case mt of
+    CommonJS -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
+    Globals -> JSAccessor (runModuleName mn) (JSVar (optionsBrowserNamespace opts))
+
+imports :: Declaration -> [ModuleName]
+imports = everything (++) (mkQ [] collect)
+  where
+  collect :: Value -> [ModuleName]
+  collect (Var (Qualified (Just mn) _)) = [mn]
+  collect (Constructor (Qualified (Just mn) _)) = [mn]
+  collect _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
@@ -87,21 +108,13 @@ declToJs opts mp (PositionedDeclaration _ d) e = declToJs opts mp d e
 declToJs _ _ _ _ = Nothing
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for an export from a
--- module.
+-- Generate key//value pairs for an object literal exporting values from a module.
 --
-exportToJs :: DeclarationRef -> [JS]
-exportToJs (TypeRef _ (Just dctors)) = flip map dctors (export . Ident . runProperName)
-exportToJs (ValueRef name) = [export name]
-exportToJs (TypeInstanceRef name) = [export name]
+exportToJs :: DeclarationRef -> [(String, JS)]
+exportToJs (TypeRef _ (Just dctors)) = map ((\n -> (n, var (Ident n))) . runProperName) dctors
+exportToJs (ValueRef name) = [(runIdent name, var name)]
+exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
 exportToJs _ = []
-
--- |
--- Generate code in the simplified Javascript intermediate representation for assigning an exported
--- value to the current module object.
---
-export :: Ident -> JS
-export ident = JSAssignment (accessor ident (JSVar "module")) (var ident)
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
@@ -225,7 +238,7 @@ varToJs m qual = qualifiedToJS m id qual
 -- variable that may have a qualified name.
 --
 qualifiedToJS :: ModuleName -> (a -> Ident) -> Qualified a -> JS
-qualifiedToJS m f (Qualified (Just m') a) | m /= m' = accessor (f a) (JSAccessor (moduleNameToJs m') $ JSVar C._ps)
+qualifiedToJS m f (Qualified (Just m') a) | m /= m' = accessor (f a) (JSVar (moduleNameToJs m'))
 qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 
 -- |
@@ -328,13 +341,3 @@ isOnlyConstructor e ctor =
   numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
   typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
   typeConstructor _ = error "Invalid argument to isOnlyConstructor"
-
-wrapExportsContainer :: Options -> [JS] -> JS
-wrapExportsContainer opts modules = JSApp (JSFunction Nothing [C._ps] $ JSBlock $ JSStringLiteral "use strict" : modules) [exportSelector]
-  where
-  exportSelector = JSConditional (JSBinary And (JSBinary NotEqualTo (JSTypeOf $ JSVar "module") (JSStringLiteral "undefined")) (JSAccessor "exports" (JSVar "module")))
-                           (JSAccessor "exports" (JSVar "module"))
-                           (JSConditional (JSBinary NotEqualTo (JSTypeOf $ JSVar "window") (JSStringLiteral "undefined"))
-                             (JSAssignment (JSAccessor browserNamespace (JSVar "window")) (JSBinary Or (JSAccessor browserNamespace (JSVar "window")) (JSObjectLiteral [])))
-                             (JSApp (JSFunction Nothing [] $ JSBlock [JSThrow $ JSStringLiteral "PureScript doesn't know how to export modules in the current environment"]) []))
-  browserNamespace = optionsBrowserNamespace opts
