@@ -37,7 +37,7 @@ import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Generics (mkQ, everything)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust, fromMaybe)
 import Control.Monad.Error
 import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
@@ -78,7 +78,7 @@ compile' env opts ms = do
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let js = JSVariableIntroduction (optionsBrowserNamespace opts) (Just (JSObjectLiteral []))
+  let js = JSVariableIntroduction (fromJust (optionsBrowserNamespace opts)) (Just (JSObjectLiteral []))
            : concatMap (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
@@ -156,6 +156,10 @@ class MonadMake m where
   --
   liftError :: Either String a -> m a
 
+  -- |
+  -- Respond to a progress update
+  --
+  progress :: String -> m ()
 
 -- |
 -- Compiles in "make" mode, compiling each module separately to a js files and an externs file
@@ -163,17 +167,17 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Monad m, MonadMake m) => Options -> [(FilePath, Module)] -> m ()
-make opts ms = do
+make :: (Functor m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> m Environment
+make outputDir opts ms = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
   (sorted, graph) <- liftError $ sortModules $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
-    let filePath = toFileName moduleName'
+    let filePath = runModuleName moduleName'
 
-        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
-        externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+        jsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "index.js"
+        externsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "externs.purs"
         inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
 
     jsTimestamp <- getTimestamp jsFile
@@ -191,16 +195,18 @@ make opts ms = do
   go initEnvironment desugared
 
   where
-  go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m ()
-  go _ [] = return ()
+  go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m Environment
+  go env [] = return env
   go env ((False, m) : ms') = do
     (_, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
 
     go env' ms'
   go env ((True, m@(Module moduleName' _ exps)) : ms') = do
-    let filePath = toFileName moduleName'
-        jsFile = "js" ++ pathSeparator : filePath ++ ".js"
-        externsFile = "externs" ++ pathSeparator : filePath ++ ".externs"
+    let filePath = runModuleName moduleName'
+        jsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "index.js"
+        externsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "externs.purs"
+
+    progress $ "Compiling " ++ runModuleName moduleName'
 
     (Module _ elaborated _, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
 
@@ -215,22 +221,19 @@ make opts ms = do
 
     go env' ms'
 
-toFileName :: ModuleName -> FilePath
-toFileName (ModuleName ps) = intercalate [pathSeparator] . map runProperName $ ps
-
-rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
-rebuildIfNecessary _ _ [] = return []
-rebuildIfNecessary graph toRebuild (m@(Module moduleName' _ _) : ms) | moduleName' `S.member` toRebuild = do
-  let deps = fromMaybe [] $ moduleName' `M.lookup` graph
-      toRebuild' = toRebuild `S.union` S.fromList deps
-  (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms
-rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms) = do
-  let externsFile = "externs" ++ pathSeparator : toFileName moduleName' ++ ".externs"
-  externs <- readTextFile externsFile
-  externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
-  case externsModules of
-    [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms
-    _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
+  rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
+  rebuildIfNecessary _ _ [] = return []
+  rebuildIfNecessary graph toRebuild (m@(Module moduleName' _ _) : ms') | moduleName' `S.member` toRebuild = do
+    let deps = fromMaybe [] $ moduleName' `M.lookup` graph
+        toRebuild' = toRebuild `S.union` S.fromList deps
+    (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms'
+  rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms') = do
+    let externsFile = outputDir ++ pathSeparator : runModuleName moduleName' ++ pathSeparator : "externs.purs"
+    externs <- readTextFile externsFile
+    externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+    case externsModules of
+      [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
+      _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]

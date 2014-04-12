@@ -23,7 +23,7 @@ module Language.PureScript.CodeGen.JS (
     isIdent
 ) where
 
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Function (on)
 import Data.List (nub, (\\))
 import Data.Generics (mkQ, everything)
@@ -57,7 +57,7 @@ moduleToJs :: ModuleType -> Options -> Module -> Environment -> [JS]
 moduleToJs mt opts (Module name decls (Just exps)) env = case mt of
   CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
   Globals ->
-    [ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (optionsBrowserNamespace opts))) (
+    [ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts)))) (
        JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) []
       )
     ]
@@ -73,7 +73,7 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
   where
   moduleBody = case mt of
     CommonJS -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
-    Globals -> JSAccessor (runModuleName mn) (JSVar (optionsBrowserNamespace opts))
+    Globals -> JSAccessor (runModuleName mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
 imports = everything (++) (mkQ [] collect)

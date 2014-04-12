@@ -48,7 +48,7 @@ data Options = Options {
     -- Specify the namespace that PureScript modules will be exported to when running in the
     -- browser.
     --
-  , optionsBrowserNamespace :: String
+  , optionsBrowserNamespace :: Maybe String
     -- |
     -- The modules to keep while enabling dead code elimination
     --
@@ -67,4 +67,4 @@ data Options = Options {
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False Nothing False "PS" [] [] False
+defaultOptions = Options False False False False Nothing False Nothing [] [] False

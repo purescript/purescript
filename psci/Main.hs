@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse, FlexibleContexts #-}
+{-# LANGUAGE DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
 
 module Main where
 
@@ -24,29 +24,36 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import Control.Monad.Error (ErrorT(..), MonadError)
+import Control.Monad.Error.Class (MonadError(..))
 
 import Data.List (intercalate, isPrefixOf, nub, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
-import Data.Traversable (traverse)
 import Data.Version (showVersion)
+import Data.Traversable (traverse)
 
 import Parser
 
+import System.IO.Error (tryIOError)
 import System.Console.Haskeline
-import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
+import System.Directory
+       (createDirectoryIfMissing, getModificationTime, doesFileExist,
+        findExecutable, getHomeDirectory, getCurrentDirectory)
+import System.Process (readProcessWithExitCode)
 import System.Exit
 import System.Environment.XDG.BaseDir
-import System.FilePath ((</>), isPathSeparator)
+import System.FilePath
+       (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import qualified System.Console.CmdTheLine as Cmd
-import System.Process
 
 import Text.Parsec (ParseError)
 
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U (print, readFile)
+import qualified System.IO.UTF8 as U
+       (writeFile, putStrLn, print, readFile)
 
 -- |
 -- The PSCI state.
@@ -57,7 +64,7 @@ import qualified System.IO.UTF8 as U (print, readFile)
 data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModuleNames :: [P.ModuleName]
-  , psciLoadedModules       :: [P.Module]
+  , psciLoadedModules       :: [(FilePath, P.Module)]
   , psciLetBindings         :: [P.Value -> P.Value]
   }
 
@@ -78,7 +85,7 @@ updateImports name st = st { psciImportedModuleNames = name : psciImportedModule
 -- |
 -- Updates the state to have more loaded files.
 --
-updateModules :: [P.Module] -> PSCiState -> PSCiState
+updateModules :: [(FilePath, P.Module)] -> PSCiState -> PSCiState
 updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modules }
 
 -- |
@@ -168,7 +175,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
   where
   findCompletions :: String -> StateT PSCiState IO [Completion]
   findCompletions str = do
-    ms <- psciLoadedModules <$> get
+    ms <- map snd . psciLoadedModules <$> get
     files <- listFiles str
     let matches = filter (isPrefixOf str) (names ms)
     return $ sortBy sorter $ map simpleCompletion matches ++ files
@@ -197,7 +204,39 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options
-options = P.Options False True False True (Just "Main") True "PS" [] [] False
+options = P.Options False True False True Nothing True (Just "PS") [] [] False
+
+-- |
+-- PSCI monad
+--
+newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Functor, Applicative, Monad)
+
+psciIO :: IO a -> PSCI a
+psciIO io = PSCI (lift (lift io))
+
+newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadError String)
+
+runMake :: Make a -> IO (Either String a)
+runMake = runErrorT . unMake
+
+makeIO :: IO a -> Make a
+makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
+
+instance P.MonadMake Make where
+  getTimestamp path = makeIO $ do
+    exists <- doesFileExist path
+    case exists of
+      True -> Just <$> getModificationTime path
+      False -> return Nothing
+  readTextFile path = makeIO $ U.readFile path
+  writeTextFile path text = makeIO $ do
+    mkdirp path
+    U.writeFile path text
+  liftError = either throwError return
+  progress s = unless (s == "Compiling Main") $ makeIO . U.putStrLn $ s
+
+mkdirp :: FilePath -> IO ()
+mkdirp = createDirectoryIfMissing True . takeDirectory
 
 -- |
 -- Makes a volatile module to execute the current expression.
@@ -217,34 +256,45 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
   in
     P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing
 
+modulesDir :: FilePath
+modulesDir = "psci_modules" ++ pathSeparator : "node_modules"
+
+indexFile :: FilePath
+indexFile = "psci_modules" ++ pathSeparator : "index.js"
+
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
-handleDeclaration :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
-handleDeclaration value st = do
+handleDeclaration :: P.Value -> PSCI ()
+handleDeclaration value = do
+  st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  case P.compile options (psciLoadedModules st ++ [m]) of
-    Left err -> outputStrLn err
-    Right (js, _, _) -> do
-      process <- lift . lift $ findNodeProcess
-      result  <- lift . lift $ traverse (\node -> readProcessWithExitCode node [] js) process
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right _ -> do
+      psciIO $ writeFile indexFile $ "require('Main').main();"
+      process <- psciIO findNodeProcess
+      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
       case result of
-        Just (ExitSuccess,   out, _)   -> outputStrLn out
-        Just (ExitFailure _, _,   err) -> outputStrLn err
-        Nothing                        -> outputStrLn "Couldn't find node.js"
+        Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
+        Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
+        Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
 
 -- |
 -- Takes a value and prints its type
 --
-handleTypeOf :: P.Value -> PSCiState -> InputT (StateT PSCiState IO) ()
-handleTypeOf value st = do
+handleTypeOf :: P.Value -> PSCI ()
+handleTypeOf value = do
+  st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  case P.compile options { P.optionsMain = Nothing } (psciLoadedModules st ++ [m]) of
-    Left err -> outputStrLn err
-    Right (_, _, env') ->
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
       case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
-        Just (ty, _) -> outputStrLn . P.prettyPrintType $ ty
-        Nothing -> outputStrLn "Could not find type"
+        Just (ty, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
+        Nothing -> PSCI $ outputStrLn "Could not find type"
 
 -- Commands
 
@@ -265,27 +315,31 @@ getCommand = do
 -- |
 -- Performs an action for each meta-command given, and also for expressions..
 --
-handleCommand :: Command -> InputT (StateT PSCiState IO) ()
-handleCommand (Expression val) = lift get >>= handleDeclaration val
-handleCommand Help = outputStrLn helpMessage
-handleCommand (Import moduleName) = lift $ modify (updateImports moduleName)
-handleCommand (Let l) = lift $ modify (updateLets l)
+handleCommand :: Command -> PSCI ()
+handleCommand (Expression val) = handleDeclaration val
+handleCommand Help = PSCI $ outputStrLn helpMessage
+handleCommand (Import moduleName) = PSCI $ lift $ modify (updateImports moduleName)
+handleCommand (Let l) = PSCI $ lift $ modify (updateLets l)
 handleCommand (LoadFile filePath) = do
-  absPath <- lift . lift $ expandTilde filePath
-  exists <- lift . lift $ doesFileExist absPath
+  absPath <- psciIO $ expandTilde filePath
+  exists <- psciIO $ doesFileExist absPath
   if exists then do
-    lift $ modify (updateImportedFiles absPath)
-    either outputStrLn (lift . modify . updateModules) =<< (lift . lift $ loadModule absPath)
+    PSCI . lift $ modify (updateImportedFiles absPath)
+    m <- psciIO $ loadModule absPath
+    case m of
+      Left err -> PSCI $ outputStrLn err
+      Right mods -> PSCI . lift $ modify (updateModules (map ((,) absPath) mods))
   else
-    outputStrLn $ "Couldn't locate: " ++ filePath
+    PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
-  files <- psciImportedFilenames <$> lift get
-  modulesOrFirstError <- fmap concat . sequence <$> mapM (lift . lift . loadModule) files
+  files <- psciImportedFilenames <$> PSCI (lift get)
+  filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . psciIO . loadModule $ file) files
+  let modulesOrFirstError = fmap concat $ sequence filesAndModules
   case modulesOrFirstError of
-    Left err -> lift . lift $ putStrLn err >> exitFailure
-    Right modules -> lift $ put (PSCiState files defaultImports modules [])
-handleCommand (TypeOf val) = lift get >>= handleTypeOf val
-handleCommand _ = outputStrLn "Unknown command"
+    Left err -> psciIO $ putStrLn err >> exitFailure
+    Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
+handleCommand (TypeOf val) = handleTypeOf val
+handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]
 inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
@@ -311,7 +365,8 @@ loop :: [FilePath] -> IO ()
 loop files = do
   config <- loadUserConfig
   preludeFilename <- getPreludeFilename
-  modulesOrFirstError <- fmap concat . sequence <$> mapM loadModule (preludeFilename : files)
+  filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . loadModule $ file) (preludeFilename : files)
+  let modulesOrFirstError = fmap concat $ sequence filesAndModules
   case modulesOrFirstError of
     Left err -> putStrLn err >> exitFailure
     Right modules -> do
@@ -319,7 +374,7 @@ loop files = do
       let settings = defaultSettings {historyFile = Just historyFilename}
       flip evalStateT (PSCiState (preludeFilename : files) defaultImports modules []) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
-        traverse_ (mapM_ handleCommand) config
+        traverse_ (mapM_ (runPSCI . handleCommand)) config
         go
       where
         go :: InputT (StateT PSCiState IO) ()
@@ -329,7 +384,7 @@ loop files = do
             Left err -> outputStrLn (show err) >> go
             Right Nothing -> go
             Right (Just Quit) -> outputStrLn quitMessage
-            Right (Just c') -> handleCommand c' >> go
+            Right (Just c') -> runPSCI (handleCommand c') >> go
 
 term :: Cmd.Term (IO ())
 term = loop <$> inputFiles
@@ -343,4 +398,3 @@ termInfo = Cmd.defTI
 
 main :: IO ()
 main = Cmd.run (term, termInfo)
-
