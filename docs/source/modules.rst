@@ -33,6 +33,16 @@ Values, type constructors and data constructors can all be explicitly imported. 
   module B where
 
   import A (runFoo, Foo(..), Bar(Bar))
+  
+Modules can also be imported `qualified`, which means that their names will not be brought directly into scope, but rather, aliased to a different module name. This can be helpful when avoiding naming conflicts::
+
+  module Main where
+  
+  import qualified Data.Array as A
+  
+  null = ...
+  
+Here, the name ``null`` would ordinarily conflict with ``null`` from ``Data.Array``, but the qualified import solves this problem. ``Data.Array.null`` can be referenced using ``A.null`` instead.
 
 Module Exports
 --------------
