@@ -33,6 +33,10 @@ data Ident
   --
   | Op String deriving (Eq, Ord, Data, Typeable)
 
+runIdent :: Ident -> String
+runIdent (Ident i) = i
+runIdent (Op op) = op
+
 instance Show Ident where
   show (Ident s) = s
   show (Op op) = '(':op ++ ")"

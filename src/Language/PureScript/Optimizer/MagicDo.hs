@@ -80,31 +80,19 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict C.monadEffDictionary effDict = True
   isReturn _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly (JSAccessor prop (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                  _ps == C._ps &&
-                                                                  prop == identToJs (Op (C.>>=)) = True
-  isBindPoly (JSIndexer (JSStringLiteral bind) (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                                   _ps == C._ps &&
-                                                                                   bind == (C.>>=) = True
+  isBindPoly (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == identToJs (Op (C.>>=))
+  isBindPoly (JSIndexer (JSStringLiteral bind) (JSVar prelude)) = prelude == C.prelude && bind == (C.>>=)
   isBindPoly _ = False
   -- Check if an expression represents the polymorphic return function
-  isRetPoly (JSAccessor returnEscaped (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                          _ps == C._ps &&
-                                                                          returnEscaped == C.returnEscaped = True
-  isRetPoly (JSIndexer (JSStringLiteral return') (JSAccessor prelude (JSVar _ps))) | prelude == C.prelude &&
-                                                                                    _ps == C._ps &&
-                                                                                    return' == C.return = True
+  isRetPoly (JSAccessor returnEscaped (JSVar prelude)) = prelude == C.prelude && returnEscaped == C.returnEscaped
+  isRetPoly (JSIndexer (JSStringLiteral return') (JSVar prelude)) = prelude == C.prelude && return' == C.return
   isRetPoly _ = False
   -- Check if an expression represents a function in the Ef module
-  isEffFunc name (JSAccessor name' (JSAccessor eff (JSVar _ps))) | eff == C.eff &&
-                                                                   _ps == C._ps &&
-                                                                   name == name' = True
+  isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
   -- Check if an expression represents the Monad Eff dictionary
   isEffDict name (JSApp (JSVar ident) [JSObjectLiteral []]) | ident == name = True
-  isEffDict name (JSApp (JSAccessor prop (JSAccessor eff (JSVar _ps))) [JSObjectLiteral []]) | eff == C.eff &&
-                                                                                               _ps == C._ps &&
-                                                                                               prop == name = True
+  isEffDict name (JSApp (JSAccessor prop (JSVar eff)) [JSObjectLiteral []]) = eff == C.eff && prop == name
   isEffDict _ _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
@@ -147,9 +135,7 @@ inlineST = everywhere (mkT convertBlock)
     JSAssignment (JSIndexer i arr) val
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (JSAccessor name' (JSAccessor st (JSVar _ps))) | st == C.st &&
-                                                                   _ps == C._ps &&
-                                                                   name == name' = True
+  isSTFunc name (JSAccessor name' (JSVar st)) = st == C.st && name == name'
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) (mkQ [] isSTRef)

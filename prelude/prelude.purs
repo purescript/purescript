@@ -271,7 +271,7 @@ module Prelude where
   foreign import numCompare
     "function numCompare(n1) {\
     \  return function(n2) {\
-    \    return n1 < n2 ? module.LT : n1 > n2 ? module.GT : module.EQ;\
+    \    return n1 < n2 ? LT : n1 > n2 ? GT : EQ;\
     \  };\
     \}" :: Number -> Number -> Ordering
 
