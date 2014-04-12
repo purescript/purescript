@@ -145,7 +145,7 @@ typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> D
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   ExternDeclaration TypeClassAccessorImport ident
     (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSIndexer (JSStringLiteral (identToProperty ident)) (JSVar "dict"))])))
-    (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
+    (moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty)))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
@@ -169,7 +169,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
     x : _ -> throwError $ mkErrorStack ("Member '" ++ show x ++ "' has not been implemented") Nothing
     [] -> do
-    
+
       let instanceTys = map memberToNameAndType tyDecls
 
       -- Replace the type arguments with the appropriate types in the member types
@@ -192,16 +192,16 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
           dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
-          
+
       return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
-  
+
   where
 
   declName :: Declaration -> Maybe Ident
   declName (PositionedDeclaration _ d) = declName d
   declName (ValueDeclaration ident _ _ _ _) = Just ident
   declName (TypeDeclaration ident _) = Just ident
-  declName _ = Nothing 
+  declName _ = Nothing
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do

@@ -182,3 +182,22 @@ freeTypeVariables = nub . go []
 --
 quantify :: Type -> Type
 quantify ty = foldr (\arg t -> ForAll arg t Nothing) ty $ freeTypeVariables ty
+
+-- |
+-- Move all universal quantifiers to the front of a type
+--
+moveQuantifiersToFront :: Type -> Type
+moveQuantifiersToFront = go [] []
+  where
+  go qs cs (ForAll q ty sco) = go ((q, sco) : qs) cs ty
+  go qs cs (ConstrainedType cs' ty) = go qs (cs ++ cs') ty
+  go qs cs ty =
+    let constrained = case cs of
+                        [] -> ty
+                        cs' -> ConstrainedType cs' ty
+    in case qs of
+         [] -> constrained
+         qs' -> foldl (\ty' (q, sco) -> ForAll q ty' sco) constrained qs'
+
+
+
