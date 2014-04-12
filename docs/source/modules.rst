@@ -34,6 +34,9 @@ Values, type constructors and data constructors can all be explicitly imported. 
 
   import A (runFoo, Foo(..), Bar(Bar))
   
+Qualified Imports
+-----------------
+  
 Modules can also be imported `qualified`, which means that their names will not be brought directly into scope, but rather, aliased to a different module name. This can be helpful when avoiding naming conflicts::
 
   module Main where
