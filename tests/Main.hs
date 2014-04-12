@@ -54,12 +54,13 @@ assert preludeExterns opts inputFile f = do
     Just err -> putStrLn err >> exitFailure
     Nothing -> return ()
 
-assertCompiles :: FilePath -> FilePath -> FilePath -> IO ()
+assertCompiles :: String -> FilePath -> FilePath -> IO ()
 assertCompiles preludeJs preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " compiles successfully"
-  let options = P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"], P.optionsCodeGenModules = ["Main"] }
+  let options = P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"], P.optionsCodeGenModules = ["Main"], P.optionsBrowserNamespace = Just "Tests" }
   assert preludeExterns options inputFile $ either (return . Just) $ \(js, _, _) -> do
     process <- findNodeProcess
+    putStrLn $ preludeJs ++ js
     result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
     case result of
       Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
@@ -69,7 +70,7 @@ assertCompiles preludeJs preludeExterns inputFile = do
 assertDoesNotCompile :: FilePath -> FilePath -> IO ()
 assertDoesNotCompile preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " does not compile"
-  assert preludeExterns P.defaultOptions inputFile $ \e ->
+  assert preludeExterns (P.defaultOptions { P.optionsBrowserNamespace = Just "Tests" }) inputFile $ \e ->
     case e of
       Left _ -> return Nothing
       Right _ -> return $ Just "Should not have compiled"
@@ -82,7 +83,7 @@ main :: IO ()
 main = do
   prelude <- preludeFilename
   putStrLn "Compiling Prelude"
-  preludeResult <- compile P.defaultOptions [prelude]
+  preludeResult <- compile (P.defaultOptions { P.optionsBrowserNamespace = Just "Tests" }) [prelude]
   case preludeResult of
     Left err -> putStrLn err >> exitFailure
     Right (preludeJs, exts, _) -> do

@@ -57,9 +57,10 @@ moduleToJs :: ModuleType -> Options -> Module -> Environment -> [JS]
 moduleToJs mt opts (Module name decls (Just exps)) env = case mt of
   CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
   Globals ->
-    [ JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts)))) (
-       JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) []
-      )
+    [ JSVariableIntroduction (fromJust (optionsBrowserNamespace opts))
+                             (Just (JSBinary Or (JSVar (fromJust (optionsBrowserNamespace opts))) (JSObjectLiteral [])) )
+    , JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts))))
+                   (JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) [])
     ]
   where
   moduleBody = JSStringLiteral "use strict" : jsImports ++ jsDecls
@@ -73,7 +74,7 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
   where
   moduleBody = case mt of
     CommonJS -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
-    Globals -> JSAccessor (runModuleName mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
+    Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
 imports = everything (++) (mkQ [] collect)

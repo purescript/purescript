@@ -204,7 +204,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options
-options = P.Options False True False True Nothing True (Just "PS") [] [] False
+options = P.Options False True False True Nothing True Nothing [] [] False
 
 -- |
 -- PSCI monad

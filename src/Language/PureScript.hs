@@ -78,8 +78,7 @@ compile' env opts ms = do
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let js = JSVariableIntroduction (fromJust (optionsBrowserNamespace opts)) (Just (JSObjectLiteral []))
-           : concatMap (\m -> moduleToJs Globals opts m env') modulesToCodeGen
+  let js = concatMap (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
   return (prettyPrintJS js', exts, env')
@@ -129,7 +128,7 @@ generateMain env opts js =
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
         Left $ show mmi ++ "." ++ C.main ++ " is undefined"
-      return $ js ++ [JSApp (JSAccessor C.main (JSVar (moduleNameToJs mmi))) []]
+      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (fromJust (optionsBrowserNamespace opts))))) []]
     _ -> return js
 
 -- |
