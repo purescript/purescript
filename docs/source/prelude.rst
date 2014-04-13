@@ -17,15 +17,24 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 ::
 
     class Alternative f where
       empty :: forall a. f a
       (<|>) :: forall a. f a -> f a -> f a
 
-    class Applicative f where
+    class (Apply f) <= Applicative f where
       pure :: forall a. a -> f a
+
+    class (Functor f) <= Apply f where
       (<*>) :: forall a b. f (a -> b) -> f a -> f b
+
+    class (Apply m) <= Bind m where
+      (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
     class Bits b where
       (&) :: b -> b -> b
@@ -41,9 +50,8 @@ Type Classes
       (||) :: b -> b -> b
       not :: b -> b
 
-    class Category a where
+    class (Semigroupoid a) <= Category a where
       id :: forall t. a t t
-      (<<<) :: forall b c d. a c d -> a b c -> a b d
 
     class Eq a where
       (==) :: a -> a -> Prim.Boolean
@@ -52,9 +60,7 @@ Type Classes
     class Functor f where
       (<$>) :: forall a b. (a -> b) -> f a -> f b
 
-    class Monad m where
-      return :: forall a. a -> m a
-      (>>=) :: forall a b. m a -> (a -> m b) -> m b
+    class (Applicative m, Bind m) <= Monad m where
 
     class Num a where
       (+) :: a -> a -> a
@@ -64,8 +70,14 @@ Type Classes
       (%) :: a -> a -> a
       negate :: a -> a
 
-    class Ord a where
+    class (Eq a) <= Ord a where
       compare :: a -> a -> Ordering
+
+    class Semigroup a where
+      (<>) :: a -> a -> a
+
+    class Semigroupoid a where
+      (<<<) :: forall b c d. a c d -> a b c -> a b d
 
     class Show a where
       show :: a -> Prim.String
@@ -74,8 +86,6 @@ Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
-
-    instance applicativeFromMonad :: (Monad m) => Applicative m
 
     instance bitsNumber :: Bits Prim.Number
 
@@ -89,13 +99,19 @@ Type Class Instances
 
     instance eqNumber :: Eq Prim.Number
 
-    instance eqString :: Eq Prim.String
+    instance eqOrdering :: Eq Ordering
 
-    instance functorFromApplicative :: (Applicative f) => Functor f
+    instance eqString :: Eq Prim.String
 
     instance numNumber :: Num Prim.Number
 
     instance ordNumber :: Ord Prim.Number
+
+    instance semigroupString :: Semigroup Prim.String
+
+    instance semigroupoidArr :: Semigroupoid Prim.Function
+
+    instance showArray :: (Show a) => Show [a]
 
     instance showBoolean :: Show Prim.Boolean
 
@@ -110,13 +126,13 @@ Values
 
 ::
 
-    (!!) :: forall a. [a] -> Prim.Number -> a
-
     (#) :: forall a b. a -> (a -> b) -> b
 
     ($) :: forall a b. (a -> b) -> a -> b
 
-    (++) :: Prim.String -> Prim.String -> Prim.String
+    (++) :: forall s. (Semigroup s) => s -> s -> s
+
+    (:) :: forall a. a -> [a] -> [a]
 
     (<) :: forall a. (Ord a) => a -> a -> Prim.Boolean
 
@@ -126,7 +142,11 @@ Values
 
     (>=) :: forall a. (Ord a) => a -> a -> Prim.Boolean
 
-    (>>>) :: forall a b c d. (Category a) => a b c -> a c d -> a b d
+    (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
+
+    ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
+
+    asTypeOf :: forall a. a -> a -> a
 
     boolAnd :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
 
@@ -134,9 +154,17 @@ Values
 
     boolOr :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
 
+    concatString :: Prim.String -> Prim.String -> Prim.String
+
+    cons :: forall a. a -> [a] -> [a]
+
     const :: forall a b. a -> b -> a
 
     flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+
+    liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
+
+    liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 
     numAdd :: Prim.Number -> Prim.Number -> Prim.Number
 
@@ -166,13 +194,40 @@ Values
 
     numZshr :: Prim.Number -> Prim.Number -> Prim.Number
 
-    on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
-
     refEq :: forall a. a -> a -> Prim.Boolean
 
     refIneq :: forall a. a -> a -> Prim.Boolean
 
+    return :: forall m a. (Monad m) => a -> m a
+
+    showArrayImpl :: forall a. (a -> Prim.String) -> [a] -> Prim.String
+
     showNumberImpl :: Prim.Number -> Prim.String
+
+    showStringImpl :: Prim.String -> Prim.String
+
+Module Data.Function
+--------------------
+
+Types
+~~~~~
+
+Type Classes
+~~~~~~~~~~~~
+
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
+Type Class Instances
+~~~~~~~~~~~~~~~~~~~~
+
+Values
+~~~~~~
+
+::
+
+    on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 
 Module Data.Eq
 --------------
@@ -188,6 +243,10 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -201,6 +260,29 @@ Values
 ::
 
     liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
+
+Module Prelude.Unsafe
+---------------------
+
+Types
+~~~~~
+
+Type Classes
+~~~~~~~~~~~~
+
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
+Type Class Instances
+~~~~~~~~~~~~~~~~~~~~
+
+Values
+~~~~~~
+
+::
+
+    unsafeIndex :: forall a. [a] -> Prim.Number -> a
 
 Module Control.Monad.Eff
 ------------------------
@@ -217,10 +299,22 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
+
+    instance applicativeEff :: Applicative (Eff e)
+
+    instance applyEff :: Apply (Eff e)
+
+    instance bindEff :: Bind (Eff e)
+
+    instance functorEff :: Functor (Eff e)
 
     instance monadEff :: Monad (Eff e)
 
@@ -229,13 +323,13 @@ Values
 
 ::
 
-    bindEff :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
+    bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
     forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e {  }) -> Eff e {  }
 
     foreachE :: forall e a. [a] -> (a -> Eff e {  }) -> Eff e {  }
 
-    retEff :: forall e a. a -> Eff e a
+    returnE :: forall e a. a -> Eff e a
 
     runPure :: forall a. Pure a -> a
 
@@ -252,6 +346,10 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -275,6 +373,10 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -304,6 +406,10 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
+.. figure:: typeclasses.png
+   :alt: typeclasses
+
+   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 

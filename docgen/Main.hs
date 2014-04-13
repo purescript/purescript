@@ -70,6 +70,8 @@ renderModule (P.Module moduleName ds exps) =
     spacer
     headerLevel 3 "Type Classes"
     spacer
+    renderTypeclassImage
+    spacer
     renderTopLevel exps (filter isTypeClassDeclaration exported)
     spacer
     headerLevel 3 "Type Class Instances"
@@ -107,6 +109,9 @@ renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
   renderDeclaration 4 exps decl
   spacer
+
+renderTypeclassImage :: Docs
+renderTypeclassImage = tell ["![typeclasses](typeclasses.png)"]
 
 renderDeclaration :: Int -> Maybe [P.DeclarationRef] -> P.Declaration -> Docs
 renderDeclaration n _ (P.TypeDeclaration ident ty) =
