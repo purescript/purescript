@@ -87,11 +87,9 @@
 
 ### Libraries
 
-- Purescript libraries are now [distributed via Bower](http://bower.io/search/?q=purescript)
-- The [purescript-datetime](https://github.com/purescript/purescript-datetime) library provides basic date/time functions
-- The [purescript-reactive](https://github.com/purescript/purescript-reactive) and [purescript-reactive-jquery]() libraries provide reactive variables, and bindings to jQuery properties.
-- The [purescript-generics](https://github.com/purescript/purescript-generics) library provides generic programming capabilities.
+- Purescript libraries are now [distributed via Bower](http://bower.io/search/?q=purescript). There are currently around 40 libraries available.
 
-### Documentation
+### Plugins
 
-- 
+- The `grunt-purescript` plugin has been updated to provide support for new command line options.
+- There is a new `gulp-purescript` plugin available for compiling with Gulp.
