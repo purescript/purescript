@@ -28,6 +28,7 @@
 - `where` clauses are now supported in value declarations, with the same rules as `let` bindings (garyb)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
+- `psc-make` now generates CommonJS-compatible modules, which can be used with `require()` in `node`. `psc` still generates modules for use in the browser. (paf31, garyb)
 
 ### Enhancements
 
@@ -82,6 +83,7 @@
 - A module containing a single orphan type declaration and no other declarations now fails to compile (garyb)
 - An error involving ordering of type class instances was fixed (garyb, paf31)
 - Externs files no longer include fixity declarations for members that were removed as dead code (garyb)
+- A bug which prevented `sequence $ [Just 1]` from typechecking was fixed (paf31)
 
 ### Libraries
 
