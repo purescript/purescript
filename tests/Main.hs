@@ -60,7 +60,6 @@ assertCompiles preludeJs preludeExterns inputFile = do
   let options = P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"], P.optionsCodeGenModules = ["Main"], P.optionsBrowserNamespace = Just "Tests" }
   assert preludeExterns options inputFile $ either (return . Just) $ \(js, _, _) -> do
     process <- findNodeProcess
-    putStrLn $ preludeJs ++ js
     result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
     case result of
       Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing

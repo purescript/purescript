@@ -677,6 +677,8 @@ inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT T
 inferLetBinding seen [] ret j = (,) seen <$> j ret
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue checkType val ty) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
+  kind <- liftCheck $ kindOf moduleName ty
+  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   let dict = if isFunction val then M.singleton (moduleName, ident) (ty, nameKind) else M.empty
   TypedValue _ val' ty' <- if checkType then bindNames dict (check val ty) else return tv
   bindNames (M.singleton (moduleName, ident) (ty', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty')]) rest ret j
@@ -694,7 +696,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
     (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
     return $ (ident, LocalVariable, val')
   bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = do
+inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = rethrowWithPosition pos $ do
   ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos d' : ds', val')
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"

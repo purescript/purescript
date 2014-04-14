@@ -28,6 +28,7 @@
 - `where` clauses are now supported in value declarations, with the same rules as `let` bindings (garyb)
 - Empty data declarations and empty type classes are now supported (paf31)
 - A new command line option `--codegen` controls which modules will have Javascript and externs generated (paf31)
+- `psc-make` now generates CommonJS-compatible modules, which can be used with `require()` in `node`. `psc` still generates modules for use in the browser. (paf31, garyb)
 
 ### Enhancements
 
@@ -82,14 +83,13 @@
 - A module containing a single orphan type declaration and no other declarations now fails to compile (garyb)
 - An error involving ordering of type class instances was fixed (garyb, paf31)
 - Externs files no longer include fixity declarations for members that were removed as dead code (garyb)
+- A bug which prevented `sequence $ [Just 1]` from typechecking was fixed (paf31)
 
 ### Libraries
 
-- Purescript libraries are now [distributed via Bower](http://bower.io/search/?q=purescript)
-- The [purescript-datetime](https://github.com/purescript/purescript-datetime) library provides basic date/time functions
-- The [purescript-reactive](https://github.com/purescript/purescript-reactive) and [purescript-reactive-jquery]() libraries provide reactive variables, and bindings to jQuery properties.
-- The [purescript-generics](https://github.com/purescript/purescript-generics) library provides generic programming capabilities.
+- Purescript libraries are now [distributed via Bower](http://bower.io/search/?q=purescript). There are currently around 40 libraries available.
 
-### Documentation
+### Plugins
 
-- 
+- The `grunt-purescript` plugin has been updated to provide support for new command line options.
+- There is a new `gulp-purescript` plugin available for compiling with Gulp.
