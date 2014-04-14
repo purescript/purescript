@@ -127,7 +127,7 @@ executable docgen
 
 executable hierarchy
     build-depends: base >=4 && <5, cmdtheline -any, purescript -any, utf8-string -any,
-                   process -any, mtl -any, parsec -any
+                   process -any, mtl -any, parsec -any, filepath -any, directory -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: hierarchy

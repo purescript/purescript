@@ -16,11 +16,15 @@
 module Main where
 
 import Control.Applicative ((<*>), (<$>))
+import Control.Monad (unless)
 
 import Data.List (intercalate,nub,sort)
+import Data.Foldable (for_)
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath ((</>))
 import System.Exit (exitFailure, exitSuccess)
 
 import Text.Parsec (ParseError)
@@ -41,6 +45,9 @@ instance Ord SuperMap where
     where
       getCls = either id snd
 
+runModuleName :: P.ModuleName -> String
+runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
+
 readInput :: FilePath -> IO (Either ParseError [P.Module])
 readInput p = do
   text <- U.readFile p
@@ -51,13 +58,21 @@ compile input mOutput = do
   modules <- readInput input
   case modules of
     Left err -> U.print err >> exitFailure
-    Right (P.Module _ decls _ : _) -> do
-      let tcs = filter P.isTypeClassDeclaration decls
-      let supers = sort . nub . filter (not . null) $ fmap superClasses tcs
-      let hier = "digraph Prelude {\n" ++ intercalate "\n" (concatMap (fmap (("  " ++) . (++ ";") . show)) supers) ++ "\n}"
-      case mOutput of
-        Just output -> U.writeFile output hier
-        Nothing     -> U.putStrLn hier
+    Right ms -> do
+      for_ ms $ \(P.Module moduleName decls _) ->
+        let name = runModuleName moduleName
+            tcs = filter P.isTypeClassDeclaration decls
+            supers = sort . nub . filter (not . null) $ fmap superClasses tcs
+            prologue = "digraph " ++ name ++ " {\n"
+            --body = intercalate "\n" (concatMap (fmap (("  " ++) . (++ ";") . show)) supers)
+            body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ show s ++ ";")) supers)
+            epilogue = "\n}"
+            hier = prologue ++ body ++ epilogue
+        in unless (null supers) $ case mOutput of
+          Just output -> do
+            createDirectoryIfMissing True output
+            U.writeFile (output </> name) hier
+          Nothing -> U.putStrLn hier
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]
@@ -69,10 +84,11 @@ superClasses _ = []
 
 outputFile :: Term (Maybe FilePath)
 outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
-     { optDoc = "The output file" }
+  { optDoc = "The output directory" }
 
 inputFile :: Term FilePath
-inputFile = value $ pos 0 "main.purs" $ posInfo { posDoc = "The input file to generate a hierarchy from" }
+inputFile = value $ pos 0 "main.purs" $ posInfo
+  { posDoc = "The input file to generate a hierarchy from" }
 
 term :: Term (IO ())
 term = compile <$> inputFile <*> outputFile
