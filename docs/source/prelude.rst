@@ -17,10 +17,10 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
+.. figure:: images/Prelude.png
+   :alt: Prelude
 
-   typeclasses
+   Prelude
 ::
 
     class Alternative f where
@@ -215,10 +215,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -243,10 +239,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -270,10 +262,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -299,10 +287,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -346,10 +330,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -373,10 +353,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -406,10 +382,6 @@ Types
 Type Classes
 ~~~~~~~~~~~~
 
-.. figure:: typeclasses.png
-   :alt: typeclasses
-
-   typeclasses
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 

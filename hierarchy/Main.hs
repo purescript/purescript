@@ -57,7 +57,7 @@ compile input mOutput = do
       let hier = "digraph Prelude {\n" ++ intercalate "\n" (concatMap (fmap (("  " ++) . (++ ";") . show)) supers) ++ "\n}"
       case mOutput of
         Just output -> U.writeFile output hier
-        Nothing      -> U.putStrLn hier
+        Nothing     -> U.putStrLn hier
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]

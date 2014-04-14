@@ -11,7 +11,7 @@
 
 ### Type Classes
 
-![typeclasses](typeclasses.png)
+![Prelude](images/Prelude.png)
 
     class Alternative f where
       empty :: forall a. f a
@@ -200,8 +200,6 @@
 
 ### Type Classes
 
-![typeclasses](typeclasses.png)
-
 
 ### Type Class Instances
 
@@ -221,8 +219,6 @@
 
 ### Type Classes
 
-![typeclasses](typeclasses.png)
-
 
 ### Type Class Instances
 
@@ -240,8 +236,6 @@
 
 
 ### Type Classes
-
-![typeclasses](typeclasses.png)
 
 
 ### Type Class Instances
@@ -262,8 +256,6 @@
 
 
 ### Type Classes
-
-![typeclasses](typeclasses.png)
 
 
 ### Type Class Instances
@@ -303,8 +295,6 @@
 
 ### Type Classes
 
-![typeclasses](typeclasses.png)
-
 
 ### Type Class Instances
 
@@ -322,8 +312,6 @@
 
 
 ### Type Classes
-
-![typeclasses](typeclasses.png)
 
 
 ### Type Class Instances
@@ -348,8 +336,6 @@
 
 
 ### Type Classes
-
-![typeclasses](typeclasses.png)
 
 
 ### Type Class Instances
