@@ -14,17 +14,17 @@
 
 module Main where
 
-import qualified Language.PureScript as P
-import System.Console.CmdTheLine
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Writer
-import System.Exit (exitSuccess, exitFailure)
-import qualified System.IO.UTF8 as U
-import qualified Paths_purescript as Paths
-import Data.Version (showVersion)
-import Data.List
 import Data.Function (on)
+import Data.List
+import Data.Version (showVersion)
+import qualified Language.PureScript as P
+import qualified Paths_purescript as Paths
+import qualified System.IO.UTF8 as U
+import System.Console.CmdTheLine
+import System.Exit (exitSuccess, exitFailure)
 
 docgen :: FilePath -> IO ()
 docgen input = do
@@ -61,6 +61,7 @@ renderModules ms = do
 renderModule :: P.Module -> Docs
 renderModule (P.Module moduleName ds exps) =
   let exported = filter (isExported exps) ds
+      hasTypeclasses = any isTypeClassDeclaration ds
   in do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
@@ -70,6 +71,9 @@ renderModule (P.Module moduleName ds exps) =
     spacer
     headerLevel 3 "Type Classes"
     spacer
+    when hasTypeclasses $ do
+      renderTypeclassImage moduleName
+      spacer
     renderTopLevel exps (filter isTypeClassDeclaration exported)
     spacer
     headerLevel 3 "Type Class Instances"
@@ -83,7 +87,7 @@ renderModule (P.Module moduleName ds exps) =
 
 isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
 isExported Nothing _ = True
-isExported _ (P.TypeInstanceDeclaration _ _ _ _ _) = True
+isExported _ P.TypeInstanceDeclaration{} = True
 isExported exps (P.PositionedDeclaration _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
@@ -107,6 +111,11 @@ renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
   renderDeclaration 4 exps decl
   spacer
+
+renderTypeclassImage :: P.ModuleName -> Docs
+renderTypeclassImage name =
+  let name' = P.runModuleName name
+  in tell ["![" ++ name' ++ "](images/" ++ name' ++ ".png)"]
 
 renderDeclaration :: Int -> Maybe [P.DeclarationRef] -> P.Declaration -> Docs
 renderDeclaration n _ (P.TypeDeclaration ident ty) =
