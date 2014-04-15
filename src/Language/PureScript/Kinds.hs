@@ -44,3 +44,17 @@ data Kind
   -- Function kinds
   --
   | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)
+
+everywhereOnKinds :: (Kind -> Kind) -> Kind -> Kind
+everywhereOnKinds f = go
+  where
+  go (Row k1) = f (Row (go k1))
+  go (FunKind k1 k2) = f (FunKind (go k1) (go k2))
+  go other = f other
+
+everythingOnKinds :: (r -> r -> r) -> (Kind -> r) -> Kind -> r
+everythingOnKinds (<>) f = go
+  where
+  go k@(Row k1) = f k <> go k1
+  go k@(FunKind k1 k2) = f k <> go k1 <> go k2
+  go other = f other

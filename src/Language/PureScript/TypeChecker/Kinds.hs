@@ -37,12 +37,23 @@ import Control.Monad.Unify
 import Control.Applicative
 
 import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
 import Data.Monoid ((<>))
 
 instance Partial Kind where
   unknown = KUnknown
   isUnknown (KUnknown u) = Just u
   isUnknown _ = Nothing
+  unknowns = everythingOnKinds (++) go
+    where
+    go (KUnknown u) = [u]
+    go _ = []
+  ($?) sub = everywhereOnKinds go
+    where
+    go t@(KUnknown u) = case H.lookup u (runSubstitution sub) of
+                          Nothing -> t
+                          Just t' -> t'
+    go other = other
 
 instance Unifiable Check Kind where
   KUnknown u1 =?= KUnknown u2 | u1 == u2 = return ()
@@ -169,5 +180,6 @@ infer' (ConstrainedType deps ty) = do
   k =?= Star
   return Star
 infer' _ = error "Invalid argument to infer"
+
 
 

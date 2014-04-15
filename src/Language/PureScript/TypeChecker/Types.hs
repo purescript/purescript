@@ -68,6 +68,7 @@ import Control.Applicative
 import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
 import Data.Function (on)
 import Data.Ord (comparing)
 import Data.Monoid ((<>))
@@ -76,6 +77,16 @@ instance Partial Type where
   unknown = TUnknown
   isUnknown (TUnknown u) = Just u
   isUnknown _ = Nothing
+  unknowns = everythingOnTypes (++) go
+    where
+    go (TUnknown u) = [u]
+    go _ = []
+  ($?) sub = everywhereOnTypes go
+    where
+    go t@(TUnknown u) = case H.lookup u (runSubstitution sub) of
+                          Nothing -> t
+                          Just t' -> t'
+    go other = other
 
 instance Unifiable Check Type where
   (=?=) = unifyTypes
@@ -494,9 +505,9 @@ varIfUnknown ty =
       toName = (:) 't' . show
       ty' = everywhereOnTypes typeToVar ty
       typeToVar :: Type -> Type
-      typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
+      typeToVar (TUnknown u) = TypeVar (toName u)
       typeToVar t = t
-  in mkForAll (sort . map (toName . runUnknown) $ unks) ty'
+  in mkForAll (sort . map toName $ unks) ty'
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -791,13 +802,13 @@ checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
 -- Generate a new skolem constant
 --
 newSkolemConstant :: UnifyT Type Check Int
-newSkolemConstant = runUnknown <$> fresh'
+newSkolemConstant = fresh'
 
 -- |
 -- Generate a new skolem scope
 --
 newSkolemScope :: UnifyT Type Check SkolemScope
-newSkolemScope = SkolemScope . runUnknown <$> fresh'
+newSkolemScope = SkolemScope <$> fresh'
 
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
@@ -1105,6 +1116,7 @@ subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
+
 
 
 
