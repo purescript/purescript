@@ -23,10 +23,8 @@
 
 module Control.Monad.Unify where
 
-import Data.Data
 import Data.Maybe
 import Data.Monoid
-import Data.Generics (mkT, mkQ, everywhere, everything)
 
 import Control.Applicative
 import Control.Monad.State
@@ -37,19 +35,16 @@ import Data.HashMap.Strict as M
 -- |
 -- Untyped unification variables
 --
-newtype Unknown = Unknown {
-  -- |
-  -- The underlying integer representing the unification variable
-  --
-    runUnknown :: Int
-  } deriving (Show, Eq, Ord, Data, Typeable)
+type Unknown = Int
 
 -- |
 -- A type which can contain unification variables
 --
-class (Typeable t, Data t) => Partial t where
+class Partial t where
   unknown :: Unknown -> t
   isUnknown :: t -> Maybe Unknown
+  unknowns :: t -> [Unknown]
+  ($?) :: Substitution t -> t -> t
 
 -- |
 -- Identifies types which support unification
@@ -67,19 +62,6 @@ instance (Partial t) => Monoid (Substitution t) where
   s1 `mappend` s2 = Substitution $
                       M.map (s2 $?) (runSubstitution s1) `M.union`
                       M.map (s1 $?) (runSubstitution s2)
-
--- |
--- Apply a substitution to a value
---
-($?) :: (Partial t) => Substitution t -> t -> t
-($?) sub = everywhere (mkT go)
-  where
-  go t =
-    case isUnknown t of
-      Nothing -> t
-      Just (Unknown u) -> case M.lookup u (runSubstitution sub) of
-                  Nothing -> t
-                  Just t' -> t'
 
 -- |
 -- State required for type checking
@@ -116,14 +98,6 @@ instance (MonadError e m) => MonadError e (UnifyT t m) where
   catchError e f = UnifyT $ catchError (unUnify e) (unUnify . f)
 
 -- |
--- Collect all unknowns occurring inside a value
---
-unknowns :: (Data d) => d -> [Unknown]
-unknowns = everything (++) (mkQ [] collect)
-  where
-  collect u@(Unknown _) = [u]
-
--- |
 -- Run a computation in the Unify monad, failing with an error, or succeeding with a return value and the new next unification variable
 --
 runUnify :: UnifyState t -> UnifyT t m a -> m (a, UnifyState t)
@@ -133,7 +107,7 @@ runUnify s = flip runStateT s . unUnify
 -- Substitute a single unification variable
 --
 substituteOne :: (Partial t) => Unknown -> t -> Substitution t
-substituteOne (Unknown u) t = Substitution $ M.singleton u t
+substituteOne u t = Substitution $ M.singleton u t
 
 -- |
 -- Replace a unification variable with the specified value in the current substitution
@@ -166,7 +140,7 @@ fresh' :: (Monad m) => UnifyT t m Unknown
 fresh' = do
   st <- UnifyT get
   UnifyT $ modify $ \s -> s { unifyNextVar = succ (unifyNextVar s) }
-  return $ Unknown (unifyNextVar st)
+  return $ unifyNextVar st
 
 -- |
 -- Generate a fresh unification variable at a specific type
@@ -175,5 +149,6 @@ fresh :: (Monad m, Partial t) => UnifyT t m t
 fresh = do
   u <- fresh'
   return $ unknown u
+
 
 

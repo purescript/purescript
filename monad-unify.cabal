@@ -1,5 +1,5 @@
 name: monad-unify
-version: 0.2.1
+version: 0.2.2
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -14,7 +14,7 @@ data-dir: ""
 
 library
     build-depends: base ==4.*,
-                   mtl -any, syb -any,
+                   mtl -any,
                    unordered-containers -any
     exposed-modules: Control.Monad.Unify
     exposed: True
