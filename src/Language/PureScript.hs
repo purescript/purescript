@@ -36,7 +36,6 @@ import qualified Language.PureScript.Constants as C
 import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
-import Data.Generics (mkQ, everything)
 import Data.Maybe (fromJust, fromMaybe)
 import Control.Monad.Error
 import Control.Monad.State.Lazy
@@ -109,7 +108,7 @@ typeCheckModule mainModuleName (Module mn decls exps) = do
 
   -- Find the type constructors exported from the current module used in a type
   findTcons :: Type -> [ProperName]
-  findTcons = everything (++) (mkQ [] go)
+  findTcons = everythingOnTypes (++) go
     where
     go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
     go _ = []

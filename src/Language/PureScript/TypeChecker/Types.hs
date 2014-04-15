@@ -43,10 +43,8 @@ module Language.PureScript.TypeChecker.Types (
 
 import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
-import qualified Data.Data as D
 import Data.Generics
-       (everythingWithContext, mkM, everywhereM,
-        everything, mkT, something, everywhere, mkQ)
+       (everythingWithContext, mkM, mkT, something, everywhere, mkQ)
 import Data.Generics.Extras
 
 import Language.PureScript.Declarations
@@ -373,7 +371,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    return $ map head grps
 	  -- Apply a substitution to a type
 	  applySubst :: [(String, Type)] -> Type -> Maybe Type
-	  applySubst subst = everywhereM (mkM replace)
+	  applySubst subst = everywhereOnTypesM replace
 	    where
 	    replace (TypeVar v) = lookup v subst
 	    replace other = Just other
@@ -463,7 +461,7 @@ skolemEscapeCheck root@TypedValue{} =
                                       _ -> ([], scos)
     where
     collectSkolems :: Type -> [SkolemScope]
-    collectSkolems = nub . everything (++) (mkQ [] collect)
+    collectSkolems = nub . everythingOnTypes (++) collect
       where
       collect (Skolem _ _ scope) = [scope]
       collect _ = []
@@ -484,8 +482,8 @@ setify = rowFromList . first (M.toList . M.fromList) . rowToList
 -- |
 -- \"Setify\" all rows occuring inside a value
 --
-setifyAll :: (D.Data d) => d -> d
-setifyAll = everywhere (mkT setify)
+setifyAll :: Type -> Type
+setifyAll = everywhereOnTypes setify
 
 -- |
 -- Replace outermost unsolved unification variables with named type variables
@@ -494,7 +492,7 @@ varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let unks = nub $ unknowns ty
       toName = (:) 't' . show
-      ty' = everywhere (mkT typeToVar) ty
+      ty' = everywhereOnTypes typeToVar ty
       typeToVar :: Type -> Type
       typeToVar (TUnknown (Unknown u)) = TypeVar (toName u)
       typeToVar t = t
@@ -529,14 +527,14 @@ replaceVarWithUnknown ident ty = do
 -- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
 -- better error messages during unification.
 --
-replaceAllTypeSynonyms' :: (D.Data d) => Environment -> d -> Either String d
+replaceAllTypeSynonyms' :: Environment -> Type -> Either String Type
 replaceAllTypeSynonyms' env d =
   let
     syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
   in
     saturateAllTypeSynonyms syns d
 
-replaceAllTypeSynonyms :: (Error e, Functor m, Monad m, MonadState CheckState m, MonadError e m) => (D.Data d) => d -> m d
+replaceAllTypeSynonyms :: (Error e, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either (throwError . strMsg) return $ replaceAllTypeSynonyms' env d
@@ -544,8 +542,8 @@ replaceAllTypeSynonyms d = do
 -- |
 -- \"Desaturate\" @SaturatedTypeSynonym@s
 --
-desaturateAllTypeSynonyms :: (D.Data d) => d -> d
-desaturateAllTypeSynonyms = everywhere (mkT replaceSaturatedTypeSynonym)
+desaturateAllTypeSynonyms :: Type -> Type
+desaturateAllTypeSynonyms = everywhereOnTypes replaceSaturatedTypeSynonym
   where
   replaceSaturatedTypeSynonym (SaturatedTypeSynonym name args) = foldl TypeApp (TypeConstructor name) args
   replaceSaturatedTypeSynonym t = t
@@ -566,8 +564,8 @@ expandTypeSynonym name args = do
   env <- getEnv
   either (throwError . strMsg) return $ expandTypeSynonym' env name args
 
-expandAllTypeSynonyms :: (Error e, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
-expandAllTypeSynonyms = everywhereM' (mkM go)
+expandAllTypeSynonyms :: (Error e, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+expandAllTypeSynonyms = everywhereOnTypesTopDownM go
   where
   go (SaturatedTypeSynonym name args) = expandTypeSynonym name args
   go other = return other
@@ -822,7 +820,7 @@ skolemizeTypesInValue ident sko scope = everywhere (mkT go)
 -- Introduce skolem scope at every occurence of a ForAll
 --
 introduceSkolemScope :: Type -> UnifyT Type Check Type
-introduceSkolemScope = everywhereM (mkM go)
+introduceSkolemScope = everywhereOnTypesM go
   where
   go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)
   go other = return other
@@ -964,7 +962,7 @@ check' (PositionedValue pos val) ty =
 check' val ty = throwError $ mkErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
 
 containsTypeSynonyms :: Type -> Bool
-containsTypeSynonyms = everything (||) (mkQ False go) where
+containsTypeSynonyms = everythingOnTypes (||) go where
   go (SaturatedTypeSynonym _ _) = True
   go _ = False
 

@@ -14,7 +14,6 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.TypeChecker.Synonyms (
-    saturateTypeSynonym,
     saturateAllTypeSynonyms
 ) where
 
@@ -23,9 +22,6 @@ import Language.PureScript.Names
 
 import Control.Applicative ((<$>))
 import Data.Maybe (fromMaybe)
-import Data.Data
-import Data.Generics
-import Data.Generics.Extras
 import Control.Monad.Writer
 import Control.Monad.Error
 
@@ -44,15 +40,15 @@ buildTypeSubstitution name n = go n []
 -- |
 -- Replace all instances of a specific type synonym with the @SaturatedTypeSynonym@ data constructor
 --
-saturateTypeSynonym :: (Data d) => Qualified ProperName -> Int -> d -> Either String d
-saturateTypeSynonym name n = everywhereM' (mkM replace)
+saturateTypeSynonym :: Qualified ProperName -> Int -> Type -> Either String Type
+saturateTypeSynonym name n = everywhereOnTypesTopDownM replace
   where
   replace t = fromMaybe t <$> buildTypeSubstitution name n t
 
 -- |
 -- Replace all type synonyms with the @SaturatedTypeSynonym@ data constructor
 --
-saturateAllTypeSynonyms :: (Data d) => [(Qualified ProperName, Int)] -> d -> Either String d
+saturateAllTypeSynonyms :: [(Qualified ProperName, Int)] -> Type -> Either String Type
 saturateAllTypeSynonyms syns d = foldM (\result (name, n) -> saturateTypeSynonym name n result) d syns
 
 

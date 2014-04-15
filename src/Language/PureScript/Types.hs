@@ -19,10 +19,11 @@ module Language.PureScript.Types where
 
 import Data.Data
 import Data.List (nub)
-import Data.Generics (everything, mkQ)
 
 import Control.Monad.Unify
 import Control.Arrow (second)
+import Control.Applicative
+import Control.Monad ((<=<))
 
 import Language.PureScript.Names
 
@@ -157,7 +158,7 @@ replaceAllTypeVars = foldl (\f (name, ty) -> replaceTypeVars name ty . f) id
 -- Collect all type variables appearing in a type
 --
 usedTypeVariables :: Type -> [String]
-usedTypeVariables = nub . everything (++) (mkQ [] go)
+usedTypeVariables = nub . everythingOnTypes (++) go
   where
   go (TypeVar v) = [v]
   go _ = []
@@ -199,5 +200,79 @@ moveQuantifiersToFront = go [] []
          [] -> constrained
          qs' -> foldl (\ty' (q, sco) -> ForAll q ty' sco) constrained qs'
 
+--
+-- Traversals
+--
 
+everywhereOnTypes :: (Type -> Type) -> Type -> Type
+everywhereOnTypes f = go
+  where
+  go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
+  go (SaturatedTypeSynonym name tys) = f (SaturatedTypeSynonym name (map go tys))
+  go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
+  go (ConstrainedType cs ty) = f (ConstrainedType (map (fmap (map go)) cs) (go ty))
+  go (RCons name ty rest) = f (RCons name (go ty) (go rest))
+  go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
+  go (PrettyPrintArray t) = f (PrettyPrintArray (go t))
+  go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
+  go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
+  go other = f other
 
+everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
+everywhereOnTypesTopDown f = go . f
+  where
+  go (TypeApp t1 t2) = TypeApp (go (f t1)) (go (f t2))
+  go (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym name (map (go . f) tys)
+  go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
+  go (ConstrainedType cs ty) = ConstrainedType (map (fmap (map (go . f))) cs) (go (f ty))
+  go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
+  go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
+  go (PrettyPrintArray t) = PrettyPrintArray (go (f t))
+  go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
+  go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
+  go other = f other
+
+sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
+sndM f (a, b) = (,) a <$> f b
+
+everywhereOnTypesM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesM f = go
+  where
+  go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
+  go (SaturatedTypeSynonym name tys) = (SaturatedTypeSynonym name <$> mapM go tys) >>= f
+  go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
+  go (ConstrainedType cs ty) = (ConstrainedType <$> mapM (sndM (mapM go)) cs <*> go ty) >>= f
+  go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
+  go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
+  go (PrettyPrintArray t) = (PrettyPrintArray <$> go t) >>= f
+  go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
+  go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
+  go other = f other
+
+everywhereOnTypesTopDownM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesTopDownM f = go <=< f
+  where
+  go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)
+  go (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym name <$> mapM (go <=< f) tys
+  go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
+  go (ConstrainedType cs ty) = ConstrainedType <$> mapM (sndM (mapM (go <=< f))) cs <*> (f ty >>= go)
+  go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
+  go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
+  go (PrettyPrintArray t) = PrettyPrintArray <$> (f t >>= go)
+  go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
+  go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
+  go other = f other
+
+everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
+everythingOnTypes (<>) f = go
+  where
+  go t@(TypeApp t1 t2) = f t <> go t1 <> go t2
+  go t@(SaturatedTypeSynonym _ tys) = foldl (<>) (f t) (map go tys)
+  go t@(ForAll _ ty _) = f t <> go ty
+  go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go $ concatMap snd cs) <> go ty
+  go t@(RCons _ ty rest) = f t <> go ty <> go rest
+  go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
+  go t@(PrettyPrintArray t1) = f t <> go t1
+  go t@(PrettyPrintObject t1) = f t <> go t1
+  go t@(PrettyPrintForAll _ t1) = f t <> go t1
+  go other = f other

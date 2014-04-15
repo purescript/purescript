@@ -21,7 +21,6 @@ module Language.PureScript.Pretty.Types (
 
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
-import Data.Generics (mkT, everywhere, everywhere')
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows
@@ -74,7 +73,7 @@ appliedFunction = mkPattern match
   match _ = Nothing
 
 insertPlaceholders :: Type -> Type
-insertPlaceholders = everywhere' (mkT convertForAlls) . everywhere (mkT convert)
+insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
