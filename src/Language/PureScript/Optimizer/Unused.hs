@@ -18,23 +18,21 @@ module Language.PureScript.Optimizer.Unused (
   removeCodeAfterReturnStatements
 ) where
 
-import Data.Generics
-
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Optimizer.Common
 
 removeUnusedVariables :: JS -> JS
-removeUnusedVariables = everywhere (mkT $ removeFromBlock withBlock)
+removeUnusedVariables = everywhereOnJS (removeFromBlock withBlock)
   where
   withBlock :: [JS] -> [JS]
   withBlock sts = go sts sts
   go :: [JS] -> [JS] -> [JS]
   go _ [] = []
-  go sts (JSVariableIntroduction var _ : rest) | not (isUsed var sts) = go sts rest
+  go sts (JSVariableIntroduction var _ : rest) | not (any (isUsed var) sts) = go sts rest
   go sts (s : rest) = s : go sts rest
 
 removeCodeAfterReturnStatements :: JS -> JS
-removeCodeAfterReturnStatements = everywhere (mkT $ removeFromBlock go)
+removeCodeAfterReturnStatements = everywhereOnJS (removeFromBlock go)
   where
   go :: [JS] -> [JS]
   go jss | not (any isJSReturn jss) = jss

@@ -17,15 +17,13 @@ module Language.PureScript.Optimizer.Blocks (
   collapseNestedBlocks
 ) where
 
-import Data.Generics
-
 import Language.PureScript.CodeGen.JS.AST
 
 -- |
 -- Collapse blocks which appear nested directly below another block
 --
 collapseNestedBlocks :: JS -> JS
-collapseNestedBlocks = everywhere (mkT collapse)
+collapseNestedBlocks = everywhereOnJS collapse
   where
   collapse :: JS -> JS
   collapse (JSBlock sts) = JSBlock (concatMap go sts)

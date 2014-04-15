@@ -15,8 +15,6 @@
 
 module Language.PureScript.Optimizer.TCO (tco) where
 
-import Data.Generics
-
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
 
@@ -28,7 +26,7 @@ tco opts | optionsNoTco opts = id
          | otherwise = tco'
 
 tco' :: JS -> JS
-tco' = everywhere (mkT convert)
+tco' = everywhereOnJS convert
   where
   tcoLabel :: String
   tcoLabel = "tco"
@@ -61,9 +59,9 @@ tco' = everywhere (mkT convert)
   isTailCall :: String -> JS -> Bool
   isTailCall ident js =
     let
-      numSelfCalls = everything (+) (mkQ 0 countSelfCalls) js
-      numSelfCallsInTailPosition = everything (+) (mkQ 0 countSelfCallsInTailPosition) js
-      numSelfCallsUnderFunctions = everything (+) (mkQ 0 countSelfCallsUnderFunctions) js
+      numSelfCalls = everythingOnJS (+) countSelfCalls js
+      numSelfCallsInTailPosition = everythingOnJS (+) countSelfCallsInTailPosition js
+      numSelfCallsUnderFunctions = everythingOnJS (+) countSelfCallsUnderFunctions js
     in
       numSelfCalls > 0
       && numSelfCalls == numSelfCallsInTailPosition
@@ -75,12 +73,12 @@ tco' = everywhere (mkT convert)
     countSelfCallsInTailPosition :: JS -> Int
     countSelfCallsInTailPosition (JSReturn ret) | isSelfCall ident ret = 1
     countSelfCallsInTailPosition _ = 0
-    countSelfCallsUnderFunctions (JSFunction _ _ js') = everything (+) (mkQ 0 countSelfCalls) js'
+    countSelfCallsUnderFunctions (JSFunction _ _ js') = everythingOnJS (+) countSelfCalls js'
     countSelfCallsUnderFunctions _ = 0
   toLoop :: String -> [String] -> JS -> JS
   toLoop ident allArgs js = JSBlock $
         map (\arg -> JSVariableIntroduction arg (Just (JSVar (copyVar arg)))) allArgs ++
-        [ JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhere (mkT loopify) js ]) ]
+        [ JSLabel tcoLabel $ JSWhile (JSBooleanLiteral True) (JSBlock [ everywhereOnJS loopify js ]) ]
     where
     loopify :: JS -> JS
     loopify (JSReturn ret) | isSelfCall ident ret =

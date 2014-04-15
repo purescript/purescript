@@ -24,7 +24,6 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
 import qualified Data.Data as D
-import Data.Generics (mkQ, everything)
 
 -- |
 -- A precedence level for an infix operator
@@ -441,12 +440,17 @@ data Binder
 -- |
 -- Collect all names introduced in binders in an expression
 --
-binderNames :: (D.Data d) => d -> [Ident]
-binderNames = everything (++) (mkQ [] go)
+binderNames :: Binder -> [Ident]
+binderNames = go []
   where
-  go (VarBinder ident) = [ident]
-  go (NamedBinder ident _) = [ident]
-  go _ = []
+  go ns (VarBinder name) = name : ns
+  go ns (ConstructorBinder _ bs) = foldl go ns bs
+  go ns (ObjectBinder bs) = foldl go ns (map snd bs)
+  go ns (ArrayBinder bs) = foldl go ns bs
+  go ns (ConsBinder b1 b2) = go (go ns b1) b2
+  go ns (NamedBinder name b) = go (name : ns) b
+  go ns (PositionedBinder _ b) = go ns b
+  go ns _ = ns
 
 --
 -- Traversals

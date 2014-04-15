@@ -16,27 +16,26 @@
 module Language.PureScript.Optimizer.Common where
 
 import Data.Maybe (fromMaybe)
-import Data.Generics
 
 import Language.PureScript.CodeGen.JS.AST
 
 applyAll :: [a -> a] -> a -> a
 applyAll = foldl1 (.)
 
-replaceIdent :: (Data d) => String -> JS -> d -> d
-replaceIdent var1 js = everywhere (mkT replace)
+replaceIdent :: String -> JS -> JS -> JS
+replaceIdent var1 js = everywhereOnJS replace
   where
   replace (JSVar var2) | var1 == var2 = js
   replace other = other
 
-replaceIdents :: (Data d) => [(String, JS)] -> d -> d
-replaceIdents vars = everywhere (mkT replace)
+replaceIdents :: [(String, JS)] -> JS -> JS
+replaceIdents vars = everywhereOnJS replace
   where
   replace v@(JSVar var) = fromMaybe v $ lookup var vars
   replace other = other
 
-isReassigned :: (Data d) => String -> d -> Bool
-isReassigned var1 = everything (||) (mkQ False check)
+isReassigned :: String -> JS -> Bool
+isReassigned var1 = everythingOnJS (||) check
   where
   check :: JS -> Bool
   check (JSFunction _ args _) | var1 `elem` args = True
@@ -46,14 +45,14 @@ isReassigned var1 = everything (||) (mkQ False check)
   check (JSForIn arg _ _) | var1 == arg = True
   check _ = False
 
-isRebound :: (Data d) => JS -> d -> Bool
-isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everything (++) (mkQ [] variablesOf) js)
+isRebound :: JS -> JS -> Bool
+isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everythingOnJS (++) variablesOf js)
   where
   variablesOf (JSVar var) = [var]
   variablesOf _ = []
 
-isUsed :: (Data d) => String -> d -> Bool
-isUsed var1 = everything (||) (mkQ False check)
+isUsed :: String -> JS -> Bool
+isUsed var1 = everythingOnJS (||) check
   where
   check :: JS -> Bool
   check (JSVar var2) | var1 == var2 = True
@@ -66,8 +65,8 @@ targetVariable (JSAccessor _ tgt) = targetVariable tgt
 targetVariable (JSIndexer _ tgt) = targetVariable tgt
 targetVariable _ = error "Invalid argument to targetVariable"
 
-isUpdated :: (Data d) => String -> d -> Bool
-isUpdated var1 = everything (||) (mkQ False check)
+isUpdated :: String -> JS -> Bool
+isUpdated var1 = everythingOnJS (||) check
   where
   check :: JS -> Bool
   check (JSAssignment target _) | var1 == targetVariable target = True

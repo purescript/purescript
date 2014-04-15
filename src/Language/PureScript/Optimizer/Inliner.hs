@@ -22,8 +22,6 @@ module Language.PureScript.Optimizer.Inliner (
   evaluateIifes
 ) where
 
-import Data.Generics
-
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Optimizer.Common
@@ -41,42 +39,42 @@ shouldInline (JSIndexer index val) = shouldInline index && shouldInline val
 shouldInline _ = False
 
 etaConvert :: JS -> JS
-etaConvert = everywhere (mkT convert)
+etaConvert = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents block@(JSBlock body)) args)])
     | all shouldInline args &&
       not (any (`isRebound` block) (map JSVar idents)) &&
       not (any (`isRebound` block) args)
-      = JSBlock (replaceIdents (zip idents args) body)
+      = JSBlock (map (replaceIdents (zip idents args)) body)
   convert js = js
 
 unThunk :: JS -> JS
-unThunk = everywhere (mkT convert)
+unThunk = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSBlock [JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) [])]) = JSBlock body
   convert js = js
 
 evaluateIifes :: JS -> JS
-evaluateIifes = everywhere (mkT convert)
+evaluateIifes = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp (JSFunction Nothing [] (JSBlock [JSReturn ret])) []) = ret
   convert js = js
 
 inlineVariables :: JS -> JS
-inlineVariables = everywhere (mkT $ removeFromBlock go)
+inlineVariables = everywhereOnJS $ removeFromBlock go
   where
   go :: [JS] -> [JS]
   go [] = []
   go (JSVariableIntroduction var (Just js) : sts)
-    | shouldInline js && not (isReassigned var sts) && not (isRebound js sts) && not (isUpdated var sts) =
-      go (replaceIdent var js sts)
+    | shouldInline js && not (any (isReassigned var) sts) && not (any (isRebound js) sts) && not (any (isUpdated var) sts) =
+      go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
-inlineOperator (m, op) f = everywhere (mkT convert)
+inlineOperator (m, op) f = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
@@ -122,7 +120,7 @@ inlineCommonOperators = applyAll
   ]
   where
   binary :: String -> String -> BinaryOperator -> JS -> JS
-  binary dictName opString op = everywhere (mkT convert)
+  binary dictName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
@@ -131,7 +129,7 @@ inlineCommonOperators = applyAll
     isOp (JSIndexer (JSStringLiteral op') (JSVar prelude)) = prelude == C.prelude && opString == op'
     isOp _ = False
   binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
-  binaryFunction dictName fnName op = everywhere (mkT convert)
+  binaryFunction dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
@@ -139,7 +137,7 @@ inlineCommonOperators = applyAll
     isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName == fnName'
     isOp _ = False
   unary :: String -> String -> UnaryOperator -> JS -> JS
-  unary dictName fnName op = everywhere (mkT convert)
+  unary dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict dictName dict = JSUnary op x

@@ -215,7 +215,7 @@ renameInModule imports exports (Module mn decls exps) =
     bindFunctionArgs pb other = return (pb, other)
 
     bindBinders :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
-    bindBinders (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, binderNames bs ++ bound), c)
+    bindBinders (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, concatMap binderNames bs ++ bound), c)
 
     letBoundVariable :: Declaration -> Maybe Ident
     letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident

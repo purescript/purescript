@@ -20,7 +20,6 @@ module Language.PureScript.Optimizer.MagicDo (
 
 import Data.List (nub)
 import Data.Maybe (fromJust, isJust)
-import Data.Generics
 
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
@@ -50,7 +49,7 @@ magicDo opts | optionsNoMagicDo opts = id
 --  }
 --
 magicDo' :: JS -> JS
-magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
+magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   where
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
@@ -106,7 +105,7 @@ magicDo' = everywhere (mkT undo) . everywhere' (mkT convert)
 -- Inline functions in the ST module
 --
 inlineST :: JS -> JS
-inlineST = everywhere (mkT convertBlock)
+inlineST = everywhereOnJS convertBlock
   where
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
@@ -116,7 +115,7 @@ inlineST = everywhere (mkT convertBlock)
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
         localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
-    in everywhere (mkT $ convert (allUsagesAreLocalVars && localVarsDoNotEscape)) arg
+    in everywhereOnJS (convert (allUsagesAreLocalVars && localVarsDoNotEscape)) arg
   convertBlock other = other
   -- Convert a block in a safe way, preserving object wrappers of references,
   -- or in a more aggressive way, turning wrappers into local variables depending on the
@@ -138,18 +137,18 @@ inlineST = everywhere (mkT convertBlock)
   isSTFunc name (JSAccessor name' (JSVar st)) = st == C.st && name == name'
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
-  findSTRefsIn = everything (++) (mkQ [] isSTRef)
+  findSTRefsIn = everythingOnJS (++) isSTRef
     where
     isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [_]) []))) | isSTFunc C.newSTRef f = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
-  findAllSTUsagesIn = everything (++) (mkQ [] isSTUsage)
+  findAllSTUsagesIn = everythingOnJS (++) isSTUsage
     where
     isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f = [ref]
     isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc C.writeSTRef f || isSTFunc C.modifySTRef f = [ref]
     isSTUsage _ = []
   -- Find all uses of a variable
-  appearingIn ref = everything (++) (mkQ [] isVar)
+  appearingIn ref = everythingOnJS (++) isVar
     where
     isVar e@(JSVar v) | v == ref = [e]
     isVar _ = []
