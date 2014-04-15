@@ -14,49 +14,71 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Scope (
-    usedNames,
+    usedNamesDecl,
+    usedNamesValue,
+    usedNamesBinder,
+    usedNamesCaseAlternative,
+    usedNamesDoNotationElement,
     unusedNames
 ) where
 
-import Control.Applicative ((<$>))
-
-import Data.Data
 import Data.List ((\\), nub)
-import Data.Generics (extQ, mkQ, everything)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
-import Language.PureScript.CodeGen.JS.AST
+
+usedNames :: (Declaration -> [Ident], Value -> [Ident], Binder -> [Ident], CaseAlternative -> [Ident], DoNotationElement -> [Ident])
+usedNames = everythingOnValues (++) f g h (const []) (const [])
+  where
+  f :: Declaration -> [Ident]
+  f (ValueDeclaration name _ _ _ _) = [name]
+  f _ = []
+
+  g :: Value -> [Ident]
+  g (Abs (Left arg) _) = [arg]
+  g (Var (Qualified Nothing name)) = [name]
+  g _ = []
+
+  h :: Binder -> [Ident]
+  h (VarBinder name) = [name]
+  h _ = []
+
+-- |
+-- Gather all used names appearing inside a declaration
+--
+usedNamesDecl :: Declaration -> [Ident]
+usedNamesDecl = let (f, _, _, _, _) = usedNames in nub . f
 
 -- |
 -- Gather all used names appearing inside a value
 --
-usedNames :: (Data d) => d -> [Ident]
-usedNames val = nub $ everything (++) (mkQ [] namesV `extQ` namesB `extQ` namesJS) val
-  where
-  namesV :: Value -> [Ident]
-  namesV (Abs (Left arg) _) = [arg]
-  namesV (Var (Qualified Nothing name)) = [name]
-  namesV _ = []
-  namesB :: Binder -> [Ident]
-  namesB (VarBinder name) = [name]
-  namesB _ = []
-  namesJS :: JS -> [Ident]
-  namesJS (JSVar name) = [Ident name]
-  namesJS (JSFunction (Just name) args _) = Ident name : (Ident <$> args)
-  namesJS (JSFunction Nothing args _) = Ident <$> args
-  namesJS (JSVariableIntroduction name _) = [Ident name]
-  namesJS (JSFor name _ _ _) = [Ident name]
-  namesJS (JSForIn name _ _) = [Ident name]
-  namesJS _ = []
+usedNamesValue :: Value -> [Ident]
+usedNamesValue = let (_, f, _, _, _) = usedNames in nub . f
+
+-- |
+-- Gather all used names appearing inside a binder
+--
+usedNamesBinder :: Binder -> [Ident]
+usedNamesBinder = let (_, _, f, _, _) = usedNames in nub . f
+
+-- |
+-- Gather all used names appearing inside a case alternative
+--
+usedNamesCaseAlternative :: CaseAlternative -> [Ident]
+usedNamesCaseAlternative = let (_, _, _, f, _) = usedNames in nub . f
+
+-- |
+-- Gather all used names appearing inside a do notation element
+--
+usedNamesDoNotationElement :: DoNotationElement -> [Ident]
+usedNamesDoNotationElement = let (_, _, _, _, f) = usedNames in nub . f
 
 -- |
 -- Generate a set of names which are unused inside a value, of the form @_{n}@ for an integer @n@
 --
-unusedNames :: (Data d) => d -> [Ident]
-unusedNames val =
+unusedNames :: [Ident] -> [Ident]
+unusedNames allNames =
   let
-    allNames = usedNames val
     varNames = map (Ident . ('_' :) . show) ([1..] :: [Int])
   in
     varNames \\ allNames

@@ -49,7 +49,8 @@ desugarAbs = map f
 
   replace (Abs (Right binder) val) =
     let
-      ident = head $ unusedNames (binder, val)
+      used = usedNamesBinder binder ++ usedNamesValue val
+      ident = head $ unusedNames used
     in
       Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing val]
   replace other = other
@@ -108,7 +109,8 @@ makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Value))] -> Declaratio
 makeCaseDeclaration ident alternatives =
   let
     argPattern = length . fst . head $ alternatives
-    args = take argPattern $ unusedNames (ident, alternatives)
+    args = take argPattern $ unusedNames used
+    used = concatMap (\(bs, (grd, val)) -> concatMap usedNamesBinder bs ++ maybe [] usedNamesValue grd ++ usedNamesValue val) alternatives
     vars = map (Var . Qualified Nothing) args
     binders = [ CaseAlternative bs g val | (bs, (g, val)) <- alternatives ]
     value = foldr (Abs . Left) (Case vars binders) args

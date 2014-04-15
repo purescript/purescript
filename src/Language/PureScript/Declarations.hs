@@ -510,3 +510,55 @@ everywhereOnValues f g h = (f', g', h')
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind (h' b) (g' v)
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
   handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos (handleDoNotationElement e)
+
+everythingOnValues :: (r -> r -> r) ->
+                      (Declaration -> r) ->
+                      (Value -> r) ->
+                      (Binder -> r) ->
+                      (CaseAlternative -> r) ->
+                      (DoNotationElement -> r) ->
+                      (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+everythingOnValues (<>) f g h i j = (f', g', h', i', j')
+  where
+  f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(ValueDeclaration _ _ bs Nothing val) = foldl (<>) (f d) (map h' bs) <> g' val
+  f' d@(ValueDeclaration _ _ bs (Just grd) val) = foldl (<>) (f d) (map h' bs) <> g' grd <> g' val
+  f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
+  f' d@(TypeClassDeclaration _ _ _ ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(PositionedDeclaration _ d1) = f d <> f' d1
+  f' d = f d
+
+  g' v@(UnaryMinus v1) = g v <> g' v1
+  g' v@(BinaryNoParens _ v1 v2) = g v <> g' v1 <> g' v2
+  g' v@(Parens v1) = g v <> g' v1
+  g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
+  g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
+  g' v@(Accessor _ v1) = g v <> g' v1
+  g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
+  g' v@(Abs _ v1) = g v <> g' v1
+  g' v@(App v1 v2) = g v <> g' v1 <> g' v2
+  g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
+  g' v@(Case vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
+  g' v@(TypedValue _ v1 _) = g v <> g' v1
+  g' v@(Let ds v1) = (foldl (<>) (g v) (map f' ds)) <> g' v1
+  g' v@(Do es) = foldl (<>) (g v) (map j' es)
+  g' v@(PositionedValue _ v1) = g v <> g' v1
+  g' v = g v
+
+  h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
+  h' b@(ObjectBinder bs) = foldl (<>) (h b) (map (h' . snd) bs)
+  h' b@(ArrayBinder bs) = foldl (<>) (h b) (map h' bs)
+  h' b@(ConsBinder b1 b2) = h b <> h' b1 <> h' b2
+  h' b@(NamedBinder _ b1) = h b <> h' b1
+  h' b@(PositionedBinder _ b1) = h b <> h' b1
+  h' b = h b
+
+  i' ca = case caseAlternativeGuard ca of
+    Nothing -> foldl (<>) (i ca) (map h' (caseAlternativeBinders ca)) <> g' (caseAlternativeResult ca)
+    Just grd -> foldl (<>) (i ca) (map h' (caseAlternativeBinders ca)) <> g' grd <> g' (caseAlternativeResult ca)
+
+  j' e@(DoNotationValue v) = j e <> g' v
+  j' e@(DoNotationBind b v) = j e <> h' b <> g' v
+  j' e@(DoNotationLet ds) = foldl (<>) (j e) (map f' ds)
+  j' e@(PositionedDoNotationElement _ e1) = j e <> j' e1

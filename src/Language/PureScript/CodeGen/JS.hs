@@ -34,7 +34,6 @@ import Control.Monad (replicateM, forM)
 import qualified Data.Map as M
 
 import Language.PureScript.Names
-import Language.PureScript.Scope
 import Language.PureScript.Declarations
 import Language.PureScript.CodeGen.Monad
 import Language.PureScript.Options
@@ -43,6 +42,8 @@ import Language.PureScript.Types
 import Language.PureScript.Optimizer
 import Language.PureScript.CodeGen.Common
 import Language.PureScript.Environment
+
+import qualified Language.PureScript.Scope as S
 
 -- |
 -- Different types of modules which are supported
@@ -167,7 +168,8 @@ valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
 extendObj :: JS -> [(String, JS)] -> JS
 extendObj obj sts = JSApp (JSFunction Nothing [] block) []
   where
-  [newObj, key] = take 2 . map identToJs . unusedNames $ (obj, sts)
+  [newObj, key] = take 2 . map identToJs . S.unusedNames $ used
+  used = usedNamesJS obj ++ concatMap (usedNamesJS . snd) sts
   jsKey = JSVar key
   jsNewObj = JSVar newObj
   block = JSBlock (objAssign:copy:extend ++ [JSReturn jsNewObj])
@@ -247,12 +249,14 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 -- and guards.
 --
 bindersToJs :: Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> JS
-bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders, vals))) $ do
+bindersToJs opts m e binders vals = runGen (map identToJs (S.unusedNames usedNames)) $ do
   valNames <- replicateM (length vals) fresh
   jss <- forM binders $ \(CaseAlternative bs grd result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (concatMap binderNames bs) e) result)] bs grd
   return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
                  vals
   where
+    usedNames = concatMap usedNamesJS vals ++ concatMap S.usedNamesCaseAlternative binders
+
     go :: [String] -> [JS] -> [Binder] -> Maybe Guard -> Gen [JS]
     go _ done [] Nothing = return done
     go _ done [] (Just cond) = return [JSIfElse (valueToJs opts m e cond) (JSBlock done) Nothing]
@@ -260,6 +264,20 @@ bindersToJs opts m e binders vals = runGen (map identToJs (unusedNames (binders,
       done'' <- go vs done' bs grd
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
+
+-- |
+-- Gather all used names appearing inside a value
+--
+usedNamesJS :: JS -> [Ident]
+usedNamesJS val = nub $ everythingOnJS (++) namesJS val
+  where
+  namesJS (JSVar name) = [Ident name]
+  namesJS (JSFunction (Just name) args _) = Ident name : map Ident args
+  namesJS (JSFunction Nothing args _) = map Ident args
+  namesJS (JSVariableIntroduction name _) = [Ident name]
+  namesJS (JSFor name _ _ _) = [Ident name]
+  namesJS (JSForIn name _ _) = [Ident name]
+  namesJS _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
@@ -342,3 +360,4 @@ isOnlyConstructor e ctor =
   numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
   typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
   typeConstructor _ = error "Invalid argument to isOnlyConstructor"
+

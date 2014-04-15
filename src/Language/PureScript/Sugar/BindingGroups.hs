@@ -21,7 +21,6 @@ module Language.PureScript.Sugar.BindingGroups (
     collapseBindingGroupsModule
 ) where
 
-import Data.Data
 import Data.Graph
 import Data.Generics
 import Data.Generics.Extras
@@ -90,7 +89,7 @@ collapseBindingGroupsForValue :: Value -> Value
 collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
-usedIdents :: (Data d) => ModuleName -> d -> [Ident]
+usedIdents :: ModuleName -> Declaration -> [Ident]
 usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
   where
   usedNames :: Value -> [Ident]
@@ -98,7 +97,7 @@ usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
   usedNames (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   usedNames _ = []
 
-usedProperNames :: (Data d) => ModuleName -> d -> [ProperName]
+usedProperNames :: ModuleName -> Declaration -> [ProperName]
 usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
   where
   usedNames :: Type -> [ProperName]
