@@ -44,7 +44,7 @@ module Language.PureScript.TypeChecker.Types (
 import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import Data.Generics
-       (everythingWithContext, mkM, mkT, something, everywhere, mkQ)
+       (everythingWithContext, mkM, something, mkQ)
 import Data.Generics.Extras
 
 import Language.PureScript.Declarations
@@ -251,7 +251,7 @@ isTyped (name, value) = (name, (value, Nothing))
 -- Map a function over type annotations appearing inside a value
 --
 overTypes :: (Type -> Type) -> Value -> Value
-overTypes f = everywhere (mkT g)
+overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Value -> Value
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
@@ -811,7 +811,7 @@ skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
 -- only example of scoped type variables.
 --
 skolemizeTypesInValue :: String -> Int -> SkolemScope -> Value -> Value
-skolemizeTypesInValue ident sko scope = everywhere (mkT go)
+skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id go id in f
   where
   go (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
   go other = other

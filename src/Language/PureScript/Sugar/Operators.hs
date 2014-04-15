@@ -57,9 +57,12 @@ rebracket ms = do
   let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
   mapM (rebracketModule opTable) ms
 
-removeSignedLiterals :: (D.Data d) => d -> d
-removeSignedLiterals = G.everywhere (G.mkT go)
+
+removeSignedLiterals :: Module -> Module
+removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   where
+  (f', _, _) = everywhereOnValues id go id
+
   go (UnaryMinus (NumericLiteral (Left n))) = NumericLiteral (Left $ negate n)
   go (UnaryMinus (NumericLiteral (Right n))) = NumericLiteral (Right $ negate n)
   go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val

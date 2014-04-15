@@ -447,3 +447,62 @@ binderNames = everything (++) (mkQ [] go)
   go (VarBinder ident) = [ident]
   go (NamedBinder ident _) = [ident]
   go _ = []
+
+--
+-- Traversals
+--
+
+everywhereOnValues :: (Declaration -> Declaration) ->
+                      (Value -> Value) ->
+                      (Binder -> Binder) ->
+                      (Declaration -> Declaration, Value -> Value, Binder -> Binder)
+everywhereOnValues f g h = (f', g', h')
+  where
+  f' :: Declaration -> Declaration
+  f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (map f' ds))
+  f' (ValueDeclaration name nameKind bs grd val) = f (ValueDeclaration name nameKind (map h' bs) (fmap g' grd) (g' val))
+  f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
+  f' (TypeClassDeclaration name args implies ds) = f (TypeClassDeclaration name args implies (map f' ds))
+  f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (map f' ds))
+  f' (PositionedDeclaration pos d) = f (PositionedDeclaration pos (f' d))
+  f' other = f other
+
+  g' :: Value -> Value
+  g' (UnaryMinus v) = g (UnaryMinus (g' v))
+  g' (BinaryNoParens op v1 v2) = g (BinaryNoParens op (g' v1) (g' v2))
+  g' (Parens v) = g (Parens (g' v))
+  g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
+  g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
+  g' (Accessor prop v) = g (Accessor prop (g' v))
+  g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
+  g' (Abs name v) = g (Abs name (g' v))
+  g' (App v1 v2) = g (App (g' v1) (g' v2))
+  g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
+  g' (Case vs alts) = g (Case (map g' vs) (map handleCaseAlternative alts))
+  g' (TypedValue check v ty) = g (TypedValue check (g' v) ty)
+  g' (Let ds v) = g (Let (map f' ds) (g' v))
+  g' (Do es) = g (Do (map handleDoNotationElement es))
+  g' (PositionedValue pos v) = g (PositionedValue pos (g' v))
+  g' other = g other
+
+  h' :: Binder -> Binder
+  h' (ConstructorBinder ctor bs) = h (ConstructorBinder ctor (map h' bs))
+  h' (ObjectBinder bs) = h (ObjectBinder (map (fmap h') bs))
+  h' (ArrayBinder bs) = h (ArrayBinder (map h' bs))
+  h' (ConsBinder b1 b2) = h (ConsBinder (h' b1) (h' b2))
+  h' (NamedBinder name b) = h (NamedBinder name (h' b))
+  h' (PositionedBinder pos b) = h (PositionedBinder pos (h' b))
+  h' other = h other
+
+  handleCaseAlternative :: CaseAlternative -> CaseAlternative
+  handleCaseAlternative ca =
+    ca { caseAlternativeBinders = map h' (caseAlternativeBinders ca)
+       , caseAlternativeGuard = fmap g' (caseAlternativeGuard ca)
+       , caseAlternativeResult = g' (caseAlternativeResult ca)
+       }
+
+  handleDoNotationElement :: DoNotationElement -> DoNotationElement
+  handleDoNotationElement (DoNotationValue v) = DoNotationValue (g' v)
+  handleDoNotationElement (DoNotationBind b v) = DoNotationBind (h' b) (g' v)
+  handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
+  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos (handleDoNotationElement e)

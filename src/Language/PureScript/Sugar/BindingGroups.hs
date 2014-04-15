@@ -79,7 +79,7 @@ createBindingGroupsForValue moduleName = everywhereM' (mkM go)
 -- Collapse all binding groups to individual declarations
 --
 collapseBindingGroups :: [Declaration] -> [Declaration]
-collapseBindingGroups = everywhere (mkT collapseBindingGroupsForValue) . concatMap go
+collapseBindingGroups = let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id in map f . concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds

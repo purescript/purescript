@@ -21,7 +21,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
 
 import Data.Monoid ((<>))
 import Data.List (groupBy)
-import Data.Generics (mkM, mkT, everywhere)
+import Data.Generics (mkM)
 import Data.Generics.Extras
 
 import Control.Applicative
@@ -43,8 +43,10 @@ desugarCasesModule ms = forM ms $ \(Module name ds exps) ->
     Module name <$> (desugarCases . desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> [Declaration]
-desugarAbs = everywhere (mkT replace)
+desugarAbs = map f
   where
+  (f, _, _) = everywhereOnValues id replace id
+
   replace (Abs (Right binder) val) =
     let
       ident = head $ unusedNames (binder, val)

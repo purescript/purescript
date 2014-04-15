@@ -48,7 +48,7 @@ import Control.Category ((>>>))
 --  * Qualify any unqualified names and types
 --
 desugar :: [Module] -> Either ErrorStack [Module]
-desugar = removeSignedLiterals
+desugar = map removeSignedLiterals
           >>> desugarDo
           >=> desugarCasesModule
           >=> desugarTypeDeclarationsModule
