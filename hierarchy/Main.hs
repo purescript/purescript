@@ -1,10 +1,10 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Main
--- Copyright   :  (c) Phil Freeman 2014
+-- Copyright   :  (c) Hardy Jones 2014
 -- License     :  MIT
 --
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
+-- Maintainer  :  Hardy Jones <jones3.hardy@gmail.com>
 -- Stability   :  experimental
 -- Portability :
 --
@@ -64,7 +64,6 @@ compile input mOutput = do
             tcs = filter P.isTypeClassDeclaration decls
             supers = sort . nub . filter (not . null) $ fmap superClasses tcs
             prologue = "digraph " ++ name ++ " {\n"
-            --body = intercalate "\n" (concatMap (fmap (("  " ++) . (++ ";") . show)) supers)
             body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ show s ++ ";")) supers)
             epilogue = "\n}"
             hier = prologue ++ body ++ epilogue
