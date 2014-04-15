@@ -93,3 +93,7 @@
 
 - The `grunt-purescript` plugin has been updated to provide support for new command line options.
 - There is a new `gulp-purescript` plugin available for compiling with Gulp.
+
+### Documentation 
+
+- There is a new `hierarchy` executable which will generate `.dot` diagrams based on the type class hierarchy of a module. The Prelude docs have been updated to include such a type class diagram. (joneshf)
