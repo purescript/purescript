@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
 
 module Language.PureScript.Declarations where
 
@@ -668,6 +668,74 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   j' e@(DoNotationLet ds) = foldl (<>) (j e) (map f' ds)
   j' e@(PositionedDoNotationElement _ e1) = j e <> j' e1
 
+everythingWithContextOnValues ::
+  s ->
+  r ->
+  (r -> r -> r) ->
+  (s -> Declaration       -> (s, r)) ->
+  (s -> Value             -> (s, r)) ->
+  (s -> Binder            -> (s, r)) ->
+  (s -> CaseAlternative   -> (s, r)) ->
+  (s -> DoNotationElement -> (s, r)) ->
+  ( Declaration       -> r
+  , Value             -> r
+  , Binder            -> r
+  , CaseAlternative   -> r
+  , DoNotationElement -> r)
+everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
+  where
+  f'' s d = let (s', r) = f s d in r <> f' s' d
+
+  f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (ValueDeclaration _ _ bs Nothing val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
+  f' s (ValueDeclaration _ _ bs (Just grd) val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) grd <> (g'' s) val
+  f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> (g'' s) val) ds)
+  f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (PositionedDeclaration _ d1) = (f'' s) d1
+  f' _ _ = r0
+
+  g'' s v = let (s', r) = g s v in r <> g' s' v
+
+  g' s (UnaryMinus v1) = (g'' s) v1
+  g' s (BinaryNoParens _ v1 v2) = (g'' s) v1 <> (g'' s) v2
+  g' s (Parens v1) = (g'' s) v1
+  g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
+  g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
+  g' s (Accessor _ v1) = (g'' s) v1
+  g' s (ObjectUpdate obj vs) = foldl (<>) ((g'' s) obj) (map (g'' s . snd) vs)
+  g' s (Abs _ v1) = (g'' s) v1
+  g' s (App v1 v2) = (g'' s) v1 <> (g'' s) v2
+  g' s (IfThenElse v1 v2 v3) = (g'' s) v1 <> (g'' s) v2 <> (g'' s) v3
+  g' s (Case vs alts) = foldl (<>) (foldl (<>) r0 (map (g'' s) vs)) (map (i'' s) alts)
+  g' s (TypedValue _ v1 _) = (g'' s) v1
+  g' s (Let ds v1) = (foldl (<>) r0 (map (f'' s) ds)) <> (g'' s) v1
+  g' s (Do es) = foldl (<>) r0 (map (j'' s) es)
+  g' s (PositionedValue _ v1) = (g'' s) v1
+  g' _ _ = r0
+
+  h'' s b = let (s', r) = h s b in r <> h' s' b
+
+  h' s (ConstructorBinder _ bs) = foldl (<>) r0 (map (h'' s) bs)
+  h' s (ObjectBinder bs) = foldl (<>) r0 (map (h'' s . snd) bs)
+  h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
+  h' s (ConsBinder b1 b2) = (h'' s) b1 <> (h'' s) b2
+  h' s (NamedBinder _ b1) = (h'' s) b1
+  h' s (PositionedBinder _ b1) = (h'' s) b1
+  h' _ _ = r0
+
+  i'' s ca = let (s', r) = i s ca in r <> i' s' ca
+
+  i' s (CaseAlternative bs Nothing val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
+  i' s (CaseAlternative bs (Just grd) val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) grd <> (g'' s) val
+
+  j'' s e = let (s', r) = j s e in r <> j' s' e
+
+  j' s (DoNotationValue v) = (g'' s) v
+  j' s (DoNotationBind b v) =  (h'' s) b <> (g'' s) v
+  j' s (DoNotationLet ds) = foldl (<>) r0 (map (f'' s) ds)
+  j' s (PositionedDoNotationElement _ e1) = (j'' s) e1
+
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
@@ -684,6 +752,5 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (SuperClassDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
-
 
 

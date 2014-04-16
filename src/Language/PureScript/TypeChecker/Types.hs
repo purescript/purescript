@@ -46,8 +46,6 @@ import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
 import Data.Function (on)
 import Data.Ord (comparing)
 import Data.Monoid
-import Data.Generics
-       (everythingWithContext, mkQ)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Types
@@ -462,22 +460,25 @@ skolemEscapeCheck root@TypedValue{} =
   -- We traverse the tree top-down, and collect any SkolemScopes introduced by ForAlls.
   -- If a Skolem is encountered whose SkolemScope is not in the current list, we have found
   -- an escaped skolem variable.
-  case everythingWithContext [] (++) (mkQ ((,) []) go) root of
-    [] -> return ()
-    ((binding, val) : _) -> throwError $ mkErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ValueError val))
+  let (_, f, _, _, _) = everythingWithContextOnValues [] [] (++) def go def def def
+  in case f root of
+       [] -> return ()
+       ((binding, val) : _) -> throwError $ mkErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ValueError val))
   where
-  go :: Value -> [(SkolemScope, Value)] -> ([(Maybe Value, Value)], [(SkolemScope, Value)])
-  go val@(TypedValue _ _ (ForAll _ _ (Just sco))) scos = ([], (sco, val) : scos)
-  go val@(TypedValue _ _ ty) scos = case collectSkolems ty \\ map fst scos of
-                                      (sco : _) -> ([(findBindingScope sco, val)], scos)
-                                      _ -> ([], scos)
+  def s _ = (s, [])
+
+  go :: [(SkolemScope, Value)] -> Value -> ([(SkolemScope, Value)], [(Maybe Value, Value)])
+  go scos val@(TypedValue _ _ (ForAll _ _ (Just sco))) = ((sco, val) : scos, [])
+  go scos val@(TypedValue _ _ ty) = case collectSkolems ty \\ map fst scos of
+                                      (sco : _) -> (scos, [(findBindingScope sco, val)])
+                                      _ -> (scos, [])
     where
     collectSkolems :: Type -> [SkolemScope]
     collectSkolems = nub . everythingOnTypes (++) collect
       where
       collect (Skolem _ _ scope) = [scope]
       collect _ = []
-  go _ scos = ([], scos)
+  go scos _ = (scos, [])
   findBindingScope :: SkolemScope -> Maybe Value
   findBindingScope sco =
     let (_, f, _, _, _) = everythingOnValues mappend (const mempty) go' (const mempty) (const mempty) (const mempty)
