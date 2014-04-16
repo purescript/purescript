@@ -22,7 +22,7 @@ module Language.PureScript.Sugar.BindingGroups (
 ) where
 
 import Data.Graph
-import Data.Generics
+import Data.Generics (mkM)
 import Data.Generics.Extras
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
@@ -90,7 +90,9 @@ collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
-usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
+usedIdents moduleName =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) usedNames (const []) (const []) (const [])
+  in nub . f
   where
   usedNames :: Value -> [Ident]
   usedNames (Var (Qualified Nothing name)) = [name]
@@ -98,7 +100,9 @@ usedIdents moduleName = nub . everything (++) (mkQ [] usedNames)
   usedNames _ = []
 
 usedProperNames :: ModuleName -> Declaration -> [ProperName]
-usedProperNames moduleName = nub . everything (++) (mkQ [] usedNames)
+usedProperNames moduleName =
+  let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
+  in nub . f
   where
   usedNames :: Type -> [ProperName]
   usedNames (ConstrainedType constraints _) = flip mapMaybe constraints $ \qual ->

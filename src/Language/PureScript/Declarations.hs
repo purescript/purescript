@@ -16,6 +16,8 @@
 
 module Language.PureScript.Declarations where
 
+import Data.Monoid (Monoid(..), mconcat)
+
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -562,3 +564,22 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   j' e@(DoNotationBind b v) = j e <> h' b <> g' v
   j' e@(DoNotationLet ds) = foldl (<>) (j e) (map f' ds)
   j' e@(PositionedDoNotationElement _ e1) = j e <> j' e1
+
+accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
+  where
+  forDecls (DataDeclaration _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (ExternDeclaration _ _ _ ty) = f ty
+  forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
+  forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)
+  forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
+  forDecls (TypeSynonymDeclaration _ _ ty) = f ty
+  forDecls (TypeDeclaration _ ty) = f ty
+  forDecls _ = mempty
+
+  forValues (TypeClassDictionary _ (_, cs) _) = mconcat (map f cs)
+  forValues (SuperClassDictionary _ tys) = mconcat (map f tys)
+  forValues (TypedValue _ _ ty) = f ty
+  forValues _ = mempty
+
+
