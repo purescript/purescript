@@ -16,10 +16,8 @@ module Language.PureScript.DeadCodeElimination (
   eliminateDeadCode
 ) where
 
-import Data.Data
 import Data.List
 import Data.Graph
-import Data.Generics
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.Names
@@ -73,8 +71,10 @@ declarationsByModule (Module moduleName ds _) = concatMap go ds
   go (PositionedDeclaration _ d) = go d
   go _ = []
 
-dependencies :: (Data d) => ModuleName -> d -> [Key]
-dependencies moduleName = nub . everything (++) (mkQ [] values)
+dependencies :: ModuleName -> Declaration -> [Key]
+dependencies moduleName =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) values (const []) (const []) (const [])
+  in nub . f
   where
   values :: Value -> [Key]
   values (Var ident) = let (mn, name) = qualify moduleName ident in [(mn, Left name)]
