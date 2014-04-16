@@ -15,10 +15,9 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Sugar.DoNotation (
-    desugarDo
+    desugarDoModule
 ) where
 
-import Data.Data
 import Data.Generics
 
 import Language.PureScript.Names
@@ -34,7 +33,10 @@ import Control.Applicative
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
 -- and all @DoNotationLet@ constructors with let expressions.
 --
-desugarDo :: (Data d) => d -> Either ErrorStack d
+desugarDoModule :: Module -> Either ErrorStack Module
+desugarDoModule (Module mn ds exts) = Module mn <$> mapM desugarDo ds <*> pure exts
+
+desugarDo :: Declaration -> Either ErrorStack Declaration
 desugarDo = everywhereM (mkM replace)
   where
   prelude :: ModuleName

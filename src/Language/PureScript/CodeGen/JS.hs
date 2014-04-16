@@ -26,7 +26,6 @@ module Language.PureScript.CodeGen.JS (
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Function (on)
 import Data.List (nub, (\\))
-import Data.Generics (mkQ, everything)
 
 import Control.Arrow (second)
 import Control.Monad (replicateM, forM)
@@ -78,7 +77,9 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
     Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
-imports = everything (++) (mkQ [] collect)
+imports =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) collect (const []) (const []) (const [])
+  in f
   where
   collect :: Value -> [ModuleName]
   collect (Var (Qualified (Just mn) _)) = [mn]

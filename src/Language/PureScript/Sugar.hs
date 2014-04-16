@@ -49,7 +49,7 @@ import Control.Category ((>>>))
 --
 desugar :: [Module] -> Either ErrorStack [Module]
 desugar = map removeSignedLiterals
-          >>> desugarDo
+          >>> mapM desugarDoModule
           >=> desugarCasesModule
           >=> desugarTypeDeclarationsModule
           >=> desugarImports

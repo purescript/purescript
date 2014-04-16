@@ -37,7 +37,6 @@ import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
 
-import qualified Data.Data as D
 import qualified Data.Generics as G
 import qualified Data.Generics.Extras as G
 
@@ -57,7 +56,6 @@ rebracket ms = do
   let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
   mapM (rebracketModule opTable) ms
 
-
 removeSignedLiterals :: Module -> Module
 removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   where
@@ -69,10 +67,12 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   go other = other
 
 rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either ErrorStack Module
-rebracketModule opTable (Module mn ds exts) = Module mn <$> (removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
+rebracketModule opTable (Module mn ds exts) = Module mn <$> (map removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
 
-removeParens :: (D.Data d) => d -> d
-removeParens = G.everywhere (G.mkT go)
+removeParens :: Declaration -> Declaration
+removeParens =
+  let (f, _, _) = everywhereOnValues id go id
+  in f
   where
   go (Parens val) = val
   go val = val
