@@ -43,8 +43,11 @@ module Language.PureScript.TypeChecker.Types (
 
 import Data.List
 import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
+import Data.Function (on)
+import Data.Ord (comparing)
+import Data.Monoid
 import Data.Generics
-       (everythingWithContext, mkM, something, mkQ)
+       (everythingWithContext, mkM, mkQ)
 import Data.Generics.Extras
 
 import Language.PureScript.Declarations
@@ -69,9 +72,6 @@ import Control.Arrow (Arrow(..))
 
 import qualified Data.Map as M
 import qualified Data.HashMap.Strict as H
-import Data.Function (on)
-import Data.Ord (comparing)
-import Data.Monoid ((<>))
 
 instance Partial Type where
   unknown = TUnknown
@@ -478,10 +478,12 @@ skolemEscapeCheck root@TypedValue{} =
       collect _ = []
   go _ scos = ([], scos)
   findBindingScope :: SkolemScope -> Maybe Value
-  findBindingScope sco = something (mkQ Nothing go') root
+  findBindingScope sco =
+    let (_, f, _, _, _) = everythingOnValues mappend (const mempty) go' (const mempty) (const mempty) (const mempty)
+    in getFirst $ f root
     where
-    go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = Just val
-    go' _ = Nothing
+    go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = First (Just val)
+    go' _ = mempty
 skolemEscapeCheck val = throwError $ mkErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ValueError val))
 
 -- |
