@@ -17,13 +17,13 @@ module Language.PureScript.ModuleDependencies (
   ModuleGraph
 ) where
 
-import Data.Data
 import Data.Graph
-import Data.Generics
 import Data.List (nub)
+import Data.Maybe (mapMaybe)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Names
+import Language.PureScript.Types
 
 -- |
 -- A list of modules with their dependencies
@@ -37,7 +37,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 sortModules :: [Module] -> Either String ([Module], ModuleGraph)
 sortModules ms = do
-  let verts = map (\m -> (m, getModuleName m, usedModules m)) ms
+  let verts = map (\m@(Module _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
   let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
   return (ms', moduleGraph)
@@ -45,19 +45,24 @@ sortModules ms = do
 -- |
 -- Calculate a list of used modules based on explicit imports and qualified names
 --
-usedModules :: (Data d) => d -> [ModuleName]
-usedModules = nub . everything (++) (mkQ [] qualifiedIdents `extQ` qualifiedProperNames `extQ` imports)
+usedModules :: Declaration -> [ModuleName]
+usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const []) in nub . f
   where
-  qualifiedIdents :: Qualified Ident -> [ModuleName]
-  qualifiedIdents (Qualified (Just mn) _) = [mn]
-  qualifiedIdents _ = []
-  qualifiedProperNames :: Qualified ProperName -> [ModuleName]
-  qualifiedProperNames (Qualified (Just mn) _) = [mn]
-  qualifiedProperNames _ = []
-  imports :: Declaration -> [ModuleName]
-  imports (ImportDeclaration mn _ _) = [mn]
-  imports (PositionedDeclaration _ d) = imports d
-  imports _ = []
+  forDecls :: Declaration -> [ModuleName]
+  forDecls (ImportDeclaration mn _ _) = [mn]
+  forDecls _ = []
+
+  forValues :: Value -> [ModuleName]
+  forValues (Var (Qualified (Just mn) _)) = [mn]
+  forValues (BinaryNoParens (Qualified (Just mn) _) _ _) = [mn]
+  forValues (Constructor (Qualified (Just mn) _)) = [mn]
+  forValues (TypedValue _ _ ty) = forTypes ty
+  forValues _ = []
+
+  forTypes :: Type -> [ModuleName]
+  forTypes (TypeConstructor (Qualified (Just mn) _)) = [mn]
+  forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
+  forTypes _ = []
 
 getModuleName :: Module -> ModuleName
 getModuleName (Module mn _ _) = mn
