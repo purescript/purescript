@@ -37,9 +37,6 @@ import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
 
-import qualified Data.Generics as G
-import qualified Data.Generics.Extras as G
-
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
@@ -67,7 +64,9 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   go other = other
 
 rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either ErrorStack Module
-rebracketModule opTable (Module mn ds exts) = Module mn <$> (map removeParens <$> G.everywhereM' (G.mkM (matchOperators opTable)) ds) <*> pure exts
+rebracketModule opTable (Module mn ds exts) =
+  let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
+  in Module mn <$> (map removeParens <$> mapM f ds) <*> pure exts
 
 removeParens :: Declaration -> Declaration
 removeParens =

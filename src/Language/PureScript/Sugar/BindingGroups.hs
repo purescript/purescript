@@ -22,8 +22,6 @@ module Language.PureScript.Sugar.BindingGroups (
 ) where
 
 import Data.Graph
-import Data.Generics (mkM)
-import Data.Generics.Extras
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
 import Control.Applicative ((<$>), (<*>), pure)
@@ -69,7 +67,9 @@ createBindingGroups moduleName ds = do
            bindingGroupDecls
 
 createBindingGroupsForValue :: ModuleName -> Declaration -> Either ErrorStack Declaration
-createBindingGroupsForValue moduleName = everywhereM' (mkM go)
+createBindingGroupsForValue moduleName =
+  let (f, _, _) = everywhereOnValuesTopDownM return go return
+  in f
   where
   go (Let ds val) = Let <$> createBindingGroups moduleName ds <*> pure val
   go other = return other

@@ -26,6 +26,7 @@ import Control.Applicative
 import Control.Monad ((<=<))
 
 import Language.PureScript.Names
+import Language.PureScript.Traversals
 
 -- |
 -- An identifier for the scope of a skolem variable
@@ -231,9 +232,6 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
   go other = f other
-
-sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
-sndM f (a, b) = (,) a <$> f b
 
 everywhereOnTypesM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesM f = go

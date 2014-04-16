@@ -37,6 +37,7 @@ library
                      Language.PureScript.Names
                      Language.PureScript.Types
                      Language.PureScript.Scope
+                     Language.PureScript.Traversals
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Sugar

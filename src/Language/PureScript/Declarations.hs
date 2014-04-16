@@ -18,14 +18,18 @@ module Language.PureScript.Declarations where
 
 import Data.Monoid (Monoid(..), mconcat)
 
+import qualified Data.Data as D
+
+import Control.Applicative
+import Control.Monad
+
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
-
-import qualified Data.Data as D
+import Language.PureScript.Traversals
 
 -- |
 -- A precedence level for an infix operator
@@ -512,6 +516,55 @@ everywhereOnValues f g h = (f', g', h')
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind (h' b) (g' v)
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
   handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos (handleDoNotationElement e)
+
+everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
+  (Declaration -> m Declaration) ->
+  (Value -> m Value) ->
+  (Binder -> m Binder) ->
+  (Declaration -> m Declaration, Value -> m Value, Binder -> m Binder)
+everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
+  where
+  f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> mapM (f' <=< f) ds
+  f' (ValueDeclaration name nameKind bs grd val) = ValueDeclaration name nameKind <$> mapM (h' <=< h) bs <*> maybeM (g' <=< g) grd <*> (g val >>= g')
+  f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
+  f' (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f' <=< f) ds
+  f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f' <=< f) ds
+  f' (PositionedDeclaration pos d) = PositionedDeclaration pos <$> (f d >>= f')
+  f' other = f other
+
+  g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
+  g' (BinaryNoParens op v1 v2) = BinaryNoParens op <$> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (Parens v) = Parens <$> (g v >>= g')
+  g' (ArrayLiteral vs) = ArrayLiteral <$> mapM (g' <=< g) vs
+  g' (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g' <=< g)) vs
+  g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
+  g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> mapM (sndM (g' <=< g)) vs
+  g' (Abs name v) = Abs name <$> (g v >>= g')
+  g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
+  g' (Case vs alts) = Case <$> mapM (g' <=< g) vs <*> mapM handleCaseAlternative alts
+  g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
+  g' (Let ds v) = Let <$> mapM (f' <=< f) ds <*> (g v >>= g')
+  g' (Do es) = Do <$> mapM handleDoNotationElement es
+  g' (PositionedValue pos v) = PositionedValue pos <$> (g v >>= g')
+  g' other = g other
+
+  h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> mapM (h' <=< h) bs
+  h' (ObjectBinder bs) = ObjectBinder <$> mapM (sndM (h' <=< h)) bs
+  h' (ArrayBinder bs) = ArrayBinder <$> mapM (h' <=< h) bs
+  h' (ConsBinder b1 b2) = ConsBinder <$> (h b1 >>= h') <*> (h b2 >>= h')
+  h' (NamedBinder name b) = NamedBinder name <$> (h b >>= h')
+  h' (PositionedBinder pos b) = PositionedBinder pos <$> (h b >>= h')
+  h' other = h other
+
+  handleCaseAlternative (CaseAlternative bs grd val) = CaseAlternative <$> mapM (h' <=< h) bs
+                                                                       <*> maybeM (g' <=< g) grd
+                                                                       <*> (g' <=< g) val
+
+  handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> (g' <=< g) v
+  handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> (h' <=< h) b <*> (g' <=< g) v
+  handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> mapM (f' <=< f) ds
+  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos <$> handleDoNotationElement e
 
 everythingOnValues :: (r -> r -> r) ->
                       (Declaration -> r) ->

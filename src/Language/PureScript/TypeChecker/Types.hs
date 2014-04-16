@@ -47,8 +47,7 @@ import Data.Function (on)
 import Data.Ord (comparing)
 import Data.Monoid
 import Data.Generics
-       (everythingWithContext, mkM, mkQ)
-import Data.Generics.Extras
+       (everythingWithContext, mkQ)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Types
@@ -273,7 +272,9 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 -- Replace type class dictionary placeholders with inferred type class dictionaries
 --
 replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
-replaceTypeClassDictionaries mn = everywhereM' (mkM go)
+replaceTypeClassDictionaries mn =
+  let (_, f, _) = everywhereOnValuesTopDownM return go return
+  in f
   where
   go (TypeClassDictionary trySuperclasses constraint dicts) = do
     env <- getEnv

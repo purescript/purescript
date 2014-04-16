@@ -19,8 +19,6 @@ module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarationsModule
 ) where
 
-import Data.Generics (mkM)
-import Data.Generics.Extras
 import Data.Monoid ((<>))
 
 import Control.Applicative
@@ -59,7 +57,8 @@ desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   fromValueDeclaration _ = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (TypeDeclaration name _ : []) = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (ValueDeclaration name nameKind bs g val : rest) = do
-  (:) <$> (ValueDeclaration name nameKind bs g <$> everywhereM' (mkM go) val) <*> desugarTypeDeclarations rest
+  let (_, f, _) = everywhereOnValuesTopDownM return go return
+  (:) <$> (ValueDeclaration name nameKind bs g <$> f val) <*> desugarTypeDeclarations rest
   where
   go (Let ds val') = Let <$> desugarTypeDeclarations ds <*> pure val'
   go other = return other
