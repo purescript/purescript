@@ -517,6 +517,7 @@ everywhereOnValues f g h = (f', g', h')
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
   handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos (handleDoNotationElement e)
 
+
 everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
   (Declaration -> m Declaration) ->
   (Value -> m Value) ->
@@ -564,6 +565,55 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> (g' <=< g) v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> (h' <=< h) b <*> (g' <=< g) v
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> mapM (f' <=< f) ds
+  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos <$> handleDoNotationElement e
+
+everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
+  (Declaration -> m Declaration) ->
+  (Value -> m Value) ->
+  (Binder -> m Binder) ->
+  (Declaration -> m Declaration, Value -> m Value, Binder -> m Binder)
+everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
+  where
+  f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> mapM f' ds) >>= f
+  f' (ValueDeclaration name nameKind bs grd val) = (ValueDeclaration name nameKind <$> mapM h' bs <*> maybeM g' grd <*> g' val) >>= f
+  f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
+  f' (TypeClassDeclaration name args implies ds) = (TypeClassDeclaration name args implies <$> mapM f' ds) >>= f
+  f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> mapM f' ds) >>= f
+  f' (PositionedDeclaration pos d) = (PositionedDeclaration pos <$> f' d) >>= f
+  f' other = f other
+
+  g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
+  g' (BinaryNoParens op v1 v2) = (BinaryNoParens op <$> (g' v1) <*> (g' v2)) >>= g
+  g' (Parens v) = (Parens <$> g' v) >>= g
+  g' (ArrayLiteral vs) = (ArrayLiteral <$> mapM g' vs) >>= g
+  g' (ObjectLiteral vs) = (ObjectLiteral <$> mapM (sndM g') vs) >>= g
+  g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
+  g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> mapM (sndM g') vs) >>= g
+  g' (Abs name v) = (Abs name <$> g' v) >>= g
+  g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
+  g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
+  g' (Case vs alts) = (Case <$> mapM g' vs <*> mapM handleCaseAlternative alts) >>= g
+  g' (TypedValue check v ty) = (TypedValue check <$> g' v <*> pure ty) >>= g
+  g' (Let ds v) = (Let <$> mapM f' ds <*> g' v) >>= g
+  g' (Do es) = (Do <$> mapM handleDoNotationElement es) >>= g
+  g' (PositionedValue pos v) = (PositionedValue pos <$> g' v) >>= g
+  g' other = g other
+
+  h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> mapM h' bs
+  h' (ObjectBinder bs) = (ObjectBinder <$> mapM (sndM h') bs) >>= h
+  h' (ArrayBinder bs) = (ArrayBinder <$> mapM h' bs) >>= h
+  h' (ConsBinder b1 b2) = (ConsBinder <$> h' b1 <*> h' b2) >>= h
+  h' (NamedBinder name b) = (NamedBinder name <$> h' b) >>= h
+  h' (PositionedBinder pos b) = (PositionedBinder pos <$> h' b) >>= h
+  h' other = h other
+
+  handleCaseAlternative (CaseAlternative bs grd val) = CaseAlternative <$> mapM h' bs
+                                                                       <*> maybeM g' grd
+                                                                       <*> g' val
+
+  handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> g' v
+  handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> h' b <*> g' v
+  handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> mapM f' ds
   handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos <$> handleDoNotationElement e
 
 everythingOnValues :: (r -> r -> r) ->
@@ -634,5 +684,6 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (SuperClassDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
+
 
 

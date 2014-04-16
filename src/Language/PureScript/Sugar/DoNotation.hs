@@ -18,8 +18,6 @@ module Language.PureScript.Sugar.DoNotation (
     desugarDoModule
 ) where
 
-import Data.Generics
-
 import Language.PureScript.Names
 import Language.PureScript.Scope
 import Language.PureScript.Declarations
@@ -37,15 +35,20 @@ desugarDoModule :: Module -> Either ErrorStack Module
 desugarDoModule (Module mn ds exts) = Module mn <$> mapM desugarDo ds <*> pure exts
 
 desugarDo :: Declaration -> Either ErrorStack Declaration
-desugarDo = everywhereM (mkM replace)
+desugarDo =
+  let (f, _, _) = everywhereOnValuesM return replace return
+  in f
   where
   prelude :: ModuleName
   prelude = ModuleName [ProperName C.prelude]
+
   bind :: Value
   bind = Var (Qualified (Just prelude) (Op (C.>>=)))
+
   replace :: Value -> Either ErrorStack Value
   replace (Do els) = go els
   replace other = return other
+
   go :: [DoNotationElement] -> Either ErrorStack Value
   go [] = error "The impossible happened in desugarDo"
   go [DoNotationValue val] = return val
