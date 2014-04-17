@@ -680,7 +680,7 @@ infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $  ty
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
 infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
@@ -693,8 +693,9 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue 
   kind <- liftCheck $ kindOf moduleName ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   let dict = if isFunction val then M.singleton (moduleName, ident) (ty, nameKind) else M.empty
-  TypedValue _ val' ty' <- if checkType then bindNames dict (check val ty) else return tv
-  bindNames (M.singleton (moduleName, ident) (ty', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty')]) rest ret j
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
+  bindNames (M.singleton (moduleName, ident) (ty'', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
