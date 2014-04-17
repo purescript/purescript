@@ -13,11 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.CodeGen.JS.AST where
-
-import Data.Data
 
 -- |
 -- Built-in unary operators
@@ -38,7 +34,7 @@ data UnaryOperator
   -- |
   -- Numeric unary \'plus\'
   --
-  | Positive deriving (Show, Eq, Data, Typeable)
+  | Positive deriving (Show, Eq)
 
 -- |
 -- Built-in binary operators
@@ -119,7 +115,7 @@ data BinaryOperator
   -- |
   -- Bitwise right shift with zero-fill
   --
-  | ZeroFillShiftRight deriving (Show, Eq, Data, Typeable)
+  | ZeroFillShiftRight deriving (Show, Eq)
 
 -- |
 -- Data type for simplified Javascript expressions
@@ -232,7 +228,7 @@ data JS
   -- |
   -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
   --
-  | JSRaw String deriving (Show, Eq, Data, Typeable)
+  | JSRaw String deriving (Show, Eq)
 
 --
 -- Traversals

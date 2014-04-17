@@ -12,13 +12,11 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Declarations where
 
 import Data.Monoid (Monoid(..), mconcat)
-
-import qualified Data.Data as D
 
 import Control.Applicative
 import Control.Monad
@@ -39,7 +37,7 @@ type Precedence = Integer
 -- |
 -- Associativity for infix operators
 --
-data Associativity = Infixl | Infixr | Infix deriving (D.Data, D.Typeable)
+data Associativity = Infixl | Infixr | Infix
 
 instance Show Associativity where
   show Infixl = "infixl"
@@ -62,7 +60,7 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (D.Data, D.Typeable)
+  }
 
 instance Show SourcePos where
   show sp = (sourceName sp) ++ " line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
@@ -70,13 +68,13 @@ instance Show SourcePos where
 -- |
 -- Fixity data for infix operators
 --
-data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
+data Fixity = Fixity Associativity Precedence deriving (Show)
 
 -- |
 -- A module declaration, consisting of a module name, a list of declarations, and a list of the
 -- declarations that are explicitly exported. If the export list is Nothing, everything is exported.
 --
-data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
+data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show)
 
 -- |
 -- An item in a list of explicit imports or exports
@@ -102,7 +100,7 @@ data DeclarationRef
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourcePos DeclarationRef
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show)
 
 instance Eq DeclarationRef where
   (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
@@ -175,7 +173,7 @@ data Declaration
   -- A declaration with source position information
   --
   | PositionedDeclaration SourcePos Declaration
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show)
 
 -- |
 -- Test if a declaration is a value declaration
@@ -346,7 +344,7 @@ data Value
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourcePos Value deriving (Show, D.Data, D.Typeable)
+  | PositionedValue SourcePos Value deriving (Show)
 
 -- |
 -- An alternative in a case statement
@@ -364,7 +362,7 @@ data CaseAlternative = CaseAlternative
     -- The result expression
     --
   , caseAlternativeResult :: Value
-  } deriving (Show, D.Data, D.Typeable)
+  } deriving (Show)
 
 -- |
 -- Find the original dictionary which a type class dictionary in scope refers to
@@ -392,7 +390,7 @@ data DoNotationElement
   -- |
   -- A do notation element with source position information
   --
-  | PositionedDoNotationElement SourcePos DoNotationElement deriving (Show, D.Data, D.Typeable)
+  | PositionedDoNotationElement SourcePos DoNotationElement deriving (Show)
 
 -- |
 -- Data type for binders
@@ -441,7 +439,7 @@ data Binder
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourcePos Binder deriving (Show, D.Data, D.Typeable)
+  | PositionedBinder SourcePos Binder deriving (Show)
 
 -- |
 -- Collect all names introduced in binders in an expression

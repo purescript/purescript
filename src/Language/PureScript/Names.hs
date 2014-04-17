@@ -13,12 +13,9 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.Names where
 
 import Data.List
-import Data.Data
 
 -- |
 -- Names for value identifiers
@@ -31,7 +28,7 @@ data Ident
   -- |
   -- A symbolic name for an infix operator
   --
-  | Op String deriving (Eq, Ord, Data, Typeable)
+  | Op String deriving (Eq, Ord)
 
 runIdent :: Ident -> String
 runIdent (Ident i) = i
@@ -44,7 +41,7 @@ instance Show Ident where
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
-newtype ProperName = ProperName { runProperName :: String } deriving (Eq, Ord, Data, Typeable)
+newtype ProperName = ProperName { runProperName :: String } deriving (Eq, Ord)
 
 instance Show ProperName where
   show = runProperName
@@ -52,7 +49,7 @@ instance Show ProperName where
 -- |
 -- Module names
 --
-data ModuleName = ModuleName [ProperName] deriving (Eq, Ord, Data, Typeable)
+data ModuleName = ModuleName [ProperName] deriving (Eq, Ord)
 
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
@@ -71,7 +68,7 @@ instance Show ModuleName where
 -- |
 -- A qualified name, i.e. a name with an optional module name
 --
-data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typeable)
+data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord)
 
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
