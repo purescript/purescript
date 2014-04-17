@@ -63,6 +63,7 @@
 - Object properties and row labels can now be accessed with arbitrary string names by using string literals (paf31)
 - `(++)` is now an alias for the Semigroup operator `(<>)` (paf31)
 - Error messages for classes with undefined or missing members have been improved (garyb)
+- The SYB dependency was removed, and traversals rewritten by hand, for a large performance increase (paf31)
  
 ### Bug Fixes
 
