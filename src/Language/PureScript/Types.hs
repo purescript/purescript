@@ -13,11 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.Types where
 
-import Data.Data
 import Data.List (nub)
 
 import Control.Monad.Unify
@@ -31,7 +28,7 @@ import Language.PureScript.Traversals
 -- |
 -- An identifier for the scope of a skolem variable
 --
-newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord, Data, Typeable)
+newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord)
 
 -- |
 -- The type of types
@@ -92,7 +89,7 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintForAll [String] Type deriving (Show, Eq, Data, Typeable)
+  | PrettyPrintForAll [String] Type deriving (Show, Eq)
 
 -- |
 -- Convert a row to a list of pairs of labels and types

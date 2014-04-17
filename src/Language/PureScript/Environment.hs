@@ -12,11 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.Environment where
-
-import Data.Data
 
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -77,7 +73,7 @@ data ForeignImportType
   -- |
   -- A type class dictionary member accessor import, generated during desugaring of type class declarations
   --
-  | TypeClassAccessorImport deriving (Show, Eq, Data, Typeable)
+  | TypeClassAccessorImport deriving (Show, Eq)
 
 -- |
 -- The kind of a name
@@ -102,7 +98,7 @@ data NameKind
   -- |
   -- A type class dictionary, generated during desugaring of type class declarations
   --
-  | TypeInstanceDictionaryValue deriving (Show, Eq, Data, Typeable)
+  | TypeInstanceDictionaryValue deriving (Show, Eq)
 
 -- |
 -- The kinds of a type
@@ -123,7 +119,7 @@ data TypeKind
   -- |
   -- A local type variable
   --
-  | LocalTypeVariable deriving (Show, Eq, Data, Typeable)
+  | LocalTypeVariable deriving (Show, Eq)
 
 -- |
 -- Construct a ProperName in the Prim module

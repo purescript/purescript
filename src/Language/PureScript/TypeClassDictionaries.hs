@@ -12,11 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.TypeClassDictionaries where
-
-import Data.Data
 
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -46,7 +42,7 @@ data TypeClassDictionaryInScope
     -- The type of this dictionary
     --
     , tcdType :: TypeClassDictionaryType
-    } deriving (Show, Data, Typeable)
+    } deriving (Show)
 
 -- |
 -- The type of a type class dictionary
@@ -59,4 +55,4 @@ data TypeClassDictionaryType
   -- |
   -- A type class dictionary which is an alias for an imported dictionary from another module
   --
-  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+  | TCDAlias (Qualified Ident) deriving (Show, Eq)

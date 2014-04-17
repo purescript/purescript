@@ -12,11 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.Kinds where
-
-import Data.Data
 
 import Control.Monad.Unify (Unknown)
 
@@ -43,7 +39,7 @@ data Kind
   -- |
   -- Function kinds
   --
-  | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)
+  | FunKind Kind Kind deriving (Show, Eq)
 
 everywhereOnKinds :: (Kind -> Kind) -> Kind -> Kind
 everywhereOnKinds f = go
