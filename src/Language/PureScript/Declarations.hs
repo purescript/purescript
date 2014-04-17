@@ -599,7 +599,7 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (PositionedValue pos v) = (PositionedValue pos <$> g' v) >>= g
   g' other = g other
 
-  h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> mapM h' bs
+  h' (ConstructorBinder ctor bs) = (ConstructorBinder ctor <$> mapM h' bs) >>= h
   h' (ObjectBinder bs) = (ObjectBinder <$> mapM (sndM h') bs) >>= h
   h' (ArrayBinder bs) = (ArrayBinder <$> mapM h' bs) >>= h
   h' (ConsBinder b1 b2) = (ConsBinder <$> h' b1 <*> h' b2) >>= h
@@ -735,6 +735,70 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   j' s (DoNotationBind b v) =  (h'' s) b <> (g'' s) v
   j' s (DoNotationLet ds) = foldl (<>) r0 (map (f'' s) ds)
   j' s (PositionedDoNotationElement _ e1) = (j'' s) e1
+
+everywhereWithContextOnValuesM :: (Functor m, Applicative m, Monad m) =>
+  s ->
+  (s -> Declaration       -> m (s, Declaration)) ->
+  (s -> Value             -> m (s, Value)) ->
+  (s -> Binder            -> m (s, Binder)) ->
+  (s -> CaseAlternative   -> m (s, CaseAlternative)) ->
+  (s -> DoNotationElement -> m (s, DoNotationElement)) ->
+  ( Declaration       -> m Declaration
+  , Value             -> m Value
+  , Binder            -> m Binder
+  , CaseAlternative   -> m CaseAlternative
+  , DoNotationElement -> m DoNotationElement)
+everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
+  where
+  f'' s = uncurry f' <=< f s
+
+  f' s (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> mapM (f'' s) ds
+  f' s (ValueDeclaration name nameKind bs grd val) = ValueDeclaration name nameKind <$> mapM (h'' s) bs <*> maybeM (g'' s) grd <*> g'' s val
+  f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (thirdM (g'' s)) ds
+  f' s (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f'' s) ds
+  f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f'' s) ds
+  f' s (PositionedDeclaration pos d1) = PositionedDeclaration pos <$> f'' s d1
+  f' _ other = return other
+
+  g'' s = uncurry g' <=< g s
+
+  g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
+  g' s (BinaryNoParens op v1 v2) = BinaryNoParens op <$> g'' s v1 <*> g'' s v2
+  g' s (Parens v) = Parens <$> g'' s v
+  g' s (ArrayLiteral vs) = ArrayLiteral <$> mapM (g'' s) vs
+  g' s (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g'' s)) vs
+  g' s (Accessor prop v) = Accessor prop <$> g'' s v
+  g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> mapM (sndM (g'' s)) vs
+  g' s (Abs name v) = Abs name <$> g'' s v
+  g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
+  g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
+  g' s (Case vs alts) = Case <$> mapM (g'' s) vs <*> mapM (i'' s) alts
+  g' s (TypedValue check v ty) = TypedValue check <$> g'' s v <*> pure ty
+  g' s (Let ds v) = Let <$> mapM (f'' s) ds <*> g'' s v
+  g' s (Do es) = Do <$> mapM (j'' s) es
+  g' s (PositionedValue pos v) = PositionedValue pos <$> g'' s v
+  g' _ other = return other
+
+  h'' s = uncurry h' <=< h s
+
+  h' s (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> mapM (h'' s) bs
+  h' s (ObjectBinder bs) = ObjectBinder <$> mapM (sndM (h'' s)) bs
+  h' s (ArrayBinder bs) = ArrayBinder <$> mapM (h'' s) bs
+  h' s (ConsBinder b1 b2) = ConsBinder <$> h'' s b1 <*> h'' s b2
+  h' s (NamedBinder name b) = NamedBinder name <$> h'' s b
+  h' s (PositionedBinder pos b) = PositionedBinder pos <$> h'' s b
+  h' _ other = return other
+
+  i'' s = uncurry i' <=< i s
+
+  i' s (CaseAlternative bs grd val) = CaseAlternative <$> mapM (h'' s) bs <*> maybeM (g'' s) grd <*> g'' s val
+
+  j'' s = uncurry j' <=< j s
+
+  j' s (DoNotationValue v) = DoNotationValue <$> g'' s v
+  j' s (DoNotationBind b v) = DoNotationBind <$> h'' s b <*> g'' s v
+  j' s (DoNotationLet ds) = DoNotationLet <$> mapM (f'' s) ds
+  j' s (PositionedDoNotationElement pos e1) = PositionedDoNotationElement pos <$> j'' s e1
 
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)

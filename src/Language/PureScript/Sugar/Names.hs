@@ -16,10 +16,8 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
-import Data.Data
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Monoid ((<>))
-import Data.Generics.Extras (mkS, extS, everywhereWithContextM')
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad.Error
@@ -31,6 +29,7 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Traversals
 
 -- |
 -- The global export environment - every declaration exported from every module.
@@ -177,83 +176,67 @@ renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either Err
 renameInModule imports exports (Module mn decls exps) =
   Module mn <$> mapM go decls <*> pure exps
   where
-  go :: Declaration -> Either ErrorStack Declaration
-  go (PositionedDeclaration pos d) = rethrowWithPosition pos $ PositionedDeclaration pos <$> go d
-  go (DataDeclaration name args dctors) =
-      rethrow (strMsg ("Error in data declaration " ++ show name) <>) $
-        DataDeclaration <$> pure name <*> pure args <*> updateAll dctors
-  go (DataBindingGroupDeclaration decls') =
-      DataBindingGroupDeclaration <$> mapM go decls'
-  go (TypeSynonymDeclaration name ps ty) =
-      rethrow (strMsg ("Error in type synonym " ++ show name) <>) $
-        TypeSynonymDeclaration <$> pure name <*> pure ps <*> updateType' ty
-  go (TypeClassDeclaration className args implies ds) =
-    TypeClassDeclaration className args <$> updateConstraints Nothing implies <*> mapM go ds
-  go (TypeInstanceDeclaration name cs cn ts ds) =
-      TypeInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts <*> mapM go ds
-  go (ExternInstanceDeclaration name cs cn ts) =
-      ExternInstanceDeclaration name <$> updateConstraints Nothing cs <*> updateClassName cn Nothing <*> updateType' ts
-  go (ValueDeclaration name nameKind [] Nothing val) = do
-    val' <- everywhereWithContextM' (Nothing, []) (mkS bindFunctionArgs `extS` bindBinders) val
-    rethrow (strMsg ("Error in declaration " ++ show name) <>) $
-      ValueDeclaration name nameKind [] Nothing <$> updateAll val'
-    where
-    bindFunctionArgs :: (Maybe SourcePos, [Ident]) -> Value -> Either ErrorStack ((Maybe SourcePos, [Ident]), Value)
-    bindFunctionArgs (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
-    bindFunctionArgs (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
-    bindFunctionArgs (pos, bound) (Let ds val') =
+  (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
+
+  updateDecl :: (Maybe SourcePos, [Ident]) -> Declaration -> Either ErrorStack ((Maybe SourcePos, [Ident]), Declaration)
+  updateDecl (_, bound) d@(PositionedDeclaration pos _) = return ((Just pos, bound), d)
+  updateDecl (pos, bound) (DataDeclaration name args dctors) =
+    (,) (pos, bound) <$> (DataDeclaration name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
+  updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
+    (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (TypeClassDeclaration className args implies ds) =
+    (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints pos implies <*> pure ds)
+  updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
+    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> mapM (updateTypesEverywhere pos) ts <*> pure ds)
+  updateDecl (pos, bound) (ExternInstanceDeclaration name cs cn ts) =
+    (,) (pos, bound) <$> (ExternInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn Nothing <*> mapM (updateTypesEverywhere pos) ts)
+  updateDecl (pos, bound) (TypeDeclaration name ty) =
+    (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDeclaration fit name js ty) =
+    (,) (pos, name : bound) <$> (ExternDeclaration fit name js <$> updateTypesEverywhere pos ty)
+  updateDecl s d = return (s, d)
+
+  updateValue :: (Maybe SourcePos, [Ident]) -> Value -> Either ErrorStack ((Maybe SourcePos, [Ident]), Value)
+  updateValue (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
+  updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
+  updateValue (pos, bound) (Let ds val') =
       let args = mapMaybe letBoundVariable ds
       in return ((pos, args ++ bound), Let ds val')
-    bindFunctionArgs (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
-      (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-    bindFunctionArgs (pos, bound) (Var name'@(Qualified (Just _) _)) =
-      (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-    bindFunctionArgs (pos, bound) (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
-      (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
-    bindFunctionArgs (pos, bound) (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
-      (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
-    bindFunctionArgs pb other = return (pb, other)
+  updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
+    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
+  updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
+    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
+  updateValue (pos, bound) (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
+    (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
+  updateValue (pos, bound) (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
+    (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
+  updateValue s@(pos, _) (Constructor name) = (,) s <$> (Constructor <$> updateDataConstructorName name pos)
+  updateValue s@(pos, _) (TypedValue check val ty) = (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+  updateValue s v = return (s, v)
 
-    bindBinders :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
-    bindBinders (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, concatMap binderNames bs ++ bound), c)
+  updateBinder :: (Maybe SourcePos, [Ident]) -> Binder -> Either ErrorStack ((Maybe SourcePos, [Ident]), Binder)
+  updateBinder (_, bound) v@(PositionedBinder pos _) = return ((Just pos, bound), v)
+  updateBinder s@(pos, _) (ConstructorBinder name b) = (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder s v = return (s, v)
 
-    letBoundVariable :: Declaration -> Maybe Ident
-    letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
-    letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
-    letBoundVariable _ = Nothing
-  go (ValueDeclaration name _ _ _ _) = error $ "Binders should have been desugared in " ++ show name
-  go (ExternDeclaration fit name js ty) =
-      rethrow (strMsg ("Error in declaration " ++ show name) <>) $
-        ExternDeclaration <$> pure fit <*> pure name <*> pure js <*> updateType' ty
-  go (BindingGroupDeclaration decls') = BindingGroupDeclaration <$> mapM go' decls'
-      where
-      go' (name, nk, value) = rethrow (strMsg ("Error in declaration " ++ show name) <>) $
-                                (,,) <$> pure name <*> pure nk <*> updateAll value
-  go d = updateAll d
+  updateCase :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
+  updateCase (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, concatMap binderNames bs ++ bound), c)
 
-  updateAll :: Data d => d -> Either ErrorStack d
-  updateAll = everywhereWithContextM' Nothing (mkS updateType `extS` updateValue `extS` updateBinder)
+  letBoundVariable :: Declaration -> Maybe Ident
+  letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
+  letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
+  letBoundVariable _ = Nothing
 
-  updateValue :: Maybe SourcePos -> Value -> Either ErrorStack (Maybe SourcePos, Value)
-  updateValue _ v@(PositionedValue pos _) = return (Just pos, v)
-  updateValue pos (Constructor name) = (,) <$> pure pos <*> (Constructor <$> updateDataConstructorName name pos)
-  updateValue pos v = return (pos, v)
+  updateTypesEverywhere :: Maybe SourcePos -> Type -> Either ErrorStack Type
+  updateTypesEverywhere pos0 = everywhereOnTypesM (updateType pos0)
+    where
+    updateType :: Maybe SourcePos -> Type -> Either ErrorStack Type
+    updateType pos (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
+    updateType pos (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name pos <*> pure tys
+    updateType pos (ConstrainedType cs t) = ConstrainedType <$> updateConstraints pos cs <*> pure t
+    updateType _ t = return t
 
-  updateBinder :: Maybe SourcePos -> Binder -> Either ErrorStack (Maybe SourcePos, Binder)
-  updateBinder _ v@(PositionedBinder pos _) = return (Just pos, v)
-  updateBinder pos (ConstructorBinder name b) = (,) <$> pure pos <*> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
-  updateBinder pos v = return (pos, v)
-
-  updateType :: Maybe SourcePos -> Type -> Either ErrorStack (Maybe SourcePos, Type)
-  updateType pos (TypeConstructor name) = (,) <$> pure pos <*> (TypeConstructor <$> updateTypeName name pos)
-  updateType pos (SaturatedTypeSynonym name tys) = (,) <$> pure pos <*> (SaturatedTypeSynonym <$> updateTypeName name pos <*> updateType' tys)
-  updateType pos (ConstrainedType cs t) = (,) <$> pure pos <*> (ConstrainedType <$> updateConstraints pos cs <*> pure t)
-  updateType pos t = return (pos, t)
-
-  updateType' :: Data d => d -> Either ErrorStack d
-  updateType' = everywhereWithContextM' Nothing (mkS updateType)
-
-  updateConstraints pos = mapM (\(name, ts) -> (,) <$> updateClassName name pos <*> pure ts)
+  updateConstraints pos = mapM (\(name, ts) -> (,) <$> updateClassName name pos <*> mapM (updateTypesEverywhere pos) ts)
 
   updateTypeName = update "type" importedTypes (\mes -> isJust . (`lookup` exportedTypes mes))
   updateClassName = update "type class" importedTypeClasses (flip elem . exportedTypeClasses)

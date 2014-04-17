@@ -1,5 +1,5 @@
 name: purescript
-version: 0.4.18.2
+version: 0.4.19
 cabal-version: >=1.8
 build-type: Custom
 license: MIT
@@ -19,15 +19,14 @@ data-dir: ""
 
 library
     build-depends: base >=4 && <5, cmdtheline -any, containers -any, unordered-containers -any,
-                   directory >= 1.2, filepath -any, mtl -any, parsec -any, syb >= 0.4.1 && < 0.5,
+                   directory >= 1.2, filepath -any, mtl -any, parsec -any,
                    transformers -any, utf8-string -any,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    monad-unify >= 0.2.2 && < 0.3,
                    xdg-basedir -any, time -any
     if (!os(windows))
         build-depends: unix -any
-    exposed-modules: Data.Generics.Extras
-                     Language.PureScript
+    exposed-modules: Language.PureScript
                      Language.PureScript.Constants
                      Language.PureScript.Options
                      Language.PureScript.Declarations
@@ -88,7 +87,7 @@ library
 executable psc
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
                    directory -any, filepath -any, mtl -any, parsec -any,
-                   purescript -any, syb >= 0.4.1 && < 0.5, transformers -any, utf8-string -any
+                   purescript -any, transformers -any, utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
@@ -98,7 +97,7 @@ executable psc
 executable psc-make
     build-depends: base >=4 && <5, cmdtheline -any, containers -any,
                    directory -any, filepath -any, mtl -any, parsec -any,
-                   purescript -any, syb >= 0.4.1 && < 0.5, transformers -any, utf8-string -any
+                   purescript -any, transformers -any, utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
@@ -108,7 +107,7 @@ executable psc-make
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, parsec -any, haskeline -any, purescript -any,
-                   syb >= 0.4.1 && < 0.5, transformers -any, utf8-string -any, process -any,
+                   transformers -any, utf8-string -any, process -any,
                    xdg-basedir -any, cmdtheline -any
     main-is: Main.hs
     buildable: True
@@ -137,7 +136,7 @@ executable hierarchy
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
-                   filepath -any, mtl -any, parsec -any, purescript -any, syb >= 0.4.1 && < 0.5,
+                   filepath -any, mtl -any, parsec -any, purescript -any, 
                    transformers -any, utf8-string -any, process -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
