@@ -78,6 +78,10 @@ data Type
   --
   | RCons String Type Type
   -- |
+  -- A type wildcard, as would appear in a partial type synonym
+  --
+  | TypeWildcard
+  -- |
   -- A placeholder used in pretty printing
   --
   | PrettyPrintFunction Type Type

@@ -32,6 +32,7 @@ import Language.PureScript.Environment
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
+  match TypeWildcard = Just "_"
   match (TypeVar var) = Just var
   match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
@@ -116,4 +117,5 @@ prettyPrintTypeAtom = fromMaybe (error "Incomplete pattern") . pattern matchType
 --
 prettyPrintType :: Type -> String
 prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
+
 

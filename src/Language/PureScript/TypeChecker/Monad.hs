@@ -200,3 +200,14 @@ liftUnify unify = do
   modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
   return (a, unifyCurrentSubstitution ust)
 
+-- |
+-- Replace type wildcards with unknowns
+--
+replaceTypeWildcards :: Type -> UnifyT t Check Type
+replaceTypeWildcards = everywhereOnTypesM replace
+  where
+  replace TypeWildcard = do
+    u <- fresh'
+    return $ TUnknown u
+  replace other = return other
+
