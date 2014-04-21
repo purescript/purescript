@@ -26,15 +26,15 @@ import qualified System.IO.UTF8 as U
 import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
 
-docgen :: FilePath -> IO ()
-docgen input = do
+docgen :: FilePath -> Bool -> IO ()
+docgen input showHierarchy = do
   text <- U.readFile input
   case P.runIndentParser input P.parseModules text of
     Left err -> do
       U.print err
       exitFailure
     Right ms -> do
-      U.putStrLn . runDocs $ renderModules ms
+      U.putStrLn . runDocs $ (renderModules showHierarchy) ms
       exitSuccess
 
 type Docs = Writer [String] ()
@@ -53,13 +53,14 @@ atIndent indent text =
   let ls = lines text in
   forM_ ls $ \l -> tell [replicate indent ' ' ++ l]
 
-renderModules :: [P.Module] -> Docs
-renderModules ms = do
+renderModules :: Bool -> [P.Module] -> Docs
+renderModules showHierarchy ms = do
   headerLevel 1 "Module Documentation"
-  mapM_ renderModule ms
+  spacer
+  mapM_ (renderModule showHierarchy) ms
 
-renderModule :: P.Module -> Docs
-renderModule (P.Module moduleName ds exps) =
+renderModule :: Bool -> P.Module -> Docs
+renderModule showHierarchy (P.Module moduleName ds exps) =
   let exported = filter (isExported exps) ds
       hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
@@ -76,8 +77,9 @@ renderModule (P.Module moduleName ds exps) =
     when hasTypeclasses $ do
       headerLevel 3 "Type Classes"
       spacer
-      renderTypeclassImage moduleName
-      spacer
+      when showHierarchy $ do
+        renderTypeclassImage moduleName
+        spacer
       renderTopLevel exps (filter isTypeClassDeclaration exported)
       spacer
     when hasTypeclassInstances $ do
@@ -191,8 +193,11 @@ isTypeInstanceDeclaration _ = False
 inputFile :: Term FilePath
 inputFile = value $ pos 0 "input.ps" $ posInfo { posDoc = "The input .ps file" }
 
+includeHeirarcy :: Term Bool
+includeHeirarcy = value $ flag $ (optInfo [ "h", "hierarchy-images" ]) { optDoc = "Include markdown for type class hierarchy images in the output." }
+
 term :: Term (IO ())
-term = docgen <$> inputFile
+term = docgen <$> inputFile <*> includeHeirarcy
 
 termInfo :: TermInfo
 termInfo = defTI
