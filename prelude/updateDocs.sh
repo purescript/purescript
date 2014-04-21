@@ -1,4 +1,4 @@
-../dist/build/docgen/docgen prelude.purs > README.md
+../dist/build/docgen/docgen --hierarchy-images prelude.purs > README.md
 ../dist/build/hierarchy/hierarchy prelude.purs -o prelude
 mkdir -p images
 mkdir -p ../docs/source/images

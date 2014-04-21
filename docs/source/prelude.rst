@@ -209,15 +209,6 @@ Values
 Module Data.Function
 --------------------
 
-Types
-~~~~~
-
-Type Classes
-~~~~~~~~~~~~
-
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
-
 Values
 ~~~~~~
 
@@ -236,9 +227,6 @@ Types
     data Ref a where
       Ref :: a -> Ref a
 
-Type Classes
-~~~~~~~~~~~~
-
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -255,15 +243,6 @@ Values
 
 Module Prelude.Unsafe
 ---------------------
-
-Types
-~~~~~
-
-Type Classes
-~~~~~~~~~~~~
-
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
 Values
 ~~~~~~
@@ -283,9 +262,6 @@ Types
     data Eff :: # ! -> * -> *
 
     type Pure a = forall e. Eff e a
-
-Type Classes
-~~~~~~~~~~~~
 
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
@@ -324,15 +300,6 @@ Values
 Module Control.Monad.Eff.Unsafe
 -------------------------------
 
-Types
-~~~~~
-
-Type Classes
-~~~~~~~~~~~~
-
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
-
 Values
 ~~~~~~
 
@@ -349,12 +316,6 @@ Types
 ::
 
     data Trace :: !
-
-Type Classes
-~~~~~~~~~~~~
-
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
 Values
 ~~~~~~
@@ -378,12 +339,6 @@ Types
     data STArray :: * -> * -> *
 
     data STRef :: * -> * -> *
-
-Type Classes
-~~~~~~~~~~~~
-
-Type Class Instances
-~~~~~~~~~~~~~~~~~~~~
 
 Values
 ~~~~~~
