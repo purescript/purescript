@@ -1,4 +1,5 @@
 # Module Documentation
+
 ## Module Prelude
 
 ### Types
@@ -195,15 +196,6 @@
 
 ## Module Data.Function
 
-### Types
-
-
-### Type Classes
-
-
-### Type Class Instances
-
-
 ### Values
 
     on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
@@ -215,9 +207,6 @@
 
     data Ref a where
       Ref :: a -> Ref a
-
-
-### Type Classes
 
 
 ### Type Class Instances
@@ -232,15 +221,6 @@
 
 ## Module Prelude.Unsafe
 
-### Types
-
-
-### Type Classes
-
-
-### Type Class Instances
-
-
 ### Values
 
     unsafeIndex :: forall a. [a] -> Prim.Number -> a
@@ -253,9 +233,6 @@
     data Eff :: # ! -> * -> *
 
     type Pure a = forall e. Eff e a
-
-
-### Type Classes
 
 
 ### Type Class Instances
@@ -290,15 +267,6 @@
 
 ## Module Control.Monad.Eff.Unsafe
 
-### Types
-
-
-### Type Classes
-
-
-### Type Class Instances
-
-
 ### Values
 
     unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
@@ -309,12 +277,6 @@
 ### Types
 
     data Trace :: !
-
-
-### Type Classes
-
-
-### Type Class Instances
 
 
 ### Values
@@ -333,12 +295,6 @@
     data STArray :: * -> * -> *
 
     data STRef :: * -> * -> *
-
-
-### Type Classes
-
-
-### Type Class Instances
 
 
 ### Values
