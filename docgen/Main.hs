@@ -61,29 +61,35 @@ renderModules ms = do
 renderModule :: P.Module -> Docs
 renderModule (P.Module moduleName ds exps) =
   let exported = filter (isExported exps) ds
+      hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
+      hasTypeclassInstances = any isTypeInstanceDeclaration ds
+      hasValues = any isValueDeclaration ds
   in do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
-    headerLevel 3 "Types"
-    spacer
-    renderTopLevel exps (filter isTypeDeclaration exported)
-    spacer
-    headerLevel 3 "Type Classes"
-    spacer
+    when hasTypes $ do
+      headerLevel 3 "Types"
+      spacer
+      renderTopLevel exps (filter isTypeDeclaration exported)
+      spacer
     when hasTypeclasses $ do
+      headerLevel 3 "Type Classes"
+      spacer
       renderTypeclassImage moduleName
       spacer
-    renderTopLevel exps (filter isTypeClassDeclaration exported)
-    spacer
-    headerLevel 3 "Type Class Instances"
-    spacer
-    renderTopLevel exps (filter isTypeInstanceDeclaration ds)
-    spacer
-    headerLevel 3 "Values"
-    spacer
-    renderTopLevel exps (filter isValueDeclaration exported)
-    spacer
+      renderTopLevel exps (filter isTypeClassDeclaration exported)
+      spacer
+    when hasTypeclassInstances $ do
+      headerLevel 3 "Type Class Instances"
+      spacer
+      renderTopLevel exps (filter isTypeInstanceDeclaration ds)
+      spacer
+    when hasValues $ do
+      headerLevel 3 "Values"
+      spacer
+      renderTopLevel exps (filter isValueDeclaration exported)
+      spacer
 
 isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
 isExported Nothing _ = True
