@@ -55,7 +55,7 @@ Function    JS Operator  Meaning
 shl         <<           Shift Left
 shr         >>           Shift Right
 zshr        \>>>         Zero-Fill Shift Right
-(++)        +            String concatenation
+(++)        \+           String concatenation
 ==========  ===========  =====================
 
 Literal Values
