@@ -195,22 +195,26 @@ Operators
 
 User-defined infix operators can be created by enclosing names in parentheses.
 
-E.g. to create a synonym for string concatenation::
+E.g. to create an infix synonym for the ``Data.Array.range`` function::
 
-  (<>) = \s1 s2 -> s1 ++ s2
+  (..) :: Number -> Number -> [Number]
+  (..) = Data.Array.range
   
-  greeting = "Hello" <> "World!"
+This function can be used as follows::
+  
+  oneToTen = 1 .. 10
 
 Regular functions can be used as operators by enclosing their names in backticks::
 
-  foo = \x y -> x * y + y
+  foo x y = x * y + y
   
   test = 10 `foo` 20
     
 Fixity declarations can associate a precedence level, which is a natural number, to a user-defined operator, and specify which way it associates::
 
-  infixl 5 <>
-  infixr 7 %%
+  infix 5 ..
+  infixl 7 %%
+  infixr 9 ^^
 
 Record Updates
 --------------
