@@ -169,7 +169,7 @@ When using ``do`` notation, the corresponding type constructor must be an instan
 
 Statements can have the following form:
 
-- ``a <- x`` which desugars to ``x >>= \a -> ...` `
+- ``a <- x`` which desugars to ``x >>= \a -> ...``
 - ``x`` which desugars to ``x >>= \_ -> ...`` or just ``x`` if this is the last statement.
 - A let binding ``let a = x`` where ``a`` can be either a name or a binder. Note the lack of the ``in`` keyword.
 
