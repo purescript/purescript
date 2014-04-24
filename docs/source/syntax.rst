@@ -101,7 +101,7 @@ The ``Prelude.Unsafe`` module defines the ``unsafeIndex`` function which retriev
   
 The code generator will turn the expression ``unsafeIndex arr index`` into the simplified Javascript ``arr[index]``.
 
-The `purescript-array` core library defines an alternative safe version ``!!`` of ``unsafeIndex`` which checks arrays bounds and returns a value of type ``Maybe a``.
+The ``purescript-array`` core library defines an alternative safe version ``!!`` of ``unsafeIndex`` which checks arrays bounds and returns a value of type ``Maybe a``.
   
 Property Accessors
 ------------------
