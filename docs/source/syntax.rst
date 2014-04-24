@@ -95,11 +95,13 @@ Record literals are surrounded by braces, as in Javascript::
 Array Indexing
 --------------
 
-To retrieve the element of an array at an index, use the ``!!`` operator::
+The ``Prelude.Unsafe`` module defines the ``unsafeIndex`` function which retrieves the element of an array at an index::
 
-  arr !! 0
+  unsafeIndex :: forall a. [a] -> Number -> a
   
-This example corresponds to the Javascript ``arr[0]``.
+The code generator will turn the expression ``unsafeIndex arr index`` into the simplified Javascript ``arr[index]``.
+
+The `purescript-array` core library defines an alternative safe version ``!!`` of ``unsafeIndex`` which checks arrays bounds and returns a value of type ``Maybe a``.
   
 Property Accessors
 ------------------
