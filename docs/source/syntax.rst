@@ -152,11 +152,7 @@ Here is an example, using the maybe monad::
 
   data Maybe a = Nothing | Just a
   
-  instance Monad Maybe where
-    ret = Just
-    (>>=) Nothing _ = Nothing
-    (>>=) (Just a) f = f a
-  
+  isEven :: Number -> Maybe {}
   isEven n | n % 2 == 0 = Just {}
   isEven _ = Nothing
   
@@ -165,17 +161,17 @@ Here is an example, using the maybe monad::
     m <- b
     let sum = n + m
     isEven sum
-    ret sum
+    return sum
 
 ``isEven`` adds two values of type ``Maybe Number`` and returns their sum, if the sum is even. If the sum is odd, ``evenSum`` returns ``Nothing``.
 
-When using ``do`` notation, the corresponding type constructor must be an instance of the ``Prelude.Monad`` type class, which defines the ``ret`` and ``>>=`` functions.
+When using ``do`` notation, the corresponding type constructor must be an instance of the ``Prelude.Monad`` type class.
 
 Statements can have the following form:
 
-- ``a <- x`` which desugars to ``m.bind x (\a -> ...)` `
-- ``let a = x`` which desugars to ``(\a -> ...)(x)``
-- ``x`` which desugars to ``m.bind x (\_ -> ...)`` or just ``x`` if this is the last statement.
+- ``a <- x`` which desugars to ``x >>= \a -> ...` `
+- ``x`` which desugars to ``x >>= \_ -> ...`` or just ``x`` if this is the last statement.
+- A let binding ``let a = x`` where ``a`` can be either a name or a binder. Note the lack of the ``in`` keyword.
 
 Binders can be used on the left hand side of ``<-`` or ``=``. For example::
 
