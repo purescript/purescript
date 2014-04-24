@@ -36,7 +36,7 @@ Superclass implications can be indicated in a class declaration with a backwards
   class (Monad m) <= MonadFail m where
     fail :: forall a. String -> m a
     
-Superclass instances will be used when searching for an instance of a subclass. For example, in the code below, the ``Monad`` constraint introduced by the ``return`` function can be discharged since ``Monad`` is a superclass of ``MonadFail``.
+Superclass instances will be used when searching for an instance of a subclass. For example, in the code below, the ``Monad`` constraint introduced by the ``return`` function can be discharged since ``Monad`` is a superclass of ``MonadFail``::
 
   assert :: forall m. (MonadFail m) => Bool -> m {}
   assert true = return {}
