@@ -19,43 +19,44 @@ But this is not::
 Operators
 ---------
 
-PureScript supports the following unary operators (in precedence order):
+Binary operators in PureScript are just regular functions. The Prelude defines a number of operators which correspond to Javascript's operators.
 
-==  =======================
-    Meaning
-==  =======================
-\-  Numeric negation
-!   Boolean negation
-~   Binary negation
-\+  Unary plus (numeric)
-==  =======================
+The Prelude defines the following functions which correspond to Javascript's unary operators::
 
-and the following binary operators (in precedence order):
+==========  ========  =======================
+Function    Operator  Meaning
+==========  ========  =======================
+negate      \-        Numeric negation
+not         !         Boolean negation
+complement  ~         Binary negation
+==========  ========  =======================
 
-====  =====================
-      Meaning
-====  =====================
-\+    Numeric addition
-\-    Numeric subtraction
-\*    Numeric multiplication
-/     Numeric division
-%     Numeric modulus
-==    Equality check
-!=    Inequality check
-<     Less than
-<=    Less than or equal
->     Greater than
->=    Greater than or equal
-&&    Boolean AND
-||    Boolean OR
-&     Binary AND
-\|    Binary OR
-^     Binary XOR
-<<    Shift Left
->>    Shift Right
-\>>>  Zero-Fill Shift Right
-++    String concatenation
-====  =====================
+and the following binary operators::
+
+==========  ===========  =====================
+Function    JS Operator  Meaning
+==========  ===========  =====================
+(\+)        \+           Numeric addition
+(\-)        \-           Numeric subtraction
+(\*)        \*           Numeric multiplication
+(/)         /            Numeric division
+(%)         %            Numeric modulus
+(==)        ==           Equality check
+(/=)        !=           Inequality check
+(<)         <            Less than
+(<=)        <=           Less than or equal
+(>)         >            Greater than
+(>=)        >=           Greater than or equal
+(&&)        &&           Boolean AND
+(||)        ||           Boolean OR
+(&)         &            Binary AND
+(\|)        \|           Binary OR
+(^)         ^            Binary XOR
+shl         <<           Shift Left
+shr         >>           Shift Right
+zshr        \>>>         Zero-Fill Shift Right
+(++)        +            String concatenation
+==========  ===========  =====================
 
 Literal Values
 --------------
@@ -185,7 +186,7 @@ A pattern match failure will generate a runtime exception, just as in the case o
 Operators
 ---------
 
-In addition to the standard operators, user-defined infix operators can be created by enclosing names in parentheses.
+User-defined infix operators can be created by enclosing names in parentheses.
 
 E.g. to create a synonym for string concatenation::
 
