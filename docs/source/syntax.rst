@@ -36,26 +36,26 @@ and the following binary operators:
 ==========  ===========  =====================
 Function    JS Operator  Meaning
 ==========  ===========  =====================
-(\+)        \+           Numeric addition
-(\-)        \-           Numeric subtraction
-(\*)        \*           Numeric multiplication
-(/)         /            Numeric division
-(%)         %            Numeric modulus
-(==)        ==           Equality check
-(/=)        !=           Inequality check
-(<)         <            Less than
-(<=)        <=           Less than or equal
-(>)         >            Greater than
-(>=)        >=           Greater than or equal
-(&&)        &&           Boolean AND
-(||)        ||           Boolean OR
-(&)         &            Binary AND
-(\|)        \|           Binary OR
-(^)         ^            Binary XOR
+\+          \+           Numeric addition
+\-          \-           Numeric subtraction
+\*          \*           Numeric multiplication
+/           /            Numeric division
+%           %            Numeric modulus
+==          ==           Equality check
+/=          !=           Inequality check
+<           <            Less than
+<=          <=           Less than or equal
+>           >            Greater than
+>=          >=           Greater than or equal
+&&          &&           Boolean AND
+||          ||           Boolean OR
+&           &            Binary AND
+\|          \|           Binary OR
+^           ^            Binary XOR
 shl         <<           Shift Left
 shr         >>           Shift Right
 zshr        \>>>         Zero-Fill Shift Right
-(++)        \+           String concatenation
+++          \+           String concatenation
 ==========  ===========  =====================
 
 Literal Values
