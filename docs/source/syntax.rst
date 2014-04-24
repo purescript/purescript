@@ -173,6 +173,15 @@ Statements can have the following form:
 - ``x`` which desugars to ``x >>= \_ -> ...`` or just ``x`` if this is the last statement.
 - A let binding ``let a = x`` where ``a`` can be either a name or a binder. Note the lack of the ``in`` keyword.
 
+The example ``evenSum`` desugars to::
+
+  evenSum a b = 
+    a >>= \n ->
+      b >>= \m ->
+        let sum = n + m in
+        isEven sum >>= \_ ->
+          return sum
+
 Binders can be used on the left hand side of ``<-`` or ``=``. For example::
 
   test arr = do
