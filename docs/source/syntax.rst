@@ -21,7 +21,7 @@ Operators
 
 Binary operators in PureScript are just regular functions. The Prelude defines a number of operators which correspond to Javascript's operators.
 
-The Prelude defines the following functions which correspond to Javascript's unary operators::
+The Prelude defines the following functions which correspond to Javascript's unary operators:
 
 ==========  ========  =======================
 Function    Operator  Meaning
@@ -31,7 +31,7 @@ not         !         Boolean negation
 complement  ~         Binary negation
 ==========  ========  =======================
 
-and the following binary operators::
+and the following binary operators:
 
 ==========  ===========  =====================
 Function    JS Operator  Meaning
