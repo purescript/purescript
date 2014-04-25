@@ -106,6 +106,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
   matches (P.PositionedDeclaration _ d) r = d `matches` r
+  matches d (P.PositionedDeclarationRef _ r) = d `matches` r
   matches _ _ = False
 
 isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
