@@ -257,10 +257,10 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
     P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing
 
 modulesDir :: FilePath
-modulesDir = "psci_modules" ++ pathSeparator : "node_modules"
+modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 
 indexFile :: FilePath
-indexFile = "psci_modules" ++ pathSeparator : "index.js"
+indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
