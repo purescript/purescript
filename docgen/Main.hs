@@ -26,16 +26,21 @@ import qualified System.IO.UTF8 as U
 import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
 
-docgen :: FilePath -> Bool -> IO ()
-docgen input showHierarchy = do
+docgen :: Bool -> [FilePath] -> IO ()
+docgen showHierarchy input = do
+  ms <- mapM parseFile (nub input)
+  U.putStrLn . runDocs $ (renderModules showHierarchy) (concat ms)
+  exitSuccess
+
+parseFile :: FilePath -> IO [P.Module]
+parseFile input = do
   text <- U.readFile input
   case P.runIndentParser input P.parseModules text of
     Left err -> do
       U.print err
       exitFailure
     Right ms -> do
-      U.putStrLn . runDocs $ (renderModules showHierarchy) ms
-      exitSuccess
+      return ms
 
 type Docs = Writer [String] ()
 
@@ -191,14 +196,14 @@ isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
-inputFile :: Term FilePath
-inputFile = value $ pos 0 "input.ps" $ posInfo { posDoc = "The input .ps file" }
+inputFiles :: Term [FilePath]
+inputFiles = value $ posAny [] $ posInfo { posName = "file(s)", posDoc = "The input .purs file(s)" }
 
 includeHeirarcy :: Term Bool
 includeHeirarcy = value $ flag $ (optInfo [ "h", "hierarchy-images" ]) { optDoc = "Include markdown for type class hierarchy images in the output." }
 
 term :: Term (IO ())
-term = docgen <$> inputFile <*> includeHeirarcy
+term = docgen <$> includeHeirarcy <*> inputFiles
 
 termInfo :: TermInfo
 termInfo = defTI
