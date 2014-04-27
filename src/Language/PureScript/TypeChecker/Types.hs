@@ -421,6 +421,7 @@ pairwise p (x : xs) = all (p x) xs && pairwise p xs
 -- Check that two types unify
 --
 unifiesWith :: Environment -> Type -> Type -> Bool
+unifiesWith _ (TUnknown u1) (TUnknown u2) | u1 == u2 = True
 unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
 unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
