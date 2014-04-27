@@ -56,13 +56,15 @@ data ModuleType = CommonJS | Globals
 moduleToJs :: ModuleType -> Options -> Module -> Environment -> [JS]
 moduleToJs mt opts (Module name decls (Just exps)) env = case mt of
   CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
-  Globals ->
+  Globals | not isModuleEmpty ->
     [ JSVariableIntroduction (fromJust (optionsBrowserNamespace opts))
                              (Just (JSBinary Or (JSVar (fromJust (optionsBrowserNamespace opts))) (JSObjectLiteral [])) )
     , JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts))))
                    (JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) [])
     ]
+  _ -> []
   where
+  isModuleEmpty = null jsDecls
   moduleBody = JSStringLiteral "use strict" : jsImports ++ jsDecls
   moduleExports = JSObjectLiteral $ concatMap exportToJs exps
   jsDecls = (concat $ mapMaybe (\decl -> fmap (map $ optimize opts) $ declToJs opts name decl env) decls)
