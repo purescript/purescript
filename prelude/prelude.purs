@@ -268,15 +268,29 @@ module Prelude where
     LT -> false
     _ -> true
 
-  foreign import numCompare
-    "function numCompare(n1) {\
+  foreign import unsafeCompare
+    "function unsafeCompare(n1) {\
     \  return function(n2) {\
     \    return n1 < n2 ? LT : n1 > n2 ? GT : EQ;\
     \  };\
-    \}" :: Number -> Number -> Ordering
-
+    \}" :: forall a. a -> a -> Ordering
+    
+  instance ordBoolean :: Ord Boolean where
+    compare false false = EQ
+    compare false true  = LT
+    compare true  true  = EQ
+    compare true  false = GT
+    
   instance ordNumber :: Ord Number where
-    compare = numCompare
+    compare = unsafeCompare
+    
+  instance ordString :: Ord String where
+    compare = unsafeCompare
+    
+  instance ordArray :: (Ord a) => Ord [a] where
+    compare (x:xs) (y:ys) = case compare x y of
+      EQ -> compare xs ys
+      other -> other
 
   infixl 10 &
   infixl 10 |
