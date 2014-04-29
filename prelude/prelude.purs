@@ -1,4 +1,27 @@
-module Prelude where
+module Prelude
+  ( flip
+  , const
+  , asTypeOf
+  , Semigroupoid, (<<<), (>>>)
+  , Category, id
+  , ($), (#)
+  , (:), cons
+  , Show, show
+  , Functor, (<$>)
+  , Apply, (<*>)
+  , Applicative, pure, liftA1
+  , Alternative, empty, (<|>)
+  , Bind, (>>=)
+  , Monad, return, liftM1, ap
+  , Num, (+), (-), (*), (/), (%)
+  , negate
+  , Eq, (==), (/=), refEq, refIneq
+  , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
+  , Bits, (&), (|), (^), shl, shr, zshr, complement
+  , BoolLike, (&&), (||)
+  , not
+  , Semigroup, (<>), (++)
+  ) where
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
