@@ -73,11 +73,7 @@ data ForeignImportType
   -- |
   -- A foreign import which contains inline Javascript as a string literal
   --
-  | InlineJavascript
-  -- |
-  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
-  --
-  | TypeClassAccessorImport deriving (Show, Eq, Data, Typeable)
+  | InlineJavascript deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The kind of a name
@@ -87,6 +83,10 @@ data NameKind
   -- A value introduced as a binding in a module
   --
   = Value
+  -- |
+  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
+  --
+  | TypeClassAccessorImport
   -- |
   -- A foreign import
   --

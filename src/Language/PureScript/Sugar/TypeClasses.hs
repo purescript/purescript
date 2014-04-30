@@ -143,9 +143,9 @@ typeClassDictionaryDeclaration name args implies members =
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
-  ExternDeclaration TypeClassAccessorImport ident
-    (Just (JSFunction (Just $ identToJs ident) ["dict"] (JSBlock [JSReturn (JSIndexer (JSStringLiteral (identToProperty ident)) (JSVar "dict"))])))
-    (moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty)))
+  ValueDeclaration ident TypeClassAccessorImport [] Nothing $
+    TypedValue False (Abs (Left $ Ident "dict") (Accessor (runIdent ident) (Var $ Qualified Nothing (Ident "dict")))) $
+    moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
