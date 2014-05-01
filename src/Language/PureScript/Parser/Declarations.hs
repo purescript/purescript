@@ -123,13 +123,13 @@ parseImportDeclaration = do
   where
   stdImport = do
     moduleName' <- moduleName
-    idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
+    idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
     return $ ImportDeclaration moduleName' idents Nothing
   qualImport = do
     reserved "qualified"
     indented
     moduleName' <- moduleName
-    idents <- P.optionMaybe $ parens $ commaSep parseDeclarationRef
+    idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
     reserved "as"
     asQ <- moduleName
     return $ ImportDeclaration moduleName' idents (Just asQ)

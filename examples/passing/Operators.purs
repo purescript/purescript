@@ -2,6 +2,9 @@ module Main where
 
   import Control.Monad.Eff
   import Debug.Trace
+  
+  (?!) :: forall a. a -> a -> a
+  (?!) x _ = x
 
   bar :: String -> String -> String
   bar = \s1 s2 -> s1 ++ s2
