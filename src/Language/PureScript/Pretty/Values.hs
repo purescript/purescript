@@ -215,12 +215,12 @@ matchConsBinder = mkPattern match'
 
 prettyPrintObjectPropertyBinder :: (String, Binder) -> StateT PrinterState Maybe String
 prettyPrintObjectPropertyBinder (key, binder) = fmap concat $ sequence
-    [ return $ key ++ ": "
+    [ return $ prettyPrintObjectKey key ++ ": "
     , prettyPrintBinder' binder
     ]
 
 prettyPrintObjectProperty :: (String, Value) -> StateT PrinterState Maybe String
 prettyPrintObjectProperty (key, value) = fmap concat $ sequence
-    [ return $ key ++ ": "
+    [ return $ prettyPrintObjectKey key ++ ": "
     , prettyPrintValue' value
     ]
