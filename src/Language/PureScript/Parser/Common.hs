@@ -54,6 +54,12 @@ reservedPsNames = [ "data"
                   ]
 
 -- |
+-- The characters allowed for use in operators
+--
+opChars :: [Char]
+opChars = ":!#$%&*+./<=>?@\\^|-~"
+
+-- |
 -- A list of reserved identifiers for types
 --
 reservedTypeNames :: [String]
@@ -82,13 +88,13 @@ identLetter = P.alphaNum <|> P.oneOf "_'"
 -- Valid first characters for an operator
 --
 opStart :: P.Parsec String u Char
-opStart = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
+opStart = P.oneOf opChars
 
 -- |
 -- Valid operators characters
 --
 opLetter :: P.Parsec String u Char
-opLetter = P.oneOf ":!#$%&*+./<=>?@\\^|-~"
+opLetter = P.oneOf opChars
 
 -- |
 -- The PureScript language definition

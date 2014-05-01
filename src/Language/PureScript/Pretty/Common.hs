@@ -17,7 +17,7 @@ module Language.PureScript.Pretty.Common where
 
 import Control.Monad.State
 import Data.List (intercalate)
-import Language.PureScript.Parser.Common (reservedPsNames)
+import Language.PureScript.Parser.Common (reservedPsNames, opChars)
 
 -- |
 -- Wrap a string in parentheses
@@ -65,4 +65,5 @@ prettyPrintMany f xs = do
 --
 prettyPrintObjectKey :: String -> String
 prettyPrintObjectKey s | s `elem` reservedPsNames = show s
+                       | head s `elem` opChars = show s
                        | otherwise = s
