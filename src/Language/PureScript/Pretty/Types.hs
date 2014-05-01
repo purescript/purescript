@@ -51,7 +51,7 @@ prettyPrintRow :: Type -> String
 prettyPrintRow = (\(tys, rest) -> intercalate ", " (map (uncurry nameAndTypeToPs) tys) ++ tailToPs rest) . toList []
   where
   nameAndTypeToPs :: String -> Type -> String
-  nameAndTypeToPs name ty = name ++ " :: " ++ prettyPrintType ty
+  nameAndTypeToPs name ty = prettyPrintObjectKey name ++ " :: " ++ prettyPrintType ty
   tailToPs :: Type -> String
   tailToPs REmpty = ""
   tailToPs other = " | " ++ prettyPrintType other

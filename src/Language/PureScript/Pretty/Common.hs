@@ -17,6 +17,7 @@ module Language.PureScript.Pretty.Common where
 
 import Control.Monad.State
 import Data.List (intercalate)
+import Language.PureScript.Parser.Common (reservedPsNames)
 
 -- |
 -- Wrap a string in parentheses
@@ -58,3 +59,10 @@ prettyPrintMany f xs = do
   ss <- mapM f xs
   indentString <- currentIndent
   return $ intercalate "\n" $ map (indentString ++) ss
+
+-- |
+-- Prints an object key, escaping reserved names.
+--
+prettyPrintObjectKey :: String -> String
+prettyPrintObjectKey s | s `elem` reservedPsNames = show s
+                       | otherwise = s
