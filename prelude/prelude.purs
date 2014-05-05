@@ -311,6 +311,9 @@ module Prelude
     compare = unsafeCompare
     
   instance ordArray :: (Ord a) => Ord [a] where
+    compare [] [] = EQ
+    compare [] _ = LT
+    compare _ [] = GT
     compare (x:xs) (y:ys) = case compare x y of
       EQ -> compare xs ys
       other -> other
