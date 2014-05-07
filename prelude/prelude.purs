@@ -80,6 +80,9 @@ module Prelude
     \  return JSON.stringify(s);\
     \}" :: String -> String
 
+  instance showUnit :: Show Unit where
+    show (Unit {}) = "Unit {}"
+
   instance showString :: Show String where
     show = showStringImpl
 
