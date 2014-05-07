@@ -21,6 +21,7 @@ module Prelude
   , BoolLike, (&&), (||)
   , not
   , Semigroup, (<>), (++)
+  , Unit(..)
   ) where
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -207,6 +208,8 @@ module Prelude
     (%) = numMod
     negate = numNegate
 
+  data Unit = Unit {}
+
   infix 4 ==
   infix 4 /=
 
@@ -227,6 +230,10 @@ module Prelude
     \    return r1 !== r2;\
     \  };\
     \}" :: forall a. a -> a -> Boolean
+
+  instance eqUnit :: Eq Unit where
+    (==) (Unit {}) (Unit {}) = true
+    (/=) (Unit {}) (Unit {}) = false
 
   instance eqString :: Eq String where
     (==) = refEq
@@ -297,6 +304,9 @@ module Prelude
     \    return n1 < n2 ? LT : n1 > n2 ? GT : EQ;\
     \  };\
     \}" :: forall a. a -> a -> Ordering
+
+  instance ordUnit :: Ord Unit where
+    compare (Unit {}) (Unit {}) = EQ
     
   instance ordBoolean :: Ord Boolean where
     compare false false = EQ
@@ -420,6 +430,9 @@ module Prelude
     \    return s1 + s2;\
     \  };\
     \}" :: String -> String -> String
+
+  instance semigroupUnit :: Semigroup Unit where
+    (<>) (Unit {}) (Unit {}) = Unit {}
 
   instance semigroupString :: Semigroup String where
     (<>) = concatString
