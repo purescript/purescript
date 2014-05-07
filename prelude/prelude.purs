@@ -21,7 +21,7 @@ module Prelude
   , BoolLike, (&&), (||)
   , not
   , Semigroup, (<>), (++)
-  , Unit(..)
+  , Unit(..), unit
   ) where
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -212,6 +212,9 @@ module Prelude
     negate = numNegate
 
   data Unit = Unit {}
+
+  unit :: forall a. a -> Unit
+  unit = const (Unit {})
 
   infix 4 ==
   infix 4 /=
