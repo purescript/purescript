@@ -213,8 +213,8 @@ module Prelude
 
   data Unit = Unit {}
 
-  unit :: forall a. a -> Unit
-  unit = const (Unit {})
+  unit :: Unit
+  unit = Unit {}
 
   infix 4 ==
   infix 4 /=
