@@ -3,4 +3,4 @@ module Main where
 import Prelude
 import Debug.Trace
 
-main = print (unit "Hello world")
+main = print (const unit $ "Hello world")
