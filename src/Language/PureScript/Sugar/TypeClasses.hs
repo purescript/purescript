@@ -21,12 +21,10 @@ module Language.PureScript.Sugar.TypeClasses (
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
-import Language.PureScript.CodeGen.Common (identToJs)
 
 import qualified Language.PureScript.Constants as C
 

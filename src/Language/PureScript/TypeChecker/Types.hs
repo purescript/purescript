@@ -348,7 +348,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Make sure the types unify with the types in the superclass implication
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
 	    -- Finally, satisfy the subclass constraint
-	    , args' <- maybeToList $ mapM (applySubst subst . TypeVar) args
+	    , args' <- maybeToList $ mapM (flip lookup subst) args
 	    , suDict <- go True subclassName args' ]
 	
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -379,12 +379,6 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    let grps = groupBy ((==) `on` fst) subst
 	    guard (all (pairwise (unifiesWith env) . map snd) grps)
 	    return $ map head grps
-	  -- Apply a substitution to a type
-	  applySubst :: [(String, Type)] -> Type -> Maybe Type
-	  applySubst subst = everywhereOnTypesM replace
-	    where
-	    replace (TypeVar v) = lookup v subst
-	    replace other = Just other
 	  -- Choose the simplest DictionaryValues from a list of candidates
 	  -- The reason for this function is as follows:
 	  -- When considering overlapping instances, we don't want to consider the same dictionary
