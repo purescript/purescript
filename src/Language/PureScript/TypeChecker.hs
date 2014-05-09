@@ -183,7 +183,7 @@ typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = d
   return $ d : ds
 typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) : rest) = do
   env <- getEnv
-  let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn) (typeClassDictionaries env)
+  let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn && tcdType tcd == TCDRegular) (typeClassDictionaries env)
   addTypeClassDictionaries [ tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
                            | tcd <- instances
                            , let (Qualified _ ident) = tcdName tcd

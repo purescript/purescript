@@ -276,7 +276,12 @@ replaceTypeClassDictionaries mn =
   where
   go (TypeClassDictionary trySuperclasses constraint dicts) = do
     env <- getEnv
-    entails env mn dicts constraint trySuperclasses
+    let superclasses = [ (superclass, (subclassName, args, index, suTyArgs))
+                       | (subclassName, (args, _, implies)) <- M.toList (typeClasses env)
+                       , (index, (superclass, suTyArgs)) <- zip [0..] implies
+                       ]
+    let superclassContext = M.fromListWith (++) (map (id *** return) superclasses)
+    entails env superclassContext mn dicts constraint trySuperclasses
   go other = return other
 
 -- |
@@ -306,8 +311,8 @@ data DictionaryValue
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Value
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
+entails :: Environment -> M.Map (Qualified ProperName) [(Qualified ProperName, [String], Integer, [Type])] -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Value
+entails env superclassContext moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
     sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
@@ -338,13 +343,9 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    , args <- solveSubgoals subst (tcdDependencies tcd) ] ++
 	
 	    -- Look for implementations via superclasses
-	    [ SubclassDictionaryValue suDict superclass index
+	    [ SubclassDictionaryValue suDict className' index
 	    | trySuperclasses'
-	    , (subclassName, (args, _, implies)) <- M.toList (typeClasses env)
-	    -- Try each superclass
-	    , (index, (superclass, suTyArgs)) <- zip [0..] implies
-	    -- Make sure the type class name matches the superclass name
-	    , className' == superclass
+	    , (subclassName, args, index, suTyArgs) <- fromMaybe [] $ M.lookup className' superclassContext
 	    -- Make sure the types unify with the types in the superclass implication
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
 	    -- Finally, satisfy the subclass constraint
