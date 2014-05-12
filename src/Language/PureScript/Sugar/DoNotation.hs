@@ -35,7 +35,7 @@ desugarDoModule :: Module -> Either ErrorStack Module
 desugarDoModule (Module mn ds exts) = Module mn <$> mapM desugarDo ds <*> pure exts
 
 desugarDo :: Declaration -> Either ErrorStack Declaration
-desugarDo (PositionedDeclaration pos d) = rethrowWithPosition pos $ desugarDo d
+desugarDo (PositionedDeclaration pos d) = (PositionedDeclaration pos) <$> (rethrowWithPosition pos $ desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in f d
