@@ -48,7 +48,7 @@ desugarDo d =
 
   replace :: Value -> Either ErrorStack Value
   replace (Do els) = go els
-  replace (PositionedValue pos d) = rethrowWithPosition pos $ replace d
+  replace (PositionedValue pos v) = rethrowWithPosition pos $ replace v
   replace other = return other
 
   go :: [DoNotationElement] -> Either ErrorStack Value
