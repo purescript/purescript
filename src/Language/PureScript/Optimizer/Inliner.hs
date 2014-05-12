@@ -53,7 +53,11 @@ unThunk :: JS -> JS
 unThunk = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) [])]) = JSBlock body
+  convert (JSBlock []) = JSBlock []
+  convert (JSBlock jss) =
+    case (last jss) of
+      JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) []) -> JSBlock $ init jss ++ body
+      _ -> JSBlock jss
   convert js = js
 
 evaluateIifes :: JS -> JS
