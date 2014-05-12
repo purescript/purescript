@@ -35,9 +35,10 @@ desugarDoModule :: Module -> Either ErrorStack Module
 desugarDoModule (Module mn ds exts) = Module mn <$> mapM desugarDo ds <*> pure exts
 
 desugarDo :: Declaration -> Either ErrorStack Declaration
-desugarDo =
+desugarDo (PositionedDeclaration pos d) = (PositionedDeclaration pos) <$> (rethrowWithPosition pos $ desugarDo d)
+desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
-  in f
+  in f d
   where
   prelude :: ModuleName
   prelude = ModuleName [ProperName C.prelude]
@@ -47,6 +48,7 @@ desugarDo =
 
   replace :: Value -> Either ErrorStack Value
   replace (Do els) = go els
+  replace (PositionedValue pos v) = rethrowWithPosition pos $ replace v
   replace other = return other
 
   go :: [DoNotationElement] -> Either ErrorStack Value
@@ -69,4 +71,4 @@ desugarDo =
   go (DoNotationLet ds : rest) = do
     rest' <- go rest
     return $ Let ds rest'
-  go (PositionedDoNotationElement pos el : rest) = PositionedValue pos <$> go (el : rest)
+  go (PositionedDoNotationElement pos el : rest) = rethrowWithPosition pos $ PositionedValue pos <$> go (el : rest)
