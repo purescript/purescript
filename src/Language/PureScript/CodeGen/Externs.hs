@@ -85,7 +85,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
 
     exportToPs (TypeInstanceRef ident) = do
       let TypeClassDictionaryInScope { tcdClassName = className, tcdInstanceTypes = tys, tcdDependencies = deps} =
-            fromMaybe (error $ "Type class instance has no dictionary in exportToPs") . find ((== Qualified (Just moduleName) ident) . tcdName) $ typeClassDictionaries env
+            fromMaybe (error $ "Type class instance has no dictionary in exportToPs") . find ((== Qualified (Just moduleName) ident) . tcdName) $ M.elems $ typeClassDictionaries env
       let constraintsText = case fromMaybe [] deps of
                               [] -> ""
                               cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "

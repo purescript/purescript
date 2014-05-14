@@ -21,6 +21,7 @@ module Language.PureScript.TypeChecker.Monad where
 import Language.PureScript.Types
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Declarations (canonicalizeDictionary)
 import Language.PureScript.Environment
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Options
@@ -63,7 +64,8 @@ bindTypes newNames action = do
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
+  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
@@ -72,7 +74,7 @@ withTypeClassDictionaries entries action = do
 -- Get the currently available list of type class dictionaries
 --
 getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [TypeClassDictionaryInScope]
-getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Temporarily bind a collection of names to local variables

@@ -84,7 +84,8 @@ addTypeClass moduleName pn args implies ds =
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = entries ++ (typeClassDictionaries . checkEnv $ st) } }
+  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
+  in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
 
 checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
@@ -182,8 +183,8 @@ typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = d
   guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
   return $ d : ds
 typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) : rest) = do
-  env <- getEnv
-  let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn) (typeClassDictionaries env)
+  tcds <- getTypeClassDictionaries
+  let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn) tcds
   addTypeClassDictionaries [ tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
                            | tcd <- instances
                            , let (Qualified _ ident) = tcdName tcd

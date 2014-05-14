@@ -49,7 +49,7 @@ data Environment = Environment {
   -- |
   -- Available type class dictionaries
   --
-  , typeClassDictionaries :: [TypeClassDictionaryInScope]
+  , typeClassDictionaries :: M.Map (Qualified Ident, Maybe ModuleName) TypeClassDictionaryInScope
   -- |
   -- Type classes
   --
@@ -60,7 +60,7 @@ data Environment = Environment {
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty [] M.empty
+initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty M.empty
 
 -- |
 -- The type of a foreign import
