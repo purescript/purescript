@@ -254,9 +254,10 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 bindersToJs :: Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> JS
 bindersToJs opts m e binders vals = runGen (map identToJs (S.unusedNames usedNames)) $ do
   valNames <- replicateM (length vals) fresh
+  let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
   jss <- forM binders $ \(CaseAlternative bs grd result) -> go valNames [JSReturn (valueToJs opts m (bindNames m (concatMap binderNames bs) e) result)] bs grd
-  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
-                 vals
+  return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+                 []
   where
     usedNames = concatMap usedNamesJS vals ++ concatMap S.usedNamesCaseAlternative binders
 
