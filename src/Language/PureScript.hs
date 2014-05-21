@@ -30,6 +30,7 @@ import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
 import Language.PureScript.DeadCodeElimination as P
+import Language.PureScript.Supply as P
 
 import qualified Language.PureScript.Constants as C
 
@@ -40,7 +41,7 @@ import Data.Maybe (fromJust, fromMaybe)
 import Control.Monad.Error
 import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
-import Control.Applicative ((<$>))
+import Control.Applicative
 import qualified Data.Map as M
 import qualified Data.Set as S
 import System.FilePath (pathSeparator)
@@ -70,14 +71,14 @@ compile = compile' initEnvironment
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
   (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
-  desugared <- stringifyErrorStack True $ desugar sorted
+  (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let js = concatMap (\m -> moduleToJs Globals opts m env') modulesToCodeGen
+  let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
   return (prettyPrintJS js', exts, env')
@@ -165,7 +166,7 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> m Environment
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> m Environment
 make outputDir opts ms = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
@@ -188,15 +189,15 @@ make outputDir opts ms = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  desugared <- liftError $ stringifyErrorStack True $ zip (map fst marked) <$> desugar (map snd marked)
+  (desugared, nextVar) <- liftError $ stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
-  go initEnvironment desugared
+  evalSupplyT nextVar (go initEnvironment desugared)
 
   where
-  go :: (Functor m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> m Environment
+  go :: (Functor m, Applicative m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
-    (_, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
+    (_, env') <- lift . liftError . runCheck' opts env $ typeCheckModule Nothing m
 
     go env' ms'
   go env ((True, m@(Module moduleName' _ exps)) : ms') = do
@@ -204,18 +205,18 @@ make outputDir opts ms = do
         jsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "index.js"
         externsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "externs.purs"
 
-    progress $ "Compiling " ++ runModuleName moduleName'
+    lift . progress $ "Compiling " ++ runModuleName moduleName'
 
-    (Module _ elaborated _, env') <- liftError . runCheck' opts env $ typeCheckModule Nothing m
+    (Module _ elaborated _, env') <- lift . liftError . runCheck' opts env $ typeCheckModule Nothing m
 
-    regrouped <- liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
-        js = prettyPrintJS $ moduleToJs CommonJS opts mod' env'
-        exts = moduleToPs mod' env'
+    js <- prettyPrintJS <$> moduleToJs CommonJS opts mod' env'
+    let exts = moduleToPs mod' env'
 
-    writeTextFile jsFile js
-    writeTextFile externsFile exts
+    lift $ writeTextFile jsFile js
+    lift $ writeTextFile externsFile exts
 
     go env' ms'
 

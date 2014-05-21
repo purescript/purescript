@@ -24,6 +24,7 @@ import Language.PureScript.Types
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Supply
 import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 
 import qualified Language.PureScript.Constants as C
@@ -40,13 +41,13 @@ import qualified Data.Map as M
 
 type MemberMap = M.Map (ModuleName, ProperName) Declaration
 
-type Desugar = StateT MemberMap (Either ErrorStack)
+type Desugar = StateT MemberMap (SupplyT (Either ErrorStack))
 
 -- |
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: [Module] -> Either ErrorStack [Module]
+desugarTypeClasses :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
@@ -160,7 +161,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (TypeClassDeclaration _ args implies tyDecls) <- lift $
+  (TypeClassDeclaration _ args implies tyDecls) <- lift . lift $
     maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $
       M.lookup (qualify mn className) m
 
@@ -203,7 +204,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
-    _ <- lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
+    _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
     return (ident, memberValue)
   memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
