@@ -45,7 +45,7 @@ readInput input = fmap collect $ forM input $ \inputFile -> do
   collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
   collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
 
-newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Monad, MonadIO, MonadError String)
+newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 
 runMake :: Make a -> IO (Either String a)
 runMake = runErrorT . unMake

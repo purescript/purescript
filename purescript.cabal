@@ -34,8 +34,8 @@ library
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
                      Language.PureScript.Names
+                     Language.PureScript.Supply
                      Language.PureScript.Types
-                     Language.PureScript.Scope
                      Language.PureScript.Traversals
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.DeadCodeElimination
@@ -53,7 +53,6 @@ library
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
-                     Language.PureScript.CodeGen.Monad
                      Language.PureScript.Optimizer
                      Language.PureScript.Optimizer.Common
                      Language.PureScript.Optimizer.MagicDo
@@ -136,7 +135,7 @@ executable hierarchy
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
-                   filepath -any, mtl -any, parsec -any, purescript -any, 
+                   filepath -any, mtl -any, parsec -any, purescript -any,
                    transformers -any, utf8-string -any, process -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
