@@ -250,3 +250,17 @@ The ``where`` keyword can also be used to introduce local declarations `at the e
     go acc 1 = acc
     go acc n = go (acc * n) (n - 1)
 
+Comments
+--------
+
+A single line comment starts with ``--``::
+
+  -- This is a comment
+  
+Multi-line comments are enclosed in ``{-`` and ``-}``. These can be nested::
+
+  {- Comment {- nested comment -} continued comment -}
+    
+  
+  
+
