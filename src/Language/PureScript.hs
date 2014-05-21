@@ -78,7 +78,7 @@ compile' env opts ms = do
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
   let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
-  let (js, _) = runSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
+  let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
   return (prettyPrintJS js', exts, env')
@@ -191,7 +191,7 @@ make outputDir opts ms = do
 
   (desugared, nextVar) <- liftError $ stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
-  fst <$> runSupplyT nextVar (go initEnvironment desugared)
+  evalSupplyT nextVar (go initEnvironment desugared)
 
   where
   go :: (Functor m, Applicative m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> SupplyT m Environment
