@@ -22,7 +22,7 @@ Alternatively, consider installing PureScript in a Cabal sandbox using ``cabal s
 Creating a new PureScript project
 ---------------------------------
 
-You can create a new PureScript project using ``grunt-init`` and [this PureScript project template](https://github.com/purescript-contrib/grunt-init-purescript). This will give you a project that uses [Grunt](http://gruntjs.com) as its build tool and [Bower](http://bower.io) for dependency management. See the [README](https://github.com/purescript-contrib/grunt-init-purescript) for step-by-step instructions.
+You can create a new PureScript project using ``grunt-init`` and `this PureScript project template <https://github.com/purescript-contrib/grunt-init-purescript>`_. This will give you a project that uses `Grunt <http://gruntjs.com>`_ as its build tool and `Bower <http://bower.io>`_ for dependency management. See the `README <https://github.com/purescript-contrib/grunt-init-purescript>`_ for step-by-step instructions.
 
 Compiler usage
 --------------
