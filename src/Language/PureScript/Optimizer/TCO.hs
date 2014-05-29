@@ -95,6 +95,9 @@ tco' = everywhereOnJS convert
     collectSelfCallArgs allArgumentValues (JSApp fn args') = collectSelfCallArgs (args' : allArgumentValues) fn
     collectSelfCallArgs allArgumentValues _ = allArgumentValues
   isSelfCall :: String -> JS -> Bool
-  isSelfCall ident (JSApp (JSVar ident') _) | ident == ident' = True
-  isSelfCall ident (JSApp fn _) = isSelfCall ident fn
+  isSelfCall ident (JSApp (JSVar ident') args) | ident == ident' && not (any isFunction args) = True
+  isSelfCall ident (JSApp fn args) | not (any isFunction args) = isSelfCall ident fn
   isSelfCall _ _ = False
+  isFunction :: JS -> Bool
+  isFunction (JSFunction _ _ _) = True
+  isFunction _ = False
