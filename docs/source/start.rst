@@ -59,5 +59,4 @@ The following command line options are supported:
 --no-magic-do          Disable the optimization that overloads the ``do`` keyword to generate efficient code specifically for the ``Eff`` monad.
 --no-opts              Skip the optimization phase.
 --no-prelude           Omit the Prelude.
---no-prelude           Omit the Prelude.
 --no-tco               Disable tail call optimizations
