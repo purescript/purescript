@@ -154,6 +154,20 @@ module Prelude
     a' <- a
     return (f' a')
 
+  instance functorArr :: Functor ((->) r) where
+    (<$>) = (<<<)
+
+  instance applyArr :: Apply ((->) r) where
+    (<*>) f g x = f x (g x)
+
+  instance applicativeArr :: Applicative ((->) r) where
+    pure = const
+
+  instance bindArr :: Bind ((->) r) where
+    (>>=) m f x = f (m x) x
+
+  instance monadArr :: Monad ((->) r)
+
   infixl 7 *
   infixl 7 /
   infixl 7 %
@@ -442,6 +456,9 @@ module Prelude
 
   instance semigroupString :: Semigroup String where
     (<>) = concatString
+
+  instance semigroupArr :: (Semigroup s') => Semigroup (s -> s') where
+    (<>) f g = \x -> f x <> g x
 
   infixr 5 ++
 

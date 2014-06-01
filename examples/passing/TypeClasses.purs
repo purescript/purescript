@@ -57,20 +57,6 @@ test4 = \_ -> return 1
 
 test5 = \_ -> Just 1 >>= \n -> return (n + 1)
 
-instance functorFunction :: Functor ((->) r) where
-  (<$>) = liftM1
-
-instance applyFunction :: Apply ((->) r) where
-  (<*>) = ap
-
-instance applicativeFunction :: Applicative ((->) r) where
-  pure a _ = a
-
-instance bindFunction :: Bind ((->) r) where
-  (>>=) f g r = g (f r) r
-
-instance monadFunction :: Monad ((->) r)
-
 ask r = r
 
 runReader r f = f r
