@@ -116,10 +116,12 @@ isExported (Just exps) decl = any (matches decl) exps
 
 isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
 isDctorExported _ Nothing _ = True
-isDctorExported ident (Just exps) ctor = flip any exps $ \e -> case e of
-  P.TypeRef ident' Nothing -> ident == ident'
-  P.TypeRef ident' (Just ctors) -> ident == ident' && ctor `elem` ctors
-  _ -> False
+isDctorExported ident (Just exps) ctor = test `any` exps
+  where
+  test (P.PositionedDeclarationRef _ d) = test d
+  test (P.TypeRef ident' Nothing) = ident == ident'
+  test (P.TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
+  test _ = False
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
@@ -137,9 +139,9 @@ renderDeclaration n _ (P.TypeDeclaration ident ty) =
 renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
 renderDeclaration n exps (P.DataDeclaration name args ctors) = do
-  let typeName = P.runProperName name ++ " " ++ unwords args
-  atIndent n $ "data " ++ typeName ++ " where"
+  let typeName = P.runProperName name ++ (if null args then "" else " " ++ unwords args)
   let exported = filter (isDctorExported name exps . fst) ctors
+  atIndent n $ "data " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
     atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> P.prettyPrintType ty ++ " -> ") tys ++ typeName
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
