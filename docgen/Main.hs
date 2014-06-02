@@ -133,20 +133,20 @@ renderTypeclassImage name =
 
 renderDeclaration :: Int -> Maybe [P.DeclarationRef] -> P.Declaration -> Docs
 renderDeclaration n _ (P.TypeDeclaration ident ty) =
-  atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
+  atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
-  atIndent n $ show ident ++ " :: " ++ P.prettyPrintType ty
+  atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration n exps (P.DataDeclaration name args ctors) = do
   let typeName = P.runProperName name ++ " " ++ unwords args
   atIndent n $ "data " ++ typeName ++ " where"
   let exported = filter (isDctorExported name exps . fst) ctors
   forM_ exported $ \(ctor, tys) ->
-    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> P.prettyPrintType ty ++ " -> ") tys ++ typeName
+    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> prettyPrintType' ty ++ " -> ") tys ++ typeName
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
   let typeName = P.runProperName name ++ " " ++ unwords args
-  atIndent n $ "type " ++ typeName ++ " = " ++ P.prettyPrintType ty
+  atIndent n $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
 renderDeclaration n exps (P.TypeClassDeclaration name args implies ds) = do
   let impliesText = case implies of
                       [] -> ""
@@ -161,6 +161,14 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
 renderDeclaration n exps (P.PositionedDeclaration _ d) =
   renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
+
+prettyPrintType' :: P.Type -> String
+prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
+  where
+  dePrim ty@(P.TypeConstructor (P.Qualified _ name))
+    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString = 
+      P.TypeConstructor $ P.Qualified Nothing name
+  dePrim other = other
 
 getName :: P.Declaration -> String
 getName (P.TypeDeclaration ident _) = show ident
