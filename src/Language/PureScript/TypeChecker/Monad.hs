@@ -136,7 +136,7 @@ data CheckState = CheckState {
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
 newtype Check a = Check { unCheck :: StateT CheckState (Either ErrorStack) a }
-  deriving (Functor, Monad, Applicative, MonadPlus, MonadState CheckState, MonadError ErrorStack)
+  deriving (Functor, Monad, Applicative, Alternative, MonadPlus, MonadState CheckState, MonadError ErrorStack)
 
 -- |
 -- Get the current @Environment@
