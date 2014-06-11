@@ -227,7 +227,6 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         ++ fromMaybe "" name
                         ++ "(" ++ intercalate ", " args ++ ") "
                         ++ ret ]
-                  , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS1 th ++ " : " ++ prettyPrintJS1 el ]
                   , [ binary    LessThan             "<" ]
                   , [ binary    LessThanOrEqualTo    "<=" ]
                   , [ binary    GreaterThan          ">" ]
@@ -252,4 +251,5 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ binary    BitwiseOr            "|" ]
                   , [ binary    And                  "&&" ]
                   , [ binary    Or                   "||" ]
+                  , [ Wrap conditional $ \(th, el) cond -> cond ++ " ? " ++ prettyPrintJS1 th ++ " : " ++ prettyPrintJS1 el ]
                     ]
