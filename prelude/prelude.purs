@@ -642,7 +642,7 @@ module Control.Monad.Eff where
                         \    while (!f()) { }\
                         \    return {};\
                         \  };\
-                        \}" :: forall e. Eff e Boolean -> Eff e {}
+                        \}" :: forall e. Eff e Boolean -> Eff e Unit
 
   foreign import whileE "function whileE(f) {\
                         \  return function(a) {\
@@ -653,7 +653,7 @@ module Control.Monad.Eff where
                         \      return {};\
                         \    };\
                         \  };\
-                        \}" :: forall e a. Eff e Boolean -> Eff e a -> Eff e {}
+                        \}" :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 
   foreign import forE "function forE(lo) {\
                       \  return function(hi) {\
@@ -665,7 +665,7 @@ module Control.Monad.Eff where
                       \      };\
                       \    };\
                       \  };\
-                      \}" :: forall e. Number -> Number -> (Number -> Eff e {}) -> Eff e {}
+                      \}" :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 
 
   foreign import foreachE "function foreachE(as) {\
@@ -674,7 +674,7 @@ module Control.Monad.Eff where
                           \      f(as[i])();\
                           \    }\
                           \  };\
-                          \}" :: forall e a. [a] -> (a -> Eff e {}) -> Eff e {}
+                          \}" :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 
 module Control.Monad.Eff.Unsafe where
 
@@ -696,9 +696,9 @@ module Debug.Trace where
                        \    console.log(s);\
                        \    return {};\
                        \  };\
-                       \}" :: forall r. String -> Eff (trace :: Trace | r) {}
+                       \}" :: forall r. String -> Eff (trace :: Trace | r) Unit
 
-  print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) {}
+  print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
   print o = trace (show o)
 
 module Control.Monad.ST where
