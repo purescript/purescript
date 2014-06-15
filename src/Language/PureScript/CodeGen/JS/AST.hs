@@ -234,6 +234,12 @@ data JS
   --
   | JSRaw String deriving (Show, Eq, Data, Typeable)
 
+targetVariable :: JS -> String
+targetVariable (JSVar var) = var
+targetVariable (JSAccessor _ tgt) = targetVariable tgt
+targetVariable (JSIndexer _ tgt) = targetVariable tgt
+targetVariable _ = error "Invalid argument to targetVariable"
+
 --
 -- Traversals
 --
