@@ -1,5 +1,5 @@
 name: purescript
-version: 0.5.2.3
+version: 0.5.2.4
 cabal-version: >=1.8
 build-type: Custom
 license: MIT
@@ -18,9 +18,9 @@ data-files: prelude/prelude.purs
 data-dir: ""
 
 library
-    build-depends: base >=4 && <5, cmdtheline -any, containers -any, unordered-containers -any,
-                   directory >= 1.2, filepath -any, mtl -any, parsec -any,
-                   transformers -any, utf8-string -any,
+    build-depends: base >=4 && <5, cmdtheline == 0.2.*, containers -any, unordered-containers -any,
+                   directory >= 1.2, filepath -any, mtl >= 2.1.0 && < 2.2.0, parsec -any,
+                   transformers >= 0.3 && < 0.4, utf8-string -any,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    monad-unify >= 0.2.2 && < 0.3,
                    xdg-basedir -any, time -any
