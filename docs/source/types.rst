@@ -84,7 +84,7 @@ The inferred type of ``addProps`` is::
   
 Here, the type variable ``r`` has kind ``# *`` - it represents a `row` of `types`. It can be instantiated with any row of named types.
 
-In other words, ``addProps`` accepts any record which has properties ``Foo`` and ``Bar``, and *any other record properties*.
+In other words, ``addProps`` accepts any record which has properties ``foo`` and ``bar``, and *any other record properties*.
 
 Therefore, the following application compiles::
 
