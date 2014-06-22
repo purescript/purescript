@@ -17,6 +17,10 @@ author: Phil Freeman <paf31@cantab.net>,
 data-files: prelude/prelude.purs
 data-dir: ""
 
+source-repository head
+    type: git
+    location: https://github.com/purescript/purescript.git
+
 library
     build-depends: base >=4 && <5, cmdtheline == 0.2.*, containers -any, unordered-containers -any,
                    directory >= 1.2, filepath -any, mtl >= 2.1.0 && < 2.2.0, parsec -any,
