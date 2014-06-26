@@ -19,8 +19,6 @@
 --
 --  * Inlining of (>>=) and ret for the Eff monad
 --
---  * Removal of unused variables
---
 --  * Removal of unnecessary thunks
 --
 --  * Eta conversion
@@ -57,7 +55,6 @@ optimize opts | optionsNoOptimizations opts = id
   [ collapseNestedBlocks
   , tco opts
   , magicDo opts
-  , removeUnusedVariables
   , removeCodeAfterReturnStatements
   , unThunk
   , etaConvert
