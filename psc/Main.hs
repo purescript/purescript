@@ -25,6 +25,7 @@ import System.Console.CmdTheLine
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
+import System.IO (stderr)
 
 import Text.Parsec (ParseError)
 
@@ -51,12 +52,12 @@ compile opts input output externs = do
   modules <- readInput input
   case modules of
     Left err -> do
-      U.print err
+      U.hPutStr stderr $ show err
       exitFailure
     Right ms -> do
       case P.compile opts (map snd ms) of
         Left err -> do
-          U.putStrLn err
+          U.hPutStrLn stderr err
           exitFailure
         Right (js, exts, _) -> do
           case output of
