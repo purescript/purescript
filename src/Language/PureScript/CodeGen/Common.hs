@@ -134,7 +134,7 @@ nameIsJsReserved name =
 -- Test if a string is a valid JS identifier (may return false negatives)
 --
 isIdent :: String -> Bool
-isIdent s@(first : rest) | not (nameIsJsReserved s) && isAlpha first && all isAlphaNum rest = True
+isIdent s@(first : rest) | not (nameIsJsReserved s) && (isAlpha first || first == '_') && all isAlphaNum rest = True
 isIdent _ = False
 
 moduleNameToJs :: ModuleName -> String

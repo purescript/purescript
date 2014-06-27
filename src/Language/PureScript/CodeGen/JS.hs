@@ -81,14 +81,18 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
     Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
-imports =
-  let (f, _, _, _, _) = everythingOnValues (++) (const []) collect (const []) (const []) (const [])
-  in f
+imports (ImportDeclaration mn _ _) = [mn]
+imports other =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) collectV collectB (const []) (const [])
+  in f other
   where
-  collect :: Value -> [ModuleName]
-  collect (Var (Qualified (Just mn) _)) = [mn]
-  collect (Constructor (Qualified (Just mn) _)) = [mn]
-  collect _ = []
+  collectV :: Value -> [ModuleName]
+  collectV (Var (Qualified (Just mn) _)) = [mn]
+  collectV (Constructor (Qualified (Just mn) _)) = [mn]
+  collectV _ = []
+  collectB :: Binder -> [ModuleName]
+  collectB (ConstructorBinder (Qualified (Just mn) _) _) = [mn]
+  collectB _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
@@ -102,16 +106,24 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ mp (DataDeclaration _ _ ctors) _ = do
+declToJs _ _ (DataDeclaration _ _ ctors) _ = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    [JSVariableIntroduction ctor (Just (go pn 0 tys []))]
+    let _ctor = '_' : ctor
+    in [ JSVariableIntroduction _ctor (Just (makeConstructor (length tys)))
+       , JSVariableIntroduction ctor  (Just (go pn 0 (length tys) []))
+       ]
     where
-    go :: ProperName -> Integer -> [Type] -> [JS] -> JS
-    go pn _ [] values =
-      JSObjectLiteral [ ("ctor", JSStringLiteral (show (Qualified (Just mp) pn))), ("values", JSArrayLiteral $ reverse values) ]
-    go pn index (_ : tys') values =
+    makeConstructor :: Int -> JS
+    makeConstructor n =
+      let
+        args = [ "value" ++ show index | index <- [0..n-1] ]
+        body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
+      in JSFunction Nothing args (JSBlock body)
+    go :: ProperName -> Int -> Int -> [JS] -> JS
+    go pn _ 0 values = JSApp (JSNew (JSVar ('_' : runProperName pn))) (reverse values)
+    go pn index n values =
       JSFunction Nothing ["value" ++ show index]
-        (JSBlock [JSReturn (go pn (index + 1) tys' (JSVar ("value" ++ show index) : values))])
+        (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
 declToJs opts mp (DataBindingGroupDeclaration ds) e = do
   jss <- mapM (\decl -> declToJs opts mp decl e) ds
   return $ Just $ concat $ catMaybes jss
@@ -123,7 +135,7 @@ declToJs _ _ _ _ = return Nothing
 -- Generate key//value pairs for an object literal exporting values from a module.
 --
 exportToJs :: DeclarationRef -> [(String, JS)]
-exportToJs (TypeRef _ (Just dctors)) = map ((\n -> (n, var (Ident n))) . runProperName) dctors
+exportToJs (TypeRef _ (Just dctors)) = concatMap ((\n -> [('_' : n, var (Ident ('_' : n))), (n, var (Ident n))]) . runProperName) dctors
 exportToJs (ValueRef name) = [(runIdent name, var name)]
 exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
 exportToJs _ = []
@@ -291,23 +303,25 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
-binderToJs m e varName done (ConstructorBinder ctor bs) = do
+binderToJs m e varName done (ConstructorBinder ctor@(Qualified ctorModule (ProperName ctorName)) bs) = do
   js <- go 0 done bs
   if isOnlyConstructor e ctor
   then
     return js
   else
-    return [JSIfElse (JSBinary EqualTo (JSAccessor "ctor" (JSVar varName)) (JSStringLiteral (show ctor)))
+    return [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS m (Ident . runProperName) _ctor))
                      (JSBlock js)
                      Nothing]
   where
+  _ctor :: Qualified ProperName
+  _ctor = Qualified ctorModule (ProperName ('_' : ctorName))
   go :: (Functor m, Applicative m, Monad m) => Integer -> [JS] -> [Binder] -> SupplyT m [JS]
   go _ done' [] = return done'
   go index done' (binder:bs') = do
     argVar <- freshName
     done'' <- go (index + 1) done' bs'
     js <- binderToJs m e argVar done'' binder
-    return (JSVariableIntroduction argVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSAccessor "values" (JSVar varName)))) : js)
+    return (JSVariableIntroduction argVar (Just (JSAccessor ("value" ++ show index) (JSVar varName))) : js)
 binderToJs m e varName done (ObjectBinder bs) = go done bs
   where
   go :: (Functor m, Applicative m, Monad m) => [JS] -> [(String, Binder)] -> SupplyT m [JS]
