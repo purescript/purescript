@@ -79,14 +79,18 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
     Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
-imports =
-  let (f, _, _, _, _) = everythingOnValues (++) (const []) collect (const []) (const []) (const [])
-  in f
+imports (ImportDeclaration mn _ _) = [mn]
+imports other =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) collectV collectB (const []) (const [])
+  in f other
   where
-  collect :: Value -> [ModuleName]
-  collect (Var (Qualified (Just mn) _)) = [mn]
-  collect (Constructor (Qualified (Just mn) _)) = [mn]
-  collect _ = []
+  collectV :: Value -> [ModuleName]
+  collectV (Var (Qualified (Just mn) _)) = [mn]
+  collectV (Constructor (Qualified (Just mn) _)) = [mn]
+  collectV _ = []
+  collectB :: Binder -> [ModuleName]
+  collectB (ConstructorBinder (Qualified (Just mn) _) _) = [mn]
+  collectB _ = []
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
