@@ -116,6 +116,9 @@ module Prelude
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
 
+  void :: forall f a. (Functor f) => f a -> f {}
+  void fa = const {} <$> fa
+
   infixl 4 <*>
 
   class (Functor f) <= Apply f where
