@@ -7,7 +7,7 @@ module Prelude
   , ($), (#)
   , (:), cons
   , Show, show
-  , Functor, (<$>)
+  , Functor, (<$>), void
   , Apply, (<*>)
   , Applicative, pure, liftA1
   , Alternative, empty, (<|>)
@@ -115,6 +115,9 @@ module Prelude
 
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  void :: forall f a. (Functor f) => f a -> f Unit
+  void fa = const unit <$> fa
 
   infixl 4 <*>
 
