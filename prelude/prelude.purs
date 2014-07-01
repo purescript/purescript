@@ -270,10 +270,21 @@ module Prelude
     (==) = refEq
     (/=) = refIneq
 
+  foreign import eqArrayImpl
+    "function eqArrayImpl(f) {\
+    \  return function(xs) {\
+    \    return function(ys) {\
+    \      if (xs.length !== ys.length) return false;\
+    \      for (var i = 0; i < xs.length; i++) {\
+    \        if (!f(xs[i])(ys[i])) return false;\
+    \      }\
+    \      return true;\
+    \    };\
+    \  };\
+    \}" :: forall a. (a -> a -> Boolean) -> [a] -> [a] -> Boolean
+
   instance eqArray :: (Eq a) => Eq [a] where
-    (==) [] [] = true
-    (==) (x:xs) (y:ys) = x == y && xs == ys
-    (==) _ _ = false
+    (==) xs ys = eqArrayImpl (==) xs ys
     (/=) xs ys = not (xs == ys)
 
   data Ordering = LT | GT | EQ
