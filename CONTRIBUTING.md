@@ -1,3 +1,5 @@
+An introductory overview of the compiler is available [here](https://www.youtube.com/watch?v=Y3P1dxqwFiE).
+
 Pull requests are encouraged.
 
 Please follow the following guidelines:
