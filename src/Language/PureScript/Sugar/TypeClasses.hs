@@ -137,8 +137,9 @@ typeClassDictionaryDeclaration name args implies members =
                                                         , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
                                                         , let fieldName = mkSuperclassDictionaryName superclass index
                                                         ], REmpty))
-
-  in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList ((C.__superclasses, superclassesType) : map (first identToProperty . memberToNameAndType) members, REmpty))
+      members' = map (first identToProperty . memberToNameAndType) members
+      mtys = if null implies then members' else (C.__superclasses, superclassesType) : members'
+  in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
@@ -187,7 +188,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
             , let fieldName = mkSuperclassDictionaryName superclass index
             ]
 
-      let memberNames' = (C.__superclasses, superclasses) : memberNames
+      let memberNames' = if null implies then memberNames else (C.__superclasses, superclasses) : memberNames
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
           dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
