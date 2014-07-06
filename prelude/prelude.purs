@@ -7,7 +7,7 @@ module Prelude
   , ($), (#)
   , (:), cons
   , Show, show
-  , Functor, (<$>)
+  , Functor, (<$>), void
   , Apply, (<*>)
   , Applicative, pure, liftA1
   , Alternative, empty, (<|>)
@@ -115,6 +115,9 @@ module Prelude
 
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  void :: forall f a. (Functor f) => f a -> f Unit
+  void fa = const unit <$> fa
 
   infixl 4 <*>
 
@@ -267,10 +270,21 @@ module Prelude
     (==) = refEq
     (/=) = refIneq
 
+  foreign import eqArrayImpl
+    "function eqArrayImpl(f) {\
+    \  return function(xs) {\
+    \    return function(ys) {\
+    \      if (xs.length !== ys.length) return false;\
+    \      for (var i = 0; i < xs.length; i++) {\
+    \        if (!f(xs[i])(ys[i])) return false;\
+    \      }\
+    \      return true;\
+    \    };\
+    \  };\
+    \}" :: forall a. (a -> a -> Boolean) -> [a] -> [a] -> Boolean
+
   instance eqArray :: (Eq a) => Eq [a] where
-    (==) [] [] = true
-    (==) (x:xs) (y:ys) = x == y && xs == ys
-    (==) _ _ = false
+    (==) xs ys = eqArrayImpl (==) xs ys
     (/=) xs ys = not (xs == ys)
 
   data Ordering = LT | GT | EQ

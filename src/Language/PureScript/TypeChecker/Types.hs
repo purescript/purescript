@@ -600,8 +600,8 @@ infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
   els <- fresh
-  forM_ ts $ \(TypedValue _ _ t) -> els =?= TypeApp tyArray t
-  return $ TypedValue True (ArrayLiteral ts) els
+  forM_ ts $ \(TypedValue _ _ t) -> els =?= t
+  return $ TypedValue True (ArrayLiteral ts) (TypeApp tyArray els)
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
   ts <- mapM (infer . snd) ps

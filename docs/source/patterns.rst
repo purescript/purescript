@@ -102,7 +102,7 @@ Record Patterns
 
 Record patterns match an input which is a record, and bring its properties into scope::
 
-  f { foo = "Foo" } = o.bar
+  f { foo = "Foo", bar = n } = n
   f _ = 0
 
 Nested Patterns
