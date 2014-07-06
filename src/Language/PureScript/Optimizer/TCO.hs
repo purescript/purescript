@@ -41,7 +41,7 @@ tco' = everywhereOnJS convert
     in case () of
       _ | isTailCall name body' ->
             let
-              allArgs = reverse $ concat argss
+              allArgs = concat $ reverse argss
             in
               JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
         | otherwise -> js
