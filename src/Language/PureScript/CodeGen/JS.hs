@@ -25,7 +25,7 @@ module Language.PureScript.CodeGen.JS (
 
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import Data.Function (on)
-import Data.List (nub, (\\), delete)
+import Data.List (nub, (\\), delete, sortBy)
 
 import Control.Monad (replicateM, forM)
 import Control.Applicative
@@ -42,7 +42,6 @@ import Language.PureScript.CodeGen.Common
 import Language.PureScript.Environment
 import Language.PureScript.Supply
 import Language.PureScript.Traversals (sndM)
-
 import qualified Language.PureScript.Constants as C
 
 -- |
@@ -89,6 +88,7 @@ imports other =
   collectV :: Value -> [ModuleName]
   collectV (Var (Qualified (Just mn) _)) = [mn]
   collectV (Constructor (Qualified (Just mn) _)) = [mn]
+  collectV (TypeClassDictionaryConstructorApp (Qualified (Just mn) _) _) = [mn]
   collectV _ = []
   collectB :: Binder -> [ModuleName]
   collectB (ConstructorBinder (Qualified (Just mn) _) _) = [mn]
@@ -109,16 +109,16 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
 declToJs _ _ (DataDeclaration _ _ ctors) _ = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
     let _ctor = '_' : ctor
-    in [ JSVariableIntroduction _ctor (Just (makeConstructor (length tys)))
+    in [ makeConstructor _ctor (length tys)
        , JSVariableIntroduction ctor  (Just (go pn 0 (length tys) []))
        ]
     where
-    makeConstructor :: Int -> JS
-    makeConstructor n =
+    makeConstructor :: String -> Int -> JS
+    makeConstructor ctorName n =
       let
         args = [ "value" ++ show index | index <- [0..n-1] ]
         body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
-      in JSFunction Nothing args (JSBlock body)
+      in JSFunction (Just ctorName) args (JSBlock body)
     go :: ProperName -> Int -> Int -> [JS] -> JS
     go pn _ 0 values = JSApp (JSNew (JSVar ('_' : runProperName pn))) (reverse values)
     go pn index n values =
@@ -127,6 +127,27 @@ declToJs _ _ (DataDeclaration _ _ ctors) _ = do
 declToJs opts mp (DataBindingGroupDeclaration ds) e = do
   jss <- mapM (\decl -> declToJs opts mp decl e) ds
   return $ Just $ concat $ catMaybes jss
+declToJs _ _ (TypeClassDeclaration name _ supers members) _ =
+  return $ Just $ [
+    JSFunction (Just $ runProperName name) (identToJs `map` args)
+      (JSBlock $ assn `map` args)]
+  where
+  assn :: Ident -> JS
+  assn arg = JSAssignment (accessor arg (JSVar "this")) (var arg)
+  args :: [Ident]
+  args = sortBy (compare `on` runIdent) $ memberNames ++ superNames
+  memberNames :: [Ident]
+  memberNames = memberToName `map` members
+  superNames :: [Ident]
+  superNames = [ toSuperName superclass index
+               | (index, (superclass, _)) <- zip [0..] supers
+               ]
+  toSuperName :: Qualified ProperName -> Integer -> Ident
+  toSuperName pn index = Ident $ C.__superclass_ ++ show pn ++ "_" ++ show index
+  memberToName :: Declaration -> Ident
+  memberToName (TypeDeclaration ident _) = ident
+  memberToName (PositionedDeclaration _ d) = memberToName d
+  memberToName _ = error "Invalid declaration in type class definition"
 declToJs _ _ (ExternDeclaration _ _ (Just js) _) _ = return $ Just [js]
 declToJs opts mp (PositionedDeclaration _ d) e = declToJs opts mp d e
 declToJs _ _ _ _ = return Nothing
@@ -138,6 +159,7 @@ exportToJs :: DeclarationRef -> [(String, JS)]
 exportToJs (TypeRef _ (Just dctors)) = concatMap ((\n -> [('_' : n, var (Ident ('_' : n))), (n, var (Ident n))]) . runProperName) dctors
 exportToJs (ValueRef name) = [(runIdent name, var name)]
 exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
+exportToJs (TypeClassRef name) = [(runProperName name, var $ Ident $ runProperName name)]
 exportToJs _ = []
 
 -- |
@@ -169,6 +191,10 @@ valueToJs _ _ _ (StringLiteral s) = return $ JSStringLiteral s
 valueToJs _ _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral <$> mapM (valueToJs opts m e) xs
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM (valueToJs opts m e)) ps
+valueToJs opts m e (TypeClassDictionaryConstructorApp name (TypedValue _ (ObjectLiteral ps) _)) =
+  JSApp (JSNew (qualifiedToJS m (Ident . runProperName) name)) <$> mapM (valueToJs opts m e . snd) (sortBy (compare `on` fst) ps)
+valueToJs _ _ _ TypeClassDictionaryConstructorApp{} =
+  error "TypeClassDictionaryConstructorApp did not contain object literal"
 valueToJs opts m e (ObjectUpdate o ps) = do
   obj <- valueToJs opts m e o
   sts <- mapM (sndM (valueToJs opts m e)) ps

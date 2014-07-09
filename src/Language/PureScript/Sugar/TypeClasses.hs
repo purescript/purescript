@@ -126,19 +126,15 @@ memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-identToProperty :: Ident -> String
-identToProperty (Ident name) = name
-identToProperty (Op op) = op
-
 typeClassDictionaryDeclaration :: ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
-  let superclassesType = TypeApp tyObject (rowFromList ([ (fieldName, function unit tySynApp)
-                                                        | (index, (superclass, tyArgs)) <- zip [0..] implies
-                                                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
-                                                        , let fieldName = mkSuperclassDictionaryName superclass index
-                                                        ], REmpty))
-      members' = map (first identToProperty . memberToNameAndType) members
-      mtys = if null implies then members' else (C.__superclasses, superclassesType) : members'
+  let superclassTypes = [ (fieldName, function unit tySynApp)
+                        | (index, (superclass, tyArgs)) <- zip [0..] implies
+                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
+                        , let fieldName = mkSuperclassDictionaryName superclass index
+                        ]
+      members' = map (first runIdent . memberToNameAndType) members
+      mtys = members' ++ superclassTypes
   in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
@@ -151,7 +147,7 @@ typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 mkSuperclassDictionaryName :: Qualified ProperName -> Integer -> String
-mkSuperclassDictionaryName pn index = show pn ++ "_" ++ show index
+mkSuperclassDictionaryName pn index = C.__superclass_ ++ show pn ++ "_" ++ show index
 
 unit :: Type
 unit = TypeApp tyObject REmpty
@@ -175,25 +171,26 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- Replace the type arguments with the appropriate types in the member types
       let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
       -- Create values for the type instance members
-      memberNames <- map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
+      memberNames <- map (first runIdent) <$> mapM (memberToNameAndValue memberTypes) decls
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
       -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
       -- dependencies, we introduce an unnamed function parameter.
-      let superclasses = ObjectLiteral
+      let superclasses =
             [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
             | (index, (superclass, suTyArgs)) <- zip [0..] implies
             , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
             , let fieldName = mkSuperclassDictionaryName superclass index
             ]
 
-      let memberNames' = if null implies then memberNames else (C.__superclasses, superclasses) : memberNames
+      let memberNames' = ObjectLiteral (memberNames ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
-          dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
-
-      return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
+          dict = TypeClassDictionaryConstructorApp className memberNames'
+          dict' = if null deps then Abs (Left (Ident "_")) dict else dict
+          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict' constrainedTy)
+      return result
 
   where
 

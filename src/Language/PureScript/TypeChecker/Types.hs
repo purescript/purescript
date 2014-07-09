@@ -317,7 +317,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
     filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
     filterModule _ = False
-	
+
     solve context' (className, tys) trySuperclasses =
       let
         dicts = go trySuperclasses className tys
@@ -336,7 +336,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
 	    -- Solve any necessary subgoals
 	    , args <- solveSubgoals subst (tcdDependencies tcd) ] ++
-	
+
 	    -- Look for implementations via superclasses
 	    [ SubclassDictionaryValue suDict superclass index
 	    | trySuperclasses'
@@ -350,7 +350,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	    -- Finally, satisfy the subclass constraint
 	    , args' <- maybeToList $ mapM (flip lookup subst) args
 	    , suDict <- go True subclassName args' ]
-	
+
 	  -- Create dictionaries for subgoals which still need to be solved by calling go recursively
 	  -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
 	  -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
@@ -370,8 +370,8 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
 	  dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
-	    App (Accessor (show superclassName ++ "_" ++ show index)
-	                  (Accessor C.__superclasses (dictionaryValueToValue dict)))
+	    App (Accessor (C.__superclass_ ++ show superclassName ++ "_" ++ show index)
+	                  (dictionaryValueToValue dict))
 	        (ObjectLiteral [])
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
@@ -939,6 +939,9 @@ check' (ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
   return $ TypedValue True (ObjectLiteral ps') t
+check' (TypeClassDictionaryConstructorApp name ps) t = do
+  ps' <- check' ps t
+  return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
 check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
   us <- zip (map fst ps) <$> replicateM (length ps) fresh

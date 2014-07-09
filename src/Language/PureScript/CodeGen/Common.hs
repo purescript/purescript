@@ -131,11 +131,10 @@ nameIsJsReserved name =
               , "yield" ]
 
 -- |
--- Test if a string is a valid JS identifier (may return false negatives)
+-- Test if a string is a valid JS identifier.
 --
 isIdent :: String -> Bool
-isIdent s@(first : rest) | not (nameIsJsReserved s) && (isAlpha first || first == '_') && all isAlphaNum rest = True
-isIdent _ = False
+isIdent s = identToJs (Ident s) == s
 
 moduleNameToJs :: ModuleName -> String
 moduleNameToJs (ModuleName pns) = intercalate "_" (runProperName `map` pns)
