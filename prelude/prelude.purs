@@ -684,9 +684,11 @@ module Control.Monad.Eff where
 
   foreign import foreachE "function foreachE(as) {\
                           \  return function(f) {\
-                          \    for (var i = 0; i < as.length; i++) {\
-                          \      f(as[i])();\
-                          \    }\
+                          \    return function() {\
+                          \      for (var i = 0; i < as.length; i++) {\
+                          \        f(as[i])();\
+                          \      }\
+                          \    };\
                           \  };\
                           \}" :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 
