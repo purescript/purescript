@@ -604,6 +604,9 @@ module Data.Eq where
     (==) = liftRef refEq
     (/=) = liftRef refIneq
 
+  instance functorRef :: Functor Ref where
+    (<$>) f (Ref x) = Ref (f x)
+
 module Prelude.Unsafe where
 
   foreign import unsafeIndex
