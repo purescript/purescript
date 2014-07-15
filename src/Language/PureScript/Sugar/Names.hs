@@ -31,6 +31,8 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Traversals
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- The global export environment - every declaration exported from every module.
 --
@@ -272,7 +274,7 @@ renameInModule imports exports (Module mn decls exps) =
 -- Finds all exported declarations in a set of modules.
 --
 findExports :: [Module] -> Either ErrorStack ExportEnvironment
-findExports = foldM addModule $ M.singleton (ModuleName [ProperName "Prim"]) primExports
+findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) primExports
   where
 
   -- The exported types from the Prim module

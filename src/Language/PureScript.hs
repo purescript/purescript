@@ -70,7 +70,7 @@ compile = compile' initEnvironment
 
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
-  (sorted, _) <- sortModules $ if optionsNoPrelude opts then ms else (map importPrelude ms)
+  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
@@ -170,7 +170,7 @@ make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options 
 make outputDir opts ms = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
-  (sorted, graph) <- liftError $ sortModules $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
+  (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = runModuleName moduleName'
@@ -241,16 +241,19 @@ reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
   combine = M.fromList . map ((fst . head) &&& map snd) . groupBy ((==) `on` fst) . sortBy (compare `on` fst)
 
 -- |
--- Add an import declaration for the Prelude to a module if it does not already explicitly import
--- it.
+-- Add an import declaration for a module if it does not already explicitly import it.
 --
-importPrelude :: Module -> Module
-importPrelude m@(Module mn decls exps)  =
-  if isPreludeImport `any` decls || mn == prelude then m
-  else Module mn (preludeImport : decls) exps
+addDefaultImport :: ModuleName -> Module -> Module
+addDefaultImport toImport m@(Module mn decls exps)  =
+  if isExistingImport `any` decls || mn == toImport then m
+  else Module mn (ImportDeclaration toImport Nothing Nothing : decls) exps
   where
-  prelude = ModuleName [ProperName C.prelude]
-  isPreludeImport (ImportDeclaration (ModuleName [ProperName mn']) _ _) | mn' == C.prelude = True
-  isPreludeImport (PositionedDeclaration _ d) = isPreludeImport d
-  isPreludeImport _ = False
-  preludeImport = ImportDeclaration prelude Nothing Nothing
+  isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
+  isExistingImport (PositionedDeclaration _ d) = isExistingImport d
+  isExistingImport _ = False
+
+importPrim :: Module -> Module
+importPrim = addDefaultImport (ModuleName [ProperName C.prim])
+
+importPrelude :: Module -> Module
+importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
