@@ -141,6 +141,12 @@ peekSTArray = "peekSTArray"
 pokeSTArray :: String
 pokeSTArray = "pokeSTArray"
 
+mkFn :: String
+mkFn = "mkFn"
+
+runFn :: String
+runFn = "runFn"
+
 -- Type Class Dictionary Names
 
 monadEffDictionary :: String
@@ -199,3 +205,6 @@ eff = "Control_Monad_Eff"
 
 st :: String
 st = "Control_Monad_ST"
+
+dataFunction :: String
+dataFunction = "Data_Function"

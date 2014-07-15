@@ -22,6 +22,8 @@ module Language.PureScript.Optimizer.Inliner (
   evaluateIifes
 ) where
 
+import Data.Maybe (fromMaybe)
+
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Optimizer.Common
@@ -88,7 +90,7 @@ inlineOperator (m, op) f = everywhereOnJS convert
   isOp _ = False
 
 inlineCommonOperators :: JS -> JS
-inlineCommonOperators = applyAll
+inlineCommonOperators = applyAll $
   [ binary C.numNumber (C.+) Add
   , binary C.numNumber (C.-) Subtract
   , binary C.numNumber (C.*) Multiply
@@ -121,7 +123,8 @@ inlineCommonOperators = applyAll
   , binary C.boolLikeBoolean (C.&&) And
   , binary C.boolLikeBoolean (C.||) Or
   , unary  C.boolLikeBoolean C.not Not
-  ]
+  ] ++
+  [ fn | i <- [0..5], fn <- [ mkFn i, runFn i ] ]
   where
   binary :: String -> String -> BinaryOperator -> JS -> JS
   binary dictName opString op = everywhereOnJS convert
@@ -150,3 +153,39 @@ inlineCommonOperators = applyAll
     isOp _ = False
   isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) [JSObjectLiteral []]) = prelude == C.prelude && prop == dictName
   isOpDict _ _ = False
+
+  mkFn :: Int -> JS -> JS
+  mkFn 0 = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert (JSApp mkFnN [JSFunction Nothing [_] (JSBlock [JSReturn ret])]) | isNFn C.mkFn 0 mkFnN =
+      JSFunction Nothing [] (JSBlock [JSReturn ret])
+    convert other = other
+  mkFn n = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert orig@(JSApp mkFnN [fn]) | isNFn C.mkFn n mkFnN =
+      case collectArgs n [] fn of
+        Just (args, ret) -> JSFunction Nothing args (JSBlock [JSReturn ret])
+        Nothing -> orig
+    convert other = other
+    collectArgs :: Int -> [String] -> JS -> Maybe ([String], JS)
+    collectArgs 0 acc ret | length acc == n = Just (reverse acc, ret)
+    collectArgs m acc (JSFunction Nothing [oneArg] (JSBlock [JSReturn ret])) = collectArgs (m - 1) (oneArg : acc) ret
+    collectArgs _ _   _ = Nothing
+
+  isNFn :: String -> Int -> JS -> Bool
+  isNFn prefix n (JSVar name) = name == (prefix ++ show n)
+  isNFn prefix n (JSAccessor name (JSVar dataFunction)) | dataFunction == C.dataFunction = name == (prefix ++ show n)
+  isNFn _ _ _ = False
+
+  runFn :: Int -> JS -> JS
+  runFn n = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert js = fromMaybe js $ go n [] js
+
+    go :: Int -> [JS] -> JS -> Maybe JS
+    go 0 acc (JSApp runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp fn acc)
+    go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
+    go _ _   _ = Nothing
