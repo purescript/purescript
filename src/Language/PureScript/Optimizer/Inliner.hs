@@ -158,19 +158,19 @@ inlineCommonOperators = applyAll $
   mkFn 0 = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp mkFnN [JSFunction Nothing [_] (JSBlock [JSReturn ret])]) | isNFn C.mkFn 0 mkFnN =
-      JSFunction Nothing [] (JSBlock [JSReturn ret])
+    convert (JSApp mkFnN [JSFunction Nothing [_] (JSBlock js)]) | isNFn C.mkFn 0 mkFnN =
+      JSFunction Nothing [] (JSBlock js)
     convert other = other
   mkFn n = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert orig@(JSApp mkFnN [fn]) | isNFn C.mkFn n mkFnN =
       case collectArgs n [] fn of
-        Just (args, ret) -> JSFunction Nothing args (JSBlock [JSReturn ret])
+        Just (args, js) -> JSFunction Nothing args (JSBlock js)
         Nothing -> orig
     convert other = other
-    collectArgs :: Int -> [String] -> JS -> Maybe ([String], JS)
-    collectArgs 0 acc ret | length acc == n = Just (reverse acc, ret)
+    collectArgs :: Int -> [String] -> JS -> Maybe ([String], [JS])
+    collectArgs 1 acc (JSFunction Nothing [oneArg] (JSBlock js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js) 
     collectArgs m acc (JSFunction Nothing [oneArg] (JSBlock [JSReturn ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 
