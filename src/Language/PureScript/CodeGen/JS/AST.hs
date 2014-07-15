@@ -170,6 +170,10 @@ data JS
   --
   | JSApp JS [JS]
   -- |
+  -- Constructor
+  --
+  | JSNew JS
+  -- |
   -- Variable
   --
   | JSVar String
@@ -218,6 +222,10 @@ data JS
   --
   | JSTypeOf JS
   -- |
+  -- InstanceOf test
+  --
+  | JSInstanceOf JS JS
+  -- |
   -- Labelled statement
   --
   | JSLabel String JS
@@ -262,6 +270,8 @@ everywhereOnJS f = go
   go (JSThrow js) = f (JSThrow (go js))
   go (JSTypeOf js) = f (JSTypeOf (go js))
   go (JSLabel name js) = f (JSLabel name (go js))
+  go (JSNew j) = f (JSNew (go j))
+  go (JSInstanceOf j1 j2) = f (JSInstanceOf (go j1) (go j2))
   go other = f other
 
 everywhereOnJSTopDown :: (JS -> JS) -> JS -> JS
@@ -288,6 +298,8 @@ everywhereOnJSTopDown f = go . f
   go (JSThrow j) = JSThrow (go (f j))
   go (JSTypeOf j) = JSTypeOf (go (f j))
   go (JSLabel name j) = JSLabel name (go (f j))
+  go (JSNew j) = JSNew (go (f j))
+  go (JSInstanceOf j1 j2) = JSInstanceOf (go (f j1)) (go (f j2))
   go other = f other
 
 everythingOnJS :: (r -> r -> r) -> (JS -> r) -> JS -> r
@@ -314,4 +326,6 @@ everythingOnJS (<>) f = go
   go j@(JSThrow j1) = f j <> go j1
   go j@(JSTypeOf j1) = f j <> go j1
   go j@(JSLabel _ j1) = f j <> go j1
+  go j@(JSNew j1) = f j <> go j1
+  go j@(JSInstanceOf j1 j2) = f j <> go j1 <> go j2
   go other = f other
