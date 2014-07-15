@@ -25,7 +25,7 @@ module Language.PureScript.CodeGen.JS (
 
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import Data.Function (on)
-import Data.List (nub, (\\))
+import Data.List (nub, (\\), delete)
 
 import Control.Monad (replicateM, forM)
 import Control.Applicative
@@ -43,6 +43,8 @@ import Language.PureScript.Environment
 import Language.PureScript.Supply
 import Language.PureScript.Traversals (sndM)
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- Different types of modules which are supported
 --
@@ -54,7 +56,7 @@ data ModuleType = CommonJS | Globals
 --
 moduleToJs :: (Functor m, Applicative m, Monad m) => ModuleType -> Options -> Module -> Environment -> SupplyT m [JS]
 moduleToJs mt opts (Module name decls (Just exps)) env = do
-  let jsImports = map (importToJs mt opts) . (\\ [name]) . nub $ concatMap imports decls
+  let jsImports = map (importToJs mt opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) . nub $ concatMap imports decls
   jsDecls <- mapM (\decl -> declToJs opts name decl env) decls
   let optimized = concat $ map (map $ optimize opts) $ catMaybes jsDecls
   let isModuleEmpty = null optimized
