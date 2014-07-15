@@ -179,6 +179,7 @@ infer' (ConstrainedType deps ty) = do
   k <- infer ty
   k =?= Star
   return Star
+infer' TypeWildcard = fresh
 infer' _ = error "Invalid argument to infer"
 
 

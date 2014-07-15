@@ -42,6 +42,9 @@ parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 parseObject :: P.Parsec String ParseState Type
 parseObject = braces $ TypeApp tyObject <$> parseRow False
 
+parseTypeWildcard :: P.Parsec String ParseState Type
+parseTypeWildcard = lexeme (P.char '_') >> return TypeWildcard
+
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do
   ident <- identifier
@@ -64,6 +67,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseArrayOf
             , parseFunction
             , parseObject
+            , parseTypeWildcard
             , parseTypeVariable
             , parseTypeConstructor
             , parseForAll
