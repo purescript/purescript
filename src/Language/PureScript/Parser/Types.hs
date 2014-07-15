@@ -30,15 +30,6 @@ import Language.PureScript.Environment
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseNumber :: P.Parsec String ParseState Type
-parseNumber = const tyNumber <$> reserved "Number"
-
-parseString :: P.Parsec String ParseState Type
-parseString = const tyString <$> reserved "String"
-
-parseBoolean :: P.Parsec String ParseState Type
-parseBoolean = const tyBoolean <$> reserved "Boolean"
-
 parseArray :: P.Parsec String ParseState Type
 parseArray = squares $ return tyArray
 
@@ -69,10 +60,7 @@ parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> id
 --
 parseTypeAtom :: P.Parsec String ParseState Type
 parseTypeAtom = indented *> P.choice (map P.try
-            [ parseNumber
-            , parseString
-            , parseBoolean
-            , parseArray
+            [ parseArray
             , parseArrayOf
             , parseFunction
             , parseObject

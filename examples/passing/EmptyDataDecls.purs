@@ -5,10 +5,10 @@ import Prelude
 data Z
 data S n
 
-data Array n a = Array [a]
+data ArrayBox n a = ArrayBox [a]
 
-nil :: forall a. Array Z a
-nil = Array []
+nil :: forall a. ArrayBox Z a
+nil = ArrayBox []
 
 foreign import concat
   "function concat(l1) {\
@@ -17,8 +17,8 @@ foreign import concat
   \  };\
   \}" :: forall a. [a] -> [a] -> [a]
 
-cons' :: forall a n. a -> Array n a -> Array (S n) a
-cons' x (Array xs) = Array $ concat [x] xs
+cons' :: forall a n. a -> ArrayBox n a -> ArrayBox (S n) a
+cons' x (ArrayBox xs) = ArrayBox $ concat [x] xs
 
 foreign import error
     "function error(msg) {\
@@ -26,5 +26,5 @@ foreign import error
     \}" :: forall a. String -> a
 
 main = case cons' 1 $ cons' 2 $ cons' 3 nil of
-         Array [1, 2, 3] -> Debug.Trace.trace "Done"
+         ArrayBox [1, 2, 3] -> Debug.Trace.trace "Done"
          _ -> error "Failed"
