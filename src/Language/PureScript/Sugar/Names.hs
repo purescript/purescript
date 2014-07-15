@@ -387,8 +387,7 @@ resolveImports env (Module currentModule decls _) =
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
   scope :: M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
-  scope = M.insert (ModuleName [ProperName C.prim]) (Nothing, Nothing, Nothing) $
-            M.insert currentModule (Nothing, Nothing, Nothing) (findImports decls)
+  scope = M.insert currentModule (Nothing, Nothing, Nothing) (findImports decls)
 
   resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
   resolveImport' imp (mn, (pos, explImports, impQual)) = do
