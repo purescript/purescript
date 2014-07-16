@@ -194,7 +194,7 @@ typesOf mainModuleName moduleName vals = do
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
 
-typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Value)] -> UnifyT Type Check ([(Ident, (Value, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind), [(Ident, Type)])
+typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Value)] -> UnifyT Type Check ([(Ident, (Value, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility), [(Ident, Type)])
 typeDictionaryForBindingGroup moduleName vals = do
   let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
@@ -212,15 +212,14 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- Make a map of names to the unification variables of untyped declarations
     untypedDict = zip (map fst untyped) untypedNames
     -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
-    dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable))) $ typedDict ++ untypedDict)
+    dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable, Undefined))) $ typedDict ++ untypedDict)
   return (es, dict, untypedDict)
 
-typeForBindingGroupElement :: ModuleName -> (Ident, (Value, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Value, Type))
-typeForBindingGroupElement moduleName e@(_, (val, _)) dict untypedDict = do
+typeForBindingGroupElement :: ModuleName -> (Ident, (Value, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Value, Type))
+typeForBindingGroupElement moduleName el dict untypedDict =
   -- If the declaration is a function, it has access to other values in the binding group.
   -- If not, the generated code might fail at runtime since those values might be undefined.
-  let dict' = if isFunction val then dict else M.empty
-  case e of
+  case el of
     -- Typed declarations
     (ident, (val', Just (ty, checkType))) -> do
       -- Kind check
@@ -228,25 +227,16 @@ typeForBindingGroupElement moduleName e@(_, (val, _)) dict untypedDict = do
       guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
       -- Check the type with the new names in scope
       ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-      val'' <- bindNames dict' $ if checkType
-                               then TypedValue True <$> check val' ty' <*> pure ty'
-                               else return (TypedValue False val' ty')
+      val'' <- bindNames dict $ if checkType
+                              then TypedValue True <$> check val' ty' <*> pure ty'
+                              else return (TypedValue False val' ty')
       return (ident, (val'', ty'))
     -- Untyped declarations
     (ident, (val', Nothing)) -> do
       -- Infer the type with the new names in scope
-      TypedValue _ val'' ty <- bindNames dict' $ infer val'
+      TypedValue _ val'' ty <- bindNames dict $ infer val'
       ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
       return (ident, (TypedValue True val'' ty, ty))
-
--- |
--- Check if a value introduces a function
---
-isFunction :: Value -> Bool
-isFunction (Abs _ _) = True
-isFunction (TypedValue _ val _) = isFunction val
-isFunction (PositionedValue _ val) = isFunction val
-isFunction _ = False
 
 -- |
 -- Check if a value contains a type annotation
@@ -630,7 +620,7 @@ infer' (Accessor prop val) = do
 infer' (Abs (Left arg) ret) = do
   ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  bindLocalVariables moduleName [(arg, ty)] $ do
+  makeBindingGroupVisible $ bindLocalVariables moduleName [(arg, ty, Defined)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
     return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
 infer' (Abs (Right _) _) = error "Binder was not desugared"
@@ -640,6 +630,7 @@ infer' (App f arg) = do
   return $ TypedValue True app ret
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
+  checkVisibility moduleName var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
   case ty of
     ConstrainedType constraints ty' -> do
@@ -680,22 +671,22 @@ infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
-inferLetBinding seen [] ret j = (,) seen <$> j ret
+inferLetBinding seen [] ret j = (,) seen <$> makeBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue checkType val ty) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-  let dict = if isFunction val then M.singleton (moduleName, ident) (ty, nameKind) else M.empty
+  let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
-  bindNames (M.singleton (moduleName, ident) (ty'', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
+  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Undefined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  let dict = if isFunction val then M.singleton (moduleName, ident) (valTy, nameKind) else M.empty
+  let dict = M.singleton (moduleName, ident) (valTy, nameKind, Undefined)
   TypedValue _ val' valTy' <- bindNames dict $ infer val
   valTy =?= valTy'
-  bindNames (M.singleton (moduleName, ident) (valTy', nameKind)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
+  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Undefined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
@@ -786,7 +777,7 @@ checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  r <- bindLocalVariables moduleName (M.toList m1) $ do
+  r <- bindLocalVariables moduleName [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $ do
     val' <- TypedValue True <$> check val ret <*> pure ret
     case grd of
       Nothing -> return $ CaseAlternative binders Nothing val'
@@ -861,7 +852,7 @@ check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
-  val' <- withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
+  val' <- makeBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
       constraints) $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
@@ -886,7 +877,7 @@ check' (ArrayLiteral vals) t@(TypeApp a ty) = do
   return $ TypedValue True array t
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
   Just moduleName <- checkCurrentModule <$> get
-  ret' <- bindLocalVariables moduleName [(arg, argTy)] $ check ret retTy
+  ret' <- makeBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
   return $ TypedValue True (Abs (Left arg) ret') ty
 check' (Abs (Right _) _) _ = error "Binder was not desugared"
 check' (App f arg) ret = do
@@ -895,6 +886,7 @@ check' (App f arg) ret = do
   return $ TypedValue True app ret
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
+  checkVisibility moduleName var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   v' <- subsumes (Just v) repl ty'

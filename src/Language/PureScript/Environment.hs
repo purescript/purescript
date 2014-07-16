@@ -33,7 +33,7 @@ data Environment = Environment {
   -- |
   -- Value names currently in scope
   --
-    names :: M.Map (ModuleName, Ident) (Type, NameKind)
+    names :: M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
   -- |
   -- Type names currently in scope
   --
@@ -74,6 +74,19 @@ data ForeignImportType
   -- A foreign import which contains inline Javascript as a string literal
   --
   | InlineJavascript deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- The visibility of a name in scope
+--
+data NameVisibility
+  -- |
+  -- The name is defined in the current binding group, but is not visible
+  --
+  = Undefined
+  -- |
+  -- The name is defined in the another binding group, or has been made visible by a function binder
+  --
+  | Defined deriving (Show, Eq)
 
 -- |
 -- The kind of a name
