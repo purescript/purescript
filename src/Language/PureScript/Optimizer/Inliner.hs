@@ -124,7 +124,7 @@ inlineCommonOperators = applyAll $
   , binary C.boolLikeBoolean (C.||) Or
   , unary  C.boolLikeBoolean C.not Not
   ] ++
-  [ fn | i <- [0..5], fn <- [ mkFn i, runFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
   binary :: String -> String -> BinaryOperator -> JS -> JS
   binary dictName opString op = everywhereOnJS convert
@@ -170,7 +170,7 @@ inlineCommonOperators = applyAll $
         Nothing -> orig
     convert other = other
     collectArgs :: Int -> [String] -> JS -> Maybe ([String], [JS])
-    collectArgs 1 acc (JSFunction Nothing [oneArg] (JSBlock js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js) 
+    collectArgs 1 acc (JSFunction Nothing [oneArg] (JSBlock js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
     collectArgs m acc (JSFunction Nothing [oneArg] (JSBlock [JSReturn ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 

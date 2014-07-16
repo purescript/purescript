@@ -490,6 +490,11 @@ module Data.Function where
   foreign import data Fn3 :: * -> * -> * -> * -> *
   foreign import data Fn4 :: * -> * -> * -> * -> * -> *
   foreign import data Fn5 :: * -> * -> * -> * -> * -> * -> *
+  foreign import data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
+  foreign import data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
+  foreign import data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+  foreign import data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+  foreign import data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 
   foreign import mkFn0
     "function mkFn0(f) {\
@@ -532,6 +537,41 @@ module Data.Function where
     \    return f(a)(b)(c)(d)(e);\
     \  };\
     \}" :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
+
+  foreign import mkFn6
+    "function mkFn6(f) {\
+    \  return function(a, b, c, d, e, f) {\
+    \    return f(a)(b)(c)(d)(e)(f);\
+    \  };\
+    \}" :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
+
+  foreign import mkFn7
+    "function mkFn7(f) {\
+    \  return function(a, b, c, d, e, f, g) {\
+    \    return f(a)(b)(c)(d)(e)(f)(g);\
+    \  };\
+    \}" :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
+
+  foreign import mkFn8
+    "function mkFn8(f) {\
+    \  return function(a, b, c, d, e, f, g, h) {\
+    \    return f(a)(b)(c)(d)(e)(f)(g)(h);\
+    \  };\
+    \}" :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
+
+  foreign import mkFn9
+    "function mkFn9(f) {\
+    \  return function(a, b, c, d, e, f, g, h, i) {\
+    \    return f(a)(b)(c)(d)(e)(f)(g)(h)(i);\
+    \  };\
+    \}" :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
+
+  foreign import mkFn10
+    "function mkFn10(f) {\
+    \  return function(a, b, c, d, e, f, g, h, i, j) {\
+    \    return f(a)(b)(c)(d)(e)(f)(g)(h)(i)(j);\
+    \  };\
+    \}" :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
 
   foreign import runFn0
     "function runFn0(f) {\
@@ -592,6 +632,111 @@ module Data.Function where
     \    };\
     \  };\
     \}" :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
+
+  foreign import runFn6
+    "function runFn6(f) {\
+    \  return function(a) {\
+    \    return function(b) {\
+    \      return function(c) {\
+    \        return function(d) {\
+    \          return function(e) {\
+    \            return function(f) {\
+    \              return f(a, b, c, d, e, f);\
+    \            };\
+    \          };\
+    \        };\
+    \      };\
+    \    };\
+    \  };\
+    \}" :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
+
+  foreign import runFn7
+    "function runFn7(f) {\
+    \  return function(a) {\
+    \    return function(b) {\
+    \      return function(c) {\
+    \        return function(d) {\
+    \          return function(e) {\
+    \            return function(f) {\
+    \              return function(g) {\
+    \                return f(a, b, c, d, e, f, g);\
+    \              };\
+    \            };\
+    \          };\
+    \        };\
+    \      };\
+    \    };\
+    \  };\
+    \}" :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
+
+  foreign import runFn8
+    "function runFn8(f) {\
+    \  return function(a) {\
+    \    return function(b) {\
+    \      return function(c) {\
+    \        return function(d) {\
+    \          return function(e) {\
+    \            return function(f) {\
+    \              return function(g) {\
+    \                return function(h) {\
+    \                  return f(a, b, c, d, e, f, g, h);\
+    \                };\
+    \              };\
+    \            };\
+    \          };\
+    \        };\
+    \      };\
+    \    };\
+    \  };\
+    \}" :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
+
+  foreign import runFn9
+    "function runFn9(f) {\
+    \  return function(a) {\
+    \    return function(b) {\
+    \      return function(c) {\
+    \        return function(d) {\
+    \          return function(e) {\
+    \            return function(f) {\
+    \              return function(g) {\
+    \                return function(h) {\
+    \                  return function(i) {\
+    \                    return f(a, b, c, d, e, f, g, h, i);\
+    \                  };\
+    \                };\
+    \              };\
+    \            };\
+    \          };\
+    \        };\
+    \      };\
+    \    };\
+    \  };\
+    \}" :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
+
+  foreign import runFn10
+    "function runFn10(f) {\
+    \  return function(a) {\
+    \    return function(b) {\
+    \      return function(c) {\
+    \        return function(d) {\
+    \          return function(e) {\
+    \            return function(f) {\
+    \              return function(g) {\
+    \                return function(h) {\
+    \                  return function(i) {\
+    \                    return function(j) {\
+    \                      return f(a, b, c, d, e, f, g, h, i, j);\
+    \                    };\
+    \                  };\
+    \                };\
+    \              };\
+    \            };\
+    \          };\
+    \        };\
+    \      };\
+    \    };\
+    \  };\
+    \}" :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 
 module Data.Eq where
 
