@@ -108,10 +108,9 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
   return $ Just jss
 declToJs _ _ (DataDeclaration _ _ ctors) _ = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    let _ctor = '_' : ctor
-    in [ makeConstructor _ctor (length tys)
-       , JSVariableIntroduction ctor  (Just (go pn 0 (length tys) []))
-       ]
+    [ makeConstructor ctor (length tys)
+    , JSAssignment (JSAccessor "create" (JSVar ctor)) (go pn 0 (length tys) [])
+    ]
     where
     makeConstructor :: String -> Int -> JS
     makeConstructor ctorName n =
@@ -120,7 +119,7 @@ declToJs _ _ (DataDeclaration _ _ ctors) _ = do
         body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
       in JSFunction (Just ctorName) args (JSBlock body)
     go :: ProperName -> Int -> Int -> [JS] -> JS
-    go pn _ 0 values = JSApp (JSNew (JSVar ('_' : runProperName pn))) (reverse values)
+    go pn _ 0 values = JSApp (JSNew (JSVar (runProperName pn))) (reverse values)
     go pn index n values =
       JSFunction Nothing ["value" ++ show index]
         (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
@@ -156,7 +155,7 @@ declToJs _ _ _ _ = return Nothing
 -- Generate key//value pairs for an object literal exporting values from a module.
 --
 exportToJs :: DeclarationRef -> [(String, JS)]
-exportToJs (TypeRef _ (Just dctors)) = concatMap ((\n -> [('_' : n, var (Ident ('_' : n))), (n, var (Ident n))]) . runProperName) dctors
+exportToJs (TypeRef _ (Just dctors)) = map ((\n -> (n, var (Ident n))) . runProperName) dctors
 exportToJs (ValueRef name) = [(runIdent name, var name)]
 exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
 exportToJs (TypeClassRef name) = [(runProperName name, var $ Ident $ runProperName name)]
@@ -199,7 +198,7 @@ valueToJs opts m e (ObjectUpdate o ps) = do
   obj <- valueToJs opts m e o
   sts <- mapM (sndM (valueToJs opts m e)) ps
   extendObj obj sts
-valueToJs _ m _ (Constructor name) = return $ qualifiedToJS m (Ident . runProperName) name
+valueToJs _ m _ (Constructor name) = return $ JSAccessor "create" $ qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = do
   vals <- mapM (valueToJs opts m e) values
   bindersToJs opts m e binders vals
@@ -329,18 +328,16 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
-binderToJs m e varName done (ConstructorBinder ctor@(Qualified ctorModule (ProperName ctorName)) bs) = do
+binderToJs m e varName done (ConstructorBinder ctor bs) = do
   js <- go 0 done bs
   if isOnlyConstructor e ctor
   then
     return js
   else
-    return [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS m (Ident . runProperName) _ctor))
+    return [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS m (Ident . runProperName) ctor))
                      (JSBlock js)
                      Nothing]
   where
-  _ctor :: Qualified ProperName
-  _ctor = Qualified ctorModule (ProperName ('_' : ctorName))
   go :: (Functor m, Applicative m, Monad m) => Integer -> [JS] -> [Binder] -> SupplyT m [JS]
   go _ done' [] = return done'
   go index done' (binder:bs') = do
