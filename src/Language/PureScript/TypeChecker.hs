@@ -71,7 +71,7 @@ valueIsNotDefined moduleName name = do
 addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
 addValue moduleName name ty nameKind = do
   env <- getEnv
-  putEnv (env { names = M.insert (moduleName, name) (ty, nameKind) (names env) })
+  putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
 addTypeClass :: ModuleName -> ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args implies ds =
@@ -174,7 +174,7 @@ typeCheckAll mainModuleName moduleName (d@(ExternDeclaration importTy name _ ty)
     guardWith (strMsg "Expected kind *") $ kind == Star
     case M.lookup (moduleName, name) (names env) of
       Just _ -> throwError . strMsg $ show name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy) (names env) })
+      Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
 typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = do

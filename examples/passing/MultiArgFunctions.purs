@@ -4,6 +4,12 @@ import Data.Function
 import Control.Monad.Eff
 import Debug.Trace
 
+f = mkFn2 $ \a b -> runFn2 g a b + runFn2 g b a
+
+g = mkFn2 $ \a b -> case {} of
+  _ | a <= 0 || b <= 0 -> b
+  _ -> runFn2 f (a - 1) (b - 1)
+
 main = do
   runFn0 (mkFn0 $ \_ -> trace $ show 0)
   runFn1 (mkFn1 $ \a -> trace $ show a) 1
@@ -16,4 +22,5 @@ main = do
   runFn8 (mkFn8 $ \a b c d e f g h -> trace $ show [a, b, c, d, e, f, g, h]) 1 2 3 4 5 6 7 8
   runFn9 (mkFn9 $ \a b c d e f g h i -> trace $ show [a, b, c, d, e, f, g, h, i]) 1 2 3 4 5 6 7 8 9
   runFn10 (mkFn10 $ \a b c d e f g h i j-> trace $ show [a, b, c, d, e, f, g, h, i, j]) 1 2 3 4 5 6 7 8 9 10
+  print $ runFn2 g 15 12
   trace "Done!"

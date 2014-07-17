@@ -293,7 +293,7 @@ handleTypeOf value = do
     Left err -> PSCI $ outputStrLn err
     Right env' ->
       case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
-        Just (ty, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
+        Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
 
 -- Commands

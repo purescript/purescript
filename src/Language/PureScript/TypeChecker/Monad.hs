@@ -39,7 +39,7 @@ import qualified Data.Map as M
 -- |
 -- Temporarily bind a collection of names to values
 --
-bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind) -> m a -> m a
+bindNames :: (MonadState CheckState m) => M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility) -> m a -> m a
 bindNames newNames action = do
   orig <- get
   modify $ \st -> st { checkEnv = (checkEnv st) { names = newNames `M.union` (names . checkEnv $ st) } }
@@ -79,9 +79,9 @@ getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
 -- |
 -- Temporarily bind a collection of names to local variables
 --
-bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type)] -> m a -> m a
+bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type, NameVisibility)] -> m a -> m a
 bindLocalVariables moduleName bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty) -> ((moduleName, name), (ty, LocalVariable)))
+  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, LocalVariable, visibility)))
 
 -- |
 -- Temporarily bind a collection of names to local type variables
@@ -91,6 +91,17 @@ bindLocalTypeVariables moduleName bindings =
   bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
 
 -- |
+-- Update the visibility of all names to Defined
+--
+makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
+makeBindingGroupVisible action = do
+  orig <- get
+  modify $ \st -> st { checkEnv = (checkEnv st) { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names . checkEnv $ st) } }
+  a <- action
+  modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
+  return a
+
+-- |
 -- Lookup the type of a value by name in the @Environment@
 --
 lookupVariable :: (Error e, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m Type
@@ -98,7 +109,27 @@ lookupVariable currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
     Nothing -> throwError . strMsg $ show var ++ " is undefined"
-    Just (ty, _) -> return ty
+    Just (ty, _, _) -> return ty
+
+-- |
+-- Lookup the visibility of a value by name in the @Environment@
+--
+getVisibility :: (Error e, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m NameVisibility
+getVisibility currentModule (Qualified moduleName var) = do
+  env <- getEnv
+  case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
+    Nothing -> throwError . strMsg $ show var ++ " is undefined"
+    Just (_, _, vis) -> return vis
+
+-- |
+-- Assert that a name is visible
+--
+checkVisibility :: (Error e, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m ()
+checkVisibility currentModule name@(Qualified _ var) = do
+  vis <- getVisibility currentModule name
+  case vis of
+    Undefined -> throwError . strMsg $ show var ++ " may not be defined in the current scope."
+    _ -> return ()
 
 -- |
 -- Lookup the kind of a type by name in the @Environment@
