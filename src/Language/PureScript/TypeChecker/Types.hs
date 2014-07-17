@@ -227,9 +227,9 @@ typeForBindingGroupElement moduleName el dict untypedDict =
       guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
       -- Check the type with the new names in scope
       ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-      val'' <- bindNames dict $ if checkType
-                              then TypedValue True <$> check val' ty' <*> pure ty'
-                              else return (TypedValue False val' ty')
+      val'' <- if checkType
+               then bindNames dict $ TypedValue True <$> check val' ty' <*> pure ty'
+               else return (TypedValue False val' ty')
       return (ident, (val'', ty'))
     -- Untyped declarations
     (ident, (val', Nothing)) -> do
