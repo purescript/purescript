@@ -679,21 +679,21 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue 
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
-  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Undefined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
+  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
   let dict = M.singleton (moduleName, ident) (valTy, nameKind, Undefined)
   TypedValue _ val' valTy' <- bindNames dict $ infer val
   valTy =?= valTy'
-  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Undefined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
+  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
   ds' <- forM es $ \e -> do
     (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
     return $ (ident, LocalVariable, val')
-  bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
+  makeBindingGroupVisible $ bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
 inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = rethrowWithPosition pos $ do
   ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos d' : ds', val')
