@@ -106,11 +106,12 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ _ (DataDeclaration _ _ ctors) _ = do
+declToJs _ mp (DataDeclaration _ _ ctors) e = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-    [ makeConstructor ctor (length tys)
-    , JSAssignment (JSAccessor "create" (JSVar ctor)) (go pn 0 (length tys) [])
-    ]
+      let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
+      in [ makeConstructor ctor (length tys)
+         , JSAssignment (JSAccessor propName (JSVar ctor)) (go pn 0 (length tys) [])
+         ]
     where
     makeConstructor :: String -> Int -> JS
     makeConstructor ctorName n =
@@ -198,7 +199,9 @@ valueToJs opts m e (ObjectUpdate o ps) = do
   obj <- valueToJs opts m e o
   sts <- mapM (sndM (valueToJs opts m e)) ps
   extendObj obj sts
-valueToJs _ m _ (Constructor name) = return $ JSAccessor "create" $ qualifiedToJS m (Ident . runProperName) name
+valueToJs _ m e (Constructor name) =
+  let propName = if isNullaryConstructor e name then "value" else "create"
+  in return $ JSAccessor propName $ qualifiedToJS m (Ident . runProperName) name
 valueToJs opts m e (Case values binders) = do
   vals <- mapM (valueToJs opts m e) values
   bindersToJs opts m e binders vals
@@ -394,3 +397,8 @@ isOnlyConstructor e ctor =
   typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
   typeConstructor _ = error "Invalid argument to isOnlyConstructor"
 
+isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
+isNullaryConstructor e ctor =
+  case fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e of
+    (_, TypeConstructor{}) -> True
+    _ -> False
