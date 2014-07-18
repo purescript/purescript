@@ -53,6 +53,7 @@ optimize :: Options -> JS -> JS
 optimize opts | optionsNoOptimizations opts = id
               | otherwise = untilFixedPoint (applyAll
   [ collapseNestedBlocks
+  , collapseNestedIfs
   , tco opts
   , magicDo opts
   , removeCodeAfterReturnStatements
