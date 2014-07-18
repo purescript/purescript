@@ -186,8 +186,8 @@ main = "main"
 
 -- Code Generation
 
-__superclasses :: String
-__superclasses = "__superclasses"
+__superclass_ :: String
+__superclass_ = "__superclass_"
 
 -- Modules
 

@@ -82,31 +82,73 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   instance subString :: Sub String where
 --     sub = ""
 --
--- becomes
+-- becomes:
+--
+--   <TypeClassDeclaration Foo ...>
 --
 --   type Foo a = { foo :: a -> a }
 --
---   foreign import foo "function foo(dict) {\
---                      \  return dict.foo;\
---                      \}" :: forall a. (Foo a) => a -> a
+--   -- this following type is marked as not needing to be checked so a new Abs
+--   -- is not introduced around the definition in type checking, but when
+--   -- called the dictionary value is still passed in for the `dict` argument
+--   foo :: forall a. (Foo a) => a -> a
+--   foo dict = dict.foo
 --
 --   fooString :: {} -> Foo String
---   fooString _ = { foo: \s -> s ++ s }
+--   fooString _ = <TypeClassDictionaryConstructorApp Foo { foo: \s -> s ++ s }>
 --
 --   fooArray :: forall a. (Foo a) => Foo [a]
---   fooArray = { foo: map foo }
+--   fooArray = <TypeClassDictionaryConstructorApp Foo { foo: map foo }>
 --
 --   {- Superclasses -}
 --
---   ...
+--   <TypeClassDeclaration Sub ...>
 --
---   subString :: {} -> { __superclasses :: { "Foo": {} -> Foo String }, sub :: String }
---   subString _ = {
---     __superclasses: {
---       "Foo": \_ -> <dictionary placeholder to be inserted during type checking\>
---     }
---     sub: ""
---   }
+--   type Sub a = { sub :: a
+--                , "__superclass_Foo_0" :: {} -> Foo a
+--                }
+--
+--   -- As with `foo` above, this type is unchecked at the declaration
+--   sub :: forall a. (Sub a) => a
+--   sub dict = dict.sub
+--
+--   subString :: {} -> Sub String
+--   subString _ = { sub: "",
+--                 , "__superclass_Foo_0": \_ -> <SuperClassDictionary Foo String>
+--                 }
+--
+-- and finally as the generated javascript:
+--
+--   function Foo(foo) {
+--       this.foo = foo;
+--   };
+--
+--   var foo = function (dict) {
+--       return dict.foo;
+--   };
+--
+--   var fooString = function (_) {
+--       return new Foo(function (s) {
+--           return s + s;
+--       });
+--   };
+--
+--   var fooArray = function (__dict_Foo_15) {
+--       return new Foo(map(foo(__dict_Foo_15)));
+--   };
+--
+--   function Sub(__superclass_Foo_0, sub) {
+--       this["__superclass_Foo_0"] = __superclass_Foo_0;
+--       this.sub = sub;
+--   };
+--
+--   var sub = function (dict) {
+--       return dict.sub;
+--   };
+--
+--   var subString = function (_) {
+--       return new Sub(fooString, "");
+--   };
 -}
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
@@ -126,19 +168,15 @@ memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-identToProperty :: Ident -> String
-identToProperty (Ident name) = name
-identToProperty (Op op) = op
-
 typeClassDictionaryDeclaration :: ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
-  let superclassesType = TypeApp tyObject (rowFromList ([ (fieldName, function unit tySynApp)
-                                                        | (index, (superclass, tyArgs)) <- zip [0..] implies
-                                                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
-                                                        , let fieldName = mkSuperclassDictionaryName superclass index
-                                                        ], REmpty))
-      members' = map (first identToProperty . memberToNameAndType) members
-      mtys = if null implies then members' else (C.__superclasses, superclassesType) : members'
+  let superclassTypes = [ (fieldName, function unit tySynApp)
+                        | (index, (superclass, tyArgs)) <- zip [0..] implies
+                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
+                        , let fieldName = mkSuperclassDictionaryName superclass index
+                        ]
+      members' = map (first runIdent . memberToNameAndType) members
+      mtys = members' ++ superclassTypes
   in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
@@ -151,7 +189,7 @@ typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 mkSuperclassDictionaryName :: Qualified ProperName -> Integer -> String
-mkSuperclassDictionaryName pn index = show pn ++ "_" ++ show index
+mkSuperclassDictionaryName pn index = C.__superclass_ ++ show pn ++ "_" ++ show index
 
 unit :: Type
 unit = TypeApp tyObject REmpty
@@ -175,25 +213,26 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- Replace the type arguments with the appropriate types in the member types
       let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
       -- Create values for the type instance members
-      memberNames <- map (first identToProperty) <$> mapM (memberToNameAndValue memberTypes) decls
+      memberNames <- map (first runIdent) <$> mapM (memberToNameAndValue memberTypes) decls
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
       -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
       -- dependencies, we introduce an unnamed function parameter.
-      let superclasses = ObjectLiteral
+      let superclasses =
             [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
             | (index, (superclass, suTyArgs)) <- zip [0..] implies
             , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
             , let fieldName = mkSuperclassDictionaryName superclass index
             ]
 
-      let memberNames' = if null implies then memberNames else (C.__superclasses, superclasses) : memberNames
+      let memberNames' = ObjectLiteral (memberNames ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
-          dict = if null deps then Abs (Left (Ident "_")) (ObjectLiteral memberNames') else ObjectLiteral memberNames'
-
-      return $ ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
+          dict = TypeClassDictionaryConstructorApp className memberNames'
+          dict' = if null deps then Abs (Left (Ident "_")) dict else dict
+          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict' constrainedTy)
+      return result
 
   where
 

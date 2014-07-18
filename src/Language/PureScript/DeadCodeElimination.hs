@@ -80,6 +80,8 @@ dependencies moduleName =
   values (Var ident) = let (mn, name) = qualify moduleName ident in [(mn, Left name)]
   values (Constructor (Qualified (Just mn) name)) = [(mn, Right name)]
   values (Constructor (Qualified Nothing _)) = error "Found unqualified data constructor"
+  values (TypeClassDictionaryConstructorApp (Qualified (Just mn) name) _) = [(mn, Right name)]
+  values (TypeClassDictionaryConstructorApp (Qualified Nothing _) _) = error "Found unqualified class dictionary constructor"
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaration -> Bool

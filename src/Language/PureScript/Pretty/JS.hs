@@ -18,7 +18,7 @@ module Language.PureScript.Pretty.JS (
 ) where
 
 import Language.PureScript.Pretty.Common
-import Language.PureScript.CodeGen.JS (isIdent)
+import Language.PureScript.CodeGen.JS (identNeedsEscaping)
 import Language.PureScript.CodeGen.JS.AST
 
 import Data.List
@@ -56,8 +56,8 @@ literals = mkPattern' match
     ]
     where
     objectPropertyToString :: String -> String
-    objectPropertyToString s | isIdent s = s
-                             | otherwise = show s
+    objectPropertyToString s | identNeedsEscaping s = show s
+                             | otherwise = s
   match (JSBlock sts) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ prettyStatements sts
@@ -174,6 +174,18 @@ typeOf = mkPattern match
   match (JSTypeOf val) = Just ((), val)
   match _ = Nothing
 
+instanceOf :: Pattern PrinterState JS (JS, JS)
+instanceOf = mkPattern match
+  where
+  match (JSInstanceOf val ty) = Just (val, ty)
+  match _ = Nothing
+
+new :: Pattern PrinterState JS ((), JS)
+new = mkPattern match
+  where
+  match (JSNew ctor) = Just ((), ctor)
+  match _ = Nothing
+
 unary :: UnaryOperator -> String -> Operator PrinterState JS String
 unary op str = Wrap match (++)
   where
@@ -222,6 +234,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
+                  , [ Wrap new $ \_ s -> "new " ++ s ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
                   , [ Wrap lam $ \(name, args) ret -> "function "
                         ++ fromMaybe "" name
@@ -232,6 +245,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ binary    GreaterThan          ">" ]
                   , [ binary    GreaterThanOrEqualTo ">=" ]
                   , [ Wrap typeOf $ \_ s -> "typeof " ++ s ]
+                  , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
                   , [ unary     Not                  "!" ]
                   , [ unary     BitwiseNot           "~" ]
                   , [ unary     Negate               "-" ]

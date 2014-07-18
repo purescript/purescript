@@ -51,6 +51,11 @@ literals = mkPattern' match
     , currentIndent
     , return "}"
     ]
+  match (TypeClassDictionaryConstructorApp className ps) = fmap concat $ sequence
+    [ return ((show className) ++ "(\n")
+    , match ps
+    , return ")"
+    ]
   match (Constructor name) = return $ show name
   match (Case values binders) = fmap concat $ sequence
     [ return "case "
@@ -73,8 +78,8 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
-  match (TypeClassDictionary _ _ _) = return "<<dict>>"
-  match (SuperClassDictionary _ _) = return "<<superclass dict>>"
+  match (TypeClassDictionary name _ _) = return $ "<<dict " ++ show name ++ ">>"
+  match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
   match (TypedValue _ val _) = prettyPrintValue' val
   match (PositionedValue _ val) = prettyPrintValue' val
   match _ = mzero

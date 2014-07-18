@@ -49,6 +49,8 @@ etaConvert = everywhereOnJS convert
       not (any (`isRebound` block) (map JSVar idents)) &&
       not (any (`isRebound` block) args)
       = JSBlock (map (replaceIdents (zip idents args)) body)
+  convert (JSFunction Nothing ["_"] (JSBlock [JSReturn (JSApp fn@JSVar{} [JSObjectLiteral []])]))
+      = fn
   convert js = js
 
 unThunk :: JS -> JS
@@ -153,7 +155,6 @@ inlineCommonOperators = applyAll $
     isOp _ = False
   isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) [JSObjectLiteral []]) = prelude == C.prelude && prop == dictName
   isOpDict _ _ = False
-
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
     where

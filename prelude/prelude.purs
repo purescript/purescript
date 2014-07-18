@@ -335,7 +335,7 @@ module Prelude
   foreign import unsafeCompare
     "function unsafeCompare(n1) {\
     \  return function(n2) {\
-    \    return n1 < n2 ? LT : n1 > n2 ? GT : EQ;\
+    \    return n1 < n2 ? LT.value : n1 > n2 ? GT.value : EQ.value;\
     \  };\
     \}" :: forall a. a -> a -> Ordering
 

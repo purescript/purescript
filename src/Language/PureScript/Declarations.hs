@@ -332,6 +332,11 @@ data Value
   --
   | Do [DoNotationElement]
   -- |
+  -- An application of a typeclass dictionary constructor. The value should be
+  -- an ObjectLiteral.
+  --
+  | TypeClassDictionaryConstructorApp (Qualified ProperName) Value
+  -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
   -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
@@ -483,6 +488,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (Parens v) = g (Parens (g' v))
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
   g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
+  g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
   g' (Abs name v) = g (Abs name (g' v))
@@ -538,6 +544,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (Parens v) = Parens <$> (g v >>= g')
   g' (ArrayLiteral vs) = ArrayLiteral <$> mapM (g' <=< g) vs
   g' (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g' <=< g)) vs
+  g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> mapM (sndM (g' <=< g)) vs
   g' (Abs name v) = Abs name <$> (g v >>= g')
@@ -587,6 +594,7 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (Parens v) = (Parens <$> g' v) >>= g
   g' (ArrayLiteral vs) = (ArrayLiteral <$> mapM g' vs) >>= g
   g' (ObjectLiteral vs) = (ObjectLiteral <$> mapM (sndM g') vs) >>= g
+  g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> mapM (sndM g') vs) >>= g
   g' (Abs name v) = (Abs name <$> g' v) >>= g
@@ -639,6 +647,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(Parens v1) = g v <> g' v1
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
   g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
+  g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(Abs _ v1) = g v <> g' v1
@@ -702,6 +711,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (Parens v1) = (g'' s) v1
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
   g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
+  g' s (TypeClassDictionaryConstructorApp _ v1) = (g'' s) v1
   g' s (Accessor _ v1) = (g'' s) v1
   g' s (ObjectUpdate obj vs) = foldl (<>) ((g'' s) obj) (map (g'' s . snd) vs)
   g' s (Abs _ v1) = (g'' s) v1
@@ -767,6 +777,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (Parens v) = Parens <$> g'' s v
   g' s (ArrayLiteral vs) = ArrayLiteral <$> mapM (g'' s) vs
   g' s (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g'' s)) vs
+  g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g'' s) v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> mapM (sndM (g'' s)) vs
   g' s (Abs name v) = Abs name <$> g'' s v
