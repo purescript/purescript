@@ -34,6 +34,12 @@ identToJs (Ident name) = concatMap identCharToString name
 identToJs (Op op) = concatMap identCharToString op
 
 -- |
+-- Test if a string is a valid JS identifier without escaping.
+--
+identNeedsEscaping :: String -> Bool
+identNeedsEscaping s = s /= identToJs (Ident s)
+
+-- |
 -- Attempts to find a human-readable name for a symbol, if none has been specified returns the
 -- ordinal value.
 --
@@ -129,12 +135,6 @@ nameIsJsReserved name =
               , "while"
               , "with"
               , "yield" ]
-
--- |
--- Test if a string is a valid JS identifier.
---
-isIdent :: String -> Bool
-isIdent s = identToJs (Ident s) == s
 
 moduleNameToJs :: ModuleName -> String
 moduleNameToJs (ModuleName pns) = intercalate "_" (runProperName `map` pns)

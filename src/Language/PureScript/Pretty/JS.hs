@@ -18,7 +18,7 @@ module Language.PureScript.Pretty.JS (
 ) where
 
 import Language.PureScript.Pretty.Common
-import Language.PureScript.CodeGen.JS (isIdent)
+import Language.PureScript.CodeGen.JS (identNeedsEscaping)
 import Language.PureScript.CodeGen.JS.AST
 
 import Data.List
@@ -56,8 +56,8 @@ literals = mkPattern' match
     ]
     where
     objectPropertyToString :: String -> String
-    objectPropertyToString s | isIdent s = s
-                             | otherwise = show s
+    objectPropertyToString s | identNeedsEscaping s = show s
+                             | otherwise = s
   match (JSBlock sts) = fmap concat $ sequence
     [ return "{\n"
     , withIndent $ prettyStatements sts

@@ -20,7 +20,7 @@ module Language.PureScript.CodeGen.JS (
     ModuleType(..),
     declToJs,
     moduleToJs,
-    isIdent
+    identNeedsEscaping
 ) where
 
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
@@ -179,8 +179,8 @@ accessor (Ident prop) = accessorString prop
 accessor (Op op) = JSIndexer (JSStringLiteral op)
 
 accessorString :: String -> JS -> JS
-accessorString prop | isIdent prop = JSAccessor prop
-                    | otherwise = JSIndexer (JSStringLiteral prop)
+accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
+                    | otherwise = JSAccessor prop
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a value or expression.
