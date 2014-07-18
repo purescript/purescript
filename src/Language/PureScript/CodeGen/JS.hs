@@ -399,6 +399,9 @@ isOnlyConstructor e ctor =
 
 isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
 isNullaryConstructor e ctor =
-  case fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e of
-    (_, TypeConstructor{}) -> True
-    _ -> False
+  not . isFunction . snd . fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
+  where
+  isFunction :: Type -> Bool
+  isFunction (ForAll _ t _) = isFunction t
+  isFunction (TypeApp t _) = isFunction t
+  isFunction t = t == tyFunction
