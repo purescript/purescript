@@ -13,9 +13,10 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Blocks (
-  collapseNestedBlocks
-) where
+module Language.PureScript.Optimizer.Blocks
+  ( collapseNestedBlocks
+  , collapseNestedIfs
+  ) where
 
 import Language.PureScript.CodeGen.JS.AST
 
@@ -31,3 +32,11 @@ collapseNestedBlocks = everywhereOnJS collapse
   go :: JS -> [JS]
   go (JSBlock sts) = sts
   go s = [s]
+
+collapseNestedIfs :: JS -> JS
+collapseNestedIfs = everywhereOnJS collapse
+  where
+  collapse :: JS -> JS
+  collapse (JSIfElse cond1 (JSBlock [JSIfElse cond2 body Nothing]) Nothing) =
+      JSIfElse (JSBinary And cond1 cond2) body Nothing
+  collapse js = js
