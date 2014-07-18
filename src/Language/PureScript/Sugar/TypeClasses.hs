@@ -82,31 +82,73 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   instance subString :: Sub String where
 --     sub = ""
 --
--- becomes
+-- becomes:
+--
+--   <TypeClassDeclaration Foo ...>
 --
 --   type Foo a = { foo :: a -> a }
 --
---   foreign import foo "function foo(dict) {\
---                      \  return dict.foo;\
---                      \}" :: forall a. (Foo a) => a -> a
+--   -- this following type is marked as not needing to be checked so a new Abs
+--   -- is not introduced around the definition in type checking, but when
+--   -- called the dictionary value is still passed in for the `dict` argument
+--   foo :: forall a. (Foo a) => a -> a
+--   foo dict = dict.foo
 --
 --   fooString :: {} -> Foo String
---   fooString _ = { foo: \s -> s ++ s }
+--   fooString _ = <TypeClassDictionaryConstructorApp Foo { foo: \s -> s ++ s }>
 --
 --   fooArray :: forall a. (Foo a) => Foo [a]
---   fooArray = { foo: map foo }
+--   fooArray = <TypeClassDictionaryConstructorApp Foo { foo: map foo }>
 --
 --   {- Superclasses -}
 --
---   ...
+--   <TypeClassDeclaration Sub ...>
 --
---   subString :: {} -> { __superclasses :: { "Foo": {} -> Foo String }, sub :: String }
---   subString _ = {
---     __superclasses: {
---       "Foo": \_ -> <dictionary placeholder to be inserted during type checking\>
---     }
---     sub: ""
---   }
+--   type Sub a = { sub :: a
+--                , "__superclass_Foo_0" :: {} -> Foo a
+--                }
+--
+--   -- As with `foo` above, this type is unchecked at the declaration
+--   sub :: forall a. (Sub a) => a
+--   sub dict = dict.sub
+--
+--   subString :: {} -> Sub String
+--   subString _ = { sub: "",
+--                 , "__superclass_Foo_0": \_ -> <SuperClassDictionary Foo String>
+--                 }
+--
+-- and finally as the generated javascript:
+--
+--   function Foo(foo) {
+--       this.foo = foo;
+--   };
+--
+--   var foo = function (dict) {
+--       return dict.foo;
+--   };
+--
+--   var fooString = function (_) {
+--       return new Foo(function (s) {
+--           return s + s;
+--       });
+--   };
+--
+--   var fooArray = function (__dict_Foo_15) {
+--       return new Foo(map(foo(__dict_Foo_15)));
+--   };
+--
+--   function Sub(__superclass_Foo_0, sub) {
+--       this["__superclass_Foo_0"] = __superclass_Foo_0;
+--       this.sub = sub;
+--   };
+--
+--   var sub = function (dict) {
+--       return dict.sub;
+--   };
+--
+--   var subString = function (_) {
+--       return new Sub(fooString, "");
+--   };
 -}
 desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
 desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
