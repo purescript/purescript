@@ -728,7 +728,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
   case M.lookup ctor (dataConstructors env) of
     Just (_, ty) -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contain constraints") ty
-      fn' <- replaceAllTypeSynonyms fn
+      fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       go binders fn'
         where
         go [] ty' = do
@@ -1005,7 +1005,9 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
-checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ValueError fn)) <>) $ checkFunctionApplication' fn fnTy arg ret
+checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ValueError fn)) <>) $ do
+  subst <- unifyCurrentSubstitution <$> UnifyT get
+  checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
   where
   errorMessage = "Error applying function of type "
     ++ prettyPrintType fnTy
@@ -1018,8 +1020,7 @@ checkFunctionApplication' :: Value -> Type -> Value -> Maybe Type -> UnifyT Type
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
   tyFunction' =?= tyFunction
   _ <- maybe (return Nothing) (subsumes Nothing retTy) ret
-  subst <- unifyCurrentSubstitution <$> UnifyT get
-  arg' <- check arg (subst $? argTy)
+  arg' <- check arg argTy
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
