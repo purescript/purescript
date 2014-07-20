@@ -22,7 +22,7 @@ import Control.Monad.Error
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
@@ -30,6 +30,7 @@ import System.IO (stderr)
 import Text.Parsec (ParseError)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.DevTools.Project as PRJ
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
@@ -46,6 +47,23 @@ readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
   where
   collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
   collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
+
+checkOnly :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+checkOnly opts input output externs = do
+  putStrLn "**** Checking for errors"
+  modules <- readInput input
+  case modules of
+    Left err -> do
+      U.hPutStr stderr $ show err
+      exitFailure
+    Right ms -> do
+      case P.checkOnly opts (map snd ms) of
+        Left err -> do
+          U.hPutStrLn stderr err
+          exitFailure
+        Right _x -> do
+          print _x
+          exitSuccess
 
 compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 compile opts input output externs = do
@@ -67,6 +85,21 @@ compile opts input output externs = do
             Just path -> mkdirp path >> U.writeFile path exts
             Nothing -> return ()
           exitSuccess
+
+runCommand :: Bool -> P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+runCommand True opts (Just files) output externs = do
+  cwd <- getCurrentDirectory
+  files_ <- PRJ.filesForProject cwd
+  let allFiles = Just $ files ++ files_
+  print allFiles
+  runCommand' opts allFiles output externs
+runCommand _ opts files output externs = runCommand' opts files output externs
+
+runCommand' :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+runCommand' opts files output externs =
+  if P.optionsErrorCheck opts
+    then checkOnly opts files output externs
+    else compile opts files output externs
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -127,8 +160,16 @@ verboseErrors :: Term Bool
 verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
      { optDoc = "Display verbose error messages" }
 
+errorsCheck :: Term Bool
+errorsCheck = value $ flag $ (optInfo [ "e", "errors-check" ])
+     { optDoc = "Check for errors only" }
+
+useProject :: Term Bool
+useProject = value $ flag $ (optInfo ["p", "project"])
+     { optDoc = "Include files from current project"}
+
 options :: Term P.Options
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> (Just <$> browserNamespace) <*> dceModules <*> codeGenModules <*> verboseErrors
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> (Just <$> browserNamespace) <*> dceModules <*> codeGenModules <*> verboseErrors <*> errorsCheck
 
 stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
 stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
@@ -138,7 +179,7 @@ stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inp
   combine True _ _ = Nothing
 
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
+term prelude = runCommand <$> useProject <*> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
@@ -151,4 +192,3 @@ main :: IO ()
 main = do
   prelude <- preludeFilename
   run (term prelude, termInfo)
-

@@ -23,7 +23,7 @@ import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
 import System.Directory
-       (doesFileExist, getModificationTime, createDirectoryIfMissing)
+       (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
 import System.IO.Error (tryIOError)
@@ -31,6 +31,7 @@ import System.IO.Error (tryIOError)
 import Text.Parsec (ParseError)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.DevTools.Project as PRJ
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
@@ -85,6 +86,14 @@ compile outputDir opts input = do
         Right _ -> do
           exitSuccess
 
+runCommand :: Bool -> FilePath -> P.Options -> [FilePath] -> IO ()
+runCommand True outputDir opts files = do
+  cwd <- getCurrentDirectory
+  files_ <- PRJ.filesForProject cwd
+  let allFiles = files ++ files_
+  compile outputDir opts allFiles
+runCommand _ outputDir opts inputs = compile outputDir opts inputs
+
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
@@ -120,8 +129,16 @@ verboseErrors :: Term Bool
 verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
      { optDoc = "Display verbose error messages" }
 
+errorsCheck :: Term Bool
+errorsCheck = value $ flag $ (optInfo [ "e", "errors-check" ])
+     { optDoc = "Check for errors only" }
+
+useProject :: Term Bool
+useProject = value $ flag $ (optInfo ["p", "project"])
+     { optDoc = "Include files from current project"}
+
 options :: Term P.Options
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> pure Nothing <*> pure [] <*> pure [] <*> verboseErrors
+options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> pure Nothing <*> pure [] <*> pure [] <*> verboseErrors <*> pure False
 
 inputFilesAndPrelude :: FilePath -> Term [FilePath]
 inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
@@ -130,7 +147,7 @@ inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
   combine False input = input
 
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> outputDirectory <*> options <*> inputFilesAndPrelude prelude
+term prelude = runCommand <$> useProject <*> outputDirectory <*> options <*> inputFilesAndPrelude prelude
 
 termInfo :: TermInfo
 termInfo = defTI
