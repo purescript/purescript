@@ -11,7 +11,8 @@ If you have the Haskell Plaform installed, then you can install the latest relea
 
 If you would like to build the latest version of the code, clone this repository and build::
 
-  git clone git://github.com:paf31/purescript.git
+  git clone git@github.com:purescript/purescript.git
+  cd purescript
   cabal configure --enable-tests
   cabal build
   cabal test
