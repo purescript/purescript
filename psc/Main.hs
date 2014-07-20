@@ -11,23 +11,23 @@
 -- |
 --
 -----------------------------------------------------------------------------
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Main where
 
 import Control.Applicative
 import Control.Monad.Error
 
 import Data.Version (showVersion)
-
+import Data.List
 import System.Console.CmdTheLine
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
-import Text.Parsec (ParseError)
+--import Text.Parsec 
+import Text.Parsec.Error
+import Text.Printf
+import Text.Parsec.Pos 
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.DevTools.Project as PRJ
@@ -48,13 +48,30 @@ readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
   collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
   collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
 
+jsonForParseError :: ParseError -> String
+jsonForParseError pe =
+  printf tpl n l c $ intercalate "," (map jsonForMessage ms)
+  where ms = errorMessages pe
+        sp = errorPos pe
+        (n, l, c) = (sourceName sp, sourceLine sp, sourceColumn sp)
+        tpl = "{\"type\":\"parse\", \"pos\" : { \"name\" : \"%s\", \"line\" : %d, \"col\" : %d}, \"messages\" : [%s]}"
+        escapeString ('\\' : '"':xs) = '\\' : '"' : escapeString xs
+        escapeString ('"':xs) = '\\' : '"' : escapeString xs
+        escapeString (x:xs) = x : escapeString xs
+        escapeString [] = []
+        buildMessage t msg = "{\"type\":\"" ++ t ++ "\", \"msg\":\"" ++ (escapeString msg) ++ "\"}"
+        jsonForMessage (SysUnExpect msg) = buildMessage "SysUnExpect" msg
+        jsonForMessage (UnExpect msg) = buildMessage "UnExpect" msg
+        jsonForMessage (Expect msg) = buildMessage "Expect" msg
+        jsonForMessage (Message msg) = buildMessage "Message" msg
+
 checkOnly :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
 checkOnly opts input output externs = do
   putStrLn "**** Checking for errors"
   modules <- readInput input
   case modules of
     Left err -> do
-      U.hPutStr stderr $ show err
+      U.hPutStr stderr $ jsonForParseError err
       exitFailure
     Right ms -> do
       case P.checkOnly opts (map snd ms) of
