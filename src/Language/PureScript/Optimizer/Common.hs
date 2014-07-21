@@ -59,12 +59,6 @@ isUsed var1 = everythingOnJS (||) check
   check (JSAssignment target _) | var1 == targetVariable target = True
   check _ = False
 
-targetVariable :: JS -> String
-targetVariable (JSVar var) = var
-targetVariable (JSAccessor _ tgt) = targetVariable tgt
-targetVariable (JSIndexer _ tgt) = targetVariable tgt
-targetVariable _ = error "Invalid argument to targetVariable"
-
 isUpdated :: String -> JS -> Bool
 isUpdated var1 = everythingOnJS (||) check
   where

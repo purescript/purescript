@@ -299,11 +299,12 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 bindersToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> SupplyT m JS
 bindersToJs opts m e binders vals = do
   valNames <- replicateM (length vals) freshName
+  let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
   jss <- forM binders $ \(CaseAlternative bs grd result) -> do
     ret <- valueToJs opts m e result
     go valNames [JSReturn ret] bs grd
-  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
-                 vals
+  return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+                 []
   where
     go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> Maybe Guard -> SupplyT m [JS]
     go _ done [] Nothing = return done
@@ -314,6 +315,45 @@ bindersToJs opts m e binders vals = do
       done'' <- go vs done' bs grd
       binderToJs m e v done'' b
     go _ _ _ _ = error "Invalid arguments to bindersToJs"
+
+substituteJSVar :: String -> JS -> JS -> JS
+substituteJSVar nm repl = go
+  where
+  go :: JS -> JS
+  go (JSVar nm') | nm == nm' = repl
+  go (JSUnary op j) = JSUnary op (go j)
+  go (JSBinary op j1 j2) = JSBinary op (go j1) (go j2)
+  go (JSArrayLiteral js) = JSArrayLiteral (map go js)
+  go (JSIndexer j1 j2) = JSIndexer (go j1) (go j2)
+  go (JSObjectLiteral js) = JSObjectLiteral (map (fmap go) js)
+  go (JSAccessor prop j) = JSAccessor prop (go j)
+  go (JSFunction name args j)
+    | any (== nm) args = JSFunction name args j
+    | otherwise = JSFunction name args (go j)
+  go (JSApp j js) = JSApp (go j) (map go js)
+  go (JSConditional j1 j2 j3) = JSConditional (go j1) (go j2) (go j3)
+  go (JSBlock js) = JSBlock (substituteJSVar' nm repl js)
+  go (JSWhile j1 j2) = JSWhile (go j1) (go j2)
+  go (JSFor name j1 j2 j3)
+    | name == nm = JSFor name (go j1) (go j2) j3
+    | otherwise = JSFor name (go j1) (go j2) (go j3)
+  go (JSForIn name j1 j2)
+    | name == nm = JSForIn name (go j1) j2
+    | otherwise = JSForIn name (go j1) (go j2)
+  go (JSIfElse j1 j2 j3) = JSIfElse (go j1) (go j2) (fmap go j3)
+  go (JSReturn j) = JSReturn (go j)
+  go (JSThrow j) = JSThrow (go j)
+  go (JSTypeOf j) = JSTypeOf (go j)
+  go (JSLabel name j) = JSLabel name (go j)
+  go (JSVariableIntroduction name j) = JSVariableIntroduction name (fmap go j)
+  go (JSAssignment tgt j) = JSAssignment tgt (go j)
+  go other = other
+
+substituteJSVar' :: String -> JS -> [JS] -> [JS]
+substituteJSVar' _  _    [] = []
+substituteJSVar' nm _    jss@(JSVariableIntroduction nm' _ : _) | nm == nm' = jss
+substituteJSVar' nm _    jss@(JSAssignment tgt _ : _) | targetVariable tgt == nm = jss
+substituteJSVar' nm repl (js : jss) = substituteJSVar nm repl js : substituteJSVar' nm repl jss
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
@@ -329,8 +369,9 @@ binderToJs _ _ varName done (BooleanBinder True) =
   return [JSIfElse (JSVar varName) (JSBlock done) Nothing]
 binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
-binderToJs _ _ varName done (VarBinder ident) =
-  return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
+binderToJs _ _ varName done (VarBinder ident) = do
+  nm <- freshName
+  return (JSVariableIntroduction nm (Just (JSVar varName)) : substituteJSVar' (identToJs ident) (JSVar nm) done)
 binderToJs m e varName done (ConstructorBinder ctor bs) = do
   js <- go 0 done bs
   if isOnlyConstructor e ctor
@@ -379,8 +420,9 @@ binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
       js2
     )) Nothing]
 binderToJs m e varName done (NamedBinder ident binder) = do
+  nm <- freshName
   js <- binderToJs m e varName done binder
-  return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
+  return (JSVariableIntroduction nm (Just (JSVar varName)) : substituteJSVar' (identToJs ident) (JSVar nm) js)
 binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
 
