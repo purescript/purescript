@@ -285,17 +285,17 @@ Values
 
     bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
-    forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e {  }) -> Eff e {  }
+    forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e Unit) -> Eff e Unit
 
-    foreachE :: forall e a. [a] -> (a -> Eff e {  }) -> Eff e {  }
+    foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 
     returnE :: forall e a. a -> Eff e a
 
     runPure :: forall a. Pure a -> a
 
-    untilE :: forall e. Eff e Prim.Boolean -> Eff e {  }
+    untilE :: forall e. Eff e Prim.Boolean -> Eff e Unit
 
-    whileE :: forall e a. Eff e Prim.Boolean -> Eff e a -> Eff e {  }
+    whileE :: forall e a. Eff e Prim.Boolean -> Eff e a -> Eff e Unit
 
 Module Control.Monad.Eff.Unsafe
 -------------------------------
@@ -322,9 +322,9 @@ Values
 
 ::
 
-    print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) {  }
+    print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 
-    trace :: forall r. Prim.String -> Eff (trace :: Trace | r) {  }
+    trace :: forall r. Prim.String -> Eff (trace :: Trace | r) Unit
 
 Module Control.Monad.ST
 -----------------------

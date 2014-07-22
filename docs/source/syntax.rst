@@ -152,8 +152,8 @@ Here is an example, using the maybe monad::
 
   data Maybe a = Nothing | Just a
   
-  isEven :: Number -> Maybe {}
-  isEven n | n % 2 == 0 = Just {}
+  isEven :: Number -> Maybe Unit
+  isEven n | n % 2 == 0 = Just unit
   isEven _ = Nothing
   
   evenSum a b = do
