@@ -6,9 +6,9 @@ foreign import testError
   \    return f();\
   \  } catch (e) {\
   \    if (e instanceof Error) return 'success';\
-  \    throw new Error('Pattern match failure is not TypeError');\
+  \    throw new Error('Pattern match failure is not Error');\
   \  }\
-  \}" :: (Unit -> Number) -> Number
+  \}" :: (Unit -> Number) -> String
 
 fn :: Number -> Number
 fn 0 = 0
