@@ -180,12 +180,6 @@ instanceOf = mkPattern match
   match (JSInstanceOf val ty) = Just (val, ty)
   match _ = Nothing
 
-new :: Pattern PrinterState JS ((), JS)
-new = mkPattern match
-  where
-  match (JSNew ctor) = Just ((), ctor)
-  match _ = Nothing
-
 unary :: UnaryOperator -> String -> Operator PrinterState JS String
 unary op str = Wrap match (++)
   where
@@ -234,8 +228,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap indexer $ \index val -> val ++ "[" ++ index ++ "]" ]
-                  , [ Wrap new $ \_ s -> "new " ++ s ]
                   , [ Wrap app $ \args val -> val ++ "(" ++ args ++ ")" ]
+                  , [ unary JSNew "new " ]
                   , [ Wrap lam $ \(name, args) ret -> "function "
                         ++ fromMaybe "" name
                         ++ "(" ++ intercalate ", " args ++ ") "
