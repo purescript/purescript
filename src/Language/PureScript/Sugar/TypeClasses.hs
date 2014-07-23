@@ -33,9 +33,9 @@ import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.State
 import Control.Arrow (first, second)
-import Data.List ((\\))
+import Data.List ((\\), find)
 import Data.Monoid ((<>))
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
 
@@ -52,7 +52,7 @@ desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
 desugarModule (Module name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> mapM (desugarDecl name) decls
+  (newExpss, declss) <- unzip <$> mapM (desugarDecl name exps) decls
   return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
@@ -150,18 +150,31 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --       return new Sub(fooString, "");
 --   };
 -}
-desugarDecl :: ModuleName -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
-desugarDecl mn d@(TypeClassDeclaration name args implies members) = do
+desugarDecl :: ModuleName -> [DeclarationRef] -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
+desugarDecl mn _ d@(TypeClassDeclaration name args implies members) = do
   modify (M.insert (mn, name) d)
   return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-desugarDecl mn d@(TypeInstanceDeclaration name deps className ty members) = do
+desugarDecl mn exps d@(TypeInstanceDeclaration name deps className tys members) = do
   desugared <- lift $ desugarCases members
-  dictDecl <- typeInstanceDictionaryDeclaration name mn deps className ty desugared
-  return $ (Just $ TypeInstanceRef name, [d, dictDecl])
-desugarDecl mn (PositionedDeclaration pos d) = do
-  (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn d
+  dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
+  let expRef = if isPublicClass className && all isPublicType (getConstructors `concatMap` tys)
+               then Just $ TypeInstanceRef name
+               else Nothing
+  return $ (expRef, [d, dictDecl])
+  where
+  isPublicClass = isPublic (elem . TypeClassRef)
+  isPublicType = isPublic $ \pn -> isJust . find (isTypeRef pn)
+  isPublic test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
+  isPublic _ _ = error "Names should have been qualified in name desugaring"
+  isTypeRef pn (TypeRef pn' _) = pn == pn'
+  isTypeRef _ _ = False
+  getConstructors = everythingOnTypes (++) getConstructor
+  getConstructor (TypeConstructor tcname) = [tcname]
+  getConstructor _ = []
+desugarDecl mn exps (PositionedDeclaration pos d) = do
+  (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
   return (dr, map (PositionedDeclaration pos) ds)
-desugarDecl _ other = return (Nothing, [other])
+desugarDecl _ _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (Ident, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
