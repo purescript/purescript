@@ -302,7 +302,7 @@ bindersToJs opts m e binders vals = do
   jss <- forM binders $ \(CaseAlternative bs grd result) -> do
     ret <- valueToJs opts m e result
     go valNames [JSReturn ret] bs grd
-  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow (JSStringLiteral "Failed pattern match")])))
+  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow $ JSApp (JSVar "Error") $ [(JSStringLiteral "Failed pattern match")]])))
                  vals
   where
     go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> Maybe Guard -> SupplyT m [JS]
