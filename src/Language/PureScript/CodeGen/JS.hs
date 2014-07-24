@@ -120,7 +120,7 @@ declToJs _ mp (DataDeclaration _ _ ctors) e = do
         body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
       in JSFunction (Just ctorName) args (JSBlock body)
     go :: ProperName -> Int -> Int -> [JS] -> JS
-    go pn _ 0 values = JSApp (JSNew (JSVar (runProperName pn))) (reverse values)
+    go pn _ 0 values = JSUnary JSNew $ JSApp (JSVar $ runProperName pn) (reverse values)
     go pn index n values =
       JSFunction Nothing ["value" ++ show index]
         (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
@@ -192,7 +192,7 @@ valueToJs _ _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
 valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral <$> mapM (valueToJs opts m e) xs
 valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM (valueToJs opts m e)) ps
 valueToJs opts m e (TypeClassDictionaryConstructorApp name (TypedValue _ (ObjectLiteral ps) _)) =
-  JSApp (JSNew (qualifiedToJS m (Ident . runProperName) name)) <$> mapM (valueToJs opts m e . snd) (sortBy (compare `on` fst) ps)
+  JSUnary JSNew . JSApp (qualifiedToJS m (Ident . runProperName) name) <$> mapM (valueToJs opts m e . snd) (sortBy (compare `on` fst) ps)
 valueToJs _ _ _ TypeClassDictionaryConstructorApp{} =
   error "TypeClassDictionaryConstructorApp did not contain object literal"
 valueToJs opts m e (ObjectUpdate o ps) = do
@@ -302,7 +302,7 @@ bindersToJs opts m e binders vals = do
   jss <- forM binders $ \(CaseAlternative bs grd result) -> do
     ret <- valueToJs opts m e result
     go valNames [JSReturn ret] bs grd
-  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow $ JSApp (JSVar "Error") $ [(JSStringLiteral "Failed pattern match")]])))
+  return $ JSApp (JSFunction Nothing valNames (JSBlock (concat jss ++ [JSThrow $ JSUnary JSNew $ JSApp (JSVar "Error") $ [(JSStringLiteral "Failed pattern match")]])))
                  vals
   where
     go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> Maybe Guard -> SupplyT m [JS]
