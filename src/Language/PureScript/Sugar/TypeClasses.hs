@@ -157,18 +157,24 @@ desugarDecl mn _ d@(TypeClassDeclaration name args implies members) = do
 desugarDecl mn exps d@(TypeInstanceDeclaration name deps className tys members) = do
   desugared <- lift $ desugarCases members
   dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
-  let expRef = if isPublicClass className && all isPublicType (getConstructors `concatMap` tys)
+  let expRef = if isExportedClass className && all isExportedType (getConstructors `concatMap` tys)
                then Just $ TypeInstanceRef name
                else Nothing
   return $ (expRef, [d, dictDecl])
   where
-  isPublicClass = isPublic (elem . TypeClassRef)
-  isPublicType = isPublic $ \pn -> isJust . find (isTypeRef pn)
-  isPublic test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
-  isPublic _ _ = error "Names should have been qualified in name desugaring"
-  isTypeRef pn (TypeRef pn' _) = pn == pn'
-  isTypeRef _ _ = False
+  isExportedClass :: Qualified ProperName -> Bool
+  isExportedClass = isExported (elem . TypeClassRef)
+  isExportedType :: Qualified ProperName -> Bool
+  isExportedType = isExported $ \pn -> isJust . find (matchesTypeRef pn)
+  isExported :: (ProperName -> [DeclarationRef] -> Bool) -> Qualified ProperName -> Bool
+  isExported test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
+  isExported _ _ = error "Names should have been qualified in name desugaring"
+  matchesTypeRef :: ProperName -> DeclarationRef -> Bool
+  matchesTypeRef pn (TypeRef pn' _) = pn == pn'
+  matchesTypeRef _ _ = False
+  getConstructors :: Type -> [Qualified ProperName]
   getConstructors = everythingOnTypes (++) getConstructor
+  getConstructor :: Type -> [Qualified ProperName]
   getConstructor (TypeConstructor tcname) = [tcname]
   getConstructor _ = []
 desugarDecl mn exps (PositionedDeclaration pos d) = do
