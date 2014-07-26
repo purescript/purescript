@@ -25,6 +25,7 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
+import System.IO (stderr)
 
 docgen :: Bool -> [FilePath] -> IO ()
 docgen showHierarchy input = do
@@ -37,7 +38,7 @@ parseFile input = do
   text <- U.readFile input
   case P.runIndentParser input P.parseModules text of
     Left err -> do
-      U.print err
+      U.hPutStr stderr $ show err
       exitFailure
     Right ms -> do
       return ms
@@ -168,7 +169,7 @@ prettyPrintType' :: P.Type -> String
 prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
   where
   dePrim ty@(P.TypeConstructor (P.Qualified _ name))
-    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString = 
+    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString =
       P.TypeConstructor $ P.Qualified Nothing name
   dePrim other = other
 
