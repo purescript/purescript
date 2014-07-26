@@ -36,15 +36,11 @@ tco' = everywhereOnJS convert
   copyVar arg = "__copy_" ++ arg
   convert :: JS -> JS
   convert js@(JSVariableIntroduction name (Just fn@JSFunction {})) =
-    let
-      (argss, body', replace) = collectAllFunctionArgs [] id fn
-    in case () of
-      _ | isTailCall name body' ->
-            let
-              allArgs = concat $ reverse argss
-            in
-              JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
-        | otherwise -> js
+    let (argss, body', replace) = collectAllFunctionArgs [] id fn
+        allArgs = concat $ reverse argss
+    in if name `notElem` allArgs && isTailCall name body'
+       then JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
+       else js
   convert js = js
   collectAllFunctionArgs :: [[String]] -> (JS -> JS) -> JS -> ([[String]], JS, JS -> JS)
   collectAllFunctionArgs allArgs f (JSFunction ident args (JSBlock (body@(JSReturn _):_))) =
