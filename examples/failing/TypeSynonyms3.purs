@@ -5,5 +5,5 @@ class Foo a where
 
 type Bar = String
 
-instance Foo Bar where
+instance fooBar :: Foo Bar where
   foo s = s

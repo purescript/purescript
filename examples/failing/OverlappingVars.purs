@@ -5,7 +5,7 @@ class OverlappingVars a where
 
 data Foo a b = Foo a b
 
-instance OverlappingVars (Foo a a) where
+instance overlappingVarsFoo :: OverlappingVars (Foo a a) where
   f a = a
 
 test = f (Foo "" 0)
