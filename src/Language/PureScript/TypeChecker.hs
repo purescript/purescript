@@ -111,7 +111,7 @@ checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance hea
 --
 typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ _ [] = return []
-typeCheckAll mainModuleName moduleName (d@(DataDeclaration name args dctors) : rest) = do
+typeCheckAll mainModuleName moduleName (d@(DataDeclaration _ name args dctors) : rest) = do
   rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
     ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
     addDataType moduleName name args dctors ctorKind
@@ -132,7 +132,7 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
   toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
   toTypeSynonym _ = Nothing
-  toDataDecl (DataDeclaration nm args dctors) = Just (nm, args, dctors)
+  toDataDecl (DataDeclaration _ nm args dctors) = Just (nm, args, dctors)
   toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do

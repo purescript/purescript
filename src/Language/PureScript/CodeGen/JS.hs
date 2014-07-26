@@ -106,7 +106,7 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ mp (DataDeclaration _ _ ctors) e = do
+declToJs _ mp (DataDeclaration _ _ _ ctors) e = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
       let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
       in [ makeConstructor ctor (length tys)

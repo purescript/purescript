@@ -114,13 +114,30 @@ instance Eq DeclarationRef where
   _ == _ = False
 
 -- |
+-- The type of a data type declaration
+--
+data DataType
+  -- |
+  -- A standard data constructor
+  --
+  = Data
+  -- |
+  -- A newtype constructor
+  --
+  | Newtype deriving (Eq, Ord, D.Data, D.Typeable)
+
+instance Show DataType where
+  show Data = "data"
+  show Newtype = "newtype"
+
+-- |
 -- The data type of declarations
 --
 data Declaration
   -- |
   -- A data type declaration (name, arguments, data constructors)
   --
-  = DataDeclaration ProperName [String] [(ProperName, [Type])]
+  = DataDeclaration DataType ProperName [String] [(ProperName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -814,7 +831,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
   forDecls (ExternDeclaration _ _ _ ty) = f ty
   forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)

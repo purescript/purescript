@@ -106,7 +106,7 @@ isExported (Just exps) decl = any (matches decl) exps
   where
   matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
   matches (P.ExternDeclaration _ ident _ _) (P.ValueRef ident') = ident == ident'
-  matches (P.DataDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
+  matches (P.DataDeclaration _ ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
   matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
@@ -138,10 +138,10 @@ renderDeclaration n _ (P.TypeDeclaration ident ty) =
   atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
-renderDeclaration n exps (P.DataDeclaration name args ctors) = do
+renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let typeName = P.runProperName name ++ (if null args then "" else " " ++ unwords args)
   let exported = filter (isDctorExported name exps . fst) ctors
-  atIndent n $ "data " ++ typeName ++ (if null exported then "" else " where")
+  atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
     atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> prettyPrintType' ty ++ " -> ") tys ++ typeName
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
@@ -168,14 +168,14 @@ prettyPrintType' :: P.Type -> String
 prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
   where
   dePrim ty@(P.TypeConstructor (P.Qualified _ name))
-    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString = 
+    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString =
       P.TypeConstructor $ P.Qualified Nothing name
   dePrim other = other
 
 getName :: P.Declaration -> String
 getName (P.TypeDeclaration ident _) = show ident
 getName (P.ExternDeclaration _ ident _ _) = show ident
-getName (P.DataDeclaration name _ _) = P.runProperName name
+getName (P.DataDeclaration _ name _ _) = P.runProperName name
 getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name

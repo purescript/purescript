@@ -54,7 +54,7 @@ parseDataDeclaration = do
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
     sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
-  return $ DataDeclaration name tyArgs ctors
+  return $ DataDeclaration Data name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
