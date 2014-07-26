@@ -31,6 +31,7 @@ import Language.PureScript.Names
 --
 reservedPsNames :: [String]
 reservedPsNames = [ "data"
+                  , "newtype"
                   , "type"
                   , "foreign"
                   , "import"

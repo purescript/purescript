@@ -56,6 +56,15 @@ parseDataDeclaration = do
     sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
   return $ DataDeclaration Data name tyArgs ctors
 
+parseNewtypeDeclaration :: P.Parsec String ParseState Declaration
+parseNewtypeDeclaration = do
+  reserved "newtype"
+  name <- indented *> properName
+  tyArg <- P.option [] $ return <$> (indented *> identifier)
+  _ <- lexeme $ indented *> P.char '='
+  ctor <- (,) <$> properName <*> (return <$> (indented *> parseTypeAtom))
+  return $ DataDeclaration Newtype name tyArg [ctor]
+
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
   TypeDeclaration <$> P.try (parseIdent <* lexeme (indented *> P.string "::"))
@@ -181,6 +190,7 @@ positioned d = PositionedDeclaration <$> sourcePos <*> d
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = positioned (P.choice
                    [ parseDataDeclaration
+                   , parseNewtypeDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
