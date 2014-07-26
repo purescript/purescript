@@ -4,5 +4,5 @@ class A a where
   a :: a -> String
   b :: a -> Number
 
-instance A String where
+instance aString :: A String where
   a s = s
