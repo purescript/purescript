@@ -12,8 +12,11 @@ newtype Box a = Box a
 
 instance showBox :: (Show a) => Show (Box a) where
   show (Box x) = "Box " ++ show x
-
+  
+apply f x = f x
+ 
 main = do
   print $ Thing "hello"
   print $ Box 42
+  print $ apply Box 9000
   trace "Done"

@@ -106,7 +106,14 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ mp (DataDeclaration _ _ _ ctors) e = do
+declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _)]) _ =
+  return $ Just $ [JSVariableIntroduction ctor (Just $
+                    JSObjectLiteral [("create",
+                      JSFunction Nothing ["value"]
+                        (JSBlock [JSReturn $ JSVar "value"]))])]
+declToJs _ _ (DataDeclaration Newtype _ _ _) _ =
+  error "newtype has multiple constructors"
+declToJs _ mp (DataDeclaration Data _ _ ctors) e = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
       let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
       in [ makeConstructor ctor (length tys)
@@ -211,6 +218,7 @@ valueToJs opts m e v@App{} = do
   let (f, args) = unApp v []
   args' <- mapM (valueToJs opts m e) args
   case f of
+    Constructor name | isNewtypeConstructor e name && length args == 1 -> return (head args')
     Constructor name | getConstructorArity e name == length args ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m (Ident . runProperName) name) args'
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m e f
@@ -343,6 +351,10 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
+binderToJs m e varName done (ConstructorBinder ctor bs) | isNewtypeConstructor e ctor =
+  case bs of
+    [b] -> binderToJs m e varName done b
+    _ -> error "binder for newtype constructor should have a single argument"
 binderToJs m e varName done (ConstructorBinder ctor bs) = do
   js <- go 0 done bs
   if isOnlyConstructor e ctor
@@ -416,6 +428,14 @@ isOnlyConstructor e ctor = numConstructors (ctor, lookupConstructor e ctor) == 1
   typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> (ModuleName, ProperName)
   typeConstructor (Qualified (Just moduleName) _, (_, tyCtor, _)) = (moduleName, tyCtor)
   typeConstructor _ = error "Invalid argument to isOnlyConstructor"
+
+-- |
+-- Checks whether a data constructor is for a newtype.
+--
+isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
+isNewtypeConstructor e ctor = case lookupConstructor e ctor of
+  (Newtype, _, _) -> True
+  (Data, _, _) -> False
 
 -- |
 -- Checks the number of arguments a data constructor accepts.
