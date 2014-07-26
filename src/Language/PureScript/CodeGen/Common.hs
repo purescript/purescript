@@ -17,7 +17,14 @@ module Language.PureScript.CodeGen.Common where
 
 import Data.Char
 import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
+import Data.Function (on)
+
+import qualified Data.Map as M
+
 import Language.PureScript.Names
+import Language.PureScript.Environment
+import Language.PureScript.Types
 
 -- |
 -- Convert an Ident into a valid Javascript identifier:
@@ -138,3 +145,49 @@ nameIsJsReserved name =
 
 moduleNameToJs :: ModuleName -> String
 moduleNameToJs (ModuleName pns) = intercalate "_" (runProperName `map` pns)
+
+-- |
+-- Finds the value stored for a data constructor in the current environment.
+-- This is a partial function, but if an invalid type has reached this far then
+-- something has gone wrong in typechecking.
+--
+lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
+lookupConstructor e ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
+
+-- |
+-- Checks whether a data constructor is the only constructor for that type, used
+-- to simplify the check when generating code for binders.
+--
+isOnlyConstructor :: Environment -> Qualified ProperName -> Bool
+isOnlyConstructor e ctor = numConstructors (ctor, lookupConstructor e ctor) == 1
+  where
+  numConstructors :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> Int
+  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
+  typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> (ModuleName, ProperName)
+  typeConstructor (Qualified (Just moduleName) _, (_, tyCtor, _)) = (moduleName, tyCtor)
+  typeConstructor _ = error "Invalid argument to isOnlyConstructor"
+
+-- |
+-- Checks whether a data constructor is for a newtype.
+--
+isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
+isNewtypeConstructor e ctor = case lookupConstructor e ctor of
+  (Newtype, _, _) -> True
+  (Data, _, _) -> False
+
+-- |
+-- Checks the number of arguments a data constructor accepts.
+--
+getConstructorArity :: Environment -> Qualified ProperName -> Int
+getConstructorArity e = go . (\(_, _, ctors) -> ctors) . lookupConstructor e
+  where
+  go :: Type -> Int
+  go (TypeApp (TypeApp f _) t) | f == tyFunction = go t + 1
+  go (ForAll _ ty _) = go ty
+  go _ = 0
+
+-- |
+-- Checks whether a data constructor has no arguments, for example, `Nothing`.
+--
+isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
+isNullaryConstructor e = (== 0) . getConstructorArity e
