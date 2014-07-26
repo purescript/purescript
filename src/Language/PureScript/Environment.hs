@@ -41,7 +41,7 @@ data Environment = Environment {
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
-  , dataConstructors :: M.Map (Qualified ProperName) (ProperName, Type)
+  , dataConstructors :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type)
   -- |
   -- Type synonyms currently in scope
   --
@@ -137,6 +137,23 @@ data TypeKind
   -- A local type variable
   --
   | LocalTypeVariable deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- The type ('data' or 'newtype') of a data type declaration
+--
+data DataDeclType
+  -- |
+  -- A standard data constructor
+  --
+  = Data
+  -- |
+  -- A newtype constructor
+  --
+  | Newtype deriving (Eq, Ord, Data, Typeable)
+
+instance Show DataDeclType where
+  show Data = "data"
+  show Newtype = "newtype"
 
 -- |
 -- Construct a ProperName in the Prim module

@@ -114,30 +114,13 @@ instance Eq DeclarationRef where
   _ == _ = False
 
 -- |
--- The type of a data type declaration
---
-data DataType
-  -- |
-  -- A standard data constructor
-  --
-  = Data
-  -- |
-  -- A newtype constructor
-  --
-  | Newtype deriving (Eq, Ord, D.Data, D.Typeable)
-
-instance Show DataType where
-  show Data = "data"
-  show Newtype = "newtype"
-
--- |
 -- The data type of declarations
 --
 data Declaration
   -- |
-  -- A data type declaration (name, arguments, data constructors)
+  -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataType ProperName [String] [(ProperName, [Type])]
+  = DataDeclaration DataDeclType ProperName [String] [(ProperName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
