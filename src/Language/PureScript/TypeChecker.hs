@@ -113,10 +113,16 @@ typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declar
 typeCheckAll _ _ [] = return []
 typeCheckAll mainModuleName moduleName (d@(DataDeclaration dtype name args dctors) : rest) = do
   rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
+    when (dtype == Newtype) $ checkNewtype dctors
     ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
     addDataType moduleName dtype name args dctors ctorKind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
+  where
+  checkNewtype :: [(ProperName, [Type])] -> Check ()
+  checkNewtype [(_, [ty])] = return ()
+  checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
+  checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
 typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
   rethrow (strMsg "Error in data binding group" <>) $ do
     let syns = mapMaybe toTypeSynonym tys

@@ -48,22 +48,13 @@ sourcePos = toSourcePos <$> P.getPosition
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
-  reserved "data"
+  dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
     sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
-  return $ DataDeclaration Data name tyArgs ctors
-
-parseNewtypeDeclaration :: P.Parsec String ParseState Declaration
-parseNewtypeDeclaration = do
-  reserved "newtype"
-  name <- indented *> properName
-  tyArg <- P.option [] $ return <$> (indented *> identifier)
-  _ <- lexeme $ indented *> P.char '='
-  ctor <- (,) <$> properName <*> (return <$> (indented *> parseTypeAtom))
-  return $ DataDeclaration Newtype name tyArg [ctor]
+  return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
@@ -190,7 +181,6 @@ positioned d = PositionedDeclaration <$> sourcePos <*> d
 parseDeclaration :: P.Parsec String ParseState Declaration
 parseDeclaration = positioned (P.choice
                    [ parseDataDeclaration
-                   , parseNewtypeDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
