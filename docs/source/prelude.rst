@@ -9,10 +9,13 @@ Types
 
 ::
 
-    data Ordering  where
-      LT :: Ordering 
-      GT :: Ordering 
-      EQ :: Ordering 
+    data Ordering where
+      LT :: Ordering
+      GT :: Ordering
+      EQ :: Ordering
+
+    data Unit where
+      Unit :: {  } -> Unit
 
 Type Classes
 ~~~~~~~~~~~~
@@ -40,9 +43,9 @@ Type Classes
       (&) :: b -> b -> b
       (|) :: b -> b -> b
       (^) :: b -> b -> b
-      shl :: b -> Prim.Number -> b
-      shr :: b -> Prim.Number -> b
-      zshr :: b -> Prim.Number -> b
+      shl :: b -> Number -> b
+      shr :: b -> Number -> b
+      zshr :: b -> Number -> b
       complement :: b -> b
 
     class BoolLike b where
@@ -54,8 +57,8 @@ Type Classes
       id :: forall t. a t t
 
     class Eq a where
-      (==) :: a -> a -> Prim.Boolean
-      (/=) :: a -> a -> Prim.Boolean
+      (==) :: a -> a -> Boolean
+      (/=) :: a -> a -> Boolean
 
     class Functor f where
       (<$>) :: forall a b. (a -> b) -> f a -> f b
@@ -80,46 +83,72 @@ Type Classes
       (<<<) :: forall b c d. a c d -> a b c -> a b d
 
     class Show a where
-      show :: a -> Prim.String
+      show :: a -> String
 
 Type Class Instances
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-    instance bitsNumber :: Bits Prim.Number
+    instance applicativeArr :: Applicative (Prim.Function r)
 
-    instance boolLikeBoolean :: BoolLike Prim.Boolean
+    instance applyArr :: Apply (Prim.Function r)
+
+    instance bindArr :: Bind (Prim.Function r)
+
+    instance bitsNumber :: Bits Number
+
+    instance boolLikeBoolean :: BoolLike Boolean
 
     instance categoryArr :: Category Prim.Function
 
     instance eqArray :: (Eq a) => Eq [a]
 
-    instance eqBoolean :: Eq Prim.Boolean
+    instance eqBoolean :: Eq Boolean
 
-    instance eqNumber :: Eq Prim.Number
+    instance eqNumber :: Eq Number
 
     instance eqOrdering :: Eq Ordering
 
-    instance eqString :: Eq Prim.String
+    instance eqString :: Eq String
 
-    instance numNumber :: Num Prim.Number
+    instance eqUnit :: Eq Unit
 
-    instance ordNumber :: Ord Prim.Number
+    instance functorArr :: Functor (Prim.Function r)
 
-    instance semigroupString :: Semigroup Prim.String
+    instance monadArr :: Monad (Prim.Function r)
+
+    instance numNumber :: Num Number
+
+    instance ordArray :: (Ord a) => Ord [a]
+
+    instance ordBoolean :: Ord Boolean
+
+    instance ordNumber :: Ord Number
+
+    instance ordString :: Ord String
+
+    instance ordUnit :: Ord Unit
+
+    instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
+
+    instance semigroupString :: Semigroup String
+
+    instance semigroupUnit :: Semigroup Unit
 
     instance semigroupoidArr :: Semigroupoid Prim.Function
 
     instance showArray :: (Show a) => Show [a]
 
-    instance showBoolean :: Show Prim.Boolean
+    instance showBoolean :: Show Boolean
 
-    instance showNumber :: Show Prim.Number
+    instance showNumber :: Show Number
 
     instance showOrdering :: Show Ordering
 
-    instance showString :: Show Prim.String
+    instance showString :: Show String
+
+    instance showUnit :: Show Unit
 
 Values
 ~~~~~~
@@ -134,27 +163,19 @@ Values
 
     (:) :: forall a. a -> [a] -> [a]
 
-    (<) :: forall a. (Ord a) => a -> a -> Prim.Boolean
+    (<) :: forall a. (Ord a) => a -> a -> Boolean
 
-    (<=) :: forall a. (Ord a) => a -> a -> Prim.Boolean
+    (<=) :: forall a. (Ord a) => a -> a -> Boolean
 
-    (>) :: forall a. (Ord a) => a -> a -> Prim.Boolean
+    (>) :: forall a. (Ord a) => a -> a -> Boolean
 
-    (>=) :: forall a. (Ord a) => a -> a -> Prim.Boolean
+    (>=) :: forall a. (Ord a) => a -> a -> Boolean
 
     (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
 
     ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
 
     asTypeOf :: forall a. a -> a -> a
-
-    boolAnd :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
-
-    boolNot :: Prim.Boolean -> Prim.Boolean
-
-    boolOr :: Prim.Boolean -> Prim.Boolean -> Prim.Boolean
-
-    concatString :: Prim.String -> Prim.String -> Prim.String
 
     cons :: forall a. a -> [a] -> [a]
 
@@ -166,55 +187,96 @@ Values
 
     liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 
-    numAdd :: Prim.Number -> Prim.Number -> Prim.Number
+    refEq :: forall a. a -> a -> Boolean
 
-    numAnd :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numCompare :: Prim.Number -> Prim.Number -> Ordering
-
-    numComplement :: Prim.Number -> Prim.Number
-
-    numDiv :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numMod :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numMul :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numNegate :: Prim.Number -> Prim.Number
-
-    numOr :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numShl :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numShr :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numSub :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numXor :: Prim.Number -> Prim.Number -> Prim.Number
-
-    numZshr :: Prim.Number -> Prim.Number -> Prim.Number
-
-    refEq :: forall a. a -> a -> Prim.Boolean
-
-    refIneq :: forall a. a -> a -> Prim.Boolean
+    refIneq :: forall a. a -> a -> Boolean
 
     return :: forall m a. (Monad m) => a -> m a
 
-    showArrayImpl :: forall a. (a -> Prim.String) -> [a] -> Prim.String
+    unit :: Unit
 
-    showNumberImpl :: Prim.Number -> Prim.String
-
-    showStringImpl :: Prim.String -> Prim.String
+    void :: forall f a. (Functor f) => f a -> f Unit
 
 Module Data.Function
 --------------------
+
+Types
+~~~~~
+
+::
+
+    data Fn0 :: * -> *
+
+    data Fn1 :: * -> * -> *
+
+    data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn2 :: * -> * -> * -> *
+
+    data Fn3 :: * -> * -> * -> * -> *
+
+    data Fn4 :: * -> * -> * -> * -> * -> *
+
+    data Fn5 :: * -> * -> * -> * -> * -> * -> *
+
+    data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 
 Values
 ~~~~~~
 
 ::
 
+    mkFn0 :: forall a. (Unit -> a) -> Fn0 a
+
+    mkFn1 :: forall a b. (a -> b) -> Fn1 a b
+
+    mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
+
+    mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
+
+    mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
+
+    mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
+
+    mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
+
+    mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
+
+    mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
+
+    mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
+
+    mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
+
     on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
+
+    runFn0 :: forall a. Fn0 a -> a
+
+    runFn1 :: forall a b. Fn1 a b -> a -> b
+
+    runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
+
+    runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
+
+    runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
+
+    runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
+
+    runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
+
+    runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
+
+    runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
+
+    runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
+
+    runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
 
 Module Data.Eq
 --------------
@@ -234,6 +296,8 @@ Type Class Instances
 
     instance eqRef :: Eq (Ref a)
 
+    instance functorRef :: Functor Ref
+
 Values
 ~~~~~~
 
@@ -249,7 +313,7 @@ Values
 
 ::
 
-    unsafeIndex :: forall a. [a] -> Prim.Number -> a
+    unsafeIndex :: forall a. [a] -> Number -> a
 
 Module Control.Monad.Eff
 ------------------------
@@ -285,7 +349,7 @@ Values
 
     bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
-    forE :: forall e. Prim.Number -> Prim.Number -> (Prim.Number -> Eff e Unit) -> Eff e Unit
+    forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 
     foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 
@@ -293,9 +357,9 @@ Values
 
     runPure :: forall a. Pure a -> a
 
-    untilE :: forall e. Eff e Prim.Boolean -> Eff e Unit
+    untilE :: forall e. Eff e Boolean -> Eff e Unit
 
-    whileE :: forall e a. Eff e Prim.Boolean -> Eff e a -> Eff e Unit
+    whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 
 Module Control.Monad.Eff.Unsafe
 -------------------------------
@@ -324,7 +388,7 @@ Values
 
     print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 
-    trace :: forall r. Prim.String -> Eff (trace :: Trace | r) Unit
+    trace :: forall r. String -> Eff (trace :: Trace | r) Unit
 
 Module Control.Monad.ST
 -----------------------
@@ -347,13 +411,13 @@ Values
 
     modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
-    newSTArray :: forall a h r. Prim.Number -> a -> Eff (st :: ST h | r) (STArray h a)
+    newSTArray :: forall a h r. Number -> a -> Eff (st :: ST h | r) (STArray h a)
 
     newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
     peekSTArray :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
 
-    pokeSTArray :: forall a h r. STArray h a -> Prim.Number -> a -> Eff (st :: ST h | r) a
+    pokeSTArray :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
 
     readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 
