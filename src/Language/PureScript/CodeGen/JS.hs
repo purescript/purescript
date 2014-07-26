@@ -207,7 +207,19 @@ valueToJs opts m e (Case values binders) = do
   bindersToJs opts m e binders vals
 valueToJs opts m e (IfThenElse cond th el) = JSConditional <$> valueToJs opts m e cond <*> valueToJs opts m e th <*> valueToJs opts m e el
 valueToJs opts m e (Accessor prop val) = accessorString prop <$> valueToJs opts m e val
-valueToJs opts m e (App val arg) = JSApp <$> valueToJs opts m e val <*> (return <$> valueToJs opts m e arg)
+valueToJs opts m e v@App{} = do
+  let (f, args) = unApp v []
+  args' <- mapM (valueToJs opts m e) args
+  case f of
+    Constructor name | getConstructorArity e name == length args ->
+      return $ JSUnary JSNew $ JSApp (qualifiedToJS m (Ident . runProperName) name) args'
+    _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m e f
+  where
+  unApp :: Value -> [Value] -> (Value, [Value])
+  unApp (App val arg) args = unApp val (arg : args)
+  unApp (PositionedValue _ val) args = unApp val args
+  unApp (TypedValue _ val _) args = unApp val args
+  unApp other args = (other, args)
 valueToJs opts m e (Let ds val) = do
   decls <- concat . catMaybes <$> mapM (flip (declToJs opts m) e) ds
   ret <- valueToJs opts m e val
@@ -385,23 +397,37 @@ binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
 
 -- |
--- Checks whether a data constructor is the only constructor for that type, used to simplify the
--- check when generating code for binders.
+-- Finds the value stored for a data constructor in the current environment.
+-- This is a partial function, but if an invalid type has reached this far then
+-- something has gone wrong in typechecking.
+--
+lookupConstructor :: Environment -> Qualified ProperName -> (ProperName, Type)
+lookupConstructor e ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
+
+-- |
+-- Checks whether a data constructor is the only constructor for that type, used
+-- to simplify the check when generating code for binders.
 --
 isOnlyConstructor :: Environment -> Qualified ProperName -> Bool
-isOnlyConstructor e ctor =
-  let ty = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
-  in numConstructors (ctor, ty) == 1
+isOnlyConstructor e ctor = numConstructors (ctor, lookupConstructor e ctor) == 1
   where
   numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
   typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
   typeConstructor _ = error "Invalid argument to isOnlyConstructor"
 
-isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
-isNullaryConstructor e ctor =
-  not . isFunction . snd . fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
+-- |
+-- Checks the number of arguments a data constructor accepts.
+--
+getConstructorArity :: Environment -> Qualified ProperName -> Int
+getConstructorArity e = go . snd . lookupConstructor e
   where
-  isFunction :: Type -> Bool
-  isFunction (ForAll _ t _) = isFunction t
-  isFunction (TypeApp t _) = isFunction t
-  isFunction t = t == tyFunction
+  go :: Type -> Int
+  go (TypeApp (TypeApp f _) t) | f == tyFunction = go t + 1
+  go (ForAll _ ty _) = go ty
+  go _ = 0
+
+-- |
+-- Checks whether a data constructor has no arguments, for example, `Nothing`.
+--
+isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
+isNullaryConstructor e = (== 0) . getConstructorArity e
