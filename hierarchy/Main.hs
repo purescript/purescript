@@ -26,6 +26,7 @@ import System.Console.CmdTheLine
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.Exit (exitFailure, exitSuccess)
+import System.IO (stderr)
 
 import Text.Parsec (ParseError)
 
@@ -57,7 +58,7 @@ compile :: FilePath -> Maybe FilePath -> IO ()
 compile input mOutput = do
   modules <- readInput input
   case modules of
-    Left err -> U.print err >> exitFailure
+    Left err -> U.hPutStr stderr (show err) >> exitFailure
     Right ms -> do
       for_ ms $ \(P.Module moduleName decls _) ->
         let name = runModuleName moduleName
