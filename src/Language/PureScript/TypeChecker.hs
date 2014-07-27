@@ -120,7 +120,7 @@ typeCheckAll mainModuleName moduleName (d@(DataDeclaration dtype name args dctor
   return $ d : ds
   where
   checkNewtype :: [(ProperName, [Type])] -> Check ()
-  checkNewtype [(_, [ty])] = return ()
+  checkNewtype [(_, [_])] = return ()
   checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
   checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
 typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
