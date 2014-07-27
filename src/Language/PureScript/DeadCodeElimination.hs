@@ -39,7 +39,8 @@ eliminateDeadCode entryPoints ms = map go ms
   entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
 
   filterExport :: [Declaration] -> DeclarationRef -> Maybe DeclarationRef
-  filterExport decls r@(TypeRef name _) | (any $ typeExists name) decls = Just r
+  filterExport decls r@(TypeRef name _) | (any $ typeOrClassExists name) decls = Just r
+  filterExport decls r@(TypeClassRef name) | (any $ typeOrClassExists name) decls = Just r
   filterExport decls r@(ValueRef name) | (any $ valueExists name) decls = Just r
   filterExport decls r@(TypeInstanceRef name) | (any $ valueExists name) decls = Just r
   filterExport _ _ = Nothing
@@ -51,11 +52,12 @@ eliminateDeadCode entryPoints ms = map go ms
   valueExists name (PositionedDeclaration _ d) = valueExists name d
   valueExists _ _ = False
 
-  typeExists :: ProperName -> Declaration -> Bool
-  typeExists name (DataDeclaration _ name' _ _) = name == name'
-  typeExists name (DataBindingGroupDeclaration decls) = any (typeExists name) decls
-  typeExists name (PositionedDeclaration _ d) = typeExists name d
-  typeExists _ _ = False
+  typeOrClassExists :: ProperName -> Declaration -> Bool
+  typeOrClassExists name (DataDeclaration _ name' _ _) = name == name'
+  typeOrClassExists name (TypeClassDeclaration name' _ _ _) = name == name'
+  typeOrClassExists name (DataBindingGroupDeclaration decls) = any (typeOrClassExists name) decls
+  typeOrClassExists name (PositionedDeclaration _ d) = typeOrClassExists name d
+  typeOrClassExists _ _ = False
 
 type Key = (ModuleName, Either Ident ProperName)
 
@@ -68,6 +70,7 @@ declarationsByModule (Module moduleName ds _) = concatMap go ds
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
   go d@(BindingGroupDeclaration names') = map (\(name, _, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
   go (DataBindingGroupDeclaration ds') = concatMap go ds'
+  go (TypeClassDeclaration name _ _ _) = [((moduleName, Right name), [])]
   go (PositionedDeclaration _ d) = go d
   go _ = []
 
@@ -102,6 +105,9 @@ isUsed moduleName graph vertexFor entryPointVertices (BindingGroupDeclaration ds
                         in any (\v -> path graph v v') entryPointVertices) ds
 isUsed moduleName graph vertexFor entryPointVertices (DataBindingGroupDeclaration ds) =
   any (isUsed moduleName graph vertexFor entryPointVertices) ds
+isUsed moduleName graph vertexFor entryPointVertices (TypeClassDeclaration name _ _ _) =
+  let Just v' = vertexFor (moduleName, Right name)
+  in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (PositionedDeclaration _ d) =
   isUsed moduleName graph vertexFor entryPointVertices d
 isUsed _ _ _ _ _ = True
