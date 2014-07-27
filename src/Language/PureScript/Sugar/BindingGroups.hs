@@ -118,7 +118,7 @@ getIdent (PositionedDeclaration _ d) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
-getProperName (DataDeclaration pn _ _) = pn
+getProperName (DataDeclaration _ pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
 getProperName (PositionedDeclaration _ d) = getProperName d
 getProperName _ = error "Expected DataDeclaration"

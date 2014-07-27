@@ -23,14 +23,12 @@ module Language.PureScript.CodeGen.JS (
     identNeedsEscaping
 ) where
 
-import Data.Maybe (catMaybes, fromJust, fromMaybe)
+import Data.Maybe (catMaybes, fromJust)
 import Data.Function (on)
 import Data.List (nub, (\\), delete, sortBy)
 
 import Control.Monad (replicateM, forM)
 import Control.Applicative
-
-import qualified Data.Map as M
 
 import Language.PureScript.Names
 import Language.PureScript.Declarations
@@ -106,7 +104,14 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ mp (DataDeclaration _ _ ctors) e = do
+declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _)]) _ =
+  return $ Just $ [JSVariableIntroduction ctor (Just $
+                    JSObjectLiteral [("create",
+                      JSFunction Nothing ["value"]
+                        (JSBlock [JSReturn $ JSVar "value"]))])]
+declToJs _ _ (DataDeclaration Newtype _ _ _) _ =
+  error "newtype has multiple constructors"
+declToJs _ mp (DataDeclaration Data _ _ ctors) e = do
   return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
       let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
       in [ makeConstructor ctor (length tys)
@@ -211,6 +216,7 @@ valueToJs opts m e v@App{} = do
   let (f, args) = unApp v []
   args' <- mapM (valueToJs opts m e) args
   case f of
+    Constructor name | isNewtypeConstructor e name && length args == 1 -> return (head args')
     Constructor name | getConstructorArity e name == length args ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m (Ident . runProperName) name) args'
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m e f
@@ -343,6 +349,10 @@ binderToJs _ _ varName done (BooleanBinder False) =
   return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
 binderToJs _ _ varName done (VarBinder ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
+binderToJs m e varName done (ConstructorBinder ctor bs) | isNewtypeConstructor e ctor =
+  case bs of
+    [b] -> binderToJs m e varName done b
+    _ -> error "binder for newtype constructor should have a single argument"
 binderToJs m e varName done (ConstructorBinder ctor bs) = do
   js <- go 0 done bs
   if isOnlyConstructor e ctor
@@ -395,39 +405,3 @@ binderToJs m e varName done (NamedBinder ident binder) = do
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
 binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
-
--- |
--- Finds the value stored for a data constructor in the current environment.
--- This is a partial function, but if an invalid type has reached this far then
--- something has gone wrong in typechecking.
---
-lookupConstructor :: Environment -> Qualified ProperName -> (ProperName, Type)
-lookupConstructor e ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
-
--- |
--- Checks whether a data constructor is the only constructor for that type, used
--- to simplify the check when generating code for binders.
---
-isOnlyConstructor :: Environment -> Qualified ProperName -> Bool
-isOnlyConstructor e ctor = numConstructors (ctor, lookupConstructor e ctor) == 1
-  where
-  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors e
-  typeConstructor (Qualified (Just moduleName) _, (tyCtor, _)) = (moduleName, tyCtor)
-  typeConstructor _ = error "Invalid argument to isOnlyConstructor"
-
--- |
--- Checks the number of arguments a data constructor accepts.
---
-getConstructorArity :: Environment -> Qualified ProperName -> Int
-getConstructorArity e = go . snd . lookupConstructor e
-  where
-  go :: Type -> Int
-  go (TypeApp (TypeApp f _) t) | f == tyFunction = go t + 1
-  go (ForAll _ ty _) = go ty
-  go _ = 0
-
--- |
--- Checks whether a data constructor has no arguments, for example, `Nothing`.
---
-isNullaryConstructor :: Environment -> Qualified ProperName -> Bool
-isNullaryConstructor e = (== 0) . getConstructorArity e

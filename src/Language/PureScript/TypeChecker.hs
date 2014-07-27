@@ -39,21 +39,21 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 
-addDataType :: ModuleName -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
-addDataType moduleName name args dctors ctorKind = do
+addDataType :: ModuleName -> DataDeclType -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
+addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
     rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
-      addDataConstructor moduleName name args dctor tys
+      addDataConstructor moduleName dtype name args dctor tys
 
-addDataConstructor :: ModuleName -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
-addDataConstructor moduleName name args dctor tys = do
+addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
+addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (name, polyType) (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -111,19 +111,25 @@ checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance hea
 --
 typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
 typeCheckAll _ _ [] = return []
-typeCheckAll mainModuleName moduleName (d@(DataDeclaration name args dctors) : rest) = do
+typeCheckAll mainModuleName moduleName (d@(DataDeclaration dtype name args dctors) : rest) = do
   rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
+    when (dtype == Newtype) $ checkNewtype dctors
     ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
-    addDataType moduleName name args dctors ctorKind
+    addDataType moduleName dtype name args dctors ctorKind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
+  where
+  checkNewtype :: [(ProperName, [Type])] -> Check ()
+  checkNewtype [(_, [ty])] = return ()
+  checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
+  checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
 typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
   rethrow (strMsg "Error in data binding group" <>) $ do
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
-    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-    forM_ (zip dataDecls data_ks) $ \((name, args, dctors), ctorKind) ->
-      addDataType moduleName name args dctors ctorKind
+    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
+    forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) ->
+      addDataType moduleName dtype name args dctors ctorKind
     forM_ (zip syns syn_ks) $ \((name, args, ty), kind) ->
       addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
@@ -132,7 +138,7 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
   toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
   toTypeSynonym _ = Nothing
-  toDataDecl (DataDeclaration nm args dctors) = Just (nm, args, dctors)
+  toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
   toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do

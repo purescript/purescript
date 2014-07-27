@@ -24,6 +24,7 @@ import qualified Data.Map as M
 
 import Control.Monad.Writer
 
+import Language.PureScript.CodeGen.Common
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty
@@ -60,7 +61,10 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
               printDctor dctor = case dctor `lookup` tys of
                                    Nothing -> Nothing
                                    Just tyArgs -> Just $ show dctor ++ " " ++ unwords (map prettyPrintTypeAtom tyArgs)
-          tell ["data " ++ show pn ++ " " ++ unwords args ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
+          let dtype = if length dctors' == 1 && isNewtypeConstructor env (Qualified (Just moduleName) $ head dctors')
+                      then "newtype"
+                      else "data"
+          tell [dtype ++ " " ++ show pn ++ " " ++ unwords args ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
         Just (_, TypeSynonym) ->
           case Qualified (Just moduleName) pn `M.lookup` typeSynonyms env of
             Nothing -> error $ show pn ++ " has no type synonym info in exportToPs"

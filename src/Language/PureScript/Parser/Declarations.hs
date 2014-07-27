@@ -48,13 +48,13 @@ sourcePos = toSourcePos <$> P.getPosition
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
-  reserved "data"
+  dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> properName
   tyArgs <- many (indented *> identifier)
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
     sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
-  return $ DataDeclaration name tyArgs ctors
+  return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
