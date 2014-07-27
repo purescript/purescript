@@ -228,7 +228,7 @@ module Prelude
     (%) = numMod
     negate = numNegate
 
-  data Unit = Unit {}
+  newtype Unit = Unit {}
 
   unit :: Unit
   unit = Unit {}
@@ -740,7 +740,7 @@ module Data.Function where
 
 module Data.Eq where
 
-  data Ref a = Ref a
+  newtype Ref a = Ref a
 
   liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
   liftRef f (Ref x) (Ref y) = f x y
