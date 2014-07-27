@@ -332,12 +332,21 @@ module Prelude
     LT -> false
     _ -> true
 
-  foreign import unsafeCompare
-    "function unsafeCompare(n1) {\
-    \  return function(n2) {\
-    \    return n1 < n2 ? LT.value : n1 > n2 ? GT.value : EQ.value;\
+  foreign import unsafeCompareImpl
+    "function unsafeCompareImpl(lt) {\
+    \  return function (eq) {\
+    \    return function (gt) {\
+    \      return function (x) {\
+    \        return function (y) {\
+    \          return x < y ? lt : x > y ? gt : eq;\
+    \        };\
+    \      };\
+    \    };\
     \  };\
-    \}" :: forall a. a -> a -> Ordering
+    \}" :: forall a. Ordering -> Ordering -> Ordering -> a -> a -> Ordering
+    
+  unsafeCompare :: forall a. a -> a -> Ordering
+  unsafeCompare = unsafeCompareImpl LT EQ GT
 
   instance ordUnit :: Ord Unit where
     compare (Unit {}) (Unit {}) = EQ
