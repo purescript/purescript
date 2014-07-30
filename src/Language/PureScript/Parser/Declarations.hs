@@ -124,7 +124,8 @@ parseImportDeclaration = do
   stdImport = do
     moduleName' <- moduleName
     idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
-    return $ ImportDeclaration moduleName' idents Nothing
+    hidingIdents <- P.optionMaybe hidingClause
+    return $ ImportDeclaration moduleName' idents hidingIdents Nothing
   qualImport = do
     reserved "qualified"
     indented
@@ -132,7 +133,11 @@ parseImportDeclaration = do
     idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
     reserved "as"
     asQ <- moduleName
-    return $ ImportDeclaration moduleName' idents (Just asQ)
+    return $ ImportDeclaration moduleName' idents Nothing (Just asQ)
+  hidingClause = do
+    reserved "hiding"
+    indented *> (parens $ commaSep parseDeclarationRef)
+
 
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
 parseDeclarationRef = PositionedDeclarationRef <$> sourcePos <*>

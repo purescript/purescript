@@ -158,10 +158,10 @@ data Declaration
   --
   | FixityDeclaration Fixity String
   -- |
-  -- A module import (module name, optional set of identifiers to import, optional "qualified as"
-  -- name)
+  -- A module import (module name, optional set of identifiers to import,
+  -- optional set of identifiers to hide, optional "qualified as" name)
   --
-  | ImportDeclaration ModuleName (Maybe [DeclarationRef]) (Maybe ModuleName)
+  | ImportDeclaration ModuleName (Maybe [DeclarationRef]) (Maybe [DeclarationRef]) (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
