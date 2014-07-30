@@ -405,7 +405,7 @@ resolveImports env (Module currentModule decls _) =
 --
 resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports -> Maybe HiddenImports -> Either ErrorStack ImportEnvironment
 resolveImport currentModule importModule exps imps impQual explImports hiddenImports =
-  maybe importAll (foldM importExplicit imps) explImports
+  maybe importAll (foldM (\m -> checkRefIsValid >=> (importExplicit m)) imps) explImports
   where
 
   -- Import everything from a module
@@ -424,19 +424,16 @@ resolveImport currentModule importModule exps imps impQual explImports hiddenImp
   -- Import something explicitly
   importExplicit :: ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
   importExplicit imp (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ importExplicit imp r
-  importExplicit imp ref@(ValueRef name) = do
-    _ <- checkRefIsValid ref
+  importExplicit imp (ValueRef name) = do
     values' <- updateImports (importedValues imp) name
     return $ imp { importedValues = values' }
-  importExplicit imp ref@(TypeRef name dctors) = do
-    _ <- checkRefIsValid ref
+  importExplicit imp (TypeRef name dctors) = do
     types' <- updateImports (importedTypes imp) name
     let allDctors = allExportedDataConstructors name
     dctors' <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
     dctors'' <- foldM updateImports (importedDataConstructors imp) dctors'
     return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
-  importExplicit imp ref@(TypeClassRef name) = do
-    _ <- checkRefIsValid ref
+  importExplicit imp (TypeClassRef name) = do
     typeClasses' <- updateImports (importedTypeClasses imp) name
     return $ imp { importedTypeClasses = typeClasses' }
   importExplicit _ _ = error "Invalid argument to importExplicit"
