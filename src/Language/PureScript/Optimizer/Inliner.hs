@@ -15,6 +15,8 @@
 
 module Language.PureScript.Optimizer.Inliner (
   inlineVariables,
+  inlinePure,
+  inlineCompose,
   inlineOperator,
   inlineCommonOperators,
   etaConvert,
@@ -71,6 +73,31 @@ evaluateIifes = everywhereOnJS convert
   convert (JSApp (JSFunction Nothing [] (JSBlock [JSReturn ret])) []) = ret
   convert js = js
 
+inlinePure :: JS -> JS
+inlinePure = everywhereOnJS convert
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSApp p eff) [js]) | isPure p && isEff eff = JSFunction Nothing [] (JSBlock [JSReturn js])
+  convert other = other
+  isPure (JSAccessor f (JSVar prelude)) = (f == C.pure' || f == C.return) && prelude == C.prelude
+  isPure _ = False
+  isEff [JSApp (JSAccessor app (JSVar eff)) _] = app == C.applicativeEffDictionary && eff == C.eff
+  isEff _ = False
+
+inlineCompose :: JS -> JS
+inlineCompose = everywhereOnJS convert
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSApp comp [f]) [g]) | isBackwardComp comp = JSFunction Nothing ["x"] (JSBlock [JSReturn (JSApp f [JSApp g [JSVar "x"]])])
+  convert (JSApp (JSApp comp [f]) [g]) | isForwardComp  comp = JSFunction Nothing ["x"] (JSBlock [JSReturn (JSApp g [JSApp f [JSVar "x"]])])
+  convert other = other
+  isBackwardComp (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.<<<) && prelude == C.prelude && isSemi semi
+  isBackwardComp _ = False
+  isForwardComp  (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.>>>) && prelude == C.prelude && isSemi semi
+  isForwardComp  _ = False
+  isSemi [JSApp (JSAccessor semi (JSVar prelude)) _] = semi == C.semigroupoidArr && prelude == C.prelude
+  isSemi _ = False
+
 inlineVariables :: JS -> JS
 inlineVariables = everywhereOnJS $ removeFromBlock go
   where
@@ -112,6 +139,7 @@ inlineCommonOperators = applyAll $
   , binary C.eqBoolean (C.==) EqualTo
   , binary C.eqBoolean (C./=) NotEqualTo
 
+  , binary C.semigroupString (C.<>) Add
   , binary C.semigroupString (C.++) Add
 
   , binaryFunction C.bitsNumber C.shl ShiftLeft
