@@ -30,6 +30,7 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Optimizer.Common
 import Language.PureScript.Names
+import Language.PureScript.Supply (freshName, evalSupply)
 
 import qualified Language.PureScript.Constants as C
 
@@ -88,9 +89,10 @@ inlineCompose :: JS -> JS
 inlineCompose = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSApp (JSApp comp [f]) [g]) | isBackwardComp comp = JSFunction Nothing ["x"] (JSBlock [JSReturn (JSApp f [JSApp g [JSVar "x"]])])
-  convert (JSApp (JSApp comp [f]) [g]) | isForwardComp  comp = JSFunction Nothing ["x"] (JSBlock [JSReturn (JSApp g [JSApp f [JSVar "x"]])])
+  convert (JSApp (JSApp comp [f]) [g]) | isBackwardComp comp = JSFunction Nothing [var] (JSBlock [JSReturn (JSApp f [JSApp g [JSVar var]])])
+  convert (JSApp (JSApp comp [f]) [g]) | isForwardComp  comp = JSFunction Nothing [var] (JSBlock [JSReturn (JSApp g [JSApp f [JSVar var]])])
   convert other = other
+  var = evalSupply 1 freshName
   isBackwardComp (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.<<<) && prelude == C.prelude && isSemi semi
   isBackwardComp _ = False
   isForwardComp  (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.>>>) && prelude == C.prelude && isSemi semi
