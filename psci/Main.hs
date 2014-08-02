@@ -303,16 +303,16 @@ handleTypeOf value = do
 handleKindOf :: P.Value -> PSCI ()
 handleKindOf value = do
   st <- PSCI $ lift get
-  let m       = createTemporaryModule False st value
-      modName = P.ModuleName [P.ProperName "Main"]
+  let m     = createTemporaryModule False st value
+      mName = P.ModuleName [P.ProperName "Main"]
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
-      case M.lookup (modName, P.Ident "it") (P.names env') of
+      case M.lookup (mName, P.Ident "it") (P.names env') of
         Just (ty, _, _) -> do
-          let st = P.CheckState env' 1 1 (Just modName)
-              k = L.runStateT (P.unCheck (P.kindOf modName ty)) st
+          let st = P.CheckState env' 0 0 (Just mName)
+              k = L.runStateT (P.unCheck (P.kindOf mName ty)) st
           case k of 
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
