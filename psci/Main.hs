@@ -296,6 +296,11 @@ handleTypeOf value = do
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
 
+-- |
+-- Takes a value and prints its kind
+--
+handleKindOf :: P.Value -> PSCI ()
+handleKindOf value = outputStrLn "Command not yet implemented"
 -- Commands
 
 -- |
@@ -339,6 +344,7 @@ handleCommand Reset = do
     Left err -> psciIO $ putStrLn err >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
+handleCommand (KindOf val) = handleKindOf val
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]
