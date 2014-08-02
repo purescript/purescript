@@ -24,6 +24,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -300,7 +301,23 @@ handleTypeOf value = do
 -- Takes a value and prints its kind
 --
 handleKindOf :: P.Value -> PSCI ()
-handleKindOf value = outputStrLn "Command not yet implemented"
+handleKindOf value = do
+  st <- PSCI $ lift get
+  let m       = createTemporaryModule False st value
+      modName = P.ModuleName [P.ProperName "Main"]
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
+      case M.lookup (modName, P.Ident "it") (P.names env') of
+        Just (ty, _, _) -> do
+          let st = P.CheckState env' 1 1 (Just modName)
+              k = L.runStateT (P.unCheck (P.kindOf modName ty)) st
+          case k of 
+            Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
+            Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
+        Nothing -> PSCI $ outputStrLn "Could not find kind"
+
 -- Commands
 
 -- |
