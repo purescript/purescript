@@ -261,7 +261,7 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} typ =
+createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
     importDecl m = P.ImportDeclaration m Nothing Nothing
@@ -320,11 +320,11 @@ handleKindOf typ = do
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
-    Right env' ->  -- P.types env' M.Map (Qualified ProperName) ([String], Type)
+    Right env' ->
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
-          let st = P.CheckState env' 0 0 (Just mName)
-              k = L.runStateT (P.unCheck (P.kindOf mName typ')) st
+          let chk = P.CheckState env' 0 0 (Just mName)
+              k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
           case k of 
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
