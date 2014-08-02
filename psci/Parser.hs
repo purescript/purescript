@@ -96,4 +96,4 @@ psciTypeOf = TypeOf <$> (char 't' *> P.whiteSpace *> P.parseValue)
 -- Parses 'Commands.KindOf' command.
 --
 psciKindOf :: Parsec String P.ParseState Command
-psciKindOf = KindOf <$> (char 'k' *> P.whiteSpace *> P.parseValue)
+psciKindOf = KindOf <$> (char 'k' *> P.whiteSpace *> P.parseType)

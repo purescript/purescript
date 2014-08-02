@@ -300,23 +300,20 @@ handleTypeOf value = do
 -- |
 -- Takes a value and prints its kind
 --
-handleKindOf :: P.Value -> PSCI ()
-handleKindOf value = do
+handleKindOf :: P.Type -> PSCI ()
+handleKindOf typ = do
   st <- PSCI $ lift get
-  let m     = createTemporaryModule False st value
+  let m = createTemporaryModule False st (P.BooleanLiteral True) -- dummy value
       mName = P.ModuleName [P.ProperName "Main"]
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
-    Right env' ->
-      case M.lookup (mName, P.Ident "it") (P.names env') of
-        Just (ty, _, _) -> do
-          let st = P.CheckState env' 0 0 (Just mName)
-              k = L.runStateT (P.unCheck (P.kindOf mName ty)) st
-          case k of 
-            Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
-            Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
-        Nothing -> PSCI $ outputStrLn "Could not find kind"
+    Right env' -> do
+      let st = P.CheckState env' 0 0 (Just mName)
+          k = L.runStateT (P.unCheck (P.kindOf mName typ)) st
+      case k of 
+        Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
+        Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
 
 -- Commands
 
@@ -361,7 +358,7 @@ handleCommand Reset = do
     Left err -> psciIO $ putStrLn err >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
-handleCommand (KindOf val) = handleKindOf val
+handleCommand (KindOf typ) = handleKindOf typ
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]
