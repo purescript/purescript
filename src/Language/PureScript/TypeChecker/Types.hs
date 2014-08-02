@@ -1022,9 +1022,12 @@ checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (J
 checkFunctionApplication' :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
   tyFunction' =?= tyFunction
-  _ <- maybe (return Nothing) (subsumes Nothing retTy) ret
   arg' <- check arg argTy
-  return (retTy, App fn arg')
+  case ret of
+    Nothing -> return (retTy, App fn arg')
+    Just ret' -> do
+      Just app' <- subsumes (Just (App fn arg')) retTy ret'
+      return (retTy, app')
 checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication fn replaced arg ret
@@ -1084,8 +1087,7 @@ subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
-  _ <- subsumes' Nothing ty1 ty2
-  return . Just $ foldl App val (map (flip (TypeClassDictionary True) dicts) constraints)
+  subsumes' (Just $ foldl App val (map (flip (TypeClassDictionary True) dicts) constraints)) ty1 ty2
 subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
   let
     (ts1, r1') = rowToList r1
