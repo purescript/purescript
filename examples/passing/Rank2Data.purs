@@ -1,7 +1,5 @@
 module Main where
 
-  import Prelude
-
   data Id = Id forall a. a -> a
 
   runId = \id a -> case id of
@@ -22,8 +20,8 @@ module Main where
       Nat g -> Nat (\zero succ -> g (f zero succ) succ)
 
   one = succ zero
-  two = succ zero
+  two = succ one
   four = add two two
   fourNumber = runNat four
    
-  main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace $ show fourNumber
