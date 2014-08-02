@@ -61,7 +61,7 @@ instance Unifiable Check Kind where
   k =?= KUnknown u = u =:= k
   Star =?= Star = return ()
   Bang =?= Bang = return ()
-  Row k1 =?= Row k2 = k1 =?= ks
+  Row k1 =?= Row k2 = k1 =?= k2
   FunKind k1 k2 =?= FunKind k3 k4 = do
     k1 =?= k3
     k2 =?= k4
