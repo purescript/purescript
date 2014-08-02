@@ -8,3 +8,4 @@ cabal.sandbox.config
 *.chs.h
 *.lksh*
 .virthualenv
+.psci_modules/

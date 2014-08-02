@@ -24,6 +24,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -256,6 +257,18 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
   in
     P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing
 
+-- |
+-- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
+--
+createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
+createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
+  let
+    moduleName = P.ModuleName [P.ProperName "Main"]
+    importDecl m = P.ImportDeclaration m Nothing Nothing
+    itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
+  in
+    P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
+
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 
@@ -295,6 +308,27 @@ handleTypeOf value = do
       case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
+
+-- |
+-- Takes a value and prints its kind
+--
+handleKindOf :: P.Type -> PSCI ()
+handleKindOf typ = do
+  st <- PSCI $ lift get
+  let m = createTemporaryModuleForKind st typ
+      mName = P.ModuleName [P.ProperName "Main"]
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
+      case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
+        Just (_, typ') -> do
+          let chk = P.CheckState env' 0 0 (Just mName)
+              k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
+          case k of 
+            Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
+            Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
+        Nothing -> PSCI $ outputStrLn "Could not find kind"
 
 -- Commands
 
@@ -339,6 +373,7 @@ handleCommand Reset = do
     Left err -> psciIO $ putStrLn err >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
+handleCommand (KindOf typ) = handleKindOf typ
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 inputFiles :: Cmd.Term [FilePath]

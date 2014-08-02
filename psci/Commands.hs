@@ -53,6 +53,10 @@ data Command
   -- Find the type of an expression
   --
   | TypeOf Value
+  -- |
+  -- Find the kind of an expression
+  -- 
+  | KindOf Type
 
 -- |
 -- The help menu.
@@ -65,4 +69,5 @@ help =
   , [":q          ", "Quit PSCi"]
   , [":r          ", "Reset"]
   , [":t <expr>   ", "Show the type of <expr>"]
+  , [":k <type>   ", "Show the kind of <type>"]
   ]
