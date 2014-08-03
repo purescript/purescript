@@ -158,7 +158,7 @@ renameInValue (ObjectLiteral vs) =
 renameInValue (Accessor prop v) =
   Accessor prop <$> renameInValue v
 renameInValue (ObjectUpdate obj vs) =
-  ObjectUpdate obj <$> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
+  ObjectUpdate <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
 renameInValue (Abs (Left name) v) =
   newScope $ Abs . Left <$> updateScope name <*> renameInValue v
 renameInValue (App v1 v2) =
