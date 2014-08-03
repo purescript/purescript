@@ -57,6 +57,8 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   convert :: JS -> JS
   -- Desugar return
   convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
+  -- Desugar pure
+  convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
     let JSReturn ret = last js in
@@ -78,6 +80,9 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Check if an expression represents a monomorphic call to return for the Eff monad
   isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict C.monadEffDictionary effDict = True
   isReturn _ = False
+  -- Check if an expression represents a monomorphic call to pure for the Eff applicative
+  isPure (JSApp purePoly [effDict]) | isPurePoly purePoly && isEffDict C.applicativeEffDictionary effDict = True
+  isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
   isBindPoly (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == identToJs (Op (C.>>=))
   isBindPoly (JSIndexer (JSStringLiteral bind) (JSVar prelude)) = prelude == C.prelude && bind == (C.>>=)
@@ -86,6 +91,10 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isRetPoly (JSAccessor returnEscaped (JSVar prelude)) = prelude == C.prelude && returnEscaped == C.returnEscaped
   isRetPoly (JSIndexer (JSStringLiteral return') (JSVar prelude)) = prelude == C.prelude && return' == C.return
   isRetPoly _ = False
+  -- Check if an expression represents the polymorphic pure function
+  isPurePoly (JSAccessor pure' (JSVar prelude)) = prelude == C.prelude && pure' == C.pure'
+  isPurePoly (JSIndexer (JSStringLiteral pure') (JSVar prelude)) = prelude == C.prelude && pure' == C.pure'
+  isPurePoly _ = False
   -- Check if an expression represents a function in the Ef module
   isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False

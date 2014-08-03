@@ -15,8 +15,6 @@
 
 module Language.PureScript.Optimizer.Inliner (
   inlineVariables,
-  inlinePure,
-  inlineCompose,
   inlineOperator,
   inlineCommonOperators,
   etaConvert,
@@ -30,7 +28,6 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.Common (identToJs)
 import Language.PureScript.Optimizer.Common
 import Language.PureScript.Names
-import Language.PureScript.Supply (freshName, evalSupply)
 
 import qualified Language.PureScript.Constants as C
 
@@ -73,32 +70,6 @@ evaluateIifes = everywhereOnJS convert
   convert :: JS -> JS
   convert (JSApp (JSFunction Nothing [] (JSBlock [JSReturn ret])) []) = ret
   convert js = js
-
-inlinePure :: JS -> JS
-inlinePure = everywhereOnJS convert
-  where
-  convert :: JS -> JS
-  convert (JSApp (JSApp p eff) [js]) | isPure p && isEff eff = JSFunction Nothing [] (JSBlock [JSReturn js])
-  convert other = other
-  isPure (JSAccessor f (JSVar prelude)) = (f == C.pure' || f == C.return) && prelude == C.prelude
-  isPure _ = False
-  isEff [JSApp (JSAccessor app (JSVar eff)) _] = app == C.applicativeEffDictionary && eff == C.eff
-  isEff _ = False
-
-inlineCompose :: JS -> JS
-inlineCompose = everywhereOnJS convert
-  where
-  convert :: JS -> JS
-  convert (JSApp (JSApp comp [f]) [g]) | isBackwardComp comp = JSFunction Nothing [var] (JSBlock [JSReturn (JSApp f [JSApp g [JSVar var]])])
-  convert (JSApp (JSApp comp [f]) [g]) | isForwardComp  comp = JSFunction Nothing [var] (JSBlock [JSReturn (JSApp g [JSApp f [JSVar var]])])
-  convert other = other
-  var = evalSupply 1 freshName
-  isBackwardComp (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.<<<) && prelude == C.prelude && isSemi semi
-  isBackwardComp _ = False
-  isForwardComp  (JSApp (JSIndexer (JSStringLiteral comp) (JSVar prelude)) semi) = comp == (C.>>>) && prelude == C.prelude && isSemi semi
-  isForwardComp  _ = False
-  isSemi [JSApp (JSAccessor semi (JSVar prelude)) _] = semi == C.semigroupoidArr && prelude == C.prelude
-  isSemi _ = False
 
 inlineVariables :: JS -> JS
 inlineVariables = everywhereOnJS $ removeFromBlock go

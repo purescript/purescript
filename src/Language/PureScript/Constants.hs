@@ -23,12 +23,6 @@ module Language.PureScript.Constants where
 (#) :: String
 (#) = "#"
 
-(<<<) :: String
-(<<<) = "<<<"
-
-(>>>) :: String
-(>>>) = ">>>"
-
 (<>) :: String
 (<>) = "<>"
 
