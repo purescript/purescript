@@ -43,7 +43,6 @@ import System.Directory
         findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Process (readProcessWithExitCode)
 import System.Exit
-import System.Environment.XDG.BaseDir
 import System.FilePath
        (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import qualified System.Console.CmdTheLine as Cmd
@@ -114,13 +113,20 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 -- Grabs the filename where the history is stored.
 --
 getHistoryFilename :: IO FilePath
-getHistoryFilename = getUserConfigFile "purescript" "psci_history"
+getHistoryFilename = do
+  home <- getHomeDirectory
+  return $ home </> ".purescript" </> "psci_history"
 
 -- |
 -- Grabs the filename where prelude is.
 --
 getPreludeFilename :: IO FilePath
-getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
+getPreludeFilename = do
+  home <- getHomeDirectory
+  let homePrelude = home </> ".purescript" </> "prelude" </> "prelude.purs"
+  useHomeDir <- doesFileExist homePrelude
+  if useHomeDir then return homePrelude
+  else Paths.getDataFileName "prelude/prelude.purs"
 
 -- |
 -- Loads a file for use with imports.
@@ -325,7 +331,7 @@ handleKindOf typ = do
         Just (_, typ') -> do
           let chk = P.CheckState env' 0 0 (Just mName)
               k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
-          case k of 
+          case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
         Nothing -> PSCI $ outputStrLn "Could not find kind"

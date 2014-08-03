@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DoAndIfThenElse #-}
 
 module Main where
 
@@ -22,8 +23,9 @@ import Control.Monad.Error
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
-import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory)
+import System.Directory
+       (doesFileExist, getHomeDirectory, createDirectoryIfMissing)
+import System.FilePath ((</>), takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
@@ -34,7 +36,12 @@ import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
 preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
+preludeFilename = do
+  home <- getHomeDirectory
+  let homePrelude = home </> ".purescript" </> "prelude" </> "prelude.purs"
+  useHomeDir <- doesFileExist homePrelude
+  if useHomeDir then return homePrelude
+  else Paths.getDataFileName "prelude/prelude.purs"
 
 readInput :: Maybe [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
 readInput Nothing = do
