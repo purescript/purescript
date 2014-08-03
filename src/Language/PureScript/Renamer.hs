@@ -18,21 +18,21 @@ module Language.PureScript.Renamer (renameInModules) where
 import Control.Applicative
 import Control.Monad.State
 
+import Data.List (find)
 import qualified Data.Map as M
 
 import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Supply
 import Language.PureScript.Traversals
 
-type Rename = StateT (M.Map Ident Ident) Supply
+type Rename = State (M.Map Ident Ident)
 
 -- |
--- Create a Rename state value for a scope from a list of idents.
+-- Runs renaming starting with a list of idents for the initial scope.
 --
-createScope :: [Ident] -> M.Map Ident Ident
-createScope scopeNames = M.fromList (zip scopeNames scopeNames)
+runRename :: [Ident] -> Rename a -> a
+runRename scope = flip evalState (M.fromList $ zip scope scope)
 
 -- |
 -- Creates a new renaming scope using the current as a basis. Used to backtrack
@@ -47,12 +47,16 @@ newScope x = get >>= lift . evalStateT x
 --
 updateScope :: Ident -> Rename Ident
 updateScope name = do
-  name' <- gets $ M.lookup name
-  name'' <- case name' of
-    Just _ -> Ident . (runIdent name ++) <$> lift freshName
+  scope <- get
+  name' <- case M.lookup name scope of
+    Just _ -> do
+      let newNames = map (\i -> Ident (runIdent name ++ "_" ++ show (i :: Int))) [1..]
+      let (Just newName) = find (\nn -> M.lookup nn scope == Nothing) newNames
+      modify $ M.insert newName newName
+      return newName
     Nothing -> return name
-  modify $ M.insert name name''
-  return name''
+  modify $ M.insert name name'
+  return name'
 
 -- |
 -- Finds the new name to use for an ident.
@@ -86,7 +90,7 @@ renameInModules = map go
   go :: Module -> Module
   go (Module mn decls exps) = Module mn (renameInDecl' (findDeclIdents decls) `map` decls) exps
   renameInDecl' :: [Ident] -> Declaration -> Declaration
-  renameInDecl' scope = evalSupply 1 . flip evalStateT (createScope scope) . renameInDecl True
+  renameInDecl' scope = runRename scope . renameInDecl True
 
 -- |
 -- Renames within a declaration. isTopLevel is used to determine whether the
