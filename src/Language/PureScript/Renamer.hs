@@ -168,11 +168,11 @@ renameInValue (Var (Qualified Nothing name)) =
 renameInValue (IfThenElse v1 v2 v3) =
   IfThenElse <$> renameInValue v1 <*> renameInValue v2 <*> renameInValue v3
 renameInValue (Case vs alts) =
-  Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
+  newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
 renameInValue (TypedValue check v ty) =
   TypedValue check <$> renameInValue v <*> pure ty
 renameInValue (Let ds v) =
-  Let <$> mapM (renameInDecl False) ds <*> renameInValue v
+  newScope $ Let <$> mapM (renameInDecl False) ds <*> renameInValue v
 renameInValue (TypeClassDictionaryConstructorApp name v) =
   TypeClassDictionaryConstructorApp name <$> renameInValue v
 renameInValue (PositionedValue pos v) =
@@ -184,7 +184,7 @@ renameInValue v = return v
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
 renameInCaseAlternative (CaseAlternative bs g v) =
-  newScope $ CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
+  CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
 
 -- |
 -- Renames within binders.
