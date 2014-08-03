@@ -158,8 +158,8 @@ renameInValue v = return v
 -- Renames within case alternatives.
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
-renameInCaseAlternative (CaseAlternative bs g v) =
-  CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
+renameInCaseAlternative (CaseAlternative bs g v) = 
+  newScope $ CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
 
 -- |
 -- Renames within binders.
