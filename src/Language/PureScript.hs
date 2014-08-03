@@ -31,6 +31,7 @@ import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Supply as P
+import Language.PureScript.Renamer as P
 
 import qualified Language.PureScript.Constants as C
 
@@ -76,8 +77,9 @@ compile' env opts ms = do
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
+  let renamed = renameInModules elim
   let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
-  let modulesToCodeGen = if null codeGenModules then elim else filter (\(Module mn _ _) -> mn `elem` codeGenModules) elim
+  let modulesToCodeGen = if null codeGenModules then renamed else filter (\(Module mn _ _) -> mn `elem` codeGenModules) renamed
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
