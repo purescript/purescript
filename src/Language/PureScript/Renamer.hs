@@ -39,7 +39,11 @@ runRename scope = flip evalState (M.fromList $ zip scope scope)
 -- when leaving an Abs.
 --
 newScope :: Rename a -> Rename a
-newScope x = get >>= lift . evalStateT x
+newScope x = do
+  scope <- get
+  a <- x
+  put scope
+  return a
 
 -- |
 -- Adds a new scope entry for an ident. If the ident is already present, a new
