@@ -76,6 +76,7 @@ library
                      Language.PureScript.Pretty.Kinds
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
+                     Language.PureScript.Renamer
                      Language.PureScript.TypeChecker
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad
