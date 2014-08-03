@@ -11,7 +11,7 @@ Please follow the following guidelines:
 - Run `purescript-test-everything` to make sure you haven't broken any core library builds.
 - Run `starter-kit` to make sure the starter kit has not been broken.
 
-If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) first.
+If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) to get started.
 
 Finally, if you have made code changes and would like to be included in the copyright notice in the cabal file, please include that change in your pull request.
 
