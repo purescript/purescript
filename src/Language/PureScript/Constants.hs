@@ -23,6 +23,9 @@ module Language.PureScript.Constants where
 (#) :: String
 (#) = "#"
 
+(<>) :: String
+(<>) = "<>"
+
 (++) :: String
 (++) = "++"
 
@@ -105,6 +108,9 @@ not = "not"
 return :: String
 return = "return"
 
+pure' :: String
+pure' = "pure"
+
 returnEscaped :: String
 returnEscaped = "$return"
 
@@ -152,6 +158,9 @@ runFn = "runFn"
 monadEffDictionary :: String
 monadEffDictionary = "monadEff"
 
+applicativeEffDictionary :: String
+applicativeEffDictionary = "applicativeEff"
+
 bindEffDictionary :: String
 bindEffDictionary = "bindEff"
 
@@ -178,6 +187,9 @@ boolLikeBoolean = "boolLikeBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
+
+semigroupoidArr :: String
+semigroupoidArr = "semigroupoidArr"
 
 -- Main module
 

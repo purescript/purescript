@@ -112,6 +112,7 @@ inlineCommonOperators = applyAll $
   , binary C.eqBoolean (C.==) EqualTo
   , binary C.eqBoolean (C./=) NotEqualTo
 
+  , binary C.semigroupString (C.<>) Add
   , binary C.semigroupString (C.++) Add
 
   , binaryFunction C.bitsNumber C.shl ShiftLeft
