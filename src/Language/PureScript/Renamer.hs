@@ -19,20 +19,39 @@ import Control.Applicative
 import Control.Monad.State
 
 import Data.List (find)
+
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 
-type Rename = State (M.Map Ident Ident)
+-- |
+-- The state object used in this module
+--
+data RenameState = RenameState {
+    -- |
+    -- A map from names bound (in the input) to their names (in the output)
+    --
+    rsBoundNames :: M.Map Ident Ident
+    -- |
+    -- The set of names which have been used and are in scope in the output
+    --
+  , rsUsedNames :: S.Set Ident
+  }
+
+type Rename = State RenameState
+
+initState :: [Ident] -> RenameState
+initState scope = RenameState (M.fromList (zip scope scope)) (S.fromList scope)
 
 -- |
 -- Runs renaming starting with a list of idents for the initial scope.
 --
 runRename :: [Ident] -> Rename a -> a
-runRename scope = flip evalState (M.fromList $ zip scope scope)
+runRename scope = flip evalState (initState scope)
 
 -- |
 -- Creates a new renaming scope using the current as a basis. Used to backtrack
@@ -52,14 +71,16 @@ newScope x = do
 updateScope :: Ident -> Rename Ident
 updateScope name = do
   scope <- get
-  name' <- case M.lookup name scope of
-    Just _ -> do
-      let newNames = map (\i -> Ident (runIdent name ++ "_" ++ show (i :: Int))) [1..]
-      let (Just newName) = find (\nn -> M.lookup nn scope == Nothing) newNames
-      modify $ M.insert newName newName
-      return newName
-    Nothing -> return name
-  modify $ M.insert name name'
+  let name' = case name `S.member` rsUsedNames scope of
+                True ->
+                  let
+                    newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
+                    Just newName = find (`S.notMember` rsUsedNames scope) newNames
+                  in newName
+                False -> name
+  modify $ \s -> s { rsBoundNames = M.insert name name' (rsBoundNames s)
+                   , rsUsedNames  = S.insert name' (rsUsedNames s)
+                   }
   return name'
 
 -- |
@@ -67,7 +88,7 @@ updateScope name = do
 --
 lookupIdent :: Ident -> Rename Ident
 lookupIdent name = do
-  name' <- gets $ M.lookup name
+  name' <- gets $ M.lookup name . rsBoundNames
   case name' of
     Just name'' -> return name''
     Nothing -> error $ "Rename scope is missing ident '" ++ show name ++ "'"
@@ -162,7 +183,7 @@ renameInValue v = return v
 -- Renames within case alternatives.
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
-renameInCaseAlternative (CaseAlternative bs g v) = 
+renameInCaseAlternative (CaseAlternative bs g v) =
   newScope $ CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
 
 -- |
