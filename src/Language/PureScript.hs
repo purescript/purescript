@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript (module P, compile, compile', MonadMake(..), make) where
+module Language.PureScript (module P, compile, compile', MonadMake(..), make, checkOnly) where
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
@@ -72,9 +72,9 @@ compile = compile' initEnvironment
 compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
 compile' env opts ms = do
   (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
-  (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
+  (desugared, nextVar) <- stringifyErrorStack (rendererFor opts) True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
-  regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  regrouped <- stringifyErrorStack (rendererFor opts) True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let entryPoints = moduleNameFromString `map` optionsModules opts
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let renamed = renameInModules elim
@@ -84,6 +84,24 @@ compile' env opts ms = do
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
   return (prettyPrintJS js', exts, env')
+  where
+  mainModuleIdent = moduleNameFromString <$> optionsMain opts
+
+-- |
+-- Stripped down version of the compile function
+--
+-- Stops once every errors has been found
+--
+checkOnly :: Options -> [Module] -> Either String String
+checkOnly = checkOnly' initEnvironment
+
+checkOnly' :: Environment -> Options -> [Module] -> Either String String
+checkOnly' env opts ms = do
+  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else map importPrelude ms
+  (desugared, _) <- stringifyErrorStack (rendererFor opts) True $ runSupplyT 0 $ desugar sorted
+  (elaborated, _) <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
+  _ <- stringifyErrorStack (rendererFor opts) True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  return "No errors found"
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
 
@@ -191,7 +209,7 @@ make outputDir opts ms = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  (desugared, nextVar) <- liftError $ stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
+  (desugared, nextVar) <- liftError $ stringifyErrorStack (rendererFor opts) True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
   evalSupplyT nextVar (go initEnvironment desugared)
 
@@ -211,7 +229,7 @@ make outputDir opts ms = do
 
     (Module _ elaborated _, env') <- lift . liftError . runCheck' opts env $ typeCheckModule Nothing m
 
-    regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- lift . liftError . stringifyErrorStack (rendererFor opts) True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
     let [renamed] = renameInModules [mod'] 

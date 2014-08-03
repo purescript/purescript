@@ -13,7 +13,10 @@
 --
 -----------------------------------------------------------------------------
 
+
 module Language.PureScript.Options where
+
+import Language.PureScript.DevTools.Renderers
 
 -- |
 -- The data type of compiler options
@@ -61,10 +64,17 @@ data Options = Options {
     -- Verbose error message
     --
   , optionsVerboseErrors :: Bool
+    -- |
+    -- Check for errors only
+  , optionsErrorCheck :: Bool
   } deriving Show
 
 -- |
 -- Default compiler options
 --
 defaultOptions :: Options
-defaultOptions = Options False False False False Nothing False Nothing [] [] False
+defaultOptions = Options False False False False Nothing False Nothing [] [] False False
+
+
+rendererFor :: Options -> Renderer
+rendererFor opts = if optionsErrorCheck opts then JSON else HumanReadable
