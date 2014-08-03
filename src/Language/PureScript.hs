@@ -214,8 +214,10 @@ make outputDir opts ms = do
     regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
-    js <- prettyPrintJS <$> moduleToJs CommonJS opts mod' env'
-    let exts = moduleToPs mod' env'
+    let [renamed] = renameInModules [mod'] 
+
+    js <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
+    let exts = moduleToPs renamed env'
 
     lift $ writeTextFile jsFile js
     lift $ writeTextFile externsFile exts
