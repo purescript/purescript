@@ -19,27 +19,50 @@ import Control.Applicative
 import Control.Monad.State
 
 import Data.List (find)
+
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 
-type Rename = State (M.Map Ident Ident)
+-- |
+-- The state object used in this module
+--
+data RenameState = RenameState {
+    -- |
+    -- A map from names bound (in the input) to their names (in the output)
+    --
+    rsBoundNames :: M.Map Ident Ident
+    -- |
+    -- The set of names which have been used and are in scope in the output
+    --
+  , rsUsedNames :: S.Set Ident
+  }
+
+type Rename = State RenameState
+
+initState :: [Ident] -> RenameState
+initState scope = RenameState (M.fromList (zip scope scope)) (S.fromList scope)
 
 -- |
 -- Runs renaming starting with a list of idents for the initial scope.
 --
 runRename :: [Ident] -> Rename a -> a
-runRename scope = flip evalState (M.fromList $ zip scope scope)
+runRename scope = flip evalState (initState scope)
 
 -- |
 -- Creates a new renaming scope using the current as a basis. Used to backtrack
 -- when leaving an Abs.
 --
 newScope :: Rename a -> Rename a
-newScope x = get >>= lift . evalStateT x
+newScope x = do
+  scope <- get
+  a <- x
+  put scope
+  return a
 
 -- |
 -- Adds a new scope entry for an ident. If the ident is already present, a new
@@ -48,14 +71,16 @@ newScope x = get >>= lift . evalStateT x
 updateScope :: Ident -> Rename Ident
 updateScope name = do
   scope <- get
-  name' <- case M.lookup name scope of
-    Just _ -> do
-      let newNames = map (\i -> Ident (runIdent name ++ "_" ++ show (i :: Int))) [1..]
-      let (Just newName) = find (\nn -> M.lookup nn scope == Nothing) newNames
-      modify $ M.insert newName newName
-      return newName
-    Nothing -> return name
-  modify $ M.insert name name'
+  let name' = case name `S.member` rsUsedNames scope of
+                True ->
+                  let
+                    newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
+                    Just newName = find (`S.notMember` rsUsedNames scope) newNames
+                  in newName
+                False -> name
+  modify $ \s -> s { rsBoundNames = M.insert name name' (rsBoundNames s)
+                   , rsUsedNames  = S.insert name' (rsUsedNames s)
+                   }
   return name'
 
 -- |
@@ -63,7 +88,7 @@ updateScope name = do
 --
 lookupIdent :: Ident -> Rename Ident
 lookupIdent name = do
-  name' <- gets $ M.lookup name
+  name' <- gets $ M.lookup name . rsBoundNames
   case name' of
     Just name'' -> return name''
     Nothing -> error $ "Rename scope is missing ident '" ++ show name ++ "'"
@@ -133,7 +158,7 @@ renameInValue (ObjectLiteral vs) =
 renameInValue (Accessor prop v) =
   Accessor prop <$> renameInValue v
 renameInValue (ObjectUpdate obj vs) =
-  ObjectUpdate obj <$> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
+  ObjectUpdate <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
 renameInValue (Abs (Left name) v) =
   newScope $ Abs . Left <$> updateScope name <*> renameInValue v
 renameInValue (App v1 v2) =
@@ -143,11 +168,11 @@ renameInValue (Var (Qualified Nothing name)) =
 renameInValue (IfThenElse v1 v2 v3) =
   IfThenElse <$> renameInValue v1 <*> renameInValue v2 <*> renameInValue v3
 renameInValue (Case vs alts) =
-  Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
+  newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
 renameInValue (TypedValue check v ty) =
   TypedValue check <$> renameInValue v <*> pure ty
 renameInValue (Let ds v) =
-  Let <$> mapM (renameInDecl False) ds <*> renameInValue v
+  newScope $ Let <$> mapM (renameInDecl False) ds <*> renameInValue v
 renameInValue (TypeClassDictionaryConstructorApp name v) =
   TypeClassDictionaryConstructorApp name <$> renameInValue v
 renameInValue (PositionedValue pos v) =
@@ -158,8 +183,8 @@ renameInValue v = return v
 -- Renames within case alternatives.
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
-renameInCaseAlternative (CaseAlternative bs g v) = 
-  newScope $ CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
+renameInCaseAlternative (CaseAlternative bs g v) =
+  CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
 
 -- |
 -- Renames within binders.
