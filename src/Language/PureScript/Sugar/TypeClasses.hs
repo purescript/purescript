@@ -261,7 +261,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
 
-  memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Value)
+  memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Expr)
   memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
     _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
@@ -271,7 +271,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
     return (ident, PositionedValue pos val)
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
-  typeInstanceDictionaryEntryValue :: Declaration -> Value
+  typeInstanceDictionaryEntryValue :: Declaration -> Expr
   typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] _ val) = val
   typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
   typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"

@@ -44,15 +44,15 @@ desugarDo d =
   prelude :: ModuleName
   prelude = ModuleName [ProperName C.prelude]
 
-  bind :: Value
+  bind :: Expr
   bind = Var (Qualified (Just prelude) (Op (C.>>=)))
 
-  replace :: Value -> SupplyT (Either ErrorStack) Value
+  replace :: Expr -> SupplyT (Either ErrorStack) Expr
   replace (Do els) = go els
   replace (PositionedValue pos v) = PositionedValue pos <$> rethrowWithPosition pos (replace v)
   replace other = return other
 
-  go :: [DoNotationElement] -> SupplyT (Either ErrorStack) Value
+  go :: [DoNotationElement] -> SupplyT (Either ErrorStack) Expr
   go [] = error "The impossible happened in desugarDo"
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do

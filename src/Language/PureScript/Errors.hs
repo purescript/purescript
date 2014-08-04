@@ -30,9 +30,9 @@ import Language.PureScript.Types
 --
 data ErrorSource
   -- |
-  -- An error which originated at a Value
+  -- An error which originated at a Expr
   --
-  = ValueError Value
+  = ExprError Expr
   -- |
   -- An error which originated at a Type
   --
@@ -89,7 +89,7 @@ isErrorNonEmpty = not . null . compileErrorMessage
 
 showError :: CompileError -> String
 showError (CompileError msg Nothing _) = msg
-showError (CompileError msg (Just (ValueError val)) _) = "Error in value " ++ prettyPrintValue val ++ ":\n" ++ msg
+showError (CompileError msg (Just (ExprError val)) _) = "Error in expression " ++ prettyPrintValue val ++ ":\n" ++ msg
 showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ":\n" ++ msg
 
 mkErrorStack :: String -> Maybe ErrorSource -> ErrorStack

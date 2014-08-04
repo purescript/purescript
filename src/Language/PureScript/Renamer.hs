@@ -132,11 +132,11 @@ renameInDecl isTopLevel (BindingGroupDeclaration ds) = do
   ds' <- mapM updateNames ds
   BindingGroupDeclaration <$> mapM updateValues ds'
   where
-  updateNames :: (Ident, NameKind, Value) -> Rename (Ident, NameKind, Value)
+  updateNames :: (Ident, NameKind, Expr) -> Rename (Ident, NameKind, Expr)
   updateNames (name, nameKind, val) = do
     name' <- if isTopLevel then return name else updateScope name
     return (name', nameKind, val)
-  updateValues :: (Ident, NameKind, Value) -> Rename (Ident, NameKind, Value)
+  updateValues :: (Ident, NameKind, Expr) -> Rename (Ident, NameKind, Expr)
   updateValues (name, nameKind, val) =
     (,,) name nameKind <$> renameInValue val
 renameInDecl _ (TypeInstanceDeclaration name cs className args ds) =
@@ -148,7 +148,7 @@ renameInDecl _ other = return other
 -- |
 -- Renames within a value.
 --
-renameInValue :: Value -> Rename Value
+renameInValue :: Expr -> Rename Expr
 renameInValue (UnaryMinus v) =
   UnaryMinus <$> renameInValue v
 renameInValue (ArrayLiteral vs) =

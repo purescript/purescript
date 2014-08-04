@@ -230,26 +230,26 @@ parseModules = whiteSpace *> mark (P.many (same *> parseModule)) <* P.eof
 booleanLiteral :: P.Parsec String ParseState Bool
 booleanLiteral = (C.reserved "true" >> return True) P.<|> (C.reserved "false" >> return False)
 
-parseNumericLiteral :: P.Parsec String ParseState Value
+parseNumericLiteral :: P.Parsec String ParseState Expr
 parseNumericLiteral = NumericLiteral <$> C.integerOrFloat
 
-parseStringLiteral :: P.Parsec String ParseState Value
+parseStringLiteral :: P.Parsec String ParseState Expr
 parseStringLiteral = StringLiteral <$> C.stringLiteral
 
-parseBooleanLiteral :: P.Parsec String ParseState Value
+parseBooleanLiteral :: P.Parsec String ParseState Expr
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
-parseArrayLiteral :: P.Parsec String ParseState Value
+parseArrayLiteral :: P.Parsec String ParseState Expr
 parseArrayLiteral = ArrayLiteral <$> C.squares (C.commaSep parseValue)
 
-parseObjectLiteral :: P.Parsec String ParseState Value
+parseObjectLiteral :: P.Parsec String ParseState Expr
 parseObjectLiteral = ObjectLiteral <$> C.braces (C.commaSep parseIdentifierAndValue)
 
-parseIdentifierAndValue :: P.Parsec String ParseState (String, Value)
+parseIdentifierAndValue :: P.Parsec String ParseState (String, Expr)
 parseIdentifierAndValue = (,) <$> (C.indented *> (C.identifier <|> C.stringLiteral) <* C.indented <* C.colon)
                               <*> (C.indented *> parseValue)
 
-parseAbs :: P.Parsec String ParseState Value
+parseAbs :: P.Parsec String ParseState Expr
 parseAbs = do
   C.reservedOp "\\"
   args <- P.many1 (C.indented *> (Abs <$> (Left <$> P.try C.parseIdent <|> Right <$> parseBinderNoParens)))
@@ -257,16 +257,16 @@ parseAbs = do
   value <- parseValue
   return $ toFunction args value
   where
-  toFunction :: [Value -> Value] -> Value -> Value
+  toFunction :: [Expr -> Expr] -> Expr -> Expr
   toFunction args value = foldr ($) value args
 
-parseVar :: P.Parsec String ParseState Value
+parseVar :: P.Parsec String ParseState Expr
 parseVar = Var <$> C.parseQualified C.parseIdent
 
-parseConstructor :: P.Parsec String ParseState Value
+parseConstructor :: P.Parsec String ParseState Expr
 parseConstructor = Constructor <$> C.parseQualified C.properName
 
-parseCase :: P.Parsec String ParseState Value
+parseCase :: P.Parsec String ParseState Expr
 parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.reserved "of") (return <$> parseValue)
                  <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
 
@@ -276,12 +276,12 @@ parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
                                        <*> (C.indented *> C.reservedOp "->" *> parseValue)
                                        P.<?> "case alternative"
 
-parseIfThenElse :: P.Parsec String ParseState Value
+parseIfThenElse :: P.Parsec String ParseState Expr
 parseIfThenElse = IfThenElse <$> (P.try (C.reserved "if") *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "then" *> C.indented *> parseValue)
                              <*> (C.indented *> C.reserved "else" *> C.indented *> parseValue)
 
-parseLet :: P.Parsec String ParseState Value
+parseLet :: P.Parsec String ParseState Expr
 parseLet = do
   C.reserved "let"
   C.indented
@@ -291,7 +291,7 @@ parseLet = do
   result <- parseValue
   return $ Let ds result
 
-parseValueAtom :: P.Parsec String ParseState Value
+parseValueAtom :: P.Parsec String ParseState Expr
 parseValueAtom = P.choice
             [ P.try parseNumericLiteral
             , P.try parseStringLiteral
@@ -307,18 +307,18 @@ parseValueAtom = P.choice
             , parseLet
             , Parens <$> C.parens parseValue ]
 
-parsePropertyUpdate :: P.Parsec String ParseState (String, Value)
+parsePropertyUpdate :: P.Parsec String ParseState (String, Expr)
 parsePropertyUpdate = do
   name <- C.lexeme (C.identifier <|> C.stringLiteral)
   _ <- C.lexeme $ C.indented *> P.char '='
   value <- C.indented *> parseValue
   return (name, value)
 
-parseAccessor :: Value -> P.Parsec String ParseState Value
+parseAccessor :: Expr -> P.Parsec String ParseState Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
 parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> (C.identifier <|> C.stringLiteral)) <*> pure obj
 
-parseDo :: P.Parsec String ParseState Value
+parseDo :: P.Parsec String ParseState Expr
 parseDo = do
   C.reserved "do"
   C.indented
@@ -339,7 +339,7 @@ parseDoNotationElement = P.choice
 -- |
 -- Parse a value
 --
-parseValue :: P.Parsec String ParseState Value
+parseValue :: P.Parsec String ParseState Expr
 parseValue = PositionedValue <$> sourcePos <*>
   (P.buildExpressionParser operators
    . C.buildPostfixParser postfixTable2

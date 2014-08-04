@@ -85,7 +85,7 @@ collapseBindingGroups = let (f, _, _) = everywhereOnValues id collapseBindingGro
   go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
   go other = [other]
 
-collapseBindingGroupsForValue :: Value -> Value
+collapseBindingGroupsForValue :: Expr -> Expr
 collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
@@ -94,7 +94,7 @@ usedIdents moduleName =
   let (f, _, _, _, _) = everythingOnValues (++) (const []) usedNames (const []) (const []) (const [])
   in nub . f
   where
-  usedNames :: Value -> [Ident]
+  usedNames :: Expr -> [Ident]
   usedNames (Var (Qualified Nothing name)) = [name]
   usedNames (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   usedNames _ = []
@@ -142,7 +142,7 @@ isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
 isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
-fromValueDecl :: Declaration -> (Ident, NameKind, Value)
+fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
 fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d

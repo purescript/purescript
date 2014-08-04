@@ -45,7 +45,7 @@ desugarAbs = mapM f
   where
   (f, _, _) = everywhereOnValuesM return replace return
 
-  replace :: Value -> SupplyT (Either ErrorStack) Value
+  replace :: Expr -> SupplyT (Either ErrorStack) Expr
   replace (Abs (Right binder) val) = do
     ident <- Ident <$> freshName
     return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing val]
@@ -98,12 +98,12 @@ isVarBinder :: Binder -> Bool
 isVarBinder (VarBinder _) = True
 isVarBinder _ = False
 
-toTuple :: Declaration -> ([Binder], (Maybe Guard, Value))
+toTuple :: Declaration -> ([Binder], (Maybe Guard, Expr))
 toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
 toTuple (PositionedDeclaration _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Value))] -> SupplyT (Either ErrorStack) Declaration
+makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Expr))] -> SupplyT (Either ErrorStack) Declaration
 makeCaseDeclaration ident alternatives = do
   let argPattern = length . fst . head $ alternatives
   args <- map Ident <$> replicateM argPattern freshName

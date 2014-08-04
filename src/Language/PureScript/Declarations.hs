@@ -154,11 +154,11 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder] (Maybe Guard) Value
+  | ValueDeclaration Ident NameKind [Binder] (Maybe Guard) Expr
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration [(Ident, NameKind, Value)]
+  | BindingGroupDeclaration [(Ident, NameKind, Expr)]
   -- |
   -- A foreign import declaration (type, name, optional inline Javascript, type)
   --
@@ -264,12 +264,12 @@ isTypeClassDeclaration _ = False
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
 --
-type Guard = Value
+type Guard = Expr
 
 -- |
--- Data type for values
+-- Data type for expressions and terms
 --
-data Value
+data Expr
   -- |
   -- A numeric literal
   --
@@ -285,41 +285,41 @@ data Value
   -- |
   -- A prefix -, will be desugared
   --
-  | UnaryMinus Value
+  | UnaryMinus Expr
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | BinaryNoParens (Qualified Ident) Value Value
+  | BinaryNoParens (Qualified Ident) Expr Expr
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | Parens Value
+  | Parens Expr
   -- |
   -- An array literal
   --
-  | ArrayLiteral [Value]
+  | ArrayLiteral [Expr]
   -- |
   -- An object literal
   --
-  | ObjectLiteral [(String, Value)]
+  | ObjectLiteral [(String, Expr)]
   -- |
   -- An record property accessor expression
   --
-  | Accessor String Value
+  | Accessor String Expr
   -- |
   -- Partial record update
   --
-  | ObjectUpdate Value [(String, Value)]
+  | ObjectUpdate Expr [(String, Expr)]
   -- |
   -- Function introduction
   --
-  | Abs (Either Ident Binder) Value
+  | Abs (Either Ident Binder) Expr
   -- |
   -- Function application
   --
-  | App Value Value
+  | App Expr Expr
   -- |
   -- Variable
   --
@@ -327,7 +327,7 @@ data Value
   -- |
   -- Conditional (if-then-else expression)
   --
-  | IfThenElse Value Value Value
+  | IfThenElse Expr Expr Expr
   -- |
   -- A data constructor
   --
@@ -336,15 +336,15 @@ data Value
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
   --
-  | Case [Value] [CaseAlternative]
+  | Case [Expr] [CaseAlternative]
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Bool Value Type
+  | TypedValue Bool Expr Type
   -- |
   -- A let binding
   --
-  | Let [Declaration] Value
+  | Let [Declaration] Expr
   -- |
   -- A do-notation block
   --
@@ -353,7 +353,7 @@ data Value
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified ProperName) Value
+  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
@@ -369,7 +369,7 @@ data Value
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourcePos Value deriving (Show, D.Data, D.Typeable)
+  | PositionedValue SourcePos Expr deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- An alternative in a case statement
@@ -386,7 +386,7 @@ data CaseAlternative = CaseAlternative
     -- |
     -- The result expression
     --
-  , caseAlternativeResult :: Value
+  , caseAlternativeResult :: Expr
   } deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -403,11 +403,11 @@ data DoNotationElement
   -- |
   -- A monadic value without a binder
   --
-  = DoNotationValue Value
+  = DoNotationValue Expr
   -- |
   -- A monadic value with a binder
   --
-  | DoNotationBind Binder Value
+  | DoNotationBind Binder Expr
   -- |
   -- A let statement, i.e. a pure value with a binder
   --
@@ -486,9 +486,9 @@ binderNames = go []
 --
 
 everywhereOnValues :: (Declaration -> Declaration) ->
-                      (Value -> Value) ->
+                      (Expr -> Expr) ->
                       (Binder -> Binder) ->
-                      (Declaration -> Declaration, Value -> Value, Binder -> Binder)
+                      (Declaration -> Declaration, Expr -> Expr, Binder -> Binder)
 everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
@@ -500,7 +500,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (PositionedDeclaration pos d) = f (PositionedDeclaration pos (f' d))
   f' other = f other
 
-  g' :: Value -> Value
+  g' :: Expr -> Expr
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens op (g' v1) (g' v2))
   g' (Parens v) = g (Parens (g' v))
@@ -544,9 +544,9 @@ everywhereOnValues f g h = (f', g', h')
 
 everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
   (Declaration -> m Declaration) ->
-  (Value -> m Value) ->
+  (Expr -> m Expr) ->
   (Binder -> m Binder) ->
-  (Declaration -> m Declaration, Value -> m Value, Binder -> m Binder)
+  (Declaration -> m Declaration, Expr -> m Expr, Binder -> m Binder)
 everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
   f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> mapM (f' <=< f) ds
@@ -594,9 +594,9 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
 everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
   (Declaration -> m Declaration) ->
-  (Value -> m Value) ->
+  (Expr -> m Expr) ->
   (Binder -> m Binder) ->
-  (Declaration -> m Declaration, Value -> m Value, Binder -> m Binder)
+  (Declaration -> m Declaration, Expr -> m Expr, Binder -> m Binder)
 everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> mapM f' ds) >>= f
@@ -644,11 +644,11 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
 everythingOnValues :: (r -> r -> r) ->
                       (Declaration -> r) ->
-                      (Value -> r) ->
+                      (Expr -> r) ->
                       (Binder -> r) ->
                       (CaseAlternative -> r) ->
                       (DoNotationElement -> r) ->
-                      (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+                      (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   where
   f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
@@ -700,12 +700,12 @@ everythingWithContextOnValues ::
   r ->
   (r -> r -> r) ->
   (s -> Declaration       -> (s, r)) ->
-  (s -> Value             -> (s, r)) ->
+  (s -> Expr             -> (s, r)) ->
   (s -> Binder            -> (s, r)) ->
   (s -> CaseAlternative   -> (s, r)) ->
   (s -> DoNotationElement -> (s, r)) ->
   ( Declaration       -> r
-  , Value             -> r
+  , Expr             -> r
   , Binder            -> r
   , CaseAlternative   -> r
   , DoNotationElement -> r)
@@ -767,12 +767,12 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 everywhereWithContextOnValuesM :: (Functor m, Applicative m, Monad m) =>
   s ->
   (s -> Declaration       -> m (s, Declaration)) ->
-  (s -> Value             -> m (s, Value)) ->
+  (s -> Expr             -> m (s, Expr)) ->
   (s -> Binder            -> m (s, Binder)) ->
   (s -> CaseAlternative   -> m (s, CaseAlternative)) ->
   (s -> DoNotationElement -> m (s, DoNotationElement)) ->
   ( Declaration       -> m Declaration
-  , Value             -> m Value
+  , Expr             -> m Expr
   , Binder            -> m Binder
   , CaseAlternative   -> m CaseAlternative
   , DoNotationElement -> m DoNotationElement)
@@ -829,7 +829,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   j' s (DoNotationLet ds) = DoNotationLet <$> mapM (f'' s) ds
   j' s (PositionedDoNotationElement pos e1) = PositionedDoNotationElement pos <$> j'' s e1
 
-accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Value -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
