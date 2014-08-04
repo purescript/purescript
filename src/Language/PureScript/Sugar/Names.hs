@@ -421,6 +421,7 @@ resolveImport currentModule importModule exps imps impQual =
       checkTypeRef (TypeRef _ Nothing) acc (TypeRef _ (Just _)) = acc
       checkTypeRef (TypeRef name (Just dctor)) _ (TypeRef name' (Just dctor')) = name == name' && dctor == dctor'
       checkTypeRef (TypeRef name _) _ (TypeRef name' Nothing) = name == name'
+      checkTypeRef (PositionedDeclarationRef _ r) acc hiddenRef = checkTypeRef r acc hiddenRef
       checkTypeRef _ acc _ = acc
     in foldl (checkTypeRef ref) False hidden
   isHidden hidden ref = ref `elem` hidden
@@ -449,7 +450,7 @@ resolveImport currentModule importModule exps imps impQual =
     return $ imp { importedTypeClasses = typeClasses' }
   importExplicit _ _ = error "Invalid argument to importExplicit"
 
-  -- Check if DeclarationRef points to a existent symbol
+  -- Check if DeclarationRef points to an existent symbol
   checkedRefs :: [DeclarationRef] -> Either ErrorStack [DeclarationRef]
   checkedRefs refs = mapM check refs
     where
@@ -478,7 +479,7 @@ resolveImport currentModule importModule exps imps impQual =
     Just x@(Qualified (Just mn) _) -> throwError $ mkErrorStack err Nothing
       where
       err = if mn == currentModule || importModule == currentModule
-            then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just importModule) name) ++ "'"
+            then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just mn) name) ++ "'"
             else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just importModule) name) ++ "'"
 
   -- The available values, types, and classes in the module being imported
