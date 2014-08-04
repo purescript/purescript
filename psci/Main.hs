@@ -264,7 +264,7 @@ createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
 createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
-    importDecl m = P.ImportDeclaration m Nothing Nothing
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
