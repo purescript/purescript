@@ -125,13 +125,13 @@ parseImportDeclaration = do
     moduleName' <- moduleName
     stdImportHiding moduleName' <|> stdImportQualifying moduleName'
     where
-    stdImportHiding moduleName' = do
+    stdImportHiding mn = do
       reserved "hiding"
       declType <- importDeclarationType Hiding
-      return $ ImportDeclaration moduleName' declType Nothing
-    stdImportQualifying moduleName' = do
+      return $ ImportDeclaration mn declType Nothing
+    stdImportQualifying mn = do
       declType <- importDeclarationType Qualifying
-      return $ ImportDeclaration moduleName' declType Nothing
+      return $ ImportDeclaration mn declType Nothing
   qualImport = do
     reserved "qualified"
     indented
