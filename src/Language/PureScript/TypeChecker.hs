@@ -188,7 +188,7 @@ typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = d
   env <- getEnv
   guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
   return $ d : ds
-typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _ _) : rest) = do
+typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) : rest) = do
   tcds <- getTypeClassDictionaries
   let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn) tcds
   addTypeClassDictionaries [ tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }

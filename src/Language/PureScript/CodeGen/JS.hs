@@ -78,7 +78,7 @@ importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleB
     Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
 imports :: Declaration -> [ModuleName]
-imports (ImportDeclaration mn _ _ _) = [mn]
+imports (ImportDeclaration mn _ _) = [mn]
 imports other =
   let (f, _, _, _, _) = everythingOnValues (++) (const []) collectV collectB (const []) (const [])
   in f other

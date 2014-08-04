@@ -43,7 +43,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
   where
 
     declToPs :: Declaration -> Writer [String] ()
-    declToPs (ImportDeclaration mn _ _ _) = tell ["import " ++ show mn ++ " ()"]
+    declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
     declToPs (FixityDeclaration (Fixity assoc prec) ident) =
       tell [ unwords [ show assoc, show prec, ident ] ]
     declToPs (PositionedDeclaration _ d) = declToPs d
