@@ -246,7 +246,7 @@ createTemporaryModule :: Bool -> PSCiState -> P.Value -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} value =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
-    importDecl m = P.ImportDeclaration m Nothing Nothing
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     itValue = foldl (\x f -> f x) value lets
@@ -264,7 +264,7 @@ createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
 createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   let
     moduleName = P.ModuleName [P.ProperName "Main"]
-    importDecl m = P.ImportDeclaration m Nothing Nothing
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing

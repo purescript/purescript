@@ -250,7 +250,7 @@ reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module mn (ImportDeclaration toImport Nothing Nothing : decls) exps
+  else Module mn (ImportDeclaration toImport Unqualified Nothing : decls) exps
   where
   isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ d) = isExistingImport d

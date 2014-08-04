@@ -114,6 +114,24 @@ instance Eq DeclarationRef where
   _ == _ = False
 
 -- |
+-- The data type which specifies type of import declaration
+--
+data ImportDeclarationType
+  -- |
+  -- Unqualified import
+  --
+  = Unqualified
+  -- |
+  -- Qualified import with a list of references to import
+  --
+  | Qualifying [DeclarationRef]
+  -- |
+  -- Import with hiding clause with a list of references to hide
+  --
+  | Hiding [DeclarationRef]
+  deriving (Show, D.Data, D.Typeable)
+
+-- |
 -- The data type of declarations
 --
 data Declaration
@@ -158,10 +176,10 @@ data Declaration
   --
   | FixityDeclaration Fixity String
   -- |
-  -- A module import (module name, optional set of identifiers to import, optional "qualified as"
-  -- name)
+  -- A module import (module name, optional set of identifiers to import,
+  -- optional set of identifiers to hide, optional "qualified as" name)
   --
-  | ImportDeclaration ModuleName (Maybe [DeclarationRef]) (Maybe ModuleName)
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --

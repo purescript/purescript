@@ -360,18 +360,13 @@ filterExports mn exps env = do
   filterValues _ result _ = return result
 
 -- |
--- Type representing a set of declarations being explicitly imported from a module
---
-type ExplicitImports = [DeclarationRef]
-
--- |
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
+findImports :: [Declaration] -> M.Map ModuleName (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)
 findImports = foldl (findImports' Nothing) M.empty
   where
-  findImports' pos result (ImportDeclaration mn expl qual) = M.insert mn (pos, expl, qual) result
+  findImports' pos result (ImportDeclaration mn typ qual) = M.insert mn (pos, typ, qual) result
   findImports' _ result (PositionedDeclaration pos d) = findImports' (Just pos) result d
   findImports' _ result _ = result
 
@@ -386,13 +381,13 @@ resolveImports env (Module currentModule decls _) =
   -- A Map from module name to the source position for the import, the list of imports from that
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
-  scope :: M.Map ModuleName (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)
-  scope = M.insert currentModule (Nothing, Nothing, Nothing) (findImports decls)
+  scope :: M.Map ModuleName (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)
+  scope = M.insert currentModule (Nothing, Unqualified, Nothing) (findImports decls)
 
-  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, Maybe ExplicitImports, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
-  resolveImport' imp (mn, (pos, explImports, impQual)) = do
+  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
+  resolveImport' imp (mn, (pos, typ, impQual)) = do
     modExports <- positioned $ maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
-    positioned $ resolveImport currentModule mn modExports imp impQual explImports
+    positioned $ resolveImport currentModule mn modExports imp impQual typ
     where
     positioned err = case pos of
       Nothing -> err
@@ -401,36 +396,76 @@ resolveImports env (Module currentModule decls _) =
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
 --
-resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> Maybe ExplicitImports-> Either ErrorStack ImportEnvironment
-resolveImport currentModule importModule exps imps impQual = maybe importAll (foldM importExplicit imps)
+resolveImport :: ModuleName -> ModuleName -> Exports -> ImportEnvironment -> Maybe ModuleName -> ImportDeclarationType -> Either ErrorStack ImportEnvironment
+resolveImport currentModule importModule exps imps impQual =
+  resolveByType
   where
 
-  -- Import everything from a module
-  importAll :: Either ErrorStack ImportEnvironment
-  importAll = do
-    imp' <- foldM (\m (name, dctors) -> importExplicit m (TypeRef name (Just dctors))) imps (exportedTypes exps)
-    imp'' <- foldM (\m name -> importExplicit m (ValueRef name)) imp' (exportedValues exps)
-    foldM (\m name -> importExplicit m (TypeClassRef name)) imp'' (exportedTypeClasses exps)
+  resolveByType :: ImportDeclarationType -> Either ErrorStack ImportEnvironment
+  resolveByType Unqualified = importAll importExplicit
+  resolveByType (Qualifying explImports) = (checkedRefs >=> foldM importExplicit imps) explImports
+  resolveByType (Hiding hiddenImports) = do
+    hiddenImports' <- checkedRefs hiddenImports
+    importAll (importNonHidden hiddenImports')
+
+  importNonHidden :: [DeclarationRef] -> ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
+  importNonHidden hidden m ref =
+    if isHidden hidden ref
+    then return m
+    else importExplicit m ref
+
+  isHidden :: [DeclarationRef] -> DeclarationRef -> Bool
+  isHidden hidden ref@(TypeRef _ _) =
+    let
+      checkTypeRef _ True _ = True
+      checkTypeRef (TypeRef _ Nothing) acc (TypeRef _ (Just _)) = acc
+      checkTypeRef (TypeRef name (Just dctor)) _ (TypeRef name' (Just dctor')) = name == name' && dctor == dctor'
+      checkTypeRef (TypeRef name _) _ (TypeRef name' Nothing) = name == name'
+      checkTypeRef (PositionedDeclarationRef _ r) acc hiddenRef = checkTypeRef r acc hiddenRef
+      checkTypeRef _ acc _ = acc
+    in foldl (checkTypeRef ref) False hidden
+  isHidden hidden ref = ref `elem` hidden
+
+  -- Import all symbols
+  importAll :: (ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment) -> Either ErrorStack ImportEnvironment
+  importAll importer = do
+    imp' <- foldM (\m (name, dctors) -> importer m (TypeRef name (Just dctors))) imps (exportedTypes exps)
+    imp'' <- foldM (\m name -> importer m (ValueRef name)) imp' (exportedValues exps)
+    foldM (\m name -> importer m (TypeClassRef name)) imp'' (exportedTypeClasses exps)
 
   -- Import something explicitly
   importExplicit :: ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
   importExplicit imp (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ importExplicit imp r
   importExplicit imp (ValueRef name) = do
-    _ <- checkImportExists "value" values name
     values' <- updateImports (importedValues imp) name
     return $ imp { importedValues = values' }
   importExplicit imp (TypeRef name dctors) = do
-    _ <- checkImportExists "type" availableTypes name
     types' <- updateImports (importedTypes imp) name
     let allDctors = allExportedDataConstructors name
     dctors' <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
     dctors'' <- foldM updateImports (importedDataConstructors imp) dctors'
     return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
   importExplicit imp (TypeClassRef name) = do
-    _ <- checkImportExists "type class" classes name
     typeClasses' <- updateImports (importedTypeClasses imp) name
     return $ imp { importedTypeClasses = typeClasses' }
   importExplicit _ _ = error "Invalid argument to importExplicit"
+
+  -- Check if DeclarationRef points to an existent symbol
+  checkedRefs :: [DeclarationRef] -> Either ErrorStack [DeclarationRef]
+  checkedRefs refs = mapM check refs
+    where
+    check (PositionedDeclarationRef pos r) = do
+      rethrowWithPosition pos $ check r
+    check ref@(ValueRef name) =
+      checkImportExists "value" values name >> return ref
+    check ref@(TypeRef name dctors) = do
+      _ <- checkImportExists "type" availableTypes name
+      let allDctors = allExportedDataConstructors name
+      _ <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
+      return ref
+    check ref@(TypeClassRef name) =
+      checkImportExists "type class" classes name >> return ref
+    check _ = error "Invalid argument to checkRefIsValid"
 
   -- Find all exported data constructors for a given type
   allExportedDataConstructors :: ProperName -> [ProperName]
@@ -444,7 +479,7 @@ resolveImport currentModule importModule exps imps impQual = maybe importAll (fo
     Just x@(Qualified (Just mn) _) -> throwError $ mkErrorStack err Nothing
       where
       err = if mn == currentModule || importModule == currentModule
-            then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just importModule) name) ++ "'"
+            then "Definition '" ++ show name ++ "' conflicts with import '" ++ show (Qualified (Just mn) name) ++ "'"
             else "Conflicting imports for '" ++ show name ++ "': '" ++ show x ++ "', '" ++ show (Qualified (Just importModule) name) ++ "'"
 
   -- The available values, types, and classes in the module being imported
