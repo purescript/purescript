@@ -198,7 +198,7 @@ renameInModule imports exports (Module mn decls exps) =
     (,) (pos, name : bound) <$> (ExternDeclaration fit name js <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
 
-  updateValue :: (Maybe SourcePos, [Ident]) -> Value -> Either ErrorStack ((Maybe SourcePos, [Ident]), Value)
+  updateValue :: (Maybe SourcePos, [Ident]) -> Expr -> Either ErrorStack ((Maybe SourcePos, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
   updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
   updateValue (pos, bound) (Let ds val') =

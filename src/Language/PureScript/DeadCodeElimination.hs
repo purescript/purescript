@@ -79,7 +79,7 @@ dependencies moduleName =
   let (f, _, _, _, _) = everythingOnValues (++) (const []) values (const []) (const []) (const [])
   in nub . f
   where
-  values :: Value -> [Key]
+  values :: Expr -> [Key]
   values (Var ident) = let (mn, name) = qualify moduleName ident in [(mn, Left name)]
   values (Constructor (Qualified (Just mn) name)) = [(mn, Right name)]
   values (Constructor (Qualified Nothing _)) = error "Found unqualified data constructor"

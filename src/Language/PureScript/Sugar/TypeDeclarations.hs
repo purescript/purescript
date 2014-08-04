@@ -49,7 +49,7 @@ desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   (_, nameKind, val) <- fromValueDeclaration d
   desugarTypeDeclarations (ValueDeclaration name nameKind [] Nothing (TypedValue True val ty) : rest)
   where
-  fromValueDeclaration :: Declaration -> Either ErrorStack (Ident, NameKind, Value)
+  fromValueDeclaration :: Declaration -> Either ErrorStack (Ident, NameKind, Expr)
   fromValueDeclaration (ValueDeclaration name' nameKind [] Nothing val) | name == name' = return (name', nameKind, val)
   fromValueDeclaration (PositionedDeclaration pos d') = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'

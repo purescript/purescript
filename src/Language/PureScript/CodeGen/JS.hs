@@ -83,7 +83,7 @@ imports other =
   let (f, _, _, _, _) = everythingOnValues (++) (const []) collectV collectB (const []) (const [])
   in f other
   where
-  collectV :: Value -> [ModuleName]
+  collectV :: Expr -> [ModuleName]
   collectV (Var (Qualified (Just mn) _)) = [mn]
   collectV (Constructor (Qualified (Just mn) _)) = [mn]
   collectV (TypeClassDictionaryConstructorApp (Qualified (Just mn) _) _) = [mn]
@@ -190,7 +190,7 @@ accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a value or expression.
 --
-valueToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> Value -> SupplyT m JS
+valueToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> Expr -> SupplyT m JS
 valueToJs _ _ _ (NumericLiteral n) = return $ JSNumericLiteral n
 valueToJs _ _ _ (StringLiteral s) = return $ JSStringLiteral s
 valueToJs _ _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
@@ -221,7 +221,7 @@ valueToJs opts m e v@App{} = do
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m (Ident . runProperName) name) args'
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m e f
   where
-  unApp :: Value -> [Value] -> (Value, [Value])
+  unApp :: Expr -> [Expr] -> (Expr, [Expr])
   unApp (App val arg) args = unApp val (arg : args)
   unApp (PositionedValue _ val) args = unApp val args
   unApp (TypedValue _ val _) args = unApp val args

@@ -168,7 +168,7 @@ unifyRows r1 r2 =
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Value)] -> Check [(Ident, (Value, Type))]
+typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
 typesOf mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
     (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
@@ -194,7 +194,7 @@ typesOf mainModuleName moduleName vals = do
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
 
-typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Value)] -> UnifyT Type Check ([(Ident, (Value, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility), [(Ident, Type)])
+typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Expr)] -> UnifyT Type Check ([(Ident, (Expr, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility), [(Ident, Type)])
 typeDictionaryForBindingGroup moduleName vals = do
   let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
@@ -215,7 +215,7 @@ typeDictionaryForBindingGroup moduleName vals = do
     dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable, Undefined))) $ typedDict ++ untypedDict)
   return (es, dict, untypedDict)
 
-typeForBindingGroupElement :: ModuleName -> (Ident, (Value, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Value, Type))
+typeForBindingGroupElement :: ModuleName -> (Ident, (Expr, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Expr, Type))
 typeForBindingGroupElement moduleName el dict untypedDict =
   -- If the declaration is a function, it has access to other values in the binding group.
   -- If not, the generated code might fail at runtime since those values might be undefined.
@@ -241,17 +241,17 @@ typeForBindingGroupElement moduleName el dict untypedDict =
 -- |
 -- Check if a value contains a type annotation
 --
-isTyped :: (Ident, Value) -> (Ident, (Value, Maybe (Type, Bool)))
+isTyped :: (Ident, Expr) -> (Ident, (Expr, Maybe (Type, Bool)))
 isTyped (name, TypedValue checkType value ty) = (name, (value, Just (ty, checkType)))
 isTyped (name, value) = (name, (value, Nothing))
 
 -- |
 -- Map a function over type annotations appearing inside a value
 --
-overTypes :: (Type -> Type) -> Value -> Value
+overTypes :: (Type -> Type) -> Expr -> Expr
 overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
-  g :: Value -> Value
+  g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
   g (TypeClassDictionary b (nm, tys) sco) = TypeClassDictionary b (nm, map f tys) sco
   g other = other
@@ -259,7 +259,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 -- |
 -- Replace type class dictionary placeholders with inferred type class dictionaries
 --
-replaceTypeClassDictionaries :: ModuleName -> Value -> Check Value
+replaceTypeClassDictionaries :: ModuleName -> Expr -> Check Expr
 replaceTypeClassDictionaries mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
@@ -296,7 +296,7 @@ data DictionaryValue
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Value
+entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Expr
 entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
@@ -354,8 +354,8 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  mkDictionary fnName Nothing = LocalDictionaryValue fnName
 	  mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
 	  mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
-	  -- Turn a DictionaryValue into a Value
-	  dictionaryValueToValue :: DictionaryValue -> Value
+	  -- Turn a DictionaryValue into a Expr
+	  dictionaryValueToValue :: DictionaryValue -> Expr
 	  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
 	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) (ObjectLiteral [])
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
@@ -434,7 +434,7 @@ typeHeadsAreEqual _ _ _ _ = Nothing
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: Value -> Check ()
+skolemEscapeCheck :: Expr -> Check ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.
@@ -446,11 +446,11 @@ skolemEscapeCheck root@TypedValue{} =
   let (_, f, _, _, _) = everythingWithContextOnValues [] [] (++) def go def def def
   in case f root of
        [] -> return ()
-       ((binding, val) : _) -> throwError $ mkErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ValueError val))
+       ((binding, val) : _) -> throwError $ mkErrorStack ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ExprError val))
   where
   def s _ = (s, [])
 
-  go :: [(SkolemScope, Value)] -> Value -> ([(SkolemScope, Value)], [(Maybe Value, Value)])
+  go :: [(SkolemScope, Expr)] -> Expr -> ([(SkolemScope, Expr)], [(Maybe Expr, Expr)])
   go scos val@(TypedValue _ _ (ForAll _ _ (Just sco))) = ((sco, val) : scos, [])
   go scos val@(TypedValue _ _ ty) = case collectSkolems ty \\ map fst scos of
                                       (sco : _) -> (scos, [(findBindingScope sco, val)])
@@ -462,14 +462,14 @@ skolemEscapeCheck root@TypedValue{} =
       collect (Skolem _ _ scope) = [scope]
       collect _ = []
   go scos _ = (scos, [])
-  findBindingScope :: SkolemScope -> Maybe Value
+  findBindingScope :: SkolemScope -> Maybe Expr
   findBindingScope sco =
     let (_, f, _, _, _) = everythingOnValues mappend (const mempty) go' (const mempty) (const mempty) (const mempty)
     in getFirst $ f root
     where
     go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = First (Just val)
     go' _ = mempty
-skolemEscapeCheck val = throwError $ mkErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ValueError val))
+skolemEscapeCheck val = throwError $ mkErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ExprError val))
 
 -- |
 -- Ensure a row contains no duplicate labels
@@ -503,7 +503,7 @@ varIfUnknown ty =
 -- This is necessary during type checking to avoid unifying a polymorphic type with a
 -- unification variable.
 --
-instantiatePolyTypeWithUnknowns :: Value -> Type -> UnifyT Type Check (Value, Type)
+instantiatePolyTypeWithUnknowns :: Expr -> Type -> UnifyT Type Check (Expr, Type)
 instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
@@ -571,19 +571,19 @@ expandAllTypeSynonyms = everywhereOnTypesTopDownM go
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (Error e, MonadError e m) => [(String, Value)] -> m ()
+ensureNoDuplicateProperties :: (Error e, MonadError e m) => [(String, Expr)] -> m ()
 ensureNoDuplicateProperties ps = guardWith (strMsg "Duplicate property names") $ length (nub . map fst $ ps) == length ps
 
 -- |
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
-infer :: Value -> UnifyT Type Check Value
-infer val = rethrow (mkErrorStack "Error inferring type of value" (Just (ValueError val)) <>) $ infer' val
+infer :: Expr -> UnifyT Type Check Expr
+infer val = rethrow (mkErrorStack "Error inferring type of value" (Just (ExprError val)) <>) $ infer' val
 
 -- |
 -- Infer a type for a value
 --
-infer' :: Value -> UnifyT Type Check Value
+infer' :: Expr -> UnifyT Type Check Expr
 infer' v@(NumericLiteral _) = return $ TypedValue True v tyNumber
 infer' v@(StringLiteral _) = return $ TypedValue True v tyString
 infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
@@ -670,7 +670,7 @@ infer' (TypedValue checkType val ty) = do
 infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
-inferLetBinding :: [Declaration] -> [Declaration] -> Value -> (Value -> UnifyT Type Check Value) -> UnifyT Type Check ([Declaration], Value)
+inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> makeBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue checkType val ty) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
@@ -810,7 +810,7 @@ skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
 -- SuperClassDictionary placeholder. These type variables are somewhat unique since they are the
 -- only example of scoped type variables.
 --
-skolemizeTypesInValue :: String -> Int -> SkolemScope -> Value -> Value
+skolemizeTypesInValue :: String -> Int -> SkolemScope -> Expr -> Expr
 skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id go id in f
   where
   go (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
@@ -828,8 +828,8 @@ introduceSkolemScope = everywhereOnTypesM go
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
-check :: Value -> Type -> UnifyT Type Check Value
-check val ty = rethrow (mkErrorStack errorMessage (Just (ValueError val)) <>) $ check' val ty
+check :: Expr -> Type -> UnifyT Type Check Expr
+check val ty = rethrow (mkErrorStack errorMessage (Just (ExprError val)) <>) $ check' val ty
   where
   errorMessage =
     "Error checking type of term " ++
@@ -840,7 +840,7 @@ check val ty = rethrow (mkErrorStack errorMessage (Just (ValueError val)) <>) $ 
 -- |
 -- Check the type of a value
 --
-check' :: Value -> Type -> UnifyT Type Check Value
+check' :: Expr -> Type -> UnifyT Type Check Expr
 check' val (ForAll ident ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
@@ -963,7 +963,7 @@ check' val ty | containsTypeSynonyms ty = do
   check val ty'
 check' (PositionedValue pos val) ty =
   rethrowWithPosition pos $ check val ty
-check' val ty = throwError $ mkErrorStack ("Value does not have type " ++ prettyPrintType ty) (Just (ValueError val))
+check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everythingOnTypes (||) go where
@@ -975,15 +975,15 @@ containsTypeSynonyms = everythingOnTypes (||) go where
 --
 -- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
 --
-checkProperties :: [(String, Value)] -> Type -> Bool -> UnifyT Type Check [(String, Value)]
+checkProperties :: [(String, Expr)] -> Type -> Bool -> UnifyT Type Check [(String, Expr)]
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
   go [] [] (Skolem _ _ _) | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ValueError (ObjectLiteral ps)))
-  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ValueError (ObjectLiteral ps)))
+                      | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
+  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
   go ((p,v):ps') [] u@(TUnknown _) = do
     v'@(TypedValue _ _ ty) <- infer v
     rest <- fresh
@@ -1002,13 +1002,13 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ValueError (ObjectLiteral ps)))
+  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ExprError (ObjectLiteral ps)))
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
-checkFunctionApplication :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
-checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ValueError fn)) <>) $ do
+checkFunctionApplication :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
+checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ExprError fn)) <>) $ do
   subst <- unifyCurrentSubstitution <$> UnifyT get
   checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
   where
@@ -1019,7 +1019,7 @@ checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (J
 -- |
 -- Check the type of a function application
 --
-checkFunctionApplication' :: Value -> Type -> Value -> Maybe Type -> UnifyT Type Check (Type, Value)
+checkFunctionApplication' :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
   tyFunction' =?= tyFunction
   arg' <- check arg argTy
@@ -1053,8 +1053,8 @@ checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a f
 -- |
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
-subsumes :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
-subsumes val ty1 ty2 = rethrow (mkErrorStack errorMessage (ValueError <$> val) <>) $ subsumes' val ty1 ty2
+subsumes :: Maybe Expr -> Type -> Type -> UnifyT Type Check (Maybe Expr)
+subsumes val ty1 ty2 = rethrow (mkErrorStack errorMessage (ExprError <$> val) <>) $ subsumes' val ty1 ty2
   where
   errorMessage = "Error checking that type "
     ++ prettyPrintType ty1
@@ -1064,7 +1064,7 @@ subsumes val ty1 ty2 = rethrow (mkErrorStack errorMessage (ValueError <$> val) <
 -- |
 -- Check whether one type subsumes another
 --
-subsumes' :: Maybe Value -> Type -> Type -> UnifyT Type Check (Maybe Value)
+subsumes' :: Maybe Expr -> Type -> Type -> UnifyT Type Check (Maybe Expr)
 subsumes' val (ForAll ident ty1 _) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2

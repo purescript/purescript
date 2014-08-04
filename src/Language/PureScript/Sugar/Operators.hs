@@ -63,7 +63,7 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
   go other = other
 
-rebracketModule :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Module -> Either ErrorStack Module
+rebracketModule :: [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> Either ErrorStack Module
 rebracketModule opTable (Module mn ds exts) =
   let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
   in Module mn <$> (map removeParens <$> mapM f ds) <*> pure exts
@@ -95,7 +95,7 @@ ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
         throwError $ mkErrorStack ("Redefined fixity for " ++ show name) Nothing
   go (_ : rest) = go rest
 
-customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Value -> Value -> Value, Associativity)]]
+customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]]
 customOperatorTable fixities =
   let
     applyUserOp ident t1 = App (App (Var ident) t1)
@@ -105,18 +105,18 @@ customOperatorTable fixities =
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups
 
-type Chain = [Either Value (Qualified Ident)]
+type Chain = [Either Expr (Qualified Ident)]
 
-matchOperators :: [[(Qualified Ident, Value -> Value -> Value, Associativity)]] -> Value -> Either ErrorStack Value
+matchOperators :: [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Expr -> Either ErrorStack Expr
 matchOperators ops = parseChains
   where
-  parseChains :: Value -> Either ErrorStack Value
+  parseChains :: Expr -> Either ErrorStack Expr
   parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
   parseChains other = return other
-  extendChain :: Value -> Chain
+  extendChain :: Expr -> Chain
   extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
   extendChain other = [Left other]
-  bracketChain :: Chain -> Either ErrorStack Value
+  bracketChain :: Chain -> Either ErrorStack Expr
   bracketChain = either (Left . (`mkErrorStack` Nothing) . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
@@ -130,7 +130,7 @@ toAssoc Infix  = P.AssocNone
 token :: (P.Stream s Identity t, Show t) => (t -> Maybe a) -> P.Parsec s u a
 token = P.token show (const (P.initialPos ""))
 
-parseValue :: P.Parsec Chain () Value
+parseValue :: P.Parsec Chain () Expr
 parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp :: P.Parsec Chain () (Qualified Ident)

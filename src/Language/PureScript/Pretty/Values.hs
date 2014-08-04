@@ -30,10 +30,10 @@ import Language.PureScript.Declarations
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (prettyPrintType)
 
-literals :: Pattern PrinterState Value String
+literals :: Pattern PrinterState Expr String
 literals = mkPattern' match
   where
-  match :: Value -> StateT PrinterState Maybe String
+  match :: Expr -> StateT PrinterState Maybe String
   match (NumericLiteral n) = return $ either show show n
   match (StringLiteral s) = return $ show s
   match (BooleanLiteral True) = return "true"
@@ -118,31 +118,31 @@ prettyPrintDoNotationElement (DoNotationLet ds) =
     ]
 prettyPrintDoNotationElement (PositionedDoNotationElement _ el) = prettyPrintDoNotationElement el
 
-ifThenElse :: Pattern PrinterState Value ((Value, Value), Value)
+ifThenElse :: Pattern PrinterState Expr ((Expr, Expr), Expr)
 ifThenElse = mkPattern match
   where
   match (IfThenElse cond th el) = Just ((th, el), cond)
   match _ = Nothing
 
-accessor :: Pattern PrinterState Value (String, Value)
+accessor :: Pattern PrinterState Expr (String, Expr)
 accessor = mkPattern match
   where
   match (Accessor prop val) = Just (prop, val)
   match _ = Nothing
 
-objectUpdate :: Pattern PrinterState Value ([String], Value)
+objectUpdate :: Pattern PrinterState Expr ([String], Expr)
 objectUpdate = mkPattern match
   where
   match (ObjectUpdate o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ prettyPrintValue val, o)
   match _ = Nothing
 
-app :: Pattern PrinterState Value (String, Value)
+app :: Pattern PrinterState Expr (String, Expr)
 app = mkPattern match
   where
   match (App val arg) = Just (prettyPrintValue arg, val)
   match _ = Nothing
 
-lam :: Pattern PrinterState Value (String, Value)
+lam :: Pattern PrinterState Expr (String, Expr)
 lam = mkPattern match
   where
   match (Abs (Left arg) val) = Just (show arg, val)
@@ -151,15 +151,15 @@ lam = mkPattern match
 -- |
 -- Generate a pretty-printed string representing an expression
 --
-prettyPrintValue :: Value -> String
+prettyPrintValue :: Expr -> String
 prettyPrintValue = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintValue'
 
-prettyPrintValue' :: Value -> StateT PrinterState Maybe String
+prettyPrintValue' :: Expr -> StateT PrinterState Maybe String
 prettyPrintValue' = runKleisli $ runPattern matchValue
   where
-  matchValue :: Pattern PrinterState Value String
+  matchValue :: Pattern PrinterState Expr String
   matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
-  operators :: OperatorTable PrinterState Value String
+  operators :: OperatorTable PrinterState Expr String
   operators =
     OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
                   , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
@@ -224,7 +224,7 @@ prettyPrintObjectPropertyBinder (key, binder) = fmap concat $ sequence
     , prettyPrintBinder' binder
     ]
 
-prettyPrintObjectProperty :: (String, Value) -> StateT PrinterState Maybe String
+prettyPrintObjectProperty :: (String, Expr) -> StateT PrinterState Maybe String
 prettyPrintObjectProperty (key, value) = fmap concat $ sequence
     [ return $ prettyPrintObjectKey key ++ ": "
     , prettyPrintValue' value
