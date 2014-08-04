@@ -24,7 +24,7 @@ data Command
   -- |
   -- A purescript expression
   --
-  = Expression Value
+  = Expression Expr
   -- |
   -- Show the help command
   --
@@ -48,14 +48,14 @@ data Command
   -- |
   -- Binds a value to a name
   --
-  | Let (Value -> Value)
+  | Let (Expr -> Expr)
   -- |
   -- Find the type of an expression
   --
-  | TypeOf Value
+  | TypeOf Expr
   -- |
   -- Find the kind of an expression
-  -- 
+  --
   | KindOf Type
 
 -- |
