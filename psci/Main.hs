@@ -234,7 +234,7 @@ instance P.MonadMake Make where
     mkdirp path
     U.writeFile path text
   liftError = either throwError return
-  progress s = unless (s == "Compiling Main") $ makeIO . U.putStrLn $ s
+  progress s = unless (s == "Compiling $PSCI") $ makeIO . U.putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -245,7 +245,7 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} value =
   let
-    moduleName = P.ModuleName [P.ProperName "Main"]
+    moduleName = P.ModuleName [P.ProperName "$PSCI"]
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
@@ -263,7 +263,7 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
 createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   let
-    moduleName = P.ModuleName [P.ProperName "Main"]
+    moduleName = P.ModuleName [P.ProperName "$PSCI"]
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
@@ -282,11 +282,11 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
-      psciIO $ writeFile indexFile $ "require('Main').main();"
+      psciIO $ writeFile indexFile $ "require('$PSCI').main();"
       process <- psciIO findNodeProcess
       result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
       case result of
@@ -301,11 +301,11 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
-      case M.lookup (P.ModuleName [P.ProperName "Main"], P.Ident "it") (P.names env') of
+      case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
 
@@ -316,8 +316,8 @@ handleKindOf :: P.Type -> PSCI ()
 handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
-      mName = P.ModuleName [P.ProperName "Main"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("Main.purs", m)])
+      mName = P.ModuleName [P.ProperName "$PSCI"]
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -340,6 +340,7 @@ getCommand = do
   firstLine <- getInputLine "> "
   case firstLine of
     Nothing -> return (Right Nothing)
+    Just "" -> return (Right Nothing)
     Just s@ (':' : _) -> return . either Left (Right . Just) $ parseCommand s -- The start of a command
     Just s -> either Left (Right . Just) . parseCommand <$> go [s]
   where
