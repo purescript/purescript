@@ -49,8 +49,8 @@ etaConvert = everywhereOnJS convert
       not (any (`isRebound` block) (map JSVar idents)) &&
       not (any (`isRebound` block) args)
       = JSBlock (map (replaceIdents (zip idents args)) body)
-  convert (JSFunction Nothing ["_"] (JSBlock [JSReturn (JSApp fn@JSVar{} [JSObjectLiteral []])]))
-      = fn
+  convert (JSFunction Nothing [arg] (JSBlock [JSReturn (JSApp fn@JSVar{} [JSObjectLiteral []])]))
+    | arg == C.__unused = fn
   convert js = js
 
 unThunk :: JS -> JS

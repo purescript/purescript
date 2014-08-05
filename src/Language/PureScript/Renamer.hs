@@ -28,6 +28,8 @@ import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- The state object used in this module
 --
@@ -69,6 +71,7 @@ newScope x = do
 -- unique name is generated and stored.
 --
 updateScope :: Ident -> Rename Ident
+updateScope i@(Ident name) | name == C.__unused = return i
 updateScope name = do
   scope <- get
   let name' = case name `S.member` rsUsedNames scope of
@@ -87,6 +90,7 @@ updateScope name = do
 -- Finds the new name to use for an ident.
 --
 lookupIdent :: Ident -> Rename Ident
+lookupIdent i@(Ident name) | name == C.__unused = return i
 lookupIdent name = do
   name' <- gets $ M.lookup name . rsBoundNames
   case name' of

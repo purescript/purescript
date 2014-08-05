@@ -239,7 +239,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
       -- dependencies, we introduce an unnamed function parameter.
       let superclasses =
-            [ (fieldName, Abs (Left (Ident "_")) (SuperClassDictionary superclass tyArgs))
+            [ (fieldName, Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs))
             | (index, (superclass, suTyArgs)) <- zip [0..] implies
             , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
             , let fieldName = mkSuperclassDictionaryName superclass index
@@ -249,7 +249,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className memberNames'
-          dict' = if null deps then Abs (Left (Ident "_")) dict else dict
+          dict' = if null deps then Abs (Left (Ident C.__unused)) dict else dict
           result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict' constrainedTy)
       return result
 
