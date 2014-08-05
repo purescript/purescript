@@ -66,7 +66,7 @@ data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModuleNames :: [P.ModuleName]
   , psciLoadedModules       :: [(FilePath, P.Module)]
-  , psciLetBindings         :: [P.Value -> P.Value]
+  , psciLetBindings         :: [P.Expr -> P.Expr]
   }
 
 -- State helpers
@@ -92,7 +92,7 @@ updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modu
 -- |
 -- Updates the state to have more let bindings.
 --
-updateLets :: (P.Value -> P.Value) -> PSCiState -> PSCiState
+updateLets :: (P.Expr -> P.Expr) -> PSCiState -> PSCiState
 updateLets name st = st { psciLetBindings = name : psciLetBindings st }
 
 -- File helpers
@@ -234,7 +234,7 @@ instance P.MonadMake Make where
     mkdirp path
     U.writeFile path text
   liftError = either throwError return
-  progress s = unless (s == "Compiling Main") $ makeIO . U.putStrLn $ s
+  progress s = unless (s == "Compiling $PSCI") $ makeIO . U.putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -242,11 +242,11 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 -- |
 -- Makes a volatile module to execute the current expression.
 --
-createTemporaryModule :: Bool -> PSCiState -> P.Value -> P.Module
+createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} value =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    importDecl m = P.ImportDeclaration m Nothing Nothing
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     itValue = foldl (\x f -> f x) value lets
@@ -264,7 +264,7 @@ createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
 createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    importDecl m = P.ImportDeclaration m Nothing Nothing
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
@@ -278,7 +278,7 @@ indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
-handleDeclaration :: P.Value -> PSCI ()
+handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
@@ -297,7 +297,7 @@ handleDeclaration value = do
 -- |
 -- Takes a value and prints its type
 --
-handleTypeOf :: P.Value -> PSCI ()
+handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
@@ -325,7 +325,7 @@ handleKindOf typ = do
         Just (_, typ') -> do
           let chk = P.CheckState env' 0 0 (Just mName)
               k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
-          case k of 
+          case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
         Nothing -> PSCI $ outputStrLn "Could not find kind"
