@@ -60,7 +60,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Desugar pure
   convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing ["_"] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind && isJSReturn (last js) && arg == C.__unused =
     let JSReturn ret = last js in
     JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : init js ++ [JSReturn (JSApp ret [])] )
   -- Desugar >>=

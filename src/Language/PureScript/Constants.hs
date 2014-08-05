@@ -201,6 +201,9 @@ main = "main"
 __superclass_ :: String
 __superclass_ = "__superclass_"
 
+__unused :: String
+__unused = "__unused"
+
 -- Modules
 
 prim :: String

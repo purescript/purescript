@@ -57,7 +57,7 @@ desugarDo d =
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App bind val) (Abs (Left (Ident "_")) rest')
+    return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = lift $ Left $ mkErrorStack "Bind statement cannot be the last statement in a do block" Nothing
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind (VarBinder ident) val : rest) = do
