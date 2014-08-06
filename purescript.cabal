@@ -17,6 +17,9 @@ author: Phil Freeman <paf31@cantab.net>,
 data-files: prelude/prelude.purs
 data-dir: ""
 
+extra-source-files: examples/passing/*.purs
+                  , examples/failing/*.purs
+
 source-repository head
     type: git
     location: https://github.com/purescript/purescript.git
