@@ -74,7 +74,7 @@ parseValueDeclaration = do
         case xs of { [] -> True; (y:ys) -> y `notElem` ys && allUnique ys }
   name <- parseIdent
   binders <- P.many parseBinderNoParens
-  M.guard $ allUnique (binders >>= binderNames)
+  M.guard (allUnique (binders >>= binderNames)) P.<?> "non-overlapping binders"
   guard <- P.optionMaybe parseGuard
   value <- lexeme (indented *> P.char '=') *> parseValue
   whereClause <- P.optionMaybe $ do
