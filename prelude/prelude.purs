@@ -10,7 +10,6 @@ module Prelude
   , Functor, (<$>), void
   , Apply, (<*>)
   , Applicative, pure, liftA1
-  , Alternative, empty, (<|>)
   , Bind, (>>=)
   , Monad, return, liftM1, ap
   , Num, (+), (-), (*), (/), (%)
@@ -129,12 +128,6 @@ module Prelude
 
   liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
   liftA1 f a = pure f <*> a
-
-  infixl 3 <|>
-
-  class Alternative f where
-    empty :: forall a. f a
-    (<|>) :: forall a. f a -> f a -> f a
 
   infixl 1 >>=
 
@@ -344,7 +337,7 @@ module Prelude
     \    };\
     \  };\
     \}" :: forall a. Ordering -> Ordering -> Ordering -> a -> a -> Ordering
-    
+
   unsafeCompare :: forall a. a -> a -> Ordering
   unsafeCompare = unsafeCompareImpl LT EQ GT
 
