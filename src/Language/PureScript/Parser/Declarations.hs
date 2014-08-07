@@ -68,12 +68,10 @@ parseTypeSynonymDeclaration =
                          <*> many (indented *> identifier)
                          <*> (lexeme (indented *> P.char '=') *> parsePolyType)
 
-allUnique :: Eq a => [a] -> Bool
-allUnique []     = True
-allUnique (x:xs) = x `notElem` xs && allUnique xs
-
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration = do
+  let allUnique xs = 
+        case xs of { [] -> True; (y:ys) -> y `notElem` ys && allUnique ys }
   name <- parseIdent
   binders <- P.many parseBinderNoParens
   M.guard $ allUnique (binders >>= binderNames)
