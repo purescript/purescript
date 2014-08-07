@@ -911,12 +911,13 @@ check' (TypedValue checkType val ty1) ty2 = do
   kind <- liftCheck $ kindOf moduleName ty1
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-  val' <- subsumes (Just val) ty1' ty2
+  ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty2
+  val' <- subsumes (Just val) ty1' ty2'
   case val' of
     Nothing -> throwError . strMsg $ "Unable to check type subsumption"
     Just val'' -> do
-      val''' <- if checkType then check val'' ty1' else return val''
-      return $ TypedValue checkType (TypedValue True val''' ty1) ty2
+      val''' <- if checkType then check val'' ty2' else return val''
+      return $ TypedValue checkType (TypedValue True val''' ty1') ty2'
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
   let ts = map (\(TypedValue _ _ t) -> t) vals'
@@ -1046,6 +1047,8 @@ checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
   checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
+checkFunctionApplication' fn fnTy dict@(TypeClassDictionary _ _ _) _ =
+  return (fnTy, App fn dict)
 checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
   ++ " to argument " ++ prettyPrintValue arg
