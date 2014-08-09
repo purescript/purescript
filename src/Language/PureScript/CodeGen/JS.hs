@@ -56,7 +56,7 @@ moduleToJs mt opts (Module name decls (Just exps)) env = do
   let jsImports = map (importToJs mt opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) . nub $ concatMap imports decls
   jsDecls <- mapM (\decl -> declToJs opts name decl env) decls
   let optimized = concat $ map (map $ optimize opts) $ catMaybes jsDecls
-  let isModuleEmpty = null optimized
+  let isModuleEmpty = null exps
   let moduleBody = JSStringLiteral "use strict" : jsImports ++ optimized
   let moduleExports = JSObjectLiteral $ concatMap exportToJs exps
   return $ case mt of
