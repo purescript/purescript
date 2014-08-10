@@ -242,6 +242,13 @@ parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 parseArrayLiteral :: P.Parsec String ParseState Expr
 parseArrayLiteral = ArrayLiteral <$> C.squares (C.commaSep parseValue)
 
+parseTupleLiteral :: P.Parsec String ParseState Expr
+parseTupleLiteral = do
+  vals <- C.parens (C.commaSep parseValue)
+  if length vals > 1
+    then return $ TupleLiteral vals
+    else P.parserFail "not a tuple"
+
 parseObjectLiteral :: P.Parsec String ParseState Expr
 parseObjectLiteral = ObjectLiteral <$> C.braces (C.commaSep parseIdentifierAndValue)
 
@@ -297,6 +304,7 @@ parseValueAtom = P.choice
             , P.try parseStringLiteral
             , P.try parseBooleanLiteral
             , parseArrayLiteral
+            , P.try parseTupleLiteral
             , P.try parseObjectLiteral
             , parseAbs
             , P.try parseConstructor
@@ -379,6 +387,13 @@ parseConstructorBinder = ConstructorBinder <$> C.lexeme (C.parseQualified C.prop
 parseObjectBinder :: P.Parsec String ParseState Binder
 parseObjectBinder = ObjectBinder <$> C.braces (C.commaSep (C.indented *> parseIdentifierAndBinder))
 
+parseTupleBinder :: P.Parsec String ParseState Binder
+parseTupleBinder = do
+  binders <- C.parens $ C.commaSep (C.indented *> parseBinder)
+  if length binders > 1
+    then return $ TupleBinder binders
+    else P.parserFail "not a tuple"
+
 parseArrayBinder :: P.Parsec String ParseState Binder
 parseArrayBinder = C.squares $ ArrayBinder <$> C.commaSep (C.indented *> parseBinder)
 
@@ -415,6 +430,7 @@ parseBinder = PositionedBinder <$> sourcePos <*>
                     , parseConstructorBinder
                     , parseObjectBinder
                     , parseArrayBinder
+                    , parseTupleBinder
                     , C.parens parseBinder ]) P.<?> "binder"
 
 -- |
