@@ -242,6 +242,12 @@ data JS
   --
   | JSRaw String deriving (Show, Eq, Data, Typeable)
 
+-- |
+-- Javascript representation of the unit value.
+--
+jsUnit :: JS
+jsUnit = JSObjectLiteral []
+
 --
 -- Traversals
 --
