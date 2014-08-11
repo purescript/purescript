@@ -19,6 +19,8 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Data.Data
 
+import qualified Language.PureScript.Constants as C
+
 -- |
 -- Built-in unary operators
 --
@@ -246,7 +248,7 @@ data JS
 -- Javascript representation of the unit value.
 --
 jsUnit :: JS
-jsUnit = JSObjectLiteral []
+jsUnit = JSAccessor C.unit (JSVar C.prelude)
 
 --
 -- Traversals
