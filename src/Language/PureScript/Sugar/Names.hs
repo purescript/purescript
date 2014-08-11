@@ -253,15 +253,19 @@ renameInModule imports exports (Module mn decls exps) =
                             -> Qualified a
                             -> Maybe SourcePos
                             -> Either ErrorStack (Qualified a)
-  update t getI checkE qname@(Qualified mn' name) pos = case (M.lookup qname (getI imports), mn') of
+  update t getI checkE qname@(Qualified mn' name) pos = positioned $ case (M.lookup qname imports', mn') of
     (Just qname', _) -> return qname'
     (Nothing, Just mn'') -> do
+      when (isExplicitQualModule mn'') $ throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show qname ++ "'") Nothing
       modExports <- getExports mn''
       if checkE modExports name
         then return qname
-        else positioned $ throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show qname ++ "'") Nothing
-    _ -> positioned $ throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show name ++ "'") Nothing
+        else throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show qname ++ "'") Nothing
+    _ -> throwError $ mkErrorStack ("Unknown " ++ t ++ " '" ++ show name ++ "'") Nothing
     where
+    isExplicitQualModule :: ModuleName -> Bool
+    isExplicitQualModule = flip elem $ mapMaybe (\(Qualified q _) -> q) (M.keys imports')
+    imports' = getI imports
     positioned err = case pos of
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
@@ -452,9 +456,9 @@ resolveImport currentModule importModule exps imps impQual =
 
   -- Check if DeclarationRef points to an existent symbol
   checkedRefs :: [DeclarationRef] -> Either ErrorStack [DeclarationRef]
-  checkedRefs refs = mapM check refs
+  checkedRefs = mapM check
     where
-    check (PositionedDeclarationRef pos r) = do
+    check (PositionedDeclarationRef pos r) =
       rethrowWithPosition pos $ check r
     check ref@(ValueRef name) =
       checkImportExists "value" values name >> return ref
@@ -498,5 +502,3 @@ resolveImport currentModule importModule exps imps impQual =
       if item `elem` exports
       then return item
       else throwError $ mkErrorStack ("Cannot import unknown " ++ t ++  " '" ++ show item ++ "' from '" ++ show importModule ++ "'") Nothing
-
-
