@@ -153,6 +153,11 @@ mkFn = "mkFn"
 runFn :: String
 runFn = "runFn"
 
+-- Prim values
+
+undefined :: String
+undefined = "undefined"
+
 -- Type Class Dictionary Names
 
 monadEffDictionary :: String

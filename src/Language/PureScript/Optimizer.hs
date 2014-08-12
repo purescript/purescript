@@ -57,6 +57,8 @@ optimize opts | optionsNoOptimizations opts = id
   , tco opts
   , magicDo opts
   , removeCodeAfterReturnStatements
+  , removeUnusedArg
+  , removeUndefinedApp
   , unThunk
   , etaConvert
   , evaluateIifes

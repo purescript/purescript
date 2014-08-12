@@ -13,12 +13,16 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Unused (
-  removeCodeAfterReturnStatements
-) where
+module Language.PureScript.Optimizer.Unused
+  ( removeCodeAfterReturnStatements
+  , removeUnusedArg
+  , removeUndefinedApp
+  ) where
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Optimizer.Common
+
+import qualified Language.PureScript.Constants as C
 
 removeCodeAfterReturnStatements :: JS -> JS
 removeCodeAfterReturnStatements = everywhereOnJS (removeFromBlock go)
@@ -28,3 +32,15 @@ removeCodeAfterReturnStatements = everywhereOnJS (removeFromBlock go)
          | otherwise = let (body, ret : _) = span (not . isJSReturn) jss in body ++ [ret]
   isJSReturn (JSReturn _) = True
   isJSReturn _ = False
+
+removeUnusedArg :: JS -> JS
+removeUnusedArg = everywhereOnJS convert
+  where
+  convert (JSFunction name [arg] body) | arg == C.__unused = JSFunction name [] body
+  convert js = js
+
+removeUndefinedApp :: JS -> JS
+removeUndefinedApp = everywhereOnJS convert
+  where
+  convert (JSApp fn [JSVar arg]) | arg == C.undefined = JSApp fn []
+  convert js = js
