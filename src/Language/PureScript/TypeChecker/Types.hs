@@ -357,12 +357,12 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  -- Turn a DictionaryValue into a Expr
 	  dictionaryValueToValue :: DictionaryValue -> Expr
 	  dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
-	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) valUnit
+	  dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) valUndefined
 	  dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
 	  dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
 	    App (Accessor (C.__superclass_ ++ show superclassName ++ "_" ++ show index)
 	                  (dictionaryValueToValue dict))
-	        valUnit
+	        valUndefined
 	  -- Ensure that a substitution is valid
 	  verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
 	  verifySubstitution subst = do
@@ -393,8 +393,8 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictTrace (SubclassDictionaryValue dict _ _) = dictTrace dict
 	  dictTrace other = other
 
-    valUnit :: Expr
-    valUnit = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
+    valUndefined :: Expr
+    valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
 -- |
 -- Check all values in a list pairwise match a predicate
