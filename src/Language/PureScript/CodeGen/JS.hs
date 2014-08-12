@@ -307,6 +307,7 @@ varToJs m qual = qualifiedToJS m id qual
 -- variable that may have a qualified name.
 --
 qualifiedToJS :: ModuleName -> (a -> Ident) -> Qualified a -> JS
+qualifiedToJS _ f (Qualified (Just (ModuleName [ProperName mn])) a) | mn == C.prim = JSVar . runIdent $ f a
 qualifiedToJS m f (Qualified (Just m') a) | m /= m' = accessor (f a) (JSVar (moduleNameToJs m'))
 qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 

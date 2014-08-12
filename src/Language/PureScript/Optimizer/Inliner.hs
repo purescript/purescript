@@ -50,7 +50,7 @@ etaConvert = everywhereOnJS convert
       not (any (`isRebound` block) args)
       = JSBlock (map (replaceIdents (zip idents args)) body)
   convert (JSFunction Nothing [arg] (JSBlock [JSReturn (JSApp fn@JSVar{} [val])]))
-    | arg == C.__unused && val == jsUnit = fn
+    | arg == C.__unused && val == jsUndefined = fn
   convert js = js
 
 unThunk :: JS -> JS
@@ -154,7 +154,7 @@ inlineCommonOperators = applyAll $
     convert other = other
     isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
     isOp _ = False
-  isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) [val]) = prelude == C.prelude && prop == dictName && val == jsUnit
+  isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) [val]) = prelude == C.prelude && prop == dictName && val == jsUndefined
   isOpDict _ _ = False
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert

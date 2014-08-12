@@ -247,8 +247,8 @@ data JS
 -- |
 -- Javascript representation of the unit value.
 --
-jsUnit :: JS
-jsUnit = JSAccessor C.unit (JSVar C.prelude)
+jsUndefined :: JS
+jsUndefined = JSVar C.undefined
 
 --
 -- Traversals

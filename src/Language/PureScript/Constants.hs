@@ -153,8 +153,10 @@ mkFn = "mkFn"
 runFn :: String
 runFn = "runFn"
 
-unit :: String
-unit = "unit"
+-- Prim values
+
+undefined :: String
+undefined = "undefined"
 
 -- Type Class Dictionary Names
 

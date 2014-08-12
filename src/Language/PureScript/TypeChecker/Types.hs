@@ -394,7 +394,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 	  dictTrace other = other
 
     valUnit :: Expr
-    valUnit = Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.unit))
+    valUnit = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
 -- |
 -- Check all values in a list pairwise match a predicate
