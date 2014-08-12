@@ -60,7 +60,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Desugar pure
   convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind && isJSReturn (last js) && arg == C.__unused =
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
     let JSReturn ret = last js in
     JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : init js ++ [JSReturn (JSApp ret [])] )
   -- Desugar >>=
@@ -99,8 +99,8 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
   -- Check if an expression represents the Monad Eff dictionary
-  isEffDict name (JSApp (JSVar ident) [val]) | ident == name && val == jsUndefined = True
-  isEffDict name (JSApp (JSAccessor prop (JSVar eff)) [val]) = eff == C.eff && prop == name && val == jsUndefined
+  isEffDict name (JSApp (JSVar ident) []) | ident == name = True
+  isEffDict name (JSApp (JSAccessor prop (JSVar eff)) []) = eff == C.eff && prop == name
   isEffDict _ _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS

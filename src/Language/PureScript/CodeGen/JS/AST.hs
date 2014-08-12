@@ -19,8 +19,6 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Data.Data
 
-import qualified Language.PureScript.Constants as C
-
 -- |
 -- Built-in unary operators
 --
@@ -243,12 +241,6 @@ data JS
   -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
   --
   | JSRaw String deriving (Show, Eq, Data, Typeable)
-
--- |
--- Javascript representation of the unit value.
---
-jsUndefined :: JS
-jsUndefined = JSVar C.undefined
 
 --
 -- Traversals
