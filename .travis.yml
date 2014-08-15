@@ -4,6 +4,6 @@ script:
   - cabal configure --enable-tests --enable-library-coverage -v2 && cabal build && cabal test
 after_script:
   - cabal install hpc-coveralls
-  - hpc-coveralls --exclude-dir=test test
+  - hpc-coveralls --exclude-dir=tests tests
 notifications:
   email: true
