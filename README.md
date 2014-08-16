@@ -1,4 +1,4 @@
-[![Build Status](https://secure.travis-ci.org/purescript/purescript.png?branch=master)](http://travis-ci.org/purescript/purescript)
+[![Build Status](https://secure.travis-ci.org/purescript/purescript.png?branch=master)](http://travis-ci.org/purescript/purescript) [![Coverage Status](https://coveralls.io/repos/purescript/purescript/badge.png?branch=master)](https://coveralls.io/r/purescript/purescript?branch=master)
 [![Hackage](https://budueba.com/hackage/purescript)](http://hackage.haskell.org/package/purescript)
 
 PureScript is a small strongly, statically typed programming language with expressive types, written in and inspired by Haskell, and compiling to Javascript.
