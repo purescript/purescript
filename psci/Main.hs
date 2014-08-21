@@ -117,12 +117,6 @@ getHistoryFilename :: IO FilePath
 getHistoryFilename = getUserConfigFile "purescript" "psci_history"
 
 -- |
--- Grabs the filename where prelude is.
---
-getPreludeFilename :: IO FilePath
-getPreludeFilename = Paths.getDataFileName "prelude/prelude.purs"
-
--- |
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
@@ -400,7 +394,7 @@ loadUserConfig = do
 loop :: [FilePath] -> IO ()
 loop files = do
   config <- loadUserConfig
-  preludeFilename <- getPreludeFilename
+  preludeFilename <- P.preludeFilename
   filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . loadModule $ file) (preludeFilename : files)
   let modulesOrFirstError = fmap concat $ sequence filesAndModules
   case modulesOrFirstError of
