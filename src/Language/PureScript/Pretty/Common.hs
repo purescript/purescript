@@ -65,5 +65,5 @@ prettyPrintMany f xs = do
 --
 prettyPrintObjectKey :: String -> String
 prettyPrintObjectKey s | s `elem` reservedPsNames = show s
-                       | head s `elem` opChars = show s
+                       | any (`elem` opChars) s = show s
                        | otherwise = s
