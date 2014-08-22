@@ -205,7 +205,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options
-options = P.Options False True False True Nothing True Nothing [] [] False
+options = P.Options False True False True Nothing True Nothing [] [] False False
 
 -- |
 -- PSCI monad
@@ -275,6 +275,8 @@ modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
+ver = showVersion Paths.version      
+
 -- |
 -- Takes a value declaration and evaluates it with the current state.
 --
@@ -282,7 +284,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) ver
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -301,7 +303,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) ver
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -317,7 +319,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) ver
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
