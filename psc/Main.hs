@@ -33,9 +33,6 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
-preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
-
 readInput :: Maybe [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
 readInput Nothing = do
   text <- getContents
@@ -149,6 +146,6 @@ termInfo = defTI
 
 main :: IO ()
 main = do
-  prelude <- preludeFilename
+  prelude <- P.preludeFilename
   run (term prelude, termInfo)
 

@@ -88,7 +88,7 @@ library
     exposed: True
     buildable: True
     hs-source-dirs: src
-    other-modules:
+    other-modules: Paths_purescript
     ghc-options: -Wall -O2
 
 executable psc
