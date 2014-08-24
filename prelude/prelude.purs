@@ -923,7 +923,7 @@ module Control.Monad.ST where
                              \      return arr[i];\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
+                             \}" :: forall a h r. STArray h a -> Number -> Eff (st :: ST h | r) a
 
   foreign import pokeSTArray "function pokeSTArray(arr) {\
                              \  return function(i) {\
