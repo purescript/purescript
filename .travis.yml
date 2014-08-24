@@ -1,3 +1,19 @@
 language: haskell
 notifications:
   email: true
+deploy:
+  provider: releases
+  api_key:
+    secure: OtFW1KWML+6IjajU45MyxtQ7tBpG6OnVPHRn/qXgtu1+ISw+Hl6OoTaKOIroVuJHBdonklvioN7/s8RN3mnljPAF9l938UsVQ30jRcV5YGh4w9Cnu5T26RW4H6NA+MA7tl1SAx2WDdsupn12DQBO3OkOYr3S3HLrdWW01Zr1xgw=
+  file:
+    - dist/build/docgen/docgen
+    - dist/build/hierarchy/hierarchy
+    - dist/build/psc-make/psc-make
+    - dist/build/psc/psc
+    - dist/build/psci/psci
+    - prelude/prelude.purs
+  skip_cleanup: true
+  on:
+    all_branches: true
+    repo: joneshf/purescript
+    tags: true
