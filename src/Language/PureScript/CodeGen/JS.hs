@@ -27,7 +27,7 @@ import Data.Maybe (catMaybes, fromJust)
 import Data.Function (on)
 import Data.List (nub, (\\), delete, sortBy)
 
-import Control.Monad (replicateM, forM)
+import Control.Monad (foldM, replicateM, forM)
 import Control.Applicative
 
 import Language.PureScript.Names
@@ -392,18 +392,27 @@ binderToJs m e varName done (ArrayBinder bs) = do
     done'' <- go done' (index + 1) bs'
     js <- binderToJs m e elVar done'' binder
     return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
-binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
-  headVar <- freshName
+binderToJs m e varName done binder@(ConsBinder _ _) = do
+  let (headBinders, tailBinder) = uncons [] binder
+      numberOfHeadBinders = fromIntegral $ length headBinders
+  js1 <- foldM (\done' (headBinder, index) -> do
+    headVar <- freshName
+    jss <- binderToJs m e headVar done' headBinder
+    return (JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : jss)) done (zip headBinders [0..])
   tailVar <- freshName
-  js1 <- binderToJs m e headVar done headBinder
   js2 <- binderToJs m e tailVar js1 tailBinder
-  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left 0))) (JSBlock
-    ( JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar varName))) :
-      JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left 1)])) :
+  return [JSIfElse (JSBinary GreaterThanOrEqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left numberOfHeadBinders))) (JSBlock
+    ( JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left numberOfHeadBinders)])) :
       js2
     )) Nothing]
+  where 
+  uncons :: [Binder] -> Binder -> ([Binder], Binder)
+  uncons acc (ConsBinder h t) = uncons (h : acc) t
+  uncons acc (PositionedBinder _ b) = uncons acc b
+  uncons acc tailBinder = (reverse acc, tailBinder)
 binderToJs m e varName done (NamedBinder ident binder) = do
   js <- binderToJs m e varName done binder
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
 binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
+
