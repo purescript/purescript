@@ -67,11 +67,11 @@ import System.FilePath (pathSeparator)
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: Options -> [Module] -> Either String (String, String, Environment)
+compile :: Options -> [Module] -> String -> Either String (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: Environment -> Options -> [Module] -> Either String (String, String, Environment)
-compile' env opts ms = do
+compile' :: Environment -> Options -> [Module] -> String -> Either String (String, String, Environment)
+compile' env opts ms prefix = do
   (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
@@ -84,9 +84,13 @@ compile' env opts ms = do
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
-  return (prettyPrintJS js', exts, env')
+  let pjs = addPrefix (optionsNoGeneratedBy opts) prefix $ prettyPrintJS js'
+  return (pjs, exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
+
+addPrefix :: Bool -> String -> String -> String
+addPrefix noGenerate prefix js = if noGenerate then js else prefix ++ js
 
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule mainModuleName (Module mn decls exps) = do
@@ -169,8 +173,8 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> m Environment
-make outputDir opts ms = do
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> String -> m Environment
+make outputDir opts ms prefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
   (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
@@ -217,7 +221,8 @@ make outputDir opts ms = do
     let mod' = Module moduleName' regrouped exps
     let [renamed] = renameInModules [mod'] 
 
-    js <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
+    pjs <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
+    let js = addPrefix (optionsNoGeneratedBy opts) prefix pjs
     let exts = moduleToPs renamed env'
 
     lift $ writeTextFile jsFile js
