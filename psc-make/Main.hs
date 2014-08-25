@@ -66,9 +66,9 @@ instance P.MonadMake Make where
   liftError = either throwError return
   progress = makeIO . U.putStrLn
 
-compile :: FilePath -> P.Options -> [FilePath] -> IO ()
-compile outputDir opts input = do
-  modules <- readInput input
+compile :: FilePath -> [FilePath] -> FilePath -> P.Options -> IO ()
+compile prelude input outputDir opts = do
+  modules <- readInput allInputFiles
   case modules of
     Left err -> do
       U.print err
@@ -81,6 +81,9 @@ compile outputDir opts input = do
           exitFailure
         Right _ -> do
           exitSuccess
+  where
+  allInputFiles | P.optionsNoPrelude opts = input
+                | otherwise = prelude : input
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -120,14 +123,8 @@ verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
 options :: Term P.Options
 options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> pure Nothing <*> pure [] <*> pure [] <*> verboseErrors
 
-inputFilesAndPrelude :: FilePath -> Term [FilePath]
-inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
-  where
-  combine True input = prelude : input
-  combine False input = input
-
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> outputDirectory <*> options <*> inputFilesAndPrelude prelude
+term prelude = compile prelude <$> inputFiles <*> outputDirectory <*> options
 
 termInfo :: TermInfo
 termInfo = defTI
