@@ -190,7 +190,7 @@ unary op str = Wrap match (++)
     match' _ = Nothing
 
 binary :: BinaryOperator -> String -> Operator PrinterState JS String
-binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
+binary op str = AssocL match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
   match :: Pattern PrinterState JS (JS, JS)
   match = mkPattern match'
