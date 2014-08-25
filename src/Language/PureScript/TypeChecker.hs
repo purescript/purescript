@@ -26,8 +26,11 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
+import Data.List (nub, (\\))
 import Data.Monoid ((<>))
+import Data.Foldable (for_)
 import qualified Data.Map as M
+
 import Control.Monad.State
 import Control.Monad.Error
 
@@ -87,6 +90,13 @@ addTypeClassDictionaries entries =
   let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
   in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
 
+checkDuplicateTypeArguments :: [String] -> Check ()
+checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
+  throwError . strMsg $ "Duplicate type argument '" ++ dup ++ "'"
+  where
+  firstDup :: Maybe String
+  firstDup = listToMaybe $ args \\ nub args
+
 checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
@@ -114,6 +124,7 @@ typeCheckAll _ _ [] = return []
 typeCheckAll mainModuleName moduleName (d@(DataDeclaration dtype name args dctors) : rest) = do
   rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
     when (dtype == Newtype) $ checkNewtype dctors
+    checkDuplicateTypeArguments args
     ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
     addDataType moduleName dtype name args dctors ctorKind
   ds <- typeCheckAll mainModuleName moduleName rest
@@ -128,9 +139,11 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
     let syns = mapMaybe toTypeSynonym tys
     let dataDecls = mapMaybe toDataDecl tys
     (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-    forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) ->
+    forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
+      checkDuplicateTypeArguments args
       addDataType moduleName dtype name args dctors ctorKind
-    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) ->
+    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+      checkDuplicateTypeArguments args
       addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
   return $ d : ds
@@ -143,6 +156,7 @@ typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : re
   toDataDecl _ = Nothing
 typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
   rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
+    checkDuplicateTypeArguments args
     kind <- kindsOf False moduleName name args [ty]
     addTypeSynonym moduleName name args ty kind
   ds <- typeCheckAll mainModuleName moduleName rest
@@ -213,3 +227,4 @@ typeCheckAll mainModuleName moduleName (PositionedDeclaration pos d : rest) =
   rethrowWithPosition pos $ do
     (d' : rest') <- typeCheckAll mainModuleName moduleName (d : rest)
     return (PositionedDeclaration pos d' : rest')
+
