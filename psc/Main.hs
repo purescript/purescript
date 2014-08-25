@@ -44,9 +44,9 @@ readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
   collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
   collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
 
-compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile opts input output externs = do
-  modules <- readInput input
+compile :: FilePath -> P.Options -> Bool -> [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
+compile prelude opts stdin input output externs = do
+  modules <- readInput stdInOrInputFiles
   case modules of
     Left err -> do
       U.hPutStr stderr $ show err
@@ -64,6 +64,11 @@ compile opts input output externs = do
             Just path -> mkdirp path >> U.writeFile path exts
             Nothing -> return ()
           exitSuccess
+  where
+  stdInOrInputFiles :: Maybe [FilePath]
+  stdInOrInputFiles | stdin = Nothing
+                    | P.optionsNoPrelude opts = Just input
+                    | otherwise = Just $ prelude : input
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -127,15 +132,8 @@ verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
 options :: Term P.Options
 options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> (Just <$> browserNamespace) <*> dceModules <*> codeGenModules <*> verboseErrors
 
-stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
-stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
-  where
-  combine False True input = Just (prelude : input)
-  combine False False input = Just input
-  combine True _ _ = Nothing
-
 term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
+term prelude = compile prelude <$> options <*> useStdIn <*> inputFiles <*> outputFile <*> externsFile
 
 termInfo :: TermInfo
 termInfo = defTI
