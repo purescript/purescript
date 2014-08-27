@@ -83,13 +83,10 @@ compile' env opts ms prefix = do
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
-  let pjs = addPrefix (optionsNoGeneratedBy opts) prefix $ prettyPrintJS js'
+  let pjs = prefix ++ prettyPrintJS js'
   return (pjs, exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
-
-addPrefix :: Bool -> String -> String -> String
-addPrefix noGenerate prefix js = if noGenerate then js else prefix ++ js
 
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule mainModuleName (Module mn decls exps) = do
@@ -221,7 +218,7 @@ make outputDir opts ms prefix = do
     let [renamed] = renameInModules [mod'] 
 
     pjs <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
-    let js = addPrefix (optionsNoGeneratedBy opts) prefix pjs
+    let js = prefix ++ pjs
     let exts = moduleToPs renamed env'
 
     lift $ writeTextFile jsFile js
