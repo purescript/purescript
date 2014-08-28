@@ -9,6 +9,7 @@ notifications:
   email: true
 deploy:
   provider: releases
+  api_key: $RELEASE_KEY
   file:
     - dist/build/docgen/docgen
     - dist/build/hierarchy/hierarchy
