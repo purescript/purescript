@@ -9,6 +9,8 @@ notifications:
   email: true
 deploy:
   provider: releases
+  api_key:
+    secure: s/P21lZPgcrXosn6DXmJXbcgCXR6NXT7p1dYXn6Uw9+M/xhKao0FC32+Q8oKDJohobhl1hj/Tn9eY0z00slfs5o5y83oSoQna3SJ9n85TRQCDpI6fMdoioH8Enos7MLAqt1cDAPYzH
   file:
     - dist/build/docgen/docgen
     - dist/build/hierarchy/hierarchy
