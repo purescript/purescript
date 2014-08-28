@@ -7,3 +7,16 @@ after_script:
   - hpc-coveralls --exclude-dir=tests tests
 notifications:
   email: true
+deploy:
+  provider: releases
+  file:
+    - dist/build/docgen/docgen
+    - dist/build/hierarchy/hierarchy
+    - dist/build/psc-make/psc-make
+    - dist/build/psc/psc
+    - dist/build/psci/psci
+    - prelude/prelude.purs
+  skip_cleanup: true
+  on:
+    all_branches: true
+    tags: true
