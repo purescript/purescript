@@ -40,7 +40,7 @@ compile opts inputFiles = do
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms -> return $ P.compile opts ms
+    Right ms -> return $ P.compile opts ms [] 
 
 assert :: FilePath -> P.Options -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do
