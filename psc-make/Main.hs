@@ -127,12 +127,6 @@ verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
 options :: Term P.Options
 options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> pure Nothing <*> pure [] <*> pure [] <*> verboseErrors
 
-inputFilesAndPrelude :: FilePath -> Term [FilePath]
-inputFilesAndPrelude prelude = combine <$> (not <$> noPrelude) <*> inputFiles
-  where
-  combine True input = prelude : input
-  combine False input = input
-
 noPrefix :: Term Bool
 noPrefix = value $ flag $ (optInfo ["p", "no-prefix" ])
      { optDoc = "Do not include comment header"}
