@@ -61,6 +61,7 @@ data Options = Options {
     -- Verbose error message
     --
   , optionsVerboseErrors :: Bool
+
   } deriving Show
 
 -- |
