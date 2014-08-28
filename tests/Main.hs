@@ -27,11 +27,7 @@ import System.Process
 import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
-import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
-
-preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
 
 readInput :: [FilePath] -> IO (Either ParseError [P.Module])
 readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
@@ -80,7 +76,7 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 
 main :: IO ()
 main = do
-  prelude <- preludeFilename
+  prelude <- P.preludeFilename
   putStrLn "Compiling Prelude"
   preludeResult <- compile (P.defaultOptions { P.optionsBrowserNamespace = Just "Tests" }) [prelude]
   case preludeResult of

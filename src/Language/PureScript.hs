@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript (module P, compile, compile', MonadMake(..), make) where
+module Language.PureScript (module P, compile, compile', MonadMake(..), make, preludeFilename) where
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
@@ -34,6 +34,7 @@ import Language.PureScript.Supply as P
 import Language.PureScript.Renamer as P
 
 import qualified Language.PureScript.Constants as C
+import qualified Paths_purescript as Paths
 
 import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
@@ -273,3 +274,6 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
+
+preludeFilename :: IO FilePath
+preludeFilename = Paths.getDataFileName "prelude/prelude.purs"

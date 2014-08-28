@@ -415,7 +415,7 @@ Values
 
     newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
-    peekSTArray :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
+    peekSTArray :: forall a h r. STArray h a -> Number -> Eff (st :: ST h | r) a
 
     pokeSTArray :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
 

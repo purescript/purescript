@@ -24,7 +24,9 @@ module Language.PureScript.Parser.Declarations (
 ) where
 
 import Data.Maybe (isJust, fromMaybe)
+
 import Control.Applicative
+import Control.Arrow ((+++))
 
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
@@ -365,7 +367,12 @@ parseBooleanBinder :: P.Parsec String ParseState Binder
 parseBooleanBinder = BooleanBinder <$> booleanLiteral
 
 parseNumberBinder :: P.Parsec String ParseState Binder
-parseNumberBinder = NumberBinder <$> C.integerOrFloat
+parseNumberBinder = NumberBinder <$> (C.lexeme sign <*> C.integerOrFloat)
+  where
+  sign :: P.Parsec String ParseState (Either Integer Double -> Either Integer Double)
+  sign = (P.char '-' >> return (negate +++ negate))
+         <|> (P.char '+' >> return id)
+         <|> return id
 
 parseVarBinder :: P.Parsec String ParseState Binder
 parseVarBinder = VarBinder <$> C.parseIdent
