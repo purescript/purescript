@@ -13,5 +13,4 @@ deploy:
   skip_cleanup: true
   on:
     all_branches: true
-    repo: joneshf/purescript
     tags: true
