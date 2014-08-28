@@ -276,7 +276,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) Nothing
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -295,7 +295,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) Nothing
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -311,7 +311,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) Nothing
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
