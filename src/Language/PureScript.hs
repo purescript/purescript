@@ -66,11 +66,11 @@ import System.FilePath (pathSeparator)
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: Options -> [Module] -> String -> Either String (String, String, Environment)
+compile :: Options -> [Module] -> Maybe String -> Either String (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: Environment -> Options -> [Module] -> String -> Either String (String, String, Environment)
-compile' env opts ms prefix = do
+compile' :: Environment -> Options -> [Module] -> Maybe String -> Either String (String, String, Environment)
+compile' env opts ms mPrefix = do
   (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
@@ -87,6 +87,9 @@ compile' env opts ms prefix = do
   return (pjs, exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
+  prefix = case mPrefix of
+            Just x -> "// " ++ x
+            Nothing -> ""
 
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule mainModuleName (Module mn decls exps) = do
@@ -169,8 +172,8 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> String -> m Environment
-make outputDir opts ms prefix = do
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> Maybe String -> m Environment
+make outputDir opts ms mPrefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
   (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
@@ -218,13 +221,20 @@ make outputDir opts ms prefix = do
     let [renamed] = renameInModules [mod'] 
 
     pjs <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
-    let js = prefix ++ pjs
-    let exts = moduleToPs renamed env'
+    let js = "// " ++ prefix ++ pjs
+    let exts' = (moduleToPs renamed env')
+    let exts = case mPrefix of
+                  Just x -> "-- " ++ x ++ exts'
+                  Nothing -> exts'
 
     lift $ writeTextFile jsFile js
     lift $ writeTextFile externsFile exts
 
     go env' ms'
+
+  prefix = case mPrefix of
+            Just x -> x
+            Nothing -> ""
 
   rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
   rebuildIfNecessary _ _ [] = return []
