@@ -73,7 +73,7 @@ instance Unifiable Check Kind where
 kindOf :: ModuleName -> Type -> Check Kind
 kindOf _ ty =
   rethrow (mkErrorStack "Error checking kind" (Just (TypeError ty)) <>) $
-    fmap tidyUp . liftUnify $ starIfUnknown <$> infer ty
+    fmap (starIfUnknown . tidyUp) . liftUnify $ infer ty
   where
   tidyUp (k, sub) = sub $? k
 
