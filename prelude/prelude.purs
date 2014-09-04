@@ -803,7 +803,7 @@ module Control.Monad.Eff where
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\
-                        \    while (!f()) { }\
+                        \    while (!f());\
                         \    return {};\
                         \  };\
                         \}" :: forall e. Eff e Boolean -> Eff e Unit
