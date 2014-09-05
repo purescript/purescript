@@ -66,7 +66,7 @@ module Prelude
 
   foreign import cons
     "function cons(e) {\
-    \  return function (l) {\
+    \  return function(l) {\
     \    return [e].concat(l);\
     \  };\
     \}" :: forall a. a -> [a] -> [a]
@@ -97,8 +97,8 @@ module Prelude
     show = showNumberImpl
 
   foreign import showArrayImpl
-    "function showArrayImpl (f) {\
-    \  return function (xs) {\
+    "function showArrayImpl(f) {\
+    \  return function(xs) {\
     \    var ss = [];\
     \    for (var i = 0, l = xs.length; i < l; i++) {\
     \      ss[i] = f(xs[i]);\
@@ -327,10 +327,10 @@ module Prelude
 
   foreign import unsafeCompareImpl
     "function unsafeCompareImpl(lt) {\
-    \  return function (eq) {\
-    \    return function (gt) {\
-    \      return function (x) {\
-    \        return function (y) {\
+    \  return function(eq) {\
+    \    return function(gt) {\
+    \      return function(x) {\
+    \        return function(y) {\
     \          return x < y ? lt : x > y ? gt : eq;\
     \        };\
     \      };\
@@ -803,7 +803,7 @@ module Control.Monad.Eff where
 
   foreign import untilE "function untilE(f) {\
                         \  return function() {\
-                        \    while (!f()) { }\
+                        \    while (!f());\
                         \    return {};\
                         \  };\
                         \}" :: forall e. Eff e Boolean -> Eff e Unit
@@ -878,7 +878,7 @@ module Control.Monad.ST where
   foreign import data STArray :: * -> * -> *
 
   foreign import newSTRef "function newSTRef(val) {\
-                          \  return function () {\
+                          \  return function() {\
                           \    return { value: val };\
                           \  };\
                           \}" :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
