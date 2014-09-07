@@ -5,6 +5,7 @@ PureScript is a small strongly, statically typed programming language with expre
 
 ## Resources
 
+- [PureScript Book](https://leanpub.com/purescript/read)
 - [Documentation](http://purescript.readthedocs.org/)
 - [#purescript IRC @ FreeNode](irc://irc.freenode.net/#purescript)
 - [Twitter](http://twitter.com/purescript)
