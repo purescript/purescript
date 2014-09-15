@@ -155,7 +155,9 @@ operator = PT.operator tokenParser
 -- Parse a string literal
 --
 stringLiteral :: P.Parsec String u String
-stringLiteral = PT.stringLiteral tokenParser
+stringLiteral = lexeme blockString <|> PT.stringLiteral tokenParser
+  where delimeter   = P.try (P.string "\"\"\"")
+        blockString = delimeter >> P.manyTill P.anyChar delimeter
 
 -- |
 -- Parse whitespace
