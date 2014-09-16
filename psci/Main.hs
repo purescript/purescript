@@ -276,7 +276,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -295,7 +295,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -311,7 +311,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -329,13 +329,13 @@ handleKindOf typ = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: InputT (StateT PSCiState IO) (Either ParseError (Maybe Command))
-getCommand = do
+getCommand :: Bool -> InputT (StateT PSCiState IO) (Either ParseError (Maybe Command))
+getCommand singleLineMode = do
   firstLine <- getInputLine "> "
   case firstLine of
     Nothing -> return (Right Nothing)
     Just "" -> return (Right Nothing)
-    Just s@ (':' : _) -> return . either Left (Right . Just) $ parseCommand s -- The start of a command
+    Just s | singleLineMode || head s == ':' -> return . either Left (Right . Just) $ parseCommand s
     Just s -> either Left (Right . Just) . parseCommand <$> go [s]
   where
     go :: [String] -> InputT (StateT PSCiState IO) String
@@ -371,9 +371,16 @@ handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
+singleLineFlag :: Cmd.Term Bool
+singleLineFlag = Cmd.value $ Cmd.flag $ (Cmd.optInfo ["single-line-mode"])
+                                                { Cmd.optName = "Single-line mode"
+                                                , Cmd.optDoc = "Run in single-line mode"
+                                                }
+
 inputFiles :: Cmd.Term [FilePath]
 inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
-                                                     , Cmd.posDoc = "Optional .purs files to load on start" }
+                                                     , Cmd.posDoc = "Optional .purs files to load on start"
+                                                     }
 
 loadUserConfig :: IO (Maybe [Command])
 loadUserConfig = do
@@ -391,8 +398,8 @@ loadUserConfig = do
 -- |
 -- The PSCI main loop.
 --
-loop :: [FilePath] -> IO ()
-loop files = do
+loop :: Bool -> [FilePath] -> IO ()
+loop singleLineMode files = do
   config <- loadUserConfig
   preludeFilename <- P.preludeFilename
   filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . loadModule $ file) (preludeFilename : files)
@@ -409,7 +416,7 @@ loop files = do
       where
         go :: InputT (StateT PSCiState IO) ()
         go = do
-          c <- getCommand
+          c <- getCommand singleLineMode
           case c of
             Left err -> outputStrLn (show err) >> go
             Right Nothing -> go
@@ -417,7 +424,7 @@ loop files = do
             Right (Just c') -> runPSCI (handleCommand c') >> go
 
 term :: Cmd.Term (IO ())
-term = loop <$> inputFiles
+term = loop <$> singleLineFlag <*> inputFiles
 
 termInfo :: Cmd.TermInfo
 termInfo = Cmd.defTI
