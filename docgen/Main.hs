@@ -144,7 +144,8 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let exported = filter (isDctorExported name exps . fst) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
-    atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ concatMap (\ty -> prettyPrintType' ty ++ " -> ") tys ++ typeName
+    let ctorTy = foldr P.function (P.TypeConstructor (P.Qualified Nothing name)) tys
+    in atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
