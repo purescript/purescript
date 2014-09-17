@@ -28,6 +28,7 @@ import Language.PureScript.Options
 import Language.PureScript.Errors
 
 import Data.Maybe
+import Data.Either (lefts, rights)
 
 import Control.Applicative
 import Control.Monad.State
@@ -232,4 +233,19 @@ liftUnify unify = do
   (a, ust) <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
   modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
   return (a, unifyCurrentSubstitution ust)
+
+-- |
+-- Typecheck in parallel
+--
+parU :: [a] -> (a -> UnifyT t Check b) -> UnifyT t Check [b]
+parU xs f = forM xs (withError . f) >>= collectErrors
+  where
+  withError :: UnifyT t Check a -> UnifyT t Check (Either ErrorStack a)
+  withError u = catchError (Right <$> u) (return . Left)
+
+  collectErrors :: [Either ErrorStack a] -> UnifyT t Check [a]
+  collectErrors es = case lefts es of
+    [err] -> throwError err
+    [] -> return $ rights es
+    errs -> throwError $ MultipleErrors errs
 

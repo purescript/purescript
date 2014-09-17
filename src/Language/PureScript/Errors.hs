@@ -16,7 +16,7 @@
 
 module Language.PureScript.Errors where
 
-import Data.List (intercalate)
+import Data.List (intersperse, intercalate)
 import Data.Monoid
 
 import Control.Monad.Error
@@ -41,25 +41,35 @@ data ErrorSource
 -- |
 -- Compilation errors
 --
-data CompileError = CompileError {
-    -- |
-    -- Error message
-    --
-    compileErrorMessage :: String
-    -- |
-    -- The value where the error occurred
-    --
-  , compileErrorValue :: Maybe ErrorSource
-    -- |
-    -- Optional source position information
-    --
-  , compileErrorPosition :: Maybe SourcePos
-  } deriving (Show)
+data CompileError
+  = CompileError
+      { -- |
+        -- Error message
+        --
+        compileErrorMessage :: String
+        -- |
+        -- The value where the error occurred
+        --
+      , compileErrorValue :: Maybe ErrorSource
+        -- |
+        -- Optional source position information
+        --
+      , compileErrorPosition :: Maybe SourcePos
+      }
+  deriving (Show)
 
 -- |
 -- A stack trace for an error
 --
-newtype ErrorStack = ErrorStack { runErrorStack :: [CompileError] } deriving (Show, Monoid)
+data ErrorStack
+  = ErrorStack { runErrorStack :: [CompileError] }
+  | MultipleErrors [ErrorStack] deriving (Show)
+
+instance Monoid ErrorStack where
+  mempty = ErrorStack []
+  mappend (ErrorStack xs) (ErrorStack ys) = ErrorStack (xs ++ ys)
+  mappend (MultipleErrors es) x = MultipleErrors [ e <> x | e <- es ]
+  mappend x (MultipleErrors es) = MultipleErrors [ x <> e | e <- es ]
 
 instance Error ErrorStack where
   strMsg s = ErrorStack [CompileError s Nothing Nothing]
@@ -80,6 +90,8 @@ prettyPrintErrorStack printFullStack (ErrorStack es) =
       in case length es' of
         1 -> showError (head es')
         _ -> showError (head es') ++ "\n" ++ showError (last es')
+prettyPrintErrorStack printFullStack (MultipleErrors es) =
+  unlines $ intersperse "" $ "Multiple errors:" : map (prettyPrintErrorStack printFullStack) es
 
 stringifyErrorStack :: Bool -> Either ErrorStack a -> Either String a
 stringifyErrorStack printFullStack = either (Left . prettyPrintErrorStack printFullStack) Right
