@@ -655,8 +655,8 @@ infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
   v3@(TypedValue _ _ t3) <- infer el
-  t2 =?= t3
-  return $ TypedValue True (IfThenElse cond' v2 v3) t2
+  (v2', v3', t) <- meet v2 v3 t2 t3
+  return $ TypedValue True (IfThenElse cond' v2' v3') t
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
@@ -1119,6 +1119,18 @@ subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
 
+-- |
+-- Compute the meet of two types, i.e. the most general type which both types subsume.
+-- TODO: handle constrained types
+--
+meet :: Expr -> Expr -> Type -> Type -> UnifyT Type Check (Expr, Expr, Type)
+meet e1 e2 t1@(ForAll _ _ _) t2 = meet e1 e2 t1 t2
+meet e1 e2 t1 (ForAll ident t2 _) = do
+  t2' <- replaceVarWithUnknown ident t2
+  meet e1 e2 t1 t2'
+meet e1 e2 t1 t2 = do
+  t1 =?= t2
+  return (e1, e2, t1)
 
 
 
