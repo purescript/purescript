@@ -1131,7 +1131,9 @@ subsumes' val ty1 ty2 = do
 -- TODO: handle constrained types
 --
 meet :: Expr -> Expr -> Type -> Type -> UnifyT Type Check (Expr, Expr, Type)
-meet e1 e2 t1@(ForAll _ _ _) t2 = meet e1 e2 t1 t2
+meet e1 e2 (ForAll ident t1 _) t2 = do
+  t1' <- replaceVarWithUnknown ident t1
+  meet e1 e2 t1' t2
 meet e1 e2 t1 (ForAll ident t2 _) = do
   t2' <- replaceVarWithUnknown ident t2
   meet e1 e2 t1 t2'
