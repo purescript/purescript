@@ -13,12 +13,37 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE GADTs, DataKinds, StandaloneDeriving #-}
+
 module Language.PureScript.Options where
+
+-- |
+-- Indicates the mode of the compiler. Lifted using DataKinds to refine the Options type.
+--
+data Mode = Compile | Make
+
+-- |
+-- Per-mode options
+--
+data ModeOptions mode where
+  CompileOptions :: String -> [String] -> [String] -> ModeOptions Compile
+  MakeOptions :: ModeOptions Make
+
+browserNamespace :: ModeOptions Compile -> String
+browserNamespace (CompileOptions ns _ _) = ns
+
+entryPointModules :: ModeOptions Compile -> [String]
+entryPointModules (CompileOptions _ ms _) = ms
+
+codeGenModules :: ModeOptions Compile -> [String]
+codeGenModules (CompileOptions _ _ ms) = ms
+
+deriving instance Show (ModeOptions mode)
 
 -- |
 -- The data type of compiler options
 --
-data Options = Options {
+data Options mode = Options {
     -- |
     -- Disable inclusion of the built in Prelude
     --
@@ -45,27 +70,24 @@ data Options = Options {
     --
   , optionsNoOptimizations :: Bool
     -- |
-    -- Specify the namespace that PureScript modules will be exported to when running in the
-    -- browser.
-    --
-  , optionsBrowserNamespace :: Maybe String
-    -- |
-    -- The modules to keep while enabling dead code elimination
-    --
-  , optionsModules :: [String]
-    -- |
-    -- The modules to code gen
-    --
-  , optionsCodeGenModules :: [String]
-    -- |
     -- Verbose error message
     --
   , optionsVerboseErrors :: Bool
-
+    -- |
+    -- Specify the namespace that PureScript modules will be exported to when running in the
+    -- browser.
+    --
+  , optionsAdditional :: ModeOptions mode
   } deriving Show
 
 -- |
 -- Default compiler options
 --
-defaultOptions :: Options
-defaultOptions = Options False False False False Nothing False Nothing [] [] False
+defaultCompileOptions :: Options Compile
+defaultCompileOptions = Options False False False False Nothing False False (CompileOptions "PS" [] [])
+
+-- |
+-- Default make options
+--
+defaultMakeOptions :: Options Make
+defaultMakeOptions = Options False False False False Nothing False False MakeOptions

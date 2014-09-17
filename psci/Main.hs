@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
 
 module Main where
 
@@ -198,8 +198,8 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 
 -- | Compilation options.
 --
-options :: P.Options
-options = P.Options False False False False Nothing False Nothing [] [] False
+options :: P.Options P.Make
+options = P.Options False False False False Nothing False False P.MakeOptions
 
 -- |
 -- PSCI monad
@@ -276,7 +276,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -295,7 +295,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -311,7 +311,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) [] 
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [("$PSCI.purs", m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -374,12 +374,12 @@ handleCommand _ = PSCI $ outputStrLn "Unknown command"
 singleLineFlag :: Cmd.Term Bool
 singleLineFlag = Cmd.value $ Cmd.flag $ (Cmd.optInfo ["single-line-mode"])
                                                 { Cmd.optName = "Single-line mode"
-                                                , Cmd.optDoc = "Run in single-line mode" 
+                                                , Cmd.optDoc = "Run in single-line mode"
                                                 }
 
 inputFiles :: Cmd.Term [FilePath]
 inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
-                                                     , Cmd.posDoc = "Optional .purs files to load on start" 
+                                                     , Cmd.posDoc = "Optional .purs files to load on start"
                                                      }
 
 loadUserConfig :: IO (Maybe [Command])

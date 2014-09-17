@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DataKinds #-}
+
 module Language.PureScript (module P, compile, compile', MonadMake(..), make, preludeFilename) where
 
 import Language.PureScript.Types as P
@@ -39,7 +41,7 @@ import qualified Paths_purescript as Paths
 import Data.List (find, sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Control.Monad.Error
 import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
@@ -67,21 +69,21 @@ import System.FilePath (pathSeparator)
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: Options -> [Module] -> [String] -> Either String (String, String, Environment)
+compile :: Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: Environment -> Options -> [Module] -> [String] -> Either String (String, String, Environment)
+compile' :: Environment -> Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
 compile' env opts ms prefix = do
   (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoints = moduleNameFromString `map` optionsModules opts
+  let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
   let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
   let renamed = renameInModules elim
-  let codeGenModules = moduleNameFromString `map` optionsCodeGenModules opts
-  let modulesToCodeGen = if null codeGenModules then renamed else filter (\(Module mn _ _) -> mn `elem` codeGenModules) renamed
-  let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs Globals opts m env') modulesToCodeGen
+  let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
+  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(Module mn _ _) -> mn `elem` codeGenModuleNames) renamed
+  let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
@@ -126,13 +128,13 @@ typeCheckModule mainModuleName (Module mn decls exps) = do
     go _ = True
 
 
-generateMain :: Environment -> Options -> [JS] -> Either String [JS]
+generateMain :: Environment -> Options Compile -> [JS] -> Either String [JS]
 generateMain env opts js =
   case moduleNameFromString <$> optionsMain opts of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
         Left $ show mmi ++ "." ++ C.main ++ " is undefined"
-      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (fromJust (optionsBrowserNamespace opts))))) []]
+      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace (optionsAdditional opts))))) []]
     _ -> return js
 
 -- |
@@ -170,7 +172,7 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options -> [(FilePath, Module)] -> [String] -> m Environment
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(FilePath, Module)] -> [String] -> m Environment
 make outputDir opts ms prefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
@@ -216,9 +218,9 @@ make outputDir opts ms prefix = do
     regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
-    let [renamed] = renameInModules [mod'] 
+    let [renamed] = renameInModules [mod']
 
-    pjs <- prettyPrintJS <$> moduleToJs CommonJS opts renamed env'
+    pjs <- prettyPrintJS <$> moduleToJs opts renamed env'
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
     let exts = unlines $ map ("-- " ++ ) prefix ++ [moduleToPs renamed env']
 

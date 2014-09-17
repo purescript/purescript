@@ -13,17 +13,16 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE GADTs, DoAndIfThenElse #-}
 
 module Language.PureScript.CodeGen.JS (
     module AST,
-    ModuleType(..),
     declToJs,
     moduleToJs,
     identNeedsEscaping
 ) where
 
-import Data.Maybe (catMaybes, fromJust)
+import Data.Maybe (catMaybes)
 import Data.Function (on)
 import Data.List (nub, (\\), delete, sortBy)
 
@@ -43,39 +42,35 @@ import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
 -- |
--- Different types of modules which are supported
---
-data ModuleType = CommonJS | Globals
-
--- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: (Functor m, Applicative m, Monad m) => ModuleType -> Options -> Module -> Environment -> SupplyT m [JS]
-moduleToJs mt opts (Module name decls (Just exps)) env = do
-  let jsImports = map (importToJs mt opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) . nub $ concatMap imports decls
+moduleToJs :: (Functor m, Applicative m, Monad m) => Options mode -> Module -> Environment -> SupplyT m [JS]
+moduleToJs opts (Module name decls (Just exps)) env = do
+  let jsImports = map (importToJs opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) . nub $ concatMap imports decls
   jsDecls <- mapM (\decl -> declToJs opts name decl env) decls
   let optimized = concat $ map (map $ optimize opts) $ catMaybes jsDecls
   let isModuleEmpty = null exps
   let moduleBody = JSStringLiteral "use strict" : jsImports ++ optimized
   let moduleExports = JSObjectLiteral $ concatMap exportToJs exps
-  return $ case mt of
-    CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
-    Globals | not isModuleEmpty ->
-      [ JSVariableIntroduction (fromJust (optionsBrowserNamespace opts))
-                               (Just (JSBinary Or (JSVar (fromJust (optionsBrowserNamespace opts))) (JSObjectLiteral [])) )
-      , JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts))))
+  return $ case optionsAdditional opts of
+    MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
+    CompileOptions ns _ _ | not isModuleEmpty ->
+      [ JSVariableIntroduction ns
+                               (Just (JSBinary Or (JSVar ns) (JSObjectLiteral [])) )
+      , JSAssignment (JSAccessor (moduleNameToJs name) (JSVar ns))
                      (JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) [])
       ]
     _ -> []
-moduleToJs _ _ _ _ = error "Exports should have been elaborated in name desugaring"
+moduleToJs _ _ _ = error "Exports should have been elaborated in name desugaring"
 
-importToJs :: ModuleType -> Options -> ModuleName -> JS
-importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleBody)
+importToJs :: Options mode -> ModuleName -> JS
+importToJs opts mn =
+  JSVariableIntroduction (moduleNameToJs mn) (Just moduleBody)
   where
-  moduleBody = case mt of
-    CommonJS -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
-    Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
+  moduleBody = case optionsAdditional opts of
+    MakeOptions -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
+    CompileOptions ns _ _ -> JSAccessor (moduleNameToJs mn) (JSVar ns)
 
 imports :: Declaration -> [ModuleName]
 imports (ImportDeclaration mn _ _) = [mn]
@@ -95,7 +90,7 @@ imports other =
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
-declToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Declaration -> Environment -> SupplyT m (Maybe [JS])
+declToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Declaration -> Environment -> SupplyT m (Maybe [JS])
 declToJs opts mp (ValueDeclaration ident _ _ _ val) e = do
   js <- valueToJs opts mp e val
   return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
@@ -190,7 +185,7 @@ accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a value or expression.
 --
-valueToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> Expr -> SupplyT m JS
+valueToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Environment -> Expr -> SupplyT m JS
 valueToJs _ _ _ (NumericLiteral n) = return $ JSNumericLiteral n
 valueToJs _ _ _ (StringLiteral s) = return $ JSStringLiteral s
 valueToJs _ _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
@@ -315,7 +310,7 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 -- Generate code in the simplified Javascript intermediate representation for pattern match binders
 -- and guards.
 --
-bindersToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> SupplyT m JS
+bindersToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> SupplyT m JS
 bindersToJs opts m e binders vals = do
   valNames <- replicateM (length vals) freshName
   let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
@@ -405,7 +400,7 @@ binderToJs m e varName done binder@(ConsBinder _ _) = do
     ( JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left numberOfHeadBinders)])) :
       js2
     )) Nothing]
-  where 
+  where
   uncons :: [Binder] -> Binder -> ([Binder], Binder)
   uncons acc (ConsBinder h t) = uncons (h : acc) t
   uncons acc (PositionedBinder _ b) = uncons acc b
@@ -415,4 +410,5 @@ binderToJs m e varName done (NamedBinder ident binder) = do
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
 binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
+
 
