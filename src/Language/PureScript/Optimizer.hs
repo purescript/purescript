@@ -49,7 +49,7 @@ import Language.PureScript.Optimizer.Blocks
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: Options -> JS -> JS
+optimize :: Options mode -> JS -> JS
 optimize opts | optionsNoOptimizations opts = id
               | otherwise = untilFixedPoint (applyAll
   [ collapseNestedBlocks

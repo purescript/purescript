@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
 
 module Main where
 
@@ -198,8 +198,8 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 
 -- | Compilation options.
 --
-options :: P.Options
-options = P.Options False True False True Nothing True Nothing [] [] False
+options :: P.Options P.Make
+options = P.Options False False False False Nothing False False P.MakeOptions
 
 -- |
 -- PSCI monad
@@ -435,3 +435,4 @@ termInfo = Cmd.defTI
 
 main :: IO ()
 main = Cmd.run (term, termInfo)
+

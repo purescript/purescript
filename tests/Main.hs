@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE DataKinds, DoAndIfThenElse #-}
 
 module Main (main) where
 
@@ -34,15 +34,15 @@ readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputF
   text <- U.readFile inputFile
   return $ P.runIndentParser inputFile P.parseModules text
 
-compile :: P.Options -> [FilePath] -> IO (Either String (String, String, P.Environment))
+compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
   modules <- readInput inputFiles
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms -> return $ P.compile opts ms [] 
+    Right ms -> return $ P.compile opts ms []
 
-assert :: FilePath -> P.Options -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
+assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do
   e <- compile opts [preludeExterns, inputFile]
   maybeErr <- f e
@@ -53,7 +53,10 @@ assert preludeExterns opts inputFile f = do
 assertCompiles :: String -> FilePath -> FilePath -> IO ()
 assertCompiles preludeJs preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " compiles successfully"
-  let options = P.defaultOptions { P.optionsMain = Just "Main", P.optionsModules = ["Main"], P.optionsCodeGenModules = ["Main"], P.optionsBrowserNamespace = Just "Tests" }
+  let options = P.defaultCompileOptions
+                              { P.optionsMain = Just "Main"
+                              , P.optionsAdditional = P.CompileOptions "Tests" ["Main"] ["Main"]
+                              }
   assert preludeExterns options inputFile $ either (return . Just) $ \(js, _, _) -> do
     process <- findNodeProcess
     result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
@@ -65,7 +68,7 @@ assertCompiles preludeJs preludeExterns inputFile = do
 assertDoesNotCompile :: FilePath -> FilePath -> IO ()
 assertDoesNotCompile preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " does not compile"
-  assert preludeExterns (P.defaultOptions { P.optionsBrowserNamespace = Just "Tests" }) inputFile $ \e ->
+  assert preludeExterns (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) inputFile $ \e ->
     case e of
       Left _ -> return Nothing
       Right _ -> return $ Just "Should not have compiled"
@@ -78,7 +81,7 @@ main :: IO ()
 main = do
   prelude <- P.preludeFilename
   putStrLn "Compiling Prelude"
-  preludeResult <- compile (P.defaultOptions { P.optionsBrowserNamespace = Just "Tests" }) [prelude]
+  preludeResult <- compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) [prelude]
   case preludeResult of
     Left err -> putStrLn err >> exitFailure
     Right (preludeJs, exts, _) -> do
@@ -97,3 +100,4 @@ main = do
       forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
         assertDoesNotCompile preludeExterns (failing ++ pathSeparator : inputFile)
       exitSuccess
+

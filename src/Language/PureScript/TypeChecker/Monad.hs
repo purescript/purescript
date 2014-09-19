@@ -28,6 +28,7 @@ import Language.PureScript.Options
 import Language.PureScript.Errors
 
 import Data.Maybe
+import Data.Either (lefts, rights)
 
 import Control.Applicative
 import Control.Monad.State
@@ -190,13 +191,13 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: Options -> Check a -> Either String (a, Environment)
+runCheck :: Options mode -> Check a -> Either String (a, Environment)
 runCheck opts = runCheck' opts initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: Options -> Environment -> Check a -> Either String (a, Environment)
+runCheck' :: Options mode -> Environment -> Check a -> Either String (a, Environment)
 runCheck' opts env c = stringifyErrorStack (optionsVerboseErrors opts) $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
@@ -232,4 +233,19 @@ liftUnify unify = do
   (a, ust) <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
   modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
   return (a, unifyCurrentSubstitution ust)
+
+-- |
+-- Typecheck in parallel
+--
+parU :: [a] -> (a -> UnifyT t Check b) -> UnifyT t Check [b]
+parU xs f = forM xs (withError . f) >>= collectErrors
+  where
+  withError :: UnifyT t Check a -> UnifyT t Check (Either ErrorStack a)
+  withError u = catchError (Right <$> u) (return . Left)
+
+  collectErrors :: [Either ErrorStack a] -> UnifyT t Check [a]
+  collectErrors es = case lefts es of
+    [err] -> throwError err
+    [] -> return $ rights es
+    errs -> throwError $ MultipleErrors errs
 

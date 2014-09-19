@@ -42,10 +42,11 @@ module Language.PureScript.TypeChecker.Types (
 -}
 
 import Data.List
-import Data.Maybe (maybeToList, isNothing, isJust, fromMaybe)
+import Data.Maybe (maybeToList, fromMaybe)
 import Data.Function (on)
 import Data.Ord (comparing)
 import Data.Monoid
+import Data.Either (lefts, rights)
 
 import Language.PureScript.Declarations
 import Language.PureScript.Types
@@ -171,14 +172,16 @@ unifyRows r1 r2 =
 typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
 typesOf mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
-    (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
-    forM es $ \e -> do
-      triple@(_, (_, ty)) <- typeForBindingGroupElement moduleName e dict untypedDict
-      -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
-      when (Just moduleName == mainModuleName && fst e == Ident C.main) $ do
-        [eff, a] <- replicateM 2 fresh
-        ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
+    (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
+    ds1 <- parU typed $ \e -> do
+      triple@(_, (_, ty)) <- checkTypedBindingGroupElement moduleName e dict
+      checkMain (fst e) ty
       return triple
+    ds2 <- forM untyped $ \e -> do
+      triple@(_, (_, ty)) <- typeForBindingGroupElement e dict untypedDict
+      checkMain (fst e) ty
+      return triple
+    return $ ds1 ++ ds2
 
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
@@ -193,17 +196,25 @@ typesOf mainModuleName moduleName vals = do
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
+  -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
+  checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
+    [eff, a] <- replicateM 2 fresh
+    ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
 
-typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Expr)] -> UnifyT Type Check ([(Ident, (Expr, Maybe (Type, Bool)))], M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility), [(Ident, Type)])
+type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
+
+type UntypedData = [(Ident, Type)]
+
+typeDictionaryForBindingGroup :: ModuleName -> [(Ident, Expr)] -> UnifyT Type Check ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
 typeDictionaryForBindingGroup moduleName vals = do
   let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
     es = map isTyped vals
     -- Filter the typed and untyped declarations
-    typed = filter (isJust . snd . snd) es
-    untyped = filter (isNothing . snd . snd) es
+    untyped = lefts es
+    typed = rights es
     -- Make a map of names to typed declarations
-    typedDict = map (\(ident, (_, Just (ty, _))) -> (ident, ty)) typed
+    typedDict = map (\(ident, (_, ty, _)) -> (ident, ty)) typed
 
   -- Create fresh unification variables for the types of untyped declarations
   untypedNames <- replicateM (length untyped) fresh
@@ -213,37 +224,33 @@ typeDictionaryForBindingGroup moduleName vals = do
     untypedDict = zip (map fst untyped) untypedNames
     -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
     dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, LocalVariable, Undefined))) $ typedDict ++ untypedDict)
-  return (es, dict, untypedDict)
+  return (untyped, typed, dict, untypedDict)
 
-typeForBindingGroupElement :: ModuleName -> (Ident, (Expr, Maybe (Type, Bool))) -> M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility) -> [(Ident, Type)] -> UnifyT Type Check (Ident, (Expr, Type))
-typeForBindingGroupElement moduleName el dict untypedDict =
-  -- If the declaration is a function, it has access to other values in the binding group.
-  -- If not, the generated code might fail at runtime since those values might be undefined.
-  case el of
-    -- Typed declarations
-    (ident, (val', Just (ty, checkType))) -> do
-      -- Kind check
-      kind <- liftCheck $ kindOf moduleName ty
-      guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
-      -- Check the type with the new names in scope
-      ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-      val'' <- if checkType
-               then bindNames dict $ TypedValue True <$> check val' ty' <*> pure ty'
-               else return (TypedValue False val' ty')
-      return (ident, (val'', ty'))
-    -- Untyped declarations
-    (ident, (val', Nothing)) -> do
-      -- Infer the type with the new names in scope
-      TypedValue _ val'' ty <- bindNames dict $ infer val'
-      ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
-      return (ident, (TypedValue True val'' ty, ty))
+checkTypedBindingGroupElement :: ModuleName -> (Ident, (Expr, Type, Bool)) -> TypeData ->  UnifyT Type Check (Ident, (Expr, Type))
+checkTypedBindingGroupElement moduleName (ident, (val', ty, checkType)) dict = do
+  -- Kind check
+  kind <- liftCheck $ kindOf moduleName ty
+  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+  -- Check the type with the new names in scope
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  val'' <- if checkType
+           then bindNames dict $ TypedValue True <$> check val' ty' <*> pure ty'
+           else return (TypedValue False val' ty')
+  return (ident, (val'', ty'))
+
+typeForBindingGroupElement :: (Ident, Expr) -> TypeData -> UntypedData -> UnifyT Type Check (Ident, (Expr, Type))
+typeForBindingGroupElement (ident, val) dict untypedDict = do
+  -- Infer the type with the new names in scope
+  TypedValue _ val' ty <- bindNames dict $ infer val
+  ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+  return (ident, (TypedValue True val' ty, ty))
 
 -- |
 -- Check if a value contains a type annotation
 --
-isTyped :: (Ident, Expr) -> (Ident, (Expr, Maybe (Type, Bool)))
-isTyped (name, TypedValue checkType value ty) = (name, (value, Just (ty, checkType)))
-isTyped (name, value) = (name, (value, Nothing))
+isTyped :: (Ident, Expr) -> (Either (Ident, Expr) (Ident, (Expr, Type, Bool)))
+isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
+isTyped (name, value) = Left (name, value)
 
 -- |
 -- Map a function over type annotations appearing inside a value
@@ -655,8 +662,8 @@ infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
   v3@(TypedValue _ _ t3) <- infer el
-  t2 =?= t3
-  return $ TypedValue True (IfThenElse cond' v2 v3) t2
+  (v2', v3', t) <- meet v2 v3 t2 t3
+  return $ TypedValue True (IfThenElse cond' v2' v3') t
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
@@ -692,10 +699,10 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret
   bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
-  (es, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
-  ds' <- forM es $ \e -> do
-    (ident, (val', _)) <- typeForBindingGroupElement moduleName e dict untypedDict
-    return $ (ident, LocalVariable, val')
+  (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
+  ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
+  let ds' = [(ident, LocalVariable, val') | (ident, (val', _)) <- ds1' ++ ds2']
   makeBindingGroupVisible $ bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
 inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = rethrowWithPosition pos $ do
   ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
@@ -1118,6 +1125,22 @@ subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val
+
+-- |
+-- Compute the meet of two types, i.e. the most general type which both types subsume.
+-- TODO: handle constrained types
+--
+meet :: Expr -> Expr -> Type -> Type -> UnifyT Type Check (Expr, Expr, Type)
+meet e1 e2 (ForAll ident t1 _) t2 = do
+  t1' <- replaceVarWithUnknown ident t1
+  meet e1 e2 t1' t2
+meet e1 e2 t1 (ForAll ident t2 _) = do
+  t2' <- replaceVarWithUnknown ident t2
+  meet e1 e2 t1 t2'
+meet e1 e2 t1 t2 = do
+  t1 =?= t2
+  return (e1, e2, t1)
+
 
 
 
