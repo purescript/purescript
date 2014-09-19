@@ -20,7 +20,7 @@ module Language.PureScript.Parser.Declarations (
     parseValue,
     parseGuard,
     parseBinder,
-    parseBinderNoParens,
+    parseBinderNoParens
 ) where
 
 import Data.Maybe (isJust, fromMaybe)
@@ -39,6 +39,7 @@ import Language.PureScript.Environment
 import qualified Language.PureScript.Parser.Common as C
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
+import qualified Control.Monad as M (guard)
 
 -- |
 -- Read source position information
@@ -71,8 +72,11 @@ parseTypeSynonymDeclaration =
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration = do
+  let allUnique xs = 
+        case xs of { [] -> True; (y:ys) -> y `notElem` ys && allUnique ys }
   name <- parseIdent
   binders <- P.many parseBinderNoParens
+  M.guard (allUnique (binders >>= binderNames)) P.<?> "non-overlapping binders"
   guard <- P.optionMaybe parseGuard
   value <- lexeme (indented *> P.char '=') *> parseValue
   whereClause <- P.optionMaybe $ do
