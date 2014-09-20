@@ -20,7 +20,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
 ) where
 
 import Data.Monoid ((<>))
-import Data.List (groupBy)
+import Data.List (nub, groupBy)
 
 import Control.Applicative
 import Control.Monad ((<=<), forM, join, unless, replicateM)
@@ -31,6 +31,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Supply
+import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |
 -- Replace all top-level binders in a module with case expressions.
@@ -82,6 +83,7 @@ toDecls :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
 toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
+  guardWith (strMsg "Overlapping function argument names") $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] Nothing body]
 toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
   let tuples = map toTuple ds

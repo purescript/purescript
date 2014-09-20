@@ -785,6 +785,8 @@ inferBinder val (PositionedBinder pos binder) =
 checkBinders :: [Type] -> Type -> [CaseAlternative] -> UnifyT Type Check [CaseAlternative]
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
+  guardWith (strMsg "Overlapping binders in case statement") $
+    let ns = concatMap binderNames binders in length (nub ns) == length ns
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables moduleName [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $ do
