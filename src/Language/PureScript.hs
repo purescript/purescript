@@ -94,7 +94,7 @@ compile' env opts ms prefix = do
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule mainModuleName (Module mn decls exps) = do
   modify (\s -> s { checkCurrentModule = Just mn })
-  decls' <- typeCheckAll mainModuleName mn decls
+  decls' <- typeCheckAll mainModuleName mn exps decls
   mapM_ checkTypesAreExported exps'
   return $ Module mn decls' exps
   where
