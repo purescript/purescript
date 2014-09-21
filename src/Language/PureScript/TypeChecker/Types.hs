@@ -863,7 +863,7 @@ check' val t@(ConstrainedType constraints ty) = do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
   val' <- makeBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
-    TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular) (map (Qualified Nothing) dictNames)
+    TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular False) (map (Qualified Nothing) dictNames)
       constraints) $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
 check' val (SaturatedTypeSynonym name args) = do
@@ -1140,6 +1140,7 @@ meet e1 e2 t1 (ForAll ident t2 _) = do
 meet e1 e2 t1 t2 = do
   t1 =?= t2
   return (e1, e2, t1)
+
 
 
 

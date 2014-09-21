@@ -151,36 +151,46 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --   };
 -}
 desugarDecl :: ModuleName -> [DeclarationRef] -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
-desugarDecl mn _ d@(TypeClassDeclaration name args implies members) = do
-  modify (M.insert (mn, name) d)
-  return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-desugarDecl mn exps d@(TypeInstanceDeclaration name deps className tys members) = do
-  desugared <- lift $ desugarCases members
-  dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
-  let expRef = if isExportedClass className && all isExportedType (getConstructors `concatMap` tys)
-               then Just $ TypeInstanceRef name
-               else Nothing
-  return $ (expRef, [d, dictDecl])
+desugarDecl mn exps = go
   where
+  go d@(TypeClassDeclaration name args implies members) = do
+    modify (M.insert (mn, name) d)
+    return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+  go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
+  go d@(TypeInstanceDeclaration name deps className tys members) = do
+    desugared <- lift $ desugarCases members
+    dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
+    return $ (expRef name className tys, [d, dictDecl])
+  go (PositionedDeclaration pos d) = do
+    (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
+    return (dr, map (PositionedDeclaration pos) ds)
+  go other = return (Nothing, [other])
+
+  expRef :: Ident -> Qualified ProperName -> [Type] -> Maybe DeclarationRef
+  expRef name className tys
+    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef name
+    | otherwise = Nothing
+
   isExportedClass :: Qualified ProperName -> Bool
   isExportedClass = isExported (elem . TypeClassRef)
+
   isExportedType :: Qualified ProperName -> Bool
   isExportedType = isExported $ \pn -> isJust . find (matchesTypeRef pn)
+
   isExported :: (ProperName -> [DeclarationRef] -> Bool) -> Qualified ProperName -> Bool
   isExported test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
   isExported _ _ = error "Names should have been qualified in name desugaring"
+
   matchesTypeRef :: ProperName -> DeclarationRef -> Bool
   matchesTypeRef pn (TypeRef pn' _) = pn == pn'
   matchesTypeRef _ _ = False
+
   getConstructors :: Type -> [Qualified ProperName]
   getConstructors = everythingOnTypes (++) getConstructor
+
   getConstructor :: Type -> [Qualified ProperName]
   getConstructor (TypeConstructor tcname) = [tcname]
   getConstructor _ = []
-desugarDecl mn exps (PositionedDeclaration pos d) = do
-  (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
-  return (dr, map (PositionedDeclaration pos) ds)
-desugarDecl _ _ other = return (Nothing, [other])
 
 memberToNameAndType :: Declaration -> (Ident, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
@@ -275,3 +285,5 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] _ val) = val
   typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
   typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"
+
+

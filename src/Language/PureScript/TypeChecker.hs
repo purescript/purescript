@@ -210,6 +210,7 @@ typeCheckAll mainModuleName moduleName exps = go
     let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in importedModule == mn) tcds
     addTypeClassDictionaries [ tcd { tcdName = Qualified (Just moduleName) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
                              | tcd <- instances
+                             , tcdExported tcd
                              , let (Qualified _ ident) = tcdName tcd
                              ]
     ds <- go rest
@@ -223,11 +224,23 @@ typeCheckAll mainModuleName moduleName exps = go
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
-    addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular]
+    addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported]
     ds <- go rest
     return $ d : ds
+    where
+    isInstanceExported :: Bool
+    isInstanceExported = maybe True (any exportsInstance) exps 
+    
+    exportsInstance :: DeclarationRef -> Bool
+    exportsInstance (TypeInstanceRef name) | name == dictName = True
+    exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
+    exportsInstance _ = False
+    
   go (PositionedDeclaration pos d : rest) =
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
+
+
+
 
