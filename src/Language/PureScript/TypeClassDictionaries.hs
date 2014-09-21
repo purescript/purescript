@@ -46,6 +46,10 @@ data TypeClassDictionaryInScope
     -- The type of this dictionary
     --
     , tcdType :: TypeClassDictionaryType
+    -- |
+    -- Is this instance exported by its module?
+    --
+    , tcdExported :: Bool
     } deriving (Show, Data, Typeable)
 
 -- |

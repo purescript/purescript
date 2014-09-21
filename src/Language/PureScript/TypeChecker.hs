@@ -119,112 +119,128 @@ checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance hea
 --
 --  * Process module imports
 --
-typeCheckAll :: Maybe ModuleName -> ModuleName -> [Declaration] -> Check [Declaration]
-typeCheckAll _ _ [] = return []
-typeCheckAll mainModuleName moduleName (d@(DataDeclaration dtype name args dctors) : rest) = do
-  rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
-    when (dtype == Newtype) $ checkNewtype dctors
-    checkDuplicateTypeArguments args
-    ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
-    addDataType moduleName dtype name args dctors ctorKind
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
+typeCheckAll :: Maybe ModuleName -> ModuleName -> Maybe [DeclarationRef] -> [Declaration] -> Check [Declaration]
+typeCheckAll mainModuleName moduleName exps = go
   where
-  checkNewtype :: [(ProperName, [Type])] -> Check ()
-  checkNewtype [(_, [_])] = return ()
-  checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
-  checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
-typeCheckAll mainModuleName moduleName (d@(DataBindingGroupDeclaration tys) : rest) = do
-  rethrow (strMsg "Error in data binding group" <>) $ do
-    let syns = mapMaybe toTypeSynonym tys
-    let dataDecls = mapMaybe toDataDecl tys
-    (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-    forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
+  go :: [Declaration] -> Check [Declaration]
+  go [] = return []
+  go (d@(DataDeclaration dtype name args dctors) : rest) = do
+    rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
+      when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments args
+      ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
       addDataType moduleName dtype name args dctors ctorKind
-    forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+    ds <- go rest
+    return $ d : ds
+    where
+    checkNewtype :: [(ProperName, [Type])] -> Check ()
+    checkNewtype [(_, [_])] = return ()
+    checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
+    checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
+  go (d@(DataBindingGroupDeclaration tys) : rest) = do
+    rethrow (strMsg "Error in data binding group" <>) $ do
+      let syns = mapMaybe toTypeSynonym tys
+      let dataDecls = mapMaybe toDataDecl tys
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
+      forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
+        checkDuplicateTypeArguments args
+        addDataType moduleName dtype name args dctors ctorKind
+      forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+        checkDuplicateTypeArguments args
+        addTypeSynonym moduleName name args ty kind
+    ds <- go rest
+    return $ d : ds
+    where
+    toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
+    toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
+    toTypeSynonym _ = Nothing
+    toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
+    toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
+    toDataDecl _ = Nothing
+  go (d@(TypeSynonymDeclaration name args ty) : rest) = do
+    rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
       checkDuplicateTypeArguments args
+      kind <- kindsOf False moduleName name args [ty]
       addTypeSynonym moduleName name args ty kind
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-  where
-  toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
-  toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
-  toTypeSynonym _ = Nothing
-  toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
-  toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
-  toDataDecl _ = Nothing
-typeCheckAll mainModuleName moduleName (d@(TypeSynonymDeclaration name args ty) : rest) = do
-  rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
-    checkDuplicateTypeArguments args
-    kind <- kindsOf False moduleName name args [ty]
-    addTypeSynonym moduleName name args ty kind
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll _ _ (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
-typeCheckAll mainModuleName moduleName (ValueDeclaration name nameKind [] Nothing val : rest) = do
-  d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
-    valueIsNotDefined moduleName name
-    [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
-    addValue moduleName name ty nameKind
-    return $ ValueDeclaration name nameKind [] Nothing val'
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll _ _ (ValueDeclaration{} : _) = error "Binders were not desugared"
-typeCheckAll mainModuleName moduleName (BindingGroupDeclaration vals : rest) = do
-  d <- rethrow (strMsg ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) <>) $ do
-    forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
+    ds <- go rest
+    return $ d : ds
+  go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
+  go (ValueDeclaration name nameKind [] Nothing val : rest) = do
+    d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
       valueIsNotDefined moduleName name
-    tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
-    vals' <- forM (zipWith (\(name, nameKind, _) (_, (val, ty)) -> (name, val, nameKind, ty)) vals tys) $ \(name, val, nameKind, ty) -> do
+      [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
-      return (name, nameKind, val)
-    return $ BindingGroupDeclaration vals'
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(ExternDataDeclaration name kind) : rest) = do
-  env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(ExternDeclaration importTy name _ ty) : rest) = do
-  rethrow (strMsg ("Error in foreign import declaration " ++ show name) <>) $ do
+      return $ ValueDeclaration name nameKind [] Nothing val'
+    ds <- go rest
+    return $ d : ds
+  go (ValueDeclaration{} : _) = error "Binders were not desugared"
+  go (BindingGroupDeclaration vals : rest) = do
+    d <- rethrow (strMsg ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) <>) $ do
+      forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
+        valueIsNotDefined moduleName name
+      tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
+      vals' <- forM (zipWith (\(name, nameKind, _) (_, (val, ty)) -> (name, val, nameKind, ty)) vals tys) $ \(name, val, nameKind, ty) -> do
+        addValue moduleName name ty nameKind
+        return (name, nameKind, val)
+      return $ BindingGroupDeclaration vals'
+    ds <- go rest
+    return $ d : ds
+  go (d@(ExternDataDeclaration name kind) : rest) = do
     env <- getEnv
-    kind <- kindOf moduleName ty
-    guardWith (strMsg "Expected kind *") $ kind == Star
-    case M.lookup (moduleName, name) (names env) of
-      Just _ -> throwError . strMsg $ show name ++ " is already defined"
-      Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(FixityDeclaration _ name) : rest) = do
-  ds <- typeCheckAll mainModuleName moduleName rest
-  env <- getEnv
-  guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
-  return $ d : ds
-typeCheckAll mainModuleName currentModule (d@(ImportDeclaration moduleName _ _) : rest) = do
-  tcds <- getTypeClassDictionaries
-  let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in moduleName == mn) tcds
-  addTypeClassDictionaries [ tcd { tcdName = Qualified (Just currentModule) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
-                           | tcd <- instances
-                           , let (Qualified _ ident) = tcdName tcd
-                           ]
-  ds <- typeCheckAll mainModuleName currentModule rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (d@(TypeClassDeclaration pn args implies tys) : rest) = do
-  addTypeClass moduleName pn args implies tys
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (TypeInstanceDeclaration dictName deps className tys _ : rest) = do
-  typeCheckAll mainModuleName moduleName (ExternInstanceDeclaration dictName deps className tys : rest)
-typeCheckAll mainModuleName moduleName (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
-  mapM_ (checkTypeClassInstance moduleName) tys
-  forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
-  addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular]
-  ds <- typeCheckAll mainModuleName moduleName rest
-  return $ d : ds
-typeCheckAll mainModuleName moduleName (PositionedDeclaration pos d : rest) =
-  rethrowWithPosition pos $ do
-    (d' : rest') <- typeCheckAll mainModuleName moduleName (d : rest)
-    return (PositionedDeclaration pos d' : rest')
+    putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
+    ds <- go rest
+    return $ d : ds
+  go (d@(ExternDeclaration importTy name _ ty) : rest) = do
+    rethrow (strMsg ("Error in foreign import declaration " ++ show name) <>) $ do
+      env <- getEnv
+      kind <- kindOf moduleName ty
+      guardWith (strMsg "Expected kind *") $ kind == Star
+      case M.lookup (moduleName, name) (names env) of
+        Just _ -> throwError . strMsg $ show name ++ " is already defined"
+        Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
+    ds <- go rest
+    return $ d : ds
+  go (d@(FixityDeclaration _ name) : rest) = do
+    ds <- go rest
+    env <- getEnv
+    guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
+    return $ d : ds
+  go (d@(ImportDeclaration importedModule _ _) : rest) = do
+    tcds <- getTypeClassDictionaries
+    let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in importedModule == mn) tcds
+    addTypeClassDictionaries [ tcd { tcdName = Qualified (Just moduleName) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
+                             | tcd <- instances
+                             , tcdExported tcd
+                             , let (Qualified _ ident) = tcdName tcd
+                             ]
+    ds <- go rest
+    return $ d : ds
+  go (d@(TypeClassDeclaration pn args implies tys) : rest) = do
+    addTypeClass moduleName pn args implies tys
+    ds <- go rest
+    return $ d : ds
+  go (TypeInstanceDeclaration dictName deps className tys _ : rest) = do
+    go (ExternInstanceDeclaration dictName deps className tys : rest)
+  go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
+    mapM_ (checkTypeClassInstance moduleName) tys
+    forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
+    addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported]
+    ds <- go rest
+    return $ d : ds
+    where
+    isInstanceExported :: Bool
+    isInstanceExported = maybe True (any exportsInstance) exps 
+    
+    exportsInstance :: DeclarationRef -> Bool
+    exportsInstance (TypeInstanceRef name) | name == dictName = True
+    exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
+    exportsInstance _ = False
+    
+  go (PositionedDeclaration pos d : rest) =
+    rethrowWithPosition pos $ do
+      (d' : rest') <- go (d : rest)
+      return (PositionedDeclaration pos d' : rest')
+
+
+
 
