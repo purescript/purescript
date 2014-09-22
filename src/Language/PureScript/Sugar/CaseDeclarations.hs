@@ -19,6 +19,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
+import Data.Maybe (isJust)
 import Data.Monoid ((<>))
 import Data.List (nub, groupBy)
 
@@ -85,11 +86,11 @@ toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = 
       body = foldr (Abs . Left) val args
   guardWith (strMsg "Overlapping function argument names") $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] Nothing body]
-toDecls ds@(ValueDeclaration ident _ bs _ _ : _) = do
+toDecls ds@(ValueDeclaration ident _ bs g _ : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
-  unless (not $ null bs) $
+  unless (not (null bs) || isJust g) $
       throwError $ mkErrorStack ("Top level case disallowed in declaration " ++ show ident) Nothing
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
