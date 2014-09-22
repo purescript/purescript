@@ -394,7 +394,7 @@ parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* C.lexeme (P.ch
                                <*> (C.indented *> parseBinder)
 
 parseNullBinder :: P.Parsec String ParseState Binder
-parseNullBinder = C.lexeme (P.char '_') *> P.notFollowedBy C.identLetter *> return NullBinder
+parseNullBinder = C.lexeme (P.char '_' *> P.notFollowedBy C.identLetter) *> return NullBinder
 
 parseIdentifierAndBinder :: P.Parsec String ParseState (String, Binder)
 parseIdentifierAndBinder = do
