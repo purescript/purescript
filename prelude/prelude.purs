@@ -21,6 +21,7 @@ module Prelude
   , not
   , Semigroup, (<>), (++)
   , Unit(..), unit
+  , Int(), fromFloor, toNumber
   ) where
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -95,6 +96,9 @@ module Prelude
 
   instance showNumber :: Show Number where
     show = showNumberImpl
+
+  instance showInt :: Show Int where
+    show (Int a) = show a
 
   foreign import showArrayImpl
     "function showArrayImpl(f) {\
@@ -226,6 +230,21 @@ module Prelude
   unit :: Unit
   unit = Unit {}
 
+  newtype Int = Int Number
+  
+  foreign import fromFloor "function fromFloor(v){return Math.floor(v);}" :: Number -> Int
+  
+  toNumber :: Int -> Number
+  toNumber (Int a) = a
+
+  instance intNumber :: Num Int where
+    (+) (Int a) (Int b) = Int $ a + b
+    (-) (Int a) (Int b) = Int $ a - b
+    (*) (Int a) (Int b) = Int $ a * b
+    (/) (Int a) (Int b) = fromFloor $ a / b
+    (%) (Int a) (Int b) = Int $ a % b
+    negate (Int a) = Int $ negate a
+
   infix 4 ==
   infix 4 /=
 
@@ -258,6 +277,10 @@ module Prelude
   instance eqNumber :: Eq Number where
     (==) = refEq
     (/=) = refIneq
+
+  instance eqInt :: Eq Int where
+    (==) (Int a) (Int b) = a == b
+    (/=) (Int a) (Int b) = a /= b
 
   instance eqBoolean :: Eq Boolean where
     (==) = refEq
@@ -353,6 +376,9 @@ module Prelude
   instance ordNumber :: Ord Number where
     compare = unsafeCompare
 
+  instance ordInt :: Ord Int where
+    compare (Int a) (Int b) = compare a b
+
   instance ordString :: Ord String where
     compare = unsafeCompare
 
@@ -372,28 +398,28 @@ module Prelude
     (&) :: b -> b -> b
     (|) :: b -> b -> b
     (^) :: b -> b -> b
-    shl :: b -> Number -> b
-    shr :: b -> Number -> b
-    zshr :: b -> Number -> b
+    shl :: b -> Int -> b
+    shr :: b -> Int -> b
+    zshr :: b -> Int -> b
     complement :: b -> b
 
   foreign import numShl "function numShl(n1) {\
                         \  return function(n2) {\
                         \    return n1 << n2;\
                         \  };\
-                        \}" :: Number -> Number -> Number
+                        \}" :: Number -> Int -> Number
 
   foreign import numShr "function numShr(n1) {\
                         \  return function(n2) {\
                         \    return n1 >> n2;\
                         \  };\
-                        \}" :: Number -> Number -> Number
+                        \}" :: Number -> Int -> Number
 
   foreign import numZshr "function numZshr(n1) {\
                           \  return function(n2) {\
                           \    return n1 >>> n2;\
                           \  };\
-                          \}" :: Number -> Number -> Number
+                          \}" :: Number -> Int -> Number
 
   foreign import numAnd "function numAnd(n1) {\
                         \  return function(n2) {\
@@ -425,6 +451,15 @@ module Prelude
     shr = numShr
     zshr = numZshr
     complement = numComplement
+
+  instance bitsInt :: Bits Int where
+    (&) (Int a) (Int b) = Int $ a & b
+    (|) (Int a) (Int b) = Int $ a | b
+    (^) (Int a) (Int b) = Int $ a ^ b
+    shl (Int a) b = Int $ shl a b
+    shr (Int a) b = Int $ shr a b
+    zshr (Int a) b = Int $ zshr a b
+    complement (Int a) = Int $ complement a
 
   infixr 2 ||
   infixr 3 &&
@@ -482,6 +517,7 @@ module Prelude
   (++) = (<>)
 
 module Data.Function where
+  import Prelude
 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
@@ -741,6 +777,7 @@ module Data.Function where
     \}" :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 
 module Data.Eq where
+  import Prelude
 
   newtype Ref a = Ref a
 
@@ -761,9 +798,10 @@ module Prelude.Unsafe where
     \  return function(n) {\
     \    return xs[n];\
     \  };\
-    \}" :: forall a. [a] -> Number -> a
+    \}" :: forall a. [a] -> Int -> a
 
 module Control.Monad.Eff where
+  import Prelude
 
   foreign import data Eff :: # ! -> * -> *
 
@@ -852,7 +890,7 @@ module Control.Monad.Eff.Unsafe where
     \}" :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 
 module Debug.Trace where
-
+  import Prelude
   import Control.Monad.Eff
 
   foreign import data Trace :: !
@@ -915,7 +953,7 @@ module Control.Monad.ST where
                             \      return arr;\
                             \    };\
                             \  };\
-                            \}" :: forall a h r. Number -> a -> Eff (st :: ST h | r) (STArray h a)
+                            \}" :: forall a h r. Int -> a -> Eff (st :: ST h | r) (STArray h a)
 
   foreign import peekSTArray "function peekSTArray(arr) {\
                              \  return function(i) {\
@@ -923,7 +961,7 @@ module Control.Monad.ST where
                              \      return arr[i];\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. STArray h a -> Number -> Eff (st :: ST h | r) a
+                             \}" :: forall a h r. STArray h a -> Int -> Eff (st :: ST h | r) a
 
   foreign import pokeSTArray "function pokeSTArray(arr) {\
                              \  return function(i) {\
@@ -933,7 +971,7 @@ module Control.Monad.ST where
                              \      };\
                              \    };\
                              \  };\
-                             \}" :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
+                             \}" :: forall a h r. STArray h a -> Int -> a -> Eff (st :: ST h | r) a
 
   foreign import runST "function runST(f) {\
                        \  return f;\
