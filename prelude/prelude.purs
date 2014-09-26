@@ -98,7 +98,7 @@ module Prelude
     show = showNumberImpl
 
   instance showInt :: Show Int where
-    show (Int a) = show a
+    show (Int a) = "fromFloor " ++ show a
 
   foreign import showArrayImpl
     "function showArrayImpl(f) {\
@@ -232,7 +232,9 @@ module Prelude
 
   newtype Int = Int Number
   
-  foreign import fromFloor "function fromFloor(v){return Math.floor(v);}" :: Number -> Int
+  foreign import fromFloor "function fromFloor(v){\
+                           \  return Math.floor(v);\
+                           \}" :: Number -> Int
   
   toNumber :: Int -> Number
   toNumber (Int a) = a
@@ -792,6 +794,7 @@ module Data.Eq where
     (<$>) f (Ref x) = Ref (f x)
 
 module Prelude.Unsafe where
+  import Prelude
 
   foreign import unsafeIndex
     "function unsafeIndex(xs) {\
@@ -906,7 +909,7 @@ module Debug.Trace where
   print o = trace (show o)
 
 module Control.Monad.ST where
-
+  import Prelude
   import Control.Monad.Eff
 
   foreign import data ST :: * -> !
