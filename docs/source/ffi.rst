@@ -14,11 +14,11 @@ Inline Javascript
 A foreign import declaration may optionally contain its definition in Javascript as a string literal. If this is provided, the string will be inserted directly into the generated Javascript before the current module definition::
 
   foreign import pow 
-    "function pow(n) {\
-    \  return function(p) {\
-    \    return Math.pow(n, p);\
-    \  };\
-    \}" :: Number -> Number -> Number
+    "function pow(n) {
+      return function(p) {
+        return Math.pow(n, p);
+      };
+    }" :: Number -> Number -> Number
 
 Importing Types
 ---------------
