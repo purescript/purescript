@@ -1,4 +1,4 @@
------------------------------------------------------------------------------
+----------------------------------------------------------------------------
 --
 -- Module      :  Main
 -- Copyright   :  (c) Phil Freeman 2013
@@ -140,11 +140,13 @@ renderDeclaration n _ (P.TypeDeclaration ident ty) =
 renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
-  let typeName = P.runProperName name ++ (if null args then "" else " " ++ unwords args)
-  let exported = filter (isDctorExported name exps . fst) ctors
+  let
+    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map P.TypeVar args)
+    typeName = prettyPrintType' typeApp
+    exported = filter (isDctorExported name exps . fst) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
-    let ctorTy = foldr P.function (P.TypeConstructor (P.Qualified Nothing name)) tys
+    let ctorTy = foldr P.function typeApp tys
     in atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
