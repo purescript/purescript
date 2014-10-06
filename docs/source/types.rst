@@ -38,21 +38,21 @@ Tagged unions can only be created using their constructors, and deconstructed th
 
 For example::
 
-  data Foo a = Foo | Bar String
+  data Foo = Foo | Bar String
   
   runFoo Foo = "It's a Foo"
   runFoo (Bar s) = "It's a Bar. The string is " ++ s
   
   test = runFoo Foo ++ runFoo (Bar "Test")
 
-In the example, Foo is a tagged union type which has two constructors. It's first constructor ``Foo`` takes no argument, and it's second ``Bar`` takes one, which must be a String.
+In the example, Foo is a tagged union type which has two constructors. Its first constructor ``Foo`` takes no arguments, and its second ``Bar`` takes one, which must be a String.
 
 ``runFoo`` is an example of pattern matching on a tagged union type to discover its constructor, and the last line shows how to construct values of type ``Foo``.
 
 Newtypes
 --------
 
-Newtypes are like data types introduced with the ``data`` keyword, but are restricted to a single contructor which contains a single arguments. Newtypes are introduced with the ``newtype`` keyword::
+Newtypes are like data types introduced with the ``data`` keyword, but are restricted to a single contructor which contains a single argument. Newtypes are introduced with the ``newtype`` keyword::
 
   newtype Percentage = Percentage Number
 
