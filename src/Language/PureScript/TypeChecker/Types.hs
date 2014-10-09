@@ -376,16 +376,18 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       --
       checkOverlaps :: [DictionaryValue] -> Check Expr    
       checkOverlaps dicts = 
-        case sortedNubBy dictTrace (chooseSimplestDictionaries dicts) of
-          [] -> throwError . strMsg $ "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
-          [_] -> return $ dictionaryValueToValue $ head dicts
-          (d1 : d2 : _) -> throwError . strMsg $ unlines
+        case [ (d1, d2) | d1 <- dicts, d2 <- dicts, d1 `overlapping` d2 ] of
+          (d1, d2) : _ -> throwError . strMsg $ unlines
             [ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintType tys) ++ "."
             , "For example:"
             , prettyPrintDictionaryValue d1
             , "and:"
             , prettyPrintDictionaryValue d2
             ]
+          _ -> case chooseSimplestDictionaries dicts of
+                 [] -> throwError . strMsg $ 
+                         "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+                 d : _ -> return $ dictionaryValueToValue d
       -- Choose the simplest DictionaryValues from a list of candidates
       -- The reason for this function is as follows:
       -- When considering overlapping instances, we don't want to consider the same dictionary
@@ -402,13 +404,19 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       isSimpleDictionaryValue (DependentDictionaryValue _ ds) = all isSimpleDictionaryValue ds
       isSimpleDictionaryValue _ = True
       -- |
-      -- Get the "trace" of a DictionaryValue - that is, remove all SubclassDictionaryValue
-      -- data constructors
+      -- Check if two dictionaries are overlapping
+      -- 
+      -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
+      -- been caught when constructing superclass dictionaries.
       --
-      dictTrace :: DictionaryValue -> DictionaryValue
-      dictTrace (DependentDictionaryValue fnName dicts) = DependentDictionaryValue fnName $ map dictTrace dicts
-      dictTrace (SubclassDictionaryValue dict _ _) = dictTrace dict
-      dictTrace other = other
+      overlapping :: DictionaryValue -> DictionaryValue -> Bool
+      overlapping (LocalDictionaryValue nm1)         (LocalDictionaryValue nm2)  | nm1 == nm2 = False
+      overlapping (GlobalDictionaryValue nm1)        (GlobalDictionaryValue nm2) | nm1 == nm2 = False
+      overlapping (DependentDictionaryValue nm1 ds1) (DependentDictionaryValue nm2 ds2) 
+        | nm1 == nm2 = any id $ zipWith overlapping ds1 ds2
+      overlapping (SubclassDictionaryValue _ _ _) _ = False
+      overlapping _ (SubclassDictionaryValue _ _ _) = False
+      overlapping _ _ = True
       -- |
       -- Render a DictionaryValue fit for human consumption in error messages
       --
