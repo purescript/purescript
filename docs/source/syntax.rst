@@ -125,7 +125,7 @@ which would correspond to the following Javascript::
     }
   }
 
-Function application is indicated by just the juxtaposition of a function with its arugments::
+Function application is indicated by just the juxtaposition of a function with its arguments::
 
   example1 10 20
 
