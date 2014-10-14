@@ -234,6 +234,14 @@ mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
 -- |
+-- Just an empty module.
+--
+emptyModule :: P.Module
+emptyModule =
+  let moduleName = P.ModuleName [P.ProperName "$PSCI"]
+  in P.Module moduleName [] Nothing
+
+-- |
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
@@ -287,6 +295,19 @@ handleDeclaration value = do
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
+
+-- |
+-- Imports a module, preserving the initial state on failure.
+--
+handleImport :: P.ModuleName -> PSCI ()
+handleImport moduleName = do
+   s <- liftM (updateImports moduleName) $ PSCI $ lift get
+   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules s ++ [("$PSCI.purs", emptyModule)]) []
+   case e of
+     Left err -> PSCI $ outputStrLn err
+     Right _  -> do
+       PSCI $ lift $ put s
+       return ()
 
 -- |
 -- Takes a value and prints its type
@@ -347,7 +368,7 @@ getCommand singleLineMode = do
 handleCommand :: Command -> PSCI ()
 handleCommand (Expression val) = handleDeclaration val
 handleCommand Help = PSCI $ outputStrLn helpMessage
-handleCommand (Import moduleName) = PSCI $ lift $ modify (updateImports moduleName)
+handleCommand (Import moduleName) = handleImport moduleName
 handleCommand (Let l) = PSCI $ lift $ modify (updateLets l)
 handleCommand (LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
@@ -435,4 +456,3 @@ termInfo = Cmd.defTI
 
 main :: IO ()
 main = Cmd.run (term, termInfo)
-
