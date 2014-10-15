@@ -104,10 +104,6 @@ noTco :: Term Bool
 noTco = value $ flag $ (optInfo [ "no-tco" ])
      { optDoc = "Disable tail call optimizations" }
 
-performRuntimeTypeChecks :: Term Bool
-performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
-     { optDoc = "Generate runtime type checks" }
-
 noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
@@ -125,7 +121,7 @@ verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
      { optDoc = "Display verbose error messages" }
 
 options :: Term (P.Options P.Make)
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> pure Nothing <*> noOpts <*> verboseErrors <*> pure P.MakeOptions
+options = P.Options <$> noPrelude <*> noTco <*> noMagicDo <*> pure Nothing <*> noOpts <*> verboseErrors <*> pure P.MakeOptions
 
 noPrefix :: Term Bool
 noPrefix = value $ flag $ (optInfo ["p", "no-prefix" ])

@@ -114,7 +114,7 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 --
 getHistoryFilename :: IO FilePath
 getHistoryFilename = do
-  home <- getHomeDirectory 
+  home <- getHomeDirectory
   let filename = home </> ".purescript" </> "psci_history"
   mkdirp filename
   return filename
@@ -202,7 +202,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options P.Make
-options = P.Options False False False False Nothing False False P.MakeOptions
+options = P.Options False False False Nothing False False P.MakeOptions
 
 -- |
 -- PSCI monad
