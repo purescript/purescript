@@ -96,10 +96,6 @@ noTco :: Term Bool
 noTco = value $ flag $ (optInfo [ "no-tco" ])
      { optDoc = "Disable tail call optimizations" }
 
-performRuntimeTypeChecks :: Term Bool
-performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
-     { optDoc = "Generate runtime type checks" }
-
 noPrelude :: Term Bool
 noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
      { optDoc = "Omit the Prelude" }
@@ -137,7 +133,7 @@ noPrefix = value $ flag $ (optInfo ["no-prefix" ])
      { optDoc = "Do not include comment header"}
 
 options :: Term (P.Options P.Compile)
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> verboseErrors <*> additionalOptions
+options = P.Options <$> noPrelude <*> noTco <*> noMagicDo <*> runMain <*> noOpts <*> verboseErrors <*> additionalOptions
   where
   additionalOptions = P.CompileOptions <$> browserNamespace <*> dceModules <*> codeGenModules
 

@@ -53,10 +53,6 @@ data Options mode = Options {
     --
   , optionsNoTco :: Bool
     -- |
-    -- Perform type checks at runtime
-    --
-  , optionsPerformRuntimeTypeChecks :: Bool
-    -- |
     -- Disable inlining of calls to return and bind for the Eff monad
     --
   , optionsNoMagicDo :: Bool
@@ -84,10 +80,10 @@ data Options mode = Options {
 -- Default compiler options
 --
 defaultCompileOptions :: Options Compile
-defaultCompileOptions = Options False False False False Nothing False False (CompileOptions "PS" [] [])
+defaultCompileOptions = Options False False False Nothing False False (CompileOptions "PS" [] [])
 
 -- |
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False False False Nothing False False MakeOptions
+defaultMakeOptions = Options False False False Nothing False False MakeOptions
