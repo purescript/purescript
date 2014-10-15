@@ -266,6 +266,17 @@ createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
   in
     P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
 
+-- |
+-- Makes a volatile module to execute the current imports.
+--
+createTemporaryModuleForImports :: PSCiState -> P.Module
+createTemporaryModuleForImports PSCiState{psciImportedModuleNames = imports} =
+  let
+    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
+  in
+    P.Module moduleName (importDecl `map` imports) Nothing
+
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 
@@ -290,6 +301,20 @@ handleDeclaration value = do
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
+
+-- |
+-- Imports a module, preserving the initial state on failure.
+--
+handleImport :: P.ModuleName -> PSCI ()
+handleImport moduleName = do
+   s <- liftM (updateImports moduleName) $ PSCI $ lift get
+   let m = createTemporaryModuleForImports s
+   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules s ++ [("$PSCI.purs", m)]) []
+   case e of
+     Left err -> PSCI $ outputStrLn err
+     Right _  -> do
+       PSCI $ lift $ put s
+       return ()
 
 -- |
 -- Takes a value and prints its type
@@ -350,7 +375,7 @@ getCommand singleLineMode = do
 handleCommand :: Command -> PSCI ()
 handleCommand (Expression val) = handleDeclaration val
 handleCommand Help = PSCI $ outputStrLn helpMessage
-handleCommand (Import moduleName) = PSCI $ lift $ modify (updateImports moduleName)
+handleCommand (Import moduleName) = handleImport moduleName
 handleCommand (Let l) = PSCI $ lift $ modify (updateLets l)
 handleCommand (LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
@@ -438,4 +463,3 @@ termInfo = Cmd.defTI
 
 main :: IO ()
 main = Cmd.run (term, termInfo)
-
