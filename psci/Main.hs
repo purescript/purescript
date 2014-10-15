@@ -43,7 +43,6 @@ import System.Directory
         findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Process (readProcessWithExitCode)
 import System.Exit
-import System.Environment.XDG.BaseDir
 import System.FilePath
        (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import qualified System.Console.CmdTheLine as Cmd
@@ -114,7 +113,11 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 -- Grabs the filename where the history is stored.
 --
 getHistoryFilename :: IO FilePath
-getHistoryFilename = getUserConfigFile "purescript" "psci_history"
+getHistoryFilename = do
+  home <- getHomeDirectory 
+  let filename = home </> ".purescript" </> "psci_history"
+  mkdirp filename
+  return filename
 
 -- |
 -- Loads a file for use with imports.
