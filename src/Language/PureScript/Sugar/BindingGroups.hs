@@ -26,6 +26,8 @@ import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
 import Control.Applicative ((<$>), (<*>), pure)
 
+import qualified Data.Set as S
+
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -91,13 +93,19 @@ collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
 usedIdents moduleName =
-  let (f, _, _, _, _) = everythingOnValues (++) (const []) usedNames (const []) (const []) (const [])
+  let (f, _, _, _, _) = everythingWithContextOnValues S.empty [] (++) def usedNamesE usedNamesB def def
   in nub . f
   where
-  usedNames :: Expr -> [Ident]
-  usedNames (Var (Qualified Nothing name)) = [name]
-  usedNames (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
-  usedNames _ = []
+  def s _ = (s, [])
+  
+  usedNamesE :: S.Set Ident -> Expr -> (S.Set Ident, [Ident])
+  usedNamesE scope (Var (Qualified Nothing name)) | name `S.notMember` scope = (scope, [name])
+  usedNamesE scope (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' && name `S.notMember` scope = (scope, [name])
+  usedNamesE scope (Abs (Left name) _) = (name `S.insert` scope, [])
+  usedNamesE scope _ = (scope, [])
+  
+  usedNamesB :: S.Set Ident -> Binder -> (S.Set Ident, [Ident])
+  usedNamesB scope binder = (scope `S.union` S.fromList (binderNames binder), [])
 
 usedProperNames :: ModuleName -> Declaration -> [ProperName]
 usedProperNames moduleName =
