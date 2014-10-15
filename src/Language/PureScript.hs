@@ -51,7 +51,6 @@ import qualified Data.Set as S
 
 import System.FilePath ((</>), pathSeparator)
 import System.Directory (getHomeDirectory, doesFileExist)
-import System.Environment.XDG.BaseDir (getUserConfigDir)
 
 -- |
 -- Compile a collection of modules
@@ -272,16 +271,11 @@ importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
 preludeFilename :: IO FilePath
 preludeFilename = fromMaybe missingPrelude . listToMaybe <$> do
-  fs <- sequence [xdsPrelude, homePrelude, cabalPrelude]
+  fs <- sequence [homePrelude, cabalPrelude]
   filterM doesFileExist fs
   where
   missingPrelude :: FilePath
-  missingPrelude = error "No Prelude found in user home, XDS user config directory or cabal path."
-
-  xdsPrelude :: IO FilePath
-  xdsPrelude = do
-    configDir <- getUserConfigDir "purescript"
-    return $ configDir </> "prelude" </> "prelude.purs"
+  missingPrelude = error "No Prelude found in user home or cabal path."
 
   homePrelude :: IO FilePath
   homePrelude = do

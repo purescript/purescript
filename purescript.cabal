@@ -1,7 +1,7 @@
 name: purescript
 version: 0.5.6.3
 cabal-version: >=1.8
-build-type: Custom
+build-type: Simple 
 license: MIT
 license-file: LICENSE
 copyright: (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
@@ -30,7 +30,7 @@ library
                    transformers >= 0.3 && < 0.5, utf8-string -any,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    monad-unify >= 0.2.2 && < 0.3,
-                   xdg-basedir -any, time -any
+                   time -any
     if (!os(windows))
         build-depends: unix -any
     exposed-modules: Language.PureScript
@@ -115,7 +115,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, parsec -any, haskeline >= 0.7.0.0, purescript -any,
                    transformers -any, utf8-string -any, process -any,
-                   xdg-basedir -any, cmdtheline -any
+                   cmdtheline -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
