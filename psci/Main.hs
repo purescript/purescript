@@ -234,14 +234,6 @@ mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
 -- |
--- Just an empty module.
---
-emptyModule :: P.Module
-emptyModule =
-  let moduleName = P.ModuleName [P.ProperName "$PSCI"]
-  in P.Module moduleName [] Nothing
-
--- |
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
@@ -270,6 +262,17 @@ createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
+
+-- |
+-- Makes a volatile module to execute the current imports.
+--
+createTemporaryModuleForImports :: PSCiState -> P.Module
+createTemporaryModuleForImports PSCiState{psciImportedModuleNames = imports} =
+  let
+    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
+  in
+    P.Module moduleName (importDecl `map` imports) Nothing
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
@@ -302,7 +305,8 @@ handleDeclaration value = do
 handleImport :: P.ModuleName -> PSCI ()
 handleImport moduleName = do
    s <- liftM (updateImports moduleName) $ PSCI $ lift get
-   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules s ++ [("$PSCI.purs", emptyModule)]) []
+   let m = createTemporaryModuleForImports s
+   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules s ++ [("$PSCI.purs", m)]) []
    case e of
      Left err -> PSCI $ outputStrLn err
      Right _  -> do
