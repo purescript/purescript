@@ -35,7 +35,6 @@ The following options are supported:
 --stdin                Read input from standard input instead of from files.
 --output               Write the generated Javascript to the specified file.
 --externs              Write a list of foreign imports declarations to the specified file in addition to generating Javascript output.
---runtime-type-checks  Generate simple runtime type checks for function arguments with simple types.
 --no-tco               Turn off tail-call elimination.
 --no-prelude           Do not include the Prelude in the generated Javascript.
 --no-magic-do          Turn off optimizations which inline calls to ``>>=`` for the ``Eff`` monad.
