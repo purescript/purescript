@@ -26,7 +26,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\), find)
+import Data.List (nub, (\\), find, intercalate)
 import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
@@ -250,7 +250,9 @@ typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elabora
 typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
-  mapM_ (checkTypesAreExported >> checkClassesAreExported) exps
+  forM_ exps checkTypesAreExported
+  forM_ exps checkClassMembersAreExported
+  forM_ exps checkClassesAreExported
   return $ Module mn decls' (Just exps)
   where
 
@@ -298,3 +300,25 @@ typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
       where
       go (TypeClassRef clsName') = clsName' /= clsName
       go _ = True
+
+  checkClassMembersAreExported :: DeclarationRef -> Check ()
+  checkClassMembersAreExported (TypeClassRef name) = do
+    let members = ValueRef `map` head (mapMaybe findClassMembers decls)
+    let missingMembers = members \\ exps
+    unless (null missingMembers) $
+      throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Class '" ++ show name ++ "' is exported but is missing member exports for '" ++ intercalate "', '" (map (show . runValueRef) missingMembers) ++ "'"
+    where
+    runValueRef :: DeclarationRef -> Ident
+    runValueRef (ValueRef refName) = refName
+    runValueRef _ = error "non-ValueRef passed to runValueRef"
+    findClassMembers :: Declaration -> Maybe [Ident]
+    findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (PositionedDeclaration _ d) = findClassMembers d
+    findClassMembers _ = Nothing
+    extractMemberName :: Declaration -> Ident
+    extractMemberName (PositionedDeclaration _ d) = extractMemberName d
+    extractMemberName (TypeDeclaration memberName _) = memberName
+    extractMemberName _ = error "Unexpected declaration in typeclass member list"
+  checkClassMembersAreExported _ = return ()
