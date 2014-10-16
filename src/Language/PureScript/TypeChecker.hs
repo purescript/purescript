@@ -17,7 +17,7 @@
 
 module Language.PureScript.TypeChecker (
     module T,
-    typeCheckAll
+    typeCheckModule
 ) where
 
 import Language.PureScript.TypeChecker.Monad as T
@@ -26,7 +26,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\))
+import Data.List (nub, (\\), find, intercalate)
 import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
@@ -119,7 +119,7 @@ checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance hea
 --
 --  * Process module imports
 --
-typeCheckAll :: Maybe ModuleName -> ModuleName -> Maybe [DeclarationRef] -> [Declaration] -> Check [Declaration]
+typeCheckAll :: Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
 typeCheckAll mainModuleName moduleName exps = go
   where
   go :: [Declaration] -> Check [Declaration]
@@ -219,7 +219,7 @@ typeCheckAll mainModuleName moduleName exps = go
     addTypeClass moduleName pn args implies tys
     ds <- go rest
     return $ d : ds
-  go (TypeInstanceDeclaration dictName deps className tys _ : rest) = do
+  go (TypeInstanceDeclaration dictName deps className tys _ : rest) =
     go (ExternInstanceDeclaration dictName deps className tys : rest)
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
     mapM_ (checkTypeClassInstance moduleName) tys
@@ -229,18 +229,97 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
     where
     isInstanceExported :: Bool
-    isInstanceExported = maybe True (any exportsInstance) exps 
-    
+    isInstanceExported = any exportsInstance exps
+
     exportsInstance :: DeclarationRef -> Bool
     exportsInstance (TypeInstanceRef name) | name == dictName = True
     exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
     exportsInstance _ = False
-    
+
   go (PositionedDeclaration pos d : rest) =
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
 
+-- |
+-- Type check an entire module and ensure all types and classes defined within the module that are
+-- required by exported members are also exported.
+--
+typeCheckModule :: Maybe ModuleName -> Module -> Check Module
+typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
+  modify (\s -> s { checkCurrentModule = Just mn })
+  decls' <- typeCheckAll mainModuleName mn exps decls
+  forM_ exps $ \e -> do
+    checkTypesAreExported e
+    checkClassMembersAreExported e
+    checkClassesAreExported e
+  return $ Module mn decls' (Just exps)
+  where
 
+  checkMemberExport :: (Show a) => String -> (Type -> [a]) -> (a -> Bool) -> DeclarationRef -> Check ()
+  checkMemberExport thing extract test (ValueRef name) = do
+    ty <- lookupVariable mn (Qualified (Just mn) name)
+    case find test (extract ty) of
+      Just hiddenType -> throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Exporting declaration '" ++ show name ++ "' requires " ++ thing ++ " '" ++ show hiddenType ++ "' to be exported as well"
+      Nothing -> return ()
+  checkMemberExport _ _ _ _ = return ()
 
+  -- Check that all the type constructors defined in the current module that appear in member types
+  -- have also been exported from the module
+  checkTypesAreExported :: DeclarationRef -> Check ()
+  checkTypesAreExported = checkMemberExport "type" findTcons isTconHidden
+    where
+    findTcons :: Type -> [ProperName]
+    findTcons = everythingOnTypes (++) go
+      where
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+      go _ = []
+    isTconHidden :: ProperName -> Bool
+    isTconHidden tyName = all go exps
+      where
+      go (TypeRef tyName' _) = tyName' /= tyName
+      go _ = True
 
+  -- Check that all the classes defined in the current module that appear in member types have also
+  -- been exported from the module
+  checkClassesAreExported :: DeclarationRef -> Check ()
+  checkClassesAreExported = checkMemberExport "class" findClasses isClassHidden
+    where
+    findClasses :: Type -> [ProperName]
+    findClasses = everythingOnTypes (++) go
+      where
+      go (ConstrainedType cs _) = mapMaybe (extractCurrentModuleClass . fst) cs
+      go _ = []
+    extractCurrentModuleClass :: Qualified ProperName -> Maybe ProperName
+    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
+    extractCurrentModuleClass _ = Nothing
+    isClassHidden :: ProperName -> Bool
+    isClassHidden clsName = all go exps
+      where
+      go (TypeClassRef clsName') = clsName' /= clsName
+      go _ = True
+
+  checkClassMembersAreExported :: DeclarationRef -> Check ()
+  checkClassMembersAreExported (TypeClassRef name) = do
+    let members = ValueRef `map` head (mapMaybe findClassMembers decls)
+    let missingMembers = members \\ exps
+    unless (null missingMembers) $
+      throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Class '" ++ show name ++ "' is exported but is missing member exports for '" ++ intercalate "', '" (map (show . runValueRef) missingMembers) ++ "'"
+    where
+    runValueRef :: DeclarationRef -> Ident
+    runValueRef (ValueRef refName) = refName
+    runValueRef _ = error "non-ValueRef passed to runValueRef"
+    findClassMembers :: Declaration -> Maybe [Ident]
+    findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (PositionedDeclaration _ d) = findClassMembers d
+    findClassMembers _ = Nothing
+    extractMemberName :: Declaration -> Ident
+    extractMemberName (PositionedDeclaration _ d) = extractMemberName d
+    extractMemberName (TypeDeclaration memberName _) = memberName
+    extractMemberName _ = error "Unexpected declaration in typeclass member list"
+  checkClassMembersAreExported _ = return ()
