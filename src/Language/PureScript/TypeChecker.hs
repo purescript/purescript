@@ -17,7 +17,7 @@
 
 module Language.PureScript.TypeChecker (
     module T,
-    typeCheckAll
+    typeCheckModule
 ) where
 
 import Language.PureScript.TypeChecker.Monad as T
@@ -26,7 +26,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\))
+import Data.List (nub, (\\), find)
 import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
@@ -119,7 +119,7 @@ checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance hea
 --
 --  * Process module imports
 --
-typeCheckAll :: Maybe ModuleName -> ModuleName -> Maybe [DeclarationRef] -> [Declaration] -> Check [Declaration]
+typeCheckAll :: Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
 typeCheckAll mainModuleName moduleName exps = go
   where
   go :: [Declaration] -> Check [Declaration]
@@ -229,18 +229,49 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
     where
     isInstanceExported :: Bool
-    isInstanceExported = maybe True (any exportsInstance) exps 
-    
+    isInstanceExported = any exportsInstance exps
+
     exportsInstance :: DeclarationRef -> Bool
     exportsInstance (TypeInstanceRef name) | name == dictName = True
     exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
     exportsInstance _ = False
-    
+
   go (PositionedDeclaration pos d : rest) =
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
 
+typeCheckModule :: Maybe ModuleName -> Module -> Check Module
+typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
+  modify (\s -> s { checkCurrentModule = Just mn })
+  decls' <- typeCheckAll mainModuleName mn exps decls
+  mapM_ checkTypesAreExported exps
+  return $ Module mn decls' (Just exps)
+  where
 
+  -- Check that all the type constructors defined in the current module that appear in member types
+  -- have also been exported from the module
+  checkTypesAreExported :: DeclarationRef -> Check ()
+  checkTypesAreExported (ValueRef name) = do
+    ty <- lookupVariable mn (Qualified (Just mn) name)
+    case find isTconHidden (findTcons ty) of
+      Just hiddenType -> throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
+      Nothing -> return ()
+  checkTypesAreExported _ = return ()
 
+  -- Find the type constructors exported from the current module used in a type
+  findTcons :: Type -> [ProperName]
+  findTcons = everythingOnTypes (++) go
+    where
+    go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+    go _ = []
 
+  -- Checks whether a type constructor is not being exported from the current module
+  isTconHidden :: ProperName -> Bool
+  isTconHidden tyName = all go exps
+    where
+    go (TypeRef tyName' _) = tyName' /= tyName
+    go _ = True

@@ -38,12 +38,11 @@ import Language.PureScript.Renamer as P
 import qualified Language.PureScript.Constants as C
 import qualified Paths_purescript as Paths
 
-import Data.List (find, sortBy, groupBy, intercalate)
+import Data.List (sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (listToMaybe, fromMaybe)
 import Control.Monad.Error
-import Control.Monad.State.Lazy
 import Control.Arrow ((&&&))
 import Control.Applicative
 import qualified Data.Map as M
@@ -92,43 +91,6 @@ compile' env opts ms prefix = do
   return (pjs, exts, env')
   where
   mainModuleIdent = moduleNameFromString <$> optionsMain opts
-
-typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule mainModuleName (Module mn decls exps) = do
-  modify (\s -> s { checkCurrentModule = Just mn })
-  decls' <- typeCheckAll mainModuleName mn exps decls
-  mapM_ checkTypesAreExported exps'
-  return $ Module mn decls' exps
-  where
-
-  exps' = fromMaybe (error "exports should have been elaborated") exps
-
-  -- Check that all the type constructors defined in the current module that appear in member types
-  -- have also been exported from the module
-  checkTypesAreExported :: DeclarationRef -> Check ()
-  checkTypesAreExported (ValueRef name) = do
-    ty <- lookupVariable mn (Qualified (Just mn) name)
-    case find isTconHidden (findTcons ty) of
-      Just hiddenType -> throwError . strMsg $
-        "Error in module '" ++ show mn ++ "':\n\
-        \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
-      Nothing -> return ()
-  checkTypesAreExported _ = return ()
-
-  -- Find the type constructors exported from the current module used in a type
-  findTcons :: Type -> [ProperName]
-  findTcons = everythingOnTypes (++) go
-    where
-    go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
-    go _ = []
-
-  -- Checks whether a type constructor is not being exported from the current module
-  isTconHidden :: ProperName -> Bool
-  isTconHidden tyName = all go exps'
-    where
-    go (TypeRef tyName' _) = tyName' /= tyName
-    go _ = True
-
 
 generateMain :: Environment -> Options Compile -> [JS] -> Either String [JS]
 generateMain env opts js =
