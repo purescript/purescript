@@ -219,7 +219,7 @@ typeCheckAll mainModuleName moduleName exps = go
     addTypeClass moduleName pn args implies tys
     ds <- go rest
     return $ d : ds
-  go (TypeInstanceDeclaration dictName deps className tys _ : rest) = do
+  go (TypeInstanceDeclaration dictName deps className tys _ : rest) =
     go (ExternInstanceDeclaration dictName deps className tys : rest)
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
     mapM_ (checkTypeClassInstance moduleName) tys
@@ -241,37 +241,60 @@ typeCheckAll mainModuleName moduleName exps = go
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
 
+-- |
+-- Type check an entire module and ensure all types and classes defined within the module that are
+-- required by exported members are also exported.
+--
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elaborated"
 typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
-  mapM_ checkTypesAreExported exps
+  mapM_ (checkTypesAreExported >> checkClassesAreExported) exps
   return $ Module mn decls' (Just exps)
   where
+
+  checkMemberExport :: (Show a) => String -> (Type -> [a]) -> (a -> Bool) -> DeclarationRef -> Check ()
+  checkMemberExport thing extract test (ValueRef name) = do
+    ty <- lookupVariable mn (Qualified (Just mn) name)
+    case find test (extract ty) of
+      Just hiddenType -> throwError . strMsg $
+        "Error in module '" ++ show mn ++ "':\n\
+        \Exporting declaration '" ++ show name ++ "' requires " ++ thing ++ " '" ++ show hiddenType ++ "' to be exported as well"
+      Nothing -> return ()
+  checkMemberExport _ _ _ _ = return ()
 
   -- Check that all the type constructors defined in the current module that appear in member types
   -- have also been exported from the module
   checkTypesAreExported :: DeclarationRef -> Check ()
-  checkTypesAreExported (ValueRef name) = do
-    ty <- lookupVariable mn (Qualified (Just mn) name)
-    case find isTconHidden (findTcons ty) of
-      Just hiddenType -> throwError . strMsg $
-        "Error in module '" ++ show mn ++ "':\n\
-        \Exporting declaration '" ++ show name ++ "' requires type '" ++ show hiddenType ++ "' to be exported as well"
-      Nothing -> return ()
-  checkTypesAreExported _ = return ()
-
-  -- Find the type constructors exported from the current module used in a type
-  findTcons :: Type -> [ProperName]
-  findTcons = everythingOnTypes (++) go
+  checkTypesAreExported = checkMemberExport "type" findTcons isTconHidden
     where
-    go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
-    go _ = []
+    findTcons :: Type -> [ProperName]
+    findTcons = everythingOnTypes (++) go
+      where
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+      go _ = []
+    isTconHidden :: ProperName -> Bool
+    isTconHidden tyName = all go exps
+      where
+      go (TypeRef tyName' _) = tyName' /= tyName
+      go _ = True
 
-  -- Checks whether a type constructor is not being exported from the current module
-  isTconHidden :: ProperName -> Bool
-  isTconHidden tyName = all go exps
+  -- Check that all the classes defined in the current module that appear in member types have also
+  -- been exported from the module
+  checkClassesAreExported :: DeclarationRef -> Check ()
+  checkClassesAreExported = checkMemberExport "class" findClasses isClassHidden
     where
-    go (TypeRef tyName' _) = tyName' /= tyName
-    go _ = True
+    findClasses :: Type -> [ProperName]
+    findClasses = everythingOnTypes (++) go
+      where
+      go (ConstrainedType cs _) = mapMaybe (extractCurrentModuleClass . fst) cs
+      go _ = []
+    extractCurrentModuleClass :: Qualified ProperName -> Maybe ProperName
+    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
+    extractCurrentModuleClass _ = Nothing
+    isClassHidden :: ProperName -> Bool
+    isClassHidden clsName = all go exps
+      where
+      go (TypeClassRef clsName') = clsName' /= clsName
+      go _ = True
