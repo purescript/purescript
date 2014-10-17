@@ -146,8 +146,8 @@ unifyRows = unifyRowsWith (=?=)
 -- Unify two rows, using the specified judgement to compare types with the same label 
 --   
 unifyRowsWith :: (Type -> Type -> UnifyT Type Check a) -> Type -> Type -> UnifyT Type Check ()
-unifyRowsWith _ REmpty REmpty = return ()
-unifyRowsWith j r1 r2 = 
+unifyRowsWith _ REmpty           REmpty           = return ()
+unifyRowsWith j r1@(RCons _ _ _) r2@(RCons _ _ _) = 
   let
     (s1, r1') = rowToList r1
     (s2, r2') = rowToList r2
@@ -165,7 +165,8 @@ unifyRowsWith j r1 r2 =
                      go ts1 ((p2, ty2) : ts2) r1' rest
       | otherwise = do rest <- fresh
                        r1' =?= RCons p2 ty2 rest
-                       go ((p1, ty1) : ts1) ts2 rest r2'
+                       go ((p1, ty1) : ts1) ts2 rest r2'   
+unifyRowsWith _ r1 r2 = throwError . strMsg $ "Cannot unify " ++ prettyPrintType r1 ++ " with " ++ prettyPrintType r2 ++ "."
 
 -- |
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
