@@ -193,6 +193,9 @@ data Declaration
   -- A declaration with source position information
   --
   | PositionedDeclaration SourcePos Declaration
+  -- |
+  -- A docstring
+  | DocString String
   deriving (Show, D.Data, D.Typeable)
 
 -- |

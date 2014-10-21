@@ -189,6 +189,23 @@ positioned :: P.Parsec String ParseState Declaration -> P.Parsec String ParseSta
 positioned d = PositionedDeclaration <$> sourcePos <*> d
 
 -- |
+-- Parse a DocString
+--
+parseDocString :: P.Parsec String ParseState Declaration
+parseDocString = do
+    P.string "--|"
+    firstLine <- do
+        firstLine <- P.many (P.alphaNum <|> P.oneOf " ")
+        P.string "\n"
+        return firstLine
+    restLines <- P.many (do
+        P.string "--"
+        lineContents <- P.many (P.alphaNum <|> P.oneOf " ")
+        P.string "\n"
+        return lineContents)
+    return $ DocString (firstLine ++ (concat restLines))
+
+-- |
 -- Parse a single declaration
 --
 parseDeclaration :: P.Parsec String ParseState Declaration
@@ -202,6 +219,7 @@ parseDeclaration = positioned (P.choice
                    , parseImportDeclaration
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration
+                   , parseDocString
                    ]) P.<?> "declaration"
 
 parseLocalDeclaration :: P.Parsec String ParseState Declaration

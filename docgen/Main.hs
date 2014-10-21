@@ -72,6 +72,7 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
       hasTypeclasses = any isTypeClassDeclaration ds
       hasTypeclassInstances = any isTypeInstanceDeclaration ds
       hasValues = any isValueDeclaration ds
+      hasDocStrings = any isDocString ds
   in do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
@@ -98,6 +99,10 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
       spacer
       renderTopLevel exps (filter isValueDeclaration exported)
       spacer
+    when hasDocStrings $ do
+      headerLevel 3 "DocStrings"
+      spacer
+      renderTopLevel exps (filter isDocString ds)
 
 isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
 isExported Nothing _ = True
@@ -166,6 +171,8 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration n exps (P.PositionedDeclaration _ d) =
   renderDeclaration n exps d
+renderDeclaration n exps (P.DocString str) = do
+    atIndent n $ "DocString: " ++ str
 renderDeclaration _ _ _ = return ()
 
 prettyPrintType' :: P.Type -> String
@@ -209,6 +216,11 @@ isTypeInstanceDeclaration :: P.Declaration -> Bool
 isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
+
+isDocString :: P.Declaration -> Bool
+isDocString P.DocString{} = True
+isDocString (P.PositionedDeclaration _ d) = isDocString d
+isDocString _ = False
 
 inputFiles :: Term [FilePath]
 inputFiles = value $ posAny [] $ posInfo { posName = "file(s)", posDoc = "The input .purs file(s)" }

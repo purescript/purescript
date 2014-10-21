@@ -240,6 +240,9 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
+  go (d@(DocString _) : rest) = do
+    ds <- go rest
+    return $ d : ds
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are
