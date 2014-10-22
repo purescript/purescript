@@ -154,12 +154,12 @@ unifyRows r1 r2 =
   unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> UnifyT Type Check ()
   unifyRows' [] (TUnknown u) sd r = u =:= rowFromList (sd, r)
   unifyRows' sd r [] (TUnknown u) = u =:= rowFromList (sd, r)
-  unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
-    occursCheck un ty
-    forM_ row $ \(_, t) -> occursCheck un t
-    u' <- fresh
-    u =?= RCons name ty u'
-    unifyRows' row r others u'
+  unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+    forM_ sd1 $ \(_, t) -> occursCheck u2 t
+    forM_ sd2 $ \(_, t) -> occursCheck u1 t
+    rest <- fresh
+    u1 =:= rowFromList (sd2, rest)
+    u2 =:= rowFromList (sd1, rest)
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
