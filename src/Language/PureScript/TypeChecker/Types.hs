@@ -140,30 +140,33 @@ unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintT
 -- error.
 --
 unifyRows :: Type -> Type -> UnifyT Type Check ()
-unifyRows r1 r2 =
+unifyRows = unifyRowsWith (=?=)
+                 
+-- |
+-- Unify two rows, using the specified judgement to compare types with the same label 
+--   
+unifyRowsWith :: (Type -> Type -> UnifyT Type Check a) -> Type -> Type -> UnifyT Type Check ()
+unifyRowsWith _ REmpty           REmpty           = return ()
+unifyRowsWith j r1@(RCons _ _ _) r2@(RCons _ _ _) = 
   let
     (s1, r1') = rowToList r1
     (s2, r2') = rowToList r2
-    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in do
-    forM_ int (uncurry (=?=))
-    unifyRows' sd1 r1' sd2 r2'
+    ts1' = sortBy (comparing fst) s1
+    ts2' = sortBy (comparing fst) s2
+  in go ts1' ts2' r1' r2'
   where
-  unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> UnifyT Type Check ()
-  unifyRows' [] (TUnknown u) sd r = u =:= rowFromList (sd, r)
-  unifyRows' sd r [] (TUnknown u) = u =:= rowFromList (sd, r)
-  unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
-    occursCheck un ty
-    forM_ row $ \(_, t) -> occursCheck un t
-    u' <- fresh
-    u =?= RCons name ty u'
-    unifyRows' row r others u'
-  unifyRows' [] REmpty [] REmpty = return ()
-  unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
-  unifyRows' sd3 r3 sd4 r4 = throwError . strMsg $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")"
+    go [] ts2 r1' r2' = r1' =?= rowFromList (ts2, r2')
+    go ts1 [] r1' r2' = r2' =?= rowFromList (ts1, r1')
+    go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
+      | p1 == p2 = do _ <- ty1 `j` ty2
+                      go ts1 ts2 r1' r2'
+      | p1 < p2 = do rest <- fresh
+                     r2' =?= RCons p1 ty1 rest
+                     go ts1 ((p2, ty2) : ts2) r1' rest
+      | otherwise = do rest <- fresh
+                       r1' =?= RCons p2 ty2 rest
+                       go ((p1, ty1) : ts1) ts2 rest r2'   
+unifyRowsWith _ r1 r2 = throwError . strMsg $ "Cannot unify " ++ prettyPrintType r1 ++ " with " ++ prettyPrintType r2 ++ "."
 
 -- |
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
@@ -1019,33 +1022,34 @@ containsTypeSynonyms = everythingOnTypes (||) go where
 -- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
 --
 checkProperties :: [(String, Expr)] -> Type -> Bool -> UnifyT Type Check [(String, Expr)]
-checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
-  go [] [] REmpty = return []
-  go [] [] u@(TUnknown _) = do u =?= REmpty
-                               return []
-  go [] [] (Skolem _ _ _) | lax = return []
-  go [] ((p, _): _) _ | lax = return []
+checkProperties ps row lax = 
+  let 
+    (ts, r') = rowToList row 
+    sts = sortBy (comparing fst) ts
+    sps = sortBy (comparing fst) ps
+  in go [] sps sts r' 
+  where
+  go acc [] [] REmpty = return acc
+  go acc [] [] u@(TUnknown _) = do u =?= REmpty
+                                   return acc
+  go acc [] [] (Skolem _ _ _) | lax = return acc
+  go _   [] [] _ = error "Invalid tail in checkProperties"
+  go acc [] ((p, _): _) _ | lax = return acc
                       | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
-  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
-  go ((p,v):ps') [] u@(TUnknown _) = do
-    v'@(TypedValue _ _ ty) <- infer v
+  go _   ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
+  go acc ((p, v) : sps') [] r = inferMissingProperty acc p v sps' [] r
+  go acc sps@((p, v):sps') sts@((t, ty):sts') r
+    | p == t = do v' <- check v ty
+                  go ((p, v') : acc) sps' sts' r
+    | p < t  = inferMissingProperty acc p v sps' sts r
+    | lax    = go acc sps sts' r
+    | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
+    
+  inferMissingProperty acc p v sps sts r = do 
+    v'@(TypedValue _ _ ty') <- infer v
     rest <- fresh
-    u =?= RCons p ty rest
-    ps'' <- go ps' [] rest
-    return $ (p, v') : ps''
-  go ((p,v):ps') ts r =
-    case lookup p ts of
-      Nothing -> do
-        v'@(TypedValue _ _ ty) <- infer v
-        rest <- fresh
-        r =?= RCons p ty rest
-        ps'' <- go ps' ts rest
-        return $ (p, v') : ps''
-      Just ty -> do
-        v' <- check v ty
-        ps'' <- go ps' (delete (p, ty) ts) r
-        return $ (p, v') : ps''
-  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ExprError (ObjectLiteral ps)))
+    r =?= RCons p ty' rest
+    go ((p, v') : acc) sps sts rest
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
@@ -1134,25 +1138,8 @@ subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   subsumes' (Just $ foldl App val (map (flip (TypeClassDictionary True) dicts) constraints)) ty1 ty2
 subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
-  let
-    (ts1, r1') = rowToList r1
-    (ts2, r2') = rowToList r2
-    ts1' = sortBy (comparing fst) ts1
-    ts2' = sortBy (comparing fst) ts2
-  go ts1' ts2' r1' r2'
+  unifyRowsWith (subsumes Nothing) r1 r2
   return val
-  where
-  go [] ts2 r1' r2' = r1' =?= rowFromList (ts2, r2')
-  go ts1 [] r1' r2' = r2' =?= rowFromList (ts1, r1')
-  go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
-    | p1 == p2 = do _ <- subsumes Nothing ty1 ty2
-                    go ts1 ts2 r1' r2'
-    | p1 < p2 = do rest <- fresh
-                   r2' =?= RCons p1 ty1 rest
-                   go ts1 ((p2, ty2) : ts2) r1' rest
-    | otherwise = do rest <- fresh
-                     r1' =?= RCons p2 ty2 rest
-                     go ((p1, ty1) : ts1) ts2 rest r2'
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
