@@ -2,7 +2,13 @@ set -e
 
 SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 
-OS=$( uname )
+OS=$1
+
+if [ -z $OS ] 
+then
+  echo "Usage: build.sh osname"
+  exit 1
+fi
 
 pushd ${SCRIPTPATH} > /dev/null
 

@@ -7,13 +7,13 @@ after_script:
   - hpc-coveralls --exclude-dir=tests tests
 notifications:
   email: true
-before_deploy: "./bundle/build.sh"
+before_deploy: "./bundle/build.sh linux64"
 deploy:
   provider: releases
   api_key: $RELEASE_KEY
   file:
-    - bundle/*.tar.gz
-    - bundle/*.sha
+    - bundle/linux64.tar.gz
+    - bundle/linux64.sha
   skip_cleanup: true
   on:
     all_branches: true
