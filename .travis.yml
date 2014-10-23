@@ -7,16 +7,13 @@ after_script:
   - hpc-coveralls --exclude-dir=tests tests
 notifications:
   email: true
+before_deploy: "./bundle/build.sh"
 deploy:
   provider: releases
   api_key: $RELEASE_KEY
   file:
-    - dist/build/docgen/docgen
-    - dist/build/hierarchy/hierarchy
-    - dist/build/psc-make/psc-make
-    - dist/build/psc/psc
-    - dist/build/psci/psci
-    - prelude/prelude.purs
+    - bundle/*.tar.gz
+    - bundle/*.sha
   skip_cleanup: true
   on:
     all_branches: true
