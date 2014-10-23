@@ -193,16 +193,11 @@ positioned d = PositionedDeclaration <$> sourcePos <*> d
 --
 parseDocString :: P.Parsec String ParseState Declaration
 parseDocString = do
-    P.string "--|"
-    firstLine <- do
-        firstLine <- P.many (P.alphaNum <|> P.oneOf " ")
-        P.string "\n"
-        return firstLine
+    _ <- P.string "-- |"
+    firstLine <- P.manyTill P.anyChar P.newline
     restLines <- P.many (do
-        P.string "--"
-        lineContents <- P.many (P.alphaNum <|> P.oneOf " ")
-        P.string "\n"
-        return lineContents)
+        _ <- P.string "--"
+        P.manyTill P.anyChar P.newline)
     return $ DocString (firstLine ++ (concat restLines))
 
 -- |

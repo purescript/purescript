@@ -138,7 +138,9 @@ tokenParser = (PT.makeTokenParser langDef) { PT.lexeme = lexeme
                     simpleSpace = P.skipMany1 (P.satisfy isSpace)
 
             oneLineComment =
-                do{ P.try (do { P.string (commentLine langDef); P.noneOf "|" })
+                do{ P.try (do { P.string (commentLine langDef)
+                              ; P.anyChar
+                              ; P.noneOf "|" })
                 ; P.skipMany (P.satisfy (/= '\n'))
                 ; return ()
                 }
