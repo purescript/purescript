@@ -108,6 +108,7 @@ findDeclIdents = concatMap go
   go (ExternDeclaration _ ident _ _) = [ident]
   go (TypeClassDeclaration _ _ _ ds) = findDeclIdents ds
   go (PositionedDeclaration _ d) = go d
+  go (DocStringDeclaration _ (Just d)) = go d
   go _ = []
 
 -- |
@@ -147,6 +148,8 @@ renameInDecl _ (TypeInstanceDeclaration name cs className args ds) =
   TypeInstanceDeclaration name cs className args <$> mapM (renameInDecl True) ds
 renameInDecl isTopLevel (PositionedDeclaration pos d) =
   PositionedDeclaration pos <$> renameInDecl isTopLevel d
+renameInDecl isTopLevel (DocStringDeclaration str (Just d)) =
+  makeDocStringDeclaration str <$> renameInDecl isTopLevel d
 renameInDecl _ other = return other
 
 -- |

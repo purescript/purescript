@@ -223,6 +223,7 @@ addDefaultImport toImport m@(Module mn decls exps)  =
   where
   isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ d) = isExistingImport d
+  isExistingImport (DocStringDeclaration _ (Just d)) = isExistingImport d
   isExistingImport _ = False
 
 importPrim :: Module -> Module

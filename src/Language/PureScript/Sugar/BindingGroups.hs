@@ -85,6 +85,7 @@ collapseBindingGroups = let (f, _, _) = everywhereOnValues id collapseBindingGro
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
   go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
+  go (DocStringDeclaration str (Just d)) = map (makeDocStringDeclaration str) $ go d
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -97,13 +98,13 @@ usedIdents moduleName =
   in nub . f
   where
   def s _ = (s, [])
-  
+
   usedNamesE :: S.Set Ident -> Expr -> (S.Set Ident, [Ident])
   usedNamesE scope (Var (Qualified Nothing name)) | name `S.notMember` scope = (scope, [name])
   usedNamesE scope (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' && name `S.notMember` scope = (scope, [name])
   usedNamesE scope (Abs (Left name) _) = (name `S.insert` scope, [])
   usedNamesE scope _ = (scope, [])
-  
+
   usedNamesB :: S.Set Ident -> Binder -> (S.Set Ident, [Ident])
   usedNamesB scope binder = (scope `S.union` S.fromList (binderNames binder), [])
 
@@ -123,12 +124,14 @@ usedProperNames moduleName =
 getIdent :: Declaration -> Ident
 getIdent (ValueDeclaration ident _ _ _ _) = ident
 getIdent (PositionedDeclaration _ d) = getIdent d
+getIdent (DocStringDeclaration _ (Just d)) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
 getProperName (DataDeclaration _ pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
 getProperName (PositionedDeclaration _ d) = getProperName d
+getProperName (DocStringDeclaration _ (Just d)) = getProperName d
 getProperName _ = error "Expected DataDeclaration"
 
 toBindingGroup :: SCC Declaration -> Declaration
@@ -148,10 +151,12 @@ toDataBindingGroup (CyclicSCC ds')
 isTypeSynonym :: Declaration -> Maybe ProperName
 isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
 isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
+isTypeSynonym (DocStringDeclaration _ (Just d)) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
 fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d
+fromValueDecl (DocStringDeclaration _ (Just d)) = fromValueDecl d
 fromValueDecl _ = error "Expected ValueDeclaration"

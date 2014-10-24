@@ -47,6 +47,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
     declToPs (FixityDeclaration (Fixity assoc prec) ident) =
       tell [ unwords [ show assoc, show prec, ident ] ]
     declToPs (PositionedDeclaration _ d) = declToPs d
+    declToPs (DocStringDeclaration _ (Just d)) = declToPs d
     declToPs _ = return ()
 
     exportToPs :: DeclarationRef -> Writer [String] ()

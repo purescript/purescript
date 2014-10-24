@@ -227,6 +227,7 @@ renameInModule imports exports (Module mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
   letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
+  letBoundVariable (DocStringDeclaration _ (Just d)) = letBoundVariable d
   letBoundVariable _ = Nothing
 
   updateTypesEverywhere :: Maybe SourcePos -> Type -> Either ErrorStack Type
@@ -307,6 +308,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addDecl mn env (ValueDeclaration name _ _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
   addDecl mn env (PositionedDeclaration _ d) = addDecl mn env d
+  addDecl mn env (DocStringDeclaration _ (Just d)) = addDecl mn env d
   addDecl _  env _ = return env
 
 -- |
@@ -372,6 +374,7 @@ findImports = foldl (findImports' Nothing) M.empty
   where
   findImports' pos result (ImportDeclaration mn typ qual) = M.insert mn (pos, typ, qual) result
   findImports' _ result (PositionedDeclaration pos d) = findImports' (Just pos) result d
+  findImports' pos result (DocStringDeclaration _ (Just d)) = findImports' pos result d
   findImports' _ result _ = result
 
 -- |

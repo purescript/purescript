@@ -108,6 +108,7 @@ isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
 isExported Nothing _ = True
 isExported _ P.TypeInstanceDeclaration{} = True
 isExported exps (P.PositionedDeclaration _ d) = isExported exps d
+isExported exps (P.DocStringDeclaration _ (Just d)) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
   matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
@@ -118,6 +119,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
   matches (P.PositionedDeclaration _ d) r = d `matches` r
   matches d (P.PositionedDeclarationRef _ r) = d `matches` r
+  matches (P.DocStringDeclaration _ (Just d)) r = d `matches` r
   matches _ _ = False
 
 isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
@@ -171,7 +173,7 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration n exps (P.PositionedDeclaration _ d) =
   renderDeclaration n exps d
-renderDeclaration n exps (P.DocString str) = do
+renderDeclaration n exps (P.DocStringDeclaration str _) = do
     atIndent n $ "DocString: " ++ str
 renderDeclaration _ _ _ = return ()
 
@@ -192,12 +194,14 @@ getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName (P.PositionedDeclaration _ d) = getName d
+getName (P.DocStringDeclaration _ (Just d)) = getName d
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool
 isValueDeclaration P.TypeDeclaration{} = True
 isValueDeclaration P.ExternDeclaration{} = True
 isValueDeclaration (P.PositionedDeclaration _ d) = isValueDeclaration d
+isValueDeclaration (P.DocStringDeclaration _ (Just d)) = isValueDeclaration d
 isValueDeclaration _ = False
 
 isTypeDeclaration :: P.Declaration -> Bool
@@ -205,20 +209,23 @@ isTypeDeclaration P.DataDeclaration{} = True
 isTypeDeclaration P.ExternDataDeclaration{} = True
 isTypeDeclaration P.TypeSynonymDeclaration{} = True
 isTypeDeclaration (P.PositionedDeclaration _ d) = isTypeDeclaration d
+isTypeDeclaration (P.DocStringDeclaration _ (Just d)) = isTypeDeclaration d
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
 isTypeClassDeclaration P.TypeClassDeclaration{} = True
 isTypeClassDeclaration (P.PositionedDeclaration _ d) = isTypeClassDeclaration d
+isTypeClassDeclaration (P.DocStringDeclaration _ (Just d)) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool
 isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
+isTypeInstanceDeclaration (P.DocStringDeclaration _ (Just d)) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
 isDocString :: P.Declaration -> Bool
-isDocString P.DocString{} = True
+isDocString P.DocStringDeclaration{} = True
 isDocString (P.PositionedDeclaration _ d) = isDocString d
 isDocString _ = False
 

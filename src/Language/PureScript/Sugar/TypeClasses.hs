@@ -164,6 +164,7 @@ desugarDecl mn exps = go
   go (PositionedDeclaration pos d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos) ds)
+  go (DocStringDeclaration _ (Just d)) = desugarDecl mn exps d
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified ProperName -> [Type] -> Maybe DeclarationRef
@@ -195,6 +196,7 @@ desugarDecl mn exps = go
 memberToNameAndType :: Declaration -> (Ident, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
+memberToNameAndType (DocStringDeclaration _ (Just d)) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
@@ -215,6 +217,8 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
     moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
+typeClassMemberToDictionaryAccessor mn name args (DocStringDeclaration str (Just d)) =
+  makeDocStringDeclaration str $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 mkSuperclassDictionaryName :: Qualified ProperName -> Integer -> String
@@ -267,6 +271,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   declName :: Declaration -> Maybe Ident
   declName (PositionedDeclaration _ d) = declName d
+  declName (DocStringDeclaration _ (Just d)) = declName d
   declName (ValueDeclaration ident _ _ _ _) = Just ident
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
@@ -279,11 +284,13 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
     (ident, val) <- memberToNameAndValue tys' d
     return (ident, PositionedValue pos val)
+  memberToNameAndValue tys' (DocStringDeclaration _ (Just d)) = memberToNameAndValue tys' d
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
   typeInstanceDictionaryEntryValue :: Declaration -> Expr
   typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] _ val) = val
   typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
+  typeInstanceDictionaryEntryValue (DocStringDeclaration pos (Just d)) = typeInstanceDictionaryEntryValue d
   typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"
 
 

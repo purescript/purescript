@@ -83,6 +83,7 @@ addTypeClass moduleName pn args implies ds =
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
   toPair (PositionedDeclaration _ d) = toPair d
+  toPair (DocStringDeclaration _ (Just d)) = toPair d
   toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
@@ -153,9 +154,11 @@ typeCheckAll mainModuleName moduleName exps = go
     where
     toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
     toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
+    toTypeSynonym (DocStringDeclaration _ (Just d')) = toTypeSynonym d'
     toTypeSynonym _ = Nothing
     toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
     toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
+    toDataDecl (DocStringDeclaration _ (Just d')) = toDataDecl d'
     toDataDecl _ = Nothing
   go (d@(TypeSynonymDeclaration name args ty) : rest) = do
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
@@ -240,9 +243,8 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
-  go (d@(DocString _) : rest) = do
-    ds <- go rest
-    return $ d : ds
+  go (DocStringDeclaration _ (Just d) : rest) = go (d : rest)
+  go (DocStringDeclaration _ Nothing : rest) = go rest
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are
@@ -320,9 +322,11 @@ typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers (PositionedDeclaration _ d) = findClassMembers d
+    findClassMembers (DocStringDeclaration _ (Just d)) = findClassMembers d
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
     extractMemberName (PositionedDeclaration _ d) = extractMemberName d
+    extractMemberName (DocStringDeclaration _ (Just d)) = extractMemberName d
     extractMemberName (TypeDeclaration memberName _) = memberName
     extractMemberName _ = error "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

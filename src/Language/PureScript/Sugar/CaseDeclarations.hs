@@ -71,6 +71,9 @@ desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
     desugarRest (PositionedDeclaration pos d : ds) = do
       (d' : ds') <- desugarRest (d : ds)
       return (PositionedDeclaration pos d' : ds')
+    desugarRest (DocStringDeclaration str (Just d) : ds) = do
+      (d' : ds') <- desugarRest (d : ds)
+      return (DocStringDeclaration str (Just d') : ds')
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
 
@@ -78,6 +81,8 @@ inSameGroup :: Declaration -> Declaration -> Bool
 inSameGroup (ValueDeclaration ident1 _ _ _ _) (ValueDeclaration ident2 _ _ _ _) = ident1 == ident2
 inSameGroup (PositionedDeclaration _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ d2) = inSameGroup d1 d2
+inSameGroup (DocStringDeclaration _ (Just d1)) d2 = inSameGroup d1 d2
+inSameGroup d1 (DocStringDeclaration _ (Just d2)) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
@@ -97,6 +102,7 @@ toDecls ds@(ValueDeclaration ident _ bs g _ : _) = do
 toDecls (PositionedDeclaration pos d : ds) = do
   (d' : ds') <- rethrowWithPosition pos $ toDecls (d : ds)
   return (PositionedDeclaration pos d' : ds')
+toDecls (DocStringDeclaration _ (Just d) : ds) = toDecls (d : ds)
 toDecls ds = return ds
 
 isVarBinder :: Binder -> Bool
@@ -106,6 +112,7 @@ isVarBinder _ = False
 toTuple :: Declaration -> ([Binder], (Maybe Guard, Expr))
 toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
 toTuple (PositionedDeclaration _ d) = toTuple d
+toTuple (DocStringDeclaration _ (Just d)) = toTuple d
 toTuple _ = error "Not a value declaration"
 
 makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Expr))] -> SupplyT (Either ErrorStack) Declaration

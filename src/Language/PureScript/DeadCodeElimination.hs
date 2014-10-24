@@ -50,6 +50,7 @@ eliminateDeadCode entryPoints ms = map go ms
   valueExists name (ExternDeclaration _ name' _ _) = name == name'
   valueExists name (BindingGroupDeclaration decls) = any (\(name', _, _) -> name == name') decls
   valueExists name (PositionedDeclaration _ d) = valueExists name d
+  valueExists name (DocStringDeclaration _ (Just d)) = valueExists name d
   valueExists _ _ = False
 
   typeOrClassExists :: ProperName -> Declaration -> Bool
@@ -57,6 +58,7 @@ eliminateDeadCode entryPoints ms = map go ms
   typeOrClassExists name (TypeClassDeclaration name' _ _ _) = name == name'
   typeOrClassExists name (DataBindingGroupDeclaration decls) = any (typeOrClassExists name) decls
   typeOrClassExists name (PositionedDeclaration _ d) = typeOrClassExists name d
+  typeOrClassExists name (DocStringDeclaration _ (Just d)) = typeOrClassExists name d
   typeOrClassExists _ _ = False
 
 type Key = (ModuleName, Either Ident ProperName)
@@ -72,6 +74,7 @@ declarationsByModule (Module moduleName ds _) = concatMap go ds
   go (DataBindingGroupDeclaration ds') = concatMap go ds'
   go (TypeClassDeclaration name _ _ _) = [((moduleName, Right name), [])]
   go (PositionedDeclaration _ d) = go d
+  go (DocStringDeclaration _ (Just d)) = go d
   go _ = []
 
 dependencies :: ModuleName -> Declaration -> [Key]
@@ -109,5 +112,7 @@ isUsed moduleName graph vertexFor entryPointVertices (TypeClassDeclaration name 
   let Just v' = vertexFor (moduleName, Right name)
   in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (PositionedDeclaration _ d) =
+  isUsed moduleName graph vertexFor entryPointVertices d
+isUsed moduleName graph vertexFor entryPointVertices (DocStringDeclaration _ (Just d)) =
   isUsed moduleName graph vertexFor entryPointVertices d
 isUsed _ _ _ _ _ = True

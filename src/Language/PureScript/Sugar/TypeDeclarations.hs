@@ -45,6 +45,8 @@ desugarTypeDeclarations :: [Declaration] -> Either ErrorStack [Declaration]
 desugarTypeDeclarations (PositionedDeclaration pos d : ds) = do
   (d' : ds') <- rethrowWithPosition pos $ desugarTypeDeclarations (d : ds)
   return (PositionedDeclaration pos d' : ds')
+desugarTypeDeclarations (DocStringDeclaration _ (Just d) : ds) =
+  desugarTypeDeclarations (d : ds)
 desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   (_, nameKind, val) <- fromValueDeclaration d
   desugarTypeDeclarations (ValueDeclaration name nameKind [] Nothing (TypedValue True val ty) : rest)
@@ -54,6 +56,7 @@ desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   fromValueDeclaration (PositionedDeclaration pos d') = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
     return (ident, nameKind, PositionedValue pos val)
+  fromValueDeclaration (DocStringDeclaration _ (Just d')) = fromValueDeclaration d'
   fromValueDeclaration _ = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (TypeDeclaration name _ : []) = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (ValueDeclaration name nameKind bs g val : rest) = do

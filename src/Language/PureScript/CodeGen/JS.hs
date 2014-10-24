@@ -146,9 +146,11 @@ declToJs _ _ (TypeClassDeclaration name _ supers members) _ =
   memberToName :: Declaration -> Ident
   memberToName (TypeDeclaration ident _) = ident
   memberToName (PositionedDeclaration _ d) = memberToName d
+  memberToName (DocStringDeclaration _ (Just d)) = memberToName d
   memberToName _ = error "Invalid declaration in type class definition"
 declToJs _ _ (ExternDeclaration _ _ (Just js) _) _ = return $ Just [js]
 declToJs opts mp (PositionedDeclaration _ d) e = declToJs opts mp d e
+declToJs opts mp (DocStringDeclaration _ (Just d)) e = declToJs opts mp d e
 declToJs _ _ _ _ = return Nothing
 
 -- |

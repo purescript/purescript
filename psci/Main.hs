@@ -186,6 +186,7 @@ completion = completeWord Nothing " \t\n\r" findCompletions
     exports (P.PositionedDeclarationRef _ r) = exports r
     exports _ = False
   getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
+  getDeclName exts (P.DocStringDeclaration _ (Just d)) = getDeclName exts d
   getDeclName _ _ = Nothing
   names :: [P.Module] -> [String]
   names ms = nub [ show qual

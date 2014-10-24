@@ -80,6 +80,7 @@ superClasses (P.TypeClassDeclaration sub _ supers@(_:_) _) =
   fmap (\(P.Qualified _ super, _) -> SuperMap (Right (super, sub))) supers
 superClasses (P.TypeClassDeclaration sub _ _ _) = [SuperMap (Left sub)]
 superClasses (P.PositionedDeclaration _ decl) = superClasses decl
+superClasses (P.DocStringDeclaration _ (Just decl)) = superClasses decl
 superClasses _ = []
 
 outputFile :: Term (Maybe FilePath)

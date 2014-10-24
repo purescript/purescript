@@ -81,6 +81,7 @@ collectFixities (Module moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [(Qualified Ident, SourcePos, Fixity)]
   collect (PositionedDeclaration pos (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
+  collect (DocStringDeclaration _ (Just d)) = collect d
   collect FixityDeclaration{} = error "Fixity without srcpos info"
   collect _ = []
 

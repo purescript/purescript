@@ -194,8 +194,9 @@ data Declaration
   --
   | PositionedDeclaration SourcePos Declaration
   -- |
-  -- A docstring
-  | DocString String
+  -- A declaration with a docstring and possible associated declarations.
+  --
+  | DocStringDeclaration String (Maybe Declaration)
   deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -204,6 +205,7 @@ data Declaration
 isValueDecl :: Declaration -> Bool
 isValueDecl ValueDeclaration{} = True
 isValueDecl (PositionedDeclaration _ d) = isValueDecl d
+isValueDecl (DocStringDeclaration _ (Just d)) = isValueDecl d
 isValueDecl _ = False
 
 -- |
@@ -213,6 +215,7 @@ isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
 isDataDecl TypeSynonymDeclaration{} = True
 isDataDecl (PositionedDeclaration _ d) = isDataDecl d
+isDataDecl (DocStringDeclaration _ (Just d)) = isDataDecl d
 isDataDecl _ = False
 
 -- |
@@ -221,6 +224,7 @@ isDataDecl _ = False
 isImportDecl :: Declaration -> Bool
 isImportDecl ImportDeclaration{} = True
 isImportDecl (PositionedDeclaration _ d) = isImportDecl d
+isImportDecl (DocStringDeclaration _ (Just d)) = isImportDecl d
 isImportDecl _ = False
 
 -- |
@@ -229,6 +233,7 @@ isImportDecl _ = False
 isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl (PositionedDeclaration _ d) = isExternDataDecl d
+isExternDataDecl (DocStringDeclaration _ (Just d)) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
@@ -237,6 +242,7 @@ isExternDataDecl _ = False
 isExternInstanceDecl :: Declaration -> Bool
 isExternInstanceDecl ExternInstanceDeclaration{} = True
 isExternInstanceDecl (PositionedDeclaration _ d) = isExternInstanceDecl d
+isExternInstanceDecl (DocStringDeclaration _ (Just d)) = isExternInstanceDecl d
 isExternInstanceDecl _ = False
 
 -- |
@@ -245,6 +251,7 @@ isExternInstanceDecl _ = False
 isFixityDecl :: Declaration -> Bool
 isFixityDecl FixityDeclaration{} = True
 isFixityDecl (PositionedDeclaration _ d) = isFixityDecl d
+isFixityDecl (DocStringDeclaration _ (Just d)) = isFixityDecl d
 isFixityDecl _ = False
 
 -- |
@@ -253,6 +260,7 @@ isFixityDecl _ = False
 isExternDecl :: Declaration -> Bool
 isExternDecl ExternDeclaration{} = True
 isExternDecl (PositionedDeclaration _ d) = isExternDecl d
+isExternDecl (DocStringDeclaration _ (Just d)) = isExternDecl d
 isExternDecl _ = False
 
 -- |
@@ -262,7 +270,14 @@ isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration (PositionedDeclaration _ d) = isTypeClassDeclaration d
+isTypeClassDeclaration (DocStringDeclaration _ (Just d)) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
+
+-- |
+-- Creates a DocStringDeclaration.
+--
+makeDocStringDeclaration :: String -> Declaration -> Declaration
+makeDocStringDeclaration str d = DocStringDeclaration str (Just d)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -501,6 +516,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (TypeClassDeclaration name args implies ds) = f (TypeClassDeclaration name args implies (map f' ds))
   f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (map f' ds))
   f' (PositionedDeclaration pos d) = f (PositionedDeclaration pos (f' d))
+  f' (DocStringDeclaration doc (Just d)) = f (DocStringDeclaration doc (Just (f' d)))
   f' other = f other
 
   g' :: Expr -> Expr
@@ -558,6 +574,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f' <=< f) ds
   f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f' <=< f) ds
   f' (PositionedDeclaration pos d) = PositionedDeclaration pos <$> (f d >>= f')
+  f' (DocStringDeclaration str (Just d)) = makeDocStringDeclaration str <$> (f d >>= f')
   f' other = f other
 
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
@@ -608,6 +625,7 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (TypeClassDeclaration name args implies ds) = (TypeClassDeclaration name args implies <$> mapM f' ds) >>= f
   f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> mapM f' ds) >>= f
   f' (PositionedDeclaration pos d) = (PositionedDeclaration pos <$> f' d) >>= f
+  f' (DocStringDeclaration str (Just d)) = (makeDocStringDeclaration str <$> f' d) >>= f
   f' other = f other
 
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
@@ -661,6 +679,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(TypeClassDeclaration _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(PositionedDeclaration _ d1) = f d <> f' d1
+  f' d@(DocStringDeclaration _ (Just d1)) = f d <> f' d1
   f' d = f d
 
   g' v@(UnaryMinus v1) = g v <> g' v1
@@ -723,6 +742,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (PositionedDeclaration _ d1) = (f'' s) d1
+  f' s (DocStringDeclaration _ (Just d1)) = (f'' s) d1
   f' _ _ = r0
 
   g'' s v = let (s', r) = g s v in r <> g' s' v
@@ -789,6 +809,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   f' s (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f'' s) ds
   f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f'' s) ds
   f' s (PositionedDeclaration pos d1) = PositionedDeclaration pos <$> f'' s d1
+  f' s (DocStringDeclaration str (Just d1)) = makeDocStringDeclaration str <$> f'' s d1
   f' _ other = return other
 
   g'' s = uncurry g' <=< g s
