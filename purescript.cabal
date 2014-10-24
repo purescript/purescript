@@ -73,6 +73,7 @@ library
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
+                     Language.PureScript.Parser.TokenParser
                      Language.PureScript.Pretty
                      Language.PureScript.Pretty.Common
                      Language.PureScript.Pretty.JS

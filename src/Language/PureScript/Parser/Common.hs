@@ -17,8 +17,6 @@
 
 module Language.PureScript.Parser.Common where
 
-import Data.Char ( isSpace )
-import Data.List ( nub )
 import Data.Functor.Identity
 import Control.Applicative
 import Control.Monad
@@ -27,6 +25,7 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
 
 import Language.PureScript.Names
+import Language.PureScript.Parser.TokenParser ( makeTokenParser )
 
 -- |
 -- A list of purescript reserved identifiers
@@ -121,60 +120,7 @@ langDef = PT.LanguageDef
 -- A token parser based on the language definition
 --
 tokenParser :: PT.GenTokenParser String u Identity
-tokenParser = (PT.makeTokenParser langDef) { PT.lexeme = lexeme
-                                           , PT.whiteSpace = whiteSpace
-                                           }
-            where
-
-            lexeme p = do{ x <- p; whiteSpace; return x  }
-            whiteSpace
-                | noLine && noMulti  = P.skipMany (simpleSpace P.<?> "")
-                | noLine             = P.skipMany (simpleSpace <|> multiLineComment P.<?> "")
-                | noMulti            = P.skipMany (simpleSpace <|> oneLineComment P.<?> "")
-                | otherwise          = P.skipMany (simpleSpace <|> oneLineComment <|> multiLineComment P.<?> "")
-                where
-                    noLine  = null (commentLine langDef)
-                    noMulti = null (commentStart langDef)
-                    simpleSpace = P.skipMany1 (P.satisfy isSpace)
-
-            oneLineComment =
-                do{ P.try (do { P.string (commentLine langDef)
-                              ; P.anyChar
-                              ; P.noneOf "|" })
-                ; P.skipMany (P.satisfy (/= '\n'))
-                ; return ()
-                }
-
-            multiLineComment =
-                do { P.try (P.string (commentStart langDef))
-                ; inComment
-                }
-
-            inComment
-                | nestedComments langDef  = inCommentMulti
-                | otherwise                = inCommentSingle
-
-            inCommentMulti
-                =   do{ P.try (P.string (commentEnd langDef)) ; return () }
-                P.<|> do{ multiLineComment                     ; inCommentMulti }
-                P.<|> do{ P.skipMany1 (P.noneOf startEnd)          ; inCommentMulti }
-                P.<|> do{ P.oneOf startEnd                       ; inCommentMulti }
-                P.<?> "end of comment"
-                where
-                startEnd   = nub (commentEnd langDef ++ commentStart langDef)
-
-            inCommentSingle
-                =   do{ P.try (P.string (commentEnd langDef)); return () }
-                P.<|> do{ P.skipMany1 (P.noneOf startEnd)         ; inCommentSingle }
-                P.<|> do{ P.oneOf startEnd                      ; inCommentSingle }
-                P.<?> "end of comment"
-                where
-                startEnd   = nub (commentEnd langDef ++ commentStart langDef)
-
-            commentLine = PT.commentLine
-            commentStart = PT.commentStart
-            commentEnd = PT.commentEnd
-            nestedComments = PT.nestedComments
+tokenParser = makeTokenParser langDef
 
 -- |
 -- Parse a token
