@@ -23,6 +23,7 @@ module Language.PureScript.Parser.Declarations (
     parseBinderNoParens,
 ) where
 
+import Data.Char (isSpace)
 import Data.Maybe (isJust, fromMaybe)
 
 import Control.Applicative
@@ -198,7 +199,9 @@ parseDocStringDeclaration = do
     restLines <- P.many (do
         _ <- P.string "--"
         P.manyTill P.anyChar P.newline)
-    return $ DocStringDeclaration (firstLine ++ (concat restLines)) Nothing
+    P.skipMany (P.satisfy isSpace)
+    declaration <- P.optionMaybe parseDeclaration
+    return $ DocStringDeclaration (firstLine ++ (concat restLines)) declaration
 
 -- |
 -- Parse a single declaration
