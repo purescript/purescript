@@ -94,7 +94,7 @@ declToJs opts mp (ValueDeclaration ident _ _ _ val) e = do
   js <- valueToJs opts mp e val
   return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
 declToJs opts mp (BindingGroupDeclaration vals) e = do
-  jss <- flip mapM vals $ \(ident, _, val) -> do
+  jss <- forM vals $ \(ident, _, val) -> do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss

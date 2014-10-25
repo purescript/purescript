@@ -99,8 +99,8 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
   -- Check if an expression represents the Monad Eff dictionary
-  isEffDict name (JSApp (JSVar ident) []) | ident == name = True
-  isEffDict name (JSApp (JSAccessor prop (JSVar eff)) []) = eff == C.eff && prop == name
+  isEffDict name (JSVar ident) | ident == name = True
+  isEffDict name (JSAccessor prop (JSVar eff)) = eff == C.eff && prop == name
   isEffDict _ _ = False
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
