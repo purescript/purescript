@@ -42,13 +42,13 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 
-addDataType :: ModuleName -> DataDeclType -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
+addDataType :: ModuleName -> DataDeclType -> ProperName -> [(String, Maybe Kind)] -> [(ProperName, [Type])] -> Kind -> Check ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
     rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
-      addDataConstructor moduleName dtype name args dctor tys
+      addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
 addDataConstructor moduleName dtype name args dctor tys = do
@@ -58,7 +58,7 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let polyType = mkForAll args dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType) (dataConstructors env) }
 
-addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
+addTypeSynonym :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
@@ -76,7 +76,7 @@ addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
-addTypeClass :: ModuleName -> ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
+addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
@@ -129,7 +129,7 @@ typeCheckAll mainModuleName moduleName exps = go
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
-      addDataType moduleName dtype name (map fst args) dctors ctorKind
+      addDataType moduleName dtype name args dctors ctorKind
     ds <- go rest
     return $ d : ds
     where
@@ -144,10 +144,10 @@ typeCheckAll mainModuleName moduleName exps = go
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         checkDuplicateTypeArguments $ map fst args
-        addDataType moduleName dtype name (map fst args) dctors ctorKind
+        addDataType moduleName dtype name args dctors ctorKind
       forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
         checkDuplicateTypeArguments $ map fst args
-        addTypeSynonym moduleName name (map fst args) ty kind
+        addTypeSynonym moduleName name args ty kind
     ds <- go rest
     return $ d : ds
     where
@@ -161,7 +161,7 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
-      addTypeSynonym moduleName name (map fst args) ty kind
+      addTypeSynonym moduleName name args ty kind
     ds <- go rest
     return $ d : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
@@ -216,7 +216,7 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ d : ds
   go (d@(TypeClassDeclaration pn args implies tys) : rest) = do
-    addTypeClass moduleName pn (map fst args) implies tys
+    addTypeClass moduleName pn args implies tys
     ds <- go rest
     return $ d : ds
   go (TypeInstanceDeclaration dictName deps className tys _ : rest) =

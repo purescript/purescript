@@ -342,7 +342,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         -- Make sure the types unify with the types in the superclass implication
         , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
-        , args' <- maybeToList $ mapM (flip lookup subst) args
+        , args' <- maybeToList $ mapM (flip lookup subst) (map fst args)
         , suDict <- go True subclassName args' ]
       
       -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -595,7 +595,7 @@ expandTypeSynonym' :: Environment -> Qualified ProperName -> [Type] -> Either St
 expandTypeSynonym' env name args =
   case M.lookup name (typeSynonyms env) of
     Just (synArgs, body) -> do
-      let repl = replaceAllTypeVars (zip synArgs args) body
+      let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
       replaceAllTypeSynonyms' env repl
     Nothing -> error "Type synonym was not defined"
 
