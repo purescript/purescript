@@ -141,7 +141,7 @@ renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
   atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let
-    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map P.TypeVar args)
+    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
     exported = filter (isDctorExported name exps . fst) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
@@ -151,13 +151,17 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
-  let typeName = P.runProperName name ++ " " ++ unwords args
+  let
+    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
+    typeName = prettyPrintType' typeApp    
   atIndent n $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
 renderDeclaration n exps (P.TypeClassDeclaration name args implies ds) = do
   let impliesText = case implies of
                       [] -> ""
                       is -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) is) ++ ") <= "
-  atIndent n $ "class " ++ impliesText ++ P.runProperName name ++ " " ++ unwords args ++ " where"
+      classApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
+      className = prettyPrintType' classApp
+  atIndent n $ "class " ++ impliesText ++ className ++ " where"
   mapM_ (renderDeclaration (n + 2) exps) ds
 renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
@@ -167,6 +171,10 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
 renderDeclaration n exps (P.PositionedDeclaration _ d) =
   renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
+
+toTypeVar :: (String, Maybe P.Kind) -> P.Type
+toTypeVar (s, Nothing) = P.TypeVar s
+toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
 
 prettyPrintType' :: P.Type -> String
 prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim

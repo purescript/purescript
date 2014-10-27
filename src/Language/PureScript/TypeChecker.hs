@@ -127,9 +127,9 @@ typeCheckAll mainModuleName moduleName exps = go
   go (d@(DataDeclaration dtype name args dctors) : rest) = do
     rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
       when (dtype == Newtype) $ checkNewtype dctors
-      checkDuplicateTypeArguments args
+      checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
-      addDataType moduleName dtype name args dctors ctorKind
+      addDataType moduleName dtype name (map fst args) dctors ctorKind
     ds <- go rest
     return $ d : ds
     where
@@ -143,11 +143,11 @@ typeCheckAll mainModuleName moduleName exps = go
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
-        checkDuplicateTypeArguments args
-        addDataType moduleName dtype name args dctors ctorKind
+        checkDuplicateTypeArguments $ map fst args
+        addDataType moduleName dtype name (map fst args) dctors ctorKind
       forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
-        checkDuplicateTypeArguments args
-        addTypeSynonym moduleName name args ty kind
+        checkDuplicateTypeArguments $ map fst args
+        addTypeSynonym moduleName name (map fst args) ty kind
     ds <- go rest
     return $ d : ds
     where
@@ -159,9 +159,9 @@ typeCheckAll mainModuleName moduleName exps = go
     toDataDecl _ = Nothing
   go (d@(TypeSynonymDeclaration name args ty) : rest) = do
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
-      checkDuplicateTypeArguments args
+      checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
-      addTypeSynonym moduleName name args ty kind
+      addTypeSynonym moduleName name (map fst args) ty kind
     ds <- go rest
     return $ d : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
@@ -216,7 +216,7 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ d : ds
   go (d@(TypeClassDeclaration pn args implies tys) : rest) = do
-    addTypeClass moduleName pn args implies tys
+    addTypeClass moduleName pn (map fst args) implies tys
     ds <- go rest
     return $ d : ds
   go (TypeInstanceDeclaration dictName deps className tys _ : rest) =
