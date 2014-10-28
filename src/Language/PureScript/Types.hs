@@ -126,20 +126,32 @@ mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
 -- Replace a type variable, taking into account variable shadowing
 --
 replaceTypeVars :: String -> Type -> Type -> Type
-replaceTypeVars = replaceTypeVars' []
+replaceTypeVars v r = replaceAllTypeVars [(v, r)]
+
+-- |
+-- Replace named type variables with types
+--
+replaceAllTypeVars :: [(String, Type)] -> Type -> Type
+replaceAllTypeVars = replaceAllTypeVars' []
   where
-  replaceTypeVars' bound name replacement = go bound
+  replaceAllTypeVars' bound m = go bound
     where
     go :: [String] -> Type -> Type
-    go _  (TypeVar v) | v == name = replacement
+    go _  (TypeVar v) = 
+      case v `lookup` m of
+        Just r -> r
+        Nothing -> TypeVar v
     go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
     go bs (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs) ts
-    go bs f@(ForAll v t sco) | v == name = f
-                             | v `elem` usedTypeVariables replacement =
-                                 let v' = genName v (name : bs ++ usedTypeVariables replacement)
-                                     t' = replaceTypeVars' bs v (TypeVar v') t
+    go bs f@(ForAll v t sco) | v `elem` keys = f
+                             | v `elem` usedVars =
+                                 let v' = genName v (keys ++ bs ++ usedVars)
+                                     t' = replaceAllTypeVars' bs [(v, TypeVar v')] t
                                  in ForAll v' (go (v' : bs) t') sco
                              | otherwise = ForAll v (go (v : bs) t) sco
+      where
+      keys = map fst m
+      usedVars = concatMap (usedTypeVariables . snd) m
     go bs (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs)) cs) (go bs t)
     go bs (RCons name' t r) = RCons name' (go bs t) (go bs r)
     go _ ty = ty
@@ -148,12 +160,6 @@ replaceTypeVars = replaceTypeVars' []
     try :: Integer -> String
     try n | (orig ++ show n) `elem` inUse = try (n + 1)
           | otherwise = orig ++ show n
-
--- |
--- Replace named type variables with types
---
-replaceAllTypeVars :: [(String, Type)] -> Type -> Type
-replaceAllTypeVars = foldl (\f (name, ty) -> replaceTypeVars name ty . f) id
 
 -- |
 -- Collect all type variables appearing in a type
