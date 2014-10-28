@@ -91,7 +91,7 @@ toDecls ds@(ValueDeclaration ident _ bs g _ : _) = do
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
   unless (not (null bs) || isJust g) $
-      throwError $ mkErrorStack ("Top level case disallowed in declaration " ++ show ident) Nothing
+      throwError $ mkErrorStack ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
 toDecls (PositionedDeclaration pos d : ds) = do
