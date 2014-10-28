@@ -132,29 +132,29 @@ replaceTypeVars v r = replaceAllTypeVars [(v, r)]
 -- Replace named type variables with types
 --
 replaceAllTypeVars :: [(String, Type)] -> Type -> Type
-replaceAllTypeVars = replaceAllTypeVars' []
+replaceAllTypeVars = go []
   where
-  replaceAllTypeVars' bound m = go bound
-    where
-    go :: [String] -> Type -> Type
-    go _  (TypeVar v) = 
-      case v `lookup` m of
-        Just r -> r
-        Nothing -> TypeVar v
-    go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
-    go bs (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs) ts
-    go bs f@(ForAll v t sco) | v `elem` keys = f
+      
+  go :: [String] -> [(String, Type)] -> Type -> Type
+  go _  m (TypeVar v) = 
+    case v `lookup` m of
+      Just r -> r
+      Nothing -> TypeVar v
+  go bs m (TypeApp t1 t2) = TypeApp (go bs m t1) (go bs m t2)
+  go bs m (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs m) ts
+  go bs m f@(ForAll v t sco) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
                              | v `elem` usedVars =
-                                 let v' = genName v (keys ++ bs ++ usedVars)
-                                     t' = replaceAllTypeVars' bs [(v, TypeVar v')] t
-                                 in ForAll v' (go (v' : bs) t') sco
-                             | otherwise = ForAll v (go (v : bs) t) sco
-      where
-      keys = map fst m
-      usedVars = concatMap (usedTypeVariables . snd) m
-    go bs (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs)) cs) (go bs t)
-    go bs (RCons name' t r) = RCons name' (go bs t) (go bs r)
-    go _ ty = ty
+                               let v' = genName v (keys ++ bs ++ usedVars)
+                                   t' = go bs [(v, TypeVar v')] t
+                               in ForAll v' (go (v' : bs) m t') sco
+                             | otherwise = ForAll v (go (v : bs) m t) sco
+    where
+    keys = map fst m
+    usedVars = concatMap (usedTypeVariables . snd) m
+  go bs m (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs m)) cs) (go bs m t)
+  go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
+  go _  _ ty = ty
+  
   genName orig inUse = try 0
     where
     try :: Integer -> String
