@@ -154,12 +154,12 @@ unifyRows r1 r2 =
   unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> UnifyT Type Check ()
   unifyRows' [] (TUnknown u) sd r = u =:= rowFromList (sd, r)
   unifyRows' sd r [] (TUnknown u) = u =:= rowFromList (sd, r)
-  unifyRows' ((name, ty):row) r others u@(TUnknown un) = do
-    occursCheck un ty
-    forM_ row $ \(_, t) -> occursCheck un t
-    u' <- fresh
-    u =?= RCons name ty u'
-    unifyRows' row r others u'
+  unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+    forM_ sd1 $ \(_, t) -> occursCheck u2 t
+    forM_ sd2 $ \(_, t) -> occursCheck u1 t
+    rest <- fresh
+    u1 =:= rowFromList (sd2, rest)
+    u2 =:= rowFromList (sd1, rest)
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
@@ -188,6 +188,8 @@ typesOf mainModuleName moduleName vals = do
     val' <- replaceTypeClassDictionaries moduleName val
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
+    -- Check rows do not contain duplicate labels
+    checkDuplicateLabels val'
     -- Remove type synonyms placeholders, remove duplicate row fields, and replace
     -- top-level unification variables with named type variables.
     let val'' = overTypes (desaturateAllTypeSynonyms . setifyAll) val'
@@ -510,6 +512,41 @@ skolemEscapeCheck root@TypedValue{} =
     go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = First (Just val)
     go' _ = mempty
 skolemEscapeCheck val = throwError $ mkErrorStack "Untyped value passed to skolemEscapeCheck" (Just (ExprError val))
+
+-- |
+-- Ensure rows do not contain duplicate labels
+--
+checkDuplicateLabels :: Expr -> Check ()
+checkDuplicateLabels = 
+  let (_, f, _) = everywhereOnValuesM def go def 
+  in void . f
+  where 
+  def :: a -> Check a
+  def = return
+   
+  go :: Expr -> Check Expr
+  go e@(TypedValue _ _ ty) = checkDups ty >> return e
+  go other = return other
+  
+  checkDups :: Type -> Check ()
+  checkDups (TypeApp t1 t2) = checkDups t1 >> checkDups t2
+  checkDups (SaturatedTypeSynonym _ ts) = mapM_ checkDups ts
+  checkDups (ForAll _ t _) = checkDups t
+  checkDups (ConstrainedType args t) = do
+    mapM_ (checkDups) $ concatMap snd args
+    checkDups t 
+  checkDups r@(RCons _ _ _) = 
+    let (ls, _) = rowToList r in 
+    case firstDup . sort . map fst $ ls of
+      Just l -> throwError . strMsg $ "Duplicate label " ++ show l ++ " in row"
+      Nothing -> return ()
+  checkDups _ = return ()
+  
+  firstDup :: (Eq a) => [a] -> Maybe a
+  firstDup (x : xs@(x' : _)) 
+    | x == x' = Just x
+    | otherwise = firstDup xs
+  firstDup _ = Nothing
 
 -- |
 -- Ensure a row contains no duplicate labels
