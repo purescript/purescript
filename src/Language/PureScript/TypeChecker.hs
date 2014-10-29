@@ -124,14 +124,15 @@ typeCheckAll mainModuleName moduleName exps = go
   where
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
-  go (d@(DataDeclaration dtype name args dctors) : rest) = do
+  go (DataDeclaration dtype name args dctors : rest) = do
     rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
-      addDataType moduleName dtype name args dctors ctorKind
+      let args' = args `withKinds` ctorKind
+      addDataType moduleName dtype name args' dctors ctorKind
     ds <- go rest
-    return $ d : ds
+    return $ DataDeclaration dtype name args dctors : ds
     where
     checkNewtype :: [(ProperName, [Type])] -> Check ()
     checkNewtype [(_, [_])] = return ()
@@ -144,10 +145,12 @@ typeCheckAll mainModuleName moduleName exps = go
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         checkDuplicateTypeArguments $ map fst args
-        addDataType moduleName dtype name args dctors ctorKind
+        let args' = args `withKinds` ctorKind 
+        addDataType moduleName dtype name args' dctors ctorKind
       forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
         checkDuplicateTypeArguments $ map fst args
-        addTypeSynonym moduleName name args ty kind
+        let args' = args `withKinds` kind
+        addTypeSynonym moduleName name args' ty kind
     ds <- go rest
     return $ d : ds
     where
@@ -157,13 +160,14 @@ typeCheckAll mainModuleName moduleName exps = go
     toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
     toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
     toDataDecl _ = Nothing
-  go (d@(TypeSynonymDeclaration name args ty) : rest) = do
+  go (TypeSynonymDeclaration name args ty : rest) = do
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
-      addTypeSynonym moduleName name args ty kind
+      let args' = args `withKinds` kind
+      addTypeSynonym moduleName name args' ty kind
     ds <- go rest
-    return $ d : ds
+    return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] Nothing val : rest) = do
     d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
@@ -240,6 +244,16 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
+  
+  -- |
+  -- This function adds the argument kinds for a type constructor so that they may appear in the externs file, 
+  -- extracted from the kind of the type constructor itself.
+  --
+  withKinds :: [(String, Maybe Kind)] -> Kind -> [(String, Maybe Kind)]
+  withKinds []                  _               = []
+  withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
+  withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
+  withKinds _                   _               = error "Invalid arguments to peelKinds"
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are
