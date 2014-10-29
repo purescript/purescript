@@ -45,7 +45,7 @@ data Environment = Environment {
   -- |
   -- Type synonyms currently in scope
   --
-  , typeSynonyms :: M.Map (Qualified ProperName) ([String], Type)
+  , typeSynonyms :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], Type)
   -- |
   -- Available type class dictionaries
   --
@@ -53,7 +53,7 @@ data Environment = Environment {
   -- |
   -- Type classes
   --
-  , typeClasses :: M.Map (Qualified ProperName) ([String], [(Ident, Type)], [(Qualified ProperName, [Type])])
+  , typeClasses :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], [(Ident, Type)], [(Qualified ProperName, [Type])])
   } deriving (Show)
 
 -- |
@@ -124,7 +124,7 @@ data TypeKind
   -- |
   -- Data type
   --
-  = DataType [String] [(ProperName, [Type])]
+  = DataType [(String, Maybe Kind)] [(ProperName, [Type])]
   -- |
   -- Type synonym
   --

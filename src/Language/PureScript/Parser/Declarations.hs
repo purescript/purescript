@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TupleSections #-}
+
 module Language.PureScript.Parser.Declarations (
     parseDeclaration,
     parseModule,
@@ -28,6 +30,7 @@ import Data.Maybe (isJust, fromMaybe)
 import Control.Applicative
 import Control.Arrow ((+++))
 
+import Language.PureScript.Kinds
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
 import Language.PureScript.Declarations
@@ -48,11 +51,15 @@ sourcePos = toSourcePos <$> P.getPosition
   where
   toSourcePos p = SourcePos (P.sourceName p) (P.sourceLine p) (P.sourceColumn p)
 
+kindedIdent :: P.Parsec String ParseState (String, Maybe Kind)
+kindedIdent = (, Nothing) <$> identifier 
+          <|> parens ((,) <$> identifier <*> (Just <$> (indented *> lexeme (P.string "::") *> indented *> parseKind)))
+
 parseDataDeclaration :: P.Parsec String ParseState Declaration
 parseDataDeclaration = do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> properName
-  tyArgs <- many (indented *> identifier)
+  tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
     sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
@@ -66,7 +73,7 @@ parseTypeDeclaration =
 parseTypeSynonymDeclaration :: P.Parsec String ParseState Declaration
 parseTypeSynonymDeclaration =
   TypeSynonymDeclaration <$> (P.try (reserved "type") *> indented *> properName)
-                         <*> many (indented *> identifier)
+                         <*> many (indented *> kindedIdent)
                          <*> (lexeme (indented *> P.char '=') *> parsePolyType)
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
@@ -163,7 +170,7 @@ parseTypeClassDeclaration = do
     reservedOp "<="
     return implies
   className <- indented *> properName
-  idents <- P.many (indented *> identifier)
+  idents <- P.many (indented *> kindedIdent)
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseTypeDeclaration))

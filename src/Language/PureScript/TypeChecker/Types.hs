@@ -124,6 +124,8 @@ unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintT
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = return ()
+  unifyTypes' (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
+  unifyTypes' ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
@@ -342,7 +344,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         -- Make sure the types unify with the types in the superclass implication
         , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
-        , args' <- maybeToList $ mapM (flip lookup subst) args
+        , args' <- maybeToList $ mapM (flip lookup subst) (map fst args)
         , suDict <- go True subclassName args' ]
       
       -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -630,7 +632,7 @@ expandTypeSynonym' :: Environment -> Qualified ProperName -> [Type] -> Either St
 expandTypeSynonym' env name args =
   case M.lookup name (typeSynonyms env) of
     Just (synArgs, body) -> do
-      let repl = replaceAllTypeVars (zip synArgs args) body
+      let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
       replaceAllTypeSynonyms' env repl
     Nothing -> error "Type synonym was not defined"
 
@@ -1041,6 +1043,10 @@ check' (Let ds val) ty = do
 check' val ty | containsTypeSynonyms ty = do
   ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
   check val ty'
+check' val kt@(KindedType ty kind) = do
+  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+  val' <- check' val ty
+  return $ TypedValue True val' kt
 check' (PositionedValue pos val) ty =
   rethrowWithPosition pos $ check val ty
 check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
@@ -1123,6 +1129,8 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
 checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   checkFunctionApplication fn ty arg ret
+checkFunctionApplication' fn (KindedType ty _) arg ret = do
+  checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
   checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
@@ -1166,6 +1174,10 @@ subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
   subsumes val ty1 ty2
 subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
   ty2 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
+  subsumes val ty1 ty2
+subsumes' val (KindedType ty1 _) ty2 = do
+  subsumes val ty1 ty2
+subsumes' val ty1 (KindedType ty2 _) = do
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries

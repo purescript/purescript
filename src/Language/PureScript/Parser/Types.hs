@@ -25,6 +25,7 @@ import Control.Monad (when, unless)
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
+import Language.PureScript.Parser.Kinds
 import Language.PureScript.Environment
 
 import qualified Text.Parsec as P
@@ -85,10 +86,12 @@ parseConstrainedType = do
   return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
-parseAnyType = P.buildExpressionParser operators parseTypeAtom P.<?> "type"
+parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
+  postfixTable = [ \t -> KindedType t <$> (P.try (lexeme (indented *> P.string "::")) *> parseKind)
+                 ]
 
 -- |
 -- Parse a monotype
