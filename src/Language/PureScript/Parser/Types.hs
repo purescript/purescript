@@ -40,7 +40,7 @@ parseFunction :: P.Parsec String ParseState Type
 parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
-parseObject = braces $ TypeApp tyObject <$> parseRow False
+parseObject = braces $ TypeApp tyObject <$> parseRow
 
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do
@@ -67,7 +67,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeVariable
             , parseTypeConstructor
             , parseForAll
-            , parens (parseRow True)
+            , parens parseRow
             , parens parsePolyType ])
 
 parseConstrainedType :: P.Parsec String ParseState Type
@@ -111,6 +111,5 @@ parseNameAndType p = (,) <$> (indented *> (identifier <|> stringLiteral) <* inde
 parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
-parseRow :: Bool -> P.Parsec String ParseState Type
-parseRow nonEmpty = (curry rowFromList <$> many' (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
-  where many' = if nonEmpty then commaSep1 else commaSep
+parseRow :: P.Parsec String ParseState Type
+parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
