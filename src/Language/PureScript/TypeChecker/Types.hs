@@ -359,7 +359,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       -- Turn a DictionaryValue into a Expr
       dictionaryValueToValue :: DictionaryValue -> Expr
       dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
-      dictionaryValueToValue (GlobalDictionaryValue fnName) = App (Var fnName) valUndefined
+      dictionaryValueToValue (GlobalDictionaryValue fnName) = Var fnName
       dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
       dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
         App (Accessor (C.__superclass_ ++ show superclassName ++ "_" ++ show index)

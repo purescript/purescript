@@ -245,9 +245,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       memberNames <- map (first runIdent) <$> mapM (memberToNameAndValue memberTypes) decls
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
-      -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
-      -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
-      -- dependencies, we introduce an unnamed function parameter.
+      -- The dictionary itself is an object literal.
       let superclasses =
             [ (fieldName, Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs))
             | (index, (superclass, suTyArgs)) <- zip [0..] implies
@@ -257,10 +255,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
       let memberNames' = ObjectLiteral (memberNames ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
-          constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
+          constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className memberNames'
-          dict' = if null deps then Abs (Left (Ident C.__unused)) dict else dict
-          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict' constrainedTy)
+          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
       return result
 
   where
