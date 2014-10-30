@@ -153,7 +153,7 @@ inlineCommonOperators = applyAll $
     convert other = other
     isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
     isOp _ = False
-  isOpDict dictName (JSApp (JSAccessor prop (JSVar prelude)) []) = prelude == C.prelude && prop == dictName
+  isOpDict dictName (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == dictName
   isOpDict _ _ = False
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
