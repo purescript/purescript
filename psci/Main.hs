@@ -324,13 +324,24 @@ externPursFile :: FilePath -> FilePath
 externPursFile moduleName = modulesDir ++ pathSeparator : moduleName ++ pathSeparator : "externs.purs"
 
 -- |
+-- Read the module's type definition.
+--
+readModuleTypes :: String -> IO String
+readModuleTypes [] = return "Module must be specified."
+readModuleTypes moduleName = let moduleFile = externPursFile moduleName in
+  do
+    exists <- doesFileExist moduleFile
+    if exists
+       then readFile moduleFile
+       else return $ "Module '" ++ moduleName ++ "' not found!"
+
+-- |
 -- Browse and display the module's function signatures
--- readFile :: FilePath -> IO String
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
-  psciIO $ (readFile . externPursFile . N.runModuleName) moduleName >>= putStrLn
+  psciIO $ (readModuleTypes . N.runModuleName) moduleName >>= putStrLn
   PSCI $ lift $ put st
   return ()
 
