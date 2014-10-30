@@ -34,6 +34,10 @@ data Command
   --
   | Import ModuleName
   -- |
+  -- Browse a module
+  --
+  | Browse ModuleName
+  -- |
   -- Load a file for use with importing
   --
   | LoadFile FilePath
@@ -65,6 +69,7 @@ help :: [[String]]
 help =
   [ [":?          ", "Show this help menu"]
   , [":i <module> ", "Import <module> for use in PSCI"]
+  , [":b <module> ", "Browse <module>"]
   , [":m <file>   ", "Load <file> for importing"]
   , [":q          ", "Quit PSCi"]
   , [":r          ", "Reset"]
