@@ -54,6 +54,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
+import qualified Language.PureScript.Names        as N
 
 -- |
 -- The PSCI state.
@@ -316,8 +317,22 @@ handleImport moduleName = do
        PSCI $ lift $ put s
        return ()
 
+-- |
+-- Compute the file `extern.purs` for the module moduleName.
+--
+externPursFile :: FilePath -> FilePath
+externPursFile moduleName = modulesDir ++ pathSeparator : moduleName ++ pathSeparator : "externs.purs"
+
+-- |
+-- Browse and display the module's function signatures
+-- readFile :: FilePath -> IO String
+--
 handleBrowse :: P.ModuleName -> PSCI ()
-handleBrowse moduleName = undefined
+handleBrowse moduleName = do
+  st <- PSCI $ lift get
+  psciIO $ (readFile . externPursFile . N.runModuleName) moduleName >>= putStrLn
+  PSCI $ lift $ put st
+  return ()
 
 -- |
 -- Takes a value and prints its type
