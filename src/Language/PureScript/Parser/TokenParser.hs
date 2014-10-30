@@ -412,9 +412,9 @@ makeTokenParser languageDef
     oneLineComment =
         do{ try (do { string (commentLine languageDef)
                     ; notFollowedBy (string " |") })
-        ; skipMany (satisfy (/= '\n'))
-        ; return ()
-        }
+          ; skipMany (satisfy (/= '\n'))
+          ; return ()
+          }
 
     multiLineComment =
         do { try (string (commentStart languageDef))

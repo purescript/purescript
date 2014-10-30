@@ -98,7 +98,7 @@ declToJs opts mp (BindingGroupDeclaration vals) e = do
     js <- valueToJs opts mp e val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
-declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _)]) _ =
+declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _, _)]) _ =
   return $ Just $ [JSVariableIntroduction ctor (Just $
                     JSObjectLiteral [("create",
                       JSFunction Nothing ["value"]
@@ -106,7 +106,7 @@ declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _)]) _ =
 declToJs _ _ (DataDeclaration Newtype _ _ _) _ =
   error "newtype has multiple constructors"
 declToJs _ mp (DataDeclaration Data _ _ ctors) e = do
-  return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
+  return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys, _) ->
       let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
       in [ makeConstructor ctor (length tys)
          , JSAssignment (JSAccessor propName (JSVar ctor)) (go pn 0 (length tys) [])

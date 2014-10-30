@@ -68,7 +68,7 @@ declarationsByModule (Module moduleName ds _) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
   go d@(ValueDeclaration name _ _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
-  go (DataDeclaration _ _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
+  go (DataDeclaration _ _ _ dctors) = map (\(name, _, _) -> ((moduleName, Right name), [])) dctors
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
   go d@(BindingGroupDeclaration names') = map (\(name, _, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
   go (DataBindingGroupDeclaration ds') = concatMap go ds'
@@ -98,7 +98,7 @@ isUsed moduleName graph vertexFor entryPointVertices (FixityDeclaration _ name) 
   let Just v' = vertexFor (moduleName, Left $ Op name)
   in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (DataDeclaration _ _ _ dctors) =
-  any (\(pn, _) -> let Just v' = vertexFor (moduleName, Right pn)
+  any (\(pn, _, _) -> let Just v' = vertexFor (moduleName, Right pn)
                    in any (\v -> path graph v v') entryPointVertices) dctors
 isUsed moduleName graph vertexFor entryPointVertices (ExternDeclaration _ name _ _) =
   let Just v' = vertexFor (moduleName, Left name)

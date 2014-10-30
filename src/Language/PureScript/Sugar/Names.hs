@@ -183,7 +183,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateDecl :: (Maybe SourcePos, [Ident]) -> Declaration -> Either ErrorStack ((Maybe SourcePos, [Ident]), Declaration)
   updateDecl (_, bound) d@(PositionedDeclaration pos _) = return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
-    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
+    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (snd3M (mapM (updateTypesEverywhere pos))) dctors)
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
     (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (TypeClassDeclaration className args implies ds) =
@@ -302,7 +302,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
     go env'' (TypeDeclaration name _) = addValue env'' mn name
     go env'' (PositionedDeclaration pos d) = rethrowWithPosition pos $ go env'' d
     go _ _ = error "Invalid declaration in TypeClassDeclaration"
-  addDecl mn env (DataDeclaration _ tn _ dcs) = addType env mn tn (map fst dcs)
+  addDecl mn env (DataDeclaration _ tn _ dcs) = addType env mn tn (map fst3 dcs)
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _ _) = addValue env mn name

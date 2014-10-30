@@ -132,13 +132,18 @@ data ImportDeclarationType
   deriving (Show, D.Data, D.Typeable)
 
 -- |
+-- A constructor definition for a DataDeclaration
+--
+type DataConstructor = (ProperName, [Type], Maybe String)
+
+-- |
 -- The data type of declarations
 --
 data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType ProperName [String] [(ProperName, [Type])]
+  = DataDeclaration DataDeclType ProperName [String] [DataConstructor]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -856,7 +861,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . getTypes) dctors)
   forDecls (ExternDeclaration _ _ _ ty) = f ty
   forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)
@@ -870,4 +875,4 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
 
-
+  getTypes (_, types', _) = types'

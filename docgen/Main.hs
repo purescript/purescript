@@ -22,6 +22,7 @@ import Data.List
 import Data.Version (showVersion)
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
+import Language.PureScript.Traversals
 import qualified System.IO.UTF8 as U
 import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
@@ -150,9 +151,9 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map P.TypeVar args)
     typeName = prettyPrintType' typeApp
-    exported = filter (isDctorExported name exps . fst) ctors
+    exported = filter (isDctorExported name exps . fst3) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
-  forM_ exported $ \(ctor, tys) ->
+  forM_ exported $ \(ctor, tys, _) ->
     let ctorTy = foldr P.function typeApp tys
     in atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =

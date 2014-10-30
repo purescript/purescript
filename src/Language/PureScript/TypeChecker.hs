@@ -41,14 +41,17 @@ import Language.PureScript.Declarations
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Traversals
 
-addDataType :: ModuleName -> DataDeclType -> ProperName -> [String] -> [(ProperName, [Type])] -> Kind -> Check ()
+addDataType :: ModuleName -> DataDeclType -> ProperName -> [String] -> [DataConstructor] -> Kind -> Check ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
-  forM_ dctors $ \(dctor, tys) ->
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map stripComment dctors)) (types env) }
+  forM_ dctors $ \(dctor, tys, _) ->
     rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
       addDataConstructor moduleName dtype name args dctor tys
+
+                 where stripComment (a, b, _) = (a, b)
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
 addDataConstructor moduleName dtype name args dctor tys = do
@@ -129,20 +132,20 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments args
-      ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
+      ctorKind <- kindsOf True moduleName name args (concatMap snd3 dctors)
       addDataType moduleName dtype name args dctors ctorKind
     ds <- go rest
     return $ d : ds
     where
-    checkNewtype :: [(ProperName, [Type])] -> Check ()
-    checkNewtype [(_, [_])] = return ()
-    checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
+    checkNewtype :: [DataConstructor] -> Check ()
+    checkNewtype [(_, [_], _)] = return ()
+    checkNewtype [(_, _, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
     checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
   go (d@(DataBindingGroupDeclaration tys) : rest) = do
     rethrow (strMsg "Error in data binding group" <>) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd3 dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         checkDuplicateTypeArguments args
         addDataType moduleName dtype name args dctors ctorKind

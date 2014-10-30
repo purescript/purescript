@@ -56,7 +56,11 @@ parseDataDeclaration = do
   tyArgs <- many (indented *> identifier)
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
-    sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
+    (flip sepBy1) pipe $ do
+      comment <- P.optionMaybe (indented *> parseDocComment)
+      name <- properName
+      types <- P.many (indented *> parseTypeAtom)
+      return $ (name, types, comment)
   return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
@@ -190,18 +194,31 @@ positioned :: P.Parsec String ParseState Declaration -> P.Parsec String ParseSta
 positioned d = PositionedDeclaration <$> sourcePos <*> d
 
 -- |
--- Parse a DocString
+-- Parse a documentation comment
+--
+parseDocComment :: P.Parsec String ParseState String
+parseDocComment = do
+    P.skipMany (P.satisfy isSpace)
+    _ <- P.string "-- |"
+    firstLine <- P.manyTill P.anyChar P.newline
+    P.skipMany (P.satisfy isSpace)
+    restLines <- P.many (do
+        _ <- P.string "--"
+        comment <- P.manyTill P.anyChar P.newline
+        P.skipMany (P.satisfy isSpace)
+        return comment)
+    P.skipMany (P.satisfy isSpace)
+    return $ firstLine ++ (concat restLines)
+
+-- |
+-- Parse a DocString declaration
 --
 parseDocStringDeclaration :: P.Parsec String ParseState Declaration
 parseDocStringDeclaration = do
-    _ <- P.string "-- |"
-    firstLine <- P.manyTill P.anyChar P.newline
-    restLines <- P.many (do
-        _ <- P.string "--"
-        P.manyTill P.anyChar P.newline)
+    comment <- parseDocComment
     P.skipMany (P.satisfy isSpace)
     declaration <- P.optionMaybe parseDeclaration
-    return $ DocStringDeclaration (firstLine ++ (concat restLines)) declaration
+    return $ DocStringDeclaration comment declaration
 
 -- |
 -- Parse a single declaration
