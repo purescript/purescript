@@ -316,6 +316,9 @@ handleImport moduleName = do
        PSCI $ lift $ put s
        return ()
 
+handleBrowse :: P.ModuleName -> PSCI ()
+handleBrowse moduleName = undefined
+
 -- |
 -- Takes a value and prints its type
 --
@@ -397,6 +400,7 @@ handleCommand Reset = do
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
+handleCommand (Browse moduleName) = handleBrowse moduleName
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 singleLineFlag :: Cmd.Term Bool
