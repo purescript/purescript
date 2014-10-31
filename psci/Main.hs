@@ -347,7 +347,7 @@ handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   PSCiState { psciLoadedModules = loadedModules
             , psciImportedFilenames = loadedPaths} <- PSCI $ lift get
-  psciIO $ (readModuleTypes loadedModules . findModulePath loadedPaths . N.runModuleName) moduleName >>= putStrLn
+  psciIO $ (readModuleTypes loadedModules . findKeyModulePath loadedPaths . N.runModuleName) moduleName >>= putStrLn
   return ()
   where
     moduleToPath :: String -> FilePath
@@ -358,21 +358,19 @@ handleBrowse moduleName = do
                       "Control.Monad.Eff", "Control.Monad.Eff.Unsafe",
                        "Debug.Trace", "Control.Monad.ST"]
 
-    -- find the fully qualified module path (key to full module) - "" if not found
-    findModulePath :: [FilePath] -> String -> Either String FilePath
-    findModulePath _ [] = Left "Module must be specified."
-    findModulePath filePaths modName =
+    -- find the fully qualified module path (key to full module)
+    findKeyModulePath :: [FilePath] -> String -> Either String FilePath
+    findKeyModulePath _ [] = Left "Module must be specified."
+    findKeyModulePath filePaths modName =
       let partialModulePath = if modName `elem` preludeModules then "/prelude/prelude.purs" else moduleToPath modName in
            case filter (isInfixOf partialModulePath) filePaths of
            []    -> Left $ "Module ('" ++ modName ++ "','" ++ partialModulePath ++ "') was not found."
            (x:_) -> Right x
 
-    -- retrieve explicit types
     getSignature (P.PositionedDeclaration _ d) = getSignature d
     getSignature (P.TypeDeclaration ident mtype) = Just $ show ident ++ " :: " ++ prettyPrintType mtype
     getSignature _ = Nothing
 
-    -- pretty print module's signature
     signatures :: P.Module -> [String]
     signatures (P.Module _ ds _) = mapMaybe getSignature ds
 
