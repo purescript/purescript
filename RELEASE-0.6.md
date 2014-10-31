@@ -27,6 +27,7 @@
 - Generated code for type class dictionaries was simplified. (@garyb, @dylex)
 - The code generator now inserts the version of `psc` into the file as a comment. (@co-dh)
 - `()` is now valid syntax, referring to the empty row. (@paf31)
+- The type checker will now display multiple errors for type errors in the same binding group. (@paf31)
 
 ### Bug Fixes
 
