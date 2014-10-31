@@ -355,28 +355,38 @@ handleTypeOf value = do
         Nothing -> PSCI $ outputStrLn "Could not find type"
 
 -- |
+-- Pretty print a module's signatures
+--
+printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
+printModuleSignatures moduleName env =
+  PSCI $ let namesEnv = P.names env
+             moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
+             in case moduleNamesIdent of
+                  [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
+                  _ -> ( outputStrLn
+                       . unlines
+                       . sort
+                       . map (showType . findType namesEnv)) moduleNamesIdent
+  where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+        findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+        showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
+        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
+        showType _ = error "The impossible happened in printModuleSignatures."
+
+-- |
 -- Browse a module and displays its signature (if module exists).
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st) []
-  PSCI $ case e of
-           Left err   -> outputStrLn err
-           Right env' ->
-             let namesEnv = P.names env'
-                 moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
-                 in case moduleNamesIdent of
-                      [] -> outputStrLn $ "Either you entered an invalid module name (see `:s loaded`) or the module '"++ P.runModuleName moduleName ++"' does not export functions."
-                      _ -> ( outputStrLn
-                           . unlines
-                           . sort
-                           . map (showType . findType namesEnv)) moduleNamesIdent
-  where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
-        findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
-        showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
-        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
-        showType _ = error "The impossible happened in handleBrowse."
+  let loadedModules = psciLoadedModules st
+  env <- psciIO . runMake $ P.make modulesDir options loadedModules []
+  case env of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
+      if moduleName `notElem` (nub . map ((\ (P.Module modName _ _ ) -> modName) . snd)) loadedModules
+        then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
+        else printModuleSignatures moduleName env'
 
 -- |
 -- Takes a value and prints its kind
