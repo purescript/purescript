@@ -42,7 +42,7 @@ psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> C.mark (many1 (C
 --
 parseCommand :: String -> Either ParseError Command
 parseCommand = P.runIndentParser "" $ choice
-                    [ P.whiteSpace *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse)
+                    [ P.whiteSpace *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse <|> psciShowModules)
                     , try psciLet
                     , psciExpression
                     ] <* eof
@@ -103,3 +103,8 @@ psciKindOf = KindOf <$> (char 'k' *> P.whiteSpace *> P.parseType)
 --
 psciBrowse :: Parsec String P.ParseState Command
 psciBrowse = Browse <$> (char 'b' *> P.whiteSpace *> P.moduleName)
+
+-- |
+-- Show Command
+psciShowModules :: Parsec String P.ParseState Command
+psciShowModules = Show <$ char 's'

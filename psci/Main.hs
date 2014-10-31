@@ -305,6 +305,14 @@ handleDeclaration value = do
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
 
+handleShowModules :: PSCI ()
+handleShowModules = do
+  PSCiState { psciLoadedModules = loadedModules } <- PSCI $ lift get
+  psciIO $ readModules loadedModules >>= putStrLn
+  return ()
+  where readModules = return . unlines . nub . map toModuleName
+        toModuleName =  N.runModuleName . (\ (D.Module mdName _ _) -> mdName) . snd
+
 -- |
 -- Imports a module, preserving the initial state on failure.
 --
@@ -447,6 +455,7 @@ handleCommand Reset = do
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
 handleCommand (Browse moduleName) = handleBrowse moduleName
+handleCommand Show = handleShowModules
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 singleLineFlag :: Cmd.Term Bool

@@ -61,6 +61,10 @@ data Command
   -- Find the kind of an expression
   --
   | KindOf Type
+  -- |
+  -- Show command
+  --
+  | Show
 
 -- |
 -- The help menu.
@@ -75,4 +79,5 @@ help =
   , [":r          ", "Reset"]
   , [":t <expr>   ", "Show the type of <expr>"]
   , [":k <type>   ", "Show the kind of <type>"]
+  , [":s          ", "Show loaded modules" ]
   ]
