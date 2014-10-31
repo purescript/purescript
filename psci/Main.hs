@@ -354,6 +354,9 @@ handleTypeOf value = do
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
 
+-- |
+-- Browse a module and displays its signature (if module exists).
+--
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
