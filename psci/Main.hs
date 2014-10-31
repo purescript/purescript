@@ -370,14 +370,6 @@ handleBrowse moduleName = do
     signatures :: P.Module -> [String]
     signatures (P.Module _ ds _) = mapMaybe getSignature ds
 
-    -- names :: [P.Module] -> [String]
-    -- names ms = nub [ show qual
-    --             | P.Module moduleName ds exts <- ms
-    --             , ident <- mapMaybe (getDeclName exts) ds
-    --             , qual <- [ P.Qualified Nothing ident
-    --                       , P.Qualified (Just moduleName) ident]
-    --             ]
-
     readModuleTypes :: [(FilePath, D.Module)] -> Either String FilePath -> IO String
     readModuleTypes [] _ = return "No module(s) loaded."
     readModuleTypes _ (Left err) = return err
