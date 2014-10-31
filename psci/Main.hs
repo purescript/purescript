@@ -28,7 +28,7 @@ import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.List (intercalate, isPrefixOf, nub, sortBy)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, isInfixOf)
 import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
 import Data.Version (showVersion)
@@ -56,6 +56,7 @@ import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Declarations as D
+import Language.PureScript.Pretty.Types (prettyPrintType)
 
 -- |
 -- The PSCI state.
@@ -323,22 +324,46 @@ handleImport moduleName = do
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
-  psciIO $ (readModuleTypes . N.runModuleName) moduleName >>= putStrLn
+  PSCiState { psciLoadedModules = loadedModules
+            , psciImportedFilenames = loadedPaths} <- PSCI $ lift get
+  psciIO $ (readModuleTypes loadedModules . findModulePath loadedPaths . N.runModuleName) moduleName >>= putStrLn
   return ()
   where
-    -- Compute the file `extern.purs` for the module moduleName.
-    externPursFile :: FilePath -> FilePath
-    externPursFile modName = modulesDir ++ pathSeparator : modName ++ pathSeparator : "externs.purs"
+    moduleToPath :: String -> FilePath
+    moduleToPath = (pathSeparator:) . (++ ".purs") . N.runModuleName . N.moduleNameFromString
 
-    -- Read the module's type definition.
-    readModuleTypes :: String -> IO String
-    readModuleTypes [] = return "Module must be specified."
-    readModuleTypes modName = let modFile = externPursFile modName in
-      do
-        exists <- doesFileExist modFile
-        if exists
-           then readFile modFile
-           else return $ "Module '" ++ modName ++ "' not found!"
+    -- find the fully qualified module path (key to full module) - "" if not found
+    findModulePath :: [FilePath] -> String -> Either String FilePath
+    findModulePath _ [] = Left "Module must be specified."
+    findModulePath filePaths modName = let partialModulePath = moduleToPath modName in
+      case filter (isInfixOf partialModulePath) filePaths of
+        []    -> Left $ "Module ('" ++ modName ++ "','" ++ partialModulePath ++ "') was not found."
+        (x:_) -> Right x
+
+    -- retrieve explicit types
+    getSignature (P.PositionedDeclaration _ d) = getSignature d
+    getSignature (P.TypeDeclaration ident mtype) = Just $ show ident ++ " :: " ++ prettyPrintType mtype
+    getSignature _ = Nothing
+
+    -- pretty print module's signature
+    signatures :: P.Module -> [String]
+    signatures (P.Module _ ds _) = mapMaybe getSignature ds
+
+    -- names :: [P.Module] -> [String]
+    -- names ms = nub [ show qual
+    --             | P.Module moduleName ds exts <- ms
+    --             , ident <- mapMaybe (getDeclName exts) ds
+    --             , qual <- [ P.Qualified Nothing ident
+    --                       , P.Qualified (Just moduleName) ident]
+    --             ]
+
+    readModuleTypes :: [(FilePath, D.Module)] -> Either String FilePath -> IO String
+    readModuleTypes [] _ = return "No module(s) loaded."
+    readModuleTypes _ (Left err) = return err
+    readModuleTypes loadedModules (Right modName) =
+      return $ case lookup modName loadedModules of
+                 Just mName -> unlines $ signatures mName
+                 _             -> "Module '" ++ modName ++ "' not found!"
 
 -- |
 -- Takes a value and prints its type
