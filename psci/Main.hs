@@ -376,7 +376,7 @@ handleBrowse moduleName = do
         findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
         showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
         showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
-        showType _ = undefined
+        showType _ = error "The impossible happened in handleBrowse."
 
 -- |
 -- Takes a value and prints its kind
