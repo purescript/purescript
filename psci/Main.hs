@@ -340,9 +340,7 @@ readModuleTypes moduleName = let moduleFile = externPursFile moduleName in
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
-  st <- PSCI $ lift get
   psciIO $ (readModuleTypes . N.runModuleName) moduleName >>= putStrLn
-  PSCI $ lift $ put st
   return ()
 
 -- |
