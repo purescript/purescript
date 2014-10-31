@@ -4,6 +4,7 @@
 
 - The `Alternative` type class hierarchy was refactored. See [here](https://github.com/purescript/purescript-control/issues/6).
 - `--runtime-type-checks` has been removed. The recommended approach is to use `purescript-foreign`. (@garyb)
+- The `Unit` type is now used in the Prelude and core libraries to represent values containing no data. (@garyb)
 
 ### New Features
 
@@ -28,6 +29,7 @@
 - The code generator now inserts the version of `psc` into the file as a comment. (@co-dh)
 - `()` is now valid syntax, referring to the empty row. (@paf31)
 - The type checker will now display multiple errors for type errors in the same binding group. (@paf31)
+- Imports can now specify hidden names using `import ... hiding ( ... )` (@andreypopp)
 
 ### Bug Fixes
 
