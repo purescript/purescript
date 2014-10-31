@@ -358,18 +358,17 @@ handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st) []
-  case e of
-    Left err   -> PSCI $ outputStrLn err
-    Right env' ->
-      let namesEnv = P.names env'
-          moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
-          in case moduleNamesIdent of
-               [] -> (PSCI . outputStrLn) "A correct module name must be specified. See `:s loaded` command for a list of those."
-               _ -> ( PSCI
-                    . outputStrLn
-                    . unlines
-                    . sort
-                    . map (showType . findType namesEnv)) moduleNamesIdent
+  PSCI $ case e of
+           Left err   -> outputStrLn err
+           Right env' ->
+             let namesEnv = P.names env'
+                 moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
+                 in case moduleNamesIdent of
+                      [] -> outputStrLn "A correct module name must be specified. See `:s loaded` command for a list of those."
+                      _ -> ( outputStrLn
+                           . unlines
+                           . sort
+                           . map (showType . findType namesEnv)) moduleNamesIdent
   where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
         showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
