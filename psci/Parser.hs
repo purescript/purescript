@@ -70,8 +70,10 @@ psciImport = Import <$> (char 'i' *> P.whiteSpace *> P.moduleName)
 --
 psciLoadFile :: Parsec String P.ParseState Command
 psciLoadFile = LoadFile . trimEnd <$> (char 'm' *> P.whiteSpace *> manyTill anyChar eof)
-  where
-  trimEnd = reverse . dropWhile isSpace . reverse
+
+-- | Trim end of input string
+trimEnd :: String -> String
+trimEnd = reverse . dropWhile isSpace . reverse
 
 -- |
 -- Parses 'Commands.Quit' command.
@@ -107,4 +109,4 @@ psciBrowse = Browse <$> (char 'b' *> P.whiteSpace *> P.moduleName)
 -- |
 -- Show Command
 psciShowModules :: Parsec String P.ParseState Command
-psciShowModules = Show <$ char 's'
+psciShowModules = Show . trimEnd <$> (char 's' *> P.whiteSpace *> manyTill anyChar eof)

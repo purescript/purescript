@@ -64,7 +64,7 @@ data Command
   -- |
   -- Show command
   --
-  | Show
+  | Show String
 
 -- |
 -- The help menu.
@@ -79,5 +79,6 @@ help =
   , [":r          ", "Reset"]
   , [":t <expr>   ", "Show the type of <expr>"]
   , [":k <type>   ", "Show the kind of <type>"]
-  , [":s          ", "Show loaded modules" ]
+  , [":s loaded   ", "Show loaded modules" ]
+  , [":s import   ", "Show imported modules" ]
   ]
