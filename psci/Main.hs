@@ -28,7 +28,7 @@ import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.List (intercalate, isPrefixOf, nub, sortBy, isInfixOf)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, isInfixOf, sort)
 import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
 import Data.Version (showVersion)
@@ -313,7 +313,7 @@ handleShowLoadedModules = do
   PSCiState { psciLoadedModules = loadedModules } <- PSCI $ lift get
   psciIO $ readModules loadedModules >>= putStrLn
   return ()
-  where readModules = return . unlines . nub . map toModuleName
+  where readModules = return . unlines . sort . nub . map toModuleName
         toModuleName =  N.runModuleName . (\ (D.Module mdName _ _) -> mdName) . snd
 
 -- |
@@ -324,7 +324,7 @@ handleShowImportedModules = do
   PSCiState { psciImportedModuleNames = importedModuleNames } <- PSCI $ lift get
   psciIO $ readModules importedModuleNames >>= putStrLn
   return ()
-  where readModules = return . unlines .  map N.runModuleName
+  where readModules = return . unlines . sort . map N.runModuleName
 
 -- |
 -- Imports a module, preserving the initial state on failure.
@@ -379,8 +379,8 @@ handleBrowse moduleName = do
     readModuleTypes _ (Left err) = return err
     readModuleTypes loadedModules (Right modName) =
       return $ case lookup modName loadedModules of
-                 Just mName -> unlines $ signatures mName
-                 _             -> "Module '" ++ modName ++ "' not found!"
+                Just mName -> (unlines . sort . signatures) mName
+                _          -> "Module '" ++ modName ++ "' not found!"
 
 -- |
 -- Takes a value and prints its type
