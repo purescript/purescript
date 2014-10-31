@@ -28,7 +28,7 @@ import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.List (intercalate, isPrefixOf, nub, sortBy)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
 import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
 import Data.Version (showVersion)
@@ -54,6 +54,8 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
+import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Declarations as D
 
 -- |
 -- The PSCI state.
@@ -303,6 +305,27 @@ handleDeclaration value = do
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
 
 -- |
+-- Show actual loaded modules in psci.
+--
+handleShowLoadedModules :: PSCI ()
+handleShowLoadedModules = do
+  PSCiState { psciLoadedModules = loadedModules } <- PSCI $ lift get
+  psciIO $ readModules loadedModules >>= putStrLn
+  return ()
+  where readModules = return . unlines . sort . nub . map toModuleName
+        toModuleName =  N.runModuleName . (\ (D.Module mdName _ _) -> mdName) . snd
+
+-- |
+-- Show the imported modules in psci.
+--
+handleShowImportedModules :: PSCI ()
+handleShowImportedModules = do
+  PSCiState { psciImportedModuleNames = importedModuleNames } <- PSCI $ lift get
+  psciIO $ readModules importedModuleNames >>= putStrLn
+  return ()
+  where readModules = return . unlines . sort . map N.runModuleName
+
+-- |
 -- Imports a module, preserving the initial state on failure.
 --
 handleImport :: P.ModuleName -> PSCI ()
@@ -330,6 +353,40 @@ handleTypeOf value = do
       case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
+
+-- |
+-- Pretty print a module's signatures
+--
+printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
+printModuleSignatures moduleName env =
+  PSCI $ let namesEnv = P.names env
+             moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
+             in case moduleNamesIdent of
+                  [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
+                  _ -> ( outputStrLn
+                       . unlines
+                       . sort
+                       . map (showType . findType namesEnv)) moduleNamesIdent
+  where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+        findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+        showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
+        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
+        showType _ = error "The impossible happened in printModuleSignatures."
+
+-- |
+-- Browse a module and displays its signature (if module exists).
+--
+handleBrowse :: P.ModuleName -> PSCI ()
+handleBrowse moduleName = do
+  st <- PSCI $ lift get
+  let loadedModules = psciLoadedModules st
+  env <- psciIO . runMake $ P.make modulesDir options loadedModules []
+  case env of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
+      if moduleName `notElem` (nub . map ((\ (P.Module modName _ _ ) -> modName) . snd)) loadedModules
+        then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
+        else printModuleSignatures moduleName env'
 
 -- |
 -- Takes a value and prints its kind
@@ -397,6 +454,9 @@ handleCommand Reset = do
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
+handleCommand (Browse moduleName) = handleBrowse moduleName
+handleCommand (Show "loaded") = handleShowLoadedModules
+handleCommand (Show "import") = handleShowImportedModules
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
 singleLineFlag :: Cmd.Term Bool
