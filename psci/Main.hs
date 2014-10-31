@@ -54,7 +54,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
-import qualified Language.PureScript.Names        as N
+import qualified Language.PureScript.Names as N
 
 -- |
 -- The PSCI state.
