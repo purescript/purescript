@@ -351,7 +351,7 @@ handleBrowse moduleName = do
   return ()
   where
     moduleToPath :: String -> FilePath
-    moduleToPath = (pathSeparator:) . (++ ".purs") . N.runModuleName . N.moduleNameFromString
+    moduleToPath = (pathSeparator:) . (++ ".purs") . map (\x -> if x == '.' then pathSeparator else x) . N.runModuleName . N.moduleNameFromString
 
     -- find the fully qualified module path (key to full module) - "" if not found
     findModulePath :: [FilePath] -> String -> Either String FilePath
