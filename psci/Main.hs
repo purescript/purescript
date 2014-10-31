@@ -318,30 +318,26 @@ handleImport moduleName = do
        return ()
 
 -- |
--- Compute the file `extern.purs` for the module moduleName.
---
-externPursFile :: FilePath -> FilePath
-externPursFile moduleName = modulesDir ++ pathSeparator : moduleName ++ pathSeparator : "externs.purs"
-
--- |
--- Read the module's type definition.
---
-readModuleTypes :: String -> IO String
-readModuleTypes [] = return "Module must be specified."
-readModuleTypes moduleName = let moduleFile = externPursFile moduleName in
-  do
-    exists <- doesFileExist moduleFile
-    if exists
-       then readFile moduleFile
-       else return $ "Module '" ++ moduleName ++ "' not found!"
-
--- |
 -- Browse and display the module's function signatures
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   psciIO $ (readModuleTypes . N.runModuleName) moduleName >>= putStrLn
   return ()
+  where
+    -- Compute the file `extern.purs` for the module moduleName.
+    externPursFile :: FilePath -> FilePath
+    externPursFile modName = modulesDir ++ pathSeparator : modName ++ pathSeparator : "externs.purs"
+
+    -- Read the module's type definition.
+    readModuleTypes :: String -> IO String
+    readModuleTypes [] = return "Module must be specified."
+    readModuleTypes modName = let modFile = externPursFile modName in
+      do
+        exists <- doesFileExist modFile
+        if exists
+           then readFile modFile
+           else return $ "Module '" ++ modName ++ "' not found!"
 
 -- |
 -- Takes a value and prints its type
