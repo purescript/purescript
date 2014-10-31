@@ -28,7 +28,7 @@ import qualified Control.Monad.Trans.State.Lazy as L
 import Control.Monad.Error (ErrorT(..), MonadError)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.List (intercalate, isPrefixOf, nub, sortBy, isInfixOf, sort)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
 import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
 import Data.Version (showVersion)
@@ -56,7 +56,6 @@ import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Declarations as D
-import Language.PureScript.Pretty.Types (prettyPrintType)
 
 -- |
 -- The PSCI state.
