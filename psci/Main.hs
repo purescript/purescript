@@ -341,48 +341,6 @@ handleImport moduleName = do
        return ()
 
 -- |
--- Browse and display the module's function signatures
---
-handleBrowse :: P.ModuleName -> PSCI ()
-handleBrowse moduleName = do
-  PSCiState { psciLoadedModules = loadedModules
-            , psciImportedFilenames = loadedPaths} <- PSCI $ lift get
-  psciIO $ (readModuleTypes loadedModules . findKeyModulePath loadedPaths . N.runModuleName) moduleName >>= putStrLn
-  return ()
-  where
-    moduleToPath :: String -> FilePath
-    moduleToPath = (pathSeparator:) . (++ ".purs") . map (\x -> if x == '.' then pathSeparator else x) . N.runModuleName . N.moduleNameFromString
-
-    -- HACK - permit to `:b` prelude modules - I do not know better
-    preludeModules = ["Prelude", "Data.Function", "Data.Eq", "Prelude.Unsafe",
-                      "Control.Monad.Eff", "Control.Monad.Eff.Unsafe",
-                       "Debug.Trace", "Control.Monad.ST"]
-
-    -- find the fully qualified module path (key to full module)
-    findKeyModulePath :: [FilePath] -> String -> Either String FilePath
-    findKeyModulePath _ [] = Left "Module must be specified."
-    findKeyModulePath filePaths modName =
-      let partialModulePath = if modName `elem` preludeModules then "/prelude/prelude.purs" else moduleToPath modName in
-           case filter (isInfixOf partialModulePath) filePaths of
-           []    -> Left $ "Module ('" ++ modName ++ "','" ++ partialModulePath ++ "') was not found."
-           (x:_) -> Right x
-
-    getSignature (P.PositionedDeclaration _ d) = getSignature d
-    getSignature (P.TypeDeclaration ident mtype) = Just $ show ident ++ " :: " ++ prettyPrintType mtype
-    getSignature _ = Nothing
-
-    signatures :: P.Module -> [String]
-    signatures (P.Module _ ds _) = mapMaybe getSignature ds
-
-    readModuleTypes :: [(FilePath, D.Module)] -> Either String FilePath -> IO String
-    readModuleTypes [] _ = return "No module(s) loaded."
-    readModuleTypes _ (Left err) = return err
-    readModuleTypes loadedModules (Right modName) =
-      return $ case lookup modName loadedModules of
-                Just mName -> (unlines . sort . signatures) mName
-                _          -> "Module '" ++ modName ++ "' not found!"
-
--- |
 -- Takes a value and prints its type
 --
 handleTypeOf :: P.Expr -> PSCI ()
@@ -396,6 +354,25 @@ handleTypeOf value = do
       case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
+
+handleBrowse :: P.ModuleName -> PSCI ()
+handleBrowse moduleName = do
+  st <- PSCI $ lift get
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st) []
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right env' ->
+      let namesEnv = P.names env'
+          moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
+      in (PSCI
+        . outputStrLn
+        . unlines
+        . sort
+        . map (showType . findType namesEnv)) moduleNamesIdent
+  where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+        findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+        showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
+        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
 
 -- |
 -- Takes a value and prints its kind
