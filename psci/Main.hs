@@ -353,13 +353,19 @@ handleBrowse moduleName = do
     moduleToPath :: String -> FilePath
     moduleToPath = (pathSeparator:) . (++ ".purs") . map (\x -> if x == '.' then pathSeparator else x) . N.runModuleName . N.moduleNameFromString
 
+    -- HACK - permit to `:b` prelude modules - I do not know better
+    preludeModules = ["Prelude", "Data.Function", "Data.Eq", "Prelude.Unsafe",
+                      "Control.Monad.Eff", "Control.Monad.Eff.Unsafe",
+                       "Debug.Trace", "Control.Monad.ST"]
+
     -- find the fully qualified module path (key to full module) - "" if not found
     findModulePath :: [FilePath] -> String -> Either String FilePath
     findModulePath _ [] = Left "Module must be specified."
-    findModulePath filePaths modName = let partialModulePath = moduleToPath modName in
-      case filter (isInfixOf partialModulePath) filePaths of
-        []    -> Left $ "Module ('" ++ modName ++ "','" ++ partialModulePath ++ "') was not found."
-        (x:_) -> Right x
+    findModulePath filePaths modName =
+      let partialModulePath = if modName `elem` preludeModules then "/prelude/prelude.purs" else moduleToPath modName in
+           case filter (isInfixOf partialModulePath) filePaths of
+           []    -> Left $ "Module ('" ++ modName ++ "','" ++ partialModulePath ++ "') was not found."
+           (x:_) -> Right x
 
     -- retrieve explicit types
     getSignature (P.PositionedDeclaration _ d) = getSignature d
