@@ -367,7 +367,7 @@ handleBrowse moduleName = do
              let namesEnv = P.names env'
                  moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
                  in case moduleNamesIdent of
-                      [] -> outputStrLn "A correct module name must be specified. See `:s loaded` command for a list of those."
+                      [] -> outputStrLn $ "Either you entered an invalid module name (see `:s loaded`) or the module '"++ P.runModuleName moduleName ++"' does not export functions."
                       _ -> ( outputStrLn
                            . unlines
                            . sort
