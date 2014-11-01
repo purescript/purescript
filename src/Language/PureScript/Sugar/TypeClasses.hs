@@ -53,7 +53,7 @@ desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
 desugarModule (Module name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> mapM (desugarDecl name exps) decls
+  (newExpss, declss) <- unzip <$> parU decls (desugarDecl name exps)
   return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 

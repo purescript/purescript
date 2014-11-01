@@ -52,14 +52,14 @@ collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (colla
 --
 createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
 createBindingGroups moduleName ds = do
-  values <- mapM (createBindingGroupsForValue moduleName) $ filter isValueDecl ds
+  values <- parU (filter isValueDecl ds) (createBindingGroupsForValue moduleName)
   let dataDecls = filter isDataDecl ds
       allProperNames = map getProperName dataDecls
       dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
-  dataBindingGroupDecls <- mapM toDataBindingGroup $ stronglyConnComp dataVerts
+  dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
   let allIdents = map getIdent values
       valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
-  bindingGroupDecls <- mapM (toBindingGroup moduleName) $ stronglyConnComp valueVerts
+  bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
   return $ filter isImportDecl ds ++
            filter isExternDataDecl ds ++
            filter isExternInstanceDecl ds ++

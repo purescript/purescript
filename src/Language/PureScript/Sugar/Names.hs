@@ -176,7 +176,7 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
 --
 renameInModule :: ImportEnvironment -> ExportEnvironment -> Module -> Either ErrorStack Module
 renameInModule imports exports (Module mn decls exps) =
-  Module mn <$> mapM go decls <*> pure exps
+  Module mn <$> parU decls go <*> pure exps
   where
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
