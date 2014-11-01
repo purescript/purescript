@@ -16,10 +16,12 @@
 
 module Language.PureScript.Errors where
 
+import Data.Either (lefts, rights)
 import Data.List (intersperse, intercalate)
 import Data.Monoid
 
 import Control.Monad.Error
+import Control.Applicative ((<$>))
 
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty
@@ -121,3 +123,18 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 --
 rethrowWithPosition :: (MonadError ErrorStack m) => SourcePos -> m a -> m a
 rethrowWithPosition pos = rethrow (positionError pos <>)
+
+-- |
+-- Collect errors in in parallel
+--
+parU :: (MonadError ErrorStack m, Functor m) => [a] -> (a -> m b) -> m [b]
+parU xs f = forM xs (withError . f) >>= collectErrors
+  where
+  withError :: (MonadError ErrorStack m, Functor m) => m a -> m (Either ErrorStack a)
+  withError u = catchError (Right <$> u) (return . Left)
+
+  collectErrors :: (MonadError ErrorStack m, Functor m) => [Either ErrorStack a] -> m [a]
+  collectErrors es = case lefts es of
+    [err] -> throwError err
+    [] -> return $ rights es
+    errs -> throwError $ MultipleErrors errs
