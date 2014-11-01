@@ -66,7 +66,7 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
 rebracketModule :: [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> Either ErrorStack Module
 rebracketModule opTable (Module mn ds exts) =
   let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
-  in Module mn <$> (map removeParens <$> mapM f ds) <*> pure exts
+  in Module mn <$> (map removeParens <$> parU ds f) <*> pure exts
 
 removeParens :: Declaration -> Declaration
 removeParens =
