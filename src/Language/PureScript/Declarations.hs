@@ -143,7 +143,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType ProperName [String] [DataConstructor]
+  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [DataConstructor]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -151,7 +151,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration ProperName [String] Type
+  | TypeSynonymDeclaration ProperName [(String, Maybe Kind)] Type
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -188,7 +188,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [String] [(Qualified ProperName, [Type])] [Declaration]
+  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [(Qualified ProperName, [Type])] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)

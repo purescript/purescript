@@ -29,6 +29,8 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Declarations
 import Language.PureScript.Pretty
 import Language.PureScript.Names
+import Language.PureScript.Kinds
+import Language.PureScript.Types
 import Language.PureScript.Environment
 
 -- |
@@ -65,12 +67,15 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
           let dtype = if length dctors' == 1 && isNewtypeConstructor env (Qualified (Just moduleName) $ head dctors')
                       then "newtype"
                       else "data"
-          tell [dtype ++ " " ++ show pn ++ " " ++ unwords args ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
+              typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing pn)) (map toTypeVar args)
+          tell [dtype ++ " " ++ typeName ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
         Just (_, TypeSynonym) ->
           case Qualified (Just moduleName) pn `M.lookup` typeSynonyms env of
             Nothing -> error $ show pn ++ " has no type synonym info in exportToPs"
             Just (args, synTy) ->
-              tell ["type " ++ show pn ++ " " ++ unwords args ++ " = " ++ prettyPrintType synTy]
+              let
+                typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing pn)) (map toTypeVar args)
+              in tell ["type " ++ typeName ++ " = " ++ prettyPrintType synTy]
         _ -> error "Invalid input in exportToPs"
 
     exportToPs (ValueRef ident) =
@@ -83,8 +88,11 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
       case Qualified (Just moduleName) className `M.lookup` typeClasses env of
         Nothing -> error $ show className ++ " has no type class definition in exportToPs"
         Just (args, members, implies) -> do
-          let impliesString = if null implies then "" else "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
-          tell ["class " ++ impliesString ++ show className ++ " " ++ unwords args ++ " where"]
+          let impliesString = if null implies 
+                              then "" 
+                              else "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
+              typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing className)) (map toTypeVar args)
+          tell ["class " ++ impliesString ++ typeName ++ " where"]
           forM_ (filter (isValueExported . fst) members) $ \(member ,ty) ->
             tell [ "  " ++ show member ++ " :: " ++ prettyPrintType ty ]
 
@@ -95,6 +103,10 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
                               [] -> ""
                               cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "
       tell ["foreign import instance " ++ show ident ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)]
+
+    toTypeVar :: (String, Maybe Kind) -> Type
+    toTypeVar (s, Nothing) = TypeVar s
+    toTypeVar (s, Just k) = KindedType (TypeVar s) k
 
     isValueExported :: Ident -> Bool
     isValueExported ident = ValueRef ident `elem` exts

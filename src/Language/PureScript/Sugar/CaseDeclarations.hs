@@ -43,7 +43,7 @@ desugarCasesModule ms = forM ms $ \(Module name ds exps) ->
     Module name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
-desugarAbs = mapM f
+desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
 
@@ -57,7 +57,7 @@ desugarAbs = mapM f
 -- Replace all top-level binders with case expressions.
 --
 desugarCases :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
-desugarCases = desugarRest <=< fmap join . mapM toDecls . groupBy inSameGroup
+desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
@@ -96,7 +96,7 @@ toDecls ds@(ValueDeclaration ident _ bs g _ : _) = do
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
   unless (not (null bs) || isJust g) $
-      throwError $ mkErrorStack ("Top level case disallowed in declaration " ++ show ident) Nothing
+      throwError $ mkErrorStack ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
 toDecls (PositionedDeclaration pos d : ds) = do

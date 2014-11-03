@@ -33,7 +33,7 @@ import Control.Monad.Trans.Class
 -- and all @DoNotationLet@ constructors with let expressions.
 --
 desugarDoModule :: Module -> SupplyT (Either ErrorStack) Module
-desugarDoModule (Module mn ds exts) = Module mn <$> mapM desugarDo ds <*> pure exts
+desugarDoModule (Module mn ds exts) = Module mn <$> parU ds desugarDo <*> pure exts
 
 desugarDo :: Declaration -> SupplyT (Either ErrorStack) Declaration
 desugarDo (PositionedDeclaration pos d) = (PositionedDeclaration pos) <$> (rethrowWithPosition pos $ desugarDo d)

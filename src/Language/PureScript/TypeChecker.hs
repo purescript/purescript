@@ -43,13 +43,13 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Traversals
 
-addDataType :: ModuleName -> DataDeclType -> ProperName -> [String] -> [DataConstructor] -> Kind -> Check ()
+addDataType :: ModuleName -> DataDeclType -> ProperName -> [(String, Maybe Kind)] -> [DataConstructor] -> Kind -> Check ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map stripComment dctors)) (types env) }
   forM_ dctors $ \(dctor, tys, _) ->
     rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
-      addDataConstructor moduleName dtype name args dctor tys
+      addDataConstructor moduleName dtype name (map fst args) dctor tys
 
                  where stripComment (a, b, _) = (a, b)
 
@@ -61,7 +61,7 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let polyType = mkForAll args dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType) (dataConstructors env) }
 
-addTypeSynonym :: ModuleName -> ProperName -> [String] -> Type -> Kind -> Check ()
+addTypeSynonym :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
@@ -79,7 +79,7 @@ addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
-addTypeClass :: ModuleName -> ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
+addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
@@ -128,14 +128,15 @@ typeCheckAll mainModuleName moduleName exps = go
   where
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
-  go (d@(DataDeclaration dtype name args dctors) : rest) = do
+  go (DataDeclaration dtype name args dctors : rest) = do
     rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
       when (dtype == Newtype) $ checkNewtype dctors
-      checkDuplicateTypeArguments args
+      checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd3 dctors)
-      addDataType moduleName dtype name args dctors ctorKind
+      let args' = args `withKinds` ctorKind
+      addDataType moduleName dtype name args' dctors ctorKind
     ds <- go rest
-    return $ d : ds
+    return $ DataDeclaration dtype name args dctors : ds
     where
     checkNewtype :: [DataConstructor] -> Check ()
     checkNewtype [(_, [_], _)] = return ()
@@ -147,11 +148,13 @@ typeCheckAll mainModuleName moduleName exps = go
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd3 dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
-        checkDuplicateTypeArguments args
-        addDataType moduleName dtype name args dctors ctorKind
+        checkDuplicateTypeArguments $ map fst args
+        let args' = args `withKinds` ctorKind
+        addDataType moduleName dtype name args' dctors ctorKind
       forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
-        checkDuplicateTypeArguments args
-        addTypeSynonym moduleName name args ty kind
+        checkDuplicateTypeArguments $ map fst args
+        let args' = args `withKinds` kind
+        addTypeSynonym moduleName name args' ty kind
     ds <- go rest
     return $ d : ds
     where
@@ -163,13 +166,14 @@ typeCheckAll mainModuleName moduleName exps = go
     toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
     toDataDecl (DocStringDeclaration _ (Just d')) = toDataDecl d'
     toDataDecl _ = Nothing
-  go (d@(TypeSynonymDeclaration name args ty) : rest) = do
+  go (TypeSynonymDeclaration name args ty : rest) = do
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
-      checkDuplicateTypeArguments args
+      checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
-      addTypeSynonym moduleName name args ty kind
+      let args' = args `withKinds` kind
+      addTypeSynonym moduleName name args' ty kind
     ds <- go rest
-    return $ d : ds
+    return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] Nothing val : rest) = do
     d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
@@ -248,6 +252,16 @@ typeCheckAll mainModuleName moduleName exps = go
       return (PositionedDeclaration pos d' : rest')
   go (DocStringDeclaration _ (Just d) : rest) = go (d : rest)
   go (DocStringDeclaration _ Nothing : rest) = go rest
+
+  -- |
+  -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
+  -- extracted from the kind of the type constructor itself.
+  --
+  withKinds :: [(String, Maybe Kind)] -> Kind -> [(String, Maybe Kind)]
+  withKinds []                  _               = []
+  withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
+  withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
+  withKinds _                   _               = error "Invalid arguments to peelKinds"
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are

@@ -26,6 +26,7 @@ import Control.Applicative
 import Control.Monad ((<=<))
 
 import Language.PureScript.Names
+import Language.PureScript.Kinds
 import Language.PureScript.Traversals
 
 -- |
@@ -78,6 +79,11 @@ data Type
   --
   | RCons String Type Type
   -- |
+  -- A type with a kind annotation
+  -- 
+  | KindedType Type Kind
+  --
+  -- |
   -- A placeholder used in pretty printing
   --
   | PrettyPrintFunction Type Type
@@ -126,34 +132,41 @@ mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
 -- Replace a type variable, taking into account variable shadowing
 --
 replaceTypeVars :: String -> Type -> Type -> Type
-replaceTypeVars = replaceTypeVars' []
-  where
-  replaceTypeVars' bound name replacement = go bound
-    where
-    go :: [String] -> Type -> Type
-    go _  (TypeVar v) | v == name = replacement
-    go bs (TypeApp t1 t2) = TypeApp (go bs t1) (go bs t2)
-    go bs (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs) ts
-    go bs f@(ForAll v t sco) | v == name = f
-                             | v `elem` usedTypeVariables replacement =
-                                 let v' = genName v (name : bs ++ usedTypeVariables replacement)
-                                     t' = replaceTypeVars' bs v (TypeVar v') t
-                                 in ForAll v' (go (v' : bs) t') sco
-                             | otherwise = ForAll v (go (v : bs) t) sco
-    go bs (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs)) cs) (go bs t)
-    go bs (RCons name' t r) = RCons name' (go bs t) (go bs r)
-    go _ ty = ty
-  genName orig inUse = try 0
-    where
-    try :: Integer -> String
-    try n | (orig ++ show n) `elem` inUse = try (n + 1)
-          | otherwise = orig ++ show n
+replaceTypeVars v r = replaceAllTypeVars [(v, r)]
 
 -- |
 -- Replace named type variables with types
 --
 replaceAllTypeVars :: [(String, Type)] -> Type -> Type
-replaceAllTypeVars = foldl (\f (name, ty) -> replaceTypeVars name ty . f) id
+replaceAllTypeVars = go []
+  where
+      
+  go :: [String] -> [(String, Type)] -> Type -> Type
+  go _  m (TypeVar v) = 
+    case v `lookup` m of
+      Just r -> r
+      Nothing -> TypeVar v
+  go bs m (TypeApp t1 t2) = TypeApp (go bs m t1) (go bs m t2)
+  go bs m (SaturatedTypeSynonym name' ts) = SaturatedTypeSynonym name' $ map (go bs m) ts
+  go bs m f@(ForAll v t sco) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
+                             | v `elem` usedVars =
+                               let v' = genName v (keys ++ bs ++ usedVars)
+                                   t' = go bs [(v, TypeVar v')] t
+                               in ForAll v' (go (v' : bs) m t') sco
+                             | otherwise = ForAll v (go (v : bs) m t) sco
+    where
+    keys = map fst m
+    usedVars = concatMap (usedTypeVariables . snd) m
+  go bs m (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs m)) cs) (go bs m t)
+  go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
+  go bs m (KindedType t k) = KindedType (go bs m t) k
+  go _  _ ty = ty
+  
+  genName orig inUse = try 0
+    where
+    try :: Integer -> String
+    try n | (orig ++ show n) `elem` inUse = try (n + 1)
+          | otherwise = orig ++ show n
 
 -- |
 -- Collect all type variables appearing in a type
@@ -177,6 +190,7 @@ freeTypeVariables = nub . go []
   go bound (ForAll v t _) = go (v : bound) t
   go bound (ConstrainedType cs t) = concatMap (concatMap (go bound) . snd) cs ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
+  go bound (KindedType t _) = go bound t
   go _ _ = []
 
 -- |
@@ -213,6 +227,7 @@ everywhereOnTypes f = go
   go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
   go (ConstrainedType cs ty) = f (ConstrainedType (map (fmap (map go)) cs) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
+  go (KindedType ty k) = f (KindedType (go ty) k)
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
   go (PrettyPrintArray t) = f (PrettyPrintArray (go t))
   go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
@@ -227,6 +242,7 @@ everywhereOnTypesTopDown f = go . f
   go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
   go (ConstrainedType cs ty) = ConstrainedType (map (fmap (map (go . f))) cs) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
+  go (KindedType ty k) = KindedType (go (f ty)) k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
   go (PrettyPrintArray t) = PrettyPrintArray (go (f t))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
@@ -241,6 +257,7 @@ everywhereOnTypesM f = go
   go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
   go (ConstrainedType cs ty) = (ConstrainedType <$> mapM (sndM (mapM go)) cs <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
+  go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
   go (PrettyPrintArray t) = (PrettyPrintArray <$> go t) >>= f
   go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
@@ -255,6 +272,7 @@ everywhereOnTypesTopDownM f = go <=< f
   go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
   go (ConstrainedType cs ty) = ConstrainedType <$> mapM (sndM (mapM (go <=< f))) cs <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
+  go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (PrettyPrintArray t) = PrettyPrintArray <$> (f t >>= go)
   go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
@@ -269,6 +287,7 @@ everythingOnTypes (<>) f = go
   go t@(ForAll _ ty _) = f t <> go ty
   go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go $ concatMap snd cs) <> go ty
   go t@(RCons _ ty rest) = f t <> go ty <> go rest
+  go t@(KindedType ty _) = f t <> go ty
   go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
   go t@(PrettyPrintArray t1) = f t <> go t1
   go t@(PrettyPrintObject t1) = f t <> go t1

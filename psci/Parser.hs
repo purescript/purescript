@@ -42,7 +42,7 @@ psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> C.mark (many1 (C
 --
 parseCommand :: String -> Either ParseError Command
 parseCommand = P.runIndentParser "" $ choice
-                    [ P.whiteSpace *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf)
+                    [ P.whiteSpace *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse <|> psciShowModules)
                     , try psciLet
                     , psciExpression
                     ] <* eof
@@ -70,8 +70,10 @@ psciImport = Import <$> (char 'i' *> P.whiteSpace *> P.moduleName)
 --
 psciLoadFile :: Parsec String P.ParseState Command
 psciLoadFile = LoadFile . trimEnd <$> (char 'm' *> P.whiteSpace *> manyTill anyChar eof)
-  where
-  trimEnd = reverse . dropWhile isSpace . reverse
+
+-- | Trim end of input string
+trimEnd :: String -> String
+trimEnd = reverse . dropWhile isSpace . reverse
 
 -- |
 -- Parses 'Commands.Quit' command.
@@ -97,3 +99,14 @@ psciTypeOf = TypeOf <$> (char 't' *> P.whiteSpace *> P.parseValue)
 --
 psciKindOf :: Parsec String P.ParseState Command
 psciKindOf = KindOf <$> (char 'k' *> P.whiteSpace *> P.parseType)
+
+-- |
+-- Parses 'Commands.Browse' command.
+--
+psciBrowse :: Parsec String P.ParseState Command
+psciBrowse = Browse <$> (char 'b' *> P.whiteSpace *> P.moduleName)
+
+-- |
+-- Show Command
+psciShowModules :: Parsec String P.ParseState Command
+psciShowModules = Show . trimEnd <$> (char 's' *> P.whiteSpace *> manyTill anyChar eof)

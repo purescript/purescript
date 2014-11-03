@@ -53,7 +53,6 @@ The ``psc-make`` executable makes CommonJS modules and supports incremental comp
 The following command line options are supported:
 
 --output=VAL           The output directory. Default: ``output``.
---runtime-type-checks  Generate runtime type checks
 --verbose-errors       Display verbose error messages.
 --help=FMT             Show this help in format FMT (``pager``, ``plain``, or ``groff``). Default: ``pager``.
 --no-magic-do          Disable the optimization that overloads the ``do`` keyword to generate efficient code specifically for the ``Eff`` monad.

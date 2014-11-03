@@ -21,6 +21,7 @@ module Language.PureScript.Sugar.TypeClasses (
 import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.Kinds
 import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -52,7 +53,7 @@ desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: Module -> Desugar Module
 desugarModule (Module name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> mapM (desugarDecl name exps) decls
+  (newExpss, declss) <- unzip <$> parU decls (desugarDecl name exps)
   return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
@@ -199,7 +200,7 @@ memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType (DocStringDeclaration _ (Just d)) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration :: ProperName -> [String] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
   let superclassTypes = [ (fieldName, function unit tySynApp)
                         | (index, (superclass, tyArgs)) <- zip [0..] implies
@@ -210,11 +211,11 @@ typeClassDictionaryDeclaration name args implies members =
       mtys = members' ++ superclassTypes
   in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
 
-typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [String] -> Declaration -> Declaration
+typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   ValueDeclaration ident TypeClassAccessorImport [] Nothing $
     TypedValue False (Abs (Left $ Ident "dict") (Accessor (runIdent ident) (Var $ Qualified Nothing (Ident "dict")))) $
-    moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map TypeVar args)] ty))
+    moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map (TypeVar . fst) args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor mn name args (DocStringDeclaration str (Just d)) =
@@ -244,27 +245,24 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       let instanceTys = map memberToNameAndType tyDecls
 
       -- Replace the type arguments with the appropriate types in the member types
-      let memberTypes = map (second (replaceAllTypeVars (zip args tys))) instanceTys
+      let memberTypes = map (second (replaceAllTypeVars (zip (map fst args) tys))) instanceTys
       -- Create values for the type instance members
       memberNames <- map (first runIdent) <$> mapM (memberToNameAndValue memberTypes) decls
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
-      -- The dictionary itself is an object literal, but for reasons related to recursion, the dictionary
-      -- must be guarded by at least one function abstraction. For that reason, if the dictionary has no
-      -- dependencies, we introduce an unnamed function parameter.
+      -- The dictionary itself is an object literal.
       let superclasses =
             [ (fieldName, Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs))
             | (index, (superclass, suTyArgs)) <- zip [0..] implies
-            , let tyArgs = map (replaceAllTypeVars (zip args tys)) suTyArgs
+            , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             , let fieldName = mkSuperclassDictionaryName superclass index
             ]
 
       let memberNames' = ObjectLiteral (memberNames ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
-          constrainedTy = quantify (if null deps then function unit dictTy else ConstrainedType deps dictTy)
+          constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className memberNames'
-          dict' = if null deps then Abs (Left (Ident C.__unused)) dict else dict
-          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict' constrainedTy)
+          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
       return result
 
   where

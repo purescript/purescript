@@ -80,20 +80,27 @@ kindOf _ ty =
 -- |
 -- Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 --
-kindsOf :: Bool -> ModuleName -> ProperName -> [String] -> [Type] -> Check Kind
+kindsOf :: Bool -> ModuleName -> ProperName -> [(String, Maybe Kind)] -> [Type] -> Check Kind
 kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
-  let dict = (name, tyCon) : zipWith (\arg kind -> (arg, kind)) (map ProperName args) kargs
+  rest <- zipWithM freshKindVar args kargs
+  let dict = (name, tyCon) : rest 
   bindLocalTypeVariables moduleName dict $
     solveTypes isData ts kargs tyCon
   where
   tidyUp (k, sub) = starIfUnknown $ sub $? k
+  
+freshKindVar :: (String, Maybe Kind) -> Kind -> UnifyT Kind Check (ProperName, Kind)
+freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
+freshKindVar (arg, Just kind') kind = do
+  kind =?= kind'
+  return (ProperName arg, kind')
 
 -- |
 -- Simultaneously infer the kinds of several mutually recursive type constructors
 --
-kindsOfAll :: ModuleName -> [(ProperName, [String], Type)] -> [(ProperName, [String], [Type])] -> Check ([Kind], [Kind])
+kindsOfAll :: ModuleName -> [(ProperName, [(String, Maybe Kind)], Type)] -> [(ProperName, [(String, Maybe Kind)], [Type])] -> Check ([Kind], [Kind])
 kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
   synVars <- replicateM (length syns) fresh
   let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
@@ -103,12 +110,12 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
     bindLocalTypeVariables moduleName dict' $ do
       data_ks <- zipWithM (\tyCon (_, args, ts) -> do
         kargs <- replicateM (length args) fresh
-        let argDict = zip (map ProperName args) kargs
+        argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes True ts kargs tyCon) tyCons tys
       syn_ks <- zipWithM (\synVar (_, args, ty) -> do
         kargs <- replicateM (length args) fresh
-        let argDict = zip (map ProperName args) kargs
+        argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes False [ty] kargs synVar) synVars syns
       return (syn_ks, data_ks)
@@ -179,6 +186,10 @@ infer' (ConstrainedType deps ty) = do
   k <- infer ty
   k =?= Star
   return Star
+infer' (KindedType ty k) = do
+  k' <- infer ty
+  k =?= k'
+  return k'
 infer' _ = error "Invalid argument to infer"
 
 

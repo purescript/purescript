@@ -26,7 +26,9 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows
 
 import Language.PureScript.Types
+import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Environment
 
 typeLiterals :: Pattern () Type String
@@ -71,6 +73,12 @@ appliedFunction = mkPattern match
   match (PrettyPrintFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
+kinded :: Pattern () Type (Kind, Type)
+kinded = mkPattern match
+  where
+  match (KindedType t k) = Just (k, t)
+  match _ = Nothing
+
 insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
@@ -96,6 +104,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
                     ]
                   , [ Wrap forall_ $ \idents ty -> "forall " ++ unwords idents ++ ". " ++ ty ]
+                  , [ Wrap kinded $ \k ty -> ty ++ " :: " ++ prettyPrintKind k ]
                   ]
 
 forall_ :: Pattern () Type ([String], Type)

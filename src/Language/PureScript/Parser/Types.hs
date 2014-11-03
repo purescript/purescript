@@ -25,6 +25,7 @@ import Control.Monad (when, unless)
 import Language.PureScript.Types
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
+import Language.PureScript.Parser.Kinds
 import Language.PureScript.Environment
 
 import qualified Text.Parsec as P
@@ -40,7 +41,7 @@ parseFunction :: P.Parsec String ParseState Type
 parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
 
 parseObject :: P.Parsec String ParseState Type
-parseObject = braces $ TypeApp tyObject <$> parseRow False
+parseObject = braces $ TypeApp tyObject <$> parseRow
 
 parseTypeVariable :: P.Parsec String ParseState Type
 parseTypeVariable = do
@@ -67,7 +68,7 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeVariable
             , parseTypeConstructor
             , parseForAll
-            , parens (parseRow True)
+            , parens parseRow
             , parens parsePolyType ])
 
 parseConstrainedType :: P.Parsec String ParseState Type
@@ -85,10 +86,12 @@ parseConstrainedType = do
   return $ maybe ty (flip ConstrainedType ty) constraints
 
 parseAnyType :: P.Parsec String ParseState Type
-parseAnyType = P.buildExpressionParser operators parseTypeAtom P.<?> "type"
+parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
+  postfixTable = [ \t -> KindedType t <$> (P.try (lexeme (indented *> P.string "::")) *> parseKind)
+                 ]
 
 -- |
 -- Parse a monotype
@@ -111,6 +114,5 @@ parseNameAndType p = (,) <$> (indented *> (identifier <|> stringLiteral) <* inde
 parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
 
-parseRow :: Bool -> P.Parsec String ParseState Type
-parseRow nonEmpty = (curry rowFromList <$> many' (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
-  where many' = if nonEmpty then commaSep1 else commaSep
+parseRow :: P.Parsec String ParseState Type
+parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
