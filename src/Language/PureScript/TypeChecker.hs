@@ -183,7 +183,11 @@ typeCheckAll mainModuleName moduleName exps = go
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
-      vals' <- forM (zipWith (\(name, nameKind, _) (_, (val, ty)) -> (name, val, nameKind, ty)) vals tys) $ \(name, val, nameKind, ty) -> do
+      vals' <- forM [ (name, val, nameKind, ty) 
+                    | (name, nameKind, _) <- vals
+                    , (name', (val, ty)) <- tys
+                    , name == name' 
+                    ] $ \(name, val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (name, nameKind, val)
       return $ BindingGroupDeclaration vals'
