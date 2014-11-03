@@ -92,6 +92,7 @@ prettyPrintDeclaration (ValueDeclaration ident _ [] Nothing val) = fmap concat $
   ]
 prettyPrintDeclaration (PositionedDeclaration _ d) = prettyPrintDeclaration d
 prettyPrintDeclaration (DocStringDeclaration _ (Just d)) = prettyPrintDeclaration d
+prettyPrintDeclaration (DocStringDeclaration _ Nothing) = return ""
 prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
