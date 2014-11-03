@@ -13,16 +13,16 @@ b = 2
 c = 3
 
 -- | Another comment
-data X =
+data X
   -- | a comment on a single line
-  X |
+  = X
   -- | A comment
   -- on multiple lines
-  Y |
+  | Y
   -- | A comment
   -- with trailing lines
   --
-  Z
+  | Z
 
 main = Debug.Trace.trace "Done"
 

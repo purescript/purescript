@@ -62,13 +62,17 @@ parseDataDeclaration = do
   name <- indented *> properName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
-    _ <- lexeme $ indented *> P.char '='
-    (flip sepBy1) pipe $ do
-      comment <- P.optionMaybe (indented *> parseDocComment)
-      name <- properName
-      types <- P.many (indented *> parseTypeAtom)
-      return $ (name, types, comment)
+    firstCtor <- parseCtor '='
+    restCtors <- P.many $ parseCtor '|'
+    return $ firstCtor : restCtors
   return $ DataDeclaration dtype name tyArgs ctors
+    where
+      parseCtor firstChar = do
+        comment <- P.optionMaybe (indented *> parseDocComment)
+        _ <- lexeme $ indented *> P.char firstChar
+        ctorName <- properName
+        ctorTypes <- P.many (indented *> parseTypeAtom)
+        return $ (ctorName, ctorTypes, comment)
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
 parseTypeDeclaration =
