@@ -25,9 +25,10 @@ strip ../dist/build/docgen/docgen
 cp ../dist/build/psc/psc           build/purescript/
 cp ../dist/build/psci/psci         build/purescript/
 cp ../dist/build/psc-make/psc-make build/purescript/
-cp ../dist/build/docgen/docgen     build/purescript/
+cp ../dist/build/psc-docs/psc-docs build/purescript/
 cp ../prelude/prelude.purs         build/purescript/
-cp install.sh                      build/purescript/
+cp README                          build/purescript/
+cp ../LICENSE                      build/purescript/
 
 # Make the binary bundle
 pushd build > /dev/null
