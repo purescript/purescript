@@ -153,9 +153,9 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
     typeName = prettyPrintType' typeApp
     exported = filter (isDctorExported name exps . fst3) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
-  forM_ exported $ \(ctor, tys, _) ->
+  forM_ exported $ \(ctor, tys, comment) ->
     let ctorTy = foldr P.function typeApp tys
-    in atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
+    in atIndent (n + 2) $ prettyPrintComment comment ++ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
 renderDeclaration n _ (P.ExternDataDeclaration name kind) =
   atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
@@ -174,8 +174,9 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration n exps (P.PositionedDeclaration _ d) =
   renderDeclaration n exps d
-renderDeclaration n exps (P.DocStringDeclaration str _) = do
-    atIndent n $ "DocString: " ++ str
+renderDeclaration n exps (P.DocStringDeclaration str (Just d)) = do
+  atIndent n $ "-- |" ++ str ++ "\n";
+  renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
 
 prettyPrintType' :: P.Type -> String
@@ -185,6 +186,14 @@ prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
     | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString =
       P.TypeConstructor $ P.Qualified Nothing name
   dePrim other = other
+
+prettyPrintComment :: Maybe String -> String
+prettyPrintComment Nothing = ""
+prettyPrintComment (Just comment) = "-- |\n" ++ concatMap (\line -> "--" ++ line ++ "\n") (partition 72 comment) ++ "--\n"
+  where
+    partition :: Int -> String -> [String]
+    partition _ [] = []
+    partition n xs = (take n xs) : (partition n (drop n xs))
 
 getName :: P.Declaration -> String
 getName (P.TypeDeclaration ident _) = show ident
