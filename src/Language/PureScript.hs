@@ -41,15 +41,16 @@ import qualified Paths_purescript as Paths
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
-import Data.Maybe (listToMaybe, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Control.Monad.Error
 import Control.Arrow ((&&&))
 import Control.Applicative
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import System.FilePath ((</>), pathSeparator)
-import System.Directory (getHomeDirectory, doesFileExist)
+import System.FilePath ((</>), pathSeparator, takeDirectory)
+import System.Directory (getAppUserDataDirectory, doesFileExist)
+import System.Environment (getProgName)
 
 -- |
 -- Compile a collection of modules
@@ -232,17 +233,20 @@ importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
 preludeFilename :: IO FilePath
-preludeFilename = fromMaybe missingPrelude . listToMaybe <$> do
-  fs <- sequence [homePrelude, cabalPrelude]
-  filterM doesFileExist fs
+preludeFilename = do
+  fs <- sequence [localPrelude, appPrelude, cabalPrelude] 
+  es <- filterM doesFileExist fs
+  case es of
+    (x : _) -> return x
+    _ -> error "No Prelude found."
   where
-  missingPrelude :: FilePath
-  missingPrelude = error "No Prelude found in user home or cabal path."
+  localPrelude :: IO FilePath
+  localPrelude = ((</> "prelude.purs") . takeDirectory) <$> getProgName
 
-  homePrelude :: IO FilePath
-  homePrelude = do
-    homeDir <- getHomeDirectory
-    return $ homeDir </> ".purescript" </> "prelude" </> "prelude.purs"
+  appPrelude :: IO FilePath
+  appPrelude = do
+    appDir <- getAppUserDataDirectory "purescript"
+    return $ appDir </> "prelude" </> "prelude.purs"
 
   cabalPrelude :: IO FilePath
   cabalPrelude = Paths.getDataFileName "prelude/prelude.purs"

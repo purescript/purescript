@@ -229,7 +229,7 @@ term = docgen <$> includeHeirarcy <*> inputFiles
 
 termInfo :: TermInfo
 termInfo = defTI
-  { termName = "docgen"
+  { termName = "psc-docs"
   , version  = showVersion Paths.version
   , termDoc  = "Generate Markdown documentation from PureScript extern files"
   }

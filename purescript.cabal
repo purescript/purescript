@@ -123,12 +123,12 @@ executable psci
                    Parser
     ghc-options: -Wall -O2
 
-executable docgen
+executable psc-docs 
     build-depends: base >=4 && <5, cmdtheline -any, purescript -any, utf8-string -any,
                    process -any, mtl -any
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: docgen
+    hs-source-dirs: psc-docs 
     other-modules:
     ghc-options: -Wall -O2
 
