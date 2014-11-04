@@ -22,6 +22,7 @@ import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
 import Control.Monad
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Applicative
 import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
@@ -29,18 +30,24 @@ import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirector
 import Text.Parsec (ParseError)
 import qualified System.IO.UTF8 as U
 
-readInput :: [FilePath] -> IO (Either ParseError [P.Module])
-readInput inputFiles = fmap (fmap concat . sequence) $ forM inputFiles $ \inputFile -> do
+readInput :: [FilePath] -> IO [(FilePath, String)]
+readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- U.readFile inputFile
-  return $ P.runIndentParser inputFile P.parseModules text
+  return (inputFile, text)
+
+loadPrelude :: Either String (String, String, P.Environment)
+loadPrelude = 
+  case P.parseModulesFromFiles [("<prelude>", P.prelude)] of
+    Left parseError -> Left (show parseError)
+    Right ms -> P.compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) (map snd ms) []
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
-  modules <- readInput inputFiles
+  modules <- P.parseModulesFromFiles <$> readInput inputFiles
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms -> return $ P.compile opts ms []
+    Right ms -> return $ P.compile opts (map snd ms) []
 
 assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do
@@ -79,10 +86,8 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 
 main :: IO ()
 main = do
-  prelude <- P.preludeFilename
-  putStrLn "Compiling Prelude"
-  preludeResult <- compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) [prelude]
-  case preludeResult of
+  putStrLn "Compiling Prelude" 
+  case loadPrelude of
     Left err -> putStrLn err >> exitFailure
     Right (preludeJs, exts, _) -> do
       tmp <- getTemporaryDirectory

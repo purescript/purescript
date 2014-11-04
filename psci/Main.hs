@@ -128,6 +128,17 @@ loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = either (Left . show) Right . P.runIndentParser filename P.parseModules <$> U.readFile filename
 
 -- |
+-- Load all modules, including the Prelude
+--
+loadAllModules :: [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
+loadAllModules files = do
+  filesAndContent <- forM files $ \filename -> do 
+    content <- U.readFile filename
+    return (filename, content)
+  return $ P.parseModulesFromFiles $ ("<prelude>", P.prelude) : filesAndContent
+
+
+-- |
 -- Expands tilde in path.
 --
 expandTilde :: FilePath -> IO FilePath
@@ -447,10 +458,9 @@ handleCommand (LoadFile filePath) = do
     PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
-  filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . psciIO . loadModule $ file) files
-  let modulesOrFirstError = fmap concat $ sequence filesAndModules
+  modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
-    Left err -> psciIO $ putStrLn err >> exitFailure
+    Left err -> psciIO $ putStrLn (show err) >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
@@ -489,15 +499,13 @@ loadUserConfig = do
 loop :: Bool -> [FilePath] -> IO ()
 loop singleLineMode files = do
   config <- loadUserConfig
-  preludeFilename <- P.preludeFilename
-  filesAndModules <- mapM (\file -> fmap (fmap (map ((,) file))) . loadModule $ file) (preludeFilename : files)
-  let modulesOrFirstError = fmap concat $ sequence filesAndModules
+  modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
-    Left err -> putStrLn err >> exitFailure
+    Left err -> putStrLn (show err) >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings {historyFile = Just historyFilename}
-      flip evalStateT (PSCiState (preludeFilename : files) defaultImports modules []) . runInputT (setComplete completion settings) $ do
+      flip evalStateT (PSCiState files defaultImports modules []) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
         traverse_ (mapM_ (runPSCI . handleCommand)) config
         go

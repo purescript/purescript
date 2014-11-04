@@ -14,8 +14,6 @@ Homepage: http://www.purescript.org/
 author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>
-data-files: prelude/prelude.purs
-data-dir: ""
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
@@ -25,14 +23,20 @@ source-repository head
     location: https://github.com/purescript/purescript.git
 
 library
-    build-depends: base >=4 && <5, cmdtheline == 0.2.*, containers -any, unordered-containers -any,
-                   directory >= 1.2, filepath -any, mtl >= 2.1.0 && < 2.3.0, parsec -any,
-                   transformers >= 0.3 && < 0.5, utf8-string -any,
+    build-depends: base >=4 && <5, 
+                   cmdtheline == 0.2.*, 
+                   containers -any, 
+                   unordered-containers -any,
+                   directory >= 1.2, 
+                   filepath -any, 
+                   mtl >= 2.1.0 && < 2.3.0, 
+                   parsec -any,
+                   transformers >= 0.3 && < 0.5, 
+                   utf8-string -any,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   monad-unify >= 0.2.2 && < 0.3,
+                   monad-unify >= 0.2.2 && < 0.3, 
+                   file-embed >= 0.0.7 && < 0.0.8,
                    time -any
-    if (!os(windows))
-        build-depends: unix -any
     exposed-modules: Language.PureScript
                      Language.PureScript.Constants
                      Language.PureScript.Options

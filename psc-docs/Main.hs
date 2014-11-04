@@ -29,19 +29,17 @@ import System.IO (stderr)
 
 docgen :: Bool -> [FilePath] -> IO ()
 docgen showHierarchy input = do
-  ms <- mapM parseFile (nub input)
-  U.putStrLn . runDocs $ (renderModules showHierarchy) (concat ms)
-  exitSuccess
-
-parseFile :: FilePath -> IO [P.Module]
-parseFile input = do
-  text <- U.readFile input
-  case P.runIndentParser input P.parseModules text of
+  e <- P.parseModulesFromFiles <$> mapM parseFile (nub input)
+  case e of
     Left err -> do
       U.hPutStr stderr $ show err
       exitFailure
     Right ms -> do
-      return ms
+      U.putStrLn . runDocs $ (renderModules showHierarchy) (map snd ms)
+      exitSuccess
+
+parseFile :: FilePath -> IO (FilePath, String)
+parseFile input = (,) input <$> U.readFile input
 
 type Docs = Writer [String] ()
 
