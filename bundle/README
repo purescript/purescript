@@ -14,7 +14,7 @@ This bundle contains the following executables:
                 in the browser)
 - psc-make      The PureScript compiler (generates CommonJS modules)
 - psci          The PureScript interactive module (requires NodeJS)
-- docgen        A documentation generator
+- psc-docs      A documentation generator
 
 and the following additional files:
 
