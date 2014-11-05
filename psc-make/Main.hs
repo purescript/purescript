@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, GeneralizedNewtypeDeriving, TupleSections #-}
+{-# LANGUAGE DataKinds, GeneralizedNewtypeDeriving, TupleSections, RecordWildCards #-}
 
 module Main where
 
@@ -33,10 +33,15 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
-readInput :: Bool -> [FilePath] -> IO [(FilePath, String)]
-readInput excludePrelude input = do
-  content <- forM input $ \inputFile -> (inputFile, ) <$> U.readFile inputFile
-  return $ bool (("<prelude>", P.prelude) :) id excludePrelude content
+data InputOptions = InputOptions
+  { ioNoPrelude   :: Bool
+  , ioInputFiles  :: [FilePath]
+  }
+
+readInput :: InputOptions -> IO [(Maybe FilePath, String)]
+readInput InputOptions{..} = do
+  content <- forM ioInputFiles $ \inputFile -> (Just inputFile, ) <$> U.readFile inputFile
+  return $ bool ((Nothing, P.prelude) :) id ioNoPrelude content
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 
@@ -64,7 +69,7 @@ instance P.MonadMake Make where
 
 compile :: [FilePath] -> FilePath -> P.Options P.Make -> Bool -> IO ()
 compile input outputDir opts usePrefix = do
-  modules <- P.parseModulesFromFiles <$> readInput (P.optionsNoPrelude opts) input
+  modules <- P.parseModulesFromFiles <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
   case modules of
     Left err -> do
       U.print err

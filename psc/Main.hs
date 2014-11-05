@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, GeneralizedNewtypeDeriving, TupleSections #-}
+{-# LANGUAGE DataKinds, GeneralizedNewtypeDeriving, TupleSections, RecordWildCards #-}
 
 module Main where
 
@@ -32,15 +32,21 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
-readInput :: Bool -> Bool -> [FilePath] -> IO [(FilePath, String)]
-readInput _              True _     = return . ("<stdin>" ,) <$> getContents
-readInput excludePrelude _    input = do
-  content <- forM input $ \inputFile -> (inputFile, ) <$> U.readFile inputFile
-  return $ bool (("<prelude>", P.prelude) :) id excludePrelude content
+data InputOptions = InputOptions
+  { ioNoPrelude   :: Bool
+  , ioUseStdIn    :: Bool
+  , ioInputFiles  :: [FilePath]
+  }
+
+readInput :: InputOptions -> IO [(Maybe FilePath, String)]
+readInput InputOptions{..}
+  | ioUseStdIn = return . (Nothing ,) <$> getContents
+  | otherwise = do content <- forM ioInputFiles $ \inputFile -> (Just inputFile, ) <$> U.readFile inputFile
+                   return $ bool ((Nothing, P.prelude) :) id ioNoPrelude content
 
 compile :: P.Options P.Compile -> Bool -> [FilePath] -> Maybe FilePath -> Maybe FilePath -> Bool -> IO ()
 compile opts stdin input output externs usePrefix = do
-  modules <- P.parseModulesFromFiles <$> readInput (P.optionsNoPrelude opts) stdin input
+  modules <- P.parseModulesFromFiles <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
       U.hPutStr stderr $ show err

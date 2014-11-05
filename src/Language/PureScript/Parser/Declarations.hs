@@ -232,13 +232,17 @@ parseModule = do
   decls <- mark (P.many (same *> parseDeclaration))
   return $ Module name decls exports
 
-parseModulesFromFiles :: [(FilePath, String)] -> Either P.ParseError [(FilePath, Module)]
-parseModulesFromFiles input = fmap collect . forM input $ \(filename, content) -> do
-    ms <- runIndentParser filename parseModules content
+-- |
+-- Parse a collection of modules 
+--
+parseModulesFromFiles :: [(Maybe FilePath, String)] -> Either P.ParseError [(Maybe FilePath, Module)]
+parseModulesFromFiles input = 
+  fmap collect . forM input $ \(filename, content) -> do
+    ms <- runIndentParser (fromMaybe "" filename) parseModules content
     return (filename, ms)
   where
-  collect :: [(FilePath, [Module])] -> [(FilePath, Module)]
-  collect xs = [ (fp, m) | (fp, ms) <- xs, m <- ms ]
+  collect :: [(k, [v])] -> [(k, v)]
+  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
 
 -- |
 -- Parse a collection of modules

@@ -42,6 +42,7 @@ import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
 import Data.FileEmbed (embedFile)
+import Data.Traversable (traverse)
 
 import Control.Monad.Error
 import Control.Arrow ((&&&))
@@ -138,7 +139,7 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(FilePath, Module)] -> [String] -> m Environment
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(Maybe FilePath, Module)] -> [String] -> m Environment
 make outputDir opts ms prefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
@@ -149,11 +150,11 @@ make outputDir opts ms prefix = do
 
         jsFile = outputDir </> filePath </> "index.js"
         externsFile = outputDir </> filePath </> "externs.purs"
-        inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
+        inputFile = join $ M.lookup moduleName' filePathMap
 
     jsTimestamp <- getTimestamp jsFile
     externsTimestamp <- getTimestamp externsFile
-    inputTimestamp <- getTimestamp inputFile
+    inputTimestamp <- join <$> traverse getTimestamp inputFile 
 
     return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
       (Just t1, Just t2, Just t3) | t1 < min t2 t3 -> s

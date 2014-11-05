@@ -17,6 +17,7 @@ module Main where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Writer
+import Control.Arrow (first)
 import Data.Function (on)
 import Data.List
 import Data.Version (showVersion)
@@ -29,7 +30,7 @@ import System.IO (stderr)
 
 docgen :: Bool -> [FilePath] -> IO ()
 docgen showHierarchy input = do
-  e <- P.parseModulesFromFiles <$> mapM parseFile (nub input)
+  e <- P.parseModulesFromFiles <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
       U.hPutStr stderr $ show err
