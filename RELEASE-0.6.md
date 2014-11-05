@@ -45,7 +45,19 @@
 
 - The `Alternative` type class hierarchy was refactored (@joneshf, @garyb)
 - The `exceptions` library no longer supports throwing exceptions of any type.
+- The following libraries have been moved to the core PureScript organisation: (@garyb)
+    - `purescript-transformers`
+    - `purescript-free`
+    - `purescript-const`
+    - `purescript-identity`
+    - `purescript-lazy`
+    - `purescript-distributive`
+    - `purescript-bifunctors`
+    - `purescript-contravariant`
+    - `purescript-profunctors`
+    - `purescript-maps`
 
 ### Documentation
 
 - The [PureScript book](https://leanpub.com/purescript/read) is now available.
+- The [PureScript wiki](https://github.com/purescript/purescript/wiki) is now the main resource for compiler and library documentation.
