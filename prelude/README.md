@@ -9,17 +9,13 @@
       GT :: Ordering
       EQ :: Ordering
 
-    data Unit where
+    newtype Unit where
       Unit :: {  } -> Unit
 
 
 ### Type Classes
 
 ![Prelude](images/Prelude.png)
-
-    class Alternative f where
-      empty :: forall a. f a
-      (<|>) :: forall a. f a -> f a -> f a
 
     class (Apply f) <= Applicative f where
       pure :: forall a. a -> f a
@@ -265,8 +261,8 @@
 
 ### Types
 
-    data Ref a where
-      Ref :: a -> Ref a
+    newtype Ref a where
+      Ref :: a -> Ref
 
 
 ### Type Class Instances
@@ -367,7 +363,7 @@
 
     newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
-    peekSTArray :: forall a h r. STArray h a -> Eff (st :: ST h | r) a
+    peekSTArray :: forall a h r. STArray h a -> Number -> Eff (st :: ST h | r) a
 
     pokeSTArray :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
 
