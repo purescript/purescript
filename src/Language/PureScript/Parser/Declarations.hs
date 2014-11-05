@@ -19,6 +19,7 @@ module Language.PureScript.Parser.Declarations (
     parseDeclaration,
     parseModule,
     parseModules,
+    parseModulesFromFiles,
     parseValue,
     parseGuard,
     parseBinder,
@@ -26,6 +27,7 @@ module Language.PureScript.Parser.Declarations (
 ) where
 
 import Data.Maybe (isJust, fromMaybe)
+import Data.Traversable (forM)
 
 import Control.Applicative
 import Control.Arrow ((+++))
@@ -229,6 +231,18 @@ parseModule = do
   _ <- lexeme $ P.string "where"
   decls <- mark (P.many (same *> parseDeclaration))
   return $ Module name decls exports
+
+-- |
+-- Parse a collection of modules 
+--
+parseModulesFromFiles :: [(Maybe FilePath, String)] -> Either P.ParseError [(Maybe FilePath, Module)]
+parseModulesFromFiles input = 
+  fmap collect . forM input $ \(filename, content) -> do
+    ms <- runIndentParser (fromMaybe "" filename) parseModules content
+    return (filename, ms)
+  where
+  collect :: [(k, [v])] -> [(k, v)]
+  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
 
 -- |
 -- Parse a collection of modules

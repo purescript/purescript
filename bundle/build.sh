@@ -26,7 +26,6 @@ cp ../dist/build/psc/psc           build/purescript/
 cp ../dist/build/psci/psci         build/purescript/
 cp ../dist/build/psc-make/psc-make build/purescript/
 cp ../dist/build/psc-docs/psc-docs build/purescript/
-cp ../prelude/prelude.purs         build/purescript/
 cp README                          build/purescript/
 cp ../LICENSE                      build/purescript/
 

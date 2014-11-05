@@ -5,6 +5,7 @@
 - The `Alternative` type class hierarchy was refactored. See [here](https://github.com/purescript/purescript-control/issues/6).
 - `--runtime-type-checks` has been removed. The recommended approach is to use `purescript-foreign`. (@garyb)
 - The `Unit` type is now used in the Prelude and core libraries to represent values containing no data. (@garyb)
+- The Prelude is no longer distributed as a separate file, but is embedded in the compiler executables. (@paf31)
 
 ### New Features
 

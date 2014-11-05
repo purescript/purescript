@@ -13,9 +13,9 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell #-}
 
-module Language.PureScript (module P, compile, compile', MonadMake(..), make, preludeFilename) where
+module Language.PureScript (module P, compile, compile', MonadMake(..), make, prelude) where
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
@@ -36,21 +36,23 @@ import Language.PureScript.Supply as P
 import Language.PureScript.Renamer as P
 
 import qualified Language.PureScript.Constants as C
-import qualified Paths_purescript as Paths
 
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
+import Data.FileEmbed (embedFile)
+import Data.Traversable (traverse)
+
 import Control.Monad.Error
 import Control.Arrow ((&&&))
 import Control.Applicative
+
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.ByteString.UTF8 as BU
 
-import System.FilePath ((</>), pathSeparator, takeDirectory)
-import System.Directory (getAppUserDataDirectory, doesFileExist)
-import System.Environment (getProgName)
+import System.FilePath ((</>))
 
 -- |
 -- Compile a collection of modules
@@ -137,7 +139,7 @@ class MonadMake m where
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(FilePath, Module)] -> [String] -> m Environment
+make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(Maybe FilePath, Module)] -> [String] -> m Environment
 make outputDir opts ms prefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
@@ -146,13 +148,13 @@ make outputDir opts ms prefix = do
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = runModuleName moduleName'
 
-        jsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "index.js"
-        externsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "externs.purs"
-        inputFile = fromMaybe (error "Input file is undefined in make") $ M.lookup moduleName' filePathMap
+        jsFile = outputDir </> filePath </> "index.js"
+        externsFile = outputDir </> filePath </> "externs.purs"
+        inputFile = join $ M.lookup moduleName' filePathMap
 
     jsTimestamp <- getTimestamp jsFile
     externsTimestamp <- getTimestamp externsFile
-    inputTimestamp <- getTimestamp inputFile
+    inputTimestamp <- join <$> traverse getTimestamp inputFile 
 
     return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
       (Just t1, Just t2, Just t3) | t1 < min t2 t3 -> s
@@ -173,8 +175,8 @@ make outputDir opts ms prefix = do
     go env' ms'
   go env ((True, m@(Module moduleName' _ exps)) : ms') = do
     let filePath = runModuleName moduleName'
-        jsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "index.js"
-        externsFile = outputDir ++ pathSeparator : filePath ++ pathSeparator : "externs.purs"
+        jsFile = outputDir </> filePath </> "index.js"
+        externsFile = outputDir </> filePath </> "externs.purs"
 
     lift . progress $ "Compiling " ++ runModuleName moduleName'
 
@@ -201,7 +203,7 @@ make outputDir opts ms prefix = do
         toRebuild' = toRebuild `S.union` S.fromList deps
     (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms'
   rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms') = do
-    let externsFile = outputDir ++ pathSeparator : runModuleName moduleName' ++ pathSeparator : "externs.purs"
+    let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
     externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
     case externsModules of
@@ -232,21 +234,5 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
-preludeFilename :: IO FilePath
-preludeFilename = do
-  fs <- sequence [localPrelude, appPrelude, cabalPrelude] 
-  es <- filterM doesFileExist fs
-  case es of
-    (x : _) -> return x
-    _ -> error "No Prelude found."
-  where
-  localPrelude :: IO FilePath
-  localPrelude = ((</> "prelude.purs") . takeDirectory) <$> getProgName
-
-  appPrelude :: IO FilePath
-  appPrelude = do
-    appDir <- getAppUserDataDirectory "purescript"
-    return $ appDir </> "prelude" </> "prelude.purs"
-
-  cabalPrelude :: IO FilePath
-  cabalPrelude = Paths.getDataFileName "prelude/prelude.purs"
+prelude :: String
+prelude = BU.toString $(embedFile "prelude/prelude.purs")

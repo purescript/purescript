@@ -16,15 +16,5 @@ This bundle contains the following executables:
 - psci          The PureScript interactive module (requires NodeJS)
 - psc-docs      A documentation generator
 
-and the following additional files:
-
-- prelude.purs  The Prelude (standard library source code)
-
 Copy these files anywhere on your PATH.
-
-The PureScript compiler will look for the Prelude in the following locations:
-
-- ~/.purescript/prelude/prelude.purs or
-  C:/Documents And Settings/<user name>/Application Data/purescript/prelude/prelude.purs
-- The directory of the compiler executable
 
