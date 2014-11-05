@@ -26,8 +26,11 @@ import Data.Maybe (catMaybes)
 import Data.Function (on)
 import Data.List (nub, (\\), delete, sortBy)
 
+import qualified Data.Map as M
+
 import Control.Monad (foldM, replicateM, forM)
 import Control.Applicative
+import Control.Arrow (second)
 
 import Language.PureScript.Names
 import Language.PureScript.Declarations
@@ -51,7 +54,7 @@ moduleToJs opts (Module name decls (Just exps)) env = do
   let optimized = concat $ map (map $ optimize opts) $ catMaybes jsDecls
   let isModuleEmpty = null exps
   let moduleBody = JSStringLiteral "use strict" : jsImports ++ optimized
-  let moduleExports = JSObjectLiteral $ concatMap exportToJs exps
+  let moduleExports = JSObjectLiteral . map (second var) . M.toList . M.unions $ map exportToJs exps
   return $ case optionsAdditional opts of
     MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
     CompileOptions ns _ _ | not isModuleEmpty ->
@@ -154,12 +157,12 @@ declToJs _ _ _ _ = return Nothing
 -- |
 -- Generate key//value pairs for an object literal exporting values from a module.
 --
-exportToJs :: DeclarationRef -> [(String, JS)]
-exportToJs (TypeRef _ (Just dctors)) = map ((\n -> (n, var (Ident n))) . runProperName) dctors
-exportToJs (ValueRef name) = [(runIdent name, var name)]
-exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
-exportToJs (TypeClassRef name) = [(runProperName name, var $ Ident $ runProperName name)]
-exportToJs _ = []
+exportToJs :: DeclarationRef -> M.Map String Ident
+exportToJs (TypeRef _ (Just dctors)) = M.fromList [ (n, Ident n) | (ProperName n) <- dctors ]
+exportToJs (ValueRef name)           = M.singleton (runIdent name) name
+exportToJs (TypeInstanceRef name)    = M.singleton (runIdent name) name
+exportToJs (TypeClassRef name)       = M.singleton (runProperName name) (Ident $ runProperName name)
+exportToJs _                         = M.empty
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
