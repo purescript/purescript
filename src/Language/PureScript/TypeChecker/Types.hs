@@ -1010,10 +1010,11 @@ check' (TypeClassDictionaryConstructorApp name ps) t = do
   return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
 check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
-  us <- zip (map fst ps) <$> replicateM (length ps) fresh
+  -- We need to be careful to avoid duplicate labels here.
+  -- We check _obj_ agaist the type _t_ with the types in _ps_ replaced with unknowns.
   let (propsToCheck, rest) = rowToList row
-      propsToRemove = map fst ps
-      remainingProps = filter (\(p, _) -> p `notElem` propsToRemove) propsToCheck
+      (removedProps, remainingProps) = partition (\(p, _) -> p `elem` map fst ps) propsToCheck
+  us <- zip (map fst removedProps) <$> replicateM (length ps) fresh
   obj' <- check obj (TypeApp tyObject (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
