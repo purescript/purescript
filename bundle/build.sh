@@ -19,7 +19,7 @@ mkdir -p build/purescript/
 strip ../dist/build/psc/psc
 strip ../dist/build/psci/psci
 strip ../dist/build/psc-make/psc-make
-strip ../dist/build/docgen/docgen
+strip ../dist/build/psc-docs/psc-docs
 
 # Copy files to staging directory
 cp ../dist/build/psc/psc           build/purescript/
