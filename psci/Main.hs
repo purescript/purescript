@@ -66,7 +66,7 @@ import qualified Language.PureScript.Declarations as D
 data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModuleNames :: [P.ModuleName]
-  , psciLoadedModules       :: [(Maybe FilePath, P.Module)]
+  , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
   , psciLetBindings         :: [P.Expr -> P.Expr]
   }
 
@@ -87,7 +87,7 @@ updateImports name st = st { psciImportedModuleNames = name : psciImportedModule
 -- |
 -- Updates the state to have more loaded files.
 --
-updateModules :: [(Maybe FilePath, P.Module)] -> PSCiState -> PSCiState
+updateModules :: [(Either P.RebuildPolicy FilePath, P.Module)] -> PSCiState -> PSCiState
 updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modules }
 
 -- |
@@ -130,12 +130,12 @@ loadModule filename = either (Left . show) Right . P.runIndentParser filename P.
 -- |
 -- Load all modules, including the Prelude
 --
-loadAllModules :: [FilePath] -> IO (Either ParseError [(Maybe FilePath, P.Module)])
+loadAllModules :: [FilePath] -> IO (Either ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do 
     content <- U.readFile filename
-    return (Just filename, content)
-  return $ P.parseModulesFromFiles $ (Nothing, P.prelude) : filesAndContent
+    return (Right filename, content)
+  return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
 
 
 -- |
@@ -303,7 +303,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Nothing, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -343,7 +343,7 @@ handleImport :: P.ModuleName -> PSCI ()
 handleImport moduleName = do
    st <- updateImports moduleName <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
-   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Nothing, m)]) []
+   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
    case e of
      Left err -> PSCI $ outputStrLn err
      Right _  -> do
@@ -357,7 +357,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf value = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st value
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Nothing, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -407,7 +407,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Nothing, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -453,7 +453,7 @@ handleCommand (LoadFile filePath) = do
     m <- psciIO $ loadModule absPath
     case m of
       Left err -> PSCI $ outputStrLn err
-      Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Just absPath)) mods))
+      Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
   else
     PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do

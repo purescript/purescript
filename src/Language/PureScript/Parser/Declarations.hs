@@ -235,10 +235,10 @@ parseModule = do
 -- |
 -- Parse a collection of modules 
 --
-parseModulesFromFiles :: [(Maybe FilePath, String)] -> Either P.ParseError [(Maybe FilePath, Module)]
-parseModulesFromFiles input = 
+parseModulesFromFiles :: (k -> String) -> [(k, String)] -> Either P.ParseError [(k, Module)]
+parseModulesFromFiles toFilePath input = 
   fmap collect . forM input $ \(filename, content) -> do
-    ms <- runIndentParser (fromMaybe "" filename) parseModules content
+    ms <- runIndentParser (toFilePath filename) parseModules content
     return (filename, ms)
   where
   collect :: [(k, [v])] -> [(k, v)]
