@@ -38,10 +38,10 @@ data InputOptions = InputOptions
   , ioInputFiles  :: [FilePath]
   }
 
-readInput :: InputOptions -> IO [(Maybe FilePath, String)]
+readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
-  content <- forM ioInputFiles $ \inputFile -> (Just inputFile, ) <$> U.readFile inputFile
-  return $ bool ((Nothing, P.prelude) :) id ioNoPrelude content
+  content <- forM ioInputFiles $ \inputFile -> (Right inputFile, ) <$> U.readFile inputFile
+  return $ bool ((Left P.RebuildNever, P.prelude) :) id ioNoPrelude content
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 
@@ -69,7 +69,7 @@ instance P.MonadMake Make where
 
 compile :: [FilePath] -> FilePath -> P.Options P.Make -> Bool -> IO ()
 compile input outputDir opts usePrefix = do
-  modules <- P.parseModulesFromFiles <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
+  modules <- P.parseModulesFromFiles (either (const "") id) <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
   case modules of
     Left err -> do
       U.print err
