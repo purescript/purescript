@@ -134,6 +134,15 @@ identifier :: P.Parsec String u String
 identifier = PT.identifier tokenParser
 
 -- |
+-- Parse an identifier in a more permissive position
+--
+identifierName :: P.Parsec String u String
+identifierName = lexeme $ do
+  c <- identStart
+  cs <- many identLetter
+  return (c:cs)
+
+-- |
 -- Parse a reserved word
 --
 reserved :: String -> P.Parsec String u ()
