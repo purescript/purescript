@@ -7,7 +7,7 @@ module Prelude
   , ($), (#)
   , (:), cons
   , Show, show
-  , Functor, (<$>), void
+  , Functor, (<$>), (<$), ($>), (<#>), void
   , Apply, (<*>)
   , Applicative, pure, liftA1
   , Bind, (>>=)
@@ -111,9 +111,21 @@ module Prelude
     show = showArrayImpl show
 
   infixl 4 <$>
+  infixl 4 <$
+  infixl 4 $>
+  infixl 1 <#>
 
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
+  (<#>) fa f = f <$> fa
+
+  (<$) :: forall f a b. (Functor f) => b -> f a -> f b
+  (<$) b fa = const b <$> fa
+
+  ($>) :: forall f a b. (Functor f) => f a -> b -> f b
+  ($>) fa b = const b <$> fa
 
   void :: forall f a. (Functor f) => f a -> f Unit
   void fa = const unit <$> fa
