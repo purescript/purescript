@@ -109,7 +109,7 @@ parsePolyType :: P.Parsec String ParseState Type
 parsePolyType = parseAnyType
 
 parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
-parseNameAndType p = (,) <$> (indented *> (identifier <|> stringLiteral) <* indented <* lexeme (P.string "::")) <*> p
+parseNameAndType p = (,) <$> (indented *> (identifierName <|> stringLiteral) <* indented <* lexeme (P.string "::")) <*> p
 
 parseRowEnding :: P.Parsec String ParseState Type
 parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))

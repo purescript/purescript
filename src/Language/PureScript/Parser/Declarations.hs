@@ -269,7 +269,7 @@ parseObjectLiteral :: P.Parsec String ParseState Expr
 parseObjectLiteral = ObjectLiteral <$> C.braces (C.commaSep parseIdentifierAndValue)
 
 parseIdentifierAndValue :: P.Parsec String ParseState (String, Expr)
-parseIdentifierAndValue = (,) <$> (C.indented *> (C.identifier <|> C.stringLiteral) <* C.indented <* C.colon)
+parseIdentifierAndValue = (,) <$> (C.indented *> (C.identifierName <|> C.stringLiteral) <* C.indented <* C.colon)
                               <*> (C.indented *> parseValue)
 
 parseAbs :: P.Parsec String ParseState Expr
@@ -332,14 +332,14 @@ parseValueAtom = P.choice
 
 parsePropertyUpdate :: P.Parsec String ParseState (String, Expr)
 parsePropertyUpdate = do
-  name <- C.lexeme (C.identifier <|> C.stringLiteral)
+  name <- C.lexeme (C.identifierName <|> C.stringLiteral)
   _ <- C.lexeme $ C.indented *> P.char '='
   value <- C.indented *> parseValue
   return (name, value)
 
 parseAccessor :: Expr -> P.Parsec String ParseState Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
-parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> (C.identifier <|> C.stringLiteral)) <*> pure obj
+parseAccessor obj = P.try $ Accessor <$> (C.indented *> C.dot *> P.notFollowedBy C.opLetter *> C.indented *> (C.identifierName <|> C.stringLiteral)) <*> pure obj
 
 parseDo :: P.Parsec String ParseState Expr
 parseDo = do
@@ -419,7 +419,7 @@ parseNullBinder = C.lexeme (P.char '_' *> P.notFollowedBy C.identLetter) *> retu
 
 parseIdentifierAndBinder :: P.Parsec String ParseState (String, Binder)
 parseIdentifierAndBinder = do
-  name <- C.lexeme (C.identifier <|> C.stringLiteral)
+  name <- C.lexeme (C.identifierName <|> C.stringLiteral)
   _ <- C.lexeme $ C.indented *> P.char '='
   binder <- C.indented *> parseBinder
   return (name, binder)
