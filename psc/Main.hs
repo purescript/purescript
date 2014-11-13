@@ -20,6 +20,7 @@ import Control.Applicative
 import Control.Monad.Error
 
 import Data.Bool (bool)
+import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
@@ -46,7 +47,7 @@ readInput InputOptions{..}
 
 compile :: P.Options P.Compile -> Bool -> [FilePath] -> Maybe FilePath -> Maybe FilePath -> Bool -> IO ()
 compile opts stdin input output externs usePrefix = do
-  modules <- P.parseModulesFromFiles <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
+  modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
       U.hPutStr stderr $ show err

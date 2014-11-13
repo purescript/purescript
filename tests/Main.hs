@@ -30,20 +30,20 @@ import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirector
 import Text.Parsec (ParseError)
 import qualified System.IO.UTF8 as U
 
-readInput :: [FilePath] -> IO [(Maybe FilePath, String)]
+readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- U.readFile inputFile
-  return (Just inputFile, text)
+  return (inputFile, text)
 
 loadPrelude :: Either String (String, String, P.Environment)
 loadPrelude = 
-  case P.parseModulesFromFiles [(Nothing, P.prelude)] of
+  case P.parseModulesFromFiles id [("", P.prelude)] of
     Left parseError -> Left (show parseError)
     Right ms -> P.compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) (map snd ms) []
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
-  modules <- P.parseModulesFromFiles <$> readInput inputFiles
+  modules <- P.parseModulesFromFiles id <$> readInput inputFiles
   case modules of
     Left parseError ->
       return (Left $ show parseError)
