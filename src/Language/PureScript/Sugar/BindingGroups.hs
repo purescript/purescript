@@ -84,7 +84,7 @@ collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups = let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id in map f . concatMap go
   where
   go (DataBindingGroupDeclaration ds) = ds
-  go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] Nothing val) ds
+  go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] (Right val)) ds
   go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
   go other = [other]
 
@@ -135,7 +135,7 @@ usedProperNames moduleName =
   usedNames _ = []
 
 getIdent :: Declaration -> Ident
-getIdent (ValueDeclaration ident _ _ _ _) = ident
+getIdent (ValueDeclaration ident _ _ _) = ident
 getIdent (PositionedDeclaration _ d) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
@@ -176,7 +176,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
 
   cycleError :: Declaration -> [Declaration] -> Either ErrorStack a
   cycleError (PositionedDeclaration p d) ds = rethrowWithPosition p $ cycleError d ds
-  cycleError (ValueDeclaration n _ _ _ e) [] = Left $
+  cycleError (ValueDeclaration n _ _ (Right e)) [] = Left $
     mkErrorStack ("Cycle in definition of " ++ show n) (Just (ExprError e))
   cycleError d ds@(_:_) = rethrow (<> mkErrorStack ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
@@ -197,7 +197,7 @@ isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration ident nameKind [] Nothing val) = (ident, nameKind, val)
+fromValueDecl (ValueDeclaration ident nameKind [] (Right val)) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d
 fromValueDecl _ = error "Expected ValueDeclaration"

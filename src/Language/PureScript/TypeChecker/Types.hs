@@ -743,21 +743,21 @@ infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> makeBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing tv@(TypedValue checkType val ty) : rest) ret j = do
+inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   kind <- liftCheck $ kindOf moduleName ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
-  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing (TypedValue checkType val' ty'')]) rest ret j
-inferLetBinding seen (ValueDeclaration ident nameKind [] Nothing val : rest) ret j = do
+  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
+inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
   valTy <- fresh
   Just moduleName <- checkCurrentModule <$> get
   let dict = M.singleton (moduleName, ident) (valTy, nameKind, Undefined)
   TypedValue _ val' valTy' <- bindNames dict $ infer val
   valTy =?= valTy'
-  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] Nothing val']) rest ret j
+  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right val')]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
@@ -845,18 +845,23 @@ inferBinder val (PositionedBinder pos binder) =
 --
 checkBinders :: [Type] -> Type -> [CaseAlternative] -> UnifyT Type Check [CaseAlternative]
 checkBinders _ _ [] = return []
-checkBinders nvals ret (CaseAlternative binders grd val : bs) = do
+checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (strMsg "Overlapping binders in case statement") $
     let ns = concatMap binderNames binders in length (nub ns) == length ns
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  r <- bindLocalVariables moduleName [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $ do
-    val' <- TypedValue True <$> check val ret <*> pure ret
-    case grd of
-      Nothing -> return $ CaseAlternative binders Nothing val'
-      Just g -> do
-        g' <- check g tyBoolean
-        return $ CaseAlternative binders (Just g') val'
+  r <- bindLocalVariables moduleName [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
+    CaseAlternative binders <$>
+      case result of
+        Left gs -> do
+          gs' <- forM gs $ \(grd, val) -> do
+            grd' <- check grd tyBoolean
+            val' <- TypedValue True <$> check val ret <*> pure ret
+            return (grd', val')
+          return $ Left gs'
+        Right val -> do
+          val' <- TypedValue True <$> check val ret <*> pure ret
+          return $ Right val'
   rs <- checkBinders nvals ret bs
   return $ r : rs
 

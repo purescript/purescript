@@ -29,6 +29,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Names
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Traversals
 
 -- |
 -- Replace all top level type declarations in a module with type annotations
@@ -47,18 +48,20 @@ desugarTypeDeclarations (PositionedDeclaration pos d : ds) = do
   return (PositionedDeclaration pos d' : ds')
 desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   (_, nameKind, val) <- fromValueDeclaration d
-  desugarTypeDeclarations (ValueDeclaration name nameKind [] Nothing (TypedValue True val ty) : rest)
+  desugarTypeDeclarations (ValueDeclaration name nameKind [] (Right (TypedValue True val ty)) : rest)
   where
   fromValueDeclaration :: Declaration -> Either ErrorStack (Ident, NameKind, Expr)
-  fromValueDeclaration (ValueDeclaration name' nameKind [] Nothing val) | name == name' = return (name', nameKind, val)
+  fromValueDeclaration (ValueDeclaration name' nameKind [] (Right val)) | name == name' = return (name', nameKind, val)
   fromValueDeclaration (PositionedDeclaration pos d') = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
     return (ident, nameKind, PositionedValue pos val)
   fromValueDeclaration _ = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (TypeDeclaration name _ : []) = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
-desugarTypeDeclarations (ValueDeclaration name nameKind bs g val : rest) = do
+desugarTypeDeclarations (ValueDeclaration name nameKind bs val : rest) = do
   let (_, f, _) = everywhereOnValuesTopDownM return go return
-  (:) <$> (ValueDeclaration name nameKind bs g <$> f val) <*> desugarTypeDeclarations rest
+      f' (Left gs) = Left <$> mapM (pairM return f) gs
+      f' (Right v) = Right <$> f v
+  (:) <$> (ValueDeclaration name nameKind bs <$> f' val) <*> desugarTypeDeclarations rest
   where
   go (Let ds val') = Let <$> desugarTypeDeclarations ds <*> pure val'
   go other = return other

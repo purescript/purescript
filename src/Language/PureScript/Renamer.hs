@@ -103,7 +103,7 @@ lookupIdent name = do
 findDeclIdents :: [Declaration] -> [Ident]
 findDeclIdents = concatMap go
   where
-  go (ValueDeclaration ident _ _ _ _) = [ident]
+  go (ValueDeclaration ident _ _ _) = [ident]
   go (BindingGroupDeclaration ds) = map (\(name, _, _) -> name) ds
   go (ExternDeclaration _ ident _ _) = [ident]
   go (TypeClassDeclaration _ _ _ ds) = findDeclIdents ds
@@ -129,9 +129,9 @@ renameInModules = map go
 -- another in the current scope.
 --
 renameInDecl :: Bool -> Declaration -> Rename Declaration
-renameInDecl isTopLevel (ValueDeclaration name nameKind [] Nothing val) = do
+renameInDecl isTopLevel (ValueDeclaration name nameKind [] (Right val)) = do
   name' <- if isTopLevel then return name else updateScope name
-  ValueDeclaration name' nameKind [] Nothing <$> renameInValue val
+  ValueDeclaration name' nameKind [] . Right <$> renameInValue val
 renameInDecl isTopLevel (BindingGroupDeclaration ds) = do
   ds' <- mapM updateNames ds
   BindingGroupDeclaration <$> mapM updateValues ds'
@@ -187,8 +187,9 @@ renameInValue v = return v
 -- Renames within case alternatives.
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
-renameInCaseAlternative (CaseAlternative bs g v) =
-  CaseAlternative <$> mapM renameInBinder bs <*> maybeM renameInValue g <*> renameInValue v
+renameInCaseAlternative (CaseAlternative bs v) =
+  CaseAlternative <$> mapM renameInBinder bs 
+                  <*> eitherM (mapM (pairM renameInValue renameInValue)) renameInValue v
 
 -- |
 -- Renames within binders.

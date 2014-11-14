@@ -19,7 +19,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
-import Data.Maybe (isJust)
+import Data.Either (isLeft)
 import Data.Monoid ((<>))
 import Data.List (nub, groupBy)
 
@@ -32,6 +32,7 @@ import Language.PureScript.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Supply
+import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |
@@ -50,7 +51,7 @@ desugarAbs = flip parU f
   replace :: Expr -> SupplyT (Either ErrorStack) Expr
   replace (Abs (Right binder) val) = do
     ident <- Ident <$> freshName
-    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing val]
+    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
   replace other = return other
 
 -- |
@@ -62,9 +63,11 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
     desugarRest :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
-    desugarRest (ValueDeclaration name nameKind bs g val : rest) =
+    desugarRest (ValueDeclaration name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
-      in (:) <$> (ValueDeclaration name nameKind bs g <$> f val) <*> desugarRest rest
+          f' (Left gs) = Left <$> mapM (pairM return f) gs
+          f' (Right v) = Right <$> f v
+      in (:) <$> (ValueDeclaration name nameKind bs <$> f' result) <*> desugarRest rest
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
       go other = return other
@@ -75,22 +78,22 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
     desugarRest [] = pure []
 
 inSameGroup :: Declaration -> Declaration -> Bool
-inSameGroup (ValueDeclaration ident1 _ _ _ _) (ValueDeclaration ident2 _ _ _ _) = ident1 == ident2
+inSameGroup (ValueDeclaration ident1 _ _ _) (ValueDeclaration ident2 _ _ _) = ident1 == ident2
 inSameGroup (PositionedDeclaration _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
-toDecls [ValueDeclaration ident nameKind bs Nothing val] | all isVarBinder bs = do
+toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
   guardWith (strMsg "Overlapping function argument names") $ length (nub args) == length args
-  return [ValueDeclaration ident nameKind [] Nothing body]
-toDecls ds@(ValueDeclaration ident _ bs g _ : _) = do
+  return [ValueDeclaration ident nameKind [] (Right body)]
+toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
       throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
-  unless (not (null bs) || isJust g) $
+  unless (not (null bs) || isLeft result) $
       throwError $ mkErrorStack ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
@@ -103,18 +106,18 @@ isVarBinder :: Binder -> Bool
 isVarBinder (VarBinder _) = True
 isVarBinder _ = False
 
-toTuple :: Declaration -> ([Binder], (Maybe Guard, Expr))
-toTuple (ValueDeclaration _ _ bs g val) = (bs, (g, val))
+toTuple :: Declaration -> ([Binder], Either [(Guard, Expr)] Expr)
+toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: Ident -> [([Binder], (Maybe Guard, Expr))] -> SupplyT (Either ErrorStack) Declaration
+makeCaseDeclaration :: Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> SupplyT (Either ErrorStack) Declaration
 makeCaseDeclaration ident alternatives = do
   let argPattern = length . fst . head $ alternatives
   args <- map Ident <$> replicateM argPattern freshName
   let
     vars = map (Var . Qualified Nothing) args
-    binders = [ CaseAlternative bs g val | (bs, (g, val)) <- alternatives ]
+    binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
     value = foldr (Abs . Left) (Case vars binders) args
-  return $ ValueDeclaration ident Value [] Nothing value
+  return $ ValueDeclaration ident Value [] (Right value)
 

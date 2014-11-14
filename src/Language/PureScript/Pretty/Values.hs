@@ -86,7 +86,7 @@ literals = mkPattern' match
 
 prettyPrintDeclaration :: Declaration -> StateT PrinterState Maybe String
 prettyPrintDeclaration (TypeDeclaration ident ty) = return $ show ident ++ " :: " ++ prettyPrintType ty
-prettyPrintDeclaration (ValueDeclaration ident _ [] Nothing val) = fmap concat $ sequence
+prettyPrintDeclaration (ValueDeclaration ident _ [] (Right val)) = fmap concat $ sequence
   [ return $ show ident ++ " = "
   , prettyPrintValue' val
   ]
@@ -94,13 +94,23 @@ prettyPrintDeclaration (PositionedDeclaration _ d) = prettyPrintDeclaration d
 prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
-prettyPrintCaseAlternative (CaseAlternative binders grd val) =
+prettyPrintCaseAlternative (CaseAlternative binders result) =
   fmap concat $ sequence
     [ intercalate ", " <$> forM binders prettyPrintBinder'
-    , maybe (return "") (fmap ("| " ++) . prettyPrintValue') grd
-    , return " -> "
-    , prettyPrintValue' val
+    , prettyPrintResult result
     ]
+  where
+  prettyPrintResult (Left gs) = concat <$> mapM prettyPrintGuardedValue gs
+  prettyPrintResult (Right v) = (" -> " ++) <$> prettyPrintValue' v
+  
+  prettyPrintGuardedValue (grd, val) =
+    fmap concat $ sequence   
+      [ return "| "
+      , prettyPrintValue' grd
+      , return " -> "
+      , prettyPrintValue' val
+      , return "\n"
+      ]
 
 prettyPrintDoNotationElement :: DoNotationElement -> StateT PrinterState Maybe String
 prettyPrintDoNotationElement (DoNotationValue val) =

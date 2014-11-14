@@ -82,14 +82,22 @@ parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration = do
   name <- parseIdent
   binders <- P.many parseBinderNoParens
-  guard <- P.optionMaybe parseGuard
-  value <- lexeme (indented *> P.char '=') *> parseValue
-  whereClause <- P.optionMaybe $ do
-    C.indented
-    reserved "where"
-    C.indented
-    C.mark $ P.many1 (C.same *> parseLocalDeclaration)
-  return $ ValueDeclaration name Value binders guard (maybe value (`Let` value) whereClause)
+  value <- Left <$> (C.indented *> 
+                       C.mark (P.many1 ((,) <$> (C.same *> parseGuard) 
+                                            <*> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
+                                       )))
+       <|> Right <$> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
+  return $ ValueDeclaration name Value binders value
+  where
+  parseValueWithWhereClause :: P.Parsec String ParseState Expr
+  parseValueWithWhereClause = do
+    value <- parseValue
+    whereClause <- P.optionMaybe $ do
+      C.indented
+      reserved "where"
+      C.indented
+      C.mark $ P.many1 (C.same *> parseLocalDeclaration)
+    return $ maybe value (`Let` value) whereClause
 
 parseExternDeclaration :: P.Parsec String ParseState Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
@@ -295,8 +303,11 @@ parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.rese
 
 parseCaseAlternative :: P.Parsec String ParseState CaseAlternative
 parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
-                                       <*> P.optionMaybe parseGuard
-                                       <*> (C.indented *> C.reservedOp "->" *> parseValue)
+                                       <*> (Left <$> (C.indented *> 
+                                                        C.mark (P.many1 ((,) <$> (C.same *> parseGuard) 
+                                                                             <*> (lexeme (indented *> C.reservedOp "->") *> parseValue)
+                                                                        )))
+                                            <|> Right <$> (lexeme (indented *> C.reservedOp "->") *> parseValue))
                                        P.<?> "case alternative"
 
 parseIfThenElse :: P.Parsec String ParseState Expr
@@ -464,6 +475,6 @@ parseBinderNoParens = P.choice (map P.try
 -- Parse a guard
 --
 parseGuard :: P.Parsec String ParseState Guard
-parseGuard = C.indented *> C.pipe *> C.indented *> parseValue
+parseGuard = C.pipe *> C.indented *> parseValue
 
 

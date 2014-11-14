@@ -93,7 +93,7 @@ imports other =
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
 declToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Declaration -> Environment -> SupplyT m (Maybe [JS])
-declToJs opts mp (ValueDeclaration ident _ _ _ val) e = do
+declToJs opts mp (ValueDeclaration ident _ _ (Right val)) e = do
   js <- valueToJs opts mp e val
   return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
 declToJs opts mp (BindingGroupDeclaration vals) e = do
@@ -280,21 +280,25 @@ bindersToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName
 bindersToJs opts m e binders vals = do
   valNames <- replicateM (length vals) freshName
   let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
-  jss <- forM binders $ \(CaseAlternative bs grd result) -> do
-    ret <- valueToJs opts m e result
-    go valNames [JSReturn ret] bs grd
+  jss <- forM binders $ \(CaseAlternative bs result) -> do
+    ret <- guardsToJs result
+    go valNames ret bs
   return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow $ JSUnary JSNew $ JSApp (JSVar "Error") $ [JSStringLiteral "Failed pattern match"]])))
                  []
   where
-    go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> Maybe Guard -> SupplyT m [JS]
-    go _ done [] Nothing = return done
-    go _ done [] (Just cond) = do
-      cond' <- valueToJs opts m e cond
-      return [JSIfElse cond' (JSBlock done) Nothing]
-    go (v:vs) done' (b:bs) grd = do
-      done'' <- go vs done' bs grd
+    go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> SupplyT m [JS]
+    go _ done [] = return done
+    go (v:vs) done' (b:bs) = do
+      done'' <- go vs done' bs
       binderToJs m e v done'' b
-    go _ _ _ _ = error "Invalid arguments to bindersToJs"
+    go _ _ _ = error "Invalid arguments to bindersToJs"
+
+    guardsToJs :: (Functor m, Applicative m, Monad m) => Either [(Guard, Expr)] Expr -> SupplyT m [JS]
+    guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
+      cond' <- valueToJs opts m e cond
+      done  <- valueToJs opts m e val
+      return $ JSIfElse cond' (JSBlock [JSReturn done]) Nothing
+    guardsToJs (Right v) = return . JSReturn <$> valueToJs opts m e v
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match

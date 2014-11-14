@@ -211,7 +211,7 @@ typeClassDictionaryDeclaration name args implies members =
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
-  ValueDeclaration ident TypeClassAccessorImport [] Nothing $
+  ValueDeclaration ident TypeClassAccessorImport [] $ Right $
     TypedValue False (Abs (Left $ Ident "dict") (Accessor (runIdent ident) (Var $ Qualified Nothing (Ident "dict")))) $
     moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map (TypeVar . fst) args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
@@ -258,19 +258,19 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className memberNames'
-          result = ValueDeclaration name TypeInstanceDictionaryValue [] Nothing (TypedValue True dict constrainedTy)
+          result = ValueDeclaration name TypeInstanceDictionaryValue [] (Right (TypedValue True dict constrainedTy))
       return result
 
   where
 
   declName :: Declaration -> Maybe Ident
   declName (PositionedDeclaration _ d) = declName d
-  declName (ValueDeclaration ident _ _ _ _) = Just ident
+  declName (ValueDeclaration ident _ _ _) = Just ident
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
 
   memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Expr)
-  memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _ _) = do
+  memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _) = do
     _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     let memberValue = typeInstanceDictionaryEntryValue d
     return (ident, memberValue)
@@ -280,7 +280,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
 
   typeInstanceDictionaryEntryValue :: Declaration -> Expr
-  typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] _ val) = val
+  typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] (Right val)) = val
   typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
   typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"
 
