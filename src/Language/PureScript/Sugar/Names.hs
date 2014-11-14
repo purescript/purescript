@@ -4,7 +4,7 @@
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
+-- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
 -- Stability   :  experimental
 -- Portability :
 --
@@ -16,6 +16,7 @@ module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
+import Data.List (nub)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Monoid ((<>))
 
@@ -158,7 +159,7 @@ desugarImports modules = do
       let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
       let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
       imports <- resolveImports env m
-      renameInModule imports env (elaborateExports exps m)
+      elaborateImports <$> renameInModule imports env (elaborateExports exps m)
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that have an exports list,
@@ -169,6 +170,23 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
   map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (exportedTypes exps) ++
   map TypeClassRef (exportedTypeClasses exps) ++
   map ValueRef (exportedValues exps))
+
+-- |
+-- Add `import X ()` for any modules where there are only fully qualified references to members.
+-- This ensures transitive instances are included when using a member from a module.
+--
+elaborateImports :: Module -> Module
+elaborateImports (Module mn decls exps) = Module mn decls' exps
+  where
+  decls' :: [Declaration]
+  decls' =
+    let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
+    in mkImport `map` nub (f `concatMap` decls) ++ decls
+  fqValues :: Expr -> [ModuleName]
+  fqValues (Var (Qualified (Just mn') _)) = [mn']
+  fqValues _ = []
+  mkImport :: ModuleName -> Declaration
+  mkImport mn' = ImportDeclaration mn' (Qualifying []) Nothing
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing

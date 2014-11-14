@@ -176,8 +176,7 @@ data Declaration
   --
   | FixityDeclaration Fixity String
   -- |
-  -- A module import (module name, optional set of identifiers to import,
-  -- optional set of identifiers to hide, optional "qualified as" name)
+  -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   --
   | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
