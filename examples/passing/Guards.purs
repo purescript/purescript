@@ -12,7 +12,12 @@ module Main where
     z -> z * 3 + 1
 
   min :: forall a. (Ord a) => a -> a -> a
-  min n m | n < m  = n
-          | m <= n = m
+  min n m | n < m     = n
+          | otherwise = m
+
+  max :: forall a. (Ord a) => a -> a -> a
+  max n m = case unit of
+    _ | m < n     -> n
+      | otherwise -> m
 
   main = Debug.Trace.trace $ min "Done" "ZZZZ"
