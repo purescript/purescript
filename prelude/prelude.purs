@@ -21,6 +21,15 @@ module Prelude
   , not
   , Semigroup, (<>), (++)
   , Unit(..), unit
+  , Tuple2(..)
+  , Tuple3(..)
+  , Tuple4(..)
+  , Tuple5(..)
+  , Tuple6(..)
+  , Tuple7(..)
+  , Tuple8(..)
+  , Tuple9(..)
+  , Tuple10(..)
   ) where
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -153,6 +162,7 @@ module Prelude
     f' <- f
     a' <- a
     return (f' a')
+
 
   instance functorArr :: Functor ((->) r) where
     (<$>) = (<<<)
@@ -484,6 +494,16 @@ module Prelude
 
   (++) :: forall s. (Semigroup s) => s -> s -> s
   (++) = (<>)
+
+  newtype Tuple2 a b = Tuple2 {_1 :: a, _2 :: b}
+  newtype Tuple3 a b c = Tuple3 {_1 :: a, _2 :: b, _3 :: c}
+  newtype Tuple4 a b c d = Tuple4 {_1 :: a, _2 :: b, _3 :: c, _4 :: d}
+  newtype Tuple5 a b c d e = Tuple5 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e}
+  newtype Tuple6 a b c d e f = Tuple6 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e, _6 :: f}
+  newtype Tuple7 a b c d e f g = Tuple7 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e, _6 :: f, _7 :: g}
+  newtype Tuple8 a b c d e f g h = Tuple8 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e, _6 :: f, _7 :: g, _8 :: h}
+  newtype Tuple9 a b c d e f g h i = Tuple9 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e, _6 :: f, _7 :: g, _8 :: h, _9 :: i}
+  newtype Tuple10 a b c d e f g h i j = Tuple10 {_1 :: a, _2 :: b, _3 :: c, _4 :: d, _5 :: e, _6 :: f, _7 :: g, _8 :: h, _9 :: i, _10 :: j}
 
 module Data.Function where
 

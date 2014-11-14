@@ -228,3 +228,30 @@ st = "Control_Monad_ST"
 
 dataFunction :: String
 dataFunction = "Data_Function"
+
+tuple2 :: String
+tuple2 = "Tuple2"
+
+tuple3 :: String
+tuple3 = "Tuple3"
+
+tuple4 :: String
+tuple4 = "Tuple4"
+
+tuple5 :: String
+tuple5 = "Tuple5"
+
+tuple6 :: String
+tuple6 = "Tuple5"
+
+tuple7 :: String
+tuple7 = "Tuple7"
+
+tuple8 :: String
+tuple8 = "Tuple8"
+
+tuple9 :: String
+tuple9 = "Tuple9"
+
+tuple10 :: String
+tuple10 = "Tuple10"

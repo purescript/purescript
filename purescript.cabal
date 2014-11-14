@@ -55,6 +55,7 @@ library
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
+                     Language.PureScript.Sugar.Tuple
                      Language.PureScript.Sugar.TypeDeclarations
                      Language.PureScript.Sugar.BindingGroups
                      Language.PureScript.Sugar.Operators

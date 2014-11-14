@@ -25,6 +25,7 @@ import Language.PureScript.Supply
 
 import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.DoNotation as S
+import Language.PureScript.Sugar.Tuple as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
@@ -51,6 +52,7 @@ import Language.PureScript.Sugar.Names as S
 desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugar = map removeSignedLiterals
           >>> mapM desugarDoModule
+          >=> mapM desugarTupleModule
           >=> desugarCasesModule
           >=> lift . (desugarTypeDeclarationsModule
                       >=> desugarImports

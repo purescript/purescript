@@ -300,6 +300,10 @@ data Expr
   --
   | ArrayLiteral [Expr]
   -- |
+  -- A tuple literal
+  --
+  | TupleLiteral [Expr]
+  -- |
   -- An object literal
   --
   | ObjectLiteral [(String, Expr)]
@@ -448,6 +452,10 @@ data Binder
   -- A binder which matches a record and binds its properties
   --
   | ObjectBinder [(String, Binder)]
+  -- |
+  -- A binder which matches a tuple and binds its elements
+  --
+  | TupleBinder [Binder]
   -- |
   -- A binder which matches an array and binds its elements
   --
