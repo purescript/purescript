@@ -1,7 +1,7 @@
 name: purescript
 version: 0.6.0.2
 cabal-version: >=1.8
-build-type: Simple 
+build-type: Simple
 license: MIT
 license-file: LICENSE
 copyright: (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
@@ -24,54 +24,42 @@ source-repository head
     location: https://github.com/purescript/purescript.git
 
 library
-    build-depends: base >=4 && <5, 
-                   cmdtheline == 0.2.*, 
-                   containers -any, 
+    build-depends: base >=4 && <5,
+                   cmdtheline == 0.2.*,
+                   containers -any,
                    unordered-containers -any,
-                   directory >= 1.2, 
-                   filepath -any, 
-                   mtl >= 2.1.0 && < 2.3.0, 
+                   directory >= 1.2,
+                   filepath -any,
+                   mtl >= 2.1.0 && < 2.3.0,
                    parsec -any,
-                   transformers >= 0.3 && < 0.5, 
+                   transformers >= 0.3 && < 0.5,
                    utf8-string -any,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   monad-unify >= 0.2.2 && < 0.3, 
+                   monad-unify >= 0.2.2 && < 0.3,
                    file-embed >= 0.0.7 && < 0.0.8,
                    time -any
     exposed-modules: Language.PureScript
-                     Language.PureScript.Constants
-                     Language.PureScript.Options
-                     Language.PureScript.Declarations
-                     Language.PureScript.Environment
-                     Language.PureScript.Errors
-                     Language.PureScript.Kinds
-                     Language.PureScript.Names
-                     Language.PureScript.Supply
-                     Language.PureScript.Types
-                     Language.PureScript.Traversals
-                     Language.PureScript.TypeClassDictionaries
-                     Language.PureScript.DeadCodeElimination
-                     Language.PureScript.Sugar
-                     Language.PureScript.ModuleDependencies
-                     Language.PureScript.Sugar.CaseDeclarations
-                     Language.PureScript.Sugar.DoNotation
-                     Language.PureScript.Sugar.TypeDeclarations
-                     Language.PureScript.Sugar.BindingGroups
-                     Language.PureScript.Sugar.Operators
-                     Language.PureScript.Sugar.TypeClasses
-                     Language.PureScript.Sugar.Names
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
+                     Language.PureScript.Constants
+                     Language.PureScript.DeadCodeElimination
+                     Language.PureScript.Declarations
+                     Language.PureScript.Environment
+                     Language.PureScript.Errors
+                     Language.PureScript.Kinds
+                     Language.PureScript.ModuleDependencies
+                     Language.PureScript.Names
                      Language.PureScript.Optimizer
+                     Language.PureScript.Optimizer.Blocks
                      Language.PureScript.Optimizer.Common
+                     Language.PureScript.Optimizer.Inliner
                      Language.PureScript.Optimizer.MagicDo
                      Language.PureScript.Optimizer.TCO
-                     Language.PureScript.Optimizer.Inliner
                      Language.PureScript.Optimizer.Unused
-                     Language.PureScript.Optimizer.Blocks
+                     Language.PureScript.Options
                      Language.PureScript.Parser
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
@@ -85,11 +73,28 @@ library
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
                      Language.PureScript.Renamer
+                     Language.PureScript.Sugar
+                     Language.PureScript.Sugar.BindingGroups
+                     Language.PureScript.Sugar.CaseDeclarations
+                     Language.PureScript.Sugar.DoNotation
+                     Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.Operators
+                     Language.PureScript.Sugar.TypeClasses
+                     Language.PureScript.Sugar.TypeDeclarations
+                     Language.PureScript.Supply
+                     Language.PureScript.Traversals
                      Language.PureScript.TypeChecker
+                     Language.PureScript.TypeChecker.Entailment
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad
+                     Language.PureScript.TypeChecker.Rows
+                     Language.PureScript.TypeChecker.Skolems
+                     Language.PureScript.TypeChecker.Subsumption
                      Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types
+                     Language.PureScript.TypeChecker.Unify
+                     Language.PureScript.TypeClassDictionaries
+                     Language.PureScript.Types
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -128,12 +133,12 @@ executable psci
                    Parser
     ghc-options: -Wall -O2
 
-executable psc-docs 
+executable psc-docs
     build-depends: base >=4 && <5, cmdtheline -any, purescript -any, utf8-string -any,
                    process -any, mtl -any
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psc-docs 
+    hs-source-dirs: psc-docs
     other-modules:
     ghc-options: -Wall -O2
 

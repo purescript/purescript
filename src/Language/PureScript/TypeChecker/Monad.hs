@@ -18,23 +18,22 @@
 
 module Language.PureScript.TypeChecker.Monad where
 
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.Declarations (canonicalizeDictionary)
-import Language.PureScript.Environment
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Options
-import Language.PureScript.Errors
-
 import Data.Maybe
+import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.State
 import Control.Monad.Error
+import Control.Monad.State
 import Control.Monad.Unify
 
-import qualified Data.Map as M
+import Language.PureScript.Declarations (canonicalizeDictionary)
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Options
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
 
 -- |
 -- Temporarily bind a collection of names to values

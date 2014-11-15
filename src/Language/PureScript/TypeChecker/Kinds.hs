@@ -22,23 +22,22 @@ module Language.PureScript.TypeChecker.Kinds (
     kindsOfAll
 ) where
 
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.Pretty
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-
-import Control.Monad.State
-import Control.Monad.Error
-import Control.Monad.Unify
+import Data.Monoid ((<>))
+import qualified Data.HashMap.Strict as H
+import qualified Data.Map as M
 
 import Control.Applicative
+import Control.Monad.Error
+import Control.Monad.State
+import Control.Monad.Unify
 
-import qualified Data.Map as M
-import qualified Data.HashMap.Strict as H
-import Data.Monoid ((<>))
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Pretty
+import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.Types
 
 instance Partial Kind where
   unknown = KUnknown
@@ -85,12 +84,12 @@ kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   rest <- zipWithM freshKindVar args kargs
-  let dict = (name, tyCon) : rest 
+  let dict = (name, tyCon) : rest
   bindLocalTypeVariables moduleName dict $
     solveTypes isData ts kargs tyCon
   where
   tidyUp (k, sub) = starIfUnknown $ sub $? k
-  
+
 freshKindVar :: (String, Maybe Kind) -> Kind -> UnifyT Kind Check (ProperName, Kind)
 freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
 freshKindVar (arg, Just kind') kind = do
