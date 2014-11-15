@@ -22,6 +22,7 @@ module Language.PureScript.TypeChecker.Kinds (
     kindsOfAll
 ) where
 
+import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
@@ -49,9 +50,7 @@ instance Partial Kind where
     go _ = []
   ($?) sub = everywhereOnKinds go
     where
-    go t@(KUnknown u) = case H.lookup u (runSubstitution sub) of
-                          Nothing -> t
-                          Just t' -> t'
+    go t@(KUnknown u) = fromMaybe t $ H.lookup u (runSubstitution sub)
     go other = other
 
 instance Unifiable Check Kind where
@@ -124,13 +123,13 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 -- |
 -- Solve the set of kind constraints associated with the data constructors for a type constructor
 --
-solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind (Check) Kind
+solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
 solveTypes isData ts kargs tyCon = do
   ks <- mapM infer ts
   when isData $ do
     tyCon =?= foldr FunKind Star kargs
     forM_ ks $ \k -> k =?= Star
-  when (not isData) $ do
+  unless isData $
     tyCon =?= foldr FunKind (head ks) kargs
   return tyCon
 
@@ -190,6 +189,3 @@ infer' (KindedType ty k) = do
   k =?= k'
   return k'
 infer' _ = error "Invalid argument to infer"
-
-
-
