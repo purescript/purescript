@@ -22,23 +22,23 @@ module Language.PureScript.TypeChecker.Kinds (
     kindsOfAll
 ) where
 
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.Pretty
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-
-import Control.Monad.State
-import Control.Monad.Error
-import Control.Monad.Unify
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import qualified Data.HashMap.Strict as H
+import qualified Data.Map as M
 
 import Control.Applicative
+import Control.Monad.Error
+import Control.Monad.State
+import Control.Monad.Unify
 
-import qualified Data.Map as M
-import qualified Data.HashMap.Strict as H
-import Data.Monoid ((<>))
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Pretty
+import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.Types
 
 instance Partial Kind where
   unknown = KUnknown
@@ -50,9 +50,7 @@ instance Partial Kind where
     go _ = []
   ($?) sub = everywhereOnKinds go
     where
-    go t@(KUnknown u) = case H.lookup u (runSubstitution sub) of
-                          Nothing -> t
-                          Just t' -> t'
+    go t@(KUnknown u) = fromMaybe t $ H.lookup u (runSubstitution sub)
     go other = other
 
 instance Unifiable Check Kind where
@@ -85,12 +83,12 @@ kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- fresh
   kargs <- replicateM (length args) fresh
   rest <- zipWithM freshKindVar args kargs
-  let dict = (name, tyCon) : rest 
+  let dict = (name, tyCon) : rest
   bindLocalTypeVariables moduleName dict $
     solveTypes isData ts kargs tyCon
   where
   tidyUp (k, sub) = starIfUnknown $ sub $? k
-  
+
 freshKindVar :: (String, Maybe Kind) -> Kind -> UnifyT Kind Check (ProperName, Kind)
 freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
 freshKindVar (arg, Just kind') kind = do
@@ -125,13 +123,13 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 -- |
 -- Solve the set of kind constraints associated with the data constructors for a type constructor
 --
-solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind (Check) Kind
+solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
 solveTypes isData ts kargs tyCon = do
   ks <- mapM infer ts
   when isData $ do
     tyCon =?= foldr FunKind Star kargs
     forM_ ks $ \k -> k =?= Star
-  when (not isData) $ do
+  unless isData $
     tyCon =?= foldr FunKind (head ks) kargs
   return tyCon
 
@@ -191,6 +189,3 @@ infer' (KindedType ty k) = do
   k =?= k'
   return k'
 infer' _ = error "Invalid argument to infer"
-
-
-
