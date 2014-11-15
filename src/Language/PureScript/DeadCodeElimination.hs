@@ -46,7 +46,7 @@ eliminateDeadCode entryPoints ms = map go ms
   filterExport _ _ = Nothing
 
   valueExists :: Ident -> Declaration -> Bool
-  valueExists name (ValueDeclaration name' _ _ _ _) = name == name'
+  valueExists name (ValueDeclaration name' _ _ _) = name == name'
   valueExists name (ExternDeclaration _ name' _ _) = name == name'
   valueExists name (BindingGroupDeclaration decls) = any (\(name', _, _) -> name == name') decls
   valueExists name (PositionedDeclaration _ d) = valueExists name d
@@ -65,7 +65,7 @@ declarationsByModule :: Module -> [(Key, [Key])]
 declarationsByModule (Module moduleName ds _) = concatMap go ds
   where
   go :: Declaration -> [(Key, [Key])]
-  go d@(ValueDeclaration name _ _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
+  go d@(ValueDeclaration name _ _ _) = [((moduleName, Left name), dependencies moduleName d)]
   go (DataDeclaration _ _ _ dctors) = map (\(name, _) -> ((moduleName, Right name), [])) dctors
   go (ExternDeclaration _ name _ _) = [((moduleName, Left name), [])]
   go d@(BindingGroupDeclaration names') = map (\(name, _, _) -> ((moduleName, Left name), dependencies moduleName d)) names'
@@ -88,7 +88,7 @@ dependencies moduleName =
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Declaration -> Bool
-isUsed moduleName graph vertexFor entryPointVertices (ValueDeclaration name _ _ _ _) =
+isUsed moduleName graph vertexFor entryPointVertices (ValueDeclaration name _ _ _) =
   let Just v' = vertexFor (moduleName, Left name)
   in any (\v -> path graph v v') entryPointVertices
 isUsed moduleName graph vertexFor entryPointVertices (FixityDeclaration _ name) =

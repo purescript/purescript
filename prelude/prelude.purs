@@ -1,5 +1,6 @@
 module Prelude
-  ( flip
+  ( otherwise
+  , flip
   , const
   , asTypeOf
   , Semigroupoid, (<<<), (>>>)
@@ -22,6 +23,9 @@ module Prelude
   , Semigroup, (<>), (++)
   , Unit(..), unit
   ) where
+
+  otherwise :: Boolean
+  otherwise = true
 
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b

@@ -169,12 +169,12 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
-  go (ValueDeclaration name nameKind [] Nothing val : rest) = do
+  go (ValueDeclaration name nameKind [] (Right val) : rest) = do
     d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration name nameKind [] Nothing val'
+      return $ ValueDeclaration name nameKind [] $ Right val'
     ds <- go rest
     return $ d : ds
   go (ValueDeclaration{} : _) = error "Binders were not desugared"

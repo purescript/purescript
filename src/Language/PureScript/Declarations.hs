@@ -22,6 +22,7 @@ import qualified Data.Data as D
 
 import Control.Applicative
 import Control.Monad
+import Control.Arrow ((***), (+++))
 
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -154,7 +155,7 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder] (Maybe Guard) Expr
+  | ValueDeclaration Ident NameKind [Binder] (Either [(Guard, Expr)] Expr)
   -- |
   -- A minimal mutually recursive set of value declarations
   --
@@ -379,13 +380,9 @@ data CaseAlternative = CaseAlternative
     --
     caseAlternativeBinders :: [Binder]
     -- |
-    -- An optional guard
+    -- The result expression or a collect of guarded expressions
     --
-  , caseAlternativeGuard :: Maybe Guard
-    -- |
-    -- The result expression
-    --
-  , caseAlternativeResult :: Expr
+  , caseAlternativeResult :: Either [(Guard, Expr)] Expr
   } deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -492,7 +489,7 @@ everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
   f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (map f' ds))
-  f' (ValueDeclaration name nameKind bs grd val) = f (ValueDeclaration name nameKind (map h' bs) (fmap g' grd) (g' val))
+  f' (ValueDeclaration name nameKind bs val) = f (ValueDeclaration name nameKind (map h' bs) ((map (g' *** g') +++ g') val))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration name args implies ds) = f (TypeClassDeclaration name args implies (map f' ds))
   f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (map f' ds))
@@ -530,8 +527,7 @@ everywhereOnValues f g h = (f', g', h')
   handleCaseAlternative :: CaseAlternative -> CaseAlternative
   handleCaseAlternative ca =
     ca { caseAlternativeBinders = map h' (caseAlternativeBinders ca)
-       , caseAlternativeGuard = fmap g' (caseAlternativeGuard ca)
-       , caseAlternativeResult = g' (caseAlternativeResult ca)
+       , caseAlternativeResult = (map (g' *** g') +++ g') (caseAlternativeResult ca)
        }
 
   handleDoNotationElement :: DoNotationElement -> DoNotationElement
@@ -549,7 +545,7 @@ everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
 everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
   f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> mapM (f' <=< f) ds
-  f' (ValueDeclaration name nameKind bs grd val) = ValueDeclaration name nameKind <$> mapM (h' <=< h) bs <*> maybeM (g' <=< g) grd <*> (g val >>= g')
+  f' (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> mapM (h' <=< h) bs <*> eitherM (mapM (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val 
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f' <=< f) ds
   f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f' <=< f) ds
@@ -582,9 +578,8 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   h' (PositionedBinder pos b) = PositionedBinder pos <$> (h b >>= h')
   h' other = h other
 
-  handleCaseAlternative (CaseAlternative bs grd val) = CaseAlternative <$> mapM (h' <=< h) bs
-                                                                       <*> maybeM (g' <=< g) grd
-                                                                       <*> (g' <=< g) val
+  handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM (h' <=< h) bs
+                                                                   <*> eitherM (mapM (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val
 
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> (g' <=< g) v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> (h' <=< h) b <*> (g' <=< g) v
@@ -599,7 +594,7 @@ everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
 everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> mapM f' ds) >>= f
-  f' (ValueDeclaration name nameKind bs grd val) = (ValueDeclaration name nameKind <$> mapM h' bs <*> maybeM g' grd <*> g' val) >>= f
+  f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> mapM h' bs <*> eitherM (mapM (pairM g' g')) g' val) >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
   f' (TypeClassDeclaration name args implies ds) = (TypeClassDeclaration name args implies <$> mapM f' ds) >>= f
   f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> mapM f' ds) >>= f
@@ -632,9 +627,8 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   h' (PositionedBinder pos b) = (PositionedBinder pos <$> h' b) >>= h
   h' other = h other
 
-  handleCaseAlternative (CaseAlternative bs grd val) = CaseAlternative <$> mapM h' bs
-                                                                       <*> maybeM g' grd
-                                                                       <*> g' val
+  handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM h' bs
+                                                                   <*> eitherM (mapM (pairM g' g')) g' val
 
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> g' v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> h' b <*> g' v
@@ -651,8 +645,8 @@ everythingOnValues :: (r -> r -> r) ->
 everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   where
   f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(ValueDeclaration _ _ bs Nothing val) = foldl (<>) (f d) (map h' bs) <> g' val
-  f' d@(ValueDeclaration _ _ bs (Just grd) val) = foldl (<>) (f d) (map h' bs) <> g' grd <> g' val
+  f' d@(ValueDeclaration _ _ bs (Right val)) = foldl (<>) (f d) (map h' bs) <> g' val
+  f' d@(ValueDeclaration _ _ bs (Left gs)) = foldl (<>) (f d) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
@@ -685,9 +679,8 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   h' b@(PositionedBinder _ b1) = h b <> h' b1
   h' b = h b
 
-  i' ca = case caseAlternativeGuard ca of
-    Nothing -> foldl (<>) (i ca) (map h' (caseAlternativeBinders ca)) <> g' (caseAlternativeResult ca)
-    Just grd -> foldl (<>) (i ca) (map h' (caseAlternativeBinders ca)) <> g' grd <> g' (caseAlternativeResult ca)
+  i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val
+  i' ca@(CaseAlternative bs (Left gs)) = foldl (<>) (i ca) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
 
   j' e@(DoNotationValue v) = j e <> g' v
   j' e@(DoNotationBind b v) = j e <> h' b <> g' v
@@ -713,8 +706,8 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f'' s d = let (s', r) = f s d in r <> f' s' d
 
   f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (ValueDeclaration _ _ bs Nothing val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
-  f' s (ValueDeclaration _ _ bs (Just grd) val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) grd <> (g'' s) val
+  f' s (ValueDeclaration _ _ bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
+  f' s (ValueDeclaration _ _ bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
   f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> (g'' s) val) ds)
   f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
@@ -753,8 +746,8 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
 
-  i' s (CaseAlternative bs Nothing val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
-  i' s (CaseAlternative bs (Just grd) val) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) grd <> (g'' s) val
+  i' s (CaseAlternative bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> g'' s val
+  i' s (CaseAlternative bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
 
   j'' s e = let (s', r) = j s e in r <> j' s' e
 
@@ -780,7 +773,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   f'' s = uncurry f' <=< f s
 
   f' s (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> mapM (f'' s) ds
-  f' s (ValueDeclaration name nameKind bs grd val) = ValueDeclaration name nameKind <$> mapM (h'' s) bs <*> maybeM (g'' s) grd <*> g'' s val
+  f' s (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> mapM (h'' s) bs <*> eitherM (mapM (pairM (g'' s) (g'' s))) (g'' s) val
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (thirdM (g'' s)) ds
   f' s (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f'' s) ds
   f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f'' s) ds
@@ -819,7 +812,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   i'' s = uncurry i' <=< i s
 
-  i' s (CaseAlternative bs grd val) = CaseAlternative <$> mapM (h'' s) bs <*> maybeM (g'' s) grd <*> g'' s val
+  i' s (CaseAlternative bs val) = CaseAlternative <$> mapM (h'' s) bs <*> eitherM (mapM (pairM (g'' s) (g'' s))) (g'' s) val
 
   j'' s = uncurry j' <=< j s
 

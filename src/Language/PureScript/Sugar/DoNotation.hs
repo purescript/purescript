@@ -66,7 +66,7 @@ desugarDo d =
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     ident <- Ident <$> freshName
-    return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] Nothing rest']))
+    return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
   go [DoNotationLet _] = lift $ Left $ mkErrorStack "Let statement cannot be the last statement in a do block" Nothing
   go (DoNotationLet ds : rest) = do
     rest' <- go rest

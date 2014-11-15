@@ -191,8 +191,8 @@ completion = completeWord Nothing " \t\n\r" findCompletions
     let matches = filter (isPrefixOf str) (names ms)
     return $ sortBy sorter $ map simpleCompletion matches ++ files
   getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
-  getDeclName Nothing (P.ValueDeclaration ident _ _ _ _) = Just ident
-  getDeclName (Just exts) (P.ValueDeclaration ident _ _ _ _) | isExported = Just ident
+  getDeclName Nothing (P.ValueDeclaration ident _ _ _) = Just ident
+  getDeclName (Just exts) (P.ValueDeclaration ident _ _ _) | isExported = Just ident
     where
     isExported = any exports exts
     exports (P.ValueRef ident') = ident == ident'
@@ -261,8 +261,8 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     itValue = foldl (\x f -> f x) value lets
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] Nothing itValue
-    mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] Nothing mainValue
+    itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right itValue
+    mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
     P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing

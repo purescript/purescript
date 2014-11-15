@@ -240,10 +240,10 @@ renameInModule imports exports (Module mn decls exps) =
   updateBinder s v = return (s, v)
 
   updateCase :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
-  updateCase (pos, bound) c@(CaseAlternative bs _ _) = return ((pos, concatMap binderNames bs ++ bound), c)
+  updateCase (pos, bound) c@(CaseAlternative bs _) = return ((pos, concatMap binderNames bs ++ bound), c)
 
   letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable (ValueDeclaration ident _ _ _ _) = Just ident
+  letBoundVariable (ValueDeclaration ident _ _ _) = Just ident
   letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
   letBoundVariable _ = Nothing
 
@@ -322,7 +322,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addDecl mn env (DataDeclaration _ tn _ dcs) = addType env mn tn (map fst dcs)
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
-  addDecl mn env (ValueDeclaration name _ _ _ _) = addValue env mn name
+  addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
   addDecl mn env (PositionedDeclaration _ d) = addDecl mn env d
   addDecl _  env _ = return env
