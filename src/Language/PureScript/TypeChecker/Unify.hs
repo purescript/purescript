@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeChecker.Types.Unify
+-- Module      :  Language.PureScript.TypeChecker.Unify
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -9,7 +9,7 @@
 -- Portability :
 --
 -- |
--- This module implements the type checker
+-- Functions and instances relating to unification
 --
 -----------------------------------------------------------------------------
 
