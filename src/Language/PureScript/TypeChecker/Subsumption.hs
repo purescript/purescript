@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeChecker.Types
+-- Module      :  Language.PureScript.TypeChecker.Subsumption
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -9,7 +9,7 @@
 -- Portability :
 --
 -- |
--- This module implements the type checker
+-- Subsumption checking
 --
 -----------------------------------------------------------------------------
 
@@ -70,9 +70,9 @@ subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
 subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
   ty2 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   subsumes val ty1 ty2
-subsumes' val (KindedType ty1 _) ty2 = do
+subsumes' val (KindedType ty1 _) ty2 =
   subsumes val ty1 ty2
-subsumes' val ty1 (KindedType ty2 _) = do
+subsumes' val ty1 (KindedType ty2 _) =
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries

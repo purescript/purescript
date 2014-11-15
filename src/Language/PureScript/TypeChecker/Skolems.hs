@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeChecker.Types
+-- Module      :  Language.PureScript.TypeChecker.Skolems
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -9,7 +9,7 @@
 -- Portability :
 --
 -- |
--- This module implements the type checker
+-- Functions relating to skolemization used during typechecking
 --
 -----------------------------------------------------------------------------
 
