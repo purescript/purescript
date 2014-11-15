@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeChecker.Types
+-- Module      :  Language.PureScript.TypeChecker.Entailment
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -9,7 +9,7 @@
 -- Portability :
 --
 -- |
--- This module implements the type checker
+-- Type class entailment
 --
 -----------------------------------------------------------------------------
 
@@ -101,7 +101,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         -- Make sure the types unify with the types in the superclass implication
         , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
-        , args' <- maybeToList $ mapM (flip lookup subst) (map fst args)
+        , args' <- maybeToList $ mapM ((`lookup` subst) . fst) args
         , suDict <- go True subclassName args' ]
 
       -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -174,9 +174,9 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       overlapping (LocalDictionaryValue nm1)         (LocalDictionaryValue nm2)  | nm1 == nm2 = False
       overlapping (GlobalDictionaryValue nm1)        (GlobalDictionaryValue nm2) | nm1 == nm2 = False
       overlapping (DependentDictionaryValue nm1 ds1) (DependentDictionaryValue nm2 ds2)
-        | nm1 == nm2 = any id $ zipWith overlapping ds1 ds2
-      overlapping (SubclassDictionaryValue _ _ _) _ = False
-      overlapping _ (SubclassDictionaryValue _ _ _) = False
+        | nm1 == nm2 = or $ zipWith overlapping ds1 ds2
+      overlapping SubclassDictionaryValue{} _ = False
+      overlapping _ SubclassDictionaryValue{} = False
       overlapping _ _ = True
       -- |
       -- Render a DictionaryValue fit for human consumption in error messages
