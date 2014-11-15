@@ -56,6 +56,7 @@ import qualified System.IO.UTF8 as U
        (writeFile, putStrLn, print, readFile)
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Declarations as D
+import qualified Language.PureScript.Constants as C
 
 -- |
 -- The PSCI state.
@@ -132,7 +133,7 @@ loadModule filename = either (Left . show) Right . P.runIndentParser filename P.
 --
 loadAllModules :: [FilePath] -> IO (Either ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
-  filesAndContent <- forM files $ \filename -> do 
+  filesAndContent <- forM files $ \filename -> do
     content <- U.readFile filename
     return (Right filename, content)
   return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
@@ -444,7 +445,9 @@ handleCommand :: Command -> PSCI ()
 handleCommand (Expression val) = handleDeclaration val
 handleCommand Help = PSCI $ outputStrLn helpMessage
 handleCommand (Import moduleName) = handleImport moduleName
-handleCommand (Let l) = PSCI $ lift $ modify (updateLets l)
+handleCommand (Let l) = do
+  PSCI $ lift $ modify (updateLets l)
+  handleDeclaration (D.Var (N.Qualified (Just $ N.ModuleName [N.ProperName C.prelude]) (N.Ident C.unit)))
 handleCommand (LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
   exists <- psciIO $ doesFileExist absPath
