@@ -149,7 +149,7 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
 -- |
 -- Check if a value contains a type annotation
 --
-isTyped :: (Ident, Expr) -> (Either (Ident, Expr) (Ident, (Expr, Type, Bool)))
+isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
 isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
 isTyped (name, value) = Left (name, value)
 
@@ -176,6 +176,14 @@ replaceTypeClassDictionaries mn =
     env <- getEnv
     entails env mn dicts constraint trySuperclasses
   go other = return other
+
+-- |
+-- Check the kind of a type, failing if it is not of kind *.
+--
+checkTypeKind :: ModuleName -> Type -> UnifyT t Check ()
+checkTypeKind moduleName ty = do
+  kind <- liftCheck $ kindOf moduleName ty
+  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -282,8 +290,7 @@ infer' (SuperClassDictionary className tys) = do
   return $ TypeClassDictionary False (className, tys) dicts
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
-  kind <- liftCheck $ kindOf moduleName ty
-  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+  checkTypeKind moduleName ty
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
@@ -294,8 +301,7 @@ inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Typ
 inferLetBinding seen [] ret j = (,) seen <$> makeBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
-  kind <- liftCheck $ kindOf moduleName ty
-  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+  checkTypeKind moduleName ty
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
@@ -315,7 +321,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   let ds' = [(ident, LocalVariable, val') | (ident, (val', _)) <- ds1' ++ ds2']
   makeBindingGroupVisible $ bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
 inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = rethrowWithPosition pos $ do
-  ((d' : ds'), val') <- inferLetBinding seen (d : ds) ret j
+  (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos d' : ds', val')
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
 
@@ -497,8 +503,7 @@ check' (SuperClassDictionary className tys) _ = do
   return $ TypeClassDictionary False (className, tys) dicts
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
-  kind <- liftCheck $ kindOf moduleName ty1
-  guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+  checkTypeKind moduleName ty1
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty2
   val' <- subsumes (Just val) ty1' ty2'
@@ -547,7 +552,7 @@ check' (Constructor c) ty = do
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
 check' (Let ds val) ty = do
-  (ds', val') <- inferLetBinding [] ds val (flip check ty)
+  (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
 check' val ty | containsTypeSynonyms ty = do
   ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
@@ -575,7 +580,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _) = do u =?= REmpty
                                return []
-  go [] [] (Skolem _ _ _) | lax = return []
+  go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
   go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
@@ -638,12 +643,12 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
 checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
   checkFunctionApplication fn ty arg ret
-checkFunctionApplication' fn (KindedType ty _) arg ret = do
+checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
   checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
-checkFunctionApplication' fn fnTy dict@(TypeClassDictionary _ _ _) _ =
+checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
 checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a function of type "
   ++ prettyPrintType fnTy
