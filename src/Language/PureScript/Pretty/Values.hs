@@ -26,7 +26,7 @@ import Control.PatternArrows
 import Control.Monad.State
 import Control.Applicative
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (prettyPrintType)
 
@@ -102,9 +102,9 @@ prettyPrintCaseAlternative (CaseAlternative binders result) =
   where
   prettyPrintResult (Left gs) = concat <$> mapM prettyPrintGuardedValue gs
   prettyPrintResult (Right v) = (" -> " ++) <$> prettyPrintValue' v
-  
+
   prettyPrintGuardedValue (grd, val) =
-    fmap concat $ sequence   
+    fmap concat $ sequence
       [ return "| "
       , prettyPrintValue' grd
       , return " -> "

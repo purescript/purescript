@@ -29,7 +29,7 @@ import Control.Applicative ((<$>), (<*>), pure)
 
 import qualified Data.Set as S
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Environment
@@ -98,13 +98,13 @@ usedIdents moduleName =
   in nub . f
   where
   def s _ = (s, [])
-  
+
   usedNamesE :: S.Set Ident -> Expr -> (S.Set Ident, [Ident])
   usedNamesE scope (Var (Qualified Nothing name)) | name `S.notMember` scope = (scope, [name])
   usedNamesE scope (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' && name `S.notMember` scope = (scope, [name])
   usedNamesE scope (Abs (Left name) _) = (name `S.insert` scope, [])
   usedNamesE scope _ = (scope, [])
-  
+
   usedNamesB :: S.Set Ident -> Binder -> (S.Set Ident, [Ident])
   usedNamesB scope binder = (scope `S.union` S.fromList (binderNames binder), [])
 
@@ -114,7 +114,7 @@ usedImmediateIdents moduleName =
   in nub . f
   where
   def s _ = (s, [])
-  
+
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
   usedNamesE True (Var (Qualified Nothing name)) = (True, [name])
   usedNamesE True (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' = (True, [name])
@@ -147,7 +147,7 @@ getProperName _ = error "Expected DataDeclaration"
 
 -- |
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
--- 
+--
 --
 toBindingGroup :: ModuleName -> SCC Declaration -> Either ErrorStack Declaration
 toBindingGroup _ (AcyclicSCC d) = return d

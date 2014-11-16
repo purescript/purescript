@@ -19,7 +19,7 @@ module Language.PureScript (module P, compile, compile', RebuildPolicy(..), Mona
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
-import Language.PureScript.Declarations as P
+import Language.PureScript.AST as P
 import Language.PureScript.Names as P
 import Language.PureScript.Parser as P
 import Language.PureScript.CodeGen as P
@@ -139,7 +139,7 @@ class MonadMake m where
 data RebuildPolicy
   -- | Never rebuild this module
   = RebuildNever
-  -- | Always rebuild this module 
+  -- | Always rebuild this module
   | RebuildAlways deriving (Show, Eq, Ord)
 
 -- |
@@ -163,7 +163,7 @@ make outputDir opts ms prefix = do
 
     jsTimestamp <- getTimestamp jsFile
     externsTimestamp <- getTimestamp externsFile
-    inputTimestamp <- traverse getTimestamp inputFile 
+    inputTimestamp <- traverse getTimestamp inputFile
 
     return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
       (Right (Just t1), Just t2, Just t3) | t1 < min t2 t3 -> s

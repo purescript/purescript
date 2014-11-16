@@ -39,6 +39,12 @@ library
                    file-embed >= 0.0.7 && < 0.0.8,
                    time -any
     exposed-modules: Language.PureScript
+                     Language.PureScript.AST
+                     Language.PureScript.AST.Binders
+                     Language.PureScript.AST.Declarations
+                     Language.PureScript.AST.Operators
+                     Language.PureScript.AST.SourcePos
+                     Language.PureScript.AST.Traversals
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
@@ -46,7 +52,6 @@ library
                      Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.Constants
                      Language.PureScript.DeadCodeElimination
-                     Language.PureScript.Declarations
                      Language.PureScript.Environment
                      Language.PureScript.Errors
                      Language.PureScript.Kinds

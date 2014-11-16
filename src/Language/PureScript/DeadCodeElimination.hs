@@ -21,7 +21,7 @@ import Data.Graph
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.Names
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 
 -- |
 -- Eliminate all declarations which are not a transitive dependency of the entry point module

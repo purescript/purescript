@@ -29,7 +29,7 @@ import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.Unify
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad

@@ -33,7 +33,7 @@ import Control.Applicative
 import Control.Arrow (second)
 
 import Language.PureScript.Names
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.Optimizer

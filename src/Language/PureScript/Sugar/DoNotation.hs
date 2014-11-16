@@ -19,7 +19,7 @@ module Language.PureScript.Sugar.DoNotation (
 ) where
 
 import Language.PureScript.Names
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Supply
 

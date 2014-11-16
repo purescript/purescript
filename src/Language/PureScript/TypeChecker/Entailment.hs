@@ -26,7 +26,7 @@ import Control.Applicative
 import Control.Arrow (Arrow(..))
 import Control.Monad.Error
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty

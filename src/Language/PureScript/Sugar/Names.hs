@@ -25,7 +25,7 @@ import Control.Monad.Error
 
 import qualified Data.Map as M
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Environment

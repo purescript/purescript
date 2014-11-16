@@ -23,7 +23,7 @@ import Data.Monoid
 import Control.Monad.Error
 import Control.Applicative ((<$>))
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 

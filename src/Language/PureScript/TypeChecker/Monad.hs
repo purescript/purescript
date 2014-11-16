@@ -26,7 +26,6 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Unify
 
-import Language.PureScript.Declarations (canonicalizeDictionary)
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds

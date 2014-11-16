@@ -35,7 +35,7 @@ import Control.Arrow ((+++))
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.CodeGen.JS.AST
@@ -54,7 +54,7 @@ sourcePos = toSourcePos <$> P.getPosition
   toSourcePos p = SourcePos (P.sourceName p) (P.sourceLine p) (P.sourceColumn p)
 
 kindedIdent :: P.Parsec String ParseState (String, Maybe Kind)
-kindedIdent = (, Nothing) <$> identifier 
+kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> lexeme (P.string "::") *> indented *> parseKind)))
 
 parseDataDeclaration :: P.Parsec String ParseState Declaration
@@ -82,8 +82,8 @@ parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration = do
   name <- parseIdent
   binders <- P.many parseBinderNoParens
-  value <- Left <$> (C.indented *> 
-                       C.mark (P.many1 ((,) <$> (C.same *> parseGuard) 
+  value <- Left <$> (C.indented *>
+                       C.mark (P.many1 ((,) <$> (C.same *> parseGuard)
                                             <*> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
                                        )))
        <|> Right <$> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
@@ -241,10 +241,10 @@ parseModule = do
   return $ Module name decls exports
 
 -- |
--- Parse a collection of modules 
+-- Parse a collection of modules
 --
 parseModulesFromFiles :: (k -> String) -> [(k, String)] -> Either P.ParseError [(k, Module)]
-parseModulesFromFiles toFilePath input = 
+parseModulesFromFiles toFilePath input =
   fmap collect . forM input $ \(filename, content) -> do
     ms <- runIndentParser (toFilePath filename) parseModules content
     return (filename, ms)
@@ -303,8 +303,8 @@ parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.rese
 
 parseCaseAlternative :: P.Parsec String ParseState CaseAlternative
 parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
-                                       <*> (Left <$> (C.indented *> 
-                                                        C.mark (P.many1 ((,) <$> (C.same *> parseGuard) 
+                                       <*> (Left <$> (C.indented *>
+                                                        C.mark (P.many1 ((,) <$> (C.same *> parseGuard)
                                                                              <*> (lexeme (indented *> C.reservedOp "->") *> parseValue)
                                                                         )))
                                             <|> Right <$> (lexeme (indented *> C.reservedOp "->") *> parseValue))
