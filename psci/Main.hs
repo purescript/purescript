@@ -317,15 +317,12 @@ handleDeclaration value = do
 handleLet :: (P.Expr -> P.Expr) -> PSCI ()
 handleLet l = do
   st <- PSCI $ lift get
-  PSCI $ lift $ modify (updateLets l)
-  st' <- PSCI $ lift get
+  let st' = updateLets l st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
   case e of
-    Left err -> do
-      PSCI $ outputStrLn err
-      PSCI $ lift (put st)
-    Right _ -> return ()
+    Left err -> PSCI $ outputStrLn err
+    Right _ -> PSCI $ lift (put st')
 
 -- |
 -- Show actual loaded modules in psci.
