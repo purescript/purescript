@@ -21,7 +21,7 @@ import Data.List
 
 import Control.Monad.Error
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types

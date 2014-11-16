@@ -1,0 +1,362 @@
+-----------------------------------------------------------------------------
+--
+-- Module      :  Language.PureScript.AST.Declarations
+-- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
+-- License     :  MIT
+--
+-- Maintainer  :  Phil Freeman <paf31@cantab.net>
+-- Stability   :  experimental
+-- Portability :
+--
+-- | Data types for modules and declarations
+--
+-----------------------------------------------------------------------------
+
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
+
+module Language.PureScript.AST.Declarations where
+
+import qualified Data.Data as D
+
+import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Operators
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Types
+import Language.PureScript.Names
+import Language.PureScript.Kinds
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.Environment
+
+-- |
+-- A module declaration, consisting of a module name, a list of declarations, and a list of the
+-- declarations that are explicitly exported. If the export list is Nothing, everything is exported.
+--
+data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- An item in a list of explicit imports or exports
+--
+data DeclarationRef
+  -- |
+  -- A type constructor with data constructors
+  --
+  = TypeRef ProperName (Maybe [ProperName])
+  -- |
+  -- A value
+  --
+  | ValueRef Ident
+  -- |
+  -- A type class
+  --
+  | TypeClassRef ProperName
+    -- |
+  -- A type class instance, created during typeclass desugaring (name, class name, instance types)
+  --
+  | TypeInstanceRef Ident
+  -- |
+  -- A declaration reference with source position information
+  --
+  | PositionedDeclarationRef SourcePos DeclarationRef
+  deriving (Show, D.Data, D.Typeable)
+
+instance Eq DeclarationRef where
+  (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
+  (ValueRef name)        == (ValueRef name')        = name == name'
+  (TypeClassRef name)    == (TypeClassRef name')    = name == name'
+  (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
+  (PositionedDeclarationRef _ r) == r' = r == r'
+  r == (PositionedDeclarationRef _ r') = r == r'
+  _ == _ = False
+
+-- |
+-- The data type which specifies type of import declaration
+--
+data ImportDeclarationType
+  -- |
+  -- Unqualified import
+  --
+  = Unqualified
+  -- |
+  -- Qualified import with a list of references to import
+  --
+  | Qualifying [DeclarationRef]
+  -- |
+  -- Import with hiding clause with a list of references to hide
+  --
+  | Hiding [DeclarationRef]
+  deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- The data type of declarations
+--
+data Declaration
+  -- |
+  -- A data type declaration (data or newtype, name, arguments, data constructors)
+  --
+  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [Type])]
+  -- |
+  -- A minimal mutually recursive set of data type declarations
+  --
+  | DataBindingGroupDeclaration [Declaration]
+  -- |
+  -- A type synonym declaration (name, arguments, type)
+  --
+  | TypeSynonymDeclaration ProperName [(String, Maybe Kind)] Type
+  -- |
+  -- A type declaration for a value (name, ty)
+  --
+  | TypeDeclaration Ident Type
+  -- |
+  -- A value declaration (name, top-level binders, optional guard, value)
+  --
+  | ValueDeclaration Ident NameKind [Binder] (Either [(Guard, Expr)] Expr)
+  -- |
+  -- A minimal mutually recursive set of value declarations
+  --
+  | BindingGroupDeclaration [(Ident, NameKind, Expr)]
+  -- |
+  -- A foreign import declaration (type, name, optional inline Javascript, type)
+  --
+  | ExternDeclaration ForeignImportType Ident (Maybe JS) Type
+  -- |
+  -- A data type foreign import (name, kind)
+  --
+  | ExternDataDeclaration ProperName Kind
+  -- |
+  -- A type class instance foreign import
+  --
+  | ExternInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type]
+  -- |
+  -- A fixity declaration (fixity data, operator name)
+  --
+  | FixityDeclaration Fixity String
+  -- |
+  -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
+  --
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
+  -- |
+  -- A type class declaration (name, argument, implies, member declarations)
+  --
+  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [(Qualified ProperName, [Type])] [Declaration]
+  -- |
+  -- A type instance declaration (name, dependencies, class name, instance types, member
+  -- declarations)
+  --
+  | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
+  -- |
+  -- A declaration with source position information
+  --
+  | PositionedDeclaration SourcePos Declaration
+  deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- Test if a declaration is a value declaration
+--
+isValueDecl :: Declaration -> Bool
+isValueDecl ValueDeclaration{} = True
+isValueDecl (PositionedDeclaration _ d) = isValueDecl d
+isValueDecl _ = False
+
+-- |
+-- Test if a declaration is a data type or type synonym declaration
+--
+isDataDecl :: Declaration -> Bool
+isDataDecl DataDeclaration{} = True
+isDataDecl TypeSynonymDeclaration{} = True
+isDataDecl (PositionedDeclaration _ d) = isDataDecl d
+isDataDecl _ = False
+
+-- |
+-- Test if a declaration is a module import
+--
+isImportDecl :: Declaration -> Bool
+isImportDecl ImportDeclaration{} = True
+isImportDecl (PositionedDeclaration _ d) = isImportDecl d
+isImportDecl _ = False
+
+-- |
+-- Test if a declaration is a data type foreign import
+--
+isExternDataDecl :: Declaration -> Bool
+isExternDataDecl ExternDataDeclaration{} = True
+isExternDataDecl (PositionedDeclaration _ d) = isExternDataDecl d
+isExternDataDecl _ = False
+
+-- |
+-- Test if a declaration is a type class instance foreign import
+--
+isExternInstanceDecl :: Declaration -> Bool
+isExternInstanceDecl ExternInstanceDeclaration{} = True
+isExternInstanceDecl (PositionedDeclaration _ d) = isExternInstanceDecl d
+isExternInstanceDecl _ = False
+
+-- |
+-- Test if a declaration is a fixity declaration
+--
+isFixityDecl :: Declaration -> Bool
+isFixityDecl FixityDeclaration{} = True
+isFixityDecl (PositionedDeclaration _ d) = isFixityDecl d
+isFixityDecl _ = False
+
+-- |
+-- Test if a declaration is a foreign import
+--
+isExternDecl :: Declaration -> Bool
+isExternDecl ExternDeclaration{} = True
+isExternDecl (PositionedDeclaration _ d) = isExternDecl d
+isExternDecl _ = False
+
+-- |
+-- Test if a declaration is a type class or instance declaration
+--
+isTypeClassDeclaration :: Declaration -> Bool
+isTypeClassDeclaration TypeClassDeclaration{} = True
+isTypeClassDeclaration TypeInstanceDeclaration{} = True
+isTypeClassDeclaration (PositionedDeclaration _ d) = isTypeClassDeclaration d
+isTypeClassDeclaration _ = False
+
+-- |
+-- A guard is just a boolean-valued expression that appears alongside a set of binders
+--
+type Guard = Expr
+
+-- |
+-- Data type for expressions and terms
+--
+data Expr
+  -- |
+  -- A numeric literal
+  --
+  = NumericLiteral (Either Integer Double)
+  -- |
+  -- A string literal
+  --
+  | StringLiteral String
+  -- |
+  -- A boolean literal
+  --
+  | BooleanLiteral Bool
+  -- |
+  -- A prefix -, will be desugared
+  --
+  | UnaryMinus Expr
+  -- |
+  -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
+  -- will be removed.
+  --
+  | BinaryNoParens (Qualified Ident) Expr Expr
+  -- |
+  -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
+  -- will be removed.
+  --
+  | Parens Expr
+  -- |
+  -- An array literal
+  --
+  | ArrayLiteral [Expr]
+  -- |
+  -- An object literal
+  --
+  | ObjectLiteral [(String, Expr)]
+  -- |
+  -- An record property accessor expression
+  --
+  | Accessor String Expr
+  -- |
+  -- Partial record update
+  --
+  | ObjectUpdate Expr [(String, Expr)]
+  -- |
+  -- Function introduction
+  --
+  | Abs (Either Ident Binder) Expr
+  -- |
+  -- Function application
+  --
+  | App Expr Expr
+  -- |
+  -- Variable
+  --
+  | Var (Qualified Ident)
+  -- |
+  -- Conditional (if-then-else expression)
+  --
+  | IfThenElse Expr Expr Expr
+  -- |
+  -- A data constructor
+  --
+  | Constructor (Qualified ProperName)
+  -- |
+  -- A case expression. During the case expansion phase of desugaring, top-level binders will get
+  -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
+  --
+  | Case [Expr] [CaseAlternative]
+  -- |
+  -- A value with a type annotation
+  --
+  | TypedValue Bool Expr Type
+  -- |
+  -- A let binding
+  --
+  | Let [Declaration] Expr
+  -- |
+  -- A do-notation block
+  --
+  | Do [DoNotationElement]
+  -- |
+  -- An application of a typeclass dictionary constructor. The value should be
+  -- an ObjectLiteral.
+  --
+  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr
+  -- |
+  -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
+  -- placeholders will be replaced with actual expressions representing type classes dictionaries which
+  -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
+  -- at superclass implementations when searching for a dictionary, the type class name and
+  -- instance type, and the type class dictionaries in scope.
+  --
+  | TypeClassDictionary Bool (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  -- |
+  -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
+  --
+  | SuperClassDictionary (Qualified ProperName) [Type]
+  -- |
+  -- A value with source position information
+  --
+  | PositionedValue SourcePos Expr deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- An alternative in a case statement
+--
+data CaseAlternative = CaseAlternative
+  { -- |
+    -- A collection of binders with which to match the inputs
+    --
+    caseAlternativeBinders :: [Binder]
+    -- |
+    -- The result expression or a collect of guarded expressions
+    --
+  , caseAlternativeResult :: Either [(Guard, Expr)] Expr
+  } deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- A statement in a do-notation block
+--
+data DoNotationElement
+  -- |
+  -- A monadic value without a binder
+  --
+  = DoNotationValue Expr
+  -- |
+  -- A monadic value with a binder
+  --
+  | DoNotationBind Binder Expr
+  -- |
+  -- A let statement, i.e. a pure value with a binder
+  --
+  | DoNotationLet [Declaration]
+  -- |
+  -- A do notation element with source position information
+  --
+  | PositionedDoNotationElement SourcePos DoNotationElement deriving (Show, D.Data, D.Typeable)

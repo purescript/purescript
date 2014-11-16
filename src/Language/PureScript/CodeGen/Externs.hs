@@ -26,7 +26,7 @@ import Control.Monad.Writer
 
 import Language.PureScript.CodeGen.Common
 import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Pretty
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -87,8 +87,8 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
       case Qualified (Just moduleName) className `M.lookup` typeClasses env of
         Nothing -> error $ show className ++ " has no type class definition in exportToPs"
         Just (args, members, implies) -> do
-          let impliesString = if null implies 
-                              then "" 
+          let impliesString = if null implies
+                              then ""
                               else "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
               typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing className)) (map toTypeVar args)
           tell ["class " ++ impliesString ++ typeName ++ " where"]

@@ -37,7 +37,7 @@ import Control.Monad.Error
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -145,7 +145,7 @@ typeCheckAll mainModuleName moduleName exps = go
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         checkDuplicateTypeArguments $ map fst args
-        let args' = args `withKinds` ctorKind 
+        let args' = args `withKinds` ctorKind
         addDataType moduleName dtype name args' dctors ctorKind
       forM_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
         checkDuplicateTypeArguments $ map fst args
@@ -183,10 +183,10 @@ typeCheckAll mainModuleName moduleName exps = go
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
-      vals' <- forM [ (name, val, nameKind, ty) 
+      vals' <- forM [ (name, val, nameKind, ty)
                     | (name, nameKind, _) <- vals
                     , (name', (val, ty)) <- tys
-                    , name == name' 
+                    , name == name'
                     ] $ \(name, val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (name, nameKind, val)
@@ -248,9 +248,9 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
       return (PositionedDeclaration pos d' : rest')
-  
+
   -- |
-  -- This function adds the argument kinds for a type constructor so that they may appear in the externs file, 
+  -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
   withKinds :: [(String, Maybe Kind)] -> Kind -> [(String, Maybe Kind)]

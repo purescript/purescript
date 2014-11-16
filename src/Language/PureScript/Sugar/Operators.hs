@@ -25,7 +25,7 @@ module Language.PureScript.Sugar.Operators (
 ) where
 
 import Language.PureScript.Names
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
 
 import Control.Applicative

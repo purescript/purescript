@@ -45,7 +45,7 @@ import qualified System.IO.UTF8 as U (writeFile, putStrLn, print, readFile)
 import Text.Parsec (ParseError)
 
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Declarations as D
+import qualified Language.PureScript.AST as D
 import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
 

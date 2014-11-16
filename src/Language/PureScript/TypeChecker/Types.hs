@@ -46,7 +46,7 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Unify
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds

@@ -23,7 +23,7 @@ import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Traversals
@@ -188,7 +188,7 @@ renameInValue v = return v
 --
 renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
 renameInCaseAlternative (CaseAlternative bs v) =
-  CaseAlternative <$> mapM renameInBinder bs 
+  CaseAlternative <$> mapM renameInBinder bs
                   <*> eitherM (mapM (pairM renameInValue renameInValue)) renameInValue v
 
 -- |

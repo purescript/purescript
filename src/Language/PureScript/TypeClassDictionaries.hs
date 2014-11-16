@@ -64,3 +64,10 @@ data TypeClassDictionaryType
   -- A type class dictionary which is an alias for an imported dictionary from another module
   --
   | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- Find the original dictionary which a type class dictionary in scope refers to
+--
+canonicalizeDictionary :: TypeClassDictionaryInScope -> Qualified Ident
+canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDRegular, tcdName = nm }) = nm
+canonicalizeDictionary (TypeClassDictionaryInScope { tcdType = TCDAlias nm }) = nm

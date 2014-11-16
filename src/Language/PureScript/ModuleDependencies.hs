@@ -21,7 +21,7 @@ import Data.Graph
 import Data.List (nub)
 import Data.Maybe (mapMaybe)
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
 

@@ -19,7 +19,7 @@ import Control.Monad
 import Control.Category ((>>>))
 import Control.Monad.Trans.Class
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Supply
 
