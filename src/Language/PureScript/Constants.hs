@@ -153,6 +153,9 @@ mkFn = "mkFn"
 runFn :: String
 runFn = "runFn"
 
+unit :: String
+unit = "unit"
+
 -- Prim values
 
 undefined :: String

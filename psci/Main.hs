@@ -17,45 +17,40 @@
 
 module Main where
 
-import Commands
+import Data.Foldable (traverse_)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
+import Data.Maybe (mapMaybe)
+import Data.Traversable (traverse)
+import Data.Version (showVersion)
+import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Error (ErrorT(..), MonadError)
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
 import qualified Control.Monad.Trans.State.Lazy as L
-import Control.Monad.Error (ErrorT(..), MonadError)
-import Control.Monad.Error.Class (MonadError(..))
 
-import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
-import Data.Maybe (mapMaybe)
-import Data.Foldable (traverse_)
-import Data.Version (showVersion)
-import Data.Traversable (traverse)
-
-import Parser
-
-import System.IO.Error (tryIOError)
 import System.Console.Haskeline
-import System.Directory
-       (createDirectoryIfMissing, getModificationTime, doesFileExist,
-        findExecutable, getHomeDirectory, getCurrentDirectory)
-import System.Process (readProcessWithExitCode)
+import System.Directory (createDirectoryIfMissing, getModificationTime, doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
-import System.FilePath
-       (pathSeparator, takeDirectory, (</>), isPathSeparator)
+import System.FilePath (pathSeparator, takeDirectory, (</>), isPathSeparator)
+import System.IO.Error (tryIOError)
+import System.Process (readProcessWithExitCode)
 import qualified System.Console.CmdTheLine as Cmd
+import qualified System.IO.UTF8 as U (writeFile, putStrLn, print, readFile)
 
 import Text.Parsec (ParseError)
 
-import qualified Data.Map as M
 import qualified Language.PureScript as P
-import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
-       (writeFile, putStrLn, print, readFile)
-import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Declarations as D
+import qualified Language.PureScript.Names as N
+import qualified Paths_purescript as Paths
+
+import Commands
+import Parser
 
 -- |
 -- The PSCI state.
@@ -132,7 +127,7 @@ loadModule filename = either (Left . show) Right . P.runIndentParser filename P.
 --
 loadAllModules :: [FilePath] -> IO (Either ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
-  filesAndContent <- forM files $ \filename -> do 
+  filesAndContent <- forM files $ \filename -> do
     content <- U.readFile filename
     return (Right filename, content)
   return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
@@ -236,9 +231,9 @@ makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do
     exists <- doesFileExist path
-    case exists of
-      True -> Just <$> getModificationTime path
-      False -> return Nothing
+    if exists
+      then Just <$> getModificationTime path
+      else return Nothing
   readTextFile path = makeIO $ U.readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
@@ -307,13 +302,27 @@ handleDeclaration value = do
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
-      psciIO $ writeFile indexFile $ "require('$PSCI').main();"
+      psciIO $ writeFile indexFile "require('$PSCI').main();"
       process <- psciIO findNodeProcess
       result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
       case result of
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
+
+-- |
+-- Takes a let declaration and updates the environment, then run a make. If the declaration fails,
+-- restore the pre-let environment.
+--
+handleLet :: (P.Expr -> P.Expr) -> PSCI ()
+handleLet l = do
+  st <- PSCI $ lift get
+  let st' = updateLets l st
+  let m = createTemporaryModule False st' (P.ObjectLiteral [])
+  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
+  case e of
+    Left err -> PSCI $ outputStrLn err
+    Right _ -> PSCI $ lift (put st')
 
 -- |
 -- Show actual loaded modules in psci.
@@ -444,7 +453,7 @@ handleCommand :: Command -> PSCI ()
 handleCommand (Expression val) = handleDeclaration val
 handleCommand Help = PSCI $ outputStrLn helpMessage
 handleCommand (Import moduleName) = handleImport moduleName
-handleCommand (Let l) = PSCI $ lift $ modify (updateLets l)
+handleCommand (Let l) = handleLet l
 handleCommand (LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
   exists <- psciIO $ doesFileExist absPath
@@ -460,7 +469,7 @@ handleCommand Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
-    Left err -> psciIO $ putStrLn (show err) >> exitFailure
+    Left err -> psciIO $ print err >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
@@ -501,7 +510,7 @@ loop singleLineMode files = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
-    Left err -> putStrLn (show err) >> exitFailure
+    Left err -> print err >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
