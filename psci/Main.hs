@@ -231,9 +231,9 @@ makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do
     exists <- doesFileExist path
-    case exists of
-      True -> Just <$> getModificationTime path
-      False -> return Nothing
+    if exists
+      then Just <$> getModificationTime path
+      else return Nothing
   readTextFile path = makeIO $ U.readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
@@ -302,7 +302,7 @@ handleDeclaration value = do
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
-      psciIO $ writeFile indexFile $ "require('$PSCI').main();"
+      psciIO $ writeFile indexFile "require('$PSCI').main();"
       process <- psciIO findNodeProcess
       result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
       case result of
@@ -472,7 +472,7 @@ handleCommand Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
-    Left err -> psciIO $ putStrLn (show err) >> exitFailure
+    Left err -> psciIO $ print err >> exitFailure
     Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
@@ -513,7 +513,7 @@ loop singleLineMode files = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
-    Left err -> putStrLn (show err) >> exitFailure
+    Left err -> print err >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
