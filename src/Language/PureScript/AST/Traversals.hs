@@ -146,7 +146,7 @@ everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' other = f other
 
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
-  g' (BinaryNoParens op v1 v2) = (BinaryNoParens op <$> (g' v1) <*> (g' v2)) >>= g
+  g' (BinaryNoParens op v1 v2) = (BinaryNoParens op <$> g' v1 <*> g' v2) >>= g
   g' (Parens v) = (Parens <$> g' v) >>= g
   g' (ArrayLiteral vs) = (ArrayLiteral <$> mapM g' vs) >>= g
   g' (ObjectLiteral vs) = (ObjectLiteral <$> mapM (sndM g') vs) >>= g
@@ -210,7 +210,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
   g' v@(Case vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
   g' v@(TypedValue _ v1 _) = g v <> g' v1
-  g' v@(Let ds v1) = (foldl (<>) (g v) (map f' ds)) <> g' v1
+  g' v@(Let ds v1) = foldl (<>) (g v) (map f' ds) <> g' v1
   g' v@(Do es) = foldl (<>) (g v) (map j' es)
   g' v@(PositionedValue _ v1) = g v <> g' v1
   g' v = g v
@@ -236,12 +236,12 @@ everythingWithContextOnValues ::
   r ->
   (r -> r -> r) ->
   (s -> Declaration       -> (s, r)) ->
-  (s -> Expr             -> (s, r)) ->
+  (s -> Expr              -> (s, r)) ->
   (s -> Binder            -> (s, r)) ->
   (s -> CaseAlternative   -> (s, r)) ->
   (s -> DoNotationElement -> (s, r)) ->
   ( Declaration       -> r
-  , Expr             -> r
+  , Expr              -> r
   , Binder            -> r
   , CaseAlternative   -> r
   , DoNotationElement -> r)
@@ -250,32 +250,32 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f'' s d = let (s', r) = f s d in r <> f' s' d
 
   f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (ValueDeclaration _ _ bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> (g'' s) val
+  f' s (ValueDeclaration _ _ bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> g'' s val
   f' s (ValueDeclaration _ _ bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
-  f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> (g'' s) val) ds)
+  f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
   f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (PositionedDeclaration _ d1) = (f'' s) d1
+  f' s (PositionedDeclaration _ d1) = f'' s d1
   f' _ _ = r0
 
   g'' s v = let (s', r) = g s v in r <> g' s' v
 
-  g' s (UnaryMinus v1) = (g'' s) v1
-  g' s (BinaryNoParens _ v1 v2) = (g'' s) v1 <> (g'' s) v2
-  g' s (Parens v1) = (g'' s) v1
+  g' s (UnaryMinus v1) = g'' s v1
+  g' s (BinaryNoParens _ v1 v2) = g'' s v1 <> g'' s v2
+  g' s (Parens v1) = g'' s v1
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
   g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
-  g' s (TypeClassDictionaryConstructorApp _ v1) = (g'' s) v1
-  g' s (Accessor _ v1) = (g'' s) v1
-  g' s (ObjectUpdate obj vs) = foldl (<>) ((g'' s) obj) (map (g'' s . snd) vs)
-  g' s (Abs _ v1) = (g'' s) v1
-  g' s (App v1 v2) = (g'' s) v1 <> (g'' s) v2
-  g' s (IfThenElse v1 v2 v3) = (g'' s) v1 <> (g'' s) v2 <> (g'' s) v3
+  g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
+  g' s (Accessor _ v1) = g'' s v1
+  g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
+  g' s (Abs _ v1) = g'' s v1
+  g' s (App v1 v2) = g'' s v1 <> g'' s v2
+  g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldl (<>) (foldl (<>) r0 (map (g'' s) vs)) (map (i'' s) alts)
-  g' s (TypedValue _ v1 _) = (g'' s) v1
-  g' s (Let ds v1) = (foldl (<>) r0 (map (f'' s) ds)) <> (g'' s) v1
+  g' s (TypedValue _ v1 _) = g'' s v1
+  g' s (Let ds v1) = foldl (<>) r0 (map (f'' s) ds) <> g'' s v1
   g' s (Do es) = foldl (<>) r0 (map (j'' s) es)
-  g' s (PositionedValue _ v1) = (g'' s) v1
+  g' s (PositionedValue _ v1) = g'' s v1
   g' _ _ = r0
 
   h'' s b = let (s', r) = h s b in r <> h' s' b
@@ -283,9 +283,9 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   h' s (ConstructorBinder _ bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (ObjectBinder bs) = foldl (<>) r0 (map (h'' s . snd) bs)
   h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
-  h' s (ConsBinder b1 b2) = (h'' s) b1 <> (h'' s) b2
-  h' s (NamedBinder _ b1) = (h'' s) b1
-  h' s (PositionedBinder _ b1) = (h'' s) b1
+  h' s (ConsBinder b1 b2) = h'' s b1 <> h'' s b2
+  h' s (NamedBinder _ b1) = h'' s b1
+  h' s (PositionedBinder _ b1) = h'' s b1
   h' _ _ = r0
 
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
@@ -295,20 +295,20 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
   j'' s e = let (s', r) = j s e in r <> j' s' e
 
-  j' s (DoNotationValue v) = (g'' s) v
-  j' s (DoNotationBind b v) =  (h'' s) b <> (g'' s) v
+  j' s (DoNotationValue v) = g'' s v
+  j' s (DoNotationBind b v) = h'' s b <> g'' s v
   j' s (DoNotationLet ds) = foldl (<>) r0 (map (f'' s) ds)
-  j' s (PositionedDoNotationElement _ e1) = (j'' s) e1
+  j' s (PositionedDoNotationElement _ e1) = j'' s e1
 
 everywhereWithContextOnValuesM :: (Functor m, Applicative m, Monad m) =>
   s ->
   (s -> Declaration       -> m (s, Declaration)) ->
-  (s -> Expr             -> m (s, Expr)) ->
+  (s -> Expr              -> m (s, Expr)) ->
   (s -> Binder            -> m (s, Binder)) ->
   (s -> CaseAlternative   -> m (s, CaseAlternative)) ->
   (s -> DoNotationElement -> m (s, DoNotationElement)) ->
   ( Declaration       -> m Declaration
-  , Expr             -> m Expr
+  , Expr              -> m Expr
   , Binder            -> m Binder
   , CaseAlternative   -> m CaseAlternative
   , DoNotationElement -> m DoNotationElement)
@@ -331,7 +331,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (Parens v) = Parens <$> g'' s v
   g' s (ArrayLiteral vs) = ArrayLiteral <$> mapM (g'' s) vs
   g' s (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g'' s)) vs
-  g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g'' s) v
+  g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> mapM (sndM (g'' s)) vs
   g' s (Abs name v) = Abs name <$> g'' s v
