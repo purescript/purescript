@@ -47,6 +47,10 @@ data Type
   --
   | TypeVar String
   -- |
+  -- A type wildcard, as would appear in a partial type synonym
+  --
+  | TypeWildcard
+  -- |
   -- A type constructor
   --
   | TypeConstructor (Qualified ProperName)
@@ -214,6 +218,16 @@ moveQuantifiersToFront = go [] []
     in case qs of
          [] -> constrained
          qs' -> foldl (\ty' (q, sco) -> ForAll q ty' sco) constrained qs'
+
+-- |
+-- Check if a type contains wildcards
+--
+containsWildcards :: Type -> Bool
+containsWildcards = everythingOnTypes (||) go
+  where
+  go :: Type -> Bool
+  go TypeWildcard = True
+  go _ = False
 
 --
 -- Traversals
