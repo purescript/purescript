@@ -47,6 +47,10 @@ data Type
   --
   | TypeVar String
   -- |
+  -- A type wildcard, as would appear in a partial type synonym
+  --
+  | TypeWildcard
+  -- |
   -- A type constructor
   --
   | TypeConstructor (Qualified ProperName)

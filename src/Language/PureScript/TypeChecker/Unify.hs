@@ -21,6 +21,7 @@ module Language.PureScript.TypeChecker.Unify (
     unifyRows,
     unifiesWith,
     replaceVarWithUnknown,
+    replaceTypeWildcards,
     varIfUnknown
 ) where
 
@@ -157,6 +158,17 @@ replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu ty
+  
+-- |
+-- Replace type wildcards with unknowns
+--
+replaceTypeWildcards :: Type -> UnifyT t Check Type
+replaceTypeWildcards = everywhereOnTypesM replace
+  where
+  replace TypeWildcard = do
+    u <- fresh'
+    return $ TUnknown u
+  replace other = return other
 
 -- |
 -- Replace outermost unsolved unification variables with named type variables

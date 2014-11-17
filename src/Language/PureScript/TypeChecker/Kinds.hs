@@ -149,6 +149,7 @@ infer :: Type -> UnifyT Kind Check Kind
 infer ty = rethrow (mkErrorStack "Error inferring type of value" (Just (TypeError ty)) <>) $ infer' ty
 
 infer' :: Type -> UnifyT Kind Check Kind
+infer' TypeWildcard = fresh
 infer' (TypeVar v) = do
   Just moduleName <- checkCurrentModule <$> get
   UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

@@ -129,15 +129,17 @@ typeDictionaryForBindingGroup moduleName vals = do
 
 checkTypedBindingGroupElement :: ModuleName -> (Ident, (Expr, Type, Bool)) -> TypeData ->  UnifyT Type Check (Ident, (Expr, Type))
 checkTypedBindingGroupElement moduleName (ident, (val', ty, checkType)) dict = do
+  -- Replace type wildcards
+  ty' <- replaceTypeWildcards ty
   -- Kind check
   kind <- liftCheck $ kindOf moduleName ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   -- Check the type with the new names in scope
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
   val'' <- if checkType
-           then bindNames dict $ TypedValue True <$> check val' ty' <*> pure ty'
-           else return (TypedValue False val' ty')
-  return (ident, (val'', ty'))
+           then bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
+           else return (TypedValue False val' ty'')
+  return (ident, (val'', ty''))
 
 typeForBindingGroupElement :: (Ident, Expr) -> TypeData -> UntypedData -> UnifyT Type Check (Ident, (Expr, Type))
 typeForBindingGroupElement (ident, val) dict untypedDict = do
@@ -259,7 +261,7 @@ infer' (App f arg) = do
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
   checkVisibility moduleName var
-  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
+  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable moduleName $ var
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
@@ -291,7 +293,7 @@ infer' (SuperClassDictionary className tys) = do
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   checkTypeKind moduleName ty
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
 infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
@@ -303,7 +305,7 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue 
   Just moduleName <- checkCurrentModule <$> get
   checkTypeKind moduleName ty
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then bindNames dict (check val ty') else return tv
   bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
@@ -483,7 +485,7 @@ check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
   checkVisibility moduleName var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
     Nothing -> throwError . strMsg $ "Unable to check type subsumption"
@@ -504,8 +506,8 @@ check' (SuperClassDictionary className tys) _ = do
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   checkTypeKind moduleName ty1
-  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-  ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty2
+  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
+  ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
     Nothing -> throwError . strMsg $ "Unable to check type subsumption"
@@ -555,7 +557,7 @@ check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
 check' val ty | containsTypeSynonyms ty = do
-  ty' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty
+  ty' <- introduceSkolemScope <=< expandAllTypeSynonyms <=< replaceTypeWildcards $ ty
   check val ty'
 check' val kt@(KindedType ty kind) = do
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
