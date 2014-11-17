@@ -1,5 +1,8 @@
 module Main where
 
+testTopLevel :: _ -> _
+testTopLevel n = n + 1
+
 test :: forall a. (Eq a) => (a -> a) -> a -> a
 test f a = go (f a) a
   where

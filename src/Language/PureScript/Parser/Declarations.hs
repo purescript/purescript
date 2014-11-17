@@ -64,7 +64,7 @@ parseDataDeclaration = do
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     _ <- lexeme $ indented *> P.char '='
-    sepBy1 ((,) <$> properName <*> P.many (indented *> parseTypeAtom)) pipe
+    sepBy1 ((,) <$> properName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
   return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: P.Parsec String ParseState Declaration
@@ -76,7 +76,7 @@ parseTypeSynonymDeclaration :: P.Parsec String ParseState Declaration
 parseTypeSynonymDeclaration =
   TypeSynonymDeclaration <$> (P.try (reserved "type") *> indented *> properName)
                          <*> many (indented *> kindedIdent)
-                         <*> (lexeme (indented *> P.char '=') *> parsePolyType)
+                         <*> (lexeme (indented *> P.char '=') *> noWildcards parsePolyType)
 
 parseValueDeclaration :: P.Parsec String ParseState Declaration
 parseValueDeclaration = do
@@ -106,16 +106,16 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
    <|> (do reserved "instance"
            name <- parseIdent <* lexeme (indented *> P.string "::")
            deps <- P.option [] $ do
-             deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
+             deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
              indented
              reservedOp "=>"
              return deps
            className <- indented *> parseQualified properName
-           tys <- P.many (indented *> parseTypeAtom)
+           tys <- P.many (indented *> noWildcards parseTypeAtom)
            return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
            js <- P.optionMaybe (JSRaw <$> stringLiteral)
-           ty <- lexeme (indented *> P.string "::") *> parsePolyType
+           ty <- lexeme (indented *> P.string "::") *> noWildcards parsePolyType
            return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty))
 
 parseAssociativity :: P.Parsec String ParseState Associativity
@@ -176,7 +176,7 @@ parseTypeClassDeclaration = do
   reserved "class"
   implies <- P.option [] $ do
     indented
-    implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
+    implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
     reservedOp "<="
     return implies
   className <- indented *> properName
@@ -191,12 +191,12 @@ parseTypeInstanceDeclaration = do
   reserved "instance"
   name <- parseIdent <* lexeme (indented *> P.string "::")
   deps <- P.optionMaybe $ do
-    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many parseTypeAtom))
+    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
     indented
     reservedOp "=>"
     return deps
   className <- indented *> parseQualified properName
-  ty <- P.many (indented *> parseTypeAtom)
+  ty <- P.many (indented *> (noWildcards parseTypeAtom))
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))

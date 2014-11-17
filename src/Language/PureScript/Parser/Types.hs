@@ -16,6 +16,7 @@
 module Language.PureScript.Parser.Types (
     parseType,
     parsePolyType,
+    noWildcards,
     parseTypeAtom
 ) where
 
@@ -111,6 +112,15 @@ parseType = do
 --
 parsePolyType :: P.Parsec String ParseState Type
 parsePolyType = parseAnyType
+
+-- |
+-- Parse an atomic type with no wildcards
+--
+noWildcards :: P.Parsec String ParseState Type -> P.Parsec String ParseState Type
+noWildcards p = do
+  ty <- p
+  when (containsWildcards ty) $ P.unexpected "type wildcard"
+  return ty
 
 parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
 parseNameAndType p = (,) <$> (indented *> (identifierName <|> stringLiteral) <* indented <* lexeme (P.string "::")) <*> p
