@@ -1,8 +1,4 @@
-## 0.7 Changes
-
-### Breaking Changes
-
-- 
+## 0.6.1 Changes
 
 ### New Features
 
@@ -14,6 +10,20 @@
 - Import instances when referencing qualified values (#667, @garyb)
 - Multiple guard clauses are now supported (#294, @paf31)
 - Type check let declarations immediately in psci (#615, @garyb)
+
+## 0.6.2 Changes
+
+### Breaking Changes
+
+- 
+
+### New Features
+
+- 
+
+### Enhancements
+
+- 
 
 ### Libraries
 
