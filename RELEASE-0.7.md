@@ -1,5 +1,22 @@
 ## 0.6.1 Changes
 
+### Breaking Changes
+
+- The body of a guarded expression must now be indented _past the guard_. For example, this is valid:
+
+```haskell
+positive n | n > 0 = true
+positive _ = false
+```
+
+but this is not:
+
+```haskell
+positive n | n > 0 
+  = true
+positive _ = false
+```
+
 ### New Features
 
 - Type wildcards are now supported (#287, @paf31)
