@@ -19,7 +19,6 @@ module Main where
 import Control.Applicative
 import Control.Monad.Error
 
-import Data.Bool (bool)
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
 
@@ -43,7 +42,7 @@ readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
   | otherwise = do content <- forM ioInputFiles $ \inputFile -> (Just inputFile, ) <$> U.readFile inputFile
-                   return $ bool ((Nothing, P.prelude) :) id ioNoPrelude content
+                   return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
 
 compile :: P.Options P.Compile -> Bool -> [FilePath] -> Maybe FilePath -> Maybe FilePath -> Bool -> IO ()
 compile opts stdin input output externs usePrefix = do

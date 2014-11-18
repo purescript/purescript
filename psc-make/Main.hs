@@ -19,7 +19,6 @@ module Main where
 import Control.Applicative
 import Control.Monad.Error
 
-import Data.Bool (bool)
 import Data.Version (showVersion)
 
 import System.Console.CmdTheLine
@@ -41,7 +40,7 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
   content <- forM ioInputFiles $ \inputFile -> (Right inputFile, ) <$> U.readFile inputFile
-  return $ bool ((Left P.RebuildNever, P.prelude) :) id ioNoPrelude content
+  return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 

@@ -42,7 +42,6 @@ import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
 import Data.FileEmbed (embedFile)
-import Data.Traversable (traverse)
 
 import Control.Monad.Error
 import Control.Arrow ((&&&))
@@ -142,6 +141,11 @@ data RebuildPolicy
   -- | Always rebuild this module
   | RebuildAlways deriving (Show, Eq, Ord)
 
+-- Traverse (Either e) instance (base 4.7)
+traverseEither :: Applicative f => (a -> f b) -> Either e a -> f (Either e b)
+traverseEither _ (Left x) = pure (Left x)
+traverseEither f (Right y) = Right <$> f y
+
 -- |
 -- Compiles in "make" mode, compiling each module separately to a js files and an externs file
 --
@@ -163,7 +167,7 @@ make outputDir opts ms prefix = do
 
     jsTimestamp <- getTimestamp jsFile
     externsTimestamp <- getTimestamp externsFile
-    inputTimestamp <- traverse getTimestamp inputFile
+    inputTimestamp <- traverseEither getTimestamp inputFile
 
     return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
       (Right (Just t1), Just t2, Just t3) | t1 < min t2 t3 -> s

@@ -19,7 +19,6 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
-import Data.Either (isLeft)
 import Data.Monoid ((<>))
 import Data.List (nub, groupBy)
 
@@ -34,6 +33,11 @@ import Language.PureScript.Errors
 import Language.PureScript.Supply
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
+
+-- Data.Either.isLeft (base 4.7)
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft (Right _) = False
 
 -- |
 -- Replace all top-level binders in a module with case expressions.
