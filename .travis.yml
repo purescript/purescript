@@ -1,9 +1,9 @@
 language: haskell
 ghc: 7.8
 script:
-  - cabal configure --enable-tests --enable-library-coverage -v2 && cabal build && cabal test
+  - ./travis-script.sh
 after_script:
-  - ./coverage.sh
+  - ./travis-after-script.sh
 notifications:
   email: true
 before_deploy: "./bundle/build.sh linux64"
