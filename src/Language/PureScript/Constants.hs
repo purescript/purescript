@@ -65,14 +65,14 @@ module Language.PureScript.Constants where
 (/=) :: String
 (/=) = "/="
 
-(&) :: String
-(&) = "&"
+(.&.) :: String
+(.&.) = ".&."
 
-bar :: String
-bar = "|"
+(.|.) :: String
+(.|.) = ".|."
 
-(^) :: String
-(^) = "^"
+(.^.) :: String
+(.^.) = ".^."
 
 (&&) :: String
 (&&) = "&&"

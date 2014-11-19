@@ -83,9 +83,9 @@ parseValueDeclaration = do
   name <- parseIdent
   binders <- P.many parseBinderNoParens
   value <- Left <$> (C.indented *>
-                       C.mark (P.many1 ((,) <$> (C.same *> parseGuard)
-                                            <*> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
-                                       )))
+                       P.many1 ((,) <$> parseGuard
+                                    <*> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
+                               ))
        <|> Right <$> (lexeme (indented *> P.char '=') *> parseValueWithWhereClause)
   return $ ValueDeclaration name Value binders value
   where
@@ -304,9 +304,9 @@ parseCase = Case <$> P.between (P.try (C.reserved "case")) (C.indented *> C.rese
 parseCaseAlternative :: P.Parsec String ParseState CaseAlternative
 parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
                                        <*> (Left <$> (C.indented *>
-                                                        C.mark (P.many1 ((,) <$> (C.same *> parseGuard)
-                                                                             <*> (lexeme (indented *> C.reservedOp "->") *> parseValue)
-                                                                        )))
+                                                        P.many1 ((,) <$> parseGuard
+                                                                     <*> (lexeme (indented *> C.reservedOp "->") *> parseValue)
+                                                                ))
                                             <|> Right <$> (lexeme (indented *> C.reservedOp "->") *> parseValue))
                                        P.<?> "case alternative"
 
