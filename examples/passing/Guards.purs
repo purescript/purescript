@@ -20,4 +20,10 @@ module Main where
     _ | m < n     -> n
       | otherwise -> m
 
+  testIndentation :: Number -> Number -> Number
+  testIndentation x y | x > 0 
+    = x + y
+                      | otherwise 
+    = y - x
+
   main = Debug.Trace.trace $ min "Done" "ZZZZ"

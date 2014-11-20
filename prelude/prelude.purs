@@ -17,7 +17,7 @@ module Prelude
   , negate
   , Eq, (==), (/=), refEq, refIneq
   , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
-  , Bits, (&), (|), (^), shl, shr, zshr, complement
+  , Bits, (.&.), (.|.), (.^.), shl, shr, zshr, complement
   , BoolLike, (&&), (||)
   , not
   , Semigroup, (<>), (++)
@@ -372,14 +372,14 @@ module Prelude
       EQ -> compare xs ys
       other -> other
 
-  infixl 10 &
-  infixl 10 |
-  infixl 10 ^
+  infixl 10 .&.
+  infixl 10 .|.
+  infixl 10 .^.
 
   class Bits b where
-    (&) :: b -> b -> b
-    (|) :: b -> b -> b
-    (^) :: b -> b -> b
+    (.&.) :: b -> b -> b
+    (.|.) :: b -> b -> b
+    (.^.) :: b -> b -> b
     shl :: b -> Number -> b
     shr :: b -> Number -> b
     zshr :: b -> Number -> b
@@ -426,9 +426,9 @@ module Prelude
                                \}" :: Number -> Number
 
   instance bitsNumber :: Bits Number where
-    (&) = numAnd
-    (|) = numOr
-    (^) = numXor
+    (.&.) = numAnd
+    (.|.) = numOr
+    (.^.) = numXor
     shl = numShl
     shr = numShr
     zshr = numZshr

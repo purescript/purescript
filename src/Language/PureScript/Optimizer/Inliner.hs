@@ -117,9 +117,9 @@ inlineCommonOperators = applyAll $
   , binaryFunction C.bitsNumber C.shl ShiftLeft
   , binaryFunction C.bitsNumber C.shr ShiftRight
   , binaryFunction C.bitsNumber C.zshr ZeroFillShiftRight
-  , binary         C.bitsNumber (C.&) BitwiseAnd
-  , binary         C.bitsNumber C.bar BitwiseOr
-  , binary         C.bitsNumber (C.^) BitwiseXor
+  , binary         C.bitsNumber (C..&.) BitwiseAnd
+  , binary         C.bitsNumber (C..|.) BitwiseOr
+  , binary         C.bitsNumber (C..^.) BitwiseXor
   , unary          C.bitsNumber C.complement BitwiseNot
 
   , binary C.boolLikeBoolean (C.&&) And

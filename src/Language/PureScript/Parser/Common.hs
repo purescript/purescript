@@ -71,7 +71,7 @@ reservedTypeNames = [ "forall"
 -- A list of reserved operators
 --
 reservedOpNames :: [String]
-reservedOpNames = [ "=>", "->", "=", ".", "\\" ]
+reservedOpNames = [ "=>", "->", "=", ".", "\\", "|" ]
 
 -- |
 -- Valid first characters for an identifier
