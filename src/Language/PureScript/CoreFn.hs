@@ -81,14 +81,13 @@ data Expr
   --
   | Constructor (Qualified ProperName)
   -- |
-  -- A case expression. During the case expansion phase of desugaring, top-level binders will get
-  -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
+  -- A case expression
   --
   | Case [Expr] [CaseAlternative]
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Bool Expr Type
+  | TypedValue Expr Type
   -- |
   -- A let binding
   --
@@ -97,11 +96,7 @@ data Expr
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr
-  -- |
-  -- A value with source position information
-  --
-  | PositionedValue SourcePos Expr deriving (Show, D.Data, D.Typeable)
+  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -149,8 +144,4 @@ data Binder
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident Binder
-  -- |
-  -- A binder with source position information
-  --
-  | PositionedBinder SourcePos Binder deriving (Show, D.Data, D.Typeable)
+  | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)

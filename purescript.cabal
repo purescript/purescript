@@ -45,6 +45,7 @@ library
                      Language.PureScript.AST.Operators
                      Language.PureScript.AST.SourcePos
                      Language.PureScript.AST.Traversals
+                     Language.PureScript.CoreFn
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
