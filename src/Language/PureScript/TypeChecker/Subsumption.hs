@@ -98,6 +98,12 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject
                      r1' =?= RCons p2 ty2 rest
                      go ((p1, ty1) : ts1) ts2 rest r2'
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
+subsumes' val ty1 ty2 | containsTypeSynonyms ty1 = do
+  ty1' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty1
+  subsumes' val ty1' ty2
+subsumes' val ty1 ty2 | containsTypeSynonyms ty2 = do
+  ty2' <- introduceSkolemScope <=< expandAllTypeSynonyms $ ty2
+  subsumes' val ty1 ty2'
 subsumes' val ty1 ty2 = do
   ty1 =?= ty2
   return val

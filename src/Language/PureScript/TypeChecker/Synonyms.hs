@@ -21,7 +21,8 @@ module Language.PureScript.TypeChecker.Synonyms (
     replaceAllTypeSynonyms,
     expandAllTypeSynonyms,
     expandTypeSynonym,
-    expandTypeSynonym'
+    expandTypeSynonym',
+    containsTypeSynonyms
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -104,7 +105,18 @@ expandTypeSynonym name args = do
   either (throwError . strMsg) return $ expandTypeSynonym' env name args
 
 expandAllTypeSynonyms :: (Error e, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
-expandAllTypeSynonyms = everywhereOnTypesTopDownM go
+expandAllTypeSynonyms ty = do
+  env <- getEnv
+  let repl = everywhereOnTypesTopDown (go env) ty
+  either (throwError . strMsg) return $ replaceAllTypeSynonyms' env repl
   where
-  go (SaturatedTypeSynonym name args) = expandTypeSynonym name args
-  go other = return other
+  go env (SaturatedTypeSynonym name args) = 
+    case M.lookup name (typeSynonyms env) of
+      Just (synArgs, body) -> replaceAllTypeVars (zip (map fst synArgs) args) body
+      Nothing -> error "Type synonym was not defined"
+  go _ other = other
+  
+containsTypeSynonyms :: Type -> Bool
+containsTypeSynonyms = everythingOnTypes (||) go where
+  go (SaturatedTypeSynonym _ _) = True
+  go _ = False
