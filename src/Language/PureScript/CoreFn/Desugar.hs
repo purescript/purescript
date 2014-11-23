@@ -34,7 +34,8 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
   let decls' = concatMap go decls
       imports = filter A.isImportDecl decls
       externs = mapMaybe goExterns decls
-  in Module mn imports exps externs decls'
+      exps' = concatMap goExports exps
+  in Module mn imports exps' externs decls'
   where
 
   go :: A.Declaration -> [Bind]
@@ -87,6 +88,14 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
   goExterns (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject) -- TODO: needs a type
   goExterns (A.PositionedDeclaration _ d) = goExterns d
   goExterns _ = Nothing
+
+  goExports :: A.DeclarationRef -> [Ident]
+  goExports (A.TypeRef _ (Just dctors)) = map (Ident . runProperName) dctors
+  goExports (A.ValueRef name) = [name]
+  goExports (A.TypeClassRef name) = [Ident $ runProperName name]
+  goExports (A.TypeInstanceRef name) = [name]
+  goExports (A.PositionedDeclarationRef _ d) = goExports d
+  goExports _ = []
 
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"

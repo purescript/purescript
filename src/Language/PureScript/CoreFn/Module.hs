@@ -23,7 +23,7 @@ import qualified Language.PureScript.AST as A
 data Module = Module
   { moduleName :: ModuleName
   , moduleImports :: [A.Declaration]
-  , moduleExports :: [A.DeclarationRef]
+  , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [Bind]
   } deriving (Show)

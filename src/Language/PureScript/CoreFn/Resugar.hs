@@ -25,7 +25,7 @@ import qualified Language.PureScript.AST as A
 
 resugar :: Module -> A.Module
 resugar (Module mn imps exps foreigns decls) =
-  A.Module mn (imps ++ map foreignToDecl foreigns ++ map bindToDecl decls) (Just exps)
+  A.Module mn (imps ++ map foreignToDecl foreigns ++ map bindToDecl decls) (Just $ map A.ValueRef exps)
 
 exprToAST :: Expr -> A.Expr
 exprToAST (Literal l) = literalToExprAST l
