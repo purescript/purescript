@@ -64,7 +64,7 @@ data DictionaryValue
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> (Qualified ProperName, [Type]) -> Bool -> Check Expr
+entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
 entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
@@ -107,7 +107,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       -- Create dictionaries for subgoals which still need to be solved by calling go recursively
       -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
       -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-      solveSubgoals :: [(String, Type)] -> Maybe [(Qualified ProperName, [Type])] -> [Maybe [DictionaryValue]]
+      solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> [Maybe [DictionaryValue]]
       solveSubgoals _ Nothing = return Nothing
       solveSubgoals subst (Just subgoals) = do
         dict <- mapM (uncurry (go True) . second (map (replaceAllTypeVars subst))) subgoals

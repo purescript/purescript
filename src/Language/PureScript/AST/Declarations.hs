@@ -126,7 +126,7 @@ data Declaration
   -- |
   -- A type class instance foreign import
   --
-  | ExternInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type]
+  | ExternInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type]
   -- |
   -- A fixity declaration (fixity data, operator name)
   --
@@ -138,12 +138,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [(Qualified ProperName, [Type])] [Declaration]
+  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [Constraint] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] [Declaration]
+  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] [Declaration]
   -- |
   -- A declaration with source position information
   --
@@ -316,7 +316,7 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Bool (Qualified ProperName, [Type]) [TypeClassDictionaryInScope]
+  | TypeClassDictionary Bool Constraint [TypeClassDictionaryInScope]
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --

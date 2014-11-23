@@ -76,7 +76,7 @@ addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
-addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
+addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }

@@ -198,7 +198,7 @@ memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
   let superclassTypes = [ (fieldName, function unit tySynApp)
                         | (index, (superclass, tyArgs)) <- zip [0..] implies
@@ -224,7 +224,7 @@ mkSuperclassDictionaryName pn index = C.__superclass_ ++ show pn ++ "_" ++ show 
 unit :: Type
 unit = TypeApp tyObject REmpty
 
-typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
+typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
   rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
   m <- get
