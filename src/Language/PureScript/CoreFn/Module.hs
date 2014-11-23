@@ -21,5 +21,5 @@ import qualified Language.PureScript.AST as A
 data Module = Module
   { moduleName :: ModuleName
   , moduleExports :: [A.DeclarationRef]
-  , moduleDecls :: [Either (Ident, Expr) [(Ident, Expr)]]
+  , moduleDecls :: [Bind]
   }

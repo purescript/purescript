@@ -32,7 +32,7 @@ data Expr
   --
   = Literal (Literal Expr)
   -- |
-  -- An record property accessor expression
+  -- A record property accessor
   --
   | Accessor String Expr
   -- |
@@ -52,10 +52,6 @@ data Expr
   --
   | Var (Qualified Ident)
   -- |
-  -- A data constructor
-  --
-  | Constructor (Qualified ProperName)
-  -- |
   -- A case expression
   --
   | Case [Expr] [CaseAlternative]
@@ -64,14 +60,40 @@ data Expr
   --
   | TypedValue Expr Type
   -- |
-  -- A let binding. Each item is either a single declaration or a binding group.
+  -- A let binding
   --
-  | Let [Either (Ident, Expr) [(Ident, Expr)]] Expr
+  | Let [Bind] Expr
   -- |
-  -- An application of a typeclass dictionary constructor. The value should be
-  -- an ObjectLiteral.
+  -- Metadata annotations for preserving information about an expression that
+  -- may be useful for certain optimizations or codegen targets.
   --
-  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr deriving (Show, D.Data, D.Typeable)
+  | Meta Meta Expr deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- A let or module binding.
+--
+data Bind
+  -- |
+  -- Non-recursive binding for a single value
+  --
+  = NotRec Ident Expr
+  -- |
+  -- Mutually recursive binding group for several values
+  --
+  | Rec [(Ident, Expr)] deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- Metadata annotations
+--
+data Meta
+  -- |
+  -- The contained value is a data constructor
+  --
+  = IsConstructor
+  -- |
+  -- The contained value is a typeclass dictionary constructor
+  --
+  | IsTypeClassDictionaryConstructor deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders

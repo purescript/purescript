@@ -40,21 +40,17 @@ exprToCoreFn (A.Abs _ _) = error "Abs with Binder argument was not desugared bef
 exprToCoreFn (A.App v1 v2) = App (exprToCoreFn v1) (exprToCoreFn v2)
 exprToCoreFn (A.Var ident) = Var ident
 exprToCoreFn (A.IfThenElse v1 v2 v3) =
-    Case [exprToCoreFn v1]
-      [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn v2)
-      , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn v3) ]
-exprToCoreFn (A.Constructor name) = Constructor name
+  Case [exprToCoreFn v1]
+    [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn v2)
+    , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn v3) ]
+exprToCoreFn (A.Constructor name) = Meta IsConstructor (Var $ properToIdent name)
 exprToCoreFn (A.Case vs alts) = Case (map exprToCoreFn vs) (map altToCoreFn alts)
 exprToCoreFn (A.TypedValue _ v ty) = TypedValue (exprToCoreFn v) ty
 exprToCoreFn (A.Let ds v) = Let (map declToCoreFn ds) (exprToCoreFn v)
-exprToCoreFn (A.TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name (exprToCoreFn v)
+exprToCoreFn (A.TypeClassDictionaryConstructorApp name v) =
+  App (Meta IsTypeClassDictionaryConstructor (Var $ properToIdent name)) (exprToCoreFn v)
 exprToCoreFn (A.PositionedValue _ v) = exprToCoreFn v
-exprToCoreFn (A.TypeClassDictionary{}) = error "TypeClassDictionary was not desugared before exprToCoreFn"
-exprToCoreFn (A.SuperClassDictionary{}) = error "SuperClassDictionary was not desugared before exprToCoreFn"
-exprToCoreFn (A.Do{}) = error "Do was not desugared before exprToCoreFn"
-exprToCoreFn (A.UnaryMinus{}) = error "UnaryMinus was not desugared before exprToCoreFn"
-exprToCoreFn (A.BinaryNoParens{}) = error "BinaryNoParens was not desugared before exprToCoreFn"
-exprToCoreFn (A.Parens{}) = error "Parens was not desugared before exprToCoreFn"
+exprToCoreFn e = error $ "Unexpected value in exprToCoreFn: " ++ show e
 
 altToCoreFn :: A.CaseAlternative -> CaseAlternative
 altToCoreFn (A.CaseAlternative bs vs) = CaseAlternative (map binderToCoreFn bs) (go vs)
@@ -76,8 +72,11 @@ binderToCoreFn (A.ConsBinder b1 b2) = ConsBinder (binderToCoreFn b1) (binderToCo
 binderToCoreFn (A.NamedBinder name b) = NamedBinder name (binderToCoreFn b)
 binderToCoreFn (A.PositionedBinder _ b) = binderToCoreFn b
 
-declToCoreFn :: A.Declaration -> Either (Ident, Expr) [(Ident, Expr)]
-declToCoreFn (A.ValueDeclaration name _ _ (Right e)) = Left (name, exprToCoreFn e)
-declToCoreFn (A.BindingGroupDeclaration ds) = Right $ map (\(name, _, e) -> (name, exprToCoreFn e)) ds
+declToCoreFn :: A.Declaration -> Bind
+declToCoreFn (A.ValueDeclaration name _ _ (Right e)) = NotRec name (exprToCoreFn e)
+declToCoreFn (A.BindingGroupDeclaration ds) = Rec $ map (\(name, _, e) -> (name, exprToCoreFn e)) ds
 declToCoreFn (A.PositionedDeclaration _ d) = declToCoreFn d
 declToCoreFn d = error $ "Unexpected value in declToCoreFn: " ++ show d
+
+properToIdent :: Qualified ProperName -> Qualified Ident
+properToIdent (Qualified q name) = Qualified q (Ident $ runProperName name)
