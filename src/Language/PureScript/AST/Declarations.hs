@@ -57,7 +57,7 @@ data DeclarationRef
   -- |
   -- A declaration reference with source position information
   --
-  | PositionedDeclarationRef SourcePos DeclarationRef
+  | PositionedDeclarationRef SourceSpan DeclarationRef
   deriving (Show, D.Data, D.Typeable)
 
 instance Eq DeclarationRef where
@@ -147,7 +147,7 @@ data Declaration
   -- |
   -- A declaration with source position information
   --
-  | PositionedDeclaration SourcePos Declaration
+  | PositionedDeclaration SourceSpan Declaration
   deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -324,7 +324,7 @@ data Expr
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourcePos Expr deriving (Show, D.Data, D.Typeable)
+  | PositionedValue SourceSpan Expr deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- An alternative in a case statement
@@ -359,4 +359,4 @@ data DoNotationElement
   -- |
   -- A do notation element with source position information
   --
-  | PositionedDoNotationElement SourcePos DoNotationElement deriving (Show, D.Data, D.Typeable)
+  | PositionedDoNotationElement SourceSpan DoNotationElement deriving (Show, D.Data, D.Typeable)

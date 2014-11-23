@@ -23,13 +23,9 @@ import qualified Data.Data as D
 --
 data SourcePos = SourcePos
   { -- |
-    -- Source name
-    --
-    sourceName :: String
-    -- |
     -- Line number
     --
-  , sourcePosLine :: Int
+    sourcePosLine :: Int
     -- |
     -- Column number
     --
@@ -37,4 +33,21 @@ data SourcePos = SourcePos
   } deriving (D.Data, D.Typeable)
 
 instance Show SourcePos where
-  show sp = sourceName sp ++ " line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
+  show sp = "line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
+
+data SourceSpan = SourceSpan
+  { -- |
+    -- Source name
+    --
+    spanName :: String
+    -- |
+    -- Start of the span
+    --
+  , spanStart :: SourcePos
+    -- End of the span
+    --
+  , spanEnd :: SourcePos
+  } deriving (D.Data, D.Typeable)
+  
+instance Show SourceSpan where
+  show sp = spanName sp ++ " " ++ show (spanStart sp) ++ " - " ++ show (spanEnd sp)

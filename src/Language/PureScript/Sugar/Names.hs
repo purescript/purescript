@@ -198,7 +198,7 @@ renameInModule imports exports (Module mn decls exps) =
   where
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
-  updateDecl :: (Maybe SourcePos, [Ident]) -> Declaration -> Either ErrorStack ((Maybe SourcePos, [Ident]), Declaration)
+  updateDecl :: (Maybe SourceSpan, [Ident]) -> Declaration -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Declaration)
   updateDecl (_, bound) d@(PositionedDeclaration pos _) = return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
     (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
@@ -216,7 +216,7 @@ renameInModule imports exports (Module mn decls exps) =
     (,) (pos, name : bound) <$> (ExternDeclaration fit name js <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
 
-  updateValue :: (Maybe SourcePos, [Ident]) -> Expr -> Either ErrorStack ((Maybe SourcePos, [Ident]), Expr)
+  updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
   updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
   updateValue (pos, bound) (Let ds val') =
@@ -234,12 +234,12 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue s@(pos, _) (TypedValue check val ty) = (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
 
-  updateBinder :: (Maybe SourcePos, [Ident]) -> Binder -> Either ErrorStack ((Maybe SourcePos, [Ident]), Binder)
+  updateBinder :: (Maybe SourceSpan, [Ident]) -> Binder -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _) = return ((Just pos, bound), v)
   updateBinder s@(pos, _) (ConstructorBinder name b) = (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
   updateBinder s v = return (s, v)
 
-  updateCase :: (Maybe SourcePos, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourcePos, [Ident]), CaseAlternative)
+  updateCase :: (Maybe SourceSpan, [Ident]) -> CaseAlternative -> Either ErrorStack ((Maybe SourceSpan, [Ident]), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) = return ((pos, concatMap binderNames bs ++ bound), c)
 
   letBoundVariable :: Declaration -> Maybe Ident
@@ -247,10 +247,10 @@ renameInModule imports exports (Module mn decls exps) =
   letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
   letBoundVariable _ = Nothing
 
-  updateTypesEverywhere :: Maybe SourcePos -> Type -> Either ErrorStack Type
+  updateTypesEverywhere :: Maybe SourceSpan -> Type -> Either ErrorStack Type
   updateTypesEverywhere pos0 = everywhereOnTypesM (updateType pos0)
     where
-    updateType :: Maybe SourcePos -> Type -> Either ErrorStack Type
+    updateType :: Maybe SourceSpan -> Type -> Either ErrorStack Type
     updateType pos (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
     updateType pos (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name pos <*> pure tys
     updateType pos (ConstrainedType cs t) = ConstrainedType <$> updateConstraints pos cs <*> pure t
@@ -269,7 +269,7 @@ renameInModule imports exports (Module mn decls exps) =
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
                             -> Qualified a
-                            -> Maybe SourcePos
+                            -> Maybe SourceSpan
                             -> Either ErrorStack (Qualified a)
   update t getI checkE qname@(Qualified mn' name) pos = positioned $ case (M.lookup qname imports', mn') of
     (Just qname', _) -> return qname'
@@ -385,7 +385,7 @@ filterExports mn exps env = do
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)
+findImports :: [Declaration] -> M.Map ModuleName (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
 findImports = foldl (findImports' Nothing) M.empty
   where
   findImports' pos result (ImportDeclaration mn typ qual) = M.insert mn (pos, typ, qual) result
@@ -403,10 +403,10 @@ resolveImports env (Module currentModule decls _) =
   -- A Map from module name to the source position for the import, the list of imports from that
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
-  scope :: M.Map ModuleName (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)
+  scope :: M.Map ModuleName (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
   scope = M.insert currentModule (Nothing, Unqualified, Nothing) (findImports decls)
 
-  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourcePos, ImportDeclarationType, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
+  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)) -> Either ErrorStack ImportEnvironment
   resolveImport' imp (mn, (pos, typ, impQual)) = do
     modExports <- positioned $ maybe (throwError $ mkErrorStack ("Cannot import unknown module '" ++ show mn ++ "'") Nothing) return $ mn `M.lookup` env
     positioned $ resolveImport currentModule mn modExports imp impQual typ
