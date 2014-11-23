@@ -87,7 +87,7 @@ compile' env opts ms prefix = do
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
   let modulesToCodeGen = map CoreFn.resugar $ if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
-  let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
+  let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   js' <- generateMain env' opts js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
   return (pjs, exts, env')
