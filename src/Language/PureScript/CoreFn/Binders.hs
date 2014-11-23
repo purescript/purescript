@@ -30,7 +30,7 @@ data Binder
   --
   = NullBinder
   -- |
-  -- A binder which matches a boolean literal
+  -- A binder which matches a literal value
   --
   | LiteralBinder (Literal Binder)
   -- |
