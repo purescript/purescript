@@ -68,7 +68,7 @@ data Binder
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourcePos Binder deriving (Show, D.Data, D.Typeable)
+  | PositionedBinder SourceSpan Binder deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- Collect all names introduced in binders in an expression

@@ -56,7 +56,7 @@ data CompileError
         -- |
         -- Optional source position information
         --
-      , compileErrorPosition :: Maybe SourcePos
+      , compileErrorPosition :: Maybe SourceSpan
       }
   deriving (Show)
 
@@ -109,7 +109,7 @@ showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prett
 mkErrorStack :: String -> Maybe ErrorSource -> ErrorStack
 mkErrorStack msg t = ErrorStack [CompileError msg t Nothing]
 
-positionError :: SourcePos -> ErrorStack
+positionError :: SourceSpan -> ErrorStack
 positionError pos = ErrorStack [CompileError "" Nothing (Just pos)]
 
 -- |
@@ -121,7 +121,7 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- |
 -- Rethrow an error with source position information
 --
-rethrowWithPosition :: (MonadError ErrorStack m) => SourcePos -> m a -> m a
+rethrowWithPosition :: (MonadError ErrorStack m) => SourceSpan -> m a -> m a
 rethrowWithPosition pos = rethrow (positionError pos <>)
 
 -- |
