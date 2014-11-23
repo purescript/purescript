@@ -24,7 +24,7 @@ data Module = Module
   { moduleName :: ModuleName
   , moduleImports :: [A.Declaration]
   , moduleExports :: [A.DeclarationRef]
-  , moduleForeign :: [A.Declaration]
+  , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [Bind]
   } deriving (Show)
 

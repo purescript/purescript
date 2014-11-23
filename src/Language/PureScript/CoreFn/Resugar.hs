@@ -25,7 +25,7 @@ import qualified Language.PureScript.AST as A
 
 resugar :: Module -> A.Module
 resugar (Module mn imps exps foreigns decls) =
-  A.Module mn (imps ++ foreigns ++ map bindToDecl decls) (Just exps)
+  A.Module mn (imps ++ map foreignToDecl foreigns ++ map bindToDecl decls) (Just exps)
 
 exprToAST :: Expr -> A.Expr
 exprToAST (Literal l) = literalToExprAST l
@@ -71,3 +71,7 @@ literalToBinderAST (ObjectLiteral vs) = A.ObjectBinder $ map (second binderToAST
 bindToDecl :: Bind -> A.Declaration
 bindToDecl (NotRec name e) = A.ValueDeclaration name Value [] (Right $ exprToAST e)
 bindToDecl (Rec ds) = A.BindingGroupDeclaration $ map (\(name, e) -> (name, Value, exprToAST e)) ds
+
+foreignToDecl :: ForeignDecl -> A.Declaration
+foreignToDecl (name, Nothing, ty) = A.ExternDeclaration ForeignImport name Nothing ty
+foreignToDecl (name, Just js, ty) = A.ExternDeclaration InlineJavascript name (Just js) ty

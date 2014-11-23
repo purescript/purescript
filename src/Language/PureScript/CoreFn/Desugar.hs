@@ -15,6 +15,7 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Data.List (sort)
+import Data.Maybe (mapMaybe)
 
 import Control.Arrow (second, (***))
 
@@ -32,9 +33,10 @@ moduleToCoreFn :: Environment -> A.Module -> Module
 moduleToCoreFn _ (A.Module mn decls (Just exps)) =
   let decls' = concatMap go decls
       imports = filter A.isImportDecl decls
-      externs = filter (\x -> A.isExternDecl x || A.isExternInstanceDecl x) decls
+      externs = mapMaybe goExterns decls
   in Module mn imports exps externs decls'
   where
+
   go :: A.Declaration -> [Bind]
   go (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
     [NotRec (Ident $ runProperName ctor) $
@@ -54,7 +56,7 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
   go d@(A.BindingGroupDeclaration{}) = [declToCoreFn d]
   go (A.ExternDeclaration{}) = []
   go (A.ExternDataDeclaration{}) = []
-  go (A.ExternInstanceDeclaration{}) = [] -- TODO: this might need to be something
+  go (A.ExternInstanceDeclaration{}) = []
   go (A.FixityDeclaration{}) = []
   go (A.ImportDeclaration{}) = []
   go (A.TypeClassDeclaration name _ supers members) =
@@ -79,6 +81,13 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
     memberToName _ = error "Invalid declaration in type class definition"
   go (A.PositionedDeclaration _ d) = go d
   go d = error $ "Unexpected declaration in moduleToCoreFn: " ++ show d
+
+  goExterns :: A.Declaration -> Maybe ForeignDecl
+  goExterns (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
+  goExterns (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject) -- TODO: needs a type
+  goExterns (A.PositionedDeclaration _ d) = goExterns d
+  goExterns _ = Nothing
+
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
