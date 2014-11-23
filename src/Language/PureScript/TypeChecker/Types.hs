@@ -97,7 +97,7 @@ typesOf mainModuleName moduleName vals = do
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
-  -- If --main is enabled, need to ƒthat `main` has type Eff eff a for some eff, a
+  -- If --main is enabled, need to that `main` has type Eff eff a for some eff, a
   checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
     [eff, a] <- replicateM 2 fresh
     ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
