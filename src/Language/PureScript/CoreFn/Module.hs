@@ -14,12 +14,17 @@
 
 module Language.PureScript.CoreFn.Module where
 
+import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
+import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 
 data Module = Module
   { moduleName :: ModuleName
-  , moduleExports :: [A.DeclarationRef]
   , moduleDecls :: [Bind]
+  , moduleForeign :: [ForeignDecl]
+  , moduleExports :: [A.DeclarationRef]
   }
+
+type ForeignDecl = (Ident, Maybe JS, Type)

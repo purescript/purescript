@@ -91,6 +91,10 @@ data Meta
   --
   = IsConstructor
   -- |
+  -- The contained value is a newtype
+  --
+  | IsNewtype
+  -- |
   -- The contained value is a typeclass dictionary constructor
   --
   | IsTypeClassDictionaryConstructor deriving (Show, D.Data, D.Typeable)
