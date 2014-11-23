@@ -15,7 +15,6 @@
 
 module Language.PureScript.Sugar (desugar, module S) where
 
-import Control.Arrow ((***), second)
 import Control.Monad
 import Control.Category ((>>>))
 import Control.Monad.Trans.Class
@@ -23,7 +22,6 @@ import Control.Monad.Trans.Class
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Supply
-import Language.PureScript.Names
 
 import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.DoNotation as S
