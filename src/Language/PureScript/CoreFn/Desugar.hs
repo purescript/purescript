@@ -16,7 +16,9 @@ module Language.PureScript.CoreFn.Desugar where
 
 import Control.Arrow (second, (***))
 
+import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
+import Language.PureScript.CoreFn.Literals
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Names
 import qualified Language.PureScript.AST as A

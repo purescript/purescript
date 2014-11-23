@@ -18,35 +18,10 @@ module Language.PureScript.CoreFn.Expr where
 
 import qualified Data.Data as D
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Types
+import Language.PureScript.CoreFn.Binders
+import Language.PureScript.CoreFn.Literals
 import Language.PureScript.Names
-
--- |
--- Data type for literal values. Parameterised so it can be used for Exprs and
--- Binders.
---
-data Literal a
-  -- |
-  -- A numeric literal
-  --
-  = NumericLiteral (Either Integer Double)
-  -- |
-  -- A string literal
-  --
-  | StringLiteral String
-  -- |
-  -- A boolean literal
-  --
-  | BooleanLiteral Bool
-  -- |
-  -- An array literal
-  --
-  | ArrayLiteral [a]
-  -- |
-  -- An object literal
-  --
-  | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable)
+import Language.PureScript.Types
 
 -- |
 -- Data type for expressions and terms
@@ -116,32 +91,3 @@ data CaseAlternative = CaseAlternative
     --
   , caseAlternativeResult :: Either [(Guard, Expr)] Expr
   } deriving (Show, D.Data, D.Typeable)
-
--- |
--- Data type for binders
---
-data Binder
-  -- |
-  -- Wildcard binder
-  --
-  = NullBinder
-  -- |
-  -- A binder which matches a boolean literal
-  --
-  | LiteralBinder (Literal Binder)
-  -- |
-  -- A binder which binds an identifier
-  --
-  | VarBinder Ident
-  -- |
-  -- A binder which matches a data constructor
-  --
-  | ConstructorBinder (Qualified ProperName) [Binder]
-  -- |
-  -- A binder which matches an array and binds its head and tail
-  --
-  | ConsBinder Binder Binder
-  -- |
-  -- A binder which binds its input to an identifier
-  --
-  | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)
