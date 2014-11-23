@@ -18,7 +18,8 @@ module Language.PureScript.CoreFn (
 
 import Language.PureScript.CoreFn.Binders as C
 import Language.PureScript.CoreFn.Desugar as C
-import Language.PureScript.CoreFn.Resugar as C
 import Language.PureScript.CoreFn.Expr as C
 import Language.PureScript.CoreFn.Literals as C
+import Language.PureScript.CoreFn.Meta as C
 import Language.PureScript.CoreFn.Module as C
+import Language.PureScript.CoreFn.Resugar as C

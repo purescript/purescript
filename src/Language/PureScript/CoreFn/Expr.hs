@@ -20,6 +20,7 @@ import qualified Data.Data as D
 
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Literals
+import Language.PureScript.CoreFn.Meta
 import Language.PureScript.Names
 import Language.PureScript.Types
 
@@ -81,23 +82,6 @@ data Bind
   -- Mutually recursive binding group for several values
   --
   | Rec [(Ident, Expr)] deriving (Show, D.Data, D.Typeable)
-
--- |
--- Metadata annotations
---
-data Meta
-  -- |
-  -- The contained value is a data constructor
-  --
-  = IsConstructor
-  -- |
-  -- The contained value is a newtype
-  --
-  | IsNewtype
-  -- |
-  -- The contained value is a typeclass dictionary constructor
-  --
-  | IsTypeClassDictionaryConstructor deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
