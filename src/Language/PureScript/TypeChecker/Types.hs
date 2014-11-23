@@ -97,7 +97,7 @@ typesOf mainModuleName moduleName vals = do
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
-  -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
+  -- If --main is enabled, need to that `main` has type Eff eff a for some eff, a
   checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
     [eff, a] <- replicateM 2 fresh
     ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
@@ -566,11 +566,6 @@ check' val kt@(KindedType ty kind) = do
 check' (PositionedValue pos val) ty =
   rethrowWithPosition pos $ check val ty
 check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
-
-containsTypeSynonyms :: Type -> Bool
-containsTypeSynonyms = everythingOnTypes (||) go where
-  go (SaturatedTypeSynonym _ _) = True
-  go _ = False
 
 -- |
 -- Check the type of a collection of named record fields

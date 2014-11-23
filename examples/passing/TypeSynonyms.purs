@@ -22,4 +22,12 @@ module Main where
   test1 :: forall a b c. Lens (Pair (Pair a b) c) a
   test1 = composeLenses fst fst
 
-  main = Debug.Trace.trace "Done"
+  -- Test partially applied nested synonyms
+  type F x y = x -> y
+
+  type G x = F x
+
+  f :: G String String -> String
+  f k = k "Done"
+
+  main = Debug.Trace.trace (f id)
