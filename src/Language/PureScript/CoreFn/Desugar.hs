@@ -12,9 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CoreFn.Desugar where
+module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Data.Either (partitionEithers)
 import Data.List (sort)
 
 import Control.Arrow (second, (***))
@@ -23,32 +22,45 @@ import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Literals
 import Language.PureScript.CoreFn.Module
-import Language.PureScript.Environment (DataDeclType(..))
+import Language.PureScript.Environment
 import Language.PureScript.Names
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants as C
 
-moduleToCoreFn :: A.Module -> Module
-moduleToCoreFn (A.Module mn decls (Just exps)) =
-  let (decls', externs) = partitionEithers $ concatMap go decls
-  in Module mn decls' externs exps
+moduleToCoreFn :: Environment -> A.Module -> Module
+moduleToCoreFn _ (A.Module mn decls (Just exps)) =
+  let decls' = concatMap go decls
+      imports = filter A.isImportDecl decls
+      externs = filter (\x -> A.isExternDecl x || A.isExternInstanceDecl x) decls
+  in Module mn imports exps externs decls'
   where
-  go :: A.Declaration -> [Either Bind ForeignDecl]
+  go :: A.Declaration -> [Bind]
   go (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
-    [Left . NotRec (Ident $ runProperName ctor) $
+    [NotRec (Ident $ runProperName ctor) $
       Meta IsNewtype (Abs (Ident "x") (Var $ Qualified Nothing (Ident "x")))]
   go d@(A.DataDeclaration Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   go (A.DataDeclaration Data _ _ ctors) =
     flip map ctors $ \(ctor, tys) ->
-      Left . NotRec (Ident $ runProperName ctor) $
-        Meta IsConstructor $
-          makeConstructor [ "value" ++ show index | index <- [0 .. length tys - 1] ]
+      let args = [ "value" ++ show index | index <- [0 .. length tys - 1] ]
+          props = ("$ctor", Literal (StringLiteral $ runModuleName mn ++ "." ++ runProperName ctor)) : [ (arg, Var $ Qualified Nothing (Ident arg)) | arg <- args ]
+      in NotRec (Ident $ runProperName ctor) $
+            Meta IsConstructor $
+              foldl (\e arg -> Abs (Ident arg) e) (Literal $ ObjectLiteral props) args
   go (A.DataBindingGroupDeclaration ds) = concatMap go ds
+  go (A.TypeSynonymDeclaration{}) = []
+  go d@(A.ValueDeclaration{}) = [declToCoreFn d]
+  go d@(A.BindingGroupDeclaration{}) = [declToCoreFn d]
+  go (A.ExternDeclaration{}) = []
+  go (A.ExternDataDeclaration{}) = []
+  go (A.ExternInstanceDeclaration{}) = [] -- TODO: this might need to be something
+  go (A.FixityDeclaration{}) = []
+  go (A.ImportDeclaration{}) = []
   go (A.TypeClassDeclaration name _ supers members) =
-    [Left . NotRec (Ident $ runProperName name) $
-      Meta IsTypeClassDictionaryConstructor $
-        makeConstructor args]
+    let props = [ (arg, Accessor arg (Var $ Qualified Nothing (Ident "dict"))) | arg <- args ]
+    in [NotRec (Ident $ runProperName name) $
+          Meta IsTypeClassDictionaryConstructor $
+            Abs (Ident "dict") (Literal $ ObjectLiteral props)]
     where
     args :: [String]
     args = sort $ memberNames ++ superNames
@@ -64,17 +76,10 @@ moduleToCoreFn (A.Module mn decls (Just exps)) =
     memberToName (A.TypeDeclaration ident _) = runIdent ident
     memberToName (A.PositionedDeclaration _ d) = memberToName d
     memberToName _ = error "Invalid declaration in type class definition"
-  go (A.ExternDeclaration _ name js ty) = [Right (name, js, ty)]
-  go d@(A.ValueDeclaration{}) = [Left $ declToCoreFn d]
-  go d@(A.BindingGroupDeclaration{}) = [Left $ declToCoreFn d]
   go (A.PositionedDeclaration _ d) = go d
   go d = error $ "Unexpected declaration in moduleToCoreFn: " ++ show d
-moduleToCoreFn (A.Module{}) = error "Module exports were not elaborated before moduleToCoreFn"
-
-makeConstructor :: [String] -> Expr
-makeConstructor args =
-  let props = [ (arg, Var $ Qualified Nothing (Ident arg)) | arg <- args ]
-  in foldl (\e arg -> Abs (Ident arg) e) (Literal $ ObjectLiteral props) args
+moduleToCoreFn _ (A.Module{}) =
+  error "Module exports were not elaborated before moduleToCoreFn"
 
 exprToCoreFn :: A.Expr -> Expr
 exprToCoreFn (A.NumericLiteral v) = Literal (NumericLiteral v)

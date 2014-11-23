@@ -326,7 +326,7 @@ binderToJs m e varName done (ConstructorBinder ctor bs) = do
   then
     return js
   else
-    return [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS m (Ident . runProperName) ctor))
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "$ctor" (JSVar varName)) (JSStringLiteral $ qnameToString ctor))
                      (JSBlock js)
                      Nothing]
   where
@@ -381,4 +381,6 @@ binderToJs m e varName done (NamedBinder ident binder) = do
 binderToJs m e varName done (PositionedBinder _ binder) =
   binderToJs m e varName done binder
 
-
+qnameToString :: Qualified ProperName -> String
+qnameToString (Qualified (Just mn) pn) = moduleNameToJs mn ++ "." ++ runProperName pn
+qnameToString _ = error "oops"

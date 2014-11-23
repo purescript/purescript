@@ -22,9 +22,10 @@ import qualified Language.PureScript.AST as A
 
 data Module = Module
   { moduleName :: ModuleName
-  , moduleDecls :: [Bind]
-  , moduleForeign :: [ForeignDecl]
+  , moduleImports :: [A.Declaration]
   , moduleExports :: [A.DeclarationRef]
-  }
+  , moduleForeign :: [A.Declaration]
+  , moduleDecls :: [Bind]
+  } deriving (Show)
 
 type ForeignDecl = (Ident, Maybe JS, Type)

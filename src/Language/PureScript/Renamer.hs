@@ -23,8 +23,7 @@ import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Language.PureScript.AST
-import Language.PureScript.Environment
+import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 
@@ -100,15 +99,11 @@ lookupIdent name = do
 -- |
 -- Finds idents introduced by declarations.
 --
-findDeclIdents :: [Declaration] -> [Ident]
+findDeclIdents :: [Bind] -> [Ident]
 findDeclIdents = concatMap go
   where
-  go (ValueDeclaration ident _ _ _) = [ident]
-  go (BindingGroupDeclaration ds) = map (\(name, _, _) -> name) ds
-  go (ExternDeclaration _ ident _ _) = [ident]
-  go (TypeClassDeclaration _ _ _ ds) = findDeclIdents ds
-  go (PositionedDeclaration _ d) = go d
-  go _ = []
+  go (NotRec ident _) = [ident]
+  go (Rec ds) = map fst ds
 
 -- |
 -- Renames within each declaration in a module.
@@ -117,8 +112,8 @@ renameInModules :: [Module] -> [Module]
 renameInModules = map go
   where
   go :: Module -> Module
-  go (Module mn decls exps) = Module mn (renameInDecl' (findDeclIdents decls) `map` decls) exps
-  renameInDecl' :: [Ident] -> Declaration -> Declaration
+  go (Module mn imps exps foreigns decls) = Module mn imps exps foreigns (renameInDecl' (findDeclIdents decls) `map` decls)
+  renameInDecl' :: [Ident] -> Bind -> Bind
   renameInDecl' scope = runRename scope . renameInDecl True
 
 -- |
@@ -128,60 +123,56 @@ renameInModules = map go
 -- been added), whereas in a Let declarations are renamed if their name shadows
 -- another in the current scope.
 --
-renameInDecl :: Bool -> Declaration -> Rename Declaration
-renameInDecl isTopLevel (ValueDeclaration name nameKind [] (Right val)) = do
+renameInDecl :: Bool -> Bind -> Rename Bind
+renameInDecl isTopLevel (NotRec name val) = do
   name' <- if isTopLevel then return name else updateScope name
-  ValueDeclaration name' nameKind [] . Right <$> renameInValue val
-renameInDecl isTopLevel (BindingGroupDeclaration ds) = do
+  NotRec name' <$> renameInValue val
+renameInDecl isTopLevel (Rec ds) = do
   ds' <- mapM updateNames ds
-  BindingGroupDeclaration <$> mapM updateValues ds'
+  Rec <$> mapM updateValues ds'
   where
-  updateNames :: (Ident, NameKind, Expr) -> Rename (Ident, NameKind, Expr)
-  updateNames (name, nameKind, val) = do
+  updateNames :: (Ident, Expr) -> Rename (Ident, Expr)
+  updateNames (name, val) = do
     name' <- if isTopLevel then return name else updateScope name
-    return (name', nameKind, val)
-  updateValues :: (Ident, NameKind, Expr) -> Rename (Ident, NameKind, Expr)
-  updateValues (name, nameKind, val) =
-    (,,) name nameKind <$> renameInValue val
-renameInDecl _ (TypeInstanceDeclaration name cs className args ds) =
-  TypeInstanceDeclaration name cs className args <$> mapM (renameInDecl True) ds
-renameInDecl isTopLevel (PositionedDeclaration pos d) =
-  PositionedDeclaration pos <$> renameInDecl isTopLevel d
-renameInDecl _ other = return other
+    return (name', val)
+  updateValues :: (Ident, Expr) -> Rename (Ident, Expr)
+  updateValues (name, val) =
+    (,) name <$> renameInValue val
 
 -- |
 -- Renames within a value.
 --
 renameInValue :: Expr -> Rename Expr
-renameInValue (UnaryMinus v) =
-  UnaryMinus <$> renameInValue v
-renameInValue (ArrayLiteral vs) =
-  ArrayLiteral <$> mapM renameInValue vs
-renameInValue (ObjectLiteral vs) =
-  ObjectLiteral <$> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
+renameInValue (Literal l) =
+  Literal <$> renameInLiteral renameInValue l
 renameInValue (Accessor prop v) =
   Accessor prop <$> renameInValue v
 renameInValue (ObjectUpdate obj vs) =
   ObjectUpdate <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
-renameInValue (Abs (Left name) v) =
-  newScope $ Abs . Left <$> updateScope name <*> renameInValue v
+renameInValue (Abs name v) =
+  newScope $ Abs <$> updateScope name <*> renameInValue v
 renameInValue (App v1 v2) =
   App <$> renameInValue v1 <*> renameInValue v2
 renameInValue (Var (Qualified Nothing name)) =
   Var . Qualified Nothing <$> lookupIdent name
-renameInValue (IfThenElse v1 v2 v3) =
-  IfThenElse <$> renameInValue v1 <*> renameInValue v2 <*> renameInValue v3
+renameInValue (Var qname) =
+  return $ Var qname
 renameInValue (Case vs alts) =
   newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
-renameInValue (TypedValue check v ty) =
-  TypedValue check <$> renameInValue v <*> pure ty
+renameInValue (TypedValue v ty) =
+  TypedValue <$> renameInValue v <*> pure ty
 renameInValue (Let ds v) =
   newScope $ Let <$> mapM (renameInDecl False) ds <*> renameInValue v
-renameInValue (TypeClassDictionaryConstructorApp name v) =
-  TypeClassDictionaryConstructorApp name <$> renameInValue v
-renameInValue (PositionedValue pos v) =
-  PositionedValue pos <$> renameInValue v
-renameInValue v = return v
+renameInValue (Meta m v) =
+  Meta m <$> renameInValue v
+
+-- |
+-- Renames within literals.
+--
+renameInLiteral :: (a -> Rename a) -> Literal a -> Rename (Literal a)
+renameInLiteral rename (ArrayLiteral bs) = ArrayLiteral <$> mapM rename bs
+renameInLiteral rename (ObjectLiteral bs) = ObjectLiteral <$> mapM (sndM rename) bs
+renameInLiteral _ l = return l
 
 -- |
 -- Renames within case alternatives.
@@ -195,17 +186,14 @@ renameInCaseAlternative (CaseAlternative bs v) =
 -- Renames within binders.
 --
 renameInBinder :: Binder -> Rename Binder
+renameInBinder NullBinder = return NullBinder
+renameInBinder (LiteralBinder b) =
+  LiteralBinder <$> renameInLiteral renameInBinder b
 renameInBinder (VarBinder name) =
   VarBinder <$> updateScope name
 renameInBinder (ConstructorBinder name bs) =
   ConstructorBinder name <$> mapM renameInBinder bs
-renameInBinder (ObjectBinder bs) =
-  ObjectBinder <$> mapM (sndM renameInBinder) bs
-renameInBinder (ArrayBinder bs) =
-  ArrayBinder <$> mapM renameInBinder bs
 renameInBinder (ConsBinder b1 b2) =
   ConsBinder <$> renameInBinder b1 <*> renameInBinder b2
 renameInBinder (NamedBinder name b) =
   NamedBinder <$> updateScope name <*> renameInBinder b
-renameInBinder (PositionedBinder _ b) = renameInBinder b
-renameInBinder other = return other

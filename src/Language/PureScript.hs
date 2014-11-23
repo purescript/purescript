@@ -17,41 +17,40 @@
 
 module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, prelude) where
 
-import Language.PureScript.Types as P
-import Language.PureScript.Kinds as P
-import Language.PureScript.AST as P
-import Language.PureScript.Names as P
-import Language.PureScript.Parser as P
-import Language.PureScript.CodeGen as P
-import Language.PureScript.CodeGen.Common as P
-import Language.PureScript.TypeChecker as P
-import Language.PureScript.Pretty as P
-import Language.PureScript.Sugar as P
-import Language.PureScript.Options as P
-import Language.PureScript.ModuleDependencies as P
-import Language.PureScript.Environment as P
-import Language.PureScript.Errors as P
-import Language.PureScript.DeadCodeElimination as P
-import Language.PureScript.Supply as P
-import Language.PureScript.Renamer as P
-
-import qualified Language.PureScript.Constants as C
-
-import Data.List (sortBy, groupBy, intercalate)
-import Data.Time.Clock
-import Data.Function (on)
-import Data.Maybe (fromMaybe)
 import Data.FileEmbed (embedFile)
-
-import Control.Monad.Error
-import Control.Arrow ((&&&))
-import Control.Applicative
-
+import Data.Function (on)
+import Data.List (sortBy, groupBy, intercalate)
+import Data.Maybe (fromMaybe)
+import Data.Time.Clock
+import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.ByteString.UTF8 as BU
+
+import Control.Applicative
+import Control.Arrow ((&&&))
+import Control.Monad.Error
 
 import System.FilePath ((</>))
+
+import Language.PureScript.AST as P
+import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen.Common as P
+import Language.PureScript.DeadCodeElimination as P
+import Language.PureScript.Environment as P
+import Language.PureScript.Errors as P
+import Language.PureScript.Kinds as P
+import Language.PureScript.ModuleDependencies as P
+import Language.PureScript.Names as P
+import Language.PureScript.Options as P
+import Language.PureScript.Parser as P
+import Language.PureScript.Pretty as P
+import Language.PureScript.Renamer as P
+import Language.PureScript.Sugar as P
+import Language.PureScript.Supply as P
+import Language.PureScript.TypeChecker as P
+import Language.PureScript.Types as P
+import qualified Language.PureScript.CoreFn as CoreFn
+import qualified Language.PureScript.Constants as C
 
 -- |
 -- Compile a collection of modules
@@ -81,11 +80,12 @@ compile' env opts ms prefix = do
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
-  let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
-  let renamed = renameInModules elim
+  let corefn = map (CoreFn.moduleToCoreFn env') regrouped
+  --let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
+  --let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
+  let renamed = renameInModules corefn --elim
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
-  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(Module mn _ _) -> mn `elem` codeGenModuleNames) renamed
+  let modulesToCodeGen = map CoreFn.resugar $ if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
   js' <- generateMain env' opts js
@@ -199,11 +199,13 @@ make outputDir opts ms prefix = do
     regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
-    let [renamed] = renameInModules [mod']
+    let corefn = CoreFn.moduleToCoreFn env' mod'
+    let [renamed'] = renameInModules [corefn]
+    let renamed = CoreFn.resugar renamed'
 
     pjs <- prettyPrintJS <$> moduleToJs opts renamed env'
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
-    let exts = unlines $ map ("-- " ++ ) prefix ++ [moduleToPs renamed env']
+    let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
 
     lift $ writeTextFile jsFile js
     lift $ writeTextFile externsFile exts
