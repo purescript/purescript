@@ -46,13 +46,9 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
       Meta IsNewtype (Abs (Ident "x") (Var $ Qualified Nothing (Ident "x")))]
   go d@(A.DataDeclaration Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
-  go (A.DataDeclaration Data _ _ ctors) =
+  go (A.DataDeclaration Data tyName _ ctors) =
     flip map ctors $ \(ctor, tys) ->
-      let args = [ "value" ++ show index | index <- [0 .. length tys - 1] ]
-          props = ("$ctor", Literal (StringLiteral $ runModuleName mn ++ "." ++ runProperName ctor)) : [ (arg, Var $ Qualified Nothing (Ident arg)) | arg <- args ]
-      in NotRec (properToIdent ctor) $
-            Meta IsConstructor $
-              foldl (\e arg -> Abs (Ident arg) e) (Literal $ ObjectLiteral props) args
+      NotRec (properToIdent ctor) $ Constructor tyName ctor (length tys)
   go (A.DataBindingGroupDeclaration ds) = concatMap go ds
   go (A.TypeSynonymDeclaration{}) = []
   go d@(A.ValueDeclaration{}) = [declToCoreFn env d]

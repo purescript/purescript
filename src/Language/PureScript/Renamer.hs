@@ -145,6 +145,7 @@ renameInDecl isTopLevel (Rec ds) = do
 renameInValue :: Expr -> Rename Expr
 renameInValue (Literal l) =
   Literal <$> renameInLiteral renameInValue l
+renameInValue c@(Constructor{}) = return c
 renameInValue (Accessor prop v) =
   Accessor prop <$> renameInValue v
 renameInValue (ObjectUpdate obj vs) =
@@ -155,8 +156,7 @@ renameInValue (App v1 v2) =
   App <$> renameInValue v1 <*> renameInValue v2
 renameInValue (Var (Qualified Nothing name)) =
   Var . Qualified Nothing <$> lookupIdent name
-renameInValue (Var qname) =
-  return $ Var qname
+renameInValue v@(Var{}) = return v
 renameInValue (Case vs alts) =
   newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
 renameInValue (TypedValue v ty) =

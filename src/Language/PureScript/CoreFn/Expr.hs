@@ -33,6 +33,10 @@ data Expr
   --
   = Literal (Literal Expr)
   -- |
+  -- A data constructor (type name, constructor name, arity)
+  --
+  | Constructor ProperName ProperName Int
+  -- |
   -- A record property accessor
   --
   | Accessor String Expr
