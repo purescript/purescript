@@ -42,7 +42,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
 
   go :: A.Declaration -> [Bind]
   go (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
-    [NotRec (Ident $ runProperName ctor) $
+    [NotRec (properToIdent ctor) $
       Meta IsNewtype (Abs (Ident "x") (Var $ Qualified Nothing (Ident "x")))]
   go d@(A.DataDeclaration Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
@@ -50,7 +50,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
     flip map ctors $ \(ctor, tys) ->
       let args = [ "value" ++ show index | index <- [0 .. length tys - 1] ]
           props = ("$ctor", Literal (StringLiteral $ runModuleName mn ++ "." ++ runProperName ctor)) : [ (arg, Var $ Qualified Nothing (Ident arg)) | arg <- args ]
-      in NotRec (Ident $ runProperName ctor) $
+      in NotRec (properToIdent ctor) $
             Meta IsConstructor $
               foldl (\e arg -> Abs (Ident arg) e) (Literal $ ObjectLiteral props) args
   go (A.DataBindingGroupDeclaration ds) = concatMap go ds
@@ -64,7 +64,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
   go (A.ImportDeclaration{}) = []
   go (A.TypeClassDeclaration name _ supers members) =
     let props = [ (arg, Accessor arg (Var $ Qualified Nothing (Ident "dict"))) | arg <- args ]
-    in [NotRec (Ident $ runProperName name) $
+    in [NotRec (properToIdent name) $
           Meta IsTypeClassDictionaryConstructor $
             Abs (Ident "dict") (Literal $ ObjectLiteral props)]
     where
@@ -92,9 +92,9 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
   goExterns _ = Nothing
 
   goExports :: A.DeclarationRef -> [Ident]
-  goExports (A.TypeRef _ (Just dctors)) = map (Ident . runProperName) dctors
+  goExports (A.TypeRef _ (Just dctors)) = map properToIdent dctors
   goExports (A.ValueRef name) = [name]
-  goExports (A.TypeClassRef name) = [Ident $ runProperName name]
+  goExports (A.TypeClassRef name) = [properToIdent name]
   goExports (A.TypeInstanceRef name) = [name]
   goExports (A.PositionedDeclarationRef _ d) = goExports d
   goExports _ = []
@@ -121,12 +121,12 @@ exprToCoreFn env (A.IfThenElse v1 v2 v3) =
     , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn env v3) ]
 exprToCoreFn env (A.Constructor name) =
   let ctorType = if isNewtypeConstructor env name then IsNewtype else IsConstructor
-  in Meta ctorType (Var $ properToIdent name)
+  in Meta ctorType (Var $ fmap properToIdent name)
 exprToCoreFn env (A.Case vs alts) = Case (map (exprToCoreFn env) vs) (map (altToCoreFn env) alts)
 exprToCoreFn env (A.TypedValue _ v ty) = TypedValue (exprToCoreFn env v) ty
 exprToCoreFn env (A.Let ds v) = Let (map (declToCoreFn env) ds) (exprToCoreFn env v)
 exprToCoreFn env (A.TypeClassDictionaryConstructorApp name v) =
-  App (Meta IsTypeClassDictionaryConstructor (Var $ properToIdent name)) (exprToCoreFn env v)
+  App (Meta IsTypeClassDictionaryConstructor (Var $ fmap properToIdent name)) (exprToCoreFn env v)
 exprToCoreFn env (A.PositionedValue _ v) = exprToCoreFn env v
 exprToCoreFn _ e = error $ "Unexpected value in exprToCoreFn: " ++ show e
 
@@ -156,8 +156,11 @@ declToCoreFn env (A.BindingGroupDeclaration ds) = Rec $ map (\(name, _, e) -> (n
 declToCoreFn env (A.PositionedDeclaration _ d) = declToCoreFn env d
 declToCoreFn _ d = error $ "Unexpected value in declToCoreFn: " ++ show d
 
-properToIdent :: Qualified ProperName -> Qualified Ident
-properToIdent (Qualified q name) = Qualified q (Ident $ runProperName name)
+-- |
+-- Converts a ProperName to an Ident.
+--
+properToIdent :: ProperName -> Ident
+properToIdent = Ident . runProperName
 
 -- |
 -- Finds the value stored for a data constructor in the current environment.

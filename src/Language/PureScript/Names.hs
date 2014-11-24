@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
 
 module Language.PureScript.Names where
 
@@ -71,7 +71,7 @@ instance Show ModuleName where
 -- |
 -- A qualified name, i.e. a name with an optional module name
 --
-data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typeable)
+data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typeable, Functor)
 
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
