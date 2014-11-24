@@ -15,7 +15,8 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Data.List (sort)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
+import qualified Data.Map as M
 
 import Control.Arrow (second, (***))
 
@@ -26,11 +27,12 @@ import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
 import Language.PureScript.Names
+import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants as C
 
 moduleToCoreFn :: Environment -> A.Module -> Module
-moduleToCoreFn _ (A.Module mn decls (Just exps)) =
+moduleToCoreFn env (A.Module mn decls (Just exps)) =
   let decls' = concatMap go decls
       imports = filter A.isImportDecl decls
       externs = mapMaybe goExterns decls
@@ -53,8 +55,8 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
               foldl (\e arg -> Abs (Ident arg) e) (Literal $ ObjectLiteral props) args
   go (A.DataBindingGroupDeclaration ds) = concatMap go ds
   go (A.TypeSynonymDeclaration{}) = []
-  go d@(A.ValueDeclaration{}) = [declToCoreFn d]
-  go d@(A.BindingGroupDeclaration{}) = [declToCoreFn d]
+  go d@(A.ValueDeclaration{}) = [declToCoreFn env d]
+  go d@(A.BindingGroupDeclaration{}) = [declToCoreFn env d]
   go (A.ExternDeclaration{}) = []
   go (A.ExternDataDeclaration{}) = []
   go (A.ExternInstanceDeclaration{}) = []
@@ -100,57 +102,75 @@ moduleToCoreFn _ (A.Module mn decls (Just exps)) =
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
-exprToCoreFn :: A.Expr -> Expr
-exprToCoreFn (A.NumericLiteral v) = Literal (NumericLiteral v)
-exprToCoreFn (A.StringLiteral v) = Literal (StringLiteral v)
-exprToCoreFn (A.BooleanLiteral v) = Literal (BooleanLiteral v)
-exprToCoreFn (A.ArrayLiteral vs) = Literal (ArrayLiteral $ map exprToCoreFn vs)
-exprToCoreFn (A.ObjectLiteral vs) = Literal (ObjectLiteral $ map (second exprToCoreFn) vs)
-exprToCoreFn (A.Accessor name v) = Accessor name (exprToCoreFn v)
-exprToCoreFn (A.ObjectUpdate obj vs) =
-  ObjectUpdate (exprToCoreFn obj) $ map (second exprToCoreFn) vs
-exprToCoreFn (A.Abs (Left name) v) = Abs name (exprToCoreFn v)
-exprToCoreFn (A.Abs _ _) = error "Abs with Binder argument was not desugared before exprToCoreFn"
-exprToCoreFn (A.App v1 v2) = App (exprToCoreFn v1) (exprToCoreFn v2)
-exprToCoreFn (A.Var ident) = Var ident
-exprToCoreFn (A.IfThenElse v1 v2 v3) =
-  Case [exprToCoreFn v1]
-    [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn v2)
-    , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn v3) ]
-exprToCoreFn (A.Constructor name) = Meta IsConstructor (Var $ properToIdent name)
-exprToCoreFn (A.Case vs alts) = Case (map exprToCoreFn vs) (map altToCoreFn alts)
-exprToCoreFn (A.TypedValue _ v ty) = TypedValue (exprToCoreFn v) ty
-exprToCoreFn (A.Let ds v) = Let (map declToCoreFn ds) (exprToCoreFn v)
-exprToCoreFn (A.TypeClassDictionaryConstructorApp name v) =
-  App (Meta IsTypeClassDictionaryConstructor (Var $ properToIdent name)) (exprToCoreFn v)
-exprToCoreFn (A.PositionedValue _ v) = exprToCoreFn v
-exprToCoreFn e = error $ "Unexpected value in exprToCoreFn: " ++ show e
+exprToCoreFn :: Environment -> A.Expr -> Expr
+exprToCoreFn _ (A.NumericLiteral v) = Literal (NumericLiteral v)
+exprToCoreFn _ (A.StringLiteral v) = Literal (StringLiteral v)
+exprToCoreFn _ (A.BooleanLiteral v) = Literal (BooleanLiteral v)
+exprToCoreFn env (A.ArrayLiteral vs) = Literal (ArrayLiteral $ map (exprToCoreFn env) vs)
+exprToCoreFn env (A.ObjectLiteral vs) = Literal (ObjectLiteral $ map (second (exprToCoreFn env)) vs)
+exprToCoreFn env (A.Accessor name v) = Accessor name (exprToCoreFn env v)
+exprToCoreFn env (A.ObjectUpdate obj vs) =
+  ObjectUpdate (exprToCoreFn env obj) $ map (second (exprToCoreFn env)) vs
+exprToCoreFn env (A.Abs (Left name) v) = Abs name (exprToCoreFn env v)
+exprToCoreFn _ (A.Abs _ _) = error "Abs with Binder argument was not desugared before exprToCoreFn"
+exprToCoreFn env (A.App v1 v2) = App (exprToCoreFn env v1) (exprToCoreFn env v2)
+exprToCoreFn _ (A.Var ident) = Var ident
+exprToCoreFn env (A.IfThenElse v1 v2 v3) =
+  Case [exprToCoreFn env v1]
+    [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn env v2)
+    , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn env v3) ]
+exprToCoreFn env (A.Constructor name) =
+  let ctorType = if isNewtypeConstructor env name then IsNewtype else IsConstructor
+  in Meta ctorType (Var $ properToIdent name)
+exprToCoreFn env (A.Case vs alts) = Case (map (exprToCoreFn env) vs) (map (altToCoreFn env) alts)
+exprToCoreFn env (A.TypedValue _ v ty) = TypedValue (exprToCoreFn env v) ty
+exprToCoreFn env (A.Let ds v) = Let (map (declToCoreFn env) ds) (exprToCoreFn env v)
+exprToCoreFn env (A.TypeClassDictionaryConstructorApp name v) =
+  App (Meta IsTypeClassDictionaryConstructor (Var $ properToIdent name)) (exprToCoreFn env v)
+exprToCoreFn env (A.PositionedValue _ v) = exprToCoreFn env v
+exprToCoreFn _ e = error $ "Unexpected value in exprToCoreFn: " ++ show e
 
-altToCoreFn :: A.CaseAlternative -> CaseAlternative
-altToCoreFn (A.CaseAlternative bs vs) = CaseAlternative (map binderToCoreFn bs) (go vs)
+altToCoreFn :: Environment -> A.CaseAlternative -> CaseAlternative
+altToCoreFn env (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn env) bs) (go vs)
   where
   go :: Either [(A.Guard, A.Expr)] A.Expr -> Either [(Guard, Expr)] Expr
-  go (Left ges) = Left $ map (exprToCoreFn *** exprToCoreFn) ges
-  go (Right e) = Right (exprToCoreFn e)
+  go (Left ges) = Left $ map (exprToCoreFn env *** exprToCoreFn env) ges
+  go (Right e) = Right (exprToCoreFn env e)
 
-binderToCoreFn :: A.Binder -> Binder
-binderToCoreFn (A.NullBinder) = NullBinder
-binderToCoreFn (A.BooleanBinder b) = LiteralBinder (BooleanLiteral b)
-binderToCoreFn (A.StringBinder s) = LiteralBinder (StringLiteral s)
-binderToCoreFn (A.NumberBinder n) = LiteralBinder (NumericLiteral n)
-binderToCoreFn (A.VarBinder name) = VarBinder name
-binderToCoreFn (A.ConstructorBinder name bs) = ConstructorBinder name (map binderToCoreFn bs)
-binderToCoreFn (A.ObjectBinder bs) = LiteralBinder (ObjectLiteral $ map (second binderToCoreFn) bs)
-binderToCoreFn (A.ArrayBinder bs) = LiteralBinder (ArrayLiteral $ map binderToCoreFn bs)
-binderToCoreFn (A.ConsBinder b1 b2) = ConsBinder (binderToCoreFn b1) (binderToCoreFn b2)
-binderToCoreFn (A.NamedBinder name b) = NamedBinder name (binderToCoreFn b)
-binderToCoreFn (A.PositionedBinder _ b) = binderToCoreFn b
+binderToCoreFn :: Environment -> A.Binder -> Binder
+binderToCoreFn _ (A.NullBinder) = NullBinder
+binderToCoreFn _ (A.BooleanBinder b) = LiteralBinder (BooleanLiteral b)
+binderToCoreFn _ (A.StringBinder s) = LiteralBinder (StringLiteral s)
+binderToCoreFn _ (A.NumberBinder n) = LiteralBinder (NumericLiteral n)
+binderToCoreFn _ (A.VarBinder name) = VarBinder name
+binderToCoreFn env (A.ConstructorBinder name bs) = ConstructorBinder name (map (binderToCoreFn env) bs)
+binderToCoreFn env (A.ObjectBinder bs) = LiteralBinder (ObjectLiteral $ map (second (binderToCoreFn env)) bs)
+binderToCoreFn env (A.ArrayBinder bs) = LiteralBinder (ArrayLiteral $ map (binderToCoreFn env) bs)
+binderToCoreFn env (A.ConsBinder b1 b2) = ConsBinder (binderToCoreFn env b1) (binderToCoreFn env b2)
+binderToCoreFn env (A.NamedBinder name b) = NamedBinder name (binderToCoreFn env b)
+binderToCoreFn env (A.PositionedBinder _ b) = binderToCoreFn env b
 
-declToCoreFn :: A.Declaration -> Bind
-declToCoreFn (A.ValueDeclaration name _ _ (Right e)) = NotRec name (exprToCoreFn e)
-declToCoreFn (A.BindingGroupDeclaration ds) = Rec $ map (\(name, _, e) -> (name, exprToCoreFn e)) ds
-declToCoreFn (A.PositionedDeclaration _ d) = declToCoreFn d
-declToCoreFn d = error $ "Unexpected value in declToCoreFn: " ++ show d
+declToCoreFn :: Environment -> A.Declaration -> Bind
+declToCoreFn env (A.ValueDeclaration name _ _ (Right e)) = NotRec name (exprToCoreFn env e)
+declToCoreFn env (A.BindingGroupDeclaration ds) = Rec $ map (\(name, _, e) -> (name, exprToCoreFn env e)) ds
+declToCoreFn env (A.PositionedDeclaration _ d) = declToCoreFn env d
+declToCoreFn _ d = error $ "Unexpected value in declToCoreFn: " ++ show d
 
 properToIdent :: Qualified ProperName -> Qualified Ident
 properToIdent (Qualified q name) = Qualified q (Ident $ runProperName name)
+
+-- |
+-- Finds the value stored for a data constructor in the current environment.
+-- This is a partial function, but if an invalid type has reached this far then
+-- something has gone wrong in typechecking.
+--
+lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
+lookupConstructor e ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
+
+-- |
+-- Checks whether a data constructor is for a newtype.
+--
+isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
+isNewtypeConstructor e ctor = case lookupConstructor e ctor of
+  (Newtype, _, _) -> True
+  (Data, _, _) -> False
