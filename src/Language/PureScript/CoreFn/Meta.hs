@@ -25,7 +25,7 @@ data Meta
   -- |
   -- The contained value is a data constructor
   --
-  = IsConstructor
+  = IsConstructor ConstructorType Arity
   -- |
   -- The contained value is a newtype
   --
@@ -34,3 +34,21 @@ data Meta
   -- The contained value is a typeclass dictionary constructor
   --
   | IsTypeClassDictionaryConstructor deriving (Show, D.Data, D.Typeable)
+
+-- |
+-- Type alias for constructor arity
+--
+type Arity = Int
+
+-- |
+-- Data constructor metadata
+--
+data ConstructorType
+  -- |
+  -- The constructor is for a type with a single construcor
+  --
+  = ProductType
+  -- |
+  -- The constructor is for a type with multiple construcors
+  --
+  | SumType deriving (Show, D.Data, D.Typeable)

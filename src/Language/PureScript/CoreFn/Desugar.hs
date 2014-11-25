@@ -14,6 +14,7 @@
 
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
+import Data.Function (on)
 import Data.List (sort, nub)
 import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as M
@@ -121,8 +122,7 @@ exprToCoreFn env (A.IfThenElse v1 v2 v3) =
     [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn env v2)
     , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn env v3) ]
 exprToCoreFn env (A.Constructor name) =
-  let ctorType = if isNewtypeConstructor env name then IsNewtype else IsConstructor
-  in Meta ctorType (Var $ fmap properToIdent name)
+  Meta (getConstructorMeta env name) (Var $ fmap properToIdent name)
 exprToCoreFn env (A.Case vs alts) = Case (map (exprToCoreFn env) vs) (map (altToCoreFn env) alts)
 exprToCoreFn env (A.TypedValue _ v ty) = TypedValue (exprToCoreFn env v) ty
 exprToCoreFn env (A.Let ds v) = Let (map (declToCoreFn env) ds) (exprToCoreFn env v)
@@ -164,17 +164,22 @@ properToIdent :: ProperName -> Ident
 properToIdent = Ident . runProperName
 
 -- |
--- Finds the value stored for a data constructor in the current environment.
--- This is a partial function, but if an invalid type has reached this far then
--- something has gone wrong in typechecking.
+-- Gets metadata for data constructors.
 --
-lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
-lookupConstructor e ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors e
-
--- |
--- Checks whether a data constructor is for a newtype.
---
-isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
-isNewtypeConstructor e ctor = case lookupConstructor e ctor of
-  (Newtype, _, _) -> True
-  (Data, _, _) -> False
+getConstructorMeta :: Environment -> Qualified ProperName -> Meta
+getConstructorMeta env ctor =
+  case fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env of
+    (Newtype, _, _) -> IsNewtype
+    dc@(Data, _, ty) ->
+      let constructorType = if numConstructors (ctor, dc) == 1 then ProductType else SumType
+      in IsConstructor constructorType (getArity ty)
+  where
+  getArity :: Type -> Int
+  getArity (TypeApp (TypeApp f _) t) | f == tyFunction = getArity t + 1
+  getArity (ForAll _ ty _) = getArity ty
+  getArity _ = 0
+  numConstructors :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> Int
+  numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
+  typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> (ModuleName, ProperName)
+  typeConstructor (Qualified (Just mn) _, (_, tyCtor, _)) = (mn, tyCtor)
+  typeConstructor _ = error "Invalid argument to isOnlyConstructor"

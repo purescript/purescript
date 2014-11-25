@@ -35,7 +35,7 @@ data Expr
   -- |
   -- A data constructor (type name, constructor name, arity)
   --
-  | Constructor ProperName ProperName Int
+  | Constructor ProperName ProperName Arity
   -- |
   -- A record property accessor
   --
