@@ -14,7 +14,7 @@
 
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Data.List (sort)
+import Data.List (sort, nub)
 import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as M
 
@@ -34,8 +34,8 @@ import qualified Language.PureScript.Constants as C
 moduleToCoreFn :: Environment -> A.Module -> Module
 moduleToCoreFn env (A.Module mn decls (Just exps)) =
   let decls' = concatMap go decls
-      imports = filter A.isImportDecl decls
-      externs = mapMaybe goExterns decls
+      imports = mapMaybe goImports decls
+      externs = nub $ mapMaybe goExterns decls
       exps' = concatMap goExports exps
   in Module mn imports exps' externs decls'
   where
@@ -80,6 +80,11 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
     memberToName _ = error "Invalid declaration in type class definition"
   go (A.PositionedDeclaration _ d) = go d
   go d = error $ "Unexpected declaration in moduleToCoreFn: " ++ show d
+
+  goImports :: A.Declaration -> Maybe ModuleName
+  goImports (A.ImportDeclaration name _ _) = Just name
+  goImports (A.PositionedDeclaration _ d) = goImports d
+  goImports _ = Nothing
 
   goExterns :: A.Declaration -> Maybe ForeignDecl
   goExterns (A.ExternDeclaration _ name js ty) = Just (name, js, ty)

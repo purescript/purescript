@@ -18,11 +18,10 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
 import Language.PureScript.Types
-import qualified Language.PureScript.AST as A
 
 data Module = Module
   { moduleName :: ModuleName
-  , moduleImports :: [A.Declaration]
+  , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [Bind]

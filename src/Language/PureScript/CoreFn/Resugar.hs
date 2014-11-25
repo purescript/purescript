@@ -26,7 +26,9 @@ import qualified Language.PureScript.AST as A
 
 resugar :: Module -> A.Module
 resugar (Module mn imps exps foreigns decls) =
-  A.Module mn (imps ++ map foreignToDecl foreigns ++ map bindToDecl decls) (Just $ map A.ValueRef exps)
+  A.Module mn (map importToDecl imps
+            ++ map foreignToDecl foreigns
+            ++ map bindToDecl decls) (Just $ map A.ValueRef exps)
 
   where
 
@@ -78,6 +80,9 @@ resugar (Module mn imps exps foreigns decls) =
   bindToDecl :: Bind -> A.Declaration
   bindToDecl (NotRec name e) = A.ValueDeclaration name Value [] (Right $ exprToAST e)
   bindToDecl (Rec ds) = A.BindingGroupDeclaration $ map (\(name, e) -> (name, Value, exprToAST e)) ds
+
+  importToDecl :: ModuleName -> A.Declaration
+  importToDecl name = A.ImportDeclaration name (A.Qualifying []) Nothing
 
   foreignToDecl :: ForeignDecl -> A.Declaration
   foreignToDecl (name, Nothing, ty) = A.ExternDeclaration ForeignImport name Nothing ty
