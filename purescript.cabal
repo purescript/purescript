@@ -53,6 +53,7 @@ library
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Resugar
+                     Language.PureScript.CoreFn.Traversals
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
