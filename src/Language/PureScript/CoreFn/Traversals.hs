@@ -44,7 +44,6 @@ everywhereOnValues f g h = (f', g', h')
 
   h' :: Binder -> Binder
   h' (LiteralBinder b) = h (LiteralBinder (handleLiteral h' b))
-  h' (ConsBinder b1 b2) = h (ConsBinder (h' b1) (h' b2))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
   h' b = h b
 
@@ -83,7 +82,6 @@ everythingOnValues (<>) f g h i = (f', g', h', i')
 
   h' b@(LiteralBinder l) = foldl (<>) (h b) (map h' (extractLiteral l))
   h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
-  h' b@(ConsBinder b1 b2) = h b <> h' b1 <> h' b2
   h' b@(NamedBinder _ b1) = h b <> h' b1
   h' b = h b
 

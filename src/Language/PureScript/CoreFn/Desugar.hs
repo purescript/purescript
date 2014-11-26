@@ -147,7 +147,9 @@ binderToCoreFn _ (A.VarBinder name) = VarBinder name
 binderToCoreFn env (A.ConstructorBinder name bs) = ConstructorBinder name (map (binderToCoreFn env) bs)
 binderToCoreFn env (A.ObjectBinder bs) = LiteralBinder (ObjectLiteral $ map (second (binderToCoreFn env)) bs)
 binderToCoreFn env (A.ArrayBinder bs) = LiteralBinder (ArrayLiteral $ map (binderToCoreFn env) bs)
-binderToCoreFn env (A.ConsBinder b1 b2) = ConsBinder (binderToCoreFn env b1) (binderToCoreFn env b2)
+binderToCoreFn env (A.ConsBinder b1 b2) =
+  let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
+  in ConstructorBinder arrCtor $ map (binderToCoreFn env) [b1, b2]
 binderToCoreFn env (A.NamedBinder name b) = NamedBinder name (binderToCoreFn env b)
 binderToCoreFn env (A.PositionedBinder _ b) = binderToCoreFn env b
 

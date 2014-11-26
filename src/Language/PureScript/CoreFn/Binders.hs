@@ -42,10 +42,6 @@ data Binder
   --
   | ConstructorBinder (Qualified ProperName) [Binder]
   -- |
-  -- A binder which matches an array and binds its head and tail
-  --
-  | ConsBinder Binder Binder
-  -- |
   -- A binder which binds its input to an identifier
   --
   | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)

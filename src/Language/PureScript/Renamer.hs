@@ -193,7 +193,5 @@ renameInBinder (VarBinder name) =
   VarBinder <$> updateScope name
 renameInBinder (ConstructorBinder name bs) =
   ConstructorBinder name <$> mapM renameInBinder bs
-renameInBinder (ConsBinder b1 b2) =
-  ConsBinder <$> renameInBinder b1 <*> renameInBinder b2
 renameInBinder (NamedBinder name b) =
   NamedBinder <$> updateScope name <*> renameInBinder b
