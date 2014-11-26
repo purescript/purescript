@@ -81,9 +81,9 @@ compile' env opts ms prefix = do
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
-  --let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
-  --let elim = if null entryPoints then regrouped else eliminateDeadCode entryPoints regrouped
-  let renamed = renameInModules corefn --elim
+  let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
+  let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
+  let renamed = renameInModules elim
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
   let modulesToCodeGen = map CoreFn.resugar $ if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
