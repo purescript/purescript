@@ -191,7 +191,7 @@ renameInBinder (LiteralBinder b) =
   LiteralBinder <$> renameInLiteral renameInBinder b
 renameInBinder (VarBinder name) =
   VarBinder <$> updateScope name
-renameInBinder (ConstructorBinder name bs) =
-  ConstructorBinder name <$> mapM renameInBinder bs
+renameInBinder (ConstructorBinder tctor dctor bs) =
+  ConstructorBinder tctor dctor <$> mapM renameInBinder bs
 renameInBinder (NamedBinder name b) =
   NamedBinder <$> updateScope name <*> renameInBinder b

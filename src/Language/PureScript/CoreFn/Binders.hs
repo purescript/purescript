@@ -38,9 +38,9 @@ data Binder
   --
   | VarBinder Ident
   -- |
-  -- A binder which matches a data constructor
+  -- A binder which matches a data constructor (type name, constructor name, binders)
   --
-  | ConstructorBinder (Qualified ProperName) [Binder]
+  | ConstructorBinder (Qualified ProperName) (Qualified ProperName) [Binder]
   -- |
   -- A binder which binds its input to an identifier
   --

@@ -144,12 +144,14 @@ binderToCoreFn _ (A.BooleanBinder b) = LiteralBinder (BooleanLiteral b)
 binderToCoreFn _ (A.StringBinder s) = LiteralBinder (StringLiteral s)
 binderToCoreFn _ (A.NumberBinder n) = LiteralBinder (NumericLiteral n)
 binderToCoreFn _ (A.VarBinder name) = VarBinder name
-binderToCoreFn env (A.ConstructorBinder name bs) = ConstructorBinder name (map (binderToCoreFn env) bs)
+binderToCoreFn env (A.ConstructorBinder dctor@(Qualified mn _) bs) =
+  let (_, tctor, _) = lookupConstructor env dctor
+  in ConstructorBinder (Qualified mn tctor) dctor (map (binderToCoreFn env) bs)
 binderToCoreFn env (A.ObjectBinder bs) = LiteralBinder (ObjectLiteral $ map (second (binderToCoreFn env)) bs)
 binderToCoreFn env (A.ArrayBinder bs) = LiteralBinder (ArrayLiteral $ map (binderToCoreFn env) bs)
 binderToCoreFn env (A.ConsBinder b1 b2) =
   let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-  in ConstructorBinder arrCtor $ map (binderToCoreFn env) [b1, b2]
+  in ConstructorBinder arrCtor arrCtor $ map (binderToCoreFn env) [b1, b2]
 binderToCoreFn env (A.NamedBinder name b) = NamedBinder name (binderToCoreFn env b)
 binderToCoreFn env (A.PositionedBinder _ b) = binderToCoreFn env b
 
@@ -166,11 +168,17 @@ properToIdent :: ProperName -> Ident
 properToIdent = Ident . runProperName
 
 -- |
+-- Finds information about data constructors from the current environment.
+--
+lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
+lookupConstructor env ctor = fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env
+
+-- |
 -- Gets metadata for data constructors.
 --
 getConstructorMeta :: Environment -> Qualified ProperName -> Meta
 getConstructorMeta env ctor =
-  case fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env of
+  case lookupConstructor env ctor of
     (Newtype, _, _) -> IsNewtype
     dc@(Data, _, ty) ->
       let constructorType = if numConstructors (ctor, dc) == 1 then ProductType else SumType

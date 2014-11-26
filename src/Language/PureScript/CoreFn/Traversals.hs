@@ -81,7 +81,7 @@ everythingOnValues (<>) f g h i = (f', g', h', i')
   g' v = g v
 
   h' b@(LiteralBinder l) = foldl (<>) (h b) (map h' (extractLiteral l))
-  h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
+  h' b@(ConstructorBinder _ _ bs) = foldl (<>) (h b) (map h' bs)
   h' b@(NamedBinder _ b1) = h b <> h' b1
   h' b = h b
 

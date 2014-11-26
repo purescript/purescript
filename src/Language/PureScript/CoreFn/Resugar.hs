@@ -66,9 +66,9 @@ resugar (Module mn imps exps foreigns decls) =
   binderToAST (NullBinder) = A.NullBinder
   binderToAST (LiteralBinder b) = literalToBinderAST b
   binderToAST (VarBinder name) = A.VarBinder name
-  binderToAST (ConstructorBinder (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Array")) [b1, b2]) =
+  binderToAST (ConstructorBinder (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Array")) _ [b1, b2]) =
     A.ConsBinder (binderToAST b1) (binderToAST b2)
-  binderToAST (ConstructorBinder name bs) = A.ConstructorBinder name (map binderToAST bs)
+  binderToAST (ConstructorBinder _ name bs) = A.ConstructorBinder name (map binderToAST bs)
   binderToAST (NamedBinder name b) = A.NamedBinder name (binderToAST b)
 
   literalToBinderAST :: Literal Binder -> A.Binder
