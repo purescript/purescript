@@ -94,7 +94,7 @@ data CaseAlternative a = CaseAlternative
   { -- |
     -- A collection of binders with which to match the inputs
     --
-    caseAlternativeBinders :: [Binder]
+    caseAlternativeBinders :: [Binder a]
     -- |
     -- The result expression or a collect of guarded expressions
     --

@@ -22,8 +22,8 @@ import Language.PureScript.CoreFn.Literals
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->
-                      (Binder -> Binder) ->
-                      (Bind a -> Bind a, Expr a -> Expr a, Binder -> Binder)
+                      (Binder a -> Binder a) ->
+                      (Bind a -> Bind a, Expr a -> Expr a, Binder a -> Binder a)
 everywhereOnValues f g h = (f', g', h')
   where
   f' (NonRec name e) = f (NonRec name (g' e))
@@ -56,9 +56,9 @@ everywhereOnValues f g h = (f', g', h')
 everythingOnValues :: (r -> r -> r) ->
                       (Bind a -> r) ->
                       (Expr a -> r) ->
-                      (Binder -> r) ->
+                      (Binder a -> r) ->
                       (CaseAlternative a -> r) ->
-                      (Bind a -> r, Expr a -> r, Binder -> r, CaseAlternative a -> r)
+                      (Bind a -> r, Expr a -> r, Binder a -> r, CaseAlternative a -> r)
 everythingOnValues (<>) f g h i = (f', g', h', i')
   where
   f' b@(NonRec _ e) = f b <> g' e

@@ -24,7 +24,7 @@ import Language.PureScript.Names
 -- |
 -- Data type for binders
 --
-data Binder
+data Binder a
   -- |
   -- Wildcard binder
   --
@@ -32,7 +32,7 @@ data Binder
   -- |
   -- A binder which matches a literal value
   --
-  | LiteralBinder (Literal Binder)
+  | LiteralBinder (Literal (Binder a))
   -- |
   -- A binder which binds an identifier
   --
@@ -40,8 +40,8 @@ data Binder
   -- |
   -- A binder which matches a data constructor (type name, constructor name, binders)
   --
-  | ConstructorBinder (Qualified ProperName) (Qualified ProperName) [Binder]
+  | ConstructorBinder (Qualified ProperName) (Qualified ProperName) [Binder a]
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident Binder deriving (Show, D.Data, D.Typeable)
+  | NamedBinder Ident (Binder a) deriving (Show, D.Data, D.Typeable)

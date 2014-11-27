@@ -139,7 +139,7 @@ altToCoreFn env (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn
   go (Left ges) = Left $ map (exprToCoreFn env *** exprToCoreFn env) ges
   go (Right e) = Right (exprToCoreFn env e)
 
-binderToCoreFn :: Environment -> A.Binder -> Binder
+binderToCoreFn :: Environment -> A.Binder -> Binder DM
 binderToCoreFn _ (A.NullBinder) = NullBinder
 binderToCoreFn _ (A.BooleanBinder b) = LiteralBinder (BooleanLiteral b)
 binderToCoreFn _ (A.StringBinder s) = LiteralBinder (StringLiteral s)

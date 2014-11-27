@@ -61,7 +61,7 @@ resugar (Module mn imps exps foreigns decls) =
     go (Left ges) = Left $ map (exprToAST *** exprToAST) ges
     go (Right e) = Right (exprToAST e)
 
-  binderToAST :: Binder -> A.Binder
+  binderToAST :: Binder a -> A.Binder
   binderToAST (NullBinder) = A.NullBinder
   binderToAST (LiteralBinder b) = literalToBinderAST b
   binderToAST (VarBinder name) = A.VarBinder name
@@ -70,7 +70,7 @@ resugar (Module mn imps exps foreigns decls) =
   binderToAST (ConstructorBinder _ name bs) = A.ConstructorBinder name (map binderToAST bs)
   binderToAST (NamedBinder name b) = A.NamedBinder name (binderToAST b)
 
-  literalToBinderAST :: Literal Binder -> A.Binder
+  literalToBinderAST :: Literal (Binder a) -> A.Binder
   literalToBinderAST (NumericLiteral v) = A.NumberBinder v
   literalToBinderAST (StringLiteral v) = A.StringBinder v
   literalToBinderAST (BooleanLiteral v) = A.BooleanBinder v

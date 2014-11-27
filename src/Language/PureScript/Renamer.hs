@@ -184,7 +184,7 @@ renameInCaseAlternative (CaseAlternative bs v) =
 -- |
 -- Renames within binders.
 --
-renameInBinder :: Binder -> Rename Binder
+renameInBinder :: Binder a -> Rename (Binder a)
 renameInBinder NullBinder = return NullBinder
 renameInBinder (LiteralBinder b) =
   LiteralBinder <$> renameInLiteral renameInBinder b
