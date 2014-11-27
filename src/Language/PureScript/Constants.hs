@@ -123,9 +123,6 @@ whileE = "whileE"
 runST :: String
 runST = "runST"
 
-runSTArray :: String
-runSTArray = "runSTArray"
-
 stRefValue :: String
 stRefValue = "value"
 
@@ -140,12 +137,6 @@ writeSTRef = "writeSTRef"
 
 modifySTRef :: String
 modifySTRef = "modifySTRef"
-
-peekSTArray :: String
-peekSTArray = "peekSTArray"
-
-pokeSTArray :: String
-pokeSTArray = "pokeSTArray"
 
 mkFn :: String
 mkFn = "mkFn"
