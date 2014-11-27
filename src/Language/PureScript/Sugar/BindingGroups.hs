@@ -47,35 +47,41 @@ createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> cre
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
 
--- |
--- Replace all sets of mutually-recursive declarations with binding groups
---
 createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
-createBindingGroups moduleName ds = do
-  values <- parU (filter isValueDecl ds) (createBindingGroupsForValue moduleName)
-  let dataDecls = filter isDataDecl ds
-      allProperNames = map getProperName dataDecls
-      dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
-  dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-  let allIdents = map getIdent values
-      valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
-  bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
-  return $ filter isImportDecl ds ++
-           filter isExternDataDecl ds ++
-           filter isExternInstanceDecl ds ++
-           dataBindingGroupDecls ++
-           filter isTypeClassDeclaration ds ++
-           filter isFixityDecl ds ++
-           filter isExternDecl ds ++
-           bindingGroupDecls
+createBindingGroups moduleName decls = do
+  (Let result _) <- createBindingGroupsForValue (Let decls (StringLiteral (error "Placeholder string literal was used in createBindingGroups.")))
+  return result
 
-createBindingGroupsForValue :: ModuleName -> Declaration -> Either ErrorStack Declaration
-createBindingGroupsForValue moduleName =
-  let (f, _, _) = everywhereOnValuesTopDownM return go return
-  in f
   where
-  go (Let ds val) = Let <$> createBindingGroups moduleName ds <*> pure val
-  go other = return other
+  createBindingGroupsForValue :: Expr -> Either ErrorStack Expr
+  createBindingGroupsForValue =
+    let (_, f, _) = everywhereOnValuesTopDownM return go return
+    in f
+    where
+    go (Let ds val) = flip Let val <$> handleDecls ds
+    go other = return other
+  
+  -- |
+  -- Replace all sets of mutually-recursive declarations with binding groups
+  --
+  handleDecls :: [Declaration] -> Either ErrorStack [Declaration]
+  handleDecls ds = do
+    let values = filter isValueDecl ds
+        dataDecls = filter isDataDecl ds
+        allProperNames = map getProperName dataDecls
+        dataVerts = map (\d -> (d, getProperName d, usedProperNames moduleName d `intersect` allProperNames)) dataDecls
+    dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
+    let allIdents = map getIdent values
+        valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
+    bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
+    return $ filter isImportDecl ds ++
+             filter isExternDataDecl ds ++
+             filter isExternInstanceDecl ds ++
+             dataBindingGroupDecls ++
+             filter isTypeClassDeclaration ds ++
+             filter isFixityDecl ds ++
+             filter isExternDecl ds ++
+             bindingGroupDecls
 
 -- |
 -- Collapse all binding groups to individual declarations
