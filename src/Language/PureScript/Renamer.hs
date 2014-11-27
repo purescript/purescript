@@ -160,8 +160,6 @@ renameInValue (Var ann (Qualified Nothing name)) =
 renameInValue v@(Var{}) = return v
 renameInValue (Case ann vs alts) =
   newScope $ Case ann <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
-renameInValue (TypedValue v ty) =
-  TypedValue <$> renameInValue v <*> pure ty
 renameInValue (Let ann ds v) =
   newScope $ Let ann <$> mapM (renameInDecl False) ds <*> renameInValue v
 

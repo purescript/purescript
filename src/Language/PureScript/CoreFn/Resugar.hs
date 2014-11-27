@@ -40,7 +40,6 @@ resugar (Module mn imps exps foreigns decls) =
   exprToAST (App _ v1 v2) = A.App (exprToAST v1) (exprToAST v2)
   exprToAST (Var _ ident) = A.Var ident
   exprToAST (Case _ vs alts) = A.Case (map exprToAST vs) (map altToAST alts)
-  exprToAST (TypedValue v ty) = A.TypedValue False (exprToAST v) ty
   exprToAST (Let _ ds v) = A.Let (map bindToDecl ds) (exprToAST v)
   exprToAST (Constructor _ _ name arity) =
     let args = [ "value" ++ show index | index <- [0 .. arity - 1] ]

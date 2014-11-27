@@ -22,7 +22,6 @@ import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Literals
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.Names
-import Language.PureScript.Types
 
 -- |
 -- Data type for expressions and terms
@@ -60,10 +59,6 @@ data Expr a
   -- A case expression
   --
   | Case a [Expr a] [CaseAlternative a]
-  -- |
-  -- A value with a type annotation
-  --
-  | TypedValue (Expr a) Type
   -- |
   -- A let binding
   --

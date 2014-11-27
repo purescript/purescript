@@ -35,7 +35,6 @@ everywhereOnValues f g h = (f', g', h')
   g' (Abs ann name e) = g (Abs ann name (g' e))
   g' (App ann v1 v2) = g (App ann (g' v1) (g' v2))
   g' (Case ann vs alts) = g (Case ann (map g' vs) (map handleCaseAlternative alts))
-  g' (TypedValue e ty) = g (TypedValue (g' e) ty)
   g' (Let ann ds e) = g (Let ann (map f' ds) (g' e))
   g' e = g e
 
@@ -70,7 +69,6 @@ everythingOnValues (<>) f g h i = (f', g', h', i')
   g' v@(Abs _ _ e1) = g v <> g' e1
   g' v@(App _ e1 e2) = g v <> g' e1 <> g' e2
   g' v@(Case _ vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
-  g' v@(TypedValue e1 _) = g v <> g' e1
   g' v@(Let _ ds e1) = foldl (<>) (g v) (map f' ds) <> g' e1
   g' v = g v
 
