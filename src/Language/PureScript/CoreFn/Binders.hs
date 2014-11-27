@@ -28,20 +28,20 @@ data Binder a
   -- |
   -- Wildcard binder
   --
-  = NullBinder
+  = NullBinder a
   -- |
   -- A binder which matches a literal value
   --
-  | LiteralBinder (Literal (Binder a))
+  | LiteralBinder a (Literal (Binder a))
   -- |
   -- A binder which binds an identifier
   --
-  | VarBinder Ident
+  | VarBinder a Ident
   -- |
   -- A binder which matches a data constructor (type name, constructor name, binders)
   --
-  | ConstructorBinder (Qualified ProperName) (Qualified ProperName) [Binder a]
+  | ConstructorBinder a (Qualified ProperName) (Qualified ProperName) [Binder a]
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident (Binder a) deriving (Show, D.Data, D.Typeable)
+  | NamedBinder a Ident (Binder a) deriving (Show, D.Data, D.Typeable)

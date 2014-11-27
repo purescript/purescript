@@ -29,18 +29,18 @@ everywhereOnValues f g h = (f', g', h')
   f' (NonRec name e) = f (NonRec name (g' e))
   f' (Rec es) = f (Rec (map (second g') es))
 
-  g' (Literal e) = g (Literal (handleLiteral g' e))
-  g' (Accessor prop e) = g (Accessor prop (g' e))
-  g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
-  g' (Abs a name e) = g (Abs a name (g' e))
-  g' (App v1 v2) = g (App (g' v1) (g' v2))
-  g' (Case vs alts) = g (Case (map g' vs) (map handleCaseAlternative alts))
+  g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
+  g' (Accessor ann prop e) = g (Accessor ann prop (g' e))
+  g' (ObjectUpdate ann obj vs) = g (ObjectUpdate ann (g' obj) (map (fmap g') vs))
+  g' (Abs ann name e) = g (Abs ann name (g' e))
+  g' (App ann v1 v2) = g (App ann (g' v1) (g' v2))
+  g' (Case ann vs alts) = g (Case ann (map g' vs) (map handleCaseAlternative alts))
   g' (TypedValue e ty) = g (TypedValue (g' e) ty)
-  g' (Let ds e) = g (Let (map f' ds) (g' e))
+  g' (Let ann ds e) = g (Let ann (map f' ds) (g' e))
   g' e = g e
 
-  h' (LiteralBinder b) = h (LiteralBinder (handleLiteral h' b))
-  h' (NamedBinder name b) = h (NamedBinder name (h' b))
+  h' (LiteralBinder a b) = h (LiteralBinder a (handleLiteral h' b))
+  h' (NamedBinder a name b) = h (NamedBinder a name (h' b))
   h' b = h b
 
   handleCaseAlternative ca =
@@ -64,19 +64,19 @@ everythingOnValues (<>) f g h i = (f', g', h', i')
   f' b@(NonRec _ e) = f b <> g' e
   f' b@(Rec es) = foldl (<>) (f b) (map (g' . snd) es)
 
-  g' v@(Literal l) = foldl (<>) (g v) (map g' (extractLiteral l))
-  g' v@(Accessor _ e1) = g v <> g' e1
-  g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
+  g' v@(Literal _ l) = foldl (<>) (g v) (map g' (extractLiteral l))
+  g' v@(Accessor _ _ e1) = g v <> g' e1
+  g' v@(ObjectUpdate _ obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(Abs _ _ e1) = g v <> g' e1
-  g' v@(App e1 e2) = g v <> g' e1 <> g' e2
-  g' v@(Case vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
+  g' v@(App _ e1 e2) = g v <> g' e1 <> g' e2
+  g' v@(Case _ vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
   g' v@(TypedValue e1 _) = g v <> g' e1
-  g' v@(Let ds e1) = foldl (<>) (g v) (map f' ds) <> g' e1
+  g' v@(Let _ ds e1) = foldl (<>) (g v) (map f' ds) <> g' e1
   g' v = g v
 
-  h' b@(LiteralBinder l) = foldl (<>) (h b) (map h' (extractLiteral l))
-  h' b@(ConstructorBinder _ _ bs) = foldl (<>) (h b) (map h' bs)
-  h' b@(NamedBinder _ b1) = h b <> h' b1
+  h' b@(LiteralBinder _ l) = foldl (<>) (h b) (map h' (extractLiteral l))
+  h' b@(ConstructorBinder _ _ _ bs) = foldl (<>) (h b) (map h' bs)
+  h' b@(NamedBinder _ _ b1) = h b <> h' b1
   h' b = h b
 
   i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val

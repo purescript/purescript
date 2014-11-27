@@ -51,7 +51,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
     error $ "Found newtype with multiple constructors: " ++ show d
   go (A.DataDeclaration Data tyName _ ctors) =
     flip map ctors $ \(ctor, tys) ->
-      NonRec (properToIdent ctor) $ Constructor tyName ctor (length tys)
+      NonRec (properToIdent ctor) $ Constructor Nothing tyName ctor (length tys)
   go (A.DataBindingGroupDeclaration ds) = concatMap go ds
   go (A.TypeSynonymDeclaration{}) = []
   go d@(A.ValueDeclaration{}) = [declToCoreFn env d]
@@ -62,9 +62,9 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
   go (A.FixityDeclaration{}) = []
   go (A.ImportDeclaration{}) = []
   go (A.TypeClassDeclaration name _ supers members) =
-    let props = [ (arg, Accessor arg (Var Nothing $ Qualified Nothing (Ident "dict"))) | arg <- args ]
+    let props = [ (arg, Accessor Nothing arg (Var Nothing $ Qualified Nothing (Ident "dict"))) | arg <- args ]
     in [NonRec (properToIdent name) $
-          Abs (Just IsTypeClassDictionaryConstructor) (Ident "dict") (Literal $ ObjectLiteral props)]
+          Abs (Just IsTypeClassDictionaryConstructor) (Ident "dict") (Literal Nothing $ ObjectLiteral props)]
     where
     args :: [String]
     args = sort $ memberNames ++ superNames
@@ -106,29 +106,29 @@ moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
 exprToCoreFn :: Environment -> A.Expr -> Expr DM
-exprToCoreFn _ (A.NumericLiteral v) = Literal (NumericLiteral v)
-exprToCoreFn _ (A.StringLiteral v) = Literal (StringLiteral v)
-exprToCoreFn _ (A.BooleanLiteral v) = Literal (BooleanLiteral v)
-exprToCoreFn env (A.ArrayLiteral vs) = Literal (ArrayLiteral $ map (exprToCoreFn env) vs)
-exprToCoreFn env (A.ObjectLiteral vs) = Literal (ObjectLiteral $ map (second (exprToCoreFn env)) vs)
-exprToCoreFn env (A.Accessor name v) = Accessor name (exprToCoreFn env v)
+exprToCoreFn _ (A.NumericLiteral v) = Literal Nothing (NumericLiteral v)
+exprToCoreFn _ (A.StringLiteral v) = Literal Nothing (StringLiteral v)
+exprToCoreFn _ (A.BooleanLiteral v) = Literal Nothing (BooleanLiteral v)
+exprToCoreFn env (A.ArrayLiteral vs) = Literal Nothing (ArrayLiteral $ map (exprToCoreFn env) vs)
+exprToCoreFn env (A.ObjectLiteral vs) = Literal Nothing (ObjectLiteral $ map (second (exprToCoreFn env)) vs)
+exprToCoreFn env (A.Accessor name v) = Accessor Nothing name (exprToCoreFn env v)
 exprToCoreFn env (A.ObjectUpdate obj vs) =
-  ObjectUpdate (exprToCoreFn env obj) $ map (second (exprToCoreFn env)) vs
+  ObjectUpdate Nothing (exprToCoreFn env obj) $ map (second (exprToCoreFn env)) vs
 exprToCoreFn env (A.Abs (Left name) v) = Abs Nothing name (exprToCoreFn env v)
 exprToCoreFn _ (A.Abs _ _) = error "Abs with Binder argument was not desugared before exprToCoreFn"
-exprToCoreFn env (A.App v1 v2) = App (exprToCoreFn env v1) (exprToCoreFn env v2)
+exprToCoreFn env (A.App v1 v2) = App Nothing (exprToCoreFn env v1) (exprToCoreFn env v2)
 exprToCoreFn _ (A.Var ident) = Var Nothing ident
 exprToCoreFn env (A.IfThenElse v1 v2 v3) =
-  Case [exprToCoreFn env v1]
-    [ CaseAlternative [LiteralBinder $ BooleanLiteral True] (Right $ exprToCoreFn env v2)
-    , CaseAlternative [LiteralBinder $ BooleanLiteral False] (Right $ exprToCoreFn env v3) ]
+  Case Nothing [exprToCoreFn env v1]
+    [ CaseAlternative [LiteralBinder Nothing $ BooleanLiteral True] (Right $ exprToCoreFn env v2)
+    , CaseAlternative [LiteralBinder Nothing $ BooleanLiteral False] (Right $ exprToCoreFn env v3) ]
 exprToCoreFn env (A.Constructor name) =
   Var (Just $ getConstructorMeta env name) $ fmap properToIdent name
-exprToCoreFn env (A.Case vs alts) = Case (map (exprToCoreFn env) vs) (map (altToCoreFn env) alts)
+exprToCoreFn env (A.Case vs alts) = Case Nothing (map (exprToCoreFn env) vs) (map (altToCoreFn env) alts)
 exprToCoreFn env (A.TypedValue _ v ty) = TypedValue (exprToCoreFn env v) ty
-exprToCoreFn env (A.Let ds v) = Let (map (declToCoreFn env) ds) (exprToCoreFn env v)
+exprToCoreFn env (A.Let ds v) = Let Nothing (map (declToCoreFn env) ds) (exprToCoreFn env v)
 exprToCoreFn env (A.TypeClassDictionaryConstructorApp name v) =
-  App (Var (Just IsTypeClassDictionaryConstructor) $ fmap properToIdent name) (exprToCoreFn env v)
+  App Nothing (Var (Just IsTypeClassDictionaryConstructor) $ fmap properToIdent name) (exprToCoreFn env v)
 exprToCoreFn env (A.PositionedValue _ v) = exprToCoreFn env v
 exprToCoreFn _ e = error $ "Unexpected value in exprToCoreFn: " ++ show e
 
@@ -140,20 +140,20 @@ altToCoreFn env (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn
   go (Right e) = Right (exprToCoreFn env e)
 
 binderToCoreFn :: Environment -> A.Binder -> Binder DM
-binderToCoreFn _ (A.NullBinder) = NullBinder
-binderToCoreFn _ (A.BooleanBinder b) = LiteralBinder (BooleanLiteral b)
-binderToCoreFn _ (A.StringBinder s) = LiteralBinder (StringLiteral s)
-binderToCoreFn _ (A.NumberBinder n) = LiteralBinder (NumericLiteral n)
-binderToCoreFn _ (A.VarBinder name) = VarBinder name
+binderToCoreFn _ (A.NullBinder) = NullBinder Nothing
+binderToCoreFn _ (A.BooleanBinder b) = LiteralBinder Nothing (BooleanLiteral b)
+binderToCoreFn _ (A.StringBinder s) = LiteralBinder Nothing (StringLiteral s)
+binderToCoreFn _ (A.NumberBinder n) = LiteralBinder Nothing (NumericLiteral n)
+binderToCoreFn _ (A.VarBinder name) = VarBinder Nothing name
 binderToCoreFn env (A.ConstructorBinder dctor@(Qualified mn _) bs) =
   let (_, tctor, _) = lookupConstructor env dctor
-  in ConstructorBinder (Qualified mn tctor) dctor (map (binderToCoreFn env) bs)
-binderToCoreFn env (A.ObjectBinder bs) = LiteralBinder (ObjectLiteral $ map (second (binderToCoreFn env)) bs)
-binderToCoreFn env (A.ArrayBinder bs) = LiteralBinder (ArrayLiteral $ map (binderToCoreFn env) bs)
+  in ConstructorBinder Nothing (Qualified mn tctor) dctor (map (binderToCoreFn env) bs)
+binderToCoreFn env (A.ObjectBinder bs) = LiteralBinder Nothing (ObjectLiteral $ map (second (binderToCoreFn env)) bs)
+binderToCoreFn env (A.ArrayBinder bs) = LiteralBinder Nothing (ArrayLiteral $ map (binderToCoreFn env) bs)
 binderToCoreFn env (A.ConsBinder b1 b2) =
   let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-  in ConstructorBinder arrCtor arrCtor $ map (binderToCoreFn env) [b1, b2]
-binderToCoreFn env (A.NamedBinder name b) = NamedBinder name (binderToCoreFn env b)
+  in ConstructorBinder Nothing arrCtor arrCtor $ map (binderToCoreFn env) [b1, b2]
+binderToCoreFn env (A.NamedBinder name b) = NamedBinder Nothing name (binderToCoreFn env b)
 binderToCoreFn env (A.PositionedBinder _ b) = binderToCoreFn env b
 
 declToCoreFn :: Environment -> A.Declaration -> Bind DM

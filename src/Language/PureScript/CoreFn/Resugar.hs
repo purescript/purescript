@@ -33,16 +33,16 @@ resugar (Module mn imps exps foreigns decls) =
   where
 
   exprToAST :: Expr a -> A.Expr
-  exprToAST (Literal l) = literalToExprAST l
-  exprToAST (Accessor name v) = A.Accessor name (exprToAST v)
-  exprToAST (ObjectUpdate obj vs) = A.ObjectUpdate (exprToAST obj) $ map (second exprToAST) vs
+  exprToAST (Literal _ l) = literalToExprAST l
+  exprToAST (Accessor _ name v) = A.Accessor name (exprToAST v)
+  exprToAST (ObjectUpdate _ obj vs) = A.ObjectUpdate (exprToAST obj) $ map (second exprToAST) vs
   exprToAST (Abs _ name v) = A.Abs (Left name) (exprToAST v)
-  exprToAST (App v1 v2) = A.App (exprToAST v1) (exprToAST v2)
+  exprToAST (App _ v1 v2) = A.App (exprToAST v1) (exprToAST v2)
   exprToAST (Var _ ident) = A.Var ident
-  exprToAST (Case vs alts) = A.Case (map exprToAST vs) (map altToAST alts)
+  exprToAST (Case _ vs alts) = A.Case (map exprToAST vs) (map altToAST alts)
   exprToAST (TypedValue v ty) = A.TypedValue False (exprToAST v) ty
-  exprToAST (Let ds v) = A.Let (map bindToDecl ds) (exprToAST v)
-  exprToAST (Constructor _ name arity) =
+  exprToAST (Let _ ds v) = A.Let (map bindToDecl ds) (exprToAST v)
+  exprToAST (Constructor _ _ name arity) =
     let args = [ "value" ++ show index | index <- [0 .. arity - 1] ]
         props = ("$ctor", A.StringLiteral $ runModuleName mn ++ "." ++ runProperName name) : [ (arg, A.Var $ Qualified Nothing (Ident arg)) | arg <- args ]
     in foldl (\e arg -> A.Abs (Left $ Ident arg) e) (A.ObjectLiteral props) args
@@ -62,13 +62,13 @@ resugar (Module mn imps exps foreigns decls) =
     go (Right e) = Right (exprToAST e)
 
   binderToAST :: Binder a -> A.Binder
-  binderToAST (NullBinder) = A.NullBinder
-  binderToAST (LiteralBinder b) = literalToBinderAST b
-  binderToAST (VarBinder name) = A.VarBinder name
-  binderToAST (ConstructorBinder (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Array")) _ [b1, b2]) =
+  binderToAST (NullBinder _) = A.NullBinder
+  binderToAST (LiteralBinder _ b) = literalToBinderAST b
+  binderToAST (VarBinder _ name) = A.VarBinder name
+  binderToAST (ConstructorBinder _ (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Array")) _ [b1, b2]) =
     A.ConsBinder (binderToAST b1) (binderToAST b2)
-  binderToAST (ConstructorBinder _ name bs) = A.ConstructorBinder name (map binderToAST bs)
-  binderToAST (NamedBinder name b) = A.NamedBinder name (binderToAST b)
+  binderToAST (ConstructorBinder _ _ name bs) = A.ConstructorBinder name (map binderToAST bs)
+  binderToAST (NamedBinder _ name b) = A.NamedBinder name (binderToAST b)
 
   literalToBinderAST :: Literal (Binder a) -> A.Binder
   literalToBinderAST (NumericLiteral v) = A.NumberBinder v

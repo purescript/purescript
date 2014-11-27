@@ -144,26 +144,26 @@ renameInDecl isTopLevel (Rec ds) = do
 -- Renames within a value.
 --
 renameInValue :: Expr a -> Rename (Expr a)
-renameInValue (Literal l) =
-  Literal <$> renameInLiteral renameInValue l
+renameInValue (Literal ann l) =
+  Literal ann <$> renameInLiteral renameInValue l
 renameInValue c@(Constructor{}) = return c
-renameInValue (Accessor prop v) =
-  Accessor prop <$> renameInValue v
-renameInValue (ObjectUpdate obj vs) =
-  ObjectUpdate <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
-renameInValue (Abs a name v) =
-  newScope $ Abs a <$> updateScope name <*> renameInValue v
-renameInValue (App v1 v2) =
-  App <$> renameInValue v1 <*> renameInValue v2
-renameInValue (Var a (Qualified Nothing name)) =
-  Var a . Qualified Nothing <$> lookupIdent name
+renameInValue (Accessor ann prop v) =
+  Accessor ann prop <$> renameInValue v
+renameInValue (ObjectUpdate ann obj vs) =
+  ObjectUpdate ann <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
+renameInValue (Abs ann name v) =
+  newScope $ Abs ann <$> updateScope name <*> renameInValue v
+renameInValue (App ann v1 v2) =
+  App ann <$> renameInValue v1 <*> renameInValue v2
+renameInValue (Var ann (Qualified Nothing name)) =
+  Var ann . Qualified Nothing <$> lookupIdent name
 renameInValue v@(Var{}) = return v
-renameInValue (Case vs alts) =
-  newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
+renameInValue (Case ann vs alts) =
+  newScope $ Case ann <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
 renameInValue (TypedValue v ty) =
   TypedValue <$> renameInValue v <*> pure ty
-renameInValue (Let ds v) =
-  newScope $ Let <$> mapM (renameInDecl False) ds <*> renameInValue v
+renameInValue (Let ann ds v) =
+  newScope $ Let ann <$> mapM (renameInDecl False) ds <*> renameInValue v
 
 -- |
 -- Renames within literals.
@@ -185,12 +185,12 @@ renameInCaseAlternative (CaseAlternative bs v) =
 -- Renames within binders.
 --
 renameInBinder :: Binder a -> Rename (Binder a)
-renameInBinder NullBinder = return NullBinder
-renameInBinder (LiteralBinder b) =
-  LiteralBinder <$> renameInLiteral renameInBinder b
-renameInBinder (VarBinder name) =
-  VarBinder <$> updateScope name
-renameInBinder (ConstructorBinder tctor dctor bs) =
-  ConstructorBinder tctor dctor <$> mapM renameInBinder bs
-renameInBinder (NamedBinder name b) =
-  NamedBinder <$> updateScope name <*> renameInBinder b
+renameInBinder n@(NullBinder{}) = return n
+renameInBinder (LiteralBinder ann b) =
+  LiteralBinder ann <$> renameInLiteral renameInBinder b
+renameInBinder (VarBinder ann name) =
+  VarBinder ann <$> updateScope name
+renameInBinder (ConstructorBinder ann tctor dctor bs) =
+  ConstructorBinder ann tctor dctor <$> mapM renameInBinder bs
+renameInBinder (NamedBinder ann name b) =
+  NamedBinder ann <$> updateScope name <*> renameInBinder b

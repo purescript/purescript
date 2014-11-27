@@ -31,19 +31,19 @@ data Expr a
   -- |
   -- A literal value
   --
-  = Literal (Literal (Expr a))
+  = Literal a (Literal (Expr a))
   -- |
   -- A data constructor (type name, constructor name, arity)
   --
-  | Constructor ProperName ProperName Arity
+  | Constructor a ProperName ProperName Arity
   -- |
   -- A record property accessor
   --
-  | Accessor String (Expr a)
+  | Accessor a String (Expr a)
   -- |
   -- Partial record update
   --
-  | ObjectUpdate (Expr a) [(String, Expr a)]
+  | ObjectUpdate a (Expr a) [(String, Expr a)]
   -- |
   -- Function introduction
   --
@@ -51,7 +51,7 @@ data Expr a
   -- |
   -- Function application
   --
-  | App (Expr a) (Expr a)
+  | App a (Expr a) (Expr a)
   -- |
   -- Variable
   --
@@ -59,7 +59,7 @@ data Expr a
   -- |
   -- A case expression
   --
-  | Case [Expr a] [CaseAlternative a]
+  | Case a [Expr a] [CaseAlternative a]
   -- |
   -- A value with a type annotation
   --
@@ -67,7 +67,7 @@ data Expr a
   -- |
   -- A let binding
   --
-  | Let [Bind a] (Expr a) deriving (Show, D.Data, D.Typeable)
+  | Let a [Bind a] (Expr a) deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A let or module binding.
