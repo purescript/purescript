@@ -20,17 +20,15 @@ import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Literals
 
-everywhereOnValues :: (Bind -> Bind) ->
-                      (Expr -> Expr) ->
+everywhereOnValues :: (Bind a -> Bind a) ->
+                      (Expr a -> Expr a) ->
                       (Binder -> Binder) ->
-                      (Bind -> Bind, Expr -> Expr, Binder -> Binder)
+                      (Bind a -> Bind a, Expr a -> Expr a, Binder -> Binder)
 everywhereOnValues f g h = (f', g', h')
   where
-  f' :: Bind -> Bind
   f' (NotRec name e) = f (NotRec name (g' e))
   f' (Rec es) = f (Rec (map (second g') es))
 
-  g' :: Expr -> Expr
   g' (Literal e) = g (Literal (handleLiteral g' e))
   g' (Accessor prop e) = g (Accessor prop (g' e))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
@@ -42,12 +40,10 @@ everywhereOnValues f g h = (f', g', h')
   g' (Meta m e) = g (Meta m (g' e))
   g' e = g e
 
-  h' :: Binder -> Binder
   h' (LiteralBinder b) = h (LiteralBinder (handleLiteral h' b))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
   h' b = h b
 
-  handleCaseAlternative :: CaseAlternative -> CaseAlternative
   handleCaseAlternative ca =
     ca { caseAlternativeBinders = map h' (caseAlternativeBinders ca)
        , caseAlternativeResult = (map (g' *** g') +++ g') (caseAlternativeResult ca)
@@ -59,11 +55,11 @@ everywhereOnValues f g h = (f', g', h')
   handleLiteral _ other = other
 
 everythingOnValues :: (r -> r -> r) ->
-                      (Bind -> r) ->
-                      (Expr -> r) ->
+                      (Bind a -> r) ->
+                      (Expr a -> r) ->
                       (Binder -> r) ->
-                      (CaseAlternative -> r) ->
-                      (Bind -> r, Expr -> r, Binder -> r, CaseAlternative -> r)
+                      (CaseAlternative a -> r) ->
+                      (Bind a -> r, Expr a -> r, Binder -> r, CaseAlternative a -> r)
 everythingOnValues (<>) f g h i = (f', g', h', i')
   where
   f' b@(NotRec _ e) = f b <> g' e

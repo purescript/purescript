@@ -27,11 +27,11 @@ import Language.PureScript.Types
 -- |
 -- Data type for expressions and terms
 --
-data Expr
+data Expr a
   -- |
   -- A literal value
   --
-  = Literal (Literal Expr)
+  = Literal (Literal (Expr a))
   -- |
   -- A data constructor (type name, constructor name, arity)
   --
@@ -39,19 +39,19 @@ data Expr
   -- |
   -- A record property accessor
   --
-  | Accessor String Expr
+  | Accessor String (Expr a)
   -- |
   -- Partial record update
   --
-  | ObjectUpdate Expr [(String, Expr)]
+  | ObjectUpdate (Expr a) [(String, Expr a)]
   -- |
   -- Function introduction
   --
-  | Abs Ident Expr
+  | Abs Ident (Expr a)
   -- |
   -- Function application
   --
-  | App Expr Expr
+  | App (Expr a) (Expr a)
   -- |
   -- Variable
   --
@@ -59,43 +59,43 @@ data Expr
   -- |
   -- A case expression
   --
-  | Case [Expr] [CaseAlternative]
+  | Case [Expr a] [CaseAlternative a]
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Expr Type
+  | TypedValue (Expr a) Type
   -- |
   -- A let binding
   --
-  | Let [Bind] Expr
+  | Let [Bind a] (Expr a)
   -- |
   -- Metadata annotations for preserving information about an expression that
   -- may be useful for certain optimizations or codegen targets.
   --
-  | Meta Meta Expr deriving (Show, D.Data, D.Typeable)
+  | Meta Meta (Expr a) deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A let or module binding.
 --
-data Bind
+data Bind a
   -- |
   -- Non-recursive binding for a single value
   --
-  = NotRec Ident Expr
+  = NotRec Ident (Expr a)
   -- |
   -- Mutually recursive binding group for several values
   --
-  | Rec [(Ident, Expr)] deriving (Show, D.Data, D.Typeable)
+  | Rec [(Ident, Expr a)] deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
 --
-type Guard = Expr
+type Guard a = Expr a
 
 -- |
 -- An alternative in a case statement
 --
-data CaseAlternative = CaseAlternative
+data CaseAlternative a = CaseAlternative
   { -- |
     -- A collection of binders with which to match the inputs
     --
@@ -103,5 +103,5 @@ data CaseAlternative = CaseAlternative
     -- |
     -- The result expression or a collect of guarded expressions
     --
-  , caseAlternativeResult :: Either [(Guard, Expr)] Expr
+  , caseAlternativeResult :: Either [(Guard a, Expr a)] (Expr a)
   } deriving (Show, D.Data, D.Typeable)

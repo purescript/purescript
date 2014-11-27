@@ -24,7 +24,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Names
 import qualified Language.PureScript.AST as A
 
-resugar :: Module -> A.Module
+resugar :: Module a -> A.Module
 resugar (Module mn imps exps foreigns decls) =
   A.Module mn (map importToDecl imps
             ++ map foreignToDecl foreigns
@@ -32,7 +32,7 @@ resugar (Module mn imps exps foreigns decls) =
 
   where
 
-  exprToAST :: Expr -> A.Expr
+  exprToAST :: Expr a -> A.Expr
   exprToAST (Literal l) = literalToExprAST l
   exprToAST (Accessor name v) = A.Accessor name (exprToAST v)
   exprToAST (ObjectUpdate obj vs) = A.ObjectUpdate (exprToAST obj) $ map (second exprToAST) vs
@@ -48,17 +48,17 @@ resugar (Module mn imps exps foreigns decls) =
     in foldl (\e arg -> A.Abs (Left $ Ident arg) e) (A.ObjectLiteral props) args
   exprToAST (Meta _ v) = exprToAST v
 
-  literalToExprAST :: Literal Expr -> A.Expr
+  literalToExprAST :: Literal (Expr a) -> A.Expr
   literalToExprAST (NumericLiteral v) = A.NumericLiteral v
   literalToExprAST (StringLiteral v) = A.StringLiteral v
   literalToExprAST (BooleanLiteral v) = A.BooleanLiteral v
   literalToExprAST (ArrayLiteral vs) = A.ArrayLiteral $ map exprToAST vs
   literalToExprAST (ObjectLiteral vs) = A.ObjectLiteral $ map (second exprToAST) vs
 
-  altToAST :: CaseAlternative -> A.CaseAlternative
+  altToAST :: CaseAlternative a -> A.CaseAlternative
   altToAST (CaseAlternative bs vs) = A.CaseAlternative (map binderToAST bs) (go vs)
     where
-    go :: Either [(Guard, Expr)] Expr -> Either [(A.Guard, A.Expr)] A.Expr
+    go :: Either [(Guard a, Expr a)] (Expr a) -> Either [(A.Guard, A.Expr)] A.Expr
     go (Left ges) = Left $ map (exprToAST *** exprToAST) ges
     go (Right e) = Right (exprToAST e)
 
@@ -78,7 +78,7 @@ resugar (Module mn imps exps foreigns decls) =
   literalToBinderAST (ArrayLiteral vs) = A.ArrayBinder $ map binderToAST vs
   literalToBinderAST (ObjectLiteral vs) = A.ObjectBinder $ map (second binderToAST) vs
 
-  bindToDecl :: Bind -> A.Declaration
+  bindToDecl :: Bind a -> A.Declaration
   bindToDecl (NotRec name e) = A.ValueDeclaration name Value [] (Right $ exprToAST e)
   bindToDecl (Rec ds) = A.BindingGroupDeclaration $ map (\(name, e) -> (name, Value, exprToAST e)) ds
 

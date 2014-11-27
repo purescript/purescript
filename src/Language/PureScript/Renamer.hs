@@ -99,7 +99,7 @@ lookupIdent name = do
 -- |
 -- Finds idents introduced by declarations.
 --
-findDeclIdents :: [Bind] -> [Ident]
+findDeclIdents :: [Bind a] -> [Ident]
 findDeclIdents = concatMap go
   where
   go (NotRec ident _) = [ident]
@@ -108,12 +108,12 @@ findDeclIdents = concatMap go
 -- |
 -- Renames within each declaration in a module.
 --
-renameInModules :: [Module] -> [Module]
+renameInModules :: [Module a] -> [Module a]
 renameInModules = map go
   where
-  go :: Module -> Module
+  go :: Module a -> Module a
   go (Module mn imps exps foreigns decls) = Module mn imps exps foreigns (renameInDecl' (findDeclIdents decls) `map` decls)
-  renameInDecl' :: [Ident] -> Bind -> Bind
+  renameInDecl' :: [Ident] -> Bind a -> Bind a
   renameInDecl' scope = runRename scope . renameInDecl True
 
 -- |
@@ -123,7 +123,7 @@ renameInModules = map go
 -- been added), whereas in a Let declarations are renamed if their name shadows
 -- another in the current scope.
 --
-renameInDecl :: Bool -> Bind -> Rename Bind
+renameInDecl :: Bool -> Bind a -> Rename (Bind a)
 renameInDecl isTopLevel (NotRec name val) = do
   name' <- if isTopLevel then return name else updateScope name
   NotRec name' <$> renameInValue val
@@ -131,18 +131,18 @@ renameInDecl isTopLevel (Rec ds) = do
   ds' <- mapM updateNames ds
   Rec <$> mapM updateValues ds'
   where
-  updateNames :: (Ident, Expr) -> Rename (Ident, Expr)
+  updateNames :: (Ident, Expr a) -> Rename (Ident, Expr a)
   updateNames (name, val) = do
     name' <- if isTopLevel then return name else updateScope name
     return (name', val)
-  updateValues :: (Ident, Expr) -> Rename (Ident, Expr)
+  updateValues :: (Ident, Expr a) -> Rename (Ident, Expr a)
   updateValues (name, val) =
     (,) name <$> renameInValue val
 
 -- |
 -- Renames within a value.
 --
-renameInValue :: Expr -> Rename Expr
+renameInValue :: Expr a -> Rename (Expr a)
 renameInValue (Literal l) =
   Literal <$> renameInLiteral renameInValue l
 renameInValue c@(Constructor{}) = return c
@@ -177,7 +177,7 @@ renameInLiteral _ l = return l
 -- |
 -- Renames within case alternatives.
 --
-renameInCaseAlternative :: CaseAlternative -> Rename CaseAlternative
+renameInCaseAlternative :: CaseAlternative a -> Rename (CaseAlternative a)
 renameInCaseAlternative (CaseAlternative bs v) =
   CaseAlternative <$> mapM renameInBinder bs
                   <*> eitherM (mapM (pairM renameInValue renameInValue)) renameInValue v

@@ -32,7 +32,9 @@ import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants as C
 
-moduleToCoreFn :: Environment -> A.Module -> Module
+type DM = ()
+
+moduleToCoreFn :: Environment -> A.Module -> Module DM
 moduleToCoreFn env (A.Module mn decls (Just exps)) =
   let decls' = concatMap go decls
       imports = mapMaybe goImports decls
@@ -41,7 +43,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
   in Module mn imports exps' externs decls'
   where
 
-  go :: A.Declaration -> [Bind]
+  go :: A.Declaration -> [Bind DM]
   go (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
     [NotRec (properToIdent ctor) $
       Meta IsNewtype (Abs (Ident "x") (Var $ Qualified Nothing (Ident "x")))]
@@ -104,7 +106,7 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
-exprToCoreFn :: Environment -> A.Expr -> Expr
+exprToCoreFn :: Environment -> A.Expr -> Expr DM
 exprToCoreFn _ (A.NumericLiteral v) = Literal (NumericLiteral v)
 exprToCoreFn _ (A.StringLiteral v) = Literal (StringLiteral v)
 exprToCoreFn _ (A.BooleanLiteral v) = Literal (BooleanLiteral v)
@@ -131,10 +133,10 @@ exprToCoreFn env (A.TypeClassDictionaryConstructorApp name v) =
 exprToCoreFn env (A.PositionedValue _ v) = exprToCoreFn env v
 exprToCoreFn _ e = error $ "Unexpected value in exprToCoreFn: " ++ show e
 
-altToCoreFn :: Environment -> A.CaseAlternative -> CaseAlternative
+altToCoreFn :: Environment -> A.CaseAlternative -> CaseAlternative DM
 altToCoreFn env (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn env) bs) (go vs)
   where
-  go :: Either [(A.Guard, A.Expr)] A.Expr -> Either [(Guard, Expr)] Expr
+  go :: Either [(A.Guard, A.Expr)] A.Expr -> Either [(Guard DM, Expr DM)] (Expr DM)
   go (Left ges) = Left $ map (exprToCoreFn env *** exprToCoreFn env) ges
   go (Right e) = Right (exprToCoreFn env e)
 
@@ -155,7 +157,7 @@ binderToCoreFn env (A.ConsBinder b1 b2) =
 binderToCoreFn env (A.NamedBinder name b) = NamedBinder name (binderToCoreFn env b)
 binderToCoreFn env (A.PositionedBinder _ b) = binderToCoreFn env b
 
-declToCoreFn :: Environment -> A.Declaration -> Bind
+declToCoreFn :: Environment -> A.Declaration -> Bind DM
 declToCoreFn env (A.ValueDeclaration name _ _ (Right e)) = NotRec name (exprToCoreFn env e)
 declToCoreFn env (A.BindingGroupDeclaration ds) = Rec $ map (\(name, _, e) -> (name, exprToCoreFn env e)) ds
 declToCoreFn env (A.PositionedDeclaration _ d) = declToCoreFn env d

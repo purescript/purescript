@@ -19,12 +19,12 @@ import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
 import Language.PureScript.Types
 
-data Module = Module
+data Module a = Module
   { moduleName :: ModuleName
   , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
-  , moduleDecls :: [Bind]
+  , moduleDecls :: [Bind a]
   } deriving (Show)
 
 type ForeignDecl = (Ident, Maybe JS, Type)
