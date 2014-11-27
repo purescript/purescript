@@ -36,9 +36,9 @@ resugar (Module mn imps exps foreigns decls) =
   exprToAST (Literal l) = literalToExprAST l
   exprToAST (Accessor name v) = A.Accessor name (exprToAST v)
   exprToAST (ObjectUpdate obj vs) = A.ObjectUpdate (exprToAST obj) $ map (second exprToAST) vs
-  exprToAST (Abs name v) = A.Abs (Left name) (exprToAST v)
+  exprToAST (Abs _ name v) = A.Abs (Left name) (exprToAST v)
   exprToAST (App v1 v2) = A.App (exprToAST v1) (exprToAST v2)
-  exprToAST (Var ident) = A.Var ident
+  exprToAST (Var _ ident) = A.Var ident
   exprToAST (Case vs alts) = A.Case (map exprToAST vs) (map altToAST alts)
   exprToAST (TypedValue v ty) = A.TypedValue False (exprToAST v) ty
   exprToAST (Let ds v) = A.Let (map bindToDecl ds) (exprToAST v)
@@ -46,7 +46,6 @@ resugar (Module mn imps exps foreigns decls) =
     let args = [ "value" ++ show index | index <- [0 .. arity - 1] ]
         props = ("$ctor", A.StringLiteral $ runModuleName mn ++ "." ++ runProperName name) : [ (arg, A.Var $ Qualified Nothing (Ident arg)) | arg <- args ]
     in foldl (\e arg -> A.Abs (Left $ Ident arg) e) (A.ObjectLiteral props) args
-  exprToAST (Meta _ v) = exprToAST v
 
   literalToExprAST :: Literal (Expr a) -> A.Expr
   literalToExprAST (NumericLiteral v) = A.NumericLiteral v
@@ -79,7 +78,7 @@ resugar (Module mn imps exps foreigns decls) =
   literalToBinderAST (ObjectLiteral vs) = A.ObjectBinder $ map (second binderToAST) vs
 
   bindToDecl :: Bind a -> A.Declaration
-  bindToDecl (NotRec name e) = A.ValueDeclaration name Value [] (Right $ exprToAST e)
+  bindToDecl (NonRec name e) = A.ValueDeclaration name Value [] (Right $ exprToAST e)
   bindToDecl (Rec ds) = A.BindingGroupDeclaration $ map (\(name, e) -> (name, Value, exprToAST e)) ds
 
   importToDecl :: ModuleName -> A.Declaration

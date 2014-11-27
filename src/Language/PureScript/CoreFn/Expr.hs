@@ -47,7 +47,7 @@ data Expr a
   -- |
   -- Function introduction
   --
-  | Abs Ident (Expr a)
+  | Abs a Ident (Expr a)
   -- |
   -- Function application
   --
@@ -55,7 +55,7 @@ data Expr a
   -- |
   -- Variable
   --
-  | Var (Qualified Ident)
+  | Var a (Qualified Ident)
   -- |
   -- A case expression
   --
@@ -67,12 +67,7 @@ data Expr a
   -- |
   -- A let binding
   --
-  | Let [Bind a] (Expr a)
-  -- |
-  -- Metadata annotations for preserving information about an expression that
-  -- may be useful for certain optimizations or codegen targets.
-  --
-  | Meta Meta (Expr a) deriving (Show, D.Data, D.Typeable)
+  | Let [Bind a] (Expr a) deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- A let or module binding.
@@ -81,7 +76,7 @@ data Bind a
   -- |
   -- Non-recursive binding for a single value
   --
-  = NotRec Ident (Expr a)
+  = NonRec Ident (Expr a)
   -- |
   -- Mutually recursive binding group for several values
   --

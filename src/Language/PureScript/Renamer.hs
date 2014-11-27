@@ -1,4 +1,5 @@
 -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Renamer
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
@@ -102,7 +103,7 @@ lookupIdent name = do
 findDeclIdents :: [Bind a] -> [Ident]
 findDeclIdents = concatMap go
   where
-  go (NotRec ident _) = [ident]
+  go (NonRec ident _) = [ident]
   go (Rec ds) = map fst ds
 
 -- |
@@ -124,9 +125,9 @@ renameInModules = map go
 -- another in the current scope.
 --
 renameInDecl :: Bool -> Bind a -> Rename (Bind a)
-renameInDecl isTopLevel (NotRec name val) = do
+renameInDecl isTopLevel (NonRec name val) = do
   name' <- if isTopLevel then return name else updateScope name
-  NotRec name' <$> renameInValue val
+  NonRec name' <$> renameInValue val
 renameInDecl isTopLevel (Rec ds) = do
   ds' <- mapM updateNames ds
   Rec <$> mapM updateValues ds'
@@ -150,12 +151,12 @@ renameInValue (Accessor prop v) =
   Accessor prop <$> renameInValue v
 renameInValue (ObjectUpdate obj vs) =
   ObjectUpdate <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
-renameInValue (Abs name v) =
-  newScope $ Abs <$> updateScope name <*> renameInValue v
+renameInValue (Abs a name v) =
+  newScope $ Abs a <$> updateScope name <*> renameInValue v
 renameInValue (App v1 v2) =
   App <$> renameInValue v1 <*> renameInValue v2
-renameInValue (Var (Qualified Nothing name)) =
-  Var . Qualified Nothing <$> lookupIdent name
+renameInValue (Var a (Qualified Nothing name)) =
+  Var a . Qualified Nothing <$> lookupIdent name
 renameInValue v@(Var{}) = return v
 renameInValue (Case vs alts) =
   newScope $ Case <$> mapM renameInValue vs <*> mapM renameInCaseAlternative alts
@@ -163,8 +164,6 @@ renameInValue (TypedValue v ty) =
   TypedValue <$> renameInValue v <*> pure ty
 renameInValue (Let ds v) =
   newScope $ Let <$> mapM (renameInDecl False) ds <*> renameInValue v
-renameInValue (Meta m v) =
-  Meta m <$> renameInValue v
 
 -- |
 -- Renames within literals.

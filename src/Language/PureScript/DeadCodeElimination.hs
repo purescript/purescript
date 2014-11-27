@@ -39,7 +39,7 @@ eliminateDeadCode entryPoints ms = map go ms
   entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
 
   bindIdents :: Bind a -> [Ident]
-  bindIdents (NotRec name _) = [name]
+  bindIdents (NonRec name _) = [name]
   bindIdents (Rec names) = map fst names
 
 type Key = (ModuleName, Ident)
@@ -50,7 +50,7 @@ declarationsByModule (Module mn _ _ fs ds) =
   in fs' ++ concatMap go ds
   where
   go :: Bind a -> [(Key, [Key])]
-  go d@(NotRec name _) = [((mn, name), dependencies mn d)]
+  go d@(NonRec name _) = [((mn, name), dependencies mn d)]
   go d@(Rec names') = map (\(name, _) -> ((mn, name), dependencies mn d)) names'
 
 dependencies :: ModuleName -> Bind a -> [Key]
@@ -59,11 +59,11 @@ dependencies mn =
   in nub . f
   where
   values :: Expr a -> [Key]
-  values (Var ident) = [qualify mn ident]
+  values (Var _ ident) = [qualify mn ident]
   values _ = []
 
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Bind a -> Bool
-isUsed mn graph vertexFor entryPointVertices (NotRec name _) =
+isUsed mn graph vertexFor entryPointVertices (NonRec name _) =
   isUsedValue mn graph vertexFor entryPointVertices name
 isUsed mn graph vertexFor entryPointVertices (Rec ds) =
   any (isUsedValue mn graph vertexFor entryPointVertices . fst) ds
