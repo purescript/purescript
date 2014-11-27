@@ -157,7 +157,6 @@ getProperName _ = error "Expected DataDeclaration"
 --
 toBindingGroup :: ModuleName -> SCC Declaration -> Either ErrorStack Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
-toBindingGroup _ (CyclicSCC [d]) = return d
 toBindingGroup moduleName (CyclicSCC ds') =
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
@@ -186,7 +185,6 @@ toBindingGroup moduleName (CyclicSCC ds') =
     mkErrorStack ("Cycle in definition of " ++ show n) (Just (ExprError e))
   cycleError d ds@(_:_) = rethrow (<> mkErrorStack ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
-
 
 toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
