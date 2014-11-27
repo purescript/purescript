@@ -119,7 +119,7 @@ inlineST = everywhereOnJS convertBlock
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
-  convertBlock (JSApp f [arg]) | isSTFunc C.runST f || isSTFunc C.runSTArray f =
+  convertBlock (JSApp f [arg]) | isSTFunc C.runST f =
     let refs = nub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
@@ -137,10 +137,6 @@ inlineST = everywhereOnJS convertBlock
     if agg then JSAssignment ref arg else JSAssignment (JSAccessor C.stRefValue ref) arg
   convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
     if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor C.stRefValue ref) (JSApp func [JSAccessor C.stRefValue ref])
-  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc C.peekSTArray f =
-    JSIndexer i arr
-  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc C.pokeSTArray f =
-    JSAssignment (JSIndexer i arr) val
   convert _ other = other
   -- Check if an expression represents a function in the ST module
   isSTFunc name (JSAccessor name' (JSVar st)) = st == C.st && name == name'
