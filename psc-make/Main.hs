@@ -126,7 +126,7 @@ noMagicDo = switch $
 
 noOpts :: Parser Bool
 noOpts = switch $
-     long "no-opts"
+     long "verbose-errors"
   <> help "Skip the optimization phase."
 
 verboseErrors :: Parser Bool

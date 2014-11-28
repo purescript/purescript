@@ -103,7 +103,7 @@ browserNamespace = strOption $
 verboseErrors :: Parser Bool
 verboseErrors = switch $
      short 'v'
-  <> long "no-opts"
+  <> long "verbose-errors"
   <> help "Display verbose error messages"
 
 noOpts :: Parser Bool
