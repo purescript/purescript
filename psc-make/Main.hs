@@ -107,6 +107,8 @@ outputDirectory :: Parser FilePath
 outputDirectory = strOption $
      short 'o'
   <> long "output"
+  <> Opts.value "output"
+  <> showDefault
   <> help "The output directory"
 
 noTco :: Parser Bool
