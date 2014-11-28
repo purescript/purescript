@@ -22,15 +22,24 @@ import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
+
+import Options.Applicative
+
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
-import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
-docgen :: Bool -> [FilePath] -> IO ()
-docgen showHierarchy input = do
+
+data PSCDocsOptions = PSCDocsOptions
+  { pscdIncludeHeir :: Bool
+  , pscdInputFiles  :: [FilePath]
+  }
+
+
+docgen :: PSCDocsOptions -> IO ()
+docgen (PSCDocsOptions showHierarchy input) = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
@@ -218,21 +227,25 @@ isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
-inputFiles :: Term [FilePath]
-inputFiles = value $ posAny [] $ posInfo { posName = "file(s)", posDoc = "The input .purs file(s)" }
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> help "The input .ps file(s)"
 
-includeHeirarcy :: Term Bool
-includeHeirarcy = value $ flag $ (optInfo [ "h", "hierarchy-images" ]) { optDoc = "Include markdown for type class hierarchy images in the output." }
+includeHeirarcy :: Parser Bool
+includeHeirarcy = switch $ 
+     long "hierarchy-images"
+  <> help "Include markdown for type class hierarchy images in the output."
 
-term :: Term (IO ())
-term = docgen <$> includeHeirarcy <*> inputFiles
-
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "psc-docs"
-  , version  = showVersion Paths.version
-  , termDoc  = "Generate Markdown documentation from PureScript extern files"
-  }
+pscDocsOptions :: Parser PSCDocsOptions
+pscDocsOptions = PSCDocsOptions <$> includeHeirarcy
+                                <*> many inputFile
 
 main :: IO ()
-main = run (term, termInfo)
+main = execParser opts >>= docgen
+  where
+  opts        = info (helper <*> pscDocsOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psc-docs - Generate Markdown documentation from PureScript extern files"
+  footerInfo  = footer $ "psc-docs " ++ showVersion Paths.version
+

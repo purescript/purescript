@@ -22,7 +22,7 @@ import Control.Monad.Error
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
 
-import System.Console.CmdTheLine
+import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
@@ -31,6 +31,16 @@ import System.IO (stderr)
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
+
+
+data PSCOptions = PSCOptions
+  { pscInput     :: [FilePath]
+  , pscOpts      :: P.Options P.Compile
+  , pscStdIn     :: Bool
+  , pscOutput    :: Maybe FilePath
+  , pscExterns   :: Maybe FilePath
+  , pscUsePrefix :: Bool
+  }
 
 data InputOptions = InputOptions
   { ioNoPrelude   :: Bool
@@ -41,11 +51,11 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
-  | otherwise = do content <- forM ioInputFiles $ \inputFile -> (Just inputFile, ) <$> U.readFile inputFile
+  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> U.readFile inFile
                    return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
 
-compile :: P.Options P.Compile -> Bool -> [FilePath] -> Maybe FilePath -> Maybe FilePath -> Bool -> IO ()
-compile opts stdin input output externs usePrefix = do
+compile :: PSCOptions -> IO ()
+compile (PSCOptions input opts stdin output externs usePrefix) = do
   modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
@@ -72,78 +82,118 @@ compile opts stdin input output externs usePrefix = do
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
-useStdIn :: Term Bool
-useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
-     { optDoc = "Read from standard input" }
+codeGenModule :: Parser String
+codeGenModule = strOption $
+     long "codegen"
+  <> help "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times."
 
-inputFiles :: Term [FilePath]
-inputFiles = value $ posAny [] $ posInfo
-     { posDoc = "The input .ps files" }
+dceModule :: Parser String
+dceModule = strOption $
+     short 'm'
+  <> long "module"
+  <> help "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times."
 
-outputFile :: Term (Maybe FilePath)
-outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
-     { optDoc = "The output .js file" }
+browserNamespace :: Parser String
+browserNamespace = strOption $
+     long "browser-namespace"
+  <> Opts.value "PS"
+  <> showDefault
+  <> help "Specify the namespace that PureScript modules will be exported to when running in the browser."
 
-externsFile :: Term (Maybe FilePath)
-externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
-     { optDoc = "The output .e.ps file" }
+verboseErrors :: Parser Bool
+verboseErrors = switch $
+     short 'v'
+  <> long "no-opts"
+  <> help "Display verbose error messages"
 
-noTco :: Term Bool
-noTco = value $ flag $ (optInfo [ "no-tco" ])
-     { optDoc = "Disable tail call optimizations" }
+noOpts :: Parser Bool
+noOpts = switch $
+     long "no-opts"
+  <> help "Skip the optimization phase."
 
-noPrelude :: Term Bool
-noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
-     { optDoc = "Omit the Prelude" }
-
-noMagicDo :: Term Bool
-noMagicDo = value $ flag $ (optInfo [ "no-magic-do" ])
-     { optDoc = "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad." }
-
-runMain :: Term (Maybe String)
-runMain = value $ defaultOpt (Just "Main") Nothing $ (optInfo [ "main" ])
-     { optDoc = "Generate code to run the main method in the specified module." }
-
-noOpts :: Term Bool
-noOpts = value $ flag $ (optInfo [ "no-opts" ])
-     { optDoc = "Skip the optimization phase." }
-
-browserNamespace :: Term String
-browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
-     { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
-
-dceModules :: Term [String]
-dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
-     { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
-
-codeGenModules :: Term [String]
-codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
-     { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
-
-verboseErrors :: Term Bool
-verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
-     { optDoc = "Display verbose error messages" }
-
-noPrefix :: Term Bool
-noPrefix = value $ flag $ (optInfo ["no-prefix" ])
-     { optDoc = "Do not include comment header"}
-
-options :: Term (P.Options P.Compile)
-options = P.Options <$> noPrelude <*> noTco <*> noMagicDo <*> runMain <*> noOpts <*> verboseErrors <*> additionalOptions
+runMain :: Parser (Maybe String)
+runMain = optional $ noArgs <|> withArgs
   where
-  additionalOptions = P.CompileOptions <$> browserNamespace <*> dceModules <*> codeGenModules
+  defaultVal = "Main"
+  noArgs     = flag' defaultVal (long "main")
+  withArgs   = strOption $ 
+        long "main"
+     <> help (concat [
+            "Generate code to run the main method in the specified module. ",
+            "(no argument: \"", defaultVal, "\")"
+        ])
+        
+noMagicDo :: Parser Bool
+noMagicDo = switch $
+     long "no-magic-do"
+  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
+        
+noTco :: Parser Bool
+noTco = switch $ 
+     long "no-tco"
+  <> help "Disable tail call optimizations"
 
-term :: Term (IO ())
-term = compile <$> options <*> useStdIn <*> inputFiles <*> outputFile <*> externsFile <*> (not <$> noPrefix)
+noPrelude :: Parser Bool
+noPrelude = switch $ 
+     long "no-prelude"
+  <> help "Omit the Prelude"
 
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "psc"
-  , version  = showVersion Paths.version
-  , termDoc  = "Compiles PureScript to Javascript"
-  }
+useStdIn :: Parser Bool
+useStdIn = switch $
+     short 's'
+  <> long "stdin"
+  <> help "Read from standard input"
+
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> help "The input .ps file(s)"
+
+outputFile :: Parser (Maybe FilePath)
+outputFile = optional . strOption $
+     short 'o'
+  <> long "output"
+  <> help "The output .js file"
+
+externsFile :: Parser (Maybe FilePath)
+externsFile = optional . strOption $
+     short 'e'
+  <> long "externs"
+  <> help "The output .e.ps file"
+
+noPrefix :: Parser Bool
+noPrefix = switch $ 
+     short 'p'
+  <> long "no-prefix"
+  <> help "Do not include comment header"
+
+options :: Parser (P.Options P.Compile)
+options = P.Options <$> noPrelude 
+                    <*> noTco 
+                    <*> noMagicDo
+                    <*> runMain
+                    <*> noOpts
+                    <*> verboseErrors
+                    <*> additionalOptions
+  where
+  additionalOptions = 
+    P.CompileOptions <$> browserNamespace 
+                     <*> many dceModule
+                     <*> many codeGenModule
+
+pscOptions :: Parser PSCOptions
+pscOptions = PSCOptions <$> many inputFile
+                        <*> options
+                        <*> useStdIn
+                        <*> outputFile
+                        <*> externsFile
+                        <*> (not <$> noPrefix)
 
 main :: IO ()
-main = run (term, termInfo)
-
+main = execParser opts >>= compile
+  where
+  opts        = info (helper <*> pscOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psc - Compiles PureScript to Javascript"
+  footerInfo  = footer $ "psc " ++ showVersion Paths.version
 
