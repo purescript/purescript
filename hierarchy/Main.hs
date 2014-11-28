@@ -15,24 +15,29 @@
 
 module Main where
 
-import Control.Applicative ((<*>), (<$>))
 import Control.Monad (unless)
 
 import Data.List (intercalate,nub,sort)
 import Data.Foldable (for_)
 import Data.Version (showVersion)
 
-import System.Console.CmdTheLine
+import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
 
-import Text.Parsec (ParseError)
+import Text.Parsec as Par (ParseError)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
+
+
+data HierarchyOptions = HierarchyOptions
+  { hierachyInput   :: FilePath
+  , hierarchyOutput :: Maybe FilePath
+  }
 
 newtype SuperMap = SuperMap { unSuperMap :: Either P.ProperName (P.ProperName, P.ProperName) }
   deriving Eq
@@ -49,13 +54,13 @@ instance Ord SuperMap where
 runModuleName :: P.ModuleName -> String
 runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
-readInput :: FilePath -> IO (Either ParseError [P.Module])
+readInput :: FilePath -> IO (Either Par.ParseError [P.Module])
 readInput p = do
   text <- U.readFile p
   return $ P.runIndentParser p P.parseModules text
 
-compile :: FilePath -> Maybe FilePath -> IO ()
-compile input mOutput = do
+compile :: HierarchyOptions -> IO ()
+compile (HierarchyOptions input mOutput) = do
   modules <- readInput input
   case modules of
     Left err -> U.hPutStr stderr (show err) >> exitFailure
@@ -82,23 +87,28 @@ superClasses (P.TypeClassDeclaration sub _ _ _) = [SuperMap (Left sub)]
 superClasses (P.PositionedDeclaration _ decl) = superClasses decl
 superClasses _ = []
 
-outputFile :: Term (Maybe FilePath)
-outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
-  { optDoc = "The output directory" }
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> value "main.purs"
+  <> showDefault
+  <> help "The input file to generate a hierarchy from"
 
-inputFile :: Term FilePath
-inputFile = value $ pos 0 "main.purs" $ posInfo
-  { posDoc = "The input file to generate a hierarchy from" }
+outputFile :: Parser (Maybe FilePath)
+outputFile = optional . strOption $
+     short 'o'
+  <> long "output"
+  <> help "The output directory"
 
-term :: Term (IO ())
-term = compile <$> inputFile <*> outputFile
-
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "hierarchy"
-  , version  = showVersion Paths.version
-  , termDoc  = "Creates a GraphViz directed graph of PureScript TypeClasses"
-  }
+pscOptions :: Parser HierarchyOptions
+pscOptions = HierarchyOptions <$> inputFile
+                              <*> outputFile
 
 main :: IO ()
-main = run (term, termInfo)
+main = execParser opts >>= compile
+  where
+  opts        = info (helper <*> pscOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "hierarchy - Creates a GraphViz directed graph of PureScript TypeClasses"
+  footerInfo  = footer $ "hierarchy " ++ showVersion Paths.version
+

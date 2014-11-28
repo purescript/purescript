@@ -33,24 +33,31 @@ import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
 import qualified Control.Monad.Trans.State.Lazy as L
 
+import Options.Applicative as Opts
+
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getModificationTime, doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
 import System.FilePath (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import System.IO.Error (tryIOError)
 import System.Process (readProcessWithExitCode)
-import qualified System.Console.CmdTheLine as Cmd
 import qualified System.IO.UTF8 as U (writeFile, putStrLn, print, readFile)
 
-import Text.Parsec (ParseError)
+import qualified Text.Parsec as Par (ParseError)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.AST as D
 import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
 
-import Commands
+import Commands as C
 import Parser
+
+
+data PSCiOptions = PSCiOptions
+  { psciSingleLineFlag :: Bool
+  , psciInputFile      :: [FilePath]
+  }
 
 -- |
 -- The PSCI state.
@@ -125,7 +132,7 @@ loadModule filename = either (Left . show) Right . P.runIndentParser filename P.
 -- |
 -- Load all modules, including the Prelude
 --
-loadAllModules :: [FilePath] -> IO (Either ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
+loadAllModules :: [FilePath] -> IO (Either Par.ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- U.readFile filename
@@ -146,7 +153,7 @@ expandTilde p = return p
 --
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
-  intercalate "\n    " (map (intercalate "    ") help)
+  intercalate "\n    " (map (intercalate "    ") C.help)
 
 -- |
 -- The welcome prologue.
@@ -180,10 +187,10 @@ completion :: CompletionFunc (StateT PSCiState IO)
 completion = completeWord Nothing " \t\n\r" findCompletions
   where
   findCompletions :: String -> StateT PSCiState IO [Completion]
-  findCompletions str = do
+  findCompletions st = do
     ms <- map snd . psciLoadedModules <$> get
-    files <- listFiles str
-    let matches = filter (isPrefixOf str) (names ms)
+    files <- listFiles st
+    let matches = filter (isPrefixOf st) (names ms)
     return $ sortBy sorter $ map simpleCompletion matches ++ files
   getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
   getDeclName Nothing (P.ValueDeclaration ident _ _ _) = Just ident
@@ -248,13 +255,13 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} value =
+createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} val =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    itValue = foldl (\x f -> f x) value lets
+    itValue = foldl (\x f -> f x) val lets
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
     itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right itValue
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
@@ -295,9 +302,9 @@ indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 -- Takes a value declaration and evaluates it with the current state.
 --
 handleDeclaration :: P.Expr -> PSCI ()
-handleDeclaration value = do
+handleDeclaration val = do
   st <- PSCI $ lift get
-  let m = createTemporaryModule True st value
+  let m = createTemporaryModule True st val
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
@@ -363,9 +370,9 @@ handleImport moduleName = do
 -- Takes a value and prints its type
 --
 handleTypeOf :: P.Expr -> PSCI ()
-handleTypeOf value = do
+handleTypeOf val = do
   st <- PSCI $ lift get
-  let m = createTemporaryModule False st value
+  let m = createTemporaryModule False st val
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
@@ -434,7 +441,7 @@ handleKindOf typ = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: Bool -> InputT (StateT PSCiState IO) (Either ParseError (Maybe Command))
+getCommand :: Bool -> InputT (StateT PSCiState IO) (Either Par.ParseError (Maybe Command))
 getCommand singleLineMode = do
   firstLine <- getInputLine "> "
   case firstLine of
@@ -478,17 +485,6 @@ handleCommand (Show "loaded") = handleShowLoadedModules
 handleCommand (Show "import") = handleShowImportedModules
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
-singleLineFlag :: Cmd.Term Bool
-singleLineFlag = Cmd.value $ Cmd.flag $ (Cmd.optInfo ["single-line-mode"])
-                                                { Cmd.optName = "Single-line mode"
-                                                , Cmd.optDoc = "Run in single-line mode"
-                                                }
-
-inputFiles :: Cmd.Term [FilePath]
-inputFiles = Cmd.value $ Cmd.posAny [] $ Cmd.posInfo { Cmd.posName = "file(s)"
-                                                     , Cmd.posDoc = "Optional .purs files to load on start"
-                                                     }
-
 loadUserConfig :: IO (Maybe [Command])
 loadUserConfig = do
   configFile <- (</> ".psci") <$> getCurrentDirectory
@@ -505,8 +501,8 @@ loadUserConfig = do
 -- |
 -- The PSCI main loop.
 --
-loop :: Bool -> [FilePath] -> IO ()
-loop singleLineMode files = do
+loop :: PSCiOptions -> IO ()
+loop (PSCiOptions singleLineMode files) = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
@@ -528,15 +524,25 @@ loop singleLineMode files = do
             Right (Just Quit) -> outputStrLn quitMessage
             Right (Just c') -> runPSCI (handleCommand c') >> go
 
-term :: Cmd.Term (IO ())
-term = loop <$> singleLineFlag <*> inputFiles
+singleLineFlag :: Parser Bool
+singleLineFlag = switch $
+     long "single-line-mode"
+  <> Opts.help "Run in single-line mode"
 
-termInfo :: Cmd.TermInfo
-termInfo = Cmd.defTI
-  { Cmd.termName = "psci"
-  , Cmd.version  = showVersion Paths.version
-  , Cmd.termDoc  = "Interactive mode for PureScript"
-  }
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> Opts.help "Optional .purs files to load on start"
+
+psciOptions :: Parser PSCiOptions
+psciOptions = PSCiOptions <$> singleLineFlag
+                          <*> many inputFile
 
 main :: IO ()
-main = Cmd.run (term, termInfo)
+main = execParser opts >>= loop
+  where
+  opts        = info (helper <*> psciOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psci - Interactive mode for PureScript"
+  footerInfo  = footer $ "psci " ++ showVersion Paths.version
+
