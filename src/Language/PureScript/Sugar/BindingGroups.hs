@@ -26,6 +26,7 @@ import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
 import Data.Monoid ((<>))
 import Control.Applicative ((<$>), (<*>), pure)
+import Control.Monad ((<=<))
 
 import qualified Data.Set as S
 
@@ -48,18 +49,14 @@ collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
 
 createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
-createBindingGroups moduleName decls = do
-  (Let result _) <- createBindingGroupsForValue (Let decls (StringLiteral (error "Placeholder string literal was used in createBindingGroups.")))
-  return result
+createBindingGroups moduleName = mapM f <=< handleDecls
 
   where
-  createBindingGroupsForValue :: Expr -> Either ErrorStack Expr
-  createBindingGroupsForValue =
-    let (_, f, _) = everywhereOnValuesTopDownM return go return
-    in f
-    where
-    go (Let ds val) = flip Let val <$> handleDecls ds
-    go other = return other
+  (f, _, _) = everywhereOnValuesTopDownM return handleExprs return 
+      
+  handleExprs :: Expr -> Either ErrorStack Expr
+  handleExprs (Let ds val) = flip Let val <$> handleDecls ds
+  handleExprs other = return other
   
   -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
