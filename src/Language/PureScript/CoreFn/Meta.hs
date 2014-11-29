@@ -33,7 +33,7 @@ data Meta
   -- |
   -- The contained value is a typeclass dictionary constructor
   --
-  | IsTypeClassDictionaryConstructor deriving (Show, D.Data, D.Typeable)
+  | IsTypeClassConstructor deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- Type alias for constructor arity

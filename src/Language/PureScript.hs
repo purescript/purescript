@@ -85,8 +85,8 @@ compile' env opts ms prefix = do
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
-  let modulesToCodeGen = map CoreFn.resugar $ if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-  let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
+  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
+  let js = evalSupply nextVar $ concat <$> mapM (moduleToJs opts) modulesToCodeGen
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   js' <- generateMain env' opts js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
@@ -200,10 +200,9 @@ make outputDir opts ms prefix = do
 
     let mod' = Module moduleName' regrouped exps
     let corefn = CoreFn.moduleToCoreFn env' mod'
-    let [renamed'] = renameInModules [corefn]
-    let renamed = CoreFn.resugar renamed'
+    let [renamed] = renameInModules [corefn]
 
-    pjs <- prettyPrintJS <$> moduleToJs opts renamed env'
+    pjs <- prettyPrintJS <$> moduleToJs opts renamed
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
     let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
 
