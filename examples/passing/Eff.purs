@@ -14,6 +14,12 @@ test2 = runPure (runST (do
           modifySTRef ref $ \n -> n + 1
           readSTRef ref))
 
+test3 = pureST (do
+          ref <- newSTRef 0
+          modifySTRef ref $ \n -> n + 1
+          readSTRef ref)
+
 main = do
   test1
   Debug.Trace.print test2
+  Debug.Trace.print test3
