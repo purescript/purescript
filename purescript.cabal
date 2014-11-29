@@ -55,10 +55,10 @@ library
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
                      Language.PureScript.CodeGen
-                     Language.PureScript.CodeGen.Common
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
+                     Language.PureScript.CodeGen.JS.Common
                      Language.PureScript.Constants
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment

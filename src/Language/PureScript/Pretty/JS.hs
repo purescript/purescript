@@ -17,17 +17,19 @@ module Language.PureScript.Pretty.JS (
     prettyPrintJS
 ) where
 
-import Language.PureScript.Pretty.Common
-import Language.PureScript.CodeGen.JS (identNeedsEscaping)
-import Language.PureScript.CodeGen.JS.AST
-
 import Data.List
 import Data.Maybe (fromMaybe)
-import qualified Control.Arrow as A
-import Control.Arrow ((<+>))
-import Control.PatternArrows
+
 import Control.Applicative
+import Control.Arrow ((<+>))
 import Control.Monad.State
+import Control.PatternArrows
+import qualified Control.Arrow as A
+
+import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.CodeGen.JS.Common
+import Language.PureScript.Pretty.Common
+
 import Numeric
 
 literals :: Pattern PrinterState JS String

@@ -16,7 +16,7 @@ module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Data.Function (on)
 import Data.List (sort, nub)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
 import Control.Arrow (second, (***))
@@ -192,13 +192,6 @@ properToIdent :: ProperName -> Ident
 properToIdent = Ident . runProperName
 
 -- |
--- Finds information about data constructors from the current environment.
---
-lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
-lookupConstructor env ctor =
-  fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env
-
--- |
 -- Gets metadata for data constructors.
 --
 getConstructorMeta :: Environment -> Qualified ProperName -> Meta
@@ -217,4 +210,4 @@ getConstructorMeta env ctor =
   numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
   typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type)) -> (ModuleName, ProperName)
   typeConstructor (Qualified (Just mn) _, (_, tyCtor, _)) = (mn, tyCtor)
-  typeConstructor _ = error "Invalid argument to isOnlyConstructor"
+  typeConstructor _ = error "Invalid argument to typeConstructor"

@@ -25,10 +25,9 @@ module Language.PureScript.Optimizer.Inliner (
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.Common (identToJs)
-import Language.PureScript.Optimizer.Common
+import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Names
-
+import Language.PureScript.Optimizer.Common
 import qualified Language.PureScript.Constants as C
 
 shouldInline :: JS -> Bool

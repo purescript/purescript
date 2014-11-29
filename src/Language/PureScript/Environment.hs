@@ -17,14 +17,14 @@
 module Language.PureScript.Environment where
 
 import Data.Data
-
-import Language.PureScript.Names
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.TypeClassDictionaries
-import qualified Language.PureScript.Constants as C
-
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
+
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
+import qualified Language.PureScript.Constants as C
 
 -- |
 -- The @Environment@ defines all values and types which are currently in scope:
@@ -219,3 +219,10 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
                        , (primName "String"   , (Star, ExternData))
                        , (primName "Number"   , (Star, ExternData))
                        , (primName "Boolean"  , (Star, ExternData)) ]
+
+-- |
+-- Finds information about data constructors from the current environment.
+--
+lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
+lookupConstructor env ctor =
+  fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env

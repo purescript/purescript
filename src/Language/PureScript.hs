@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript
--- Copyright   :  (c) Phil Freeman 2013
+-- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
@@ -34,7 +34,6 @@ import System.FilePath ((</>))
 
 import Language.PureScript.AST as P
 import Language.PureScript.CodeGen as P
-import Language.PureScript.CodeGen.Common as P
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
@@ -76,7 +75,7 @@ compile = compile' initEnvironment
 
 compile' :: Environment -> Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
 compile' env opts ms prefix = do
-  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
+  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else map importPrelude ms
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
@@ -156,7 +155,7 @@ make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options 
 make outputDir opts ms prefix = do
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
-  (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else (map (importPrelude . snd) ms)
+  (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else map (importPrelude . snd) ms
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = runModuleName moduleName'

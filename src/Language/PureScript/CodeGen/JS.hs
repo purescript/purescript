@@ -17,9 +17,9 @@
 
 module Language.PureScript.CodeGen.JS (
     module AST,
+    module Common,
     bindToJs,
-    moduleToJs,
-    identNeedsEscaping
+    moduleToJs
 ) where
 
 import Data.List ((\\), delete)
@@ -29,8 +29,8 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Monad (foldM, replicateM, forM)
 
-import Language.PureScript.CodeGen.Common
 import Language.PureScript.CodeGen.JS.AST as AST
+import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Optimizer
