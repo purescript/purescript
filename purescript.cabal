@@ -107,8 +107,8 @@ library
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, utf8-string -any
+                   mtl >= 2.1.0 && < 2.3, optparse-applicative -any, parsec -any, purescript -any,
+                   transformers >= 0.3 && < 0.5, utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
@@ -117,8 +117,8 @@ executable psc
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any, 
-                   transformers -any, utf8-string -any
+                   mtl >= 2.1.0 && < 2.3, optparse-applicative -any, parsec -any, purescript -any, 
+                   transformers >= 0.3 && < 0.5, utf8-string -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
@@ -127,8 +127,8 @@ executable psc-make
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any, 
-                   haskeline >= 0.7.0.0, purescript -any, transformers -any, 
+                   mtl >= 2.1.0 && < 2.3, optparse-applicative -any, parsec -any, 
+                   haskeline >= 0.7.0.0, purescript -any, transformers >= 0.3 && < 0.5, 
                    utf8-string -any, process -any
                    
     main-is: Main.hs
@@ -140,7 +140,7 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any, utf8-string -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any
+                   optparse-applicative -any, process -any, mtl >= 2.1.0 && < 2.3.0 
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
@@ -148,8 +148,8 @@ executable psc-docs
     ghc-options: -Wall -O2
 
 executable hierarchy
-    build-depends: base >=4 && <5, purescript -any, utf8-string -any, optparse-applicative >= 0.10.0,
-                   process -any, mtl -any, parsec -any, filepath -any, directory -any
+    build-depends: base >=4 && <5, purescript -any, utf8-string -any, optparse-applicative -any,
+                   process -any, mtl >= 2.1.0 && < 2.3.0, parsec -any, filepath -any, directory -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: hierarchy
@@ -158,8 +158,8 @@ executable hierarchy
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
-                   filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, utf8-string -any, process -any
+                   filepath -any, mtl >= 2.1.0 && < 2.3.0, parsec -any, purescript -any,
+                   transformers >= 0.3 && < 0.5, utf8-string -any, process -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True
