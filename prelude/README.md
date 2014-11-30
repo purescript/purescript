@@ -371,6 +371,8 @@
 
     runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 
+    pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
+
     runSTArray :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 
     writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a

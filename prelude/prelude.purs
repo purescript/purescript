@@ -915,3 +915,5 @@ module Control.Monad.ST where
                        \  return f;\
                        \}" :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 
+  pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
+  pureST st = runPure (runST st)
