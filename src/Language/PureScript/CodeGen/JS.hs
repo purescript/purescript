@@ -119,6 +119,14 @@ valueToJs opts m (ObjectUpdate _ o ps) = do
   obj <- valueToJs opts m o
   sts <- mapM (sndM (valueToJs opts m)) ps
   extendObj obj sts
+valueToJs opts m (Abs (_, _, Just IsTypeClassConstructor) arg val) =
+  case val of
+    Literal _ (ObjectLiteral props) ->
+      JSFunction Nothing [identToJs arg] . JSBlock <$> mapM assign props
+    _ -> error "TypeClassConstructor had non-ObjectLiteral value in valueToJS"
+  where
+  assign (name, v) =
+    JSAssignment (accessorString name (JSVar "this")) <$> valueToJs opts m v
 valueToJs opts m (Abs _ arg val) = do
   ret <- valueToJs opts m val
   return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
