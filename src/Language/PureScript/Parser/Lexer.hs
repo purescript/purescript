@@ -25,12 +25,14 @@ module Language.PureScript.Parser.Lexer
 import Prelude hiding (lex)
 
 import Data.Functor (void)
+import Data.Functor.Identity
 
 import Control.Applicative
 
 import Language.PureScript.Parser.Common
 
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Token as PT
 
 data Comment
   = LineComment String
@@ -76,22 +78,21 @@ data PositionedToken = PositionedToken
   , ptComments :: [Comment]
   } deriving (Show, Eq)
 
-lex :: String -> Either String ([PositionedToken], [Comment])
+lex :: String -> Either String [PositionedToken]
 lex input = 
   case P.parse parseTokens "" input of
     Left err -> Left $ show err
-    Right (ts, cs) -> (, cs) <$> j [] [] (insertNewlines 1 ts)
+    Right ts -> j [] [] (insertNewlines 1 ts)
   where
       
-  parseTokens :: P.Parsec String u ([PositionedToken], [Comment])
-  parseTokens = (,) <$> (P.many (whitespace *> parsePositionedToken) <* P.eof)
-                    <*> P.many parseComment
+  parseTokens :: P.Parsec String u [PositionedToken]
+  parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
   
   whitespace :: P.Parsec String u ()
   whitespace = P.skipMany (P.oneOf " \t\r\n")
       
   parseComment :: P.Parsec String u Comment
-  parseComment = whitespace *> (BlockComment <$> blockComment <|> LineComment <$> lineComment)
+  parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
     where
     blockComment :: P.Parsec String u String
     blockComment = P.try $ P.string "{-" *> P.manyTill P.anyChar (P.try (P.string "-}"))
@@ -107,27 +108,26 @@ lex input =
     return $ PositionedToken (P.sourceLine pos) (P.sourceColumn pos) tok comments
   
   parseToken :: P.Parsec String u Token
-  parseToken = whitespace *> P.choice
-    [ P.try $ P.char '<' *> (P.char '-' *> pure LArrow    
-                             <|> P.char '=' *> pure LFatArrow 
-                             <|> P.notFollowedBy symbolChar *> pure LAngle)
-    , P.try $ P.char '=' *> (P.char '>' *> pure RFatArrow 
-                             <|> P.notFollowedBy symbolChar *> pure Equals)
-    , P.try $ P.char ':' *> (P.char ':' *> pure DoubleColon 
-                             <|> P.notFollowedBy symbolChar *> pure Colon)
-    , P.try $ P.string "->" *> pure RArrow
-    , P.try $ P.char '('    *> P.notFollowedBy symbolChar *> pure LParen
-    , P.try $ P.char ')'    *> P.notFollowedBy symbolChar *> pure RParen
-    , P.try $ P.char '{'    *> P.notFollowedBy symbolChar *> pure LBrace
-    , P.try $ P.char '}'    *> P.notFollowedBy symbolChar *> pure RBrace
+  parseToken = P.choice
+    [ P.try $ P.string "<-" *> P.notFollowedBy symbolChar *> pure LArrow    
+    , P.try $ P.string "<=" *> P.notFollowedBy symbolChar *> pure LFatArrow
+    , P.try $ P.string "->" *> P.notFollowedBy symbolChar *> pure RArrow    
+    , P.try $ P.string "=>" *> P.notFollowedBy symbolChar *> pure RFatArrow 
+    , P.try $ P.string "::" *> P.notFollowedBy symbolChar *> pure DoubleColon 
+    , P.try $ P.char '('    *> pure LParen
+    , P.try $ P.char ')'    *> pure RParen
+    , P.try $ P.char '{'    *> pure LBrace
+    , P.try $ P.char '}'    *> pure RBrace
+    , P.try $ P.char '['    *> pure LSquare
+    , P.try $ P.char ']'    *> pure RSquare
+    , P.try $ P.char '`'    *> pure Tick
+    , P.try $ P.char ','    *> pure Comma
+    , P.try $ P.char '<'    *> P.notFollowedBy symbolChar *> pure LAngle
     , P.try $ P.char '>'    *> P.notFollowedBy symbolChar *> pure RAngle
-    , P.try $ P.char '['    *> P.notFollowedBy symbolChar *> pure LSquare
-    , P.try $ P.char ']'    *> P.notFollowedBy symbolChar *> pure RSquare
+    , P.try $ P.char '='    *> P.notFollowedBy symbolChar *> pure Equals
     , P.try $ P.char ':'    *> P.notFollowedBy symbolChar *> pure Colon
     , P.try $ P.char '|'    *> P.notFollowedBy symbolChar *> pure Pipe
-    , P.try $ P.char '`'    *> P.notFollowedBy symbolChar *> pure Tick
     , P.try $ P.char '.'    *> P.notFollowedBy symbolChar *> pure Dot
-    , P.try $ P.char ','    *> P.notFollowedBy symbolChar *> pure Comma
     , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
     , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
     , LName         <$> parseLName 
@@ -136,7 +136,7 @@ lex input =
     , StringLiteral <$> parseStringLiteral
     , Natural       <$> parseNatural
     , ANumber       <$> parseANumber
-    ]
+    ] <* whitespace
   
     where
     parseLName :: P.Parsec String u String
@@ -152,13 +152,41 @@ lex input =
     symbolChar = P.oneOf opChars
     
     parseStringLiteral :: P.Parsec String u String
-    parseStringLiteral = fail "StringLiteral not implemented"
+    parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
+      where 
+      delimeter   = P.try (P.string "\"\"\"")
+      blockString = delimeter >> P.manyTill P.anyChar delimeter
     
     parseNatural :: P.Parsec String u Integer
-    parseNatural = fail "Natural not implemented"
+    parseNatural = P.try $ PT.natural tokenParser
     
     parseANumber :: P.Parsec String u (Either Integer Double)
-    parseANumber = fail "ANumber not implemented"
+    parseANumber = (Right <$> P.try (PT.float tokenParser) <|>
+                    Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
+  
+  -- |
+  -- We use Text.Parsec.Token to implement the string and number lexemes
+  --
+  langDef :: PT.GenLanguageDef String u Identity
+  langDef = PT.LanguageDef
+    { PT.reservedNames   = []
+    , PT.reservedOpNames = []
+    , PT.commentStart    = ""
+    , PT.commentEnd      = ""
+    , PT.commentLine     = ""
+    , PT.nestedComments  = True
+    , PT.identStart      = fail "Identifiers not supported"
+    , PT.identLetter     = fail "Identifiers not supported"
+    , PT.opStart         = fail "Operators not supported"
+    , PT.opLetter        = fail "Operators not supported"
+    , PT.caseSensitive   = True
+    }
+
+  -- |
+  -- A token parser based on the language definition
+  --
+  tokenParser :: PT.GenTokenParser String u Identity
+  tokenParser = PT.makeTokenParser langDef
   
   insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
   insertNewlines _   [] = []
