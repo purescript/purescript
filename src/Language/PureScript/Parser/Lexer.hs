@@ -272,7 +272,7 @@ insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts)
   | otherwise      = t : insertNewlines ref ts
 
 splitModules :: [PositionedToken] -> [[PositionedToken]]
-splitModules = split (isModuleToken . ptToken)
+splitModules = map indentAll . split (isModuleToken . ptToken)
   where
   split :: (a -> Bool) -> [a] -> [[a]]
   split _ [] = []
@@ -284,6 +284,13 @@ splitModules = split (isModuleToken . ptToken)
   isModuleToken :: Token -> Bool
   isModuleToken (LName "module") = True
   isModuleToken _ = False
+  
+  indentAll :: [PositionedToken] -> [PositionedToken]
+  indentAll (t : ts) | isModuleToken (ptToken t) = t : map indent ts
+  indentAll other = other
+  
+  indent :: PositionedToken -> PositionedToken
+  indent t = t { ptSourcePos = P.setSourceColumn (ptSourcePos t) (succ (P.sourceColumn (ptSourcePos t))) }
 
 j :: [Int] -> [PositionedToken] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
 j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
