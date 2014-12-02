@@ -110,7 +110,7 @@ parseExternDeclaration = P.try (reserved "foreign") *> reserved "import" *>
            name <- parseIdent <* doubleColon
            deps <- P.option [] $ do
              deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-             symbol' "=>"
+             rfatArrow
              return deps
            className <- parseQualified properName
            tys <- P.many (noWildcards parseTypeAtom)
@@ -172,7 +172,7 @@ parseTypeClassDeclaration = do
   reserved "class"
   implies <- P.option [] $ do
     implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-    symbol' "<="
+    lfatArrow
     return implies
   className <- properName
   idents <- P.many kindedIdent
@@ -187,7 +187,7 @@ parseTypeInstanceDeclaration = do
   name <- parseIdent <* doubleColon
   deps <- P.optionMaybe $ do
     deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-    symbol' "=>"
+    rfatArrow
     return deps
   className <- parseQualified properName
   ty <- P.many (noWildcards parseTypeAtom)

@@ -50,7 +50,7 @@ parseQualified parser = part []
 -- Parse an identifier or parenthesized operator
 --
 parseIdent :: TokenParser u Ident
-parseIdent = (Ident <$> lname) <|> (Op <$> parens symbol)
+parseIdent = (Ident <$> identifier) <|> (Op <$> parens symbol)
 
 -- |
 -- Run the first parser, then match the second if possible, applying the specified function on a successful match

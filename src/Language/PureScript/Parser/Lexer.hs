@@ -149,7 +149,8 @@ instance Show PositionedToken where
 lex :: String -> Either P.ParseError [PositionedToken]
 lex input = do
   ts <- P.parse parseTokens "" input
-  j [] [] (insertNewlines 1 ts)
+  let annot = insertNewlines 1 ts
+  j [] [] annot
   where
       
   parseTokens :: P.Parsec String u [PositionedToken]
@@ -257,8 +258,8 @@ lex input = do
   
   insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
   insertNewlines _   [] = []
-  insertNewlines _   (t1@PositionedToken { ptToken = LName s } : ts@(t2@PositionedToken { ptSourcePos = pos } : _)) 
-    | shouldIndent s = t1 : t2 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : insertNewlines (P.sourceLine pos) ts
+  insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
+    | shouldIndent s = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
   insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
     | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
     | otherwise      = t : insertNewlines ref ts
@@ -426,12 +427,16 @@ symbol :: TokenParser u String
 symbol = token go P.<?> "symbol"
   where
   go (Symbol s) = Just s
+  go Colon      = Just ":"
+  go LFatArrow  = Just "<="
   go _ = Nothing
 
 symbol' :: String -> TokenParser u ()
 symbol' s = token go P.<?> show s
   where
   go (Symbol s') | s == s'   = Just ()
+  go Colon       | s == ":"  = Just ()
+  go LFatArrow   | s == "<=" = Just ()
   go _ = Nothing
   
 stringLiteral :: TokenParser u String
