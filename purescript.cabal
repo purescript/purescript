@@ -69,7 +69,6 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Declarations
                      Language.PureScript.Parser.Kinds
-                     Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
                      Language.PureScript.Pretty
                      Language.PureScript.Pretty.Common

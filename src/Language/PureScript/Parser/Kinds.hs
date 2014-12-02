@@ -18,28 +18,27 @@ module Language.PureScript.Parser.Kinds (
 ) where
 
 import Language.PureScript.Kinds
-import Language.PureScript.Parser.State
-import Language.PureScript.Parser.Common
+import Language.PureScript.Parser.Lexer
 import Control.Applicative
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseStar :: P.Parsec String ParseState Kind
-parseStar = const Star <$> lexeme (P.char '*')
+parseStar :: TokenParser u Kind
+parseStar = const Star <$> symbol' "*"
 
-parseBang :: P.Parsec String ParseState Kind
-parseBang = const Bang <$> lexeme (P.char '!')
+parseBang :: TokenParser u Kind
+parseBang = const Bang <$> symbol' "!"
 
-parseTypeAtom :: P.Parsec String ParseState Kind
-parseTypeAtom = indented *> P.choice (map P.try
-            [ parseStar
-            , parseBang
-            , parens parseKind ])
+parseTypeAtom :: TokenParser u Kind
+parseTypeAtom = P.choice $ map P.try
+                  [ parseStar
+                  , parseBang
+                  , parens parseKind ]
 -- |
 -- Parse a kind
 --
-parseKind :: P.Parsec String ParseState Kind
+parseKind :: TokenParser u Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
-  operators = [ [ P.Prefix (lexeme (P.char '#') >> return Row) ]
-              , [ P.Infix (lexeme (P.try (P.string "->")) >> return FunKind) P.AssocRight ] ]
+  operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
+              , [ P.Infix ((P.try rarrow) >> return FunKind) P.AssocRight ] ]
