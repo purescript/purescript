@@ -266,7 +266,7 @@ tokenParser = PT.makeTokenParser langDef
 insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
 insertNewlines _   [] = []
 insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
-  | shouldIndent s = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
+  | shouldIndent s && ptToken t2 /= LBrace = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
 insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
   | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
   | otherwise      = t : insertNewlines ref ts
@@ -295,8 +295,6 @@ splitModules = map indentAll . split (isModuleToken . ptToken)
 j :: [Int] -> [PositionedToken] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
 j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
   | m == n = j (m : ms) (t { ptToken = Semi } : acc) ts
-{-j []       acc ((t@PositionedToken{ ptToken = Newline 1 })      : ts) 
-  = j [] (t { ptToken = Semi } : acc) ts-}
 j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
   | n < m = j ms (t { ptToken = RBrace } : acc) (t : ts)
 j ms       acc (PositionedToken{ ptToken = Newline _ }          : ts) 
