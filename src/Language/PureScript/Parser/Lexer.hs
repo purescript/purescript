@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Lexer
   , Token()
   , TokenParser()
   , lex
+  , lexModules
   , token
   , match
   , lparen
@@ -151,155 +152,175 @@ lex input = do
   ts <- P.parse parseTokens "" input
   let annot = insertNewlines 1 ts
   j [] [] annot
+      
+lexModules :: String -> Either P.ParseError [[PositionedToken]]
+lexModules input = do
+  ts <- P.parse parseTokens "" input
+  let split = splitModules ts
+      annot = insertNewlines 1 `map` split
+  j [] [] `mapM` annot
+      
+parseTokens :: P.Parsec String u [PositionedToken]
+parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
+
+whitespace :: P.Parsec String u ()
+whitespace = P.skipMany (P.oneOf " \t\r\n")
+    
+parseComment :: P.Parsec String u Comment
+parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
   where
-      
-  parseTokens :: P.Parsec String u [PositionedToken]
-  parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
-  
-  whitespace :: P.Parsec String u ()
-  whitespace = P.skipMany (P.oneOf " \t\r\n")
-      
-  parseComment :: P.Parsec String u Comment
-  parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
-    where
-    blockComment :: P.Parsec String u String
-    blockComment = P.try $ P.string "{-" *> P.manyTill P.anyChar (P.try (P.string "-}"))
+  blockComment :: P.Parsec String u String
+  blockComment = P.try $ P.string "{-" *> P.manyTill P.anyChar (P.try (P.string "-}"))
 
-    lineComment :: P.Parsec String u String
-    lineComment = P.try $ P.string "--" *> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof))
-  
-  parsePositionedToken :: P.Parsec String u PositionedToken
-  parsePositionedToken = do
-    pos <- P.getPosition
-    comments <- P.many parseComment
-    tok <- parseToken
-    return $ PositionedToken pos tok comments
-  
-  parseToken :: P.Parsec String u Token
-  parseToken = P.choice
-    [ P.try $ P.string "<-" *> P.notFollowedBy symbolChar *> pure LArrow    
-    , P.try $ P.string "<=" *> P.notFollowedBy symbolChar *> pure LFatArrow
-    , P.try $ P.string "->" *> P.notFollowedBy symbolChar *> pure RArrow    
-    , P.try $ P.string "=>" *> P.notFollowedBy symbolChar *> pure RFatArrow 
-    , P.try $ P.string "::" *> P.notFollowedBy symbolChar *> pure DoubleColon 
-    , P.try $ P.char '('    *> pure LParen
-    , P.try $ P.char ')'    *> pure RParen
-    , P.try $ P.char '{'    *> pure LBrace
-    , P.try $ P.char '}'    *> pure RBrace
-    , P.try $ P.char '['    *> pure LSquare
-    , P.try $ P.char ']'    *> pure RSquare
-    , P.try $ P.char '`'    *> pure Tick
-    , P.try $ P.char ','    *> pure Comma
-    , P.try $ P.char '='    *> P.notFollowedBy symbolChar *> pure Equals
-    , P.try $ P.char ':'    *> P.notFollowedBy symbolChar *> pure Colon
-    , P.try $ P.char '|'    *> P.notFollowedBy symbolChar *> pure Pipe
-    , P.try $ P.char '.'    *> P.notFollowedBy symbolChar *> pure Dot
-    , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
-    , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
-    , LName         <$> parseLName 
-    , UName         <$> parseUName 
-    , Symbol        <$> parseSymbol 
-    , StringLiteral <$> parseStringLiteral
-    , Number        <$> parseNumber
-    ] <* whitespace
-  
-    where
-    parseLName :: P.Parsec String u String
-    parseLName = (:) <$> identStart <*> P.many identLetter
-    
-    parseUName :: P.Parsec String u String
-    parseUName = (:) <$> P.upper <*> P.many P.alphaNum
-    
-    parseSymbol :: P.Parsec String u String
-    parseSymbol = P.many1 symbolChar
-    
-    identStart :: P.Parsec String u Char
-    identStart = P.lower <|> P.oneOf "_"
-    
-    identLetter :: P.Parsec String u Char
-    identLetter = P.alphaNum <|> P.oneOf "_'"
-    
-    symbolChar :: P.Parsec String u Char
-    symbolChar = P.oneOf opChars
-    
-    parseStringLiteral :: P.Parsec String u String
-    parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
-      where 
-      delimeter   = P.try (P.string "\"\"\"")
-      blockString = delimeter >> P.manyTill P.anyChar delimeter
-    
-    parseNumber :: P.Parsec String u (Either Integer Double)
-    parseNumber = (Right <$> P.try (PT.float tokenParser) <|>
-                   Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
-  
-  -- |
-  -- We use Text.Parsec.Token to implement the string and number lexemes
-  --
-  langDef :: PT.GenLanguageDef String u Identity
-  langDef = PT.LanguageDef
-    { PT.reservedNames   = []
-    , PT.reservedOpNames = []
-    , PT.commentStart    = ""
-    , PT.commentEnd      = ""
-    , PT.commentLine     = ""
-    , PT.nestedComments  = True
-    , PT.identStart      = fail "Identifiers not supported"
-    , PT.identLetter     = fail "Identifiers not supported"
-    , PT.opStart         = fail "Operators not supported"
-    , PT.opLetter        = fail "Operators not supported"
-    , PT.caseSensitive   = True
-    }
+  lineComment :: P.Parsec String u String
+  lineComment = P.try $ P.string "--" *> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof))
 
-  -- |
-  -- A token parser based on the language definition
-  --
-  tokenParser :: PT.GenTokenParser String u Identity
-  tokenParser = PT.makeTokenParser langDef
-  
-  insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
-  insertNewlines _   [] = []
-  insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
-    | shouldIndent s = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
-  insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
-    | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
-    | otherwise      = t : insertNewlines ref ts
-  
-  j :: [Int] -> [PositionedToken] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
-  j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
-    | m == n = j (m : ms) (t { ptToken = Semi } : acc) ts
-  j []       acc ((t@PositionedToken{ ptToken = Newline 1 })      : ts) 
-    = j [] (t { ptToken = Semi } : acc) ts
-  j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
-    | n < m = j ms (t { ptToken = RBrace } : acc) (t : ts)
-  j ms       acc (PositionedToken{ ptToken = Newline _ }          : ts) 
-    = j ms acc ts
-  j (m : ms) acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-    | n > m = j (n : m : ms) (t { ptToken = LBrace } : acc) ts
-  j []       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-    | n > 1 = j [n] (t { ptToken = LBrace } : acc) ts
-  j ms       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-    = j ms (t { ptToken = RBrace, ptComments = [] } : t { ptToken = LBrace, ptComments = [] } : acc) (t { ptToken = Newline n } : ts)
-  j (1 : ms) acc ((t@PositionedToken{ ptToken = RBrace })         : ts) 
-    = j ms (t : acc) ts 
-  j _        _   (t@PositionedToken{ ptToken = RBrace }           : _ ) 
-    = Left $ P.newErrorMessage (P.Message "Unexpected }") (ptSourcePos t)
-  j ms       acc ((t@PositionedToken{ ptToken = LBrace })         : ts) 
-    = j (1 : ms) (t { ptToken = LBrace } : acc) ts 
-  j ms       acc (t : ts)                              
-    = j ms (t : acc) ts
-  j []       acc []                                    
-    = return $ reverse acc
-  j (m : ms) acc []                                    
-    | m > 1 = j ms (PositionedToken (P.newPos "" 0 0) RBrace [] : acc) []
-  j _        _   _                                     
-    = error "Invalid input to j"
+parsePositionedToken :: P.Parsec String u PositionedToken
+parsePositionedToken = do
+  pos <- P.getPosition
+  comments <- P.many parseComment
+  tok <- parseToken
+  return $ PositionedToken pos tok comments
 
-  shouldIndent :: String -> Bool
-  shouldIndent "of" = True
-  shouldIndent "do" = True
-  shouldIndent "where" = True
-  shouldIndent "let" = True
-  shouldIndent _ = False
+parseToken :: P.Parsec String u Token
+parseToken = P.choice
+  [ P.try $ P.string "<-" *> P.notFollowedBy symbolChar *> pure LArrow    
+  , P.try $ P.string "<=" *> P.notFollowedBy symbolChar *> pure LFatArrow
+  , P.try $ P.string "->" *> P.notFollowedBy symbolChar *> pure RArrow    
+  , P.try $ P.string "=>" *> P.notFollowedBy symbolChar *> pure RFatArrow 
+  , P.try $ P.string "::" *> P.notFollowedBy symbolChar *> pure DoubleColon 
+  , P.try $ P.char '('    *> pure LParen
+  , P.try $ P.char ')'    *> pure RParen
+  , P.try $ P.char '{'    *> pure LBrace
+  , P.try $ P.char '}'    *> pure RBrace
+  , P.try $ P.char '['    *> pure LSquare
+  , P.try $ P.char ']'    *> pure RSquare
+  , P.try $ P.char '`'    *> pure Tick
+  , P.try $ P.char ','    *> pure Comma
+  , P.try $ P.char '='    *> P.notFollowedBy symbolChar *> pure Equals
+  , P.try $ P.char ':'    *> P.notFollowedBy symbolChar *> pure Colon
+  , P.try $ P.char '|'    *> P.notFollowedBy symbolChar *> pure Pipe
+  , P.try $ P.char '.'    *> P.notFollowedBy symbolChar *> pure Dot
+  , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
+  , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
+  , LName         <$> parseLName 
+  , UName         <$> parseUName 
+  , Symbol        <$> parseSymbol 
+  , StringLiteral <$> parseStringLiteral
+  , Number        <$> parseNumber
+  ] <* whitespace
+
+  where
+  parseLName :: P.Parsec String u String
+  parseLName = (:) <$> identStart <*> P.many identLetter
+  
+  parseUName :: P.Parsec String u String
+  parseUName = (:) <$> P.upper <*> P.many P.alphaNum
+  
+  parseSymbol :: P.Parsec String u String
+  parseSymbol = P.many1 symbolChar
+  
+  identStart :: P.Parsec String u Char
+  identStart = P.lower <|> P.oneOf "_"
+  
+  identLetter :: P.Parsec String u Char
+  identLetter = P.alphaNum <|> P.oneOf "_'"
+  
+  symbolChar :: P.Parsec String u Char
+  symbolChar = P.oneOf opChars
+  
+  parseStringLiteral :: P.Parsec String u String
+  parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
+    where 
+    delimeter   = P.try (P.string "\"\"\"")
+    blockString = delimeter >> P.manyTill P.anyChar delimeter
+  
+  parseNumber :: P.Parsec String u (Either Integer Double)
+  parseNumber = (Right <$> P.try (PT.float tokenParser) <|>
+                 Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
+
+-- |
+-- We use Text.Parsec.Token to implement the string and number lexemes
+--
+langDef :: PT.GenLanguageDef String u Identity
+langDef = PT.LanguageDef
+  { PT.reservedNames   = []
+  , PT.reservedOpNames = []
+  , PT.commentStart    = ""
+  , PT.commentEnd      = ""
+  , PT.commentLine     = ""
+  , PT.nestedComments  = True
+  , PT.identStart      = fail "Identifiers not supported"
+  , PT.identLetter     = fail "Identifiers not supported"
+  , PT.opStart         = fail "Operators not supported"
+  , PT.opLetter        = fail "Operators not supported"
+  , PT.caseSensitive   = True
+  }
+
+-- |
+-- A token parser based on the language definition
+--
+tokenParser :: PT.GenTokenParser String u Identity
+tokenParser = PT.makeTokenParser langDef
+
+insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
+insertNewlines _   [] = []
+insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
+  | shouldIndent s = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
+insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
+  | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
+  | otherwise      = t : insertNewlines ref ts
+
+splitModules :: [PositionedToken] -> [[PositionedToken]]
+splitModules = split (isModuleToken . ptToken)
+  where
+  split :: (a -> Bool) -> [a] -> [[a]]
+  split _ [] = []
+  split p (x : xs) 
+    | p x = let (ys, zs) = span (not . p) xs
+            in (x : ys) : split p zs
+    | otherwise = split p xs
+         
+  isModuleToken :: Token -> Bool
+  isModuleToken (LName "module") = True
+  isModuleToken _ = False
+
+j :: [Int] -> [PositionedToken] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
+j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
+  | m == n = j (m : ms) (t { ptToken = Semi } : acc) ts
+{-j []       acc ((t@PositionedToken{ ptToken = Newline 1 })      : ts) 
+  = j [] (t { ptToken = Semi } : acc) ts-}
+j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
+  | n < m = j ms (t { ptToken = RBrace } : acc) (t : ts)
+j ms       acc (PositionedToken{ ptToken = Newline _ }          : ts) 
+  = j ms acc ts
+j (m : ms) acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
+  | n > m = j (n : m : ms) (t { ptToken = LBrace } : acc) ts
+j []       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
+  | n > 1 = j [n] (t { ptToken = LBrace } : acc) ts
+j ms       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
+  = j ms (t { ptToken = RBrace, ptComments = [] } : t { ptToken = LBrace, ptComments = [] } : acc) (t { ptToken = Newline n } : ts)
+j (1 : ms) acc ((t@PositionedToken{ ptToken = RBrace })         : ts) 
+  = j ms (t : acc) ts
+j _        _   (t@PositionedToken{ ptToken = RBrace }           : _ ) 
+  = Left $ P.newErrorMessage (P.Message "Unexpected }") (ptSourcePos t)
+j ms       acc ((t@PositionedToken{ ptToken = LBrace })         : ts) 
+  = j (1 : ms) (t { ptToken = LBrace } : acc) ts
+j ms       acc (t : ts)                              
+  = j ms (t : acc) ts
+j []       acc []                                    
+  = return $ reverse acc
+j (m : ms) acc []                                    
+  | m > 1 = j ms (PositionedToken (P.newPos "" 0 0) RBrace [] : acc) []
+j _        _   _                                     
+  = error "Invalid input to j"
+
+shouldIndent :: String -> Bool
+shouldIndent "of" = True
+shouldIndent "do" = True
+shouldIndent "where" = True
+shouldIndent "let" = True
+shouldIndent _ = False
  
 type TokenParser u a = P.Parsec [PositionedToken] u a
  
