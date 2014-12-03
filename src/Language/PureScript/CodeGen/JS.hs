@@ -22,7 +22,8 @@ module Language.PureScript.CodeGen.JS (
     moduleToJs
 ) where
 
-import Data.List ((\\), delete)
+import Data.Function (on)
+import Data.List ((\\), delete, sortBy)
 import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Applicative
@@ -119,14 +120,15 @@ valueToJs opts m (ObjectUpdate _ o ps) = do
   obj <- valueToJs opts m o
   sts <- mapM (sndM (valueToJs opts m)) ps
   extendObj obj sts
-valueToJs opts m (Abs (_, _, Just IsTypeClassConstructor) arg val) =
+valueToJs _ _ (Abs (_, _, Just IsTypeClassConstructor) _ val) =
   case val of
     Literal _ (ObjectLiteral props) ->
-      JSFunction Nothing [identToJs arg] . JSBlock <$> mapM assign props
+      let props' = sortBy (compare `on` fst) props
+      in return $ JSFunction Nothing (map (identToJs . Ident . fst) props') (JSBlock $ map assign props)
     _ -> error "TypeClassConstructor had non-ObjectLiteral value in valueToJS"
   where
   assign (name, v) =
-    JSAssignment (accessorString name (JSVar "this")) <$> valueToJs opts m v
+    JSAssignment (accessorString name (JSVar "this")) (JSVar . identToJs . Ident $ name)
 valueToJs opts m (Abs _ arg val) = do
   ret <- valueToJs opts m val
   return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
@@ -138,7 +140,11 @@ valueToJs opts m v@App{} = do
     Var (_, _, Just (IsConstructor _ arity)) name | arity == length args ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     Var (_, _, Just IsTypeClassConstructor) name ->
-      return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
+      case args of
+        [Literal _ (ObjectLiteral props)] -> do
+          args'' <- mapM (valueToJs opts m . snd) (sortBy (compare `on` fst) props)
+          return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args''
+        _ -> error "TypeClassConstructor application had non-ObjectLiteral value in valueToJS"
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m f
   where
   unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
