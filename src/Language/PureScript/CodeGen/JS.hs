@@ -48,7 +48,7 @@ moduleToJs :: (Functor m, Applicative m, Monad m) => Options mode -> Module Ann 
 moduleToJs opts (Module name imps exps foreigns decls) = do
   let jsImports = map (importToJs opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) $ imps
   let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
-  jsDecls <- mapM (bindToJs opts name) decls
+  jsDecls <- mapM (bindToJs name) decls
   let optimized = concatMap (map $ optimize opts) $ catMaybes jsDecls
   let isModuleEmpty = null exps
   let moduleBody = JSStringLiteral "use strict" : jsImports ++ foreigns' ++ optimized
@@ -63,6 +63,9 @@ moduleToJs opts (Module name imps exps foreigns decls) = do
       ]
     _ -> []
 
+-- |
+-- Generates Javascript code for a module import.
+--
 importToJs :: Options mode -> ModuleName -> JS
 importToJs opts mn =
   JSVariableIntroduction (moduleNameToJs mn) (Just moduleBody)
@@ -74,13 +77,13 @@ importToJs opts mn =
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
-bindToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Bind Ann -> SupplyT m (Maybe [JS])
-bindToJs opts mp (NonRec ident val) = do
-  js <- valueToJs opts mp val
+bindToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Bind Ann -> SupplyT m (Maybe [JS])
+bindToJs mp (NonRec ident val) = do
+  js <- valueToJs mp val
   return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
-bindToJs opts mp (Rec vals) = do
+bindToJs mp (Rec vals) = do
   jss <- forM vals $ \(ident, val) -> do
-    js <- valueToJs opts mp val
+    js <- valueToJs mp val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
   return $ Just jss
 
@@ -107,34 +110,34 @@ accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a value or expression.
 --
-valueToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Expr Ann -> SupplyT m JS
-valueToJs opts m (Literal _ l) =
-  literalToValueJS opts m l
-valueToJs _ m (Var (_, _, Just (IsConstructor _ 0)) name) =
+valueToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Expr Ann -> SupplyT m JS
+valueToJs m (Literal _ l) =
+  literalToValueJS m l
+valueToJs m (Var (_, _, Just (IsConstructor _ 0)) name) =
   return $ JSAccessor "value" $ qualifiedToJS m id name
-valueToJs _ m (Var (_, _, Just (IsConstructor _ _)) name) =
+valueToJs m (Var (_, _, Just (IsConstructor _ _)) name) =
   return $ JSAccessor "create" $ qualifiedToJS m id name
-valueToJs opts m (Accessor _ prop val) =
-  accessorString prop <$> valueToJs opts m val
-valueToJs opts m (ObjectUpdate _ o ps) = do
-  obj <- valueToJs opts m o
-  sts <- mapM (sndM (valueToJs opts m)) ps
+valueToJs m (Accessor _ prop val) =
+  accessorString prop <$> valueToJs m val
+valueToJs m (ObjectUpdate _ o ps) = do
+  obj <- valueToJs m o
+  sts <- mapM (sndM (valueToJs m)) ps
   extendObj obj sts
-valueToJs _ _ (Abs (_, _, Just IsTypeClassConstructor) _ val) =
+valueToJs _ (Abs (_, _, Just IsTypeClassConstructor) _ val) =
   case val of
     Literal _ (ObjectLiteral props) ->
       let props' = sortBy (compare `on` fst) props
       in return $ JSFunction Nothing (map (identToJs . Ident . fst) props') (JSBlock $ map assign props)
     _ -> error "TypeClassConstructor had non-ObjectLiteral value in valueToJS"
   where
-  assign (name, v) =
+  assign (name, _) =
     JSAssignment (accessorString name (JSVar "this")) (JSVar . identToJs . Ident $ name)
-valueToJs opts m (Abs _ arg val) = do
-  ret <- valueToJs opts m val
+valueToJs m (Abs _ arg val) = do
+  ret <- valueToJs m val
   return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
-valueToJs opts m v@App{} = do
+valueToJs m v@App{} = do
   let (f, args) = unApp v []
-  args' <- mapM (valueToJs opts m) args
+  args' <- mapM (valueToJs m) args
   case f of
     Var (_, _, Just IsNewtype) _ -> return (head args')
     Var (_, _, Just (IsConstructor _ arity)) name | arity == length args ->
@@ -142,33 +145,33 @@ valueToJs opts m v@App{} = do
     Var (_, _, Just IsTypeClassConstructor) name ->
       case args of
         [Literal _ (ObjectLiteral props)] -> do
-          args'' <- mapM (valueToJs opts m . snd) (sortBy (compare `on` fst) props)
+          args'' <- mapM (valueToJs m . snd) (sortBy (compare `on` fst) props)
           return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args''
         _ -> error "TypeClassConstructor application had non-ObjectLiteral value in valueToJS"
-    _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m f
+    _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs m f
   where
   unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
   unApp (App _ val arg) args = unApp val (arg : args)
   unApp other args = (other, args)
-valueToJs _ m (Var _ ident) =
+valueToJs m (Var _ ident) =
   return $ varToJs m ident
-valueToJs opts m (Case _ values binders) = do
-  vals <- mapM (valueToJs opts m) values
-  bindersToJs opts m binders vals
-valueToJs opts m (Let _ ds val) = do
-  decls <- concat . catMaybes <$> mapM (bindToJs opts m) ds
-  ret <- valueToJs opts m val
+valueToJs m (Case _ values binders) = do
+  vals <- mapM (valueToJs m) values
+  bindersToJs m binders vals
+valueToJs m (Let _ ds val) = do
+  decls <- concat . catMaybes <$> mapM (bindToJs m) ds
+  ret <- valueToJs m val
   return $ JSApp (JSFunction Nothing [] (JSBlock (decls ++ [JSReturn ret]))) []
-valueToJs _ _ (Constructor (_, _, Just IsNewtype) _ (ProperName ctor) _) =
+valueToJs _ (Constructor (_, _, Just IsNewtype) _ (ProperName ctor) _) =
   return $ JSVariableIntroduction ctor (Just $
               JSObjectLiteral [("create",
                 JSFunction Nothing ["value"]
                   (JSBlock [JSReturn $ JSVar "value"]))])
-valueToJs _ _ (Constructor _ _ (ProperName ctor) 0) =
+valueToJs _ (Constructor _ _ (ProperName ctor) 0) =
   return $ iife ctor [ JSFunction (Just ctor) [] (JSBlock [])
          , JSAssignment (JSAccessor "value" (JSVar ctor))
               (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
-valueToJs _ _ (Constructor _ _ (ProperName ctor) arity) =
+valueToJs _ (Constructor _ _ (ProperName ctor) arity) =
   return $ iife ctor [ makeConstructor ctor arity
          , JSAssignment (JSAccessor "create" (JSVar ctor)) (go ctor 0 arity [])
          ]
@@ -187,12 +190,12 @@ valueToJs _ _ (Constructor _ _ (ProperName ctor) arity) =
 iife :: String -> [JS] -> JS
 iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
-literalToValueJS :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> Literal (Expr Ann) -> SupplyT m JS
-literalToValueJS _ _ (NumericLiteral n) = return $ JSNumericLiteral n
-literalToValueJS _ _ (StringLiteral s) = return $ JSStringLiteral s
-literalToValueJS _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
-literalToValueJS opts m (ArrayLiteral xs) = JSArrayLiteral <$> mapM (valueToJs opts m) xs
-literalToValueJS opts m (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM (valueToJs opts m)) ps
+literalToValueJS :: (Functor m, Applicative m, Monad m) => ModuleName -> Literal (Expr Ann) -> SupplyT m JS
+literalToValueJS _ (NumericLiteral n) = return $ JSNumericLiteral n
+literalToValueJS _ (StringLiteral s) = return $ JSStringLiteral s
+literalToValueJS _ (BooleanLiteral b) = return $ JSBooleanLiteral b
+literalToValueJS m (ArrayLiteral xs) = JSArrayLiteral <$> mapM (valueToJs m) xs
+literalToValueJS m (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM (valueToJs m)) ps
 
 -- |
 -- Shallow copy an object.
@@ -234,8 +237,8 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 -- Generate code in the simplified Javascript intermediate representation for pattern match binders
 -- and guards.
 --
-bindersToJs :: (Functor m, Applicative m, Monad m) => Options mode -> ModuleName -> [CaseAlternative Ann] -> [JS] -> SupplyT m JS
-bindersToJs opts m binders vals = do
+bindersToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> [CaseAlternative Ann] -> [JS] -> SupplyT m JS
+bindersToJs m binders vals = do
   valNames <- replicateM (length vals) freshName
   let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
   jss <- forM binders $ \(CaseAlternative bs result) -> do
@@ -253,10 +256,10 @@ bindersToJs opts m binders vals = do
 
     guardsToJs :: (Functor m, Applicative m, Monad m) => Either [(Guard Ann, Expr Ann)] (Expr Ann) -> SupplyT m [JS]
     guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
-      cond' <- valueToJs opts m cond
-      done  <- valueToJs opts m val
+      cond' <- valueToJs m cond
+      done  <- valueToJs m val
       return $ JSIfElse cond' (JSBlock [JSReturn done]) Nothing
-    guardsToJs (Right v) = return . JSReturn <$> valueToJs opts m v
+    guardsToJs (Right v) = return . JSReturn <$> valueToJs m v
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a pattern match
