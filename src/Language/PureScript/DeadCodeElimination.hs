@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :
 --
--- |
+-- | Dead code elimination.
 --
 -----------------------------------------------------------------------------
 
@@ -38,37 +38,55 @@ eliminateDeadCode entryPoints ms = map go ms
   (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
   entryPointVertices = mapMaybe (vertexFor . fst) . filter (\((mn, _), _) -> mn `elem` entryPoints) $ declarations
 
-  bindIdents :: Bind a -> [Ident]
-  bindIdents (NonRec name _) = [name]
-  bindIdents (Rec names) = map fst names
+-- |
+-- Extract declaration names for a binding group.
+--
+bindIdents :: Bind a -> [Ident]
+bindIdents (NonRec name _) = [name]
+bindIdents (Rec names) = map fst names
 
+-- |
+-- Key type to use in graph
+--
 type Key = (ModuleName, Ident)
 
+-- |
+-- Find dependencies for each member in a module.
+--
 declarationsByModule :: Module a -> [(Key, [Key])]
 declarationsByModule (Module mn _ _ fs ds) =
   let fs' = map (\(name, _, _) -> ((mn, name), [])) fs
   in fs' ++ concatMap go ds
   where
   go :: Bind a -> [(Key, [Key])]
-  go d@(NonRec name _) = [((mn, name), dependencies mn d)]
-  go d@(Rec names') = map (\(name, _) -> ((mn, name), dependencies mn d)) names'
+  go d@(NonRec name _) = [((mn, name), dependencies d)]
+  go d@(Rec names') = map (\(name, _) -> ((mn, name), dependencies d)) names'
 
-dependencies :: ModuleName -> Bind a -> [Key]
-dependencies mn =
+-- |
+-- Find all referenced values within a binding group.
+--
+dependencies :: Bind a -> [Key]
+dependencies =
   let (f, _, _, _) = everythingOnValues (++) (const []) values (const []) (const [])
   in nub . f
   where
   values :: Expr a -> [Key]
-  values (Var _ ident) = [qualify mn ident]
+  values (Var _ (Qualified (Just mn) ident)) = [(mn, ident)]
   values _ = []
 
+-- |
+-- Check whether a binding group is used.
+--
 isUsed :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Bind a -> Bool
 isUsed mn graph vertexFor entryPointVertices (NonRec name _) =
-  isUsedValue mn graph vertexFor entryPointVertices name
+  isUsed' mn graph vertexFor entryPointVertices name
 isUsed mn graph vertexFor entryPointVertices (Rec ds) =
-  any (isUsedValue mn graph vertexFor entryPointVertices . fst) ds
+  any (isUsed' mn graph vertexFor entryPointVertices . fst) ds
 
-isUsedValue :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Ident -> Bool
-isUsedValue mn graph vertexFor entryPointVertices name =
+-- |
+-- Check whether a named declaration is used.
+--
+isUsed' :: ModuleName -> Graph -> (Key -> Maybe Vertex) -> [Vertex] -> Ident -> Bool
+isUsed' mn graph vertexFor entryPointVertices name =
   let Just v' = vertexFor (mn, name)
   in any (\v -> path graph v v') entryPointVertices
