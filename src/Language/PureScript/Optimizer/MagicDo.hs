@@ -60,13 +60,11 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Desugar pure
   convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
-    let JSReturn ret = last js in
-    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : init js ++ [JSReturn (JSApp ret [])] )
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : map applyReturns js )
   -- Desugar >>=
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
-    let JSReturn ret = last js in
-    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : init js ++ [JSReturn (JSApp ret [])] )
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : map applyReturns js)
   -- Desugar untilE
   convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn $ JSObjectLiteral []])) []
@@ -106,9 +104,15 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
-
-  isJSReturn (JSReturn _) = True
-  isJSReturn _ = False
+  
+  applyReturns :: JS -> JS
+  applyReturns (JSReturn ret) = JSReturn (JSApp ret [])
+  applyReturns (JSBlock jss) = JSBlock (map applyReturns jss)
+  applyReturns (JSWhile cond js) = JSWhile cond (applyReturns js)
+  applyReturns (JSFor v lo hi js) = JSFor v lo hi (applyReturns js)
+  applyReturns (JSForIn v xs js) = JSForIn v xs (applyReturns js)
+  applyReturns (JSIfElse cond t f) = JSIfElse cond (applyReturns t) (applyReturns `fmap` f)
+  applyReturns other = other
 
 -- |
 -- Inline functions in the ST module
