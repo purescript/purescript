@@ -541,8 +541,11 @@ psciOptions = PSCiOptions <$> singleLineFlag
 main :: IO ()
 main = execParser opts >>= loop
   where
-  opts        = info (helper <*> psciOptions) infoModList
+  opts        = info (version <*> helper <*> psciOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psci - Interactive mode for PureScript"
   footerInfo  = footer $ "psci " ++ showVersion Paths.version
+  
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> Opts.help "Show the version number" <> hidden
 

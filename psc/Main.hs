@@ -192,8 +192,11 @@ pscOptions = PSCOptions <$> many inputFile
 main :: IO ()
 main = execParser opts >>= compile
   where
-  opts        = info (helper <*> pscOptions) infoModList
+  opts        = info (version <*> helper <*> pscOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psc - Compiles PureScript to Javascript"
   footerInfo  = footer $ "psc " ++ showVersion Paths.version
+  
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
 
