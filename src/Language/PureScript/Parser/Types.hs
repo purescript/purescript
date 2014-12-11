@@ -24,47 +24,50 @@ import Control.Applicative
 import Control.Monad (when, unless)
 
 import Language.PureScript.Types
-import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
+import Language.PureScript.Parser.Lexer
 import Language.PureScript.Environment
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseArray :: P.Parsec String ParseState Type
+parseArray :: TokenParser u Type
 parseArray = squares $ return tyArray
 
-parseArrayOf :: P.Parsec String ParseState Type
+parseArrayOf :: TokenParser u Type
 parseArrayOf = squares $ TypeApp tyArray <$> parseType
 
-parseFunction :: P.Parsec String ParseState Type
-parseFunction = parens $ P.try (lexeme (P.string "->")) >> return tyFunction
+parseFunction :: TokenParser u Type
+parseFunction = parens $ P.try rarrow >> return tyFunction
 
-parseObject :: P.Parsec String ParseState Type
+parseObject :: TokenParser u Type
 parseObject = braces $ TypeApp tyObject <$> parseRow
 
-parseTypeWildcard :: P.Parsec String ParseState Type
-parseTypeWildcard = lexeme (P.char '_') >> return TypeWildcard
+parseTypeWildcard :: TokenParser u Type
+parseTypeWildcard = reserved "_" >> return TypeWildcard
 
-parseTypeVariable :: P.Parsec String ParseState Type
+parseTypeVariable :: TokenParser u Type
 parseTypeVariable = do
   ident <- identifier
   when (ident `elem` reservedTypeNames) $ P.unexpected ident
   return $ TypeVar ident
+  where
+  reservedTypeNames :: [String]
+  reservedTypeNames = [ "forall", "where" ]
 
-parseTypeConstructor :: P.Parsec String ParseState Type
+parseTypeConstructor :: TokenParser u Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
-parseForAll :: P.Parsec String ParseState Type
-parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
+parseForAll :: TokenParser u Type
+parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 identifier <* dot)
                        <*> parseConstrainedType
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor
 --
-parseTypeAtom :: P.Parsec String ParseState Type
-parseTypeAtom = indented *> P.choice (map P.try
+parseTypeAtom :: TokenParser u Type
+parseTypeAtom = P.choice $ map P.try
             [ parseArray
             , parseArrayOf
             , parseFunction
@@ -74,34 +77,32 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeConstructor
             , parseForAll
             , parens parseRow
-            , parens parsePolyType ])
+            , parens parsePolyType ]
 
-parseConstrainedType :: P.Parsec String ParseState Type
+parseConstrainedType :: TokenParser u Type
 parseConstrainedType = do
   constraints <- P.optionMaybe . P.try $ do
     constraints <- parens . commaSep1 $ do
       className <- parseQualified properName
-      indented
       ty <- P.many parseTypeAtom
       return (className, ty)
-    _ <- lexeme $ P.string "=>"
+    _ <- rfatArrow
     return constraints
-  indented
   ty <- parseType
   return $ maybe ty (flip ConstrainedType ty) constraints
 
-parseAnyType :: P.Parsec String ParseState Type
+parseAnyType :: TokenParser u Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
-              , [ P.Infix (P.try (lexeme (P.string "->")) >> return function) P.AssocRight ] ]
-  postfixTable = [ \t -> KindedType t <$> (P.try (lexeme (indented *> P.string "::")) *> parseKind)
+              , [ P.Infix (P.try rarrow >> return function) P.AssocRight ] ]
+  postfixTable = [ \t -> KindedType t <$> (P.try doubleColon *> parseKind)
                  ]
 
 -- |
 -- Parse a monotype
 --
-parseType :: P.Parsec String ParseState Type
+parseType :: TokenParser u Type
 parseType = do
   ty <- parseAnyType
   unless (isMonoType ty) $ P.unexpected "polymorphic type"
@@ -110,23 +111,23 @@ parseType = do
 -- |
 -- Parse a polytype
 --
-parsePolyType :: P.Parsec String ParseState Type
+parsePolyType :: TokenParser u Type
 parsePolyType = parseAnyType
 
 -- |
 -- Parse an atomic type with no wildcards
 --
-noWildcards :: P.Parsec String ParseState Type -> P.Parsec String ParseState Type
+noWildcards :: TokenParser u Type -> TokenParser u Type
 noWildcards p = do
   ty <- p
   when (containsWildcards ty) $ P.unexpected "type wildcard"
   return ty
 
-parseNameAndType :: P.Parsec String ParseState t -> P.Parsec String ParseState (String, t)
-parseNameAndType p = (,) <$> (indented *> (identifierName <|> stringLiteral) <* indented <* lexeme (P.string "::")) <*> p
+parseNameAndType :: TokenParser u t -> TokenParser u (String, t)
+parseNameAndType p = (,) <$> (lname <|> stringLiteral) <* doubleColon <*> p
 
-parseRowEnding :: P.Parsec String ParseState Type
-parseRowEnding = P.option REmpty (TypeVar <$> (lexeme (indented *> P.char '|') *> indented *> identifier))
+parseRowEnding :: TokenParser u Type
+parseRowEnding = P.option REmpty (TypeVar <$> (pipe *> identifier))
 
-parseRow :: P.Parsec String ParseState Type
+parseRow :: TokenParser u Type
 parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"

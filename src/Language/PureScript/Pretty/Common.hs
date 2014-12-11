@@ -17,7 +17,7 @@ module Language.PureScript.Pretty.Common where
 
 import Control.Monad.State
 import Data.List (intercalate)
-import Language.PureScript.Parser.Common (reservedPsNames, opChars)
+import Language.PureScript.Parser.Lexer (reservedPsNames, opChars)
 
 -- |
 -- Wrap a string in parentheses
