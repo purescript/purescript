@@ -244,8 +244,10 @@ pscDocsOptions = PSCDocsOptions <$> includeHeirarcy
 main :: IO ()
 main = execParser opts >>= docgen
   where
-  opts        = info (helper <*> pscDocsOptions) infoModList
+  opts        = info (version <*> helper <*> pscDocsOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psc-docs - Generate Markdown documentation from PureScript extern files"
   footerInfo  = footer $ "psc-docs " ++ showVersion Paths.version
-
+  
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
