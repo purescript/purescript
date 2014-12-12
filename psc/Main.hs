@@ -24,7 +24,7 @@ import Data.Version (showVersion)
 
 import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
@@ -71,7 +71,10 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
             Just path -> mkdirp path >> U.writeFile path js
             Nothing -> U.putStrLn js
           case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
+            Just path -> do
+              mkdirp path
+              forM_ (zip (map snd ms) exts) $ \(P.Module mn _ _, content) ->
+                U.writeFile (path </> show mn <> ".externs.purs") content
             Nothing -> return ()
           exitSuccess
   where
