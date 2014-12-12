@@ -71,10 +71,11 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
             Just path -> mkdirp path >> U.writeFile path js
             Nothing -> U.putStrLn js
           case externs of
-            Just path -> do
-              mkdirp path
-              forM_ (zip (map snd ms) exts) $ \(P.Module mn _ _, content) ->
-                U.writeFile (path </> show mn <> ".externs.purs") content
+            Just dir -> do
+              createDirectoryIfMissing True dir
+              forM_ (zip (map snd ms) exts) $ \(P.Module mn _ _, content) -> do
+                let path = dir </> show mn <> ".externs.purs"
+                U.writeFile path content
             Nothing -> return ()
           exitSuccess
   where
