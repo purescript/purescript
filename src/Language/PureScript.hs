@@ -15,7 +15,7 @@
 
 {-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell #-}
 
-module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, prelude) where
+module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, preludeModules) where
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
@@ -248,5 +248,13 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
-prelude :: String
-prelude = BU.toString $(embedFile "prelude/prelude.purs")
+preludeModules :: [String]
+preludeModules = BU.toString `map`
+  [ $(embedFile "prelude/modules/Prelude.purs")
+  , $(embedFile "prelude/modules/Prelude.Unsafe.purs")
+  , $(embedFile "prelude/modules/Control.Monad.Eff.purs")
+  , $(embedFile "prelude/modules/Control.Monad.Eff.Unsafe.purs")
+  , $(embedFile "prelude/modules/Control.Monad.ST.purs")
+  , $(embedFile "prelude/modules/Data.Function.purs")
+  , $(embedFile "prelude/modules/Debug.Trace.purs")
+  ]

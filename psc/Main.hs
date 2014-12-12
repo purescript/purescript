@@ -52,7 +52,7 @@ readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
   | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> U.readFile inFile
-                   return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
+                   return (if ioNoPrelude then content else map (Nothing,) P.preludeModules ++ content)
 
 compile :: PSCOptions -> IO ()
 compile (PSCOptions input opts stdin output externs usePrefix) = do

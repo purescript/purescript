@@ -20,7 +20,6 @@ module Language.PureScript.Parser.Lexer
   , Token()
   , TokenParser()
   , lex
-  , lexModules
   , token
   , match
   , lparen
@@ -151,14 +150,7 @@ lex :: String -> Either P.ParseError [PositionedToken]
 lex input = do
   ts <- P.parse parseTokens "" input
   let annot = insertNewlines 1 ts
-  j [] [] annot
-      
-lexModules :: String -> Either P.ParseError [[PositionedToken]]
-lexModules input = do
-  ts <- P.parse parseTokens "" input
-  let split = splitModules ts
-      annot = insertNewlines 1 `map` split
-  j [] [] `mapM` annot
+  toInsensitive annot
       
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
@@ -264,61 +256,39 @@ tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
 insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
-insertNewlines _   [] = []
+insertNewlines ref  [] = [PositionedToken (P.newPos "" ref 1) (Newline 0) []]
 insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
   | shouldIndent s && ptToken t2 /= LBrace = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
 insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
   | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
   | otherwise      = t : insertNewlines ref ts
 
-splitModules :: [PositionedToken] -> [[PositionedToken]]
-splitModules = map indentAll . split (isModuleToken . ptToken)
+-- |
+-- The L function, see the Haskell 98 report, appendix B
+-- Turns indentation-sensitive token streams into indentation-insensitive streams, 
+-- by inserting explicit braces.
+--
+toInsensitive :: [PositionedToken] -> Either P.ParseError [PositionedToken]
+toInsensitive = l []
   where
-  split :: (a -> Bool) -> [a] -> [[a]]
-  split _ [] = []
-  split p (x : xs) 
-    | p x = let (ys, zs) = span (not . p) xs
-            in (x : ys) : split p zs
-    | otherwise = split p xs
-         
-  isModuleToken :: Token -> Bool
-  isModuleToken (LName "module") = True
-  isModuleToken _ = False
-  
-  indentAll :: [PositionedToken] -> [PositionedToken]
-  indentAll (t : ts) | isModuleToken (ptToken t) = t : map indent ts
-  indentAll other = other
-  
-  indent :: PositionedToken -> PositionedToken
-  indent t = t { ptSourcePos = P.setSourceColumn (ptSourcePos t) (succ (P.sourceColumn (ptSourcePos t))) }
+  l :: [Int] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
+  l (m : ms) ((t@PositionedToken{ ptToken = Newline n })      : ts)  | m == n = cons (t { ptToken = Semi })   $ l (m : ms)     ts
+                                                                     | n < m  = cons (t { ptToken = RBrace }) $ l ms           (t : ts)
+  l ms       (PositionedToken{ ptToken = Newline _ }          : ts)           =                                 l ms           ts
+  l (m : ms) ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)  | n > m  = cons (t { ptToken = LBrace }) $ l (n : m : ms) ts
+  l []       ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)  | n > 0  = cons (t { ptToken = LBrace }) $ l [n] ts
+  l ms       ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)           = cons (t { ptToken = LBrace, ptComments = [] }) $ 
+                                                                                  cons (t { ptToken = RBrace, ptComments = [] }) $ 
+                                                                                    l ms           (t { ptToken = Newline n } : ts)
+  l (0 : ms) ((t@PositionedToken{ ptToken = RBrace })         : ts)           = cons t                        $ l ms           ts
+  l _        (t@PositionedToken{ ptToken = RBrace }           : _)            = Left $ P.newErrorMessage (P.Message "Unexpected }") (ptSourcePos t)
+  l ms       ((t@PositionedToken{ ptToken = LBrace })         : ts)           = cons (t { ptToken = LBrace }) $ l (0 : ms)     ts
+  l ms       (t : ts)                                                         = cons t                        $ l ms           ts
+  l []       []                                                               = return []
+  l _        _                                                                = error "Invalid input to j"
 
-j :: [Int] -> [PositionedToken] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
-j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
-  | m == n = j (m : ms) (t { ptToken = Semi } : acc) ts
-j (m : ms) acc ((t@PositionedToken{ ptToken = Newline n })      : ts) 
-  | n < m = j ms (t { ptToken = RBrace } : acc) (t : ts)
-j ms       acc (PositionedToken{ ptToken = Newline _ }          : ts) 
-  = j ms acc ts
-j (m : ms) acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-  | n > m = j (n : m : ms) (t { ptToken = LBrace } : acc) ts
-j []       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-  | n > 1 = j [n] (t { ptToken = LBrace } : acc) ts
-j ms       acc ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts) 
-  = j ms (t { ptToken = RBrace, ptComments = [] } : t { ptToken = LBrace, ptComments = [] } : acc) (t { ptToken = Newline n } : ts)
-j (1 : ms) acc ((t@PositionedToken{ ptToken = RBrace })         : ts) 
-  = j ms (t : acc) ts
-j _        _   (t@PositionedToken{ ptToken = RBrace }           : _ ) 
-  = Left $ P.newErrorMessage (P.Message "Unexpected }") (ptSourcePos t)
-j ms       acc ((t@PositionedToken{ ptToken = LBrace })         : ts) 
-  = j (1 : ms) (t { ptToken = LBrace } : acc) ts
-j ms       acc (t : ts)                              
-  = j ms (t : acc) ts
-j []       acc []                                    
-  = return $ reverse acc
-j (m : ms) acc []                                    
-  | m > 1 = j ms (PositionedToken (P.newPos "" 0 0) RBrace [] : acc) []
-j _        _   _                                     
-  = error "Invalid input to j"
+cons :: (Applicative f) => a -> f [a] -> f [a]
+cons x xs = (:) x <$> xs
 
 shouldIndent :: String -> Bool
 shouldIndent "of" = True

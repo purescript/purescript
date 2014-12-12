@@ -1,5 +1,5 @@
-../dist/build/docgen/docgen --hierarchy-images prelude.purs > README.md
-../dist/build/hierarchy/hierarchy prelude.purs -o prelude
+../dist/build/psc-docs/psc-docs --hierarchy-images modules/*.purs > README.md
+../dist/build/hierarchy/hierarchy modules/Prelude.purs -o prelude
 
 mkdir -p images
 

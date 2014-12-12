@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving, TupleSections #-}
 
 module Main where
 
@@ -139,7 +139,7 @@ loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- U.readFile filename
     return (Right filename, content)
-  return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
+  return $ P.parseModulesFromFiles (either (const "") id) $ map (Left P.RebuildNever,) P.preludeModules ++ filesAndContent
 
 
 -- |
