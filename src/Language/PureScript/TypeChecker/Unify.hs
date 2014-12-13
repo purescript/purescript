@@ -25,7 +25,8 @@ module Language.PureScript.TypeChecker.Unify (
     varIfUnknown
 ) where
 
-import Data.List (nub, sort)
+import Data.Ord (comparing)
+import Data.List (nub, sort, sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import qualified Data.HashMap.Strict as H
@@ -139,7 +140,9 @@ unifyRows r1 r2 =
 -- Check that two types unify
 --
 unifiesWith :: Environment -> Type -> Type -> Bool
-unifiesWith _ (TUnknown u1) (TUnknown u2) | u1 == u2 = True
+unifiesWith _ (TUnknown u1) (TUnknown u2) = u1 == u2
+unifiesWith _ (TUnknown _) (Skolem _ _ _) = True
+unifiesWith _ (Skolem _ _ _) (TUnknown _) = True
 unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
 unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
@@ -149,6 +152,18 @@ unifiesWith e (SaturatedTypeSynonym name args) t2 =
     Left  _  -> False
     Right t1 -> unifiesWith e t1 t2
 unifiesWith e t1 t2@(SaturatedTypeSynonym _ _) = unifiesWith e t2 t1
+unifiesWith _ REmpty REmpty = True
+unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _)
+    | not (unifiesWith e r1' r2') = False
+    | otherwise = match (sortBy cmp s1) (sortBy cmp s2)
+  where
+    (s1, r1') = rowToList r1
+    (s2, r2') = rowToList r2
+    cmp = comparing fst
+    match [] [] = True
+    match ((name1, ty1):tys1) ((name2, ty2):tys2) =
+      name1 == name2 && unifiesWith e ty1 ty2 && match tys1 tys2
+    match _ _ = False
 unifiesWith _ _ _ = False
 
 -- |
@@ -158,7 +173,7 @@ replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu ty
-  
+
 -- |
 -- Replace type wildcards with unknowns
 --

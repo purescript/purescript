@@ -199,14 +199,14 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
-typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1) (TypeApp h2 t2) = (++) <$> typeHeadsAreEqual m e h1 h2 <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
-typeHeadsAreEqual _ _ _ _ = Nothing
+typeHeadsAreEqual _ e t1 t2
+  | unifiesWith e t1 t2 = Just []
+  | otherwise           = Nothing
 
 -- |
 -- Check all values in a list pairwise match a predicate
