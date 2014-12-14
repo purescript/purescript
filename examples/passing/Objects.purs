@@ -26,5 +26,10 @@ module Main where
 
   test5 = case { "***": 1 } of
     { "***" = n } -> n
+
+  test6 = case { "***": 1 } of
+               { "***": n } -> n
+
+  test7 {a:    snoog , b     : blah } = blah
     
   main = Debug.Trace.trace "Done"
