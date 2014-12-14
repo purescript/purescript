@@ -436,7 +436,7 @@ parseNullBinder = C.lexeme (P.char '_' *> P.notFollowedBy C.identLetter) *> retu
 parseIdentifierAndBinder :: P.Parsec String ParseState (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme (C.identifierName <|> C.stringLiteral)
-  _ <- C.lexeme $ C.indented *> P.char '='
+  _ <- C.lexeme $ C.indented *> (P.char '=' <|> P.char ':')
   binder <- C.indented *> parseBinder
   return (name, binder)
 
