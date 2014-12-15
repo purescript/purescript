@@ -32,7 +32,12 @@ properName = ProperName <$> uname
 -- Parse a module name
 --
 moduleName :: TokenParser ModuleName
-moduleName = ModuleName <$> P.try (P.sepBy properName dot)
+moduleName = part []
+  where
+  part path = (do name <- ProperName <$> P.try qualifier
+                  part (path `snoc` name))
+              <|> (ModuleName . snoc path <$> properName)
+  snoc path name = path ++ [name]
 
 -- |
 -- Parse a qualified name, i.e. M.name or just name
@@ -40,10 +45,9 @@ moduleName = ModuleName <$> P.try (P.sepBy properName dot)
 parseQualified :: TokenParser a -> TokenParser (Qualified a)
 parseQualified parser = part []
   where
-  part path = (do name <- P.try (properName <* delimiter)
+  part path = (do name <- ProperName <$> P.try qualifier
                   part (updatePath path name))
               <|> (Qualified (qual path) <$> P.try parser)
-  delimiter = dot <* P.notFollowedBy dot
   updatePath path name = path ++ [name]
   qual path = if null path then Nothing else Just $ ModuleName path
 

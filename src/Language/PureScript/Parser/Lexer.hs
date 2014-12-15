@@ -50,6 +50,7 @@ module Language.PureScript.Parser.Lexer
   , commaSep
   , commaSep1
   , lname
+  , qualifier
   , uname
   , uname'
   , reserved
@@ -104,10 +105,39 @@ data Token
   | At
   | LName String
   | UName String
+  | Qualifier String
   | Symbol String
   | StringLiteral String
   | Number (Either Integer Double)
   deriving (Show, Eq, Ord)
+  
+prettyPrintToken :: Token -> String
+prettyPrintToken LParen            = "("
+prettyPrintToken RParen            = ")"
+prettyPrintToken LBrace            = "{"
+prettyPrintToken RBrace            = "}"
+prettyPrintToken LSquare           = "["
+prettyPrintToken RSquare           = "]"
+prettyPrintToken LArrow            = "<-"
+prettyPrintToken RArrow            = "->"
+prettyPrintToken LFatArrow         = "<="
+prettyPrintToken RFatArrow         = "=>"
+prettyPrintToken Colon             = ":"
+prettyPrintToken DoubleColon       = "::"
+prettyPrintToken Equals            = "="
+prettyPrintToken Pipe              = "|"
+prettyPrintToken Tick              = "`"
+prettyPrintToken Dot               = "."
+prettyPrintToken Comma             = ","
+prettyPrintToken Semi              = ";"
+prettyPrintToken At                = "@"
+prettyPrintToken (Indent n)        = "indentation at level " ++ show n
+prettyPrintToken (LName s)         = show s
+prettyPrintToken (UName s)         = show s
+prettyPrintToken (Qualifier _)     = "qualifier"
+prettyPrintToken (Symbol s)        = s
+prettyPrintToken (StringLiteral s) = show s
+prettyPrintToken (Number n)        = either show show n
 
 data PositionedToken = PositionedToken
   { ptSourcePos :: P.SourcePos
@@ -165,7 +195,8 @@ parseToken = P.choice
   , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
   , LName         <$> parseLName 
-  , UName         <$> parseUName 
+  , do uName <- parseUName
+       (Qualifier uName <$ P.char '.') <|> pure (UName uName)
   , Symbol        <$> parseSymbol 
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
@@ -240,10 +271,10 @@ insertIndents ref (t : ts) = t : insertIndents ref ts
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
  
 token :: (Token -> Maybe a) -> TokenParser a
-token f = P.token show ptSourcePos (f . ptToken)
+token f = P.token (prettyPrintToken . ptToken) ptSourcePos (f . ptToken)
 
 match :: Token -> TokenParser ()
-match tok = token (\tok' -> if tok == tok' then Just () else Nothing) P.<?> show tok
+match tok = token (\tok' -> if tok == tok' then Just () else Nothing) P.<?> prettyPrintToken tok
 
 lparen :: TokenParser ()
 lparen = match LParen
@@ -345,6 +376,12 @@ lname :: TokenParser String
 lname = token go P.<?> "identifier"
   where
   go (LName s) = Just s
+  go _ = Nothing
+
+qualifier :: TokenParser String
+qualifier = token go P.<?> "qualifier"
+  where
+  go (Qualifier s) = Just s
   go _ = Nothing
 
 reserved :: String -> TokenParser ()
