@@ -37,7 +37,7 @@ import Language.PureScript.Renamer as P
 
 import qualified Language.PureScript.Constants as C
 
-import Data.List (sortBy, groupBy, intercalate)
+import Data.List (sortBy, groupBy)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (fromMaybe)

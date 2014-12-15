@@ -20,23 +20,24 @@ module Language.PureScript.Parser.Common where
 import Control.Applicative
 
 import Language.PureScript.Parser.Lexer
+import Language.PureScript.Parser.State
 import Language.PureScript.Names
 
 import qualified Text.Parsec as P
 
-properName :: TokenParser u ProperName
+properName :: TokenParser ProperName
 properName = ProperName <$> uname
 
 -- |
 -- Parse a module name
 --
-moduleName :: TokenParser u ModuleName
+moduleName :: TokenParser ModuleName
 moduleName = ModuleName <$> P.try (P.sepBy properName dot)
 
 -- |
 -- Parse a qualified name, i.e. M.name or just name
 --
-parseQualified :: TokenParser u a -> TokenParser u (Qualified a)
+parseQualified :: TokenParser a -> TokenParser (Qualified a)
 parseQualified parser = part []
   where
   part path = (do name <- P.try (properName <* delimiter)
@@ -49,7 +50,7 @@ parseQualified parser = part []
 -- |
 -- Parse an identifier or parenthesized operator
 --
-parseIdent :: TokenParser u Ident
+parseIdent :: TokenParser Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens symbol)
 
 -- |
@@ -84,12 +85,12 @@ buildPostfixParser fs first = do
 -- |
 -- Parse an identifier in backticks or an operator
 --
-parseIdentInfix :: TokenParser u (Qualified Ident)
+parseIdentInfix :: TokenParser (Qualified Ident)
 parseIdentInfix = P.between tick tick (parseQualified (Ident <$> identifier)) <|> (parseQualified (Op <$> symbol))
 
 -- |
 -- Run a parser
 --
-runTokenParser :: FilePath -> TokenParser () a -> [PositionedToken] -> Either P.ParseError a
-runTokenParser filePath p = P.parse p filePath
+runTokenParser :: FilePath -> TokenParser a -> [PositionedToken] -> Either P.ParseError a
+runTokenParser filePath p = P.runParser p (ParseState []) filePath
 

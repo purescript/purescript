@@ -67,6 +67,8 @@ library
                      Language.PureScript.Parser
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Lexer
+                     Language.PureScript.Parser.State
+                     Language.PureScript.Parser.Indentation
                      Language.PureScript.Parser.Declarations
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.Types
@@ -103,7 +105,7 @@ library
     buildable: True
     hs-source-dirs: src
     other-modules: Paths_purescript
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
@@ -113,7 +115,7 @@ executable psc
     buildable: True
     hs-source-dirs: psc
     other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -fno-warn-warnings-deprecations -fno-warn-unused-do-bind -O2
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
@@ -123,7 +125,7 @@ executable psc-make
     buildable: True
     hs-source-dirs: psc-make
     other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -fno-warn-warnings-deprecations -fno-warn-unused-do-bind -O2
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -136,7 +138,7 @@ executable psci
     hs-source-dirs: psci
     other-modules: Commands
                    Parser
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -fno-warn-unused-do-bind -O2
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any, utf8-string -any,
@@ -145,7 +147,7 @@ executable psc-docs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules:
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -fno-warn-unused-do-bind -O2
 
 executable hierarchy
     build-depends: base >=4 && <5, purescript -any, utf8-string -any, optparse-applicative >= 0.10.0,
@@ -154,7 +156,7 @@ executable hierarchy
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -fno-warn-unused-do-bind -O2
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,

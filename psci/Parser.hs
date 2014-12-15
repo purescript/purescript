@@ -31,7 +31,7 @@ import qualified Language.PureScript as P
 -- However, since we don't support the @Eff@ monad,
 -- we actually want the normal @let@.
 --
-psciLet :: P.TokenParser u Command
+psciLet :: P.TokenParser Command
 psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.braces (P.semiSep P.parseDeclaration)))
 
 -- |
@@ -58,25 +58,25 @@ parseCommand s = do
 -- |
 -- Parses expressions entered at the PSCI repl.
 --
-psciExpression :: P.TokenParser u Command
+psciExpression :: P.TokenParser Command
 psciExpression = Expression <$> P.parseValue
 
 -- |
 -- Parses 'Commands.Help' command.
 --
-psciHelp :: P.TokenParser u Command
+psciHelp :: P.TokenParser Command
 psciHelp = Help <$ P.symbol' "?"
 
 -- |
 -- Parses 'Commands.Import' command.
 --
-psciImport :: P.TokenParser u Command
+psciImport :: P.TokenParser Command
 psciImport = Import <$> (P.reserved "i" *> P.moduleName)
 
 -- |
 -- Parses 'Commands.LoadFile' command.
 --
-psciLoadFile :: P.TokenParser u Command
+psciLoadFile :: P.TokenParser Command
 psciLoadFile = fail "Not implemented" {-LoadFile . trimEnd <$> (reserved "m" *> P.lname)
 
 -- | Trim end of input string
@@ -86,35 +86,35 @@ trimEnd = reverse . dropWhile isSpace . reverse -}
 -- |
 -- Parses 'Commands.Quit' command.
 --
-psciQuit :: P.TokenParser u Command
+psciQuit :: P.TokenParser Command
 psciQuit = Quit <$ P.reserved "q"
 
 -- |
 -- Parses 'Commands.Reload' command.
 --
-psciReload :: P.TokenParser u Command
+psciReload :: P.TokenParser Command
 psciReload = Reset <$ P.reserved "r"
 
 -- |
 -- Parses 'Commands.TypeOf' command.
 --
-psciTypeOf :: P.TokenParser u Command
+psciTypeOf :: P.TokenParser Command
 psciTypeOf = TypeOf <$> (P.reserved "t" *> P.parseValue)
 
 
 -- |
 -- Parses 'Commands.KindOf' command.
 --
-psciKindOf :: P.TokenParser u Command
+psciKindOf :: P.TokenParser Command
 psciKindOf = KindOf <$> (P.reserved "k" *> P.parseType)
 
 -- |
 -- Parses 'Commands.Browse' command.
 --
-psciBrowse :: P.TokenParser u Command
+psciBrowse :: P.TokenParser Command
 psciBrowse = Browse <$> (P.reserved "b" *> P.moduleName)
 
 -- |
 -- Show Command
-psciShowModules :: P.TokenParser u Command
+psciShowModules :: P.TokenParser Command
 psciShowModules = Show <$> (P.reserved "s" *> P.lname)

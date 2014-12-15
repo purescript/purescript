@@ -31,6 +31,7 @@ module Language.PureScript.Parser.Lexer
   , lsquare
   , rsquare
   , squares
+  , indent
   , larrow 
   , rarrow 
   , lfatArrow
@@ -70,9 +71,9 @@ import Data.Functor.Identity
 
 import Control.Applicative
 
+import Language.PureScript.Parser.State
+
 import qualified Text.Parsec as P
-import qualified Text.Parsec.Pos as P
-import qualified Text.Parsec.Error as P
 import qualified Text.Parsec.Token as PT
 
 data Comment
@@ -87,8 +88,7 @@ data Token
   | RBrace
   | LSquare
   | RSquare
-  | Newline Int
-  | ShouldIndent Int
+  | Indent Int
   | LArrow
   | RArrow
   | LFatArrow
@@ -107,35 +107,7 @@ data Token
   | Symbol String
   | StringLiteral String
   | Number (Either Integer Double)
-  deriving (Eq, Ord)
-
-instance Show Token where
-  show LParen            = "("
-  show RParen            = ")"
-  show LBrace            = "{"
-  show RBrace            = "}"
-  show LSquare           = "["
-  show RSquare           = "]"
-  show LArrow            = "<-"
-  show RArrow            = "->"
-  show LFatArrow         = "<="
-  show RFatArrow         = "=>"
-  show Colon             = ":"
-  show DoubleColon       = "::"
-  show Equals            = "="
-  show Pipe              = "|"
-  show Tick              = "`"
-  show Dot               = "."
-  show Comma             = ","
-  show Semi              = ";"
-  show At                = "@"
-  show (Newline _)       = "newline"
-  show (ShouldIndent _)  = "indentation marker"
-  show (LName s)         = show s
-  show (UName s)         = show s
-  show (Symbol s)        = show s
-  show (StringLiteral s) = show s
-  show (Number n)        = either show show n 
+  deriving (Show, Eq, Ord)
 
 data PositionedToken = PositionedToken
   { ptSourcePos :: P.SourcePos
@@ -147,10 +119,7 @@ instance Show PositionedToken where
   show = show . ptToken
 
 lex :: String -> Either P.ParseError [PositionedToken]
-lex input = do
-  ts <- P.parse parseTokens "" input
-  let annot = insertNewlines 1 ts
-  toInsensitive annot
+lex input = insertIndents 1 <$> P.parse parseTokens "" input
       
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
@@ -255,171 +224,148 @@ langDef = PT.LanguageDef
 tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
-insertNewlines :: Int -> [PositionedToken] -> [PositionedToken]
-insertNewlines ref  [] = [PositionedToken (P.newPos "" ref 1) (Newline 0) []]
-insertNewlines _   (t1@PositionedToken { ptToken = LName s } : t2@PositionedToken { ptSourcePos = pos } : ts) 
-  | shouldIndent s && ptToken t2 /= LBrace = t1 : t1 { ptToken = ShouldIndent (P.sourceColumn pos), ptComments = [] } : t2 : insertNewlines (P.sourceLine pos) ts
-insertNewlines ref (t@PositionedToken { ptSourcePos = pos } : ts) 
-  | P.sourceLine pos > ref = t { ptToken = Newline (P.sourceColumn pos), ptComments = [] } : t : insertNewlines (P.sourceLine pos) ts
-  | otherwise      = t : insertNewlines ref ts
-
--- |
--- The L function, see the Haskell 98 report, appendix B
--- Turns indentation-sensitive token streams into indentation-insensitive streams, 
--- by inserting explicit braces.
---
-toInsensitive :: [PositionedToken] -> Either P.ParseError [PositionedToken]
-toInsensitive = l []
+insertIndents :: Int -> [PositionedToken] -> [PositionedToken]
+insertIndents _   [] = []
+insertIndents ref (t@PositionedToken { ptToken = LName s } : ts@(t'@PositionedToken { ptSourcePos = pos } : _)) 
+  | shouldIndent && indenting = t : t' { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : insertIndents (P.sourceColumn pos) ts
   where
-  l :: [Int] -> [PositionedToken] -> Either P.ParseError [PositionedToken]
-  l (m : ms) ((t@PositionedToken{ ptToken = Newline n })      : ts)  | m == n = cons (t { ptToken = Semi })   $ l (m : ms)     ts
-                                                                     | n < m  = cons (t { ptToken = RBrace }) $ l ms           (t : ts)
-  l ms       (PositionedToken{ ptToken = Newline _ }          : ts)           =                                 l ms           ts
-  l (m : ms) ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)  | n > m  = cons (t { ptToken = LBrace }) $ l (n : m : ms) ts
-  l []       ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)  | n > 0  = cons (t { ptToken = LBrace }) $ l [n] ts
-  l ms       ((t@PositionedToken{ ptToken = ShouldIndent n }) : ts)           = cons (t { ptToken = LBrace, ptComments = [] }) $ 
-                                                                                  cons (t { ptToken = RBrace, ptComments = [] }) $ 
-                                                                                    l ms           (t { ptToken = Newline n } : ts)
-  l (0 : ms) ((t@PositionedToken{ ptToken = RBrace })         : ts)           = cons t                        $ l ms           ts
-  l _        (t@PositionedToken{ ptToken = RBrace }           : _)            = Left $ P.newErrorMessage (P.Message "Unexpected }") (ptSourcePos t)
-  l ms       ((t@PositionedToken{ ptToken = LBrace })         : ts)           = cons (t { ptToken = LBrace }) $ l (0 : ms)     ts
-  l ms       (t : ts)                                                         = cons t                        $ l ms           ts
-  l []       []                                                               = return []
-  l _        _                                                                = error "Invalid input to j"
-
-cons :: (Applicative f) => a -> f [a] -> f [a]
-cons x xs = (:) x <$> xs
-
-shouldIndent :: String -> Bool
-shouldIndent "of" = True
-shouldIndent "do" = True
-shouldIndent "where" = True
-shouldIndent "let" = True
-shouldIndent _ = False
+  shouldIndent = s `elem` ["of", "do", "where", "let"]
+  indenting    = P.sourceColumn pos > ref
+insertIndents ref (t@PositionedToken { ptSourcePos = pos1 } : ts@(PositionedToken { ptSourcePos = pos2 } : _)) 
+  | unindenting = t : t { ptToken = Indent (P.sourceColumn pos2), ptComments = [] } : insertIndents (P.sourceColumn pos2) ts
+  where
+  unindenting = P.sourceLine pos2 > P.sourceLine pos1 && P.sourceColumn pos2 <= ref   
+insertIndents ref (t : ts) = t : insertIndents ref ts
  
-type TokenParser u a = P.Parsec [PositionedToken] u a
+type TokenParser a = P.Parsec [PositionedToken] ParseState a
  
-token :: (Token -> Maybe a) -> TokenParser u a
+token :: (Token -> Maybe a) -> TokenParser a
 token f = P.token show ptSourcePos (f . ptToken)
 
-match :: Token -> TokenParser u ()
+match :: Token -> TokenParser ()
 match tok = token (\tok' -> if tok == tok' then Just () else Nothing) P.<?> show tok
 
-lparen :: TokenParser u ()
+lparen :: TokenParser ()
 lparen = match LParen
 
-rparen :: TokenParser u ()
+rparen :: TokenParser ()
 rparen = match RParen
 
-parens :: TokenParser u a -> TokenParser u a
+parens :: TokenParser a -> TokenParser a
 parens = P.between lparen rparen
 
-lbrace :: TokenParser u ()
+lbrace :: TokenParser ()
 lbrace = match LBrace
 
-rbrace :: TokenParser u ()
+rbrace :: TokenParser ()
 rbrace = match RBrace
 
-braces :: TokenParser u a -> TokenParser u a
+braces :: TokenParser a -> TokenParser a
 braces = P.between lbrace rbrace
 
-lsquare :: TokenParser u ()
+lsquare :: TokenParser ()
 lsquare = match LSquare
 
-rsquare :: TokenParser u ()
+rsquare :: TokenParser ()
 rsquare = match RSquare
 
-squares :: TokenParser u a -> TokenParser u a
+squares :: TokenParser a -> TokenParser a
 squares = P.between lsquare rsquare
 
-larrow :: TokenParser u ()
+indent :: TokenParser Int
+indent = token go P.<?> "indentation"
+  where
+  go (Indent n) = Just n
+  go _ = Nothing
+
+larrow :: TokenParser ()
 larrow = match LArrow
 
-rarrow :: TokenParser u ()
+rarrow :: TokenParser ()
 rarrow = match RArrow
 
-lfatArrow :: TokenParser u ()
+lfatArrow :: TokenParser ()
 lfatArrow = match LFatArrow
 
-rfatArrow :: TokenParser u ()
+rfatArrow :: TokenParser ()
 rfatArrow = match RFatArrow
 
-colon :: TokenParser u ()
+colon :: TokenParser ()
 colon = match Colon
 
-doubleColon :: TokenParser u ()
+doubleColon :: TokenParser ()
 doubleColon = match DoubleColon
 
-equals :: TokenParser u ()
+equals :: TokenParser ()
 equals = match Equals
 
-pipe :: TokenParser u ()
+pipe :: TokenParser ()
 pipe = match Pipe
 
-tick :: TokenParser u ()
+tick :: TokenParser ()
 tick = match Tick
 
-dot :: TokenParser u ()
+dot :: TokenParser ()
 dot = match Dot
 
-comma :: TokenParser u ()
+comma :: TokenParser ()
 comma = match Comma
 
-semi :: TokenParser u ()
+semi :: TokenParser ()
 semi = match Semi
 
-at :: TokenParser u ()
+at :: TokenParser ()
 at = match At 
 
 -- |
 -- Parse zero or more values separated by semicolons
 --
-semiSep :: TokenParser u a -> TokenParser u [a]
+semiSep :: TokenParser a -> TokenParser [a]
 semiSep = flip P.sepBy semi
 
 -- |
 -- Parse one or more values separated by semicolons
 --
-semiSep1 :: TokenParser u a -> TokenParser u [a]
+semiSep1 :: TokenParser a -> TokenParser [a]
 semiSep1 = flip P.sepBy1 semi
 
 -- |
 -- Parse zero or more values separated by commas
 --
-commaSep :: TokenParser u a -> TokenParser u [a]
+commaSep :: TokenParser a -> TokenParser [a]
 commaSep = flip P.sepBy comma
 
 -- |
 -- Parse one or more values separated by commas
 --
-commaSep1 :: TokenParser u a -> TokenParser u [a]
+commaSep1 :: TokenParser a -> TokenParser [a]
 commaSep1 = flip P.sepBy1 comma
 
-lname :: TokenParser u String
+lname :: TokenParser String
 lname = token go P.<?> "identifier"
   where
   go (LName s) = Just s
   go _ = Nothing
 
-reserved :: String -> TokenParser u ()
+reserved :: String -> TokenParser ()
 reserved s = token go P.<?> show s
   where
   go (LName s') | s == s' = Just ()
   go _ = Nothing
 
-uname :: TokenParser u String
+uname :: TokenParser String
 uname = token go P.<?> "proper name"
   where
   go (UName s) = Just s
   go _ = Nothing
 
-uname' :: String -> TokenParser u ()
+uname' :: String -> TokenParser ()
 uname' s = token go P.<?> show s
   where
   go (UName s') | s == s' = Just ()
   go _ = Nothing
   
-symbol :: TokenParser u String
+symbol :: TokenParser String
 symbol = token go P.<?> "symbol"
   where
   go (Symbol s) = Just s
@@ -427,7 +373,7 @@ symbol = token go P.<?> "symbol"
   go LFatArrow  = Just "<="
   go _ = Nothing
 
-symbol' :: String -> TokenParser u ()
+symbol' :: String -> TokenParser ()
 symbol' s = token go P.<?> show s
   where
   go (Symbol s') | s == s'   = Just ()
@@ -435,25 +381,25 @@ symbol' s = token go P.<?> show s
   go LFatArrow   | s == "<=" = Just ()
   go _ = Nothing
   
-stringLiteral :: TokenParser u String
+stringLiteral :: TokenParser String
 stringLiteral = token go P.<?> "string literal"
   where
   go (StringLiteral s) = Just s
   go _ = Nothing
 
-number :: TokenParser u (Either Integer Double)
+number :: TokenParser (Either Integer Double)
 number = token go P.<?> "number"
   where
   go (Number n) = Just n
   go _ = Nothing
 
-natural ::  TokenParser u Integer
+natural ::  TokenParser Integer
 natural = token go P.<?> "natural"
   where
   go (Number (Left n)) = Just n
   go _ = Nothing
 
-identifier :: TokenParser u String
+identifier :: TokenParser String
 identifier = token go P.<?> "identifier"
   where
   go (LName s) | s `notElem` reservedPsNames = Just s

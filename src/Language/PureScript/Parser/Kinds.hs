@@ -23,13 +23,13 @@ import Control.Applicative
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseStar :: TokenParser u Kind
+parseStar :: TokenParser Kind
 parseStar = const Star <$> symbol' "*"
 
-parseBang :: TokenParser u Kind
+parseBang :: TokenParser Kind
 parseBang = const Bang <$> symbol' "!"
 
-parseTypeAtom :: TokenParser u Kind
+parseTypeAtom :: TokenParser Kind
 parseTypeAtom = P.choice $ map P.try
                   [ parseStar
                   , parseBang
@@ -37,7 +37,7 @@ parseTypeAtom = P.choice $ map P.try
 -- |
 -- Parse a kind
 --
-parseKind :: TokenParser u Kind
+parseKind :: TokenParser Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
   operators = [ [ P.Prefix (symbol' "#" >> return Row) ]

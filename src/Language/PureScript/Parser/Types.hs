@@ -32,22 +32,22 @@ import Language.PureScript.Environment
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseArray :: TokenParser u Type
+parseArray :: TokenParser Type
 parseArray = squares $ return tyArray
 
-parseArrayOf :: TokenParser u Type
+parseArrayOf :: TokenParser Type
 parseArrayOf = squares $ TypeApp tyArray <$> parseType
 
-parseFunction :: TokenParser u Type
+parseFunction :: TokenParser Type
 parseFunction = parens $ P.try rarrow >> return tyFunction
 
-parseObject :: TokenParser u Type
+parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyObject <$> parseRow
 
-parseTypeWildcard :: TokenParser u Type
+parseTypeWildcard :: TokenParser Type
 parseTypeWildcard = reserved "_" >> return TypeWildcard
 
-parseTypeVariable :: TokenParser u Type
+parseTypeVariable :: TokenParser Type
 parseTypeVariable = do
   ident <- identifier
   when (ident `elem` reservedTypeNames) $ P.unexpected ident
@@ -56,17 +56,17 @@ parseTypeVariable = do
   reservedTypeNames :: [String]
   reservedTypeNames = [ "forall", "where" ]
 
-parseTypeConstructor :: TokenParser u Type
+parseTypeConstructor :: TokenParser Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
-parseForAll :: TokenParser u Type
+parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 identifier <* dot)
                        <*> parseConstrainedType
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor
 --
-parseTypeAtom :: TokenParser u Type
+parseTypeAtom :: TokenParser Type
 parseTypeAtom = P.choice $ map P.try
             [ parseArray
             , parseArrayOf
@@ -79,7 +79,7 @@ parseTypeAtom = P.choice $ map P.try
             , parens parseRow
             , parens parsePolyType ]
 
-parseConstrainedType :: TokenParser u Type
+parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
   constraints <- P.optionMaybe . P.try $ do
     constraints <- parens . commaSep1 $ do
@@ -91,7 +91,7 @@ parseConstrainedType = do
   ty <- parseType
   return $ maybe ty (flip ConstrainedType ty) constraints
 
-parseAnyType :: TokenParser u Type
+parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
@@ -102,7 +102,7 @@ parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTabl
 -- |
 -- Parse a monotype
 --
-parseType :: TokenParser u Type
+parseType :: TokenParser Type
 parseType = do
   ty <- parseAnyType
   unless (isMonoType ty) $ P.unexpected "polymorphic type"
@@ -111,23 +111,23 @@ parseType = do
 -- |
 -- Parse a polytype
 --
-parsePolyType :: TokenParser u Type
+parsePolyType :: TokenParser Type
 parsePolyType = parseAnyType
 
 -- |
 -- Parse an atomic type with no wildcards
 --
-noWildcards :: TokenParser u Type -> TokenParser u Type
+noWildcards :: TokenParser Type -> TokenParser Type
 noWildcards p = do
   ty <- p
   when (containsWildcards ty) $ P.unexpected "type wildcard"
   return ty
 
-parseNameAndType :: TokenParser u t -> TokenParser u (String, t)
+parseNameAndType :: TokenParser t -> TokenParser (String, t)
 parseNameAndType p = (,) <$> (lname <|> stringLiteral) <* doubleColon <*> p
 
-parseRowEnding :: TokenParser u Type
+parseRowEnding :: TokenParser Type
 parseRowEnding = P.option REmpty (TypeVar <$> (pipe *> identifier))
 
-parseRow :: TokenParser u Type
+parseRow :: TokenParser Type
 parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
