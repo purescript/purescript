@@ -27,9 +27,9 @@
       (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
     class Bits b where
-      (&) :: b -> b -> b
-      (|) :: b -> b -> b
-      (^) :: b -> b -> b
+      (.&.) :: b -> b -> b
+      (.|.) :: b -> b -> b
+      (.^.) :: b -> b -> b
       shl :: b -> Number -> b
       shr :: b -> Number -> b
       zshr :: b -> Number -> b
@@ -146,6 +146,8 @@
 
     (:) :: forall a. a -> [a] -> [a]
 
+    (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
+
     (<) :: forall a. (Ord a) => a -> a -> Boolean
 
     (<=) :: forall a. (Ord a) => a -> a -> Boolean
@@ -169,6 +171,8 @@
     liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
 
     liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
+
+    otherwise :: Boolean
 
     refEq :: forall a. a -> a -> Boolean
 
@@ -262,7 +266,7 @@
 ### Types
 
     newtype Ref a where
-      Ref :: a -> Ref
+      Ref :: a -> Ref a
 
 
 ### Type Class Instances
@@ -350,8 +354,6 @@
 
     data ST :: * -> !
 
-    data STArray :: * -> * -> *
-
     data STRef :: * -> * -> *
 
 
@@ -359,21 +361,13 @@
 
     modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 
-    newSTArray :: forall a h r. Number -> a -> Eff (st :: ST h | r) (STArray h a)
-
     newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 
-    peekSTArray :: forall a h r. STArray h a -> Number -> Eff (st :: ST h | r) a
-
-    pokeSTArray :: forall a h r. STArray h a -> Number -> a -> Eff (st :: ST h | r) a
+    pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
 
     readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 
     runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
-
-    pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
-
-    runSTArray :: forall a r. (forall h. Eff (st :: ST h | r) (STArray h a)) -> Eff r [a]
 
     writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 
