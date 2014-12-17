@@ -24,12 +24,6 @@ import Control.Monad (guard)
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
       
-popUntil :: Int -> TokenParser ()
-popUntil ref = do
-  n <- indent
-  modifyState $ popIndentationWhile (> n)
-  guard (n == ref)
-      
 genBlock :: Bool -> TokenParser a -> TokenParser [a]
 genBlock lenient p = do
   choice [ do n <- try $ do
@@ -40,9 +34,10 @@ genBlock lenient p = do
                 modifyState $ pushIndentation n
                 return n
               first <- p
-              rest <- many . try $ do 
-                popUntil n <?> ("indentation at level " ++ show n)
+              rest <- many $ do 
+                indentAt n
                 p
+              modifyState popIndentation
               return $ first : rest
          , return []
          ]
