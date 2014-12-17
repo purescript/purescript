@@ -32,6 +32,7 @@ module Language.PureScript.Parser.Lexer
   , rsquare
   , squares
   , indent
+  , indentAt
   , larrow 
   , rarrow 
   , lfatArrow
@@ -149,7 +150,7 @@ instance Show PositionedToken where
   show = show . ptToken
 
 lex :: String -> Either P.ParseError [PositionedToken]
-lex input = insertIndents 1 <$> P.parse parseTokens "" input
+lex input = insertIndents <$> P.parse parseTokens "" input
       
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
@@ -255,18 +256,25 @@ langDef = PT.LanguageDef
 tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
-insertIndents :: Int -> [PositionedToken] -> [PositionedToken]
-insertIndents _   [] = []
-insertIndents ref (t@PositionedToken { ptToken = LName s } : ts@(t'@PositionedToken { ptSourcePos = pos } : _)) 
-  | shouldIndent && indenting = t : t' { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : insertIndents (P.sourceColumn pos) ts
+insertIndents :: [PositionedToken] -> [PositionedToken]
+insertIndents = go True [1]
   where
-  shouldIndent = s `elem` ["of", "do", "where", "let"]
-  indenting    = P.sourceColumn pos > ref
-insertIndents ref (t@PositionedToken { ptSourcePos = pos1 } : ts@(PositionedToken { ptSourcePos = pos2 } : _)) 
-  | unindenting = t : t { ptToken = Indent (P.sourceColumn pos2), ptComments = [] } : insertIndents (P.sourceColumn pos2) ts
-  where
-  unindenting = P.sourceLine pos2 > P.sourceLine pos1 && P.sourceColumn pos2 <= ref   
-insertIndents ref (t : ts) = t : insertIndents ref ts
+  go :: Bool -> [P.Column] -> [PositionedToken] -> [PositionedToken]
+  go _     _          [] = []
+  go _     cs@(c : _) (t@PositionedToken { ptToken = LName s } : ts@(t'@PositionedToken { ptSourcePos = pos } : _)) 
+    | shouldIndent && indenting = t : t' { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : go True (P.sourceColumn pos : cs) ts
+    where
+    shouldIndent = s `elem` ["of", "do", "where", "let"]
+    indenting    = let p = P.sourceColumn pos in p == 1 || p > c
+  go _     (c : cs)   ts@(PositionedToken { ptSourcePos = pos } : _) 
+    | unindenting = go False cs ts
+    where
+    unindenting = P.sourceColumn pos < c 
+  go False cs@(c : _) (t@PositionedToken { ptSourcePos = pos } : ts) 
+    | isMatching = t { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : t : go False cs ts
+    where
+    isMatching = P.sourceColumn pos == c   
+  go _     cs         (t : ts) = t : go False cs ts
  
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
  
@@ -307,6 +315,12 @@ indent :: TokenParser Int
 indent = token go P.<?> "indentation"
   where
   go (Indent n) = Just n
+  go _ = Nothing
+
+indentAt :: P.Column -> TokenParser ()
+indentAt n = token go P.<?> "indentation at level " ++ show n
+  where
+  go (Indent n') | n == n' = Just ()
   go _ = Nothing
 
 larrow :: TokenParser ()
@@ -430,7 +444,7 @@ number = token go P.<?> "number"
   go (Number n) = Just n
   go _ = Nothing
 
-natural ::  TokenParser Integer
+natural :: TokenParser Integer
 natural = token go P.<?> "natural"
   where
   go (Number (Left n)) = Just n
