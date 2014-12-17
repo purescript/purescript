@@ -1,5 +1,166 @@
 # Module Documentation
 
+## Module Control.Monad.Eff.Unsafe
+
+### Values
+
+    unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
+
+
+## Module Control.Monad.Eff
+
+### Types
+
+    data Eff :: # ! -> * -> *
+
+    type Pure a = forall e. Eff e a
+
+
+### Type Class Instances
+
+    instance applicativeEff :: Applicative (Eff e)
+
+    instance applyEff :: Apply (Eff e)
+
+    instance bindEff :: Bind (Eff e)
+
+    instance functorEff :: Functor (Eff e)
+
+    instance monadEff :: Monad (Eff e)
+
+
+### Values
+
+    forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
+
+    foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
+
+    runPure :: forall a. Pure a -> a
+
+    untilE :: forall e. Eff e Boolean -> Eff e Unit
+
+    whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
+
+
+## Module Control.Monad.ST
+
+### Types
+
+    data ST :: * -> !
+
+    data STRef :: * -> * -> *
+
+
+### Values
+
+    modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
+
+    newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
+
+    readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
+
+    runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
+
+    writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
+
+
+## Module Data.Function
+
+### Types
+
+    data Fn0 :: * -> *
+
+    data Fn1 :: * -> * -> *
+
+    data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn2 :: * -> * -> * -> *
+
+    data Fn3 :: * -> * -> * -> * -> *
+
+    data Fn4 :: * -> * -> * -> * -> * -> *
+
+    data Fn5 :: * -> * -> * -> * -> * -> * -> *
+
+    data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+
+    data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
+
+
+### Values
+
+    mkFn0 :: forall a. (Unit -> a) -> Fn0 a
+
+    mkFn1 :: forall a b. (a -> b) -> Fn1 a b
+
+    mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
+
+    mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
+
+    mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
+
+    mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
+
+    mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
+
+    mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
+
+    mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
+
+    mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
+
+    mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
+
+    on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
+
+    runFn0 :: forall a. Fn0 a -> a
+
+    runFn1 :: forall a b. Fn1 a b -> a -> b
+
+    runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
+
+    runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
+
+    runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
+
+    runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
+
+    runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
+
+    runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
+
+    runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
+
+    runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
+
+    runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
+
+
+## Module Debug.Trace
+
+### Types
+
+    data Trace :: !
+
+
+### Values
+
+    print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
+
+    trace :: forall r. String -> Eff (trace :: Trace | r) Unit
+
+
+## Module Prelude.Unsafe
+
+### Values
+
+    unsafeIndex :: forall a. [a] -> Number -> a
+
+
 ## Module Prelude
 
 ### Types
@@ -183,193 +344,6 @@
     unit :: Unit
 
     void :: forall f a. (Functor f) => f a -> f Unit
-
-
-## Module Data.Function
-
-### Types
-
-    data Fn0 :: * -> *
-
-    data Fn1 :: * -> * -> *
-
-    data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
-
-    data Fn2 :: * -> * -> * -> *
-
-    data Fn3 :: * -> * -> * -> * -> *
-
-    data Fn4 :: * -> * -> * -> * -> * -> *
-
-    data Fn5 :: * -> * -> * -> * -> * -> * -> *
-
-    data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
-
-    data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
-
-    data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
-
-    data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
-
-
-### Values
-
-    mkFn0 :: forall a. (Unit -> a) -> Fn0 a
-
-    mkFn1 :: forall a b. (a -> b) -> Fn1 a b
-
-    mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
-
-    mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
-
-    mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
-
-    mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
-
-    mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
-
-    mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
-
-    mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
-
-    mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
-
-    mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
-
-    on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
-
-    runFn0 :: forall a. Fn0 a -> a
-
-    runFn1 :: forall a b. Fn1 a b -> a -> b
-
-    runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
-
-    runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
-
-    runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
-
-    runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
-
-    runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
-
-    runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
-
-    runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
-
-    runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
-
-    runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
-
-
-## Module Data.Eq
-
-### Types
-
-    newtype Ref a where
-      Ref :: a -> Ref a
-
-
-### Type Class Instances
-
-    instance eqRef :: Eq (Ref a)
-
-    instance functorRef :: Functor Ref
-
-
-### Values
-
-    liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
-
-
-## Module Prelude.Unsafe
-
-### Values
-
-    unsafeIndex :: forall a. [a] -> Number -> a
-
-
-## Module Control.Monad.Eff
-
-### Types
-
-    data Eff :: # ! -> * -> *
-
-    type Pure a = forall e. Eff e a
-
-
-### Type Class Instances
-
-    instance applicativeEff :: Applicative (Eff e)
-
-    instance applyEff :: Apply (Eff e)
-
-    instance bindEff :: Bind (Eff e)
-
-    instance functorEff :: Functor (Eff e)
-
-    instance monadEff :: Monad (Eff e)
-
-
-### Values
-
-    bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
-
-    forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
-
-    foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
-
-    returnE :: forall e a. a -> Eff e a
-
-    runPure :: forall a. Pure a -> a
-
-    untilE :: forall e. Eff e Boolean -> Eff e Unit
-
-    whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
-
-
-## Module Control.Monad.Eff.Unsafe
-
-### Values
-
-    unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
-
-
-## Module Debug.Trace
-
-### Types
-
-    data Trace :: !
-
-
-### Values
-
-    print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
-
-    trace :: forall r. String -> Eff (trace :: Trace | r) Unit
-
-
-## Module Control.Monad.ST
-
-### Types
-
-    data ST :: * -> !
-
-    data STRef :: * -> * -> *
-
-
-### Values
-
-    modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
-
-    newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
-
-    pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
-
-    readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
-
-    runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
-
-    writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 
 
 

@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving, TupleSections #-}
 
 module Main where
 
@@ -127,7 +127,9 @@ getHistoryFilename = do
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule filename = either (Left . show) Right . P.runIndentParser filename P.parseModules <$> U.readFile filename
+loadModule filename = do
+  content <- U.readFile filename
+  return $ either (Left . show) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
 -- Load all modules, including the Prelude
@@ -137,7 +139,7 @@ loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- U.readFile filename
     return (Right filename, content)
-  return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
+  return $ P.parseModulesFromFiles (either (const "") id) $ map (Left P.RebuildNever,) P.preludeModules ++ filesAndContent
 
 
 -- |

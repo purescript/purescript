@@ -24,7 +24,7 @@ import Data.Version (showVersion)
 
 import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
@@ -52,7 +52,7 @@ readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
   | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> U.readFile inFile
-                   return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
+                   return (if ioNoPrelude then content else map (Nothing,) P.preludeModules ++ content)
 
 compile :: PSCOptions -> IO ()
 compile (PSCOptions input opts stdin output externs usePrefix) = do
@@ -71,7 +71,11 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
             Just path -> mkdirp path >> U.writeFile path js
             Nothing -> U.putStrLn js
           case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
+            Just dir -> do
+              createDirectoryIfMissing True dir
+              forM_ (zip (map snd ms) exts) $ \(P.Module mn _ _, content) -> do
+                let path = dir </> show mn <> ".externs.purs"
+                U.writeFile path content
             Nothing -> return ()
           exitSuccess
   where
