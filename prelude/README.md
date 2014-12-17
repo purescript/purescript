@@ -268,6 +268,41 @@
     unsafeIndex :: forall a. [a] -> Number -> a
 
 
+## Module Control.Monad.Eff
+
+### Types
+
+    data Eff :: # ! -> * -> *
+
+    type Pure a = forall e. Eff e a
+
+
+### Type Class Instances
+
+    instance applicativeEff :: Applicative (Eff e)
+
+    instance applyEff :: Apply (Eff e)
+
+    instance bindEff :: Bind (Eff e)
+
+    instance functorEff :: Functor (Eff e)
+
+    instance monadEff :: Monad (Eff e)
+
+
+### Values
+
+    forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
+
+    foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
+
+    runPure :: forall a. Pure a -> a
+
+    untilE :: forall e. Eff e Boolean -> Eff e Unit
+
+    whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
+
+
 ## Module Control.Monad.Eff.Unsafe
 
 ### Values

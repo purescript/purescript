@@ -2,6 +2,7 @@
   modules/Prelude.purs \
   modules/Data.Function.purs \
   modules/Prelude.Unsafe.purs \
+  modules/Control.Monad.Eff.purs \
   modules/Control.Monad.Eff.Unsafe.purs \
   modules/Debug.Trace.purs \
   modules/Control.Monad.ST.purs \
