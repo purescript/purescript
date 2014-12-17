@@ -239,10 +239,11 @@ parseModule = do
 --
 parseModulesFromFiles :: (k -> String) -> [(k, String)] -> Either P.ParseError [(k, Module)]
 parseModulesFromFiles toFilePath input =
-  forM input $ \(filename, content) -> do
-    ts <- lex content
-    ms <- runTokenParser (toFilePath filename) (parseModule <* P.eof) ts
-    return (filename, ms)
+  forM input $ \(k, content) -> do
+    let filename = toFilePath k
+    ts <- lex filename content
+    ms <- runTokenParser filename (parseModule <* P.eof) ts
+    return (k, ms)
 
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)

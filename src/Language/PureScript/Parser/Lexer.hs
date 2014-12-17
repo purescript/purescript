@@ -149,8 +149,8 @@ data PositionedToken = PositionedToken
 instance Show PositionedToken where
   show = show . ptToken
 
-lex :: String -> Either P.ParseError [PositionedToken]
-lex input = insertIndents <$> P.parse parseTokens "" input
+lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
+lex filePath input = insertIndents <$> P.parse parseTokens filePath input
       
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof

@@ -39,7 +39,7 @@ psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.braces (P.semiSep P.parseDec
 --
 parseCommand :: String -> Either ParseError Command
 parseCommand s = do
-  ts <- P.lex s
+  ts <- P.lex "" s
   flip (P.runTokenParser "") ts $ choice
     [ P.colon *> choice [ psciHelp
                         , psciImport
