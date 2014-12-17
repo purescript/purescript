@@ -168,7 +168,7 @@ parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <
   lineComment = P.try $ P.string "--" *> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof))
 
 parsePositionedToken :: P.Parsec String u PositionedToken
-parsePositionedToken = do
+parsePositionedToken = P.try $ do
   pos <- P.getPosition
   comments <- P.many parseComment
   tok <- parseToken
