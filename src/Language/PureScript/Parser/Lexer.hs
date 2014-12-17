@@ -257,24 +257,28 @@ tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
 insertIndents :: [PositionedToken] -> [PositionedToken]
-insertIndents = go True [1]
+insertIndents = findOutdents True [1]
   where
-  go :: Bool -> [P.Column] -> [PositionedToken] -> [PositionedToken]
-  go _     _          [] = []
-  go _     cs@(c : _) (t@PositionedToken { ptToken = LName s } : ts@(t'@PositionedToken { ptSourcePos = pos } : _)) 
-    | shouldIndent && indenting = t : t' { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : go True (P.sourceColumn pos : cs) ts
+  findOutdents :: Bool -> [P.Column] -> [PositionedToken] -> [PositionedToken]
+  findOutdents _     _          [] = []
+  findOutdents _     (c : cs)   ts@(PositionedToken { ptSourcePos = pos } : _) 
+    | unindenting = findOutdents False cs ts
+    where
+    unindenting = P.sourceColumn pos < c 
+  findOutdents False cs@(c : _) (t@PositionedToken { ptSourcePos = pos } : ts) 
+    | isMatching = t { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : findIndents cs (t : ts)
+    where
+    isMatching = P.sourceColumn pos == c   
+  findOutdents _     cs         (t : ts) = findIndents cs (t : ts)
+  
+  findIndents :: [P.Column] -> [PositionedToken] -> [PositionedToken]
+  findIndents _          [] = []
+  findIndents cs@(c : _) (t@PositionedToken { ptToken = LName s } : ts@(t'@PositionedToken { ptSourcePos = pos } : _)) 
+    | shouldIndent && indenting = t : t' { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : findOutdents True (P.sourceColumn pos : cs) ts
     where
     shouldIndent = s `elem` ["of", "do", "where", "let"]
     indenting    = let p = P.sourceColumn pos in p == 1 || p > c
-  go _     (c : cs)   ts@(PositionedToken { ptSourcePos = pos } : _) 
-    | unindenting = go False cs ts
-    where
-    unindenting = P.sourceColumn pos < c 
-  go False cs@(c : _) (t@PositionedToken { ptSourcePos = pos } : ts) 
-    | isMatching = t { ptToken = Indent (P.sourceColumn pos), ptComments = [] } : t : go False cs ts
-    where
-    isMatching = P.sourceColumn pos == c   
-  go _     cs         (t : ts) = t : go False cs ts
+  findIndents cs         (t : ts) = t : findOutdents False cs ts
  
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
  

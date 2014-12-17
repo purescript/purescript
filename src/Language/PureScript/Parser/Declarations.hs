@@ -349,7 +349,7 @@ parseDoNotationBind = DoNotationBind <$> parseBinder <*> (larrow *> parseValue)
 parseDoNotationElement :: TokenParser DoNotationElement
 parseDoNotationElement = P.choice
             [ P.try parseDoNotationBind
-            , P.try parseDoNotationLet
+            , parseDoNotationLet
             , P.try (DoNotationValue <$> parseValue) ]
 
 -- |
