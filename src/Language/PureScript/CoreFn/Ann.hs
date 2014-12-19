@@ -22,3 +22,9 @@ import Language.PureScript.Types
 -- Type alias for basic annotations
 --
 type Ann = (Maybe SourcePos, Maybe Type, Maybe Meta)
+
+-- |
+-- Initial annotation with no metadata
+--
+nullAnn :: Ann
+nullAnn = (Nothing, Nothing, Nothing)

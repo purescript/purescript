@@ -34,9 +34,9 @@ import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants as C
 
-nullAnn :: Ann
-nullAnn = (Nothing, Nothing, Nothing)
-
+-- |
+-- Desugars a module from AST to CoreFn representation.
+--
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn env (A.Module mn decls (Just exps)) =
   let imports = nub $ mapMaybe importToCoreFn decls
@@ -47,17 +47,28 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
+-- |
+-- Desugars import declarations from AST to CoreFn representation.
+--
 importToCoreFn :: A.Declaration -> Maybe ModuleName
 importToCoreFn (A.ImportDeclaration name _ _) = Just name
 importToCoreFn (A.PositionedDeclaration _ d) = importToCoreFn d
 importToCoreFn _ = Nothing
 
+-- |
+-- Desugars foreign declarations from AST to CoreFn representation.
+--
 externToCoreFn :: A.Declaration -> Maybe ForeignDecl
 externToCoreFn (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
 externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
 externToCoreFn (A.PositionedDeclaration _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
 
+-- |
+-- Desugars export declarations references from AST to CoreFn representation.
+-- CoreFn modules only export values, so all data constructors, class
+-- constructor, instances and values are flattened into one list.
+--
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ (Just dctors)) = map properToIdent dctors
 exportToCoreFn (A.ValueRef name) = [name]
@@ -66,6 +77,9 @@ exportToCoreFn (A.TypeInstanceRef name) = [name]
 exportToCoreFn (A.PositionedDeclarationRef _ d) = exportToCoreFn d
 exportToCoreFn _ = []
 
+-- |
+-- Desugars member declarations from AST to CoreFn representation.
+--
 declToCoreFn :: Environment -> Maybe SourcePos -> A.Declaration -> [Bind Ann]
 declToCoreFn _ sp (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
   [NonRec (properToIdent ctor) $
@@ -86,6 +100,11 @@ declToCoreFn env _ (A.PositionedDeclaration sp d) =
   declToCoreFn env (Just sp) d
 declToCoreFn _ _ _ = []
 
+-- |
+-- Makes a typeclass dictionary constructor function. The returned expression
+-- is a function that accepts the superclass instances and member
+-- implementations and returns a record for the instance dictionary.
+--
 mkTypeClassConstructor :: Maybe SourcePos -> [Constraint] -> [A.Declaration] -> Expr Ann
 mkTypeClassConstructor sp supers members =
   let props = [ (arg, Accessor nullAnn arg (Var nullAnn $ Qualified Nothing (Ident "dict"))) | arg <- args ]
@@ -108,6 +127,9 @@ mkTypeClassConstructor sp supers members =
   memberToName (A.PositionedDeclaration _ d) = memberToName d
   memberToName _ = error "Invalid declaration in type class definition"
 
+-- |
+-- Desugars expressions from AST to CoreFn representation.
+--
 exprToCoreFn :: Environment -> Maybe SourcePos -> Maybe Type -> A.Expr -> Expr Ann
 exprToCoreFn _ sp ty (A.NumericLiteral v) =
   Literal (sp, ty, Nothing) (NumericLiteral v)
@@ -152,6 +174,9 @@ exprToCoreFn env _ ty (A.PositionedValue sp v) =
 exprToCoreFn _ _ _ e =
   error $ "Unexpected value in exprToCoreFn: " ++ show e
 
+-- |
+-- Desugars case alternatives from AST to CoreFn representation.
+--
 altToCoreFn :: Environment -> Maybe SourcePos -> A.CaseAlternative -> CaseAlternative Ann
 altToCoreFn env sp (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn env sp) bs) (go vs)
   where
@@ -159,6 +184,9 @@ altToCoreFn env sp (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCor
   go (Left ges) = Left $ map (exprToCoreFn env sp Nothing *** exprToCoreFn env sp Nothing) ges
   go (Right e) = Right (exprToCoreFn env sp Nothing e)
 
+-- |
+-- Desugars case binders from AST to CoreFn representation.
+--
 binderToCoreFn :: Environment -> Maybe SourcePos -> A.Binder -> Binder Ann
 binderToCoreFn _ sp (A.NullBinder) =
   NullBinder (sp, Nothing, Nothing)
