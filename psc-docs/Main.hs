@@ -75,8 +75,8 @@ renderModules showHierarchy ms = do
   mapM_ (renderModule showHierarchy) ms
 
 renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy (P.Module moduleName ds exps) =
-  let exported = filter (isExported exps) ds
+renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
+  let ds = P.exportedDeclarations mdl
       hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
       hasTypeclassInstances = any isTypeInstanceDeclaration ds
@@ -87,7 +87,7 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
     when hasTypes $ do
       headerLevel 3 "Types"
       spacer
-      renderTopLevel exps (filter isTypeDeclaration exported)
+      renderTopLevel exps (filter isTypeDeclaration ds)
       spacer
     when hasTypeclasses $ do
       headerLevel 3 "Type Classes"
@@ -95,7 +95,7 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
       when showHierarchy $ do
         renderTypeclassImage moduleName
         spacer
-      renderTopLevel exps (filter isTypeClassDeclaration exported)
+      renderTopLevel exps (filter isTypeClassDeclaration ds)
       spacer
     when hasTypeclassInstances $ do
       headerLevel 3 "Type Class Instances"
@@ -105,33 +105,8 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
     when hasValues $ do
       headerLevel 3 "Values"
       spacer
-      renderTopLevel exps (filter isValueDeclaration exported)
+      renderTopLevel exps (filter isValueDeclaration ds)
       spacer
-
-isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
-isExported Nothing _ = True
-isExported _ P.TypeInstanceDeclaration{} = True
-isExported exps (P.PositionedDeclaration _ d) = isExported exps d
-isExported (Just exps) decl = any (matches decl) exps
-  where
-  matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
-  matches (P.ExternDeclaration _ ident _ _) (P.ValueRef ident') = ident == ident'
-  matches (P.DataDeclaration _ ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
-  matches (P.PositionedDeclaration _ d) r = d `matches` r
-  matches d (P.PositionedDeclarationRef _ r) = d `matches` r
-  matches _ _ = False
-
-isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
-isDctorExported _ Nothing _ = True
-isDctorExported ident (Just exps) ctor = test `any` exps
-  where
-  test (P.PositionedDeclarationRef _ d) = test d
-  test (P.TypeRef ident' Nothing) = ident == ident'
-  test (P.TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
-  test _ = False
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
@@ -152,7 +127,7 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
-    exported = filter (isDctorExported name exps . fst) ctors
+    exported = filter (P.isDctorExported name exps . fst) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
     let ctorTy = foldr P.function typeApp tys
