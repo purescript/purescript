@@ -45,7 +45,7 @@ parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyObject <$> parseRow
 
 parseTypeWildcard :: TokenParser Type
-parseTypeWildcard = symbol' "_" >> return TypeWildcard
+parseTypeWildcard = reserved "_" >> return TypeWildcard
 
 parseTypeVariable :: TokenParser Type
 parseTypeVariable = do
