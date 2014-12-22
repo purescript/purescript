@@ -170,8 +170,8 @@ parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <
 
 parsePositionedToken :: P.Parsec String u PositionedToken
 parsePositionedToken = P.try $ do
-  pos <- P.getPosition
   comments <- P.many parseComment
+  pos <- P.getPosition
   tok <- parseToken
   return $ PositionedToken pos tok comments
 
