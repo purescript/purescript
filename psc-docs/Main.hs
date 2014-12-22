@@ -75,8 +75,8 @@ renderModules showHierarchy ms = do
   mapM_ (renderModule showHierarchy) ms
 
 renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy mdl@(P.Module moduleName ds exps) =
-  let exported = P.exportedDeclarations mdl
+renderModule showHierarchy mdl =
+  let ds = P.exportedDeclarations mdl
       hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
       hasTypeclassInstances = any isTypeInstanceDeclaration ds
@@ -87,7 +87,7 @@ renderModule showHierarchy mdl@(P.Module moduleName ds exps) =
     when hasTypes $ do
       headerLevel 3 "Types"
       spacer
-      renderTopLevel exps (filter isTypeDeclaration exported)
+      renderTopLevel exps (filter isTypeDeclaration ds)
       spacer
     when hasTypeclasses $ do
       headerLevel 3 "Type Classes"
@@ -95,7 +95,7 @@ renderModule showHierarchy mdl@(P.Module moduleName ds exps) =
       when showHierarchy $ do
         renderTypeclassImage moduleName
         spacer
-      renderTopLevel exps (filter isTypeClassDeclaration exported)
+      renderTopLevel exps (filter isTypeClassDeclaration ds)
       spacer
     when hasTypeclassInstances $ do
       headerLevel 3 "Type Class Instances"
@@ -105,7 +105,7 @@ renderModule showHierarchy mdl@(P.Module moduleName ds exps) =
     when hasValues $ do
       headerLevel 3 "Values"
       spacer
-      renderTopLevel exps (filter isValueDeclaration exported)
+      renderTopLevel exps (filter isValueDeclaration ds)
       spacer
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
