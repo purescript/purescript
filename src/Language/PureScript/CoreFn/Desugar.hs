@@ -22,6 +22,7 @@ import qualified Data.Map as M
 import Control.Arrow (second, (***))
 
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Traversals
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
@@ -39,13 +40,22 @@ import qualified Language.PureScript.Constants as C
 --
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn env (A.Module mn decls (Just exps)) =
-  let imports = nub $ mapMaybe importToCoreFn decls
+  let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn env Nothing) decls
   in Module mn imports exps' externs decls'
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
+
+findQualModules :: [A.Declaration] -> [ModuleName]
+findQualModules decls =
+  let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
+  in f `concatMap` decls
+  where
+  fqValues :: A.Expr -> [ModuleName]
+  fqValues (A.Var (Qualified (Just mn) _)) = [mn]
+  fqValues _ = []
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.
