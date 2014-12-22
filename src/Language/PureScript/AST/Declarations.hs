@@ -35,6 +35,51 @@ import Language.PureScript.Environment
 data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
 
 -- |
+-- Test if a declaration is exported, given a module's export list.
+--
+isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
+isExported Nothing _ = True
+isExported _ TypeInstanceDeclaration{} = True
+isExported exps (PositionedDeclaration _ d) = isExported exps d
+isExported (Just exps) decl = any (matches decl) exps
+  where
+  matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
+  matches (ExternDeclaration _ ident _ _) (ValueRef ident') = ident == ident'
+  matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
+  matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
+  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
+  matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
+  matches (PositionedDeclaration _ d) r = d `matches` r
+  matches d (PositionedDeclarationRef _ r) = d `matches` r
+  matches _ _ = False
+
+exportedDeclarations :: Module -> [Declaration]
+exportedDeclarations (Module _ decls exps) = filter (isExported exps) decls
+
+-- |
+-- Test if a data constructor for a given type is exported, given a module's export list.
+--
+isDctorExported :: ProperName -> Maybe [DeclarationRef] -> ProperName -> Bool
+isDctorExported _ Nothing _ = True
+isDctorExported ident (Just exps) ctor = test `any` exps
+  where
+  test (PositionedDeclarationRef _ d) = test d
+  test (TypeRef ident' Nothing) = ident == ident'
+  test (TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
+  test _ = False
+
+-- |
+-- Return the exported data constructors for a given type.
+--
+exportedDctors :: Module -> ProperName -> [ProperName]
+exportedDctors (Module _ decls exps) ident =
+  filter (isDctorExported ident exps) dctors
+  where
+  dctors = concatMap getDctors decls
+  getDctors (DataDeclaration _ _ _ ctors) = map fst ctors
+  getDctors _ = []
+
+-- |
 -- An item in a list of explicit imports or exports
 --
 data DeclarationRef
