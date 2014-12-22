@@ -75,7 +75,7 @@ renderModules showHierarchy ms = do
   mapM_ (renderModule showHierarchy) ms
 
 renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy mdl =
+renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
   let ds = P.exportedDeclarations mdl
       hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
