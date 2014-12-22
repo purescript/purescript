@@ -261,26 +261,6 @@
     runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
 
 
-## Module Data.Eq
-
-### Types
-
-    newtype Ref a where
-      Ref :: a -> Ref a
-
-
-### Type Class Instances
-
-    instance eqRef :: Eq (Ref a)
-
-    instance functorRef :: Functor Ref
-
-
-### Values
-
-    liftRef :: forall a b. (a -> a -> b) -> Ref a -> Ref a -> b
-
-
 ## Module Prelude.Unsafe
 
 ### Values
@@ -312,13 +292,9 @@
 
 ### Values
 
-    bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
-
     forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 
     foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
-
-    returnE :: forall e a. a -> Eff e a
 
     runPure :: forall a. Pure a -> a
 

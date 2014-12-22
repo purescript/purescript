@@ -49,7 +49,7 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
   content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> U.readFile inFile
-  return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
+  return (if ioNoPrelude then content else map (Left P.RebuildNever,) P.preludeModules ++ content)
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 

@@ -15,7 +15,7 @@
 
 {-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell #-}
 
-module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, prelude) where
+module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, preludeModules) where
 
 import Language.PureScript.Types as P
 import Language.PureScript.Kinds as P
@@ -37,7 +37,7 @@ import Language.PureScript.Renamer as P
 
 import qualified Language.PureScript.Constants as C
 
-import Data.List (sortBy, groupBy, intercalate)
+import Data.List (sortBy, groupBy)
 import Data.Time.Clock
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
@@ -72,10 +72,10 @@ import System.FilePath ((</>))
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
+compile :: Options Compile -> [Module] -> [String] -> Either String (String, [String], Environment)
 compile = compile' initEnvironment
 
-compile' :: Environment -> Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
+compile' :: Environment -> Options Compile -> [Module] -> [String] -> Either String (String, [String], Environment)
 compile' env opts ms prefix = do
   (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else (map importPrelude ms)
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
@@ -87,7 +87,7 @@ compile' env opts ms prefix = do
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
   let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(Module mn _ _) -> mn `elem` codeGenModuleNames) renamed
   let js = evalSupply nextVar $ concat <$> mapM (\m -> moduleToJs opts m env') modulesToCodeGen
-  let exts = intercalate "\n" . map (`moduleToPs` env') $ modulesToCodeGen
+  let exts = map (`moduleToPs` env') modulesToCodeGen
   js' <- generateMain env' opts js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
   return (pjs, exts, env')
@@ -219,7 +219,7 @@ make outputDir opts ms prefix = do
   rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+    externsModules <- liftError . fmap (map snd) . either (Left . show) Right $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
       _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
@@ -248,5 +248,13 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
-prelude :: String
-prelude = BU.toString $(embedFile "prelude/prelude.purs")
+preludeModules :: [String]
+preludeModules = BU.toString `map`
+  [ $(embedFile "prelude/modules/Prelude.purs")
+  , $(embedFile "prelude/modules/Prelude.Unsafe.purs")
+  , $(embedFile "prelude/modules/Control.Monad.Eff.purs")
+  , $(embedFile "prelude/modules/Control.Monad.Eff.Unsafe.purs")
+  , $(embedFile "prelude/modules/Control.Monad.ST.purs")
+  , $(embedFile "prelude/modules/Data.Function.purs")
+  , $(embedFile "prelude/modules/Debug.Trace.purs")
+  ]
