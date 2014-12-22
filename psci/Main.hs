@@ -127,7 +127,9 @@ getHistoryFilename = do
 -- Loads a file for use with imports.
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule filename = either (Left . show) Right . P.runIndentParser filename P.parseModules <$> U.readFile filename
+loadModule filename = do
+  content <- U.readFile filename
+  return $ either (Left . show) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
 -- Load all modules, including the Prelude

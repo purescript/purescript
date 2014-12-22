@@ -55,9 +55,9 @@ runModuleName :: P.ModuleName -> String
 runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
 readInput :: FilePath -> IO (Either Par.ParseError [P.Module])
-readInput p = do
-  text <- U.readFile p
-  return $ P.runIndentParser p P.parseModules text
+readInput filename = do
+  content <- U.readFile filename
+  return $ fmap (map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions input mOutput) = do

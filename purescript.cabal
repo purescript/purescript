@@ -65,6 +65,7 @@ library
                      Language.PureScript.Optimizer.Unused
                      Language.PureScript.Options
                      Language.PureScript.Parser
+                     Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
                      Language.PureScript.Parser.Kinds

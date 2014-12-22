@@ -17,6 +17,8 @@ module Parser (
     parseCommand
   ) where
 
+import Prelude hiding (lex)
+
 import Commands
 
 import Data.Char (isSpace)
@@ -28,21 +30,31 @@ import Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Parser.Common as C (mark, same)
 
+parseRestWith :: P.TokenParser a -> Parsec String () a
+parseRestWith p = do
+  s <- many anyChar
+  case P.lex "" s >>= P.runTokenParser "" p of
+    Left err -> fail (show err)
+    Right a -> return a
+
 -- |
 -- PSCI version of @let@.
 -- This is essentially let from do-notation.
 -- However, since we don't support the @Eff@ monad,
 -- we actually want the normal @let@.
 --
-psciLet :: Parsec String P.ParseState Command
-psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> C.mark (many1 (C.same *> P.parseDeclaration))))
+psciLet :: Parsec String () Command
+psciLet = Let <$> (P.Let <$> (string "let" *> spaces *> parseRestWith manyDecls))
+  where
+  manyDecls :: P.TokenParser [P.Declaration]
+  manyDecls = C.mark (many1 (C.same *> P.parseDeclaration))
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
 parseCommand :: String -> Either ParseError Command
-parseCommand = P.runIndentParser "" $ choice
-                    [ P.whiteSpace *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse <|> psciShowModules)
+parseCommand = flip parse "" $ choice
+                    [ spaces *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse <|> psciShowModules)
                     , try psciLet
                     , psciExpression
                     ] <* eof
@@ -50,26 +62,26 @@ parseCommand = P.runIndentParser "" $ choice
 -- |
 -- Parses expressions entered at the PSCI repl.
 --
-psciExpression :: Parsec String P.ParseState Command
-psciExpression = Expression <$> P.parseValue
+psciExpression :: Parsec String () Command
+psciExpression = Expression <$> parseRestWith P.parseValue
 
 -- |
 -- Parses 'Commands.Help' command.
 --
-psciHelp :: Parsec String P.ParseState Command
+psciHelp :: Parsec String () Command
 psciHelp = Help <$ char '?'
 
 -- |
 -- Parses 'Commands.Import' command.
 --
-psciImport :: Parsec String P.ParseState Command
-psciImport = Import <$> (char 'i' *> P.whiteSpace *> P.moduleName)
+psciImport :: Parsec String () Command
+psciImport = Import <$> (char 'i' *> spaces *> parseRestWith P.moduleName)
 
 -- |
 -- Parses 'Commands.LoadFile' command.
 --
-psciLoadFile :: Parsec String P.ParseState Command
-psciLoadFile = LoadFile . trimEnd <$> (char 'm' *> P.whiteSpace *> manyTill anyChar eof)
+psciLoadFile :: Parsec String () Command
+psciLoadFile = LoadFile . trimEnd <$> (char 'm' *> spaces *> manyTill anyChar eof)
 
 -- | Trim end of input string
 trimEnd :: String -> String
@@ -78,35 +90,35 @@ trimEnd = reverse . dropWhile isSpace . reverse
 -- |
 -- Parses 'Commands.Quit' command.
 --
-psciQuit :: Parsec String P.ParseState Command
+psciQuit :: Parsec String () Command
 psciQuit = Quit <$ char 'q'
 
 -- |
 -- Parses 'Commands.Reload' command.
 --
-psciReload :: Parsec String P.ParseState Command
+psciReload :: Parsec String () Command
 psciReload = Reset <$ char 'r'
 
 -- |
 -- Parses 'Commands.TypeOf' command.
 --
-psciTypeOf :: Parsec String P.ParseState Command
-psciTypeOf = TypeOf <$> (char 't' *> P.whiteSpace *> P.parseValue)
+psciTypeOf :: Parsec String () Command
+psciTypeOf = TypeOf <$> (char 't' *> spaces *> parseRestWith P.parseValue)
 
 
 -- |
 -- Parses 'Commands.KindOf' command.
 --
-psciKindOf :: Parsec String P.ParseState Command
-psciKindOf = KindOf <$> (char 'k' *> P.whiteSpace *> P.parseType)
+psciKindOf :: Parsec String () Command
+psciKindOf = KindOf <$> (char 'k' *> spaces *> parseRestWith P.parseType)
 
 -- |
 -- Parses 'Commands.Browse' command.
 --
-psciBrowse :: Parsec String P.ParseState Command
-psciBrowse = Browse <$> (char 'b' *> P.whiteSpace *> P.moduleName)
+psciBrowse :: Parsec String () Command
+psciBrowse = Browse <$> (char 'b' *> spaces *> parseRestWith P.moduleName)
 
 -- |
 -- Show Command
-psciShowModules :: Parsec String P.ParseState Command
-psciShowModules = Show . trimEnd <$> (char 's' *> P.whiteSpace *> manyTill anyChar eof)
+psciShowModules :: Parsec String () Command
+psciShowModules = Show . trimEnd <$> (char 's' *> spaces *> manyTill anyChar eof)
