@@ -226,3 +226,11 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
 lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
 lookupConstructor env ctor =
   fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env
+
+-- |
+-- Checks whether a data constructor is for a newtype.
+--
+isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
+isNewtypeConstructor e ctor = case lookupConstructor e ctor of
+  (Newtype, _, _) -> True
+  (Data, _, _) -> False

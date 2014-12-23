@@ -107,11 +107,3 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
 
     isValueExported :: Ident -> Bool
     isValueExported ident = ValueRef ident `elem` exts
-
--- |
--- Checks whether a data constructor is for a newtype.
---
-isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
-isNewtypeConstructor e ctor = case lookupConstructor e ctor of
-  (Newtype, _, _) -> True
-  (Data, _, _) -> False
