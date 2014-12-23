@@ -29,10 +29,11 @@ import Language.PureScript.Names
 eliminateDeadCode :: [ModuleName] -> [Module a] -> [Module a]
 eliminateDeadCode entryPoints ms = map go ms
   where
-  go (Module mn imps exps foreigns ds) = Module mn imps exps' foreigns ds'
+  go (Module mn imps exps foreigns ds) = Module mn imps exps' foreigns' ds'
     where
     ds' = filter (isUsed mn graph vertexFor entryPointVertices) ds
-    names = concatMap bindIdents ds' ++ map (\(name, _, _) -> name) foreigns
+    foreigns' = filter ((isUsed' mn graph vertexFor entryPointVertices) . foreignIdent) foreigns
+    names = concatMap bindIdents ds' ++ map foreignIdent foreigns'
     exps' = filter (`elem` names) exps
   declarations = concatMap declarationsByModule ms
   (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
@@ -46,6 +47,11 @@ bindIdents (NonRec name _) = [name]
 bindIdents (Rec names) = map fst names
 
 -- |
+-- Extract the ident for a foreign declaration.
+--
+foreignIdent (name, _, _) = name
+
+-- |
 -- Key type to use in graph
 --
 type Key = (ModuleName, Ident)
@@ -55,7 +61,7 @@ type Key = (ModuleName, Ident)
 --
 declarationsByModule :: Module a -> [(Key, [Key])]
 declarationsByModule (Module mn _ _ fs ds) =
-  let fs' = map (\(name, _, _) -> ((mn, name), [])) fs
+  let fs' = map ((\name -> ((mn, name), [])) . foreignIdent) fs
   in fs' ++ concatMap go ds
   where
   go :: Bind a -> [(Key, [Key])]
