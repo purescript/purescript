@@ -48,10 +48,15 @@ import qualified Text.Parsec.Expr as P
 -- |
 -- Read source position information
 --
-sourcePos :: P.Parsec s u SourcePos
-sourcePos = toSourcePos <$> P.getPosition
+withSourceSpan :: (SourceSpan -> a -> a) -> P.Parsec s u a -> P.Parsec s u a
+withSourceSpan f p = do
+  start <- P.getPosition
+  x <- p
+  end <- P.getPosition
+  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  return $ f sp x
   where
-  toSourcePos p = SourcePos (P.sourceName p) (P.sourceLine p) (P.sourceColumn p)
+  toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 kindedIdent :: P.Parsec String ParseState (String, Maybe Kind)
 kindedIdent = (, Nothing) <$> identifier
@@ -165,11 +170,11 @@ parseImportDeclaration = do
 
 
 parseDeclarationRef :: P.Parsec String ParseState DeclarationRef
-parseDeclarationRef = PositionedDeclarationRef <$> sourcePos <*>
-  (ValueRef <$> parseIdent
-   <|> do name <- properName
-          dctors <- P.optionMaybe $ parens (lexeme (P.string "..") *> pure Nothing <|> Just <$> commaSep properName)
-          return $ maybe (TypeClassRef name) (TypeRef name) dctors)
+parseDeclarationRef = withSourceSpan PositionedDeclarationRef $
+  ValueRef <$> parseIdent
+    <|> do name <- properName
+           dctors <- P.optionMaybe $ parens (lexeme (P.string "..") *> pure Nothing <|> Just <$> commaSep properName)
+           return $ maybe (TypeClassRef name) (TypeRef name) dctors
 
 parseTypeClassDeclaration :: P.Parsec String ParseState Declaration
 parseTypeClassDeclaration = do
@@ -203,7 +208,7 @@ parseTypeInstanceDeclaration = do
   return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty members
 
 positioned :: P.Parsec String ParseState Declaration -> P.Parsec String ParseState Declaration
-positioned d = PositionedDeclaration <$> sourcePos <*> d
+positioned d = withSourceSpan PositionedDeclaration d
 
 -- |
 -- Parse a single declaration
@@ -222,10 +227,10 @@ parseDeclaration = positioned (P.choice
                    ]) P.<?> "declaration"
 
 parseLocalDeclaration :: P.Parsec String ParseState Declaration
-parseLocalDeclaration = PositionedDeclaration <$> sourcePos <*> P.choice
+parseLocalDeclaration = positioned (P.choice
                    [ parseTypeDeclaration
                    , parseValueDeclaration
-                   ] P.<?> "local declaration"
+                   ] P.<?> "local declaration")
 
 -- |
 -- Parse a module header and a collection of declarations
@@ -374,10 +379,10 @@ parseDoNotationElement = P.choice
 -- Parse a value
 --
 parseValue :: P.Parsec String ParseState Expr
-parseValue = PositionedValue <$> sourcePos <*>
+parseValue = withSourceSpan PositionedValue
   (P.buildExpressionParser operators
-   . C.buildPostfixParser postfixTable2
-   $ indexersAndAccessors) P.<?> "expression"
+    . C.buildPostfixParser postfixTable2
+    $ indexersAndAccessors) P.<?> "expression"
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
@@ -431,7 +436,7 @@ parseNullBinder = C.lexeme (P.char '_' *> P.notFollowedBy C.identLetter) *> retu
 parseIdentifierAndBinder :: P.Parsec String ParseState (String, Binder)
 parseIdentifierAndBinder = do
   name <- C.lexeme (C.identifierName <|> C.stringLiteral)
-  _ <- C.lexeme $ C.indented *> P.char '='
+  _ <- C.lexeme $ C.indented *> (P.char '=' <|> P.char ':')
   binder <- C.indented *> parseBinder
   return (name, binder)
 
@@ -439,8 +444,7 @@ parseIdentifierAndBinder = do
 -- Parse a binder
 --
 parseBinder :: P.Parsec String ParseState Binder
-parseBinder = PositionedBinder <$> sourcePos <*>
-    P.buildExpressionParser operators parseBinderAtom P.<?> "expression"
+parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators parseBinderAtom P.<?> "expression")
   where
   operators = [ [ P.Infix ( C.lexeme (P.try $ C.indented *> C.reservedOp ":") >> return ConsBinder) P.AssocRight ] ]
   parseBinderAtom :: P.Parsec String ParseState Binder

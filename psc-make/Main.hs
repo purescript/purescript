@@ -21,7 +21,8 @@ import Control.Monad.Error
 
 import Data.Version (showVersion)
 
-import System.Console.CmdTheLine
+import Options.Applicative as Opts
+
 import System.Directory
        (doesFileExist, getModificationTime, createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
@@ -32,6 +33,14 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
 
+
+data PSCMakeOptions = PSCMakeOptions
+  { pscmInput     :: [FilePath]
+  , pscmOutputDir :: FilePath
+  , pscmOpts      :: P.Options P.Make
+  , pscmUsePrefix :: Bool
+  }
+
 data InputOptions = InputOptions
   { ioNoPrelude   :: Bool
   , ioInputFiles  :: [FilePath]
@@ -39,7 +48,7 @@ data InputOptions = InputOptions
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
-  content <- forM ioInputFiles $ \inputFile -> (Right inputFile, ) <$> U.readFile inputFile
+  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> U.readFile inFile
   return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
@@ -66,8 +75,8 @@ instance P.MonadMake Make where
   liftError = either throwError return
   progress = makeIO . U.putStrLn
 
-compile :: [FilePath] -> FilePath -> P.Options P.Make -> Bool -> IO ()
-compile input outputDir opts usePrefix = do
+compile :: PSCMakeOptions -> IO ()
+compile (PSCMakeOptions input outputDir opts usePrefix) = do
   modules <- P.parseModulesFromFiles (either (const "") id) <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
   case modules of
     Left err -> do
@@ -89,51 +98,74 @@ compile input outputDir opts usePrefix = do
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
 
-inputFiles :: Term [FilePath]
-inputFiles = value $ posAny [] $ posInfo
-     { posDoc = "The input .ps files" }
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> help "The input .ps file(s)"
 
-outputDirectory :: Term FilePath
-outputDirectory = value $ opt "output" $ (optInfo [ "o", "output" ])
-     { optDoc = "The output directory" }
+outputDirectory :: Parser FilePath
+outputDirectory = strOption $
+     short 'o'
+  <> long "output"
+  <> Opts.value "output"
+  <> showDefault
+  <> help "The output directory"
 
-noTco :: Term Bool
-noTco = value $ flag $ (optInfo [ "no-tco" ])
-     { optDoc = "Disable tail call optimizations" }
+noTco :: Parser Bool
+noTco = switch $ 
+     long "no-tco"
+  <> help "Disable tail call optimizations"
 
-noPrelude :: Term Bool
-noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
-     { optDoc = "Omit the Prelude" }
+noPrelude :: Parser Bool
+noPrelude = switch $ 
+     long "no-prelude"
+  <> help "Omit the Prelude"
 
-noMagicDo :: Term Bool
-noMagicDo = value $ flag $ (optInfo [ "no-magic-do" ])
-     { optDoc = "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad." }
+noMagicDo :: Parser Bool
+noMagicDo = switch $
+     long "no-magic-do"
+  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
 
-noOpts :: Term Bool
-noOpts = value $ flag $ (optInfo [ "no-opts" ])
-     { optDoc = "Skip the optimization phase." }
+noOpts :: Parser Bool
+noOpts = switch $
+     long "verbose-errors"
+  <> help "Skip the optimization phase."
 
-verboseErrors :: Term Bool
-verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
-     { optDoc = "Display verbose error messages" }
+verboseErrors :: Parser Bool
+verboseErrors = switch $
+     short 'v'
+  <> long "no-opts"
+  <> help "Display verbose error messages"
 
-options :: Term (P.Options P.Make)
-options = P.Options <$> noPrelude <*> noTco <*> noMagicDo <*> pure Nothing <*> noOpts <*> verboseErrors <*> pure P.MakeOptions
+noPrefix :: Parser Bool
+noPrefix = switch $ 
+     short 'p'
+  <> long "no-prefix"
+  <> help "Do not include comment header"
 
-noPrefix :: Term Bool
-noPrefix = value $ flag $ (optInfo ["p", "no-prefix" ])
-     { optDoc = "Do not include comment header"}
 
-term :: Term (IO ())
-term = compile <$> inputFiles <*> outputDirectory <*> options <*> (not <$> noPrefix)
+options :: Parser (P.Options P.Make)
+options = P.Options <$> noPrelude 
+                    <*> noTco 
+                    <*> noMagicDo
+                    <*> pure Nothing
+                    <*> noOpts
+                    <*> verboseErrors
+                    <*> pure P.MakeOptions
 
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "psc-make"
-  , version  = showVersion Paths.version
-  , termDoc  = "Compiles PureScript to Javascript"
-  }
+pscMakeOptions :: Parser PSCMakeOptions
+pscMakeOptions = PSCMakeOptions <$> many inputFile 
+                                <*> outputDirectory 
+                                <*> options 
+                                <*> (not <$> noPrefix)
 
 main :: IO ()
-main = run (term, termInfo)
-
+main = execParser opts >>= compile
+  where
+  opts        = info (version <*> helper <*> pscMakeOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psc-make - Compiles PureScript to Javascript"
+  footerInfo  = footer $ "psc-make " ++ showVersion Paths.version
+  
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden

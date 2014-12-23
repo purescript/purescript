@@ -135,7 +135,7 @@ everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
   (Expr -> m Expr) ->
   (Binder -> m Binder) ->
   (Declaration -> m Declaration, Expr -> m Expr, Binder -> m Binder)
-everywhereOnValuesM f g h = (f' <=< f, g' <=< g, h' <=< h)
+everywhereOnValuesM f g h = (f', g', h')
   where
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> mapM f' ds) >>= f
   f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> mapM h' bs <*> eitherM (mapM (pairM g' g')) g' val) >>= f

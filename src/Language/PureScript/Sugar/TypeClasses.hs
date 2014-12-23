@@ -18,7 +18,7 @@ module Language.PureScript.Sugar.TypeClasses (
   desugarTypeClasses
 ) where
 
-import Language.PureScript.AST
+import Language.PureScript.AST hiding (isExported)
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Kinds

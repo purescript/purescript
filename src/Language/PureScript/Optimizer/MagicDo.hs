@@ -59,13 +59,11 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Desugar pure
   convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
-    let JSReturn ret = last js in
-    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : init js ++ [JSReturn (JSApp ret [])] )
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : map applyReturns js )
   -- Desugar >>=
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind && isJSReturn (last js) =
-    let JSReturn ret = last js in
-    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : init js ++ [JSReturn (JSApp ret [])] )
+  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind =
+    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : map applyReturns js)
   -- Desugar untilE
   convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn $ JSObjectLiteral []])) []
@@ -105,9 +103,15 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
-
-  isJSReturn (JSReturn _) = True
-  isJSReturn _ = False
+  
+  applyReturns :: JS -> JS
+  applyReturns (JSReturn ret) = JSReturn (JSApp ret [])
+  applyReturns (JSBlock jss) = JSBlock (map applyReturns jss)
+  applyReturns (JSWhile cond js) = JSWhile cond (applyReturns js)
+  applyReturns (JSFor v lo hi js) = JSFor v lo hi (applyReturns js)
+  applyReturns (JSForIn v xs js) = JSForIn v xs (applyReturns js)
+  applyReturns (JSIfElse cond t f) = JSIfElse cond (applyReturns t) (applyReturns `fmap` f)
+  applyReturns other = other
 
 -- |
 -- Inline functions in the ST module
@@ -118,7 +122,7 @@ inlineST = everywhereOnJS convertBlock
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
-  convertBlock (JSApp f [arg]) | isSTFunc C.runST f || isSTFunc C.runSTArray f =
+  convertBlock (JSApp f [arg]) | isSTFunc C.runST f =
     let refs = nub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
@@ -136,10 +140,6 @@ inlineST = everywhereOnJS convertBlock
     if agg then JSAssignment ref arg else JSAssignment (JSAccessor C.stRefValue ref) arg
   convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
     if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor C.stRefValue ref) (JSApp func [JSAccessor C.stRefValue ref])
-  convert _ (JSApp (JSApp (JSApp f [arr]) [i]) []) | isSTFunc C.peekSTArray f =
-    JSIndexer i arr
-  convert _ (JSApp (JSApp (JSApp (JSApp f [arr]) [i]) [val]) []) | isSTFunc C.pokeSTArray f =
-    JSAssignment (JSIndexer i arr) val
   convert _ other = other
   -- Check if an expression represents a function in the ST module
   isSTFunc name (JSAccessor name' (JSVar st)) = st == C.st && name == name'

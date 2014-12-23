@@ -53,6 +53,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
 addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
+  mapM_ checkTypeSynonyms tys
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
@@ -61,6 +62,7 @@ addDataConstructor moduleName dtype name args dctor tys = do
 addTypeSynonym :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
+  checkTypeSynonyms ty
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
@@ -105,6 +107,12 @@ checkTypeClassInstance _ (TypeConstructor ctor) = do
   return ()
 checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
 checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance head is invalid." (Just (TypeError ty))
+
+-- |
+-- Check that type synonyms are fully-applied in a type
+--
+checkTypeSynonyms :: Type -> Check ()
+checkTypeSynonyms = void . replaceAllTypeSynonyms
 
 -- |
 -- Type check all declarations in a module

@@ -22,15 +22,24 @@ import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
+
+import Options.Applicative
+
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import qualified System.IO.UTF8 as U
-import System.Console.CmdTheLine
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (stderr)
 
-docgen :: Bool -> [FilePath] -> IO ()
-docgen showHierarchy input = do
+
+data PSCDocsOptions = PSCDocsOptions
+  { pscdIncludeHeir :: Bool
+  , pscdInputFiles  :: [FilePath]
+  }
+
+
+docgen :: PSCDocsOptions -> IO ()
+docgen (PSCDocsOptions showHierarchy input) = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
@@ -66,8 +75,8 @@ renderModules showHierarchy ms = do
   mapM_ (renderModule showHierarchy) ms
 
 renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy (P.Module moduleName ds exps) =
-  let exported = filter (isExported exps) ds
+renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
+  let ds = P.exportedDeclarations mdl
       hasTypes = any isTypeDeclaration ds
       hasTypeclasses = any isTypeClassDeclaration ds
       hasTypeclassInstances = any isTypeInstanceDeclaration ds
@@ -78,7 +87,7 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
     when hasTypes $ do
       headerLevel 3 "Types"
       spacer
-      renderTopLevel exps (filter isTypeDeclaration exported)
+      renderTopLevel exps (filter isTypeDeclaration ds)
       spacer
     when hasTypeclasses $ do
       headerLevel 3 "Type Classes"
@@ -86,7 +95,7 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
       when showHierarchy $ do
         renderTypeclassImage moduleName
         spacer
-      renderTopLevel exps (filter isTypeClassDeclaration exported)
+      renderTopLevel exps (filter isTypeClassDeclaration ds)
       spacer
     when hasTypeclassInstances $ do
       headerLevel 3 "Type Class Instances"
@@ -96,33 +105,8 @@ renderModule showHierarchy (P.Module moduleName ds exps) =
     when hasValues $ do
       headerLevel 3 "Values"
       spacer
-      renderTopLevel exps (filter isValueDeclaration exported)
+      renderTopLevel exps (filter isValueDeclaration ds)
       spacer
-
-isExported :: Maybe [P.DeclarationRef] -> P.Declaration -> Bool
-isExported Nothing _ = True
-isExported _ P.TypeInstanceDeclaration{} = True
-isExported exps (P.PositionedDeclaration _ d) = isExported exps d
-isExported (Just exps) decl = any (matches decl) exps
-  where
-  matches (P.TypeDeclaration ident _) (P.ValueRef ident') = ident == ident'
-  matches (P.ExternDeclaration _ ident _ _) (P.ValueRef ident') = ident == ident'
-  matches (P.DataDeclaration _ ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.ExternDataDeclaration ident _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeSynonymDeclaration ident _ _) (P.TypeRef ident' _) = ident == ident'
-  matches (P.TypeClassDeclaration ident _ _ _) (P.TypeClassRef ident') = ident == ident'
-  matches (P.PositionedDeclaration _ d) r = d `matches` r
-  matches d (P.PositionedDeclarationRef _ r) = d `matches` r
-  matches _ _ = False
-
-isDctorExported :: P.ProperName -> Maybe [P.DeclarationRef] -> P.ProperName -> Bool
-isDctorExported _ Nothing _ = True
-isDctorExported ident (Just exps) ctor = test `any` exps
-  where
-  test (P.PositionedDeclarationRef _ d) = test d
-  test (P.TypeRef ident' Nothing) = ident == ident'
-  test (P.TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
-  test _ = False
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
@@ -143,7 +127,7 @@ renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
-    exported = filter (isDctorExported name exps . fst) ctors
+    exported = filter (P.isDctorExported name exps . fst) ctors
   atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
   forM_ exported $ \(ctor, tys) ->
     let ctorTy = foldr P.function typeApp tys
@@ -218,21 +202,27 @@ isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
 isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
-inputFiles :: Term [FilePath]
-inputFiles = value $ posAny [] $ posInfo { posName = "file(s)", posDoc = "The input .purs file(s)" }
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> help "The input .ps file(s)"
 
-includeHeirarcy :: Term Bool
-includeHeirarcy = value $ flag $ (optInfo [ "h", "hierarchy-images" ]) { optDoc = "Include markdown for type class hierarchy images in the output." }
+includeHeirarcy :: Parser Bool
+includeHeirarcy = switch $ 
+     long "hierarchy-images"
+  <> help "Include markdown for type class hierarchy images in the output."
 
-term :: Term (IO ())
-term = docgen <$> includeHeirarcy <*> inputFiles
-
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "psc-docs"
-  , version  = showVersion Paths.version
-  , termDoc  = "Generate Markdown documentation from PureScript extern files"
-  }
+pscDocsOptions :: Parser PSCDocsOptions
+pscDocsOptions = PSCDocsOptions <$> includeHeirarcy
+                                <*> many inputFile
 
 main :: IO ()
-main = run (term, termInfo)
+main = execParser opts >>= docgen
+  where
+  opts        = info (version <*> helper <*> pscDocsOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psc-docs - Generate Markdown documentation from PureScript extern files"
+  footerInfo  = footer $ "psc-docs " ++ showVersion Paths.version
+  
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
