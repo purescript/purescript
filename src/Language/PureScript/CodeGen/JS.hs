@@ -123,31 +123,28 @@ valueToJs m (ObjectUpdate _ o ps) = do
   obj <- valueToJs m o
   sts <- mapM (sndM (valueToJs m)) ps
   extendObj obj sts
-valueToJs _ (Abs (_, _, Just IsTypeClassConstructor) _ val) =
-  case val of
-    Literal _ (ObjectLiteral props) ->
-      let props' = sortBy (compare `on` fst) props
-      in return $ JSFunction Nothing (map (identToJs . Ident . fst) props') (JSBlock $ map assign props)
-    _ -> error "TypeClassConstructor had non-ObjectLiteral value in valueToJS"
+valueToJs _ e@(Abs (_, _, Just IsTypeClassConstructor) _ val) =
+  let args = unAbs e
+  in return $ JSFunction Nothing (map identToJs args) (JSBlock $ map assign args)
   where
-  assign (name, _) =
-    JSAssignment (accessorString name (JSVar "this")) (JSVar . identToJs . Ident $ name)
+  unAbs :: Expr Ann -> [Ident]
+  unAbs (Abs _ arg val) = arg : unAbs val
+  unAbs _ = []
+  assign :: Ident -> JS
+  assign name = JSAssignment (accessorString (runIdent name) (JSVar "this"))
+                             (var name)
 valueToJs m (Abs _ arg val) = do
   ret <- valueToJs m val
   return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
-valueToJs m v@App{} = do
-  let (f, args) = unApp v []
+valueToJs m e@App{} = do
+  let (f, args) = unApp e []
   args' <- mapM (valueToJs m) args
   case f of
     Var (_, _, Just IsNewtype) _ -> return (head args')
     Var (_, _, Just (IsConstructor _ arity)) name | arity == length args ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     Var (_, _, Just IsTypeClassConstructor) name ->
-      case args of
-        [Literal _ (ObjectLiteral props)] -> do
-          args'' <- mapM (valueToJs m . snd) (sortBy (compare `on` fst) props)
-          return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args''
-        _ -> error "TypeClassConstructor application had non-ObjectLiteral value in valueToJS"
+      return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs m f
   where
   unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])

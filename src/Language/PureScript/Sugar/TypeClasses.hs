@@ -14,9 +14,11 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Sugar.TypeClasses (
-  desugarTypeClasses
-) where
+module Language.PureScript.Sugar.TypeClasses
+  ( desugarTypeClasses
+  , typeClassMemberName
+  , superClassDictionaryNames
+  ) where
 
 import Language.PureScript.AST hiding (isExported)
 import Language.PureScript.Names
@@ -200,11 +202,10 @@ memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
-  let superclassTypes = [ (fieldName, function unit tySynApp)
-                        | (index, (superclass, tyArgs)) <- zip [0..] implies
-                        , let tySynApp = foldl TypeApp (TypeConstructor superclass) tyArgs
-                        , let fieldName = mkSuperclassDictionaryName superclass index
-                        ]
+  let superclassTypes = superClassDictionaryNames implies `zip`
+        [ function unit (foldl TypeApp (TypeConstructor superclass) tyArgs)
+        | (superclass, tyArgs) <- implies
+        ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
   in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
@@ -217,9 +218,6 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
   PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
-
-mkSuperclassDictionaryName :: Qualified ProperName -> Integer -> String
-mkSuperclassDictionaryName pn index = C.__superclass_ ++ show pn ++ "_" ++ show index
 
 unit :: Type
 unit = TypeApp tyObject REmpty
@@ -242,22 +240,23 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
       -- Replace the type arguments with the appropriate types in the member types
       let memberTypes = map (second (replaceAllTypeVars (zip (map fst args) tys))) instanceTys
+
       -- Create values for the type instance members
-      memberNames <- map (first runIdent) <$> mapM (memberToNameAndValue memberTypes) decls
+      members <- zip (map typeClassMemberName decls) <$> mapM (memberToValue memberTypes) decls
+
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is an object literal.
-      let superclasses =
-            [ (fieldName, Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs))
-            | (index, (superclass, suTyArgs)) <- zip [0..] implies
+      let superclasses = superClassDictionaryNames implies `zip`
+            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
+            | (superclass, suTyArgs) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
-            , let fieldName = mkSuperclassDictionaryName superclass index
             ]
 
-      let memberNames' = ObjectLiteral (memberNames ++ superclasses)
+      let props = ObjectLiteral (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
-          dict = TypeClassDictionaryConstructorApp className memberNames'
+          dict = TypeClassDictionaryConstructorApp className props
           result = ValueDeclaration name TypeInstanceDictionaryValue [] (Right (TypedValue True dict constrainedTy))
       return result
 
@@ -269,19 +268,23 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
 
-  memberToNameAndValue :: [(Ident, Type)] -> Declaration -> Desugar (Ident, Expr)
-  memberToNameAndValue tys' d@(ValueDeclaration ident _ _ _) = do
+  memberToValue :: [(Ident, Type)] -> Declaration -> Desugar Expr
+  memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
     _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
-    let memberValue = typeInstanceDictionaryEntryValue d
-    return (ident, memberValue)
-  memberToNameAndValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
-    (ident, val) <- memberToNameAndValue tys' d
-    return (ident, PositionedValue pos val)
-  memberToNameAndValue _ _ = error "Invalid declaration in type instance definition"
+    return val
+  memberToValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
+    val <- memberToValue tys' d
+    return (PositionedValue pos val)
+  memberToValue _ _ = error "Invalid declaration in type instance definition"
 
-  typeInstanceDictionaryEntryValue :: Declaration -> Expr
-  typeInstanceDictionaryEntryValue (ValueDeclaration _ _ [] (Right val)) = val
-  typeInstanceDictionaryEntryValue (PositionedDeclaration pos d) = PositionedValue pos (typeInstanceDictionaryEntryValue d)
-  typeInstanceDictionaryEntryValue _ = error "Invalid declaration in type instance definition"
+typeClassMemberName :: Declaration -> String
+typeClassMemberName (TypeDeclaration ident _) = runIdent ident
+typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
+typeClassMemberName (PositionedDeclaration _ d) = typeClassMemberName d
+typeClassMemberName d = error $ "Invalid declaration in type class definition: " ++ show d
 
-
+superClassDictionaryNames :: [Constraint] -> [String]
+superClassDictionaryNames supers =
+  [ C.__superclass_ ++ show pn ++ "_" ++ show (index :: Integer)
+  | (index, (pn, _)) <- zip [0..] supers
+  ]

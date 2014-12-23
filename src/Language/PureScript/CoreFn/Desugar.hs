@@ -15,7 +15,7 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Data.Function (on)
-import Data.List (sort, nub)
+import Data.List (sort, sortBy, nub)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
@@ -31,6 +31,7 @@ import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
 import Language.PureScript.Names
+import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants as C
@@ -116,26 +117,14 @@ declToCoreFn _ _ _ = []
 -- implementations and returns a record for the instance dictionary.
 --
 mkTypeClassConstructor :: Maybe SourceSpan -> [Constraint] -> [A.Declaration] -> Expr Ann
+mkTypeClassConstructor ss [] [] = Literal (ss, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor ss supers members =
-  let props = [ (arg, Accessor nullAnn arg (Var nullAnn $ Qualified Nothing (Ident "dict"))) | arg <- args ]
+  let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers
+      props = [ (arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
+      dict = Literal nullAnn (ObjectLiteral props)
   in Abs (ss, Nothing, Just IsTypeClassConstructor)
-         (Ident "dict")
-         (Literal nullAnn $ ObjectLiteral props)
-  where
-  args :: [String]
-  args = sort $ memberNames ++ superNames
-  memberNames :: [String]
-  memberNames = memberToName `map` members
-  superNames :: [String]
-  superNames = [ toSuperName superclass index
-               | (index, (superclass, _)) <- zip [0..] supers
-               ]
-  toSuperName :: Qualified ProperName -> Integer -> String
-  toSuperName pn index = C.__superclass_ ++ show pn ++ "_" ++ show index
-  memberToName :: A.Declaration -> String
-  memberToName (A.TypeDeclaration ident _) = runIdent ident
-  memberToName (A.PositionedDeclaration _ d) = memberToName d
-  memberToName _ = error "Invalid declaration in type class definition"
+         (Ident a)
+         (foldr (Abs nullAnn . Ident) dict as)
 
 -- |
 -- Desugars expressions from AST to CoreFn representation.
@@ -177,8 +166,10 @@ exprToCoreFn env ss _ (A.TypedValue _ v ty) =
   exprToCoreFn env ss (Just ty) v
 exprToCoreFn env ss ty (A.Let ds v) =
   Let (ss, ty, Nothing) (concatMap (declToCoreFn env ss) ds) (exprToCoreFn env ss Nothing v)
-exprToCoreFn env ss ty (A.TypeClassDictionaryConstructorApp name v) =
-  App (ss, ty, Nothing) (Var (Nothing, Nothing, Just IsTypeClassConstructor) $ fmap properToIdent name) (exprToCoreFn env ss Nothing v)
+exprToCoreFn env ss ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.ObjectLiteral vs) _)) =
+  let args = map (exprToCoreFn env ss Nothing . snd) $ sortBy (compare `on` fst) vs
+      ctor = Var (ss, Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
+  in foldl (App (ss, Nothing, Nothing)) ctor args
 exprToCoreFn env _ ty (A.PositionedValue ss v) =
   exprToCoreFn env (Just ss) ty v
 exprToCoreFn _ _ _ e =

@@ -100,7 +100,7 @@ lookupIdent name = do
 -- |
 -- Finds idents introduced by declarations.
 --
-findDeclIdents :: [Bind a] -> [Ident]
+findDeclIdents :: [Bind Ann] -> [Ident]
 findDeclIdents = concatMap go
   where
   go (NonRec ident _) = [ident]
@@ -109,12 +109,12 @@ findDeclIdents = concatMap go
 -- |
 -- Renames within each declaration in a module.
 --
-renameInModules :: [Module a] -> [Module a]
+renameInModules :: [Module Ann] -> [Module Ann]
 renameInModules = map go
   where
-  go :: Module a -> Module a
-  go (Module mn imps exps foreigns decls) = Module mn imps exps foreigns (renameInDecl' (findDeclIdents decls) `map` decls)
-  renameInDecl' :: [Ident] -> Bind a -> Bind a
+  go :: Module Ann -> Module Ann
+  go m@(Module _ _ _ _ decls) = m { moduleDecls = renameInDecl' (findDeclIdents decls) `map` decls }
+  renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann
   renameInDecl' scope = runRename scope . renameInDecl True
 
 -- |
@@ -124,7 +124,7 @@ renameInModules = map go
 -- been added), whereas in a Let declarations are renamed if their name shadows
 -- another in the current scope.
 --
-renameInDecl :: Bool -> Bind a -> Rename (Bind a)
+renameInDecl :: Bool -> Bind Ann -> Rename (Bind Ann)
 renameInDecl isTopLevel (NonRec name val) = do
   name' <- if isTopLevel then return name else updateScope name
   NonRec name' <$> renameInValue val
@@ -132,18 +132,17 @@ renameInDecl isTopLevel (Rec ds) = do
   ds' <- mapM updateNames ds
   Rec <$> mapM updateValues ds'
   where
-  updateNames :: (Ident, Expr a) -> Rename (Ident, Expr a)
+  updateNames :: (Ident, Expr Ann) -> Rename (Ident, Expr Ann)
   updateNames (name, val) = do
     name' <- if isTopLevel then return name else updateScope name
     return (name', val)
-  updateValues :: (Ident, Expr a) -> Rename (Ident, Expr a)
-  updateValues (name, val) =
-    (,) name <$> renameInValue val
+  updateValues :: (Ident, Expr Ann) -> Rename (Ident, Expr Ann)
+  updateValues (name, val) = (,) name <$> renameInValue val
 
 -- |
 -- Renames within a value.
 --
-renameInValue :: Expr a -> Rename (Expr a)
+renameInValue :: Expr Ann -> Rename (Expr Ann)
 renameInValue (Literal ann l) =
   Literal ann <$> renameInLiteral renameInValue l
 renameInValue c@(Constructor{}) = return c
@@ -151,6 +150,7 @@ renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
 renameInValue (ObjectUpdate ann obj vs) =
   ObjectUpdate ann <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
+renameInValue e@(Abs (_, _, Just IsTypeClassConstructor) _ _) = return e
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =
@@ -174,7 +174,7 @@ renameInLiteral _ l = return l
 -- |
 -- Renames within case alternatives.
 --
-renameInCaseAlternative :: CaseAlternative a -> Rename (CaseAlternative a)
+renameInCaseAlternative :: CaseAlternative Ann -> Rename (CaseAlternative Ann)
 renameInCaseAlternative (CaseAlternative bs v) =
   CaseAlternative <$> mapM renameInBinder bs
                   <*> eitherM (mapM (pairM renameInValue renameInValue)) renameInValue v
