@@ -32,7 +32,7 @@ eliminateDeadCode entryPoints ms = map go ms
   go (Module mn imps exps foreigns ds) = Module mn imps exps' foreigns ds'
     where
     ds' = filter (isUsed mn graph vertexFor entryPointVertices) ds
-    names = concatMap bindIdents ds'
+    names = concatMap bindIdents ds' ++ map (\(name, _, _) -> name) foreigns
     exps' = filter (`elem` names) exps
   declarations = concatMap declarationsByModule ms
   (graph, _, vertexFor) = graphFromEdges $ map (\(key, deps) -> (key, key, deps)) declarations
