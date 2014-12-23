@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.Inliner
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Inliner
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Inliner (
+module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineVariables,
   inlineOperator,
   inlineCommonOperators,
@@ -27,7 +27,7 @@ import Data.Maybe (fromMaybe)
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Names
-import Language.PureScript.Optimizer.Common
+import Language.PureScript.CodeGen.JS.Optimizer.Common
 import qualified Language.PureScript.Constants as C
 
 shouldInline :: JS -> Bool

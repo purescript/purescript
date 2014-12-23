@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer
 -- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
@@ -31,7 +31,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer (
+module Language.PureScript.CodeGen.JS.Optimizer (
     optimize
 ) where
 
@@ -39,12 +39,12 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
 
-import Language.PureScript.Optimizer.Common
-import Language.PureScript.Optimizer.TCO
-import Language.PureScript.Optimizer.MagicDo
-import Language.PureScript.Optimizer.Inliner
-import Language.PureScript.Optimizer.Unused
-import Language.PureScript.Optimizer.Blocks
+import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.CodeGen.JS.Optimizer.TCO
+import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
+import Language.PureScript.CodeGen.JS.Optimizer.Inliner
+import Language.PureScript.CodeGen.JS.Optimizer.Unused
+import Language.PureScript.CodeGen.JS.Optimizer.Blocks
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code

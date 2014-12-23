@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.Blocks
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Blocks
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Blocks
+module Language.PureScript.CodeGen.JS.Optimizer.Blocks
   ( collapseNestedBlocks
   , collapseNestedIfs
   ) where

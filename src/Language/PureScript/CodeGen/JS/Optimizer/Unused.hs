@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.Unused
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Unused
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -13,14 +13,14 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Unused
+module Language.PureScript.CodeGen.JS.Optimizer.Unused
   ( removeCodeAfterReturnStatements
   , removeUnusedArg
   , removeUndefinedApp
   ) where
 
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.Optimizer.Common
+import Language.PureScript.CodeGen.JS.Optimizer.Common
 
 import qualified Language.PureScript.Constants as C
 

@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.MagicDo
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.MagicDo
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.MagicDo (
+module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (
   magicDo
 ) where
 
@@ -103,7 +103,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
-  
+
   applyReturns :: JS -> JS
   applyReturns (JSReturn ret) = JSReturn (JSApp ret [])
   applyReturns (JSBlock jss) = JSBlock (map applyReturns jss)

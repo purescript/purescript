@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.Common
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Common
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.Common where
+module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
 import Data.Maybe (fromMaybe)
 
