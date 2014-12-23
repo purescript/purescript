@@ -32,7 +32,7 @@ eliminateDeadCode entryPoints ms = map go ms
   go (Module mn imps exps foreigns ds) = Module mn imps exps' foreigns' ds'
     where
     ds' = filter (isUsed mn graph vertexFor entryPointVertices) ds
-    foreigns' = filter ((isUsed' mn graph vertexFor entryPointVertices) . foreignIdent) foreigns
+    foreigns' = filter (isUsed' mn graph vertexFor entryPointVertices . foreignIdent) foreigns
     names = concatMap bindIdents ds' ++ map foreignIdent foreigns'
     exps' = filter (`elem` names) exps
   declarations = concatMap declarationsByModule ms
@@ -49,6 +49,7 @@ bindIdents (Rec names) = map fst names
 -- |
 -- Extract the ident for a foreign declaration.
 --
+foreignIdent :: ForeignDecl -> Ident
 foreignIdent (name, _, _) = name
 
 -- |
