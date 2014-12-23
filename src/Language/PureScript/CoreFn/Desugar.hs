@@ -90,24 +90,24 @@ exportToCoreFn _ = []
 -- |
 -- Desugars member declarations from AST to CoreFn representation.
 --
-declToCoreFn :: Environment -> Maybe SourcePos -> A.Declaration -> [Bind Ann]
-declToCoreFn _ sp (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
+declToCoreFn :: Environment -> Maybe SourceSpan -> A.Declaration -> [Bind Ann]
+declToCoreFn _ ss (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
   [NonRec (properToIdent ctor) $
-    Abs (sp, Nothing, Just IsNewtype) (Ident "x") (Var nullAnn $ Qualified Nothing (Ident "x"))]
+    Abs (ss, Nothing, Just IsNewtype) (Ident "x") (Var nullAnn $ Qualified Nothing (Ident "x"))]
 declToCoreFn _ _ d@(A.DataDeclaration Newtype _ _ _) =
   error $ "Found newtype with multiple constructors: " ++ show d
-declToCoreFn _ sp (A.DataDeclaration Data tyName _ ctors) =
+declToCoreFn _ ss (A.DataDeclaration Data tyName _ ctors) =
   flip map ctors $ \(ctor, tys) ->
-    NonRec (properToIdent ctor) $ Constructor (sp, Nothing, Nothing) tyName ctor (length tys)
-declToCoreFn env sp (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn env sp) ds
-declToCoreFn env sp (A.ValueDeclaration name _ _ (Right e)) =
-  [NonRec name (exprToCoreFn env sp Nothing e)]
-declToCoreFn env sp (A.BindingGroupDeclaration ds) =
-  [Rec $ map (\(name, _, e) -> (name, exprToCoreFn env sp Nothing e)) ds]
-declToCoreFn _ sp (A.TypeClassDeclaration name _ supers members) =
-  [NonRec (properToIdent name) $ mkTypeClassConstructor sp supers members]
-declToCoreFn env _ (A.PositionedDeclaration sp d) =
-  declToCoreFn env (Just sp) d
+    NonRec (properToIdent ctor) $ Constructor (ss, Nothing, Nothing) tyName ctor (length tys)
+declToCoreFn env ss (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn env ss) ds
+declToCoreFn env ss (A.ValueDeclaration name _ _ (Right e)) =
+  [NonRec name (exprToCoreFn env ss Nothing e)]
+declToCoreFn env ss (A.BindingGroupDeclaration ds) =
+  [Rec $ map (\(name, _, e) -> (name, exprToCoreFn env ss Nothing e)) ds]
+declToCoreFn _ ss (A.TypeClassDeclaration name _ supers members) =
+  [NonRec (properToIdent name) $ mkTypeClassConstructor ss supers members]
+declToCoreFn env _ (A.PositionedDeclaration ss d) =
+  declToCoreFn env (Just ss) d
 declToCoreFn _ _ _ = []
 
 -- |
@@ -115,10 +115,10 @@ declToCoreFn _ _ _ = []
 -- is a function that accepts the superclass instances and member
 -- implementations and returns a record for the instance dictionary.
 --
-mkTypeClassConstructor :: Maybe SourcePos -> [Constraint] -> [A.Declaration] -> Expr Ann
-mkTypeClassConstructor sp supers members =
+mkTypeClassConstructor :: Maybe SourceSpan -> [Constraint] -> [A.Declaration] -> Expr Ann
+mkTypeClassConstructor ss supers members =
   let props = [ (arg, Accessor nullAnn arg (Var nullAnn $ Qualified Nothing (Ident "dict"))) | arg <- args ]
-  in Abs (sp, Nothing, Just IsTypeClassConstructor)
+  in Abs (ss, Nothing, Just IsTypeClassConstructor)
          (Ident "dict")
          (Literal nullAnn $ ObjectLiteral props)
   where
@@ -140,88 +140,88 @@ mkTypeClassConstructor sp supers members =
 -- |
 -- Desugars expressions from AST to CoreFn representation.
 --
-exprToCoreFn :: Environment -> Maybe SourcePos -> Maybe Type -> A.Expr -> Expr Ann
-exprToCoreFn _ sp ty (A.NumericLiteral v) =
-  Literal (sp, ty, Nothing) (NumericLiteral v)
-exprToCoreFn _ sp ty (A.StringLiteral v) =
-  Literal (sp, ty, Nothing) (StringLiteral v)
-exprToCoreFn _ sp ty (A.BooleanLiteral v) =
-  Literal (sp, ty, Nothing) (BooleanLiteral v)
-exprToCoreFn env sp ty (A.ArrayLiteral vs) =
-  Literal (sp, ty, Nothing) (ArrayLiteral $ map (exprToCoreFn env sp Nothing) vs)
-exprToCoreFn env sp ty (A.ObjectLiteral vs) =
-  Literal (sp, ty, Nothing) (ObjectLiteral $ map (second (exprToCoreFn env sp Nothing)) vs)
-exprToCoreFn env sp ty (A.Accessor name v) =
-  Accessor (sp, ty, Nothing) name (exprToCoreFn env sp Nothing v)
-exprToCoreFn env sp ty (A.ObjectUpdate obj vs) =
-  ObjectUpdate (sp, ty, Nothing) (exprToCoreFn env sp Nothing obj) $ map (second (exprToCoreFn env sp Nothing)) vs
-exprToCoreFn env sp ty (A.Abs (Left name) v) =
-  Abs (sp, ty, Nothing) name (exprToCoreFn env sp Nothing v)
+exprToCoreFn :: Environment -> Maybe SourceSpan -> Maybe Type -> A.Expr -> Expr Ann
+exprToCoreFn _ ss ty (A.NumericLiteral v) =
+  Literal (ss, ty, Nothing) (NumericLiteral v)
+exprToCoreFn _ ss ty (A.StringLiteral v) =
+  Literal (ss, ty, Nothing) (StringLiteral v)
+exprToCoreFn _ ss ty (A.BooleanLiteral v) =
+  Literal (ss, ty, Nothing) (BooleanLiteral v)
+exprToCoreFn env ss ty (A.ArrayLiteral vs) =
+  Literal (ss, ty, Nothing) (ArrayLiteral $ map (exprToCoreFn env ss Nothing) vs)
+exprToCoreFn env ss ty (A.ObjectLiteral vs) =
+  Literal (ss, ty, Nothing) (ObjectLiteral $ map (second (exprToCoreFn env ss Nothing)) vs)
+exprToCoreFn env ss ty (A.Accessor name v) =
+  Accessor (ss, ty, Nothing) name (exprToCoreFn env ss Nothing v)
+exprToCoreFn env ss ty (A.ObjectUpdate obj vs) =
+  ObjectUpdate (ss, ty, Nothing) (exprToCoreFn env ss Nothing obj) $ map (second (exprToCoreFn env ss Nothing)) vs
+exprToCoreFn env ss ty (A.Abs (Left name) v) =
+  Abs (ss, ty, Nothing) name (exprToCoreFn env ss Nothing v)
 exprToCoreFn _ _ _ (A.Abs _ _) =
   error "Abs with Binder argument was not desugared before exprToCoreFn"
-exprToCoreFn env sp ty (A.App v1 v2) =
-  App (sp, ty, Nothing) (exprToCoreFn env sp Nothing v1) (exprToCoreFn env sp Nothing v2)
-exprToCoreFn _ sp ty (A.Var ident) =
-  Var (sp, ty, Nothing) ident
-exprToCoreFn env sp ty (A.IfThenElse v1 v2 v3) =
-  Case (sp, ty, Nothing) [exprToCoreFn env sp Nothing v1]
+exprToCoreFn env ss ty (A.App v1 v2) =
+  App (ss, ty, Nothing) (exprToCoreFn env ss Nothing v1) (exprToCoreFn env ss Nothing v2)
+exprToCoreFn _ ss ty (A.Var ident) =
+  Var (ss, ty, Nothing) ident
+exprToCoreFn env ss ty (A.IfThenElse v1 v2 v3) =
+  Case (ss, ty, Nothing) [exprToCoreFn env ss Nothing v1]
     [ CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral True]
                       (Right $ exprToCoreFn env Nothing Nothing v2)
     , CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral False]
                       (Right $ exprToCoreFn env Nothing Nothing v3) ]
-exprToCoreFn env sp ty (A.Constructor name) =
-  Var (sp, ty, Just $ getConstructorMeta env name) $ fmap properToIdent name
-exprToCoreFn env sp ty (A.Case vs alts) =
-  Case (sp, ty, Nothing) (map (exprToCoreFn env sp Nothing) vs) (map (altToCoreFn env sp) alts)
-exprToCoreFn env sp _ (A.TypedValue _ v ty) =
-  exprToCoreFn env sp (Just ty) v
-exprToCoreFn env sp ty (A.Let ds v) =
-  Let (sp, ty, Nothing) (concatMap (declToCoreFn env sp) ds) (exprToCoreFn env sp Nothing v)
-exprToCoreFn env sp ty (A.TypeClassDictionaryConstructorApp name v) =
-  App (sp, ty, Nothing) (Var (Nothing, Nothing, Just IsTypeClassConstructor) $ fmap properToIdent name) (exprToCoreFn env sp Nothing v)
-exprToCoreFn env _ ty (A.PositionedValue sp v) =
-  exprToCoreFn env (Just sp) ty v
+exprToCoreFn env ss ty (A.Constructor name) =
+  Var (ss, ty, Just $ getConstructorMeta env name) $ fmap properToIdent name
+exprToCoreFn env ss ty (A.Case vs alts) =
+  Case (ss, ty, Nothing) (map (exprToCoreFn env ss Nothing) vs) (map (altToCoreFn env ss) alts)
+exprToCoreFn env ss _ (A.TypedValue _ v ty) =
+  exprToCoreFn env ss (Just ty) v
+exprToCoreFn env ss ty (A.Let ds v) =
+  Let (ss, ty, Nothing) (concatMap (declToCoreFn env ss) ds) (exprToCoreFn env ss Nothing v)
+exprToCoreFn env ss ty (A.TypeClassDictionaryConstructorApp name v) =
+  App (ss, ty, Nothing) (Var (Nothing, Nothing, Just IsTypeClassConstructor) $ fmap properToIdent name) (exprToCoreFn env ss Nothing v)
+exprToCoreFn env _ ty (A.PositionedValue ss v) =
+  exprToCoreFn env (Just ss) ty v
 exprToCoreFn _ _ _ e =
   error $ "Unexpected value in exprToCoreFn: " ++ show e
 
 -- |
 -- Desugars case alternatives from AST to CoreFn representation.
 --
-altToCoreFn :: Environment -> Maybe SourcePos -> A.CaseAlternative -> CaseAlternative Ann
-altToCoreFn env sp (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn env sp) bs) (go vs)
+altToCoreFn :: Environment -> Maybe SourceSpan -> A.CaseAlternative -> CaseAlternative Ann
+altToCoreFn env ss (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn env ss) bs) (go vs)
   where
   go :: Either [(A.Guard, A.Expr)] A.Expr -> Either [(Guard Ann, Expr Ann)] (Expr Ann)
-  go (Left ges) = Left $ map (exprToCoreFn env sp Nothing *** exprToCoreFn env sp Nothing) ges
-  go (Right e) = Right (exprToCoreFn env sp Nothing e)
+  go (Left ges) = Left $ map (exprToCoreFn env ss Nothing *** exprToCoreFn env ss Nothing) ges
+  go (Right e) = Right (exprToCoreFn env ss Nothing e)
 
 -- |
 -- Desugars case binders from AST to CoreFn representation.
 --
-binderToCoreFn :: Environment -> Maybe SourcePos -> A.Binder -> Binder Ann
-binderToCoreFn _ sp (A.NullBinder) =
-  NullBinder (sp, Nothing, Nothing)
-binderToCoreFn _ sp (A.BooleanBinder b) =
-  LiteralBinder (sp, Nothing, Nothing) (BooleanLiteral b)
-binderToCoreFn _ sp (A.StringBinder s) =
-  LiteralBinder (sp, Nothing, Nothing) (StringLiteral s)
-binderToCoreFn _ sp (A.NumberBinder n) =
-  LiteralBinder (sp, Nothing, Nothing) (NumericLiteral n)
-binderToCoreFn _ sp (A.VarBinder name) =
-  VarBinder (sp, Nothing, Nothing) name
-binderToCoreFn env sp (A.ConstructorBinder dctor@(Qualified mn _) bs) =
+binderToCoreFn :: Environment -> Maybe SourceSpan -> A.Binder -> Binder Ann
+binderToCoreFn _ ss (A.NullBinder) =
+  NullBinder (ss, Nothing, Nothing)
+binderToCoreFn _ ss (A.BooleanBinder b) =
+  LiteralBinder (ss, Nothing, Nothing) (BooleanLiteral b)
+binderToCoreFn _ ss (A.StringBinder s) =
+  LiteralBinder (ss, Nothing, Nothing) (StringLiteral s)
+binderToCoreFn _ ss (A.NumberBinder n) =
+  LiteralBinder (ss, Nothing, Nothing) (NumericLiteral n)
+binderToCoreFn _ ss (A.VarBinder name) =
+  VarBinder (ss, Nothing, Nothing) name
+binderToCoreFn env ss (A.ConstructorBinder dctor@(Qualified mn _) bs) =
   let (_, tctor, _) = lookupConstructor env dctor
-  in ConstructorBinder (sp, Nothing, Just $ getConstructorMeta env dctor) (Qualified mn tctor) dctor (map (binderToCoreFn env sp) bs)
-binderToCoreFn env sp (A.ObjectBinder bs) =
-  LiteralBinder (sp, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn env sp)) bs)
-binderToCoreFn env sp (A.ArrayBinder bs) =
-  LiteralBinder (sp, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn env sp) bs)
-binderToCoreFn env sp (A.ConsBinder b1 b2) =
+  in ConstructorBinder (ss, Nothing, Just $ getConstructorMeta env dctor) (Qualified mn tctor) dctor (map (binderToCoreFn env ss) bs)
+binderToCoreFn env ss (A.ObjectBinder bs) =
+  LiteralBinder (ss, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn env ss)) bs)
+binderToCoreFn env ss (A.ArrayBinder bs) =
+  LiteralBinder (ss, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn env ss) bs)
+binderToCoreFn env ss (A.ConsBinder b1 b2) =
   let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-  in ConstructorBinder (sp, Nothing, Nothing) arrCtor arrCtor $ map (binderToCoreFn env sp) [b1, b2]
-binderToCoreFn env sp (A.NamedBinder name b) =
-  NamedBinder (sp, Nothing, Nothing) name (binderToCoreFn env sp b)
-binderToCoreFn env _ (A.PositionedBinder sp b) =
-  binderToCoreFn env (Just sp) b
+  in ConstructorBinder (ss, Nothing, Nothing) arrCtor arrCtor $ map (binderToCoreFn env ss) [b1, b2]
+binderToCoreFn env ss (A.NamedBinder name b) =
+  NamedBinder (ss, Nothing, Nothing) name (binderToCoreFn env ss b)
+binderToCoreFn env _ (A.PositionedBinder ss b) =
+  binderToCoreFn env (Just ss) b
 
 -- |
 -- Converts a ProperName to an Ident.
