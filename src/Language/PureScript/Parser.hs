@@ -31,4 +31,5 @@ import Language.PureScript.Parser.Common as P
 import Language.PureScript.Parser.Types as P
 import Language.PureScript.Parser.State as P
 import Language.PureScript.Parser.Kinds as P
+import Language.PureScript.Parser.Lexer as P
 import Language.PureScript.Parser.Declarations as P

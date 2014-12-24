@@ -219,7 +219,7 @@ make outputDir opts ms prefix = do
   rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- liftError . either (Left . show) Right $ P.runIndentParser externsFile P.parseModules externs
+    externsModules <- liftError . fmap (map snd) . either (Left . show) Right $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
       _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
