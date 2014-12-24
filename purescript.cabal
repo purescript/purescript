@@ -104,7 +104,7 @@ library
     buildable: True
     hs-source-dirs: src
     other-modules: Paths_purescript
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
@@ -114,7 +114,7 @@ executable psc
     buildable: True
     hs-source-dirs: psc
     other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any, 
@@ -124,7 +124,7 @@ executable psc-make
     buildable: True
     hs-source-dirs: psc-make
     other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -137,7 +137,7 @@ executable psci
     hs-source-dirs: psci
     other-modules: Commands
                    Parser
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any, utf8-string -any,
@@ -146,7 +146,7 @@ executable psc-docs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules:
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable hierarchy
     build-depends: base >=4 && <5, purescript -any, utf8-string -any, optparse-applicative >= 0.10.0,
@@ -155,7 +155,7 @@ executable hierarchy
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,

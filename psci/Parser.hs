@@ -30,95 +30,53 @@ import Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Parser.Common as C (mark, same)
 
-parseRestWith :: P.TokenParser a -> Parsec String () a
-parseRestWith p = do
-  s <- many anyChar
-  case P.lex "" s >>= P.runTokenParser "" p of
-    Left err -> fail (show err)
-    Right a -> return a
-
--- |
--- PSCI version of @let@.
--- This is essentially let from do-notation.
--- However, since we don't support the @Eff@ monad,
--- we actually want the normal @let@.
---
-psciLet :: Parsec String () Command
-psciLet = Let <$> (P.Let <$> (string "let" *> spaces *> parseRestWith manyDecls))
-  where
-  manyDecls :: P.TokenParser [P.Declaration]
-  manyDecls = C.mark (many1 (C.same *> P.parseDeclaration))
-
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
-parseCommand :: String -> Either ParseError Command
-parseCommand = flip parse "" $ choice
-                    [ spaces *> char ':' *> (psciHelp <|> psciImport <|> psciLoadFile <|> psciQuit <|> psciReload <|> psciTypeOf <|> psciKindOf <|> psciBrowse <|> psciShowModules)
-                    , try psciLet
-                    , psciExpression
-                    ] <* eof
+parseCommand :: String -> Either String Command
+parseCommand cmdString = 
+  case splitCommand cmdString of 
+    Just ('?', _) -> return Help
+    Just ('q', _) -> return Quit
+    Just ('r', _) -> return Reset
+    Just ('i', moduleName) -> Import <$> parseRest P.moduleName moduleName
+    Just ('b', moduleName) -> Browse <$> parseRest P.moduleName moduleName
+    Just ('m', filename) -> return $ LoadFile (trimEnd filename)
+    Just ('s', command) -> return $ Show (trimEnd command)
+    Just ('t', expr) -> TypeOf <$> parseRest P.parseValue expr
+    Just ('k', ty) -> KindOf <$> parseRest P.parseType ty
+    Just _ -> Left $ "Unrecognized command. Type :? for help."
+    Nothing -> parseRest (psciLet <|> psciExpression) cmdString
+  where
+  parseRest :: P.TokenParser a -> String -> Either String a
+  parseRest p s = either (Left . show) Right $ do
+    ts <- P.lex "" s
+    P.runTokenParser "" (p <* eof) ts
+  
+  trimEnd :: String -> String
+  trimEnd = reverse . dropWhile isSpace . reverse
 
--- |
--- Parses expressions entered at the PSCI repl.
---
-psciExpression :: Parsec String () Command
-psciExpression = Expression <$> parseRestWith P.parseValue
+  -- |
+  -- Split a command into a command char and the trailing string
+  --
+  splitCommand :: String -> Maybe (Char, String)
+  splitCommand (':' : c : s) = Just (c, dropWhile isSpace s)
+  splitCommand _ = Nothing
 
--- |
--- Parses 'Commands.Help' command.
---
-psciHelp :: Parsec String () Command
-psciHelp = Help <$ char '?'
-
--- |
--- Parses 'Commands.Import' command.
---
-psciImport :: Parsec String () Command
-psciImport = Import <$> (char 'i' *> spaces *> parseRestWith P.moduleName)
-
--- |
--- Parses 'Commands.LoadFile' command.
---
-psciLoadFile :: Parsec String () Command
-psciLoadFile = LoadFile . trimEnd <$> (char 'm' *> spaces *> manyTill anyChar eof)
-
--- | Trim end of input string
-trimEnd :: String -> String
-trimEnd = reverse . dropWhile isSpace . reverse
-
--- |
--- Parses 'Commands.Quit' command.
---
-psciQuit :: Parsec String () Command
-psciQuit = Quit <$ char 'q'
-
--- |
--- Parses 'Commands.Reload' command.
---
-psciReload :: Parsec String () Command
-psciReload = Reset <$ char 'r'
-
--- |
--- Parses 'Commands.TypeOf' command.
---
-psciTypeOf :: Parsec String () Command
-psciTypeOf = TypeOf <$> (char 't' *> spaces *> parseRestWith P.parseValue)
-
-
--- |
--- Parses 'Commands.KindOf' command.
---
-psciKindOf :: Parsec String () Command
-psciKindOf = KindOf <$> (char 'k' *> spaces *> parseRestWith P.parseType)
-
--- |
--- Parses 'Commands.Browse' command.
---
-psciBrowse :: Parsec String () Command
-psciBrowse = Browse <$> (char 'b' *> spaces *> parseRestWith P.moduleName)
-
--- |
--- Show Command
-psciShowModules :: Parsec String () Command
-psciShowModules = Show . trimEnd <$> (char 's' *> spaces *> manyTill anyChar eof)
+  -- |
+  -- Parses expressions entered at the PSCI repl.
+  --
+  psciExpression :: P.TokenParser Command
+  psciExpression = Expression <$> P.parseValue
+  
+  -- |
+  -- PSCI version of @let@.
+  -- This is essentially let from do-notation.
+  -- However, since we don't support the @Eff@ monad,
+  -- we actually want the normal @let@.
+  --
+  psciLet :: P.TokenParser Command
+  psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> manyDecls))
+    where
+    manyDecls :: P.TokenParser [P.Declaration]
+    manyDecls = C.mark (many1 (C.same *> P.parseDeclaration))

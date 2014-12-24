@@ -443,7 +443,7 @@ handleKindOf typ = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: Bool -> InputT (StateT PSCiState IO) (Either Par.ParseError (Maybe Command))
+getCommand :: Bool -> InputT (StateT PSCiState IO) (Either String (Maybe Command))
 getCommand singleLineMode = do
   firstLine <- getInputLine "> "
   case firstLine of
@@ -521,7 +521,7 @@ loop (PSCiOptions singleLineMode files) = do
         go = do
           c <- getCommand singleLineMode
           case c of
-            Left err -> outputStrLn (show err) >> go
+            Left err -> outputStrLn err >> go
             Right Nothing -> go
             Right (Just Quit) -> outputStrLn quitMessage
             Right (Just c') -> runPSCI (handleCommand c') >> go
