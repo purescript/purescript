@@ -78,7 +78,7 @@ addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
-addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Check ()
+addTypeClass :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Check ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
@@ -235,15 +235,24 @@ typeCheckAll mainModuleName moduleName exps = go
     addTypeClass moduleName pn args implies tys
     ds <- go rest
     return $ d : ds
-  go (TypeInstanceDeclaration dictName deps className tys _ : rest) =
-    go (ExternInstanceDeclaration dictName deps className tys : rest)
+  go (d@(TypeInstanceDeclaration dictName deps className tys _) : rest) = do
+    goInstance d dictName deps className tys rest
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
+    goInstance d dictName deps className tys rest
+  go (PositionedDeclaration pos d : rest) =
+    rethrowWithPosition pos $ do
+      (d' : rest') <- go (d : rest)
+      return (PositionedDeclaration pos d' : rest')
+  goInstance :: Declaration -> Ident -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Check [Declaration]
+  goInstance d dictName deps className tys rest = do
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
     addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported]
     ds <- go rest
     return $ d : ds
+
     where
+
     isInstanceExported :: Bool
     isInstanceExported = any exportsInstance exps
 
@@ -251,11 +260,6 @@ typeCheckAll mainModuleName moduleName exps = go
     exportsInstance (TypeInstanceRef name) | name == dictName = True
     exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
     exportsInstance _ = False
-
-  go (PositionedDeclaration pos d : rest) =
-    rethrowWithPosition pos $ do
-      (d' : rest') <- go (d : rest)
-      return (PositionedDeclaration pos d' : rest')
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,

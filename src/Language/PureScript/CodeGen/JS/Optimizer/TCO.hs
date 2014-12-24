@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Optimizer.TCO
+-- Module      :  Language.PureScript.CodeGen.JS.Optimizer.TCO
 -- Copyright   :  (c) Phil Freeman 2013-14
 -- License     :  MIT
 --
@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Optimizer.TCO (tco) where
+module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST

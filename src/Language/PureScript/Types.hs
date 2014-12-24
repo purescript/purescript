@@ -69,7 +69,7 @@ data Type
   -- |
   -- A type with a set of type class constraints
   --
-  | ConstrainedType [(Qualified ProperName, [Type])] Type
+  | ConstrainedType [Constraint] Type
   -- |
   -- A skolem constant
   --
@@ -84,7 +84,7 @@ data Type
   | RCons String Type Type
   -- |
   -- A type with a kind annotation
-  -- 
+  --
   | KindedType Type Kind
   --
   -- |
@@ -103,6 +103,11 @@ data Type
   -- A placeholder used in pretty printing
   --
   | PrettyPrintForAll [String] Type deriving (Show, Eq, Data, Typeable)
+
+-- |
+-- A typeclass constraint
+--
+type Constraint = (Qualified ProperName, [Type])
 
 -- |
 -- Convert a row to a list of pairs of labels and types
@@ -144,9 +149,9 @@ replaceTypeVars v r = replaceAllTypeVars [(v, r)]
 replaceAllTypeVars :: [(String, Type)] -> Type -> Type
 replaceAllTypeVars = go []
   where
-      
+
   go :: [String] -> [(String, Type)] -> Type -> Type
-  go _  m (TypeVar v) = 
+  go _  m (TypeVar v) =
     case v `lookup` m of
       Just r -> r
       Nothing -> TypeVar v
@@ -165,7 +170,7 @@ replaceAllTypeVars = go []
   go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
   go bs m (KindedType t k) = KindedType (go bs m t) k
   go _  _ ty = ty
-  
+
   genName orig inUse = try 0
     where
     try :: Integer -> String

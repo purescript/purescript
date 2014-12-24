@@ -17,21 +17,19 @@ module Language.PureScript.CodeGen.Externs (
     moduleToPs
 ) where
 
-import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List (intercalate, find)
-
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
 import Control.Monad.Writer
 
-import Language.PureScript.CodeGen.Common
-import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.AST
-import Language.PureScript.Pretty
-import Language.PureScript.Names
-import Language.PureScript.Kinds
-import Language.PureScript.Types
 import Language.PureScript.Environment
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Pretty
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
 
 -- |
 -- Generate foreign imports for all declarations in a module
@@ -109,4 +107,3 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
 
     isValueExported :: Ident -> Bool
     isValueExported ident = ValueRef ident `elem` exts
-

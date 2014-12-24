@@ -41,7 +41,7 @@ data TypeClassDictionaryInScope
     -- |
     -- Type class dependencies which must be satisfied to construct this dictionary
     --
-    , tcdDependencies :: Maybe [(Qualified ProperName, [Type])]
+    , tcdDependencies :: Maybe [Constraint]
     -- |
     -- The type of this dictionary
     --
