@@ -37,7 +37,7 @@ moduleName = part []
   where
   part path = (do name <- ProperName <$> P.try qualifier
                   part (path `snoc` name))
-              <|> (ModuleName . snoc path <$> properName)
+              <|> (ModuleName . snoc path . ProperName <$> mname)
   snoc path name = path ++ [name]
 
 -- |
