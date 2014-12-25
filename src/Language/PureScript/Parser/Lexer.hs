@@ -54,6 +54,7 @@ module Language.PureScript.Parser.Lexer
   , qualifier
   , uname
   , uname'
+  , mname
   , reserved
   , symbol
   , symbol'
@@ -69,7 +70,7 @@ module Language.PureScript.Parser.Lexer
 
 import Prelude hiding (lex)
 
-import Control.Monad (void)
+import Control.Monad (void, guard)
 import Data.Functor.Identity
 
 import Control.Applicative
@@ -198,7 +199,7 @@ parseToken = P.choice
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
   , LName         <$> parseLName 
   , do uName <- parseUName
-       (Qualifier uName <$ P.char '.') <|> pure (UName uName)
+       (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
   , Symbol        <$> parseSymbol 
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
@@ -209,7 +210,7 @@ parseToken = P.choice
   parseLName = (:) <$> identStart <*> P.many identLetter
   
   parseUName :: P.Parsec String u String
-  parseUName = (:) <$> P.upper <*> P.many P.alphaNum
+  parseUName = (:) <$> P.upper <*> P.many uidentLetter
   
   parseSymbol :: P.Parsec String u String
   parseSymbol = P.many1 symbolChar
@@ -219,7 +220,10 @@ parseToken = P.choice
   
   identLetter :: P.Parsec String u Char
   identLetter = P.alphaNum <|> P.oneOf "_'"
-  
+
+  uidentLetter :: P.Parsec String u Char
+  uidentLetter = P.alphaNum <|> P.char '_'
+
   symbolChar :: P.Parsec String u Char
   symbolChar = P.oneOf opChars
   
@@ -391,6 +395,12 @@ uname = token go P.<?> "proper name"
   go (UName s) = Just s
   go _ = Nothing
 
+mname :: TokenParser String
+mname = token go P.<?> "module name"
+  where
+  go (UName s) | validModuleName s = Just s
+  go _ = Nothing
+
 uname' :: String -> TokenParser ()
 uname' s = token go P.<?> show s
   where
@@ -436,6 +446,9 @@ identifier = token go P.<?> "identifier"
   where
   go (LName s) | s `notElem` reservedPsNames = Just s
   go _ = Nothing
+  
+validModuleName :: String -> Bool
+validModuleName s = not ('_' `elem` s)
   
 -- |
 -- A list of purescript reserved identifiers
