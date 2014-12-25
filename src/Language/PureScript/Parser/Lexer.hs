@@ -69,7 +69,7 @@ module Language.PureScript.Parser.Lexer
 
 import Prelude hiding (lex)
 
-import Data.Functor (void)
+import Control.Monad (void)
 import Data.Functor.Identity
 
 import Control.Applicative
