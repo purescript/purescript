@@ -74,12 +74,15 @@ declarationsByModule (Module mn _ _ fs ds) =
 --
 dependencies :: Bind a -> [Key]
 dependencies =
-  let (f, _, _, _) = everythingOnValues (++) (const []) values (const []) (const [])
+  let (f, _, _, _) = everythingOnValues (++) (const []) values binders (const [])
   in nub . f
   where
   values :: Expr a -> [Key]
   values (Var _ (Qualified (Just mn) ident)) = [(mn, ident)]
   values _ = []
+  binders :: Binder a -> [Key]
+  binders (ConstructorBinder _ _ (Qualified (Just mn) ident) _) = [(mn, Ident $ runProperName ident)]
+  binders _ = []
 
 -- |
 -- Check whether a binding group is used.
