@@ -234,22 +234,27 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
 
   getLoadedModules :: StateT PSCiState IO [P.Module]
   getLoadedModules = map snd . psciLoadedModules <$> get
+
   getModuleNames :: StateT PSCiState IO [String]
   getModuleNames = moduleNames <$> getLoadedModules
+
   getIdentNames :: StateT PSCiState IO [String]
   getIdentNames = identNames <$> getLoadedModules
 
   getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
-  getDeclName Nothing (P.ValueDeclaration ident _ _ _) = Just ident
-  getDeclName (Just exts) (P.ValueDeclaration ident _ _ _) | isExported = Just ident
-    where
-    isExported = any exports exts
-    exports (P.ValueRef ident') = ident == ident'
-    exports (P.PositionedDeclarationRef _ r) = exports r
-    exports _ = False
+  getDeclName exts (P.ValueDeclaration ident _ _ _)  | isExported ident exts = Just ident
+  getDeclName exts (P.ExternDeclaration _ ident _ _) | isExported ident exts = Just ident
   getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
   getDeclName _ _ = Nothing
 
+  isExported :: N.Ident -> Maybe [P.DeclarationRef] -> Bool
+  isExported ident = maybe True (any exports)
+    where
+    exports :: P.DeclarationRef -> Bool
+    exports (P.ValueRef ident') = ident == ident'
+    exports (P.PositionedDeclarationRef _ r) = exports r
+    exports _ = False
+  
   identNames :: [P.Module] -> [String]
   identNames ms = nub [ show qual
                       | P.Module moduleName ds exts <- ms
