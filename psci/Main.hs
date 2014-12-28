@@ -225,7 +225,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
     return $ sortBy sorter completions
 
   getCompletion :: CompletionContext -> String -> StateT PSCiState IO [Either String Completion]
-  getCompletion (Command s) _ = return $ (map Left) $ filter (isPrefixOf s) C.commands
+  getCompletion (Command s) _ = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
   getCompletion FilePath f = (map Right) <$> listFiles f
   getCompletion Module _ = (map Left) <$> getModuleNames
   getCompletion Identifier _ = (map Left) <$> getIdentNames
