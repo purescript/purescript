@@ -185,19 +185,19 @@ quitMessage = "See ya!"
 
 -- Haskeline completions
 
-data CompletionContext = Command String | FilePath | Module | Identifier | Fixed [String] | Multiple [CompletionContext]
+data CompletionContext = Command String | FilePath String | Module | Identifier | Fixed [String] | Multiple [CompletionContext]
                          deriving (Show)
 
 -- |
 -- Decide what kind of completion we need based on input.
-completionContext :: String -> Maybe CompletionContext
-completionContext cmd@"" = Just $ Multiple [Command cmd, Identifier]
-completionContext cmd@(':' : _ )
+completionContext :: String -> String -> Maybe CompletionContext
+completionContext cmd@"" _ = Just $ Multiple [Command cmd, Identifier]
+completionContext cmd@(':' : _ ) _
   | cmd `elem` C.commands || cmd == ":" = Just $ Command cmd
-completionContext (':' : c : _) = case c of
+completionContext (':' : c : _) word = case c of
   'i' -> Just Module
   'b' -> Just Module
-  'm' -> Just FilePath
+  'm' -> Just $ FilePath word
   'q' -> Nothing
   'r' -> Nothing
   '?' -> Nothing
@@ -205,7 +205,7 @@ completionContext (':' : c : _) = case c of
   't' -> Just Identifier
   'k' -> Just Identifier
   _   -> Nothing
-completionContext _ = Just Identifier
+completionContext _ _ = Just Identifier
 
 -- |
 -- Loads module, function, and file completions.
@@ -215,22 +215,22 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
   where
   findCompletions :: String -> String -> StateT PSCiState IO [Completion]
   findCompletions prev word = do
-    let ctx = completionContext $ (dropWhile isSpace (reverse prev)) ++ word
+    let ctx = completionContext ((dropWhile isSpace (reverse prev)) ++ word) word
     completions <- case ctx of
       Nothing -> return []
       (Just c) -> (mapMaybe $ either (\cand -> if word `isPrefixOf` cand
                                                then Just $ simpleCompletion cand
                                                else Nothing) Just)
-                  <$> getCompletion c word
+                  <$> getCompletion c
     return $ sortBy sorter completions
 
-  getCompletion :: CompletionContext -> String -> StateT PSCiState IO [Either String Completion]
-  getCompletion (Command s) _ = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
-  getCompletion FilePath f = (map Right) <$> listFiles f
-  getCompletion Module _ = (map Left) <$> getModuleNames
-  getCompletion Identifier _ = (map Left) <$> getIdentNames
-  getCompletion (Fixed list) _ = return $ (map Left) list
-  getCompletion (Multiple contexts) f = concat <$> mapM (flip getCompletion $ f) contexts
+  getCompletion :: CompletionContext -> StateT PSCiState IO [Either String Completion]
+  getCompletion (Command s) = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
+  getCompletion (FilePath f) = (map Right) <$> listFiles f
+  getCompletion Module = (map Left) <$> getModuleNames
+  getCompletion Identifier = (map Left) <$> getIdentNames
+  getCompletion (Fixed list) = return $ (map Left) list
+  getCompletion (Multiple contexts) = concat <$> mapM getCompletion contexts
 
   getLoadedModules :: StateT PSCiState IO [P.Module]
   getLoadedModules = map snd . psciLoadedModules <$> get
