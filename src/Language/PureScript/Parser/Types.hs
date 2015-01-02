@@ -126,7 +126,9 @@ parseNameAndType :: TokenParser t -> TokenParser (String, t)
 parseNameAndType p = (,) <$> (indented *> (lname <|> stringLiteral) <* indented <* doubleColon) <*> p
 
 parseRowEnding :: TokenParser Type
-parseRowEnding = P.option REmpty (TypeVar <$> (indented *> pipe *> indented *> identifier))
+parseRowEnding = P.option REmpty $ indented *> pipe *> indented *> P.choice  (map P.try
+            [ parseTypeWildcard
+            , TypeVar <$> identifier ])
 
 parseRow :: TokenParser Type
 parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
