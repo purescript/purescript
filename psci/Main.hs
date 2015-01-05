@@ -18,7 +18,7 @@
 module Main where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, isPrefixOf, nub, sortBy, sort, partition)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
@@ -35,7 +35,6 @@ import Control.Monad.Trans.State.Strict
 import qualified Control.Monad.Trans.State.Lazy as L
 
 import Options.Applicative as Opts
-import Options.Applicative.Types as Opts
 
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getModificationTime, doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
@@ -58,6 +57,7 @@ import Parser
 
 data PSCiOptions = PSCiOptions
   { psciSingleLineFlag :: Bool
+  , psciInputNodeFlags :: [String]
   , psciInputFile      :: [FilePath]
   }
 
@@ -560,8 +560,8 @@ loadUserConfig = do
 -- |
 -- The PSCI main loop.
 --
-loop :: PSCiOptions -> [String] -> IO ()
-loop (PSCiOptions singleLineMode files) nflags = do
+loop :: PSCiOptions -> IO ()
+loop (PSCiOptions singleLineMode nflags files) = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
@@ -593,19 +593,22 @@ inputFile = strArgument $
      metavar "FILE"
   <> Opts.help "Optional .purs files to load on start"
 
+nodeFlagsFlag :: Parser [String]
+nodeFlagsFlag = option parser $
+     long "node-flags"
+  <> metavar "NODE_FLAGS"
+  <> Opts.help "Flags to pass to node, separated by spaces"
+  where
+    parser = words' <$> str
+    words' x = traceShow ("words", x) $ words x
+
 psciOptions :: Parser PSCiOptions
 psciOptions = PSCiOptions <$> singleLineFlag
+                          <*> nodeFlagsFlag
                           <*> many inputFile
 
-splitOpts :: PSCiOptions -> (PSCiOptions, [String])
-splitOpts (opts@PSCiOptions { psciInputFile = fs }) = (opts { psciInputFile = notFlags}, flags)
-  where
-    (flags, notFlags) = partition isFlag fs
-    isFlag ('-':_) = True
-    isFlag _       = False
-
 main :: IO ()
-main = uncurry loop . splitOpts =<< execParser opts
+main = execParser opts >>= loop
   where
   opts        = info (version <*> helper <*> psciOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
