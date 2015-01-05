@@ -18,7 +18,7 @@
 module Main where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, isPrefixOf, nub, sortBy, sort)
+import Data.List (intercalate, isPrefixOf, nub, sortBy, sort, partition)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
@@ -35,6 +35,7 @@ import Control.Monad.Trans.State.Strict
 import qualified Control.Monad.Trans.State.Lazy as L
 
 import Options.Applicative as Opts
+import Options.Applicative.Types as Opts
 
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getModificationTime, doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
@@ -71,6 +72,7 @@ data PSCiState = PSCiState
   , psciImportedModuleNames :: [P.ModuleName]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
   , psciLetBindings         :: [P.Expr -> P.Expr]
+  , psciNodeFlags           :: [String]
   }
 
 -- State helpers
@@ -254,7 +256,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
     exports (P.ValueRef ident') = ident == ident'
     exports (P.PositionedDeclarationRef _ r) = exports r
     exports _ = False
-  
+
   identNames :: [P.Module] -> [String]
   identNames ms = nub [ show qual
                       | P.Module moduleName ds exts <- ms
@@ -362,12 +364,13 @@ handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  let nodeArgs = psciNodeFlags st ++ [indexFile]
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
       psciIO $ writeFile indexFile "require('$PSCI').main();"
       process <- psciIO findNodeProcess
-      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
+      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
       case result of
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
@@ -533,7 +536,7 @@ handleCommand Reset = do
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
     Left err -> psciIO $ print err >> exitFailure
-    Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
+    Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [] [])
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
 handleCommand (Browse moduleName) = handleBrowse moduleName
@@ -557,8 +560,8 @@ loadUserConfig = do
 -- |
 -- The PSCI main loop.
 --
-loop :: PSCiOptions -> IO ()
-loop (PSCiOptions singleLineMode files) = do
+loop :: PSCiOptions -> [String] -> IO ()
+loop (PSCiOptions singleLineMode files) nflags = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules files
   case modulesOrFirstError of
@@ -566,7 +569,7 @@ loop (PSCiOptions singleLineMode files) = do
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
-      flip evalStateT (PSCiState files defaultImports modules []) . runInputT (setComplete completion settings) $ do
+      flip evalStateT (PSCiState files defaultImports modules [] nflags) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
         traverse_ (mapM_ (runPSCI . handleCommand)) config
         go
@@ -594,14 +597,20 @@ psciOptions :: Parser PSCiOptions
 psciOptions = PSCiOptions <$> singleLineFlag
                           <*> many inputFile
 
+splitOpts :: PSCiOptions -> (PSCiOptions, [String])
+splitOpts (opts@PSCiOptions { psciInputFile = fs }) = (opts { psciInputFile = notFlags}, flags)
+  where
+    (flags, notFlags) = partition isFlag fs
+    isFlag ('-':_) = True
+    isFlag _       = False
+
 main :: IO ()
-main = execParser opts >>= loop
+main = uncurry loop . splitOpts =<< execParser opts
   where
   opts        = info (version <*> helper <*> psciOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psci - Interactive mode for PureScript"
   footerInfo  = footer $ "psci " ++ showVersion Paths.version
-  
+
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> Opts.help "Show the version number" <> hidden
-
