@@ -595,8 +595,8 @@ inputFile = strArgument $
 
 nodeFlagsFlag :: Parser [String]
 nodeFlagsFlag = option parser $
-     long "node-flags"
-  <> metavar "NODE_FLAGS"
+     long "node-opts"
+  <> metavar "NODE_OPTS"
   <> Opts.help "Flags to pass to node, separated by spaces"
   where
     parser = words' <$> str
