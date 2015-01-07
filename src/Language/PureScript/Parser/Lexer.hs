@@ -70,6 +70,8 @@ module Language.PureScript.Parser.Lexer
 
 import Prelude hiding (lex)
 
+import Data.Char (isSpace)
+
 import Control.Monad (void, guard)
 import Data.Functor.Identity
 
@@ -158,7 +160,7 @@ parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
 
 whitespace :: P.Parsec String u ()
-whitespace = P.skipMany (P.oneOf " \t\r\n")
+whitespace = P.skipMany (P.satisfy isSpace)
     
 parseComment :: P.Parsec String u Comment
 parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
