@@ -127,6 +127,12 @@ same :: P.Parsec s ParseState ()
 same = checkIndentation (==) P.<?> "no indentation"
 
 -- |
+-- Read the comments from the the next token, without consuming it
+--
+readComments :: P.Parsec [PositionedToken] u [Comment]
+readComments = P.lookAhead $ ptComments <$> P.anyToken
+
+-- |
 -- Run a parser
 --
 runTokenParser :: FilePath -> TokenParser a -> [PositionedToken] -> Either P.ParseError a

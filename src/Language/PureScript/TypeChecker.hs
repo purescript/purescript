@@ -84,7 +84,7 @@ addTypeClass moduleName pn args implies ds =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
-  toPair (PositionedDeclaration _ d) = toPair d
+  toPair (PositionedDeclaration _ _ d) = toPair d
   toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
@@ -163,10 +163,10 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
     where
     toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
-    toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
+    toTypeSynonym (PositionedDeclaration _ _ d') = toTypeSynonym d'
     toTypeSynonym _ = Nothing
     toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
-    toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
+    toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty : rest) = do
     rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
@@ -239,10 +239,10 @@ typeCheckAll mainModuleName moduleName exps = go
     goInstance d dictName deps className tys rest
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
     goInstance d dictName deps className tys rest
-  go (PositionedDeclaration pos d : rest) =
+  go (PositionedDeclaration pos com d : rest) =
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
-      return (PositionedDeclaration pos d' : rest')
+      return (PositionedDeclaration pos com d' : rest')
   goInstance :: Declaration -> Ident -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Check [Declaration]
   goInstance d dictName deps className tys rest = do
     mapM_ (checkTypeClassInstance moduleName) tys
@@ -258,7 +258,7 @@ typeCheckAll mainModuleName moduleName exps = go
 
     exportsInstance :: DeclarationRef -> Bool
     exportsInstance (TypeInstanceRef name) | name == dictName = True
-    exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
+    exportsInstance (PositionedDeclarationRef _ _ r) = exportsInstance r
     exportsInstance _ = False
 
   -- |
@@ -346,10 +346,10 @@ typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
     runValueRef _ = error "non-ValueRef passed to runValueRef"
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
-    findClassMembers (PositionedDeclaration _ d) = findClassMembers d
+    findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
-    extractMemberName (PositionedDeclaration _ d) = extractMemberName d
+    extractMemberName (PositionedDeclaration _ _ d) = extractMemberName d
     extractMemberName (TypeDeclaration memberName _) = memberName
     extractMemberName _ = error "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

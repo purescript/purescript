@@ -17,14 +17,15 @@ module Language.PureScript.CoreFn.Ann where
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.Types
+import Language.PureScript.Parser.Lexer
 
 -- |
 -- Type alias for basic annotations
 --
-type Ann = (Maybe SourceSpan, Maybe Type, Maybe Meta)
+type Ann = (Maybe SourceSpan, [Comment], Maybe Type, Maybe Meta)
 
 -- |
 -- Initial annotation with no metadata
 --
 nullAnn :: Ann
-nullAnn = (Nothing, Nothing, Nothing)
+nullAnn = (Nothing, [], Nothing, Nothing)

@@ -22,8 +22,7 @@ module Language.PureScript.CodeGen.JS (
     moduleToJs
 ) where
 
-import Data.Function (on)
-import Data.List ((\\), delete, sortBy)
+import Data.List ((\\), delete)
 import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Applicative
@@ -113,9 +112,9 @@ accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
 valueToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Expr Ann -> SupplyT m JS
 valueToJs m (Literal _ l) =
   literalToValueJS m l
-valueToJs m (Var (_, _, Just (IsConstructor _ 0)) name) =
+valueToJs m (Var (_, _, _, Just (IsConstructor _ 0)) name) =
   return $ JSAccessor "value" $ qualifiedToJS m id name
-valueToJs m (Var (_, _, Just (IsConstructor _ _)) name) =
+valueToJs m (Var (_, _, _, Just (IsConstructor _ _)) name) =
   return $ JSAccessor "create" $ qualifiedToJS m id name
 valueToJs m (Accessor _ prop val) =
   accessorString prop <$> valueToJs m val
@@ -123,7 +122,7 @@ valueToJs m (ObjectUpdate _ o ps) = do
   obj <- valueToJs m o
   sts <- mapM (sndM (valueToJs m)) ps
   extendObj obj sts
-valueToJs _ e@(Abs (_, _, Just IsTypeClassConstructor) _ val) =
+valueToJs _ e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
   let args = unAbs e
   in return $ JSFunction Nothing (map identToJs args) (JSBlock $ map assign args)
   where
@@ -140,10 +139,10 @@ valueToJs m e@App{} = do
   let (f, args) = unApp e []
   args' <- mapM (valueToJs m) args
   case f of
-    Var (_, _, Just IsNewtype) _ -> return (head args')
-    Var (_, _, Just (IsConstructor _ arity)) name | arity == length args ->
+    Var (_, _, _, Just IsNewtype) _ -> return (head args')
+    Var (_, _, _, Just (IsConstructor _ arity)) name | arity == length args ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
-    Var (_, _, Just IsTypeClassConstructor) name ->
+    Var (_, _, _, Just IsTypeClassConstructor) name ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs m f
   where
@@ -159,7 +158,7 @@ valueToJs m (Let _ ds val) = do
   decls <- concat . catMaybes <$> mapM (bindToJs m) ds
   ret <- valueToJs m val
   return $ JSApp (JSFunction Nothing [] (JSBlock (decls ++ [JSReturn ret]))) []
-valueToJs _ (Constructor (_, _, Just IsNewtype) _ (ProperName ctor) _) =
+valueToJs _ (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
   return $ JSVariableIntroduction ctor (Just $
               JSObjectLiteral [("create",
                 JSFunction Nothing ["value"]
@@ -268,9 +267,9 @@ binderToJs m varName done (LiteralBinder _ l) =
   literalToBinderJS m varName done l
 binderToJs _ varName done (VarBinder _ ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
-binderToJs m varName done (ConstructorBinder (_, _, Just IsNewtype) _ _ [b]) =
+binderToJs m varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
   binderToJs m varName done b
-binderToJs m varName done (ConstructorBinder (_, _, Just (IsConstructor ctorType _)) _ ctor bs) = do
+binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType _)) _ ctor bs) = do
   js <- go 0 done bs
   return $ case ctorType of
     ProductType -> js

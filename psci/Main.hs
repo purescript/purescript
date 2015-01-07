@@ -244,7 +244,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
   getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
   getDeclName exts (P.ValueDeclaration ident _ _ _)  | isExported ident exts = Just ident
   getDeclName exts (P.ExternDeclaration _ ident _ _) | isExported ident exts = Just ident
-  getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
+  getDeclName exts (P.PositionedDeclaration _ _ d) = getDeclName exts d
   getDeclName _ _ = Nothing
 
   isExported :: N.Ident -> Maybe [P.DeclarationRef] -> Bool
@@ -252,7 +252,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
     where
     exports :: P.DeclarationRef -> Bool
     exports (P.ValueRef ident') = ident == ident'
-    exports (P.PositionedDeclarationRef _ r) = exports r
+    exports (P.PositionedDeclarationRef _ _ r) = exports r
     exports _ = False
   
   identNames :: [P.Module] -> [String]

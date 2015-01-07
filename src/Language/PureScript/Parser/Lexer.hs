@@ -13,13 +13,15 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, DeriveDataTypeable #-}
 
 module Language.PureScript.Parser.Lexer 
   ( PositionedToken(..)
+  , Comment(..)
   , Token()
   , TokenParser()
   , lex
+  , anyToken
   , token
   , match
   , lparen
@@ -73,6 +75,8 @@ import Prelude hiding (lex)
 import Control.Monad (void, guard)
 import Data.Functor.Identity
 
+import qualified Data.Data as D
+
 import Control.Applicative
 
 import Language.PureScript.Parser.State
@@ -83,7 +87,7 @@ import qualified Text.Parsec.Token as PT
 data Comment
   = LineComment String
   | BlockComment String
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, D.Data, D.Typeable)
   
 data Token
   = LParen
@@ -262,6 +266,9 @@ tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
+ 
+anyToken :: TokenParser PositionedToken
+anyToken = P.token (prettyPrintToken . ptToken) ptSourcePos Just
  
 token :: (Token -> Maybe a) -> TokenParser a
 token f = P.token (prettyPrintToken . ptToken) ptSourcePos (f . ptToken)

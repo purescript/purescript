@@ -199,7 +199,7 @@ renameInModule imports exports (Module mn decls exps) =
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
   updateDecl :: (Maybe SourceSpan, [Ident]) -> Declaration -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Declaration)
-  updateDecl (_, bound) d@(PositionedDeclaration pos _) = return ((Just pos, bound), d)
+  updateDecl (_, bound) d@(PositionedDeclaration pos _ _) = return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
     (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
@@ -217,7 +217,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateDecl s d = return (s, d)
 
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Expr)
-  updateValue (_, bound) v@(PositionedValue pos' _) = return ((Just pos', bound), v)
+  updateValue (_, bound) v@(PositionedValue pos' _ _) = return ((Just pos', bound), v)
   updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
   updateValue (pos, bound) (Let ds val') =
       let args = mapMaybe letBoundVariable ds
@@ -235,7 +235,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue s v = return (s, v)
 
   updateBinder :: (Maybe SourceSpan, [Ident]) -> Binder -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Binder)
-  updateBinder (_, bound) v@(PositionedBinder pos _) = return ((Just pos, bound), v)
+  updateBinder (_, bound) v@(PositionedBinder pos _ _) = return ((Just pos, bound), v)
   updateBinder s@(pos, _) (ConstructorBinder name b) = (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
   updateBinder s v = return (s, v)
 
@@ -244,7 +244,7 @@ renameInModule imports exports (Module mn decls exps) =
 
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable (ValueDeclaration ident _ _ _) = Just ident
-  letBoundVariable (PositionedDeclaration _ d) = letBoundVariable d
+  letBoundVariable (PositionedDeclaration _ _ d) = letBoundVariable d
   letBoundVariable _ = Nothing
 
   updateTypesEverywhere :: Maybe SourceSpan -> Type -> Either ErrorStack Type
@@ -317,14 +317,14 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
     foldM go env' ds
     where
     go env'' (TypeDeclaration name _) = addValue env'' mn name
-    go env'' (PositionedDeclaration pos d) = rethrowWithPosition pos $ go env'' d
+    go env'' (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ go env'' d
     go _ _ = error "Invalid declaration in TypeClassDeclaration"
   addDecl mn env (DataDeclaration _ tn _ dcs) = addType env mn tn (map fst dcs)
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
-  addDecl mn env (PositionedDeclaration _ d) = addDecl mn env d
+  addDecl mn env (PositionedDeclaration _ _ d) = addDecl mn env d
   addDecl _  env _ = return env
 
 -- |
@@ -349,7 +349,7 @@ filterExports mn exps env = do
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
   filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> Either ErrorStack [(ProperName, [ProperName])]
-  filterTypes expTys result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterTypes expTys result r
+  filterTypes expTys result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterTypes expTys result r
   filterTypes expTys result (TypeRef name expDcons) = do
     dcons <- maybe (throwError $ mkErrorStack ("Cannot export undefined type '" ++ show name ++ "'") Nothing) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
@@ -365,7 +365,7 @@ filterExports mn exps env = do
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
   filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> Either ErrorStack [ProperName]
-  filterClasses exps' result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterClasses exps' result r
+  filterClasses exps' result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterClasses exps' result r
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
@@ -374,7 +374,7 @@ filterExports mn exps env = do
 
   -- Ensure the exported values exist in the module and add them to the set of exports
   filterValues :: [Ident] -> [Ident] -> DeclarationRef -> Either ErrorStack [Ident]
-  filterValues exps' result (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ filterValues exps' result r
+  filterValues exps' result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterValues exps' result r
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
@@ -389,7 +389,7 @@ findImports :: [Declaration] -> M.Map ModuleName (Maybe SourceSpan, ImportDeclar
 findImports = foldl (findImports' Nothing) M.empty
   where
   findImports' pos result (ImportDeclaration mn typ qual) = M.insert mn (pos, typ, qual) result
-  findImports' _ result (PositionedDeclaration pos d) = findImports' (Just pos) result d
+  findImports' _ result (PositionedDeclaration pos _ d) = findImports' (Just pos) result d
   findImports' _ result _ = result
 
 -- |
@@ -443,7 +443,7 @@ resolveImport currentModule importModule exps imps impQual =
       checkTypeRef (TypeRef _ Nothing) acc (TypeRef _ (Just _)) = acc
       checkTypeRef (TypeRef name (Just dctor)) _ (TypeRef name' (Just dctor')) = name == name' && dctor == dctor'
       checkTypeRef (TypeRef name _) _ (TypeRef name' Nothing) = name == name'
-      checkTypeRef (PositionedDeclarationRef _ r) acc hiddenRef = checkTypeRef r acc hiddenRef
+      checkTypeRef (PositionedDeclarationRef _ _ r) acc hiddenRef = checkTypeRef r acc hiddenRef
       checkTypeRef _ acc _ = acc
     in foldl (checkTypeRef ref) False hidden
   isHidden hidden ref = ref `elem` hidden
@@ -457,7 +457,7 @@ resolveImport currentModule importModule exps imps impQual =
 
   -- Import something explicitly
   importExplicit :: ImportEnvironment -> DeclarationRef -> Either ErrorStack ImportEnvironment
-  importExplicit imp (PositionedDeclarationRef pos r) = rethrowWithPosition pos $ importExplicit imp r
+  importExplicit imp (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ importExplicit imp r
   importExplicit imp (ValueRef name) = do
     values' <- updateImports (importedValues imp) name
     return $ imp { importedValues = values' }
@@ -476,7 +476,7 @@ resolveImport currentModule importModule exps imps impQual =
   checkedRefs :: [DeclarationRef] -> Either ErrorStack [DeclarationRef]
   checkedRefs = mapM check
     where
-    check (PositionedDeclarationRef pos r) =
+    check (PositionedDeclarationRef pos _ r) =
       rethrowWithPosition pos $ check r
     check ref@(ValueRef name) =
       checkImportExists "value" values name >> return ref

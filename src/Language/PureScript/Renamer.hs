@@ -150,7 +150,7 @@ renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
 renameInValue (ObjectUpdate ann obj vs) =
   ObjectUpdate ann <$> renameInValue obj <*> mapM (\(name, v) -> (,) name <$> renameInValue v) vs
-renameInValue e@(Abs (_, _, Just IsTypeClassConstructor) _ _) = return e
+renameInValue e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) = return e
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =

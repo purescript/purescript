@@ -75,16 +75,16 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
       go other = return other
-    desugarRest (PositionedDeclaration pos d : ds) = do
+    desugarRest (PositionedDeclaration pos com d : ds) = do
       (d' : ds') <- desugarRest (d : ds)
-      return (PositionedDeclaration pos d' : ds')
+      return (PositionedDeclaration pos com d' : ds')
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
 
 inSameGroup :: Declaration -> Declaration -> Bool
 inSameGroup (ValueDeclaration ident1 _ _ _) (ValueDeclaration ident2 _ _ _) = ident1 == ident2
-inSameGroup (PositionedDeclaration _ d1) d2 = inSameGroup d1 d2
-inSameGroup d1 (PositionedDeclaration _ d2) = inSameGroup d1 d2
+inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
+inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
@@ -101,9 +101,9 @@ toDecls ds@(ValueDeclaration ident _ bs result : _) = do
       throwError $ mkErrorStack ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
-toDecls (PositionedDeclaration pos d : ds) = do
+toDecls (PositionedDeclaration pos com d : ds) = do
   (d' : ds') <- rethrowWithPosition pos $ toDecls (d : ds)
-  return (PositionedDeclaration pos d' : ds')
+  return (PositionedDeclaration pos com d' : ds')
 toDecls ds = return ds
 
 isVarBinder :: Binder -> Bool
@@ -112,7 +112,7 @@ isVarBinder _ = False
 
 toTuple :: Declaration -> ([Binder], Either [(Guard, Expr)] Expr)
 toTuple (ValueDeclaration _ _ bs result) = (bs, result)
-toTuple (PositionedDeclaration _ d) = toTuple d
+toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
 makeCaseDeclaration :: Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> SupplyT (Either ErrorStack) Declaration
