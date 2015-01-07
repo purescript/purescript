@@ -185,27 +185,28 @@ quitMessage = "See ya!"
 
 -- Haskeline completions
 
-data CompletionContext = Command String | FilePath | Module | Identifier | Fixed [String] | Multiple [CompletionContext]
+data CompletionContext = Command String | FilePath String | Module | Identifier
+                       | Type | Fixed [String] | Multiple [CompletionContext]
                          deriving (Show)
 
 -- |
 -- Decide what kind of completion we need based on input.
-completionContext :: String -> Maybe CompletionContext
-completionContext cmd@"" = Just $ Multiple [Command cmd, Identifier]
-completionContext cmd@(':' : _ )
+completionContext :: String -> String -> Maybe CompletionContext
+completionContext cmd@"" _ = Just $ Multiple [Command cmd, Identifier]
+completionContext cmd@(':' : _ ) _
   | cmd `elem` C.commands || cmd == ":" = Just $ Command cmd
-completionContext (':' : c : _) = case c of
+completionContext (':' : c : _) word = case c of
   'i' -> Just Module
   'b' -> Just Module
-  'm' -> Just FilePath
+  'm' -> Just $ FilePath word
   'q' -> Nothing
   'r' -> Nothing
   '?' -> Nothing
   's' -> Just $ Fixed ["import", "loaded"]
   't' -> Just Identifier
-  'k' -> Just Identifier
+  'k' -> Just Type
   _   -> Nothing
-completionContext _ = Just Identifier
+completionContext _ _ = Just Identifier
 
 -- |
 -- Loads module, function, and file completions.
@@ -215,22 +216,23 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
   where
   findCompletions :: String -> String -> StateT PSCiState IO [Completion]
   findCompletions prev word = do
-    let ctx = completionContext $ (dropWhile isSpace (reverse prev)) ++ word
+    let ctx = completionContext ((dropWhile isSpace (reverse prev)) ++ word) word
     completions <- case ctx of
       Nothing -> return []
       (Just c) -> (mapMaybe $ either (\cand -> if word `isPrefixOf` cand
                                                then Just $ simpleCompletion cand
                                                else Nothing) Just)
-                  <$> getCompletion c word
+                  <$> getCompletion c
     return $ sortBy sorter completions
 
-  getCompletion :: CompletionContext -> String -> StateT PSCiState IO [Either String Completion]
-  getCompletion (Command s) _ = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
-  getCompletion FilePath f = (map Right) <$> listFiles f
-  getCompletion Module _ = (map Left) <$> getModuleNames
-  getCompletion Identifier _ = (map Left) <$> getIdentNames
-  getCompletion (Fixed list) _ = return $ (map Left) list
-  getCompletion (Multiple contexts) f = concat <$> mapM (flip getCompletion $ f) contexts
+  getCompletion :: CompletionContext -> StateT PSCiState IO [Either String Completion]
+  getCompletion (Command s) = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
+  getCompletion (FilePath f) = (map Right) <$> listFiles f
+  getCompletion Module = (map Left) <$> getModuleNames
+  getCompletion Identifier = (map Left) <$> ((++) <$> getIdentNames <*> getDctorNames)
+  getCompletion Type = (map Left) <$> getTypeNames
+  getCompletion (Fixed list) = return $ (map Left) list
+  getCompletion (Multiple contexts) = concat <$> mapM getCompletion contexts
 
   getLoadedModules :: StateT PSCiState IO [P.Module]
   getLoadedModules = map snd . psciLoadedModules <$> get
@@ -238,30 +240,60 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
   getModuleNames :: StateT PSCiState IO [String]
   getModuleNames = moduleNames <$> getLoadedModules
 
+  mapLoadedModulesAndQualify :: (Show a) => (P.Module -> [a]) -> StateT PSCiState IO [String]
+  mapLoadedModulesAndQualify f = do
+    ms <- getLoadedModules
+    q <- sequence [qualifyIfNeeded m (f m) | m <- ms]
+    return $ concat q
+
   getIdentNames :: StateT PSCiState IO [String]
-  getIdentNames = identNames <$> getLoadedModules
+  getIdentNames = mapLoadedModulesAndQualify identNames
 
-  getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
-  getDeclName exts (P.ValueDeclaration ident _ _ _)  | isExported ident exts = Just ident
-  getDeclName exts (P.ExternDeclaration _ ident _ _) | isExported ident exts = Just ident
-  getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
-  getDeclName _ _ = Nothing
+  getDctorNames :: StateT PSCiState IO [String]
+  getDctorNames = mapLoadedModulesAndQualify dctorNames
 
-  isExported :: N.Ident -> Maybe [P.DeclarationRef] -> Bool
-  isExported ident = maybe True (any exports)
-    where
-    exports :: P.DeclarationRef -> Bool
-    exports (P.ValueRef ident') = ident == ident'
-    exports (P.PositionedDeclarationRef _ r) = exports r
-    exports _ = False
-  
-  identNames :: [P.Module] -> [String]
-  identNames ms = nub [ show qual
-                      | P.Module moduleName ds exts <- ms
-                      , ident <- mapMaybe (getDeclName exts) ds
-                      , qual <- [ P.Qualified Nothing ident
-                                , P.Qualified (Just moduleName) ident]
-                      ]
+  getTypeNames :: StateT PSCiState IO [String]
+  getTypeNames = mapLoadedModulesAndQualify typeDecls
+
+  qualifyIfNeeded :: (Show a) => P.Module -> [a] -> StateT PSCiState IO [String]
+  qualifyIfNeeded m decls = do
+    let name = P.getModuleName m
+    imported <- psciImportedModuleNames <$> get
+    let qualified = map (P.Qualified $ Just name) decls
+    if name `elem` imported then
+        return $ map show $ qualified ++ (map (P.Qualified Nothing) decls)
+    else
+        return $ map show qualified
+
+  typeDecls :: P.Module -> [N.ProperName]
+  typeDecls m = mapMaybe getTypeName $ filter P.isDataDecl (P.exportedDeclarations m)
+      where getTypeName :: P.Declaration -> Maybe N.ProperName
+            getTypeName (P.TypeSynonymDeclaration name _ _) = Just name
+            getTypeName (P.DataDeclaration _ name _ _) = Just name
+            getTypeName (P.PositionedDeclaration _ d) = getTypeName d
+            getTypeName _ = Nothing
+
+  identNames :: P.Module -> [N.Ident]
+  identNames (P.Module _ ds exports) = nub [ ident | ident <- mapMaybe (getDeclName exports) ds ]
+    where getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
+          getDeclName exts decl@(P.ValueDeclaration ident _ _ _)  | P.isExported exts decl = Just ident
+          getDeclName exts decl@(P.ExternDeclaration _ ident _ _) | P.isExported exts decl = Just ident
+          getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
+          getDeclName _ _ = Nothing
+
+  dctorNames :: P.Module -> [N.ProperName]
+  dctorNames m = nub $ concat $ map (P.exportedDctors m) dnames
+    where getDataDeclName :: P.Declaration -> Maybe N.ProperName
+          getDataDeclName (P.DataDeclaration _ name _ _) = Just name
+          getDataDeclName (P.PositionedDeclaration _ d) = getDataDeclName d
+          getDataDeclName _ = Nothing
+
+          dnames :: [N.ProperName]
+          dnames = (mapMaybe getDataDeclName onlyDataDecls)
+
+          onlyDataDecls :: [P.Declaration]
+          onlyDataDecls = (filter P.isDataDecl (P.exportedDeclarations m))
+
   moduleNames :: [P.Module] -> [String]
   moduleNames ms = nub [show moduleName | P.Module moduleName _ _ <- ms]
 
@@ -601,7 +633,6 @@ main = execParser opts >>= loop
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psci - Interactive mode for PureScript"
   footerInfo  = footer $ "psci " ++ showVersion Paths.version
-  
+
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> Opts.help "Show the version number" <> hidden
-
