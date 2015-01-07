@@ -29,6 +29,7 @@ import qualified Control.Arrow as A
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Parser.Lexer (Comment(..))
 
 import Numeric
 
@@ -119,6 +120,32 @@ literals = mkPattern' match
     [ return $ lbl ++ ": "
     , prettyPrintJS' js
     ]
+  match (JSComment com js) = fmap concat $ sequence $
+    [ return "\n"
+    , currentIndent
+    , return "/**\n"
+    ] ++
+    map asLine (concatMap commentLines com) ++
+    [ currentIndent
+    , return " */\n"
+    , currentIndent
+    , prettyPrintJS' js
+    ]
+    where
+    commentLines :: Comment -> [String]
+    commentLines (LineComment s) = [s]
+    commentLines (BlockComment s) = lines s
+    
+    asLine :: String -> StateT PrinterState Maybe String 
+    asLine s = do
+      i <- currentIndent
+      return $ i ++ " * " ++ removeComments s ++ "\n"
+    
+    removeComments :: String -> String
+    removeComments ('*' : '/' : s) = removeComments s
+    removeComments (c : s) = c : removeComments s
+    
+    removeComments [] = []
   match (JSRaw js) = return js
   match _ = mzero
 

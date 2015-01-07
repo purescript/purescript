@@ -29,3 +29,9 @@ type Ann = (Maybe SourceSpan, [Comment], Maybe Type, Maybe Meta)
 --
 nullAnn :: Ann
 nullAnn = (Nothing, [], Nothing, Nothing)
+
+-- |
+-- Remove the comments from an annotation
+--
+removeComments :: Ann -> Ann
+removeComments (ss, _, ty, meta) = (ss, [], ty, meta)

@@ -152,9 +152,19 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
                           [] -> ""
                           cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
-renderDeclaration n exps (P.PositionedDeclaration _ _ d) =
+renderDeclaration n exps (P.PositionedDeclaration _ com d) = do
+  renderComments n com
+  spacer
   renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
+
+renderComments :: Int -> [P.Comment] -> Docs
+renderComments n cs = mapM_ (atIndent n) ls
+  where
+  ls = concatMap toLines cs
+  
+  toLines (P.LineComment s) = [s]
+  toLines (P.BlockComment s) = lines s
 
 toTypeVar :: (String, Maybe P.Kind) -> P.Type
 toTypeVar (s, Nothing) = P.TypeVar s

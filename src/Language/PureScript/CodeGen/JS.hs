@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, ViewPatterns #-}
 
 module Language.PureScript.CodeGen.JS (
     module AST,
@@ -23,7 +23,7 @@ module Language.PureScript.CodeGen.JS (
 ) where
 
 import Data.List ((\\), delete)
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (mapMaybe)
 
 import Control.Applicative
 import Control.Arrow ((&&&))
@@ -48,7 +48,7 @@ moduleToJs opts (Module name imps exps foreigns decls) = do
   let jsImports = map (importToJs opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) $ imps
   let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
   jsDecls <- mapM (bindToJs name) decls
-  let optimized = concatMap (map $ optimize opts) $ catMaybes jsDecls
+  let optimized = concatMap (map $ optimize opts) jsDecls
   let isModuleEmpty = null exps
   let moduleBody = JSStringLiteral "use strict" : jsImports ++ foreigns' ++ optimized
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) exps
@@ -76,15 +76,23 @@ importToJs opts mn =
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a declaration
 --
-bindToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Bind Ann -> SupplyT m (Maybe [JS])
-bindToJs mp (NonRec ident val) = do
+bindToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Bind Ann -> SupplyT m [JS]
+bindToJs mp (NonRec ident val) = return <$> nonRecToJS mp ident val
+bindToJs mp (Rec vals) = forM vals (uncurry (nonRecToJS mp))
+
+-- |
+-- Generate code in the simplified Javascript intermediate representation for a single non-recursive 
+-- declaration.
+--
+-- The main purpose of this function is to handle code generation for comments.
+--
+nonRecToJS :: (Functor m, Applicative m, Monad m) => ModuleName -> Ident -> Expr Ann -> SupplyT m JS
+nonRecToJS m i e@(extractAnn -> (_, com, _, _)) | not (null com) =
+  JSComment com <$> nonRecToJS m i (modifyAnn removeComments e)
+nonRecToJS mp ident val = do
   js <- valueToJs mp val
-  return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
-bindToJs mp (Rec vals) = do
-  jss <- forM vals $ \(ident, val) -> do
-    js <- valueToJs mp val
-    return $ JSVariableIntroduction (identToJs ident) (Just js)
-  return $ Just jss
+  return $ JSVariableIntroduction (identToJs ident) (Just js)
+  
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
@@ -155,7 +163,7 @@ valueToJs m (Case _ values binders) = do
   vals <- mapM (valueToJs m) values
   bindersToJs m binders vals
 valueToJs m (Let _ ds val) = do
-  decls <- concat . catMaybes <$> mapM (bindToJs m) ds
+  decls <- concat <$> mapM (bindToJs m) ds
   ret <- valueToJs m val
   return $ JSApp (JSFunction Nothing [] (JSBlock (decls ++ [JSReturn ret]))) []
 valueToJs _ (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
