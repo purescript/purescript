@@ -34,6 +34,10 @@ import Language.PureScript.Environment
 --
 data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
 
+-- | Return a module's name.
+getModuleName :: Module -> ModuleName
+getModuleName (Module name _ _) = name
+
 -- |
 -- Test if a declaration is exported, given a module's export list.
 --
@@ -44,6 +48,7 @@ isExported exps (PositionedDeclaration _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
   matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
+  matches (ValueDeclaration ident _ _ _) (ValueRef ident') = ident == ident'
   matches (ExternDeclaration _ ident _ _) (ValueRef ident') = ident == ident'
   matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
   matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
@@ -77,6 +82,7 @@ exportedDctors (Module _ decls exps) ident =
   where
   dctors = concatMap getDctors decls
   getDctors (DataDeclaration _ _ _ ctors) = map fst ctors
+  getDctors (PositionedDeclaration _ d) = getDctors d
   getDctors _ = []
 
 -- |

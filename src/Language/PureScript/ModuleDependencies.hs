@@ -64,9 +64,6 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
   forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
   forTypes _ = []
 
-getModuleName :: Module -> ModuleName
-getModuleName (Module mn _ _) = mn
-
 -- |
 -- Convert a strongly connected component of the module graph to a module
 --
