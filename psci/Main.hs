@@ -274,7 +274,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
             getTypeName _ = Nothing
 
   identNames :: P.Module -> [N.Ident]
-  identNames (P.Module _ ds exports) = nub [ ident | ident <- mapMaybe (getDeclName exports) ds ]
+  identNames (P.Module _ ds exports) = nub [ ident | ident <- mapMaybe (getDeclName exports) (D.flattenDecls ds) ]
     where getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
           getDeclName exts decl@(P.ValueDeclaration ident _ _ _)  | P.isExported exts decl = Just ident
           getDeclName exts decl@(P.ExternDeclaration _ ident _ _) | P.isExported exts decl = Just ident
