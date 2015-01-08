@@ -59,7 +59,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches _ _ = False
 
 exportedDeclarations :: Module -> [Declaration]
-exportedDeclarations (Module _ decls exps) = filter (isExported exps) decls
+exportedDeclarations (Module _ decls exps) = filter (isExported exps) (flattenDecls decls)
 
 -- |
 -- Test if a data constructor for a given type is exported, given a module's export list.
@@ -80,7 +80,7 @@ exportedDctors :: Module -> ProperName -> [ProperName]
 exportedDctors (Module _ decls exps) ident =
   filter (isDctorExported ident exps) dctors
   where
-  dctors = concatMap getDctors decls
+  dctors = concatMap getDctors (flattenDecls decls)
   getDctors (DataDeclaration _ _ _ ctors) = map fst ctors
   getDctors (PositionedDeclaration _ d) = getDctors d
   getDctors _ = []
@@ -266,6 +266,14 @@ isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration (PositionedDeclaration _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
+
+-- |
+-- Recursively flatten data binding groups in the list of declarations
+flattenDecls :: [Declaration] -> [Declaration]
+flattenDecls = concatMap flattenOne
+    where flattenOne :: Declaration -> [Declaration]
+          flattenOne (DataBindingGroupDeclaration decls) = concatMap flattenOne decls
+          flattenOne d = [d]
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
