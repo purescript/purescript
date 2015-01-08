@@ -81,7 +81,7 @@ literals = mkPattern' match
   match (TypeClassDictionary name _ _) = return $ "<<dict " ++ show name ++ ">>"
   match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
   match (TypedValue _ val _) = prettyPrintValue' val
-  match (PositionedValue _ val) = prettyPrintValue' val
+  match (PositionedValue _ _ val) = prettyPrintValue' val
   match _ = mzero
 
 prettyPrintDeclaration :: Declaration -> StateT PrinterState Maybe String
@@ -90,7 +90,7 @@ prettyPrintDeclaration (ValueDeclaration ident _ [] (Right val)) = fmap concat $
   [ return $ show ident ++ " = "
   , prettyPrintValue' val
   ]
-prettyPrintDeclaration (PositionedDeclaration _ d) = prettyPrintDeclaration d
+prettyPrintDeclaration (PositionedDeclaration _ _ d) = prettyPrintDeclaration d
 prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
@@ -126,7 +126,7 @@ prettyPrintDoNotationElement (DoNotationLet ds) =
     [ return "let "
     , withIndent $ prettyPrintMany prettyPrintDeclaration ds
     ]
-prettyPrintDoNotationElement (PositionedDoNotationElement _ el) = prettyPrintDoNotationElement el
+prettyPrintDoNotationElement (PositionedDoNotationElement _ _ el) = prettyPrintDoNotationElement el
 
 ifThenElse :: Pattern PrinterState Expr ((Expr, Expr), Expr)
 ifThenElse = mkPattern match
@@ -204,7 +204,7 @@ prettyPrintBinderAtom = mkPattern' match
     , return "]"
     ]
   match (NamedBinder ident binder) = ((show ident ++ "@") ++) <$> prettyPrintBinder' binder
-  match (PositionedBinder _ binder) = prettyPrintBinder' binder
+  match (PositionedBinder _ _ binder) = prettyPrintBinder' binder
   match _ = mzero
 
 -- |

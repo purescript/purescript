@@ -30,6 +30,7 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Language.PureScript.Comments
 
 -- |
 -- Generate foreign imports for all declarations in a module
@@ -46,11 +47,15 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
     declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
     declToPs (FixityDeclaration (Fixity assoc prec) ident) =
       tell [ unwords [ show assoc, show prec, ident ] ]
-    declToPs (PositionedDeclaration _ d) = declToPs d
+    declToPs (PositionedDeclaration _ com d) = mapM commentToPs com >> declToPs d
     declToPs _ = return ()
+    
+    commentToPs :: Comment -> Writer [String] ()
+    commentToPs (LineComment s) = tell ["-- " ++ s]
+    commentToPs (BlockComment s) = tell ["{- " ++ s ++ " -}"]
 
     exportToPs :: DeclarationRef -> Writer [String] ()
-    exportToPs (PositionedDeclarationRef _ r) = exportToPs r
+    exportToPs (PositionedDeclarationRef _ _ r) = exportToPs r
     exportToPs (TypeRef pn dctors) = do
       case Qualified (Just moduleName) pn `M.lookup` types env of
         Nothing -> error $ show pn ++ " has no kind in exportToPs"

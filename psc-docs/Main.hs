@@ -152,9 +152,19 @@ renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys 
                           [] -> ""
                           cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
   atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
-renderDeclaration n exps (P.PositionedDeclaration _ d) =
+renderDeclaration n exps (P.PositionedDeclaration _ com d) = do
+  renderComments n com
+  spacer
   renderDeclaration n exps d
 renderDeclaration _ _ _ = return ()
+
+renderComments :: Int -> [P.Comment] -> Docs
+renderComments n cs = mapM_ (atIndent n) ls
+  where
+  ls = concatMap toLines cs
+  
+  toLines (P.LineComment s) = [s]
+  toLines (P.BlockComment s) = lines s
 
 toTypeVar :: (String, Maybe P.Kind) -> P.Type
 toTypeVar (s, Nothing) = P.TypeVar s
@@ -176,30 +186,30 @@ getName (P.ExternDataDeclaration name _) = P.runProperName name
 getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
 getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
 getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
-getName (P.PositionedDeclaration _ d) = getName d
+getName (P.PositionedDeclaration _ _ d) = getName d
 getName _ = error "Invalid argument to getName"
 
 isValueDeclaration :: P.Declaration -> Bool
 isValueDeclaration P.TypeDeclaration{} = True
 isValueDeclaration P.ExternDeclaration{} = True
-isValueDeclaration (P.PositionedDeclaration _ d) = isValueDeclaration d
+isValueDeclaration (P.PositionedDeclaration _ _ d) = isValueDeclaration d
 isValueDeclaration _ = False
 
 isTypeDeclaration :: P.Declaration -> Bool
 isTypeDeclaration P.DataDeclaration{} = True
 isTypeDeclaration P.ExternDataDeclaration{} = True
 isTypeDeclaration P.TypeSynonymDeclaration{} = True
-isTypeDeclaration (P.PositionedDeclaration _ d) = isTypeDeclaration d
+isTypeDeclaration (P.PositionedDeclaration _ _ d) = isTypeDeclaration d
 isTypeDeclaration _ = False
 
 isTypeClassDeclaration :: P.Declaration -> Bool
 isTypeClassDeclaration P.TypeClassDeclaration{} = True
-isTypeClassDeclaration (P.PositionedDeclaration _ d) = isTypeClassDeclaration d
+isTypeClassDeclaration (P.PositionedDeclaration _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 isTypeInstanceDeclaration :: P.Declaration -> Bool
 isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
-isTypeInstanceDeclaration (P.PositionedDeclaration _ d) = isTypeInstanceDeclaration d
+isTypeInstanceDeclaration (P.PositionedDeclaration _ _ d) = isTypeInstanceDeclaration d
 isTypeInstanceDeclaration _ = False
 
 inputFile :: Parser FilePath

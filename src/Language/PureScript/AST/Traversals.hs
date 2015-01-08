@@ -37,7 +37,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration name args implies ds) = f (TypeClassDeclaration name args implies (map f' ds))
   f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (map f' ds))
-  f' (PositionedDeclaration pos d) = f (PositionedDeclaration pos (f' d))
+  f' (PositionedDeclaration pos com d) = f (PositionedDeclaration pos com (f' d))
   f' other = f other
 
   g' :: Expr -> Expr
@@ -56,7 +56,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (TypedValue check v ty) = g (TypedValue check (g' v) ty)
   g' (Let ds v) = g (Let (map f' ds) (g' v))
   g' (Do es) = g (Do (map handleDoNotationElement es))
-  g' (PositionedValue pos v) = g (PositionedValue pos (g' v))
+  g' (PositionedValue pos com v) = g (PositionedValue pos com (g' v))
   g' other = g other
 
   h' :: Binder -> Binder
@@ -65,7 +65,7 @@ everywhereOnValues f g h = (f', g', h')
   h' (ArrayBinder bs) = h (ArrayBinder (map h' bs))
   h' (ConsBinder b1 b2) = h (ConsBinder (h' b1) (h' b2))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
-  h' (PositionedBinder pos b) = h (PositionedBinder pos (h' b))
+  h' (PositionedBinder pos com b) = h (PositionedBinder pos com (h' b))
   h' other = h other
 
   handleCaseAlternative :: CaseAlternative -> CaseAlternative
@@ -78,7 +78,7 @@ everywhereOnValues f g h = (f', g', h')
   handleDoNotationElement (DoNotationValue v) = DoNotationValue (g' v)
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind (h' b) (g' v)
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
-  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos (handleDoNotationElement e)
+  handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com (handleDoNotationElement e)
 
 
 everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
@@ -93,7 +93,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f' <=< f) ds
   f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f' <=< f) ds
-  f' (PositionedDeclaration pos d) = PositionedDeclaration pos <$> (f d >>= f')
+  f' (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (f d >>= f')
   f' other = f other
 
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
@@ -111,7 +111,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
   g' (Let ds v) = Let <$> mapM (f' <=< f) ds <*> (g v >>= g')
   g' (Do es) = Do <$> mapM handleDoNotationElement es
-  g' (PositionedValue pos v) = PositionedValue pos <$> (g v >>= g')
+  g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
   g' other = g other
 
   h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> mapM (h' <=< h) bs
@@ -119,7 +119,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   h' (ArrayBinder bs) = ArrayBinder <$> mapM (h' <=< h) bs
   h' (ConsBinder b1 b2) = ConsBinder <$> (h b1 >>= h') <*> (h b2 >>= h')
   h' (NamedBinder name b) = NamedBinder name <$> (h b >>= h')
-  h' (PositionedBinder pos b) = PositionedBinder pos <$> (h b >>= h')
+  h' (PositionedBinder pos com b) = PositionedBinder pos com <$> (h b >>= h')
   h' other = h other
 
   handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM (h' <=< h) bs
@@ -128,7 +128,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> (g' <=< g) v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> (h' <=< h) b <*> (g' <=< g) v
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> mapM (f' <=< f) ds
-  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos <$> handleDoNotationElement e
+  handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com <$> handleDoNotationElement e
 
 everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
   (Declaration -> m Declaration) ->
@@ -142,7 +142,7 @@ everywhereOnValuesM f g h = (f', g', h')
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
   f' (TypeClassDeclaration name args implies ds) = (TypeClassDeclaration name args implies <$> mapM f' ds) >>= f
   f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> mapM f' ds) >>= f
-  f' (PositionedDeclaration pos d) = (PositionedDeclaration pos <$> f' d) >>= f
+  f' (PositionedDeclaration pos com d) = (PositionedDeclaration pos com <$> f' d) >>= f
   f' other = f other
 
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
@@ -160,7 +160,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (TypedValue check v ty) = (TypedValue check <$> g' v <*> pure ty) >>= g
   g' (Let ds v) = (Let <$> mapM f' ds <*> g' v) >>= g
   g' (Do es) = (Do <$> mapM handleDoNotationElement es) >>= g
-  g' (PositionedValue pos v) = (PositionedValue pos <$> g' v) >>= g
+  g' (PositionedValue pos com v) = (PositionedValue pos com <$> g' v) >>= g
   g' other = g other
 
   h' (ConstructorBinder ctor bs) = (ConstructorBinder ctor <$> mapM h' bs) >>= h
@@ -168,7 +168,7 @@ everywhereOnValuesM f g h = (f', g', h')
   h' (ArrayBinder bs) = (ArrayBinder <$> mapM h' bs) >>= h
   h' (ConsBinder b1 b2) = (ConsBinder <$> h' b1 <*> h' b2) >>= h
   h' (NamedBinder name b) = (NamedBinder name <$> h' b) >>= h
-  h' (PositionedBinder pos b) = (PositionedBinder pos <$> h' b) >>= h
+  h' (PositionedBinder pos com b) = (PositionedBinder pos com <$> h' b) >>= h
   h' other = h other
 
   handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM h' bs
@@ -177,7 +177,7 @@ everywhereOnValuesM f g h = (f', g', h')
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> g' v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> h' b <*> g' v
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> mapM f' ds
-  handleDoNotationElement (PositionedDoNotationElement pos e) = PositionedDoNotationElement pos <$> handleDoNotationElement e
+  handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com <$> handleDoNotationElement e
 
 everythingOnValues :: (r -> r -> r) ->
                       (Declaration -> r) ->
@@ -194,7 +194,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(PositionedDeclaration _ d1) = f d <> f' d1
+  f' d@(PositionedDeclaration _ _ d1) = f d <> f' d1
   f' d = f d
 
   g' v@(UnaryMinus v1) = g v <> g' v1
@@ -212,7 +212,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(TypedValue _ v1 _) = g v <> g' v1
   g' v@(Let ds v1) = foldl (<>) (g v) (map f' ds) <> g' v1
   g' v@(Do es) = foldl (<>) (g v) (map j' es)
-  g' v@(PositionedValue _ v1) = g v <> g' v1
+  g' v@(PositionedValue _ _ v1) = g v <> g' v1
   g' v = g v
 
   h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
@@ -220,7 +220,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   h' b@(ArrayBinder bs) = foldl (<>) (h b) (map h' bs)
   h' b@(ConsBinder b1 b2) = h b <> h' b1 <> h' b2
   h' b@(NamedBinder _ b1) = h b <> h' b1
-  h' b@(PositionedBinder _ b1) = h b <> h' b1
+  h' b@(PositionedBinder _ _ b1) = h b <> h' b1
   h' b = h b
 
   i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val
@@ -229,7 +229,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   j' e@(DoNotationValue v) = j e <> g' v
   j' e@(DoNotationBind b v) = j e <> h' b <> g' v
   j' e@(DoNotationLet ds) = foldl (<>) (j e) (map f' ds)
-  j' e@(PositionedDoNotationElement _ e1) = j e <> j' e1
+  j' e@(PositionedDoNotationElement _ _ e1) = j e <> j' e1
 
 everythingWithContextOnValues ::
   s ->
@@ -255,7 +255,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
   f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (PositionedDeclaration _ d1) = f'' s d1
+  f' s (PositionedDeclaration _ _ d1) = f'' s d1
   f' _ _ = r0
 
   g'' s v = let (s', r) = g s v in r <> g' s' v
@@ -275,7 +275,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (TypedValue _ v1 _) = g'' s v1
   g' s (Let ds v1) = foldl (<>) r0 (map (f'' s) ds) <> g'' s v1
   g' s (Do es) = foldl (<>) r0 (map (j'' s) es)
-  g' s (PositionedValue _ v1) = g'' s v1
+  g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = r0
 
   h'' s b = let (s', r) = h s b in r <> h' s' b
@@ -285,7 +285,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (ConsBinder b1 b2) = h'' s b1 <> h'' s b2
   h' s (NamedBinder _ b1) = h'' s b1
-  h' s (PositionedBinder _ b1) = h'' s b1
+  h' s (PositionedBinder _ _ b1) = h'' s b1
   h' _ _ = r0
 
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
@@ -298,7 +298,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   j' s (DoNotationValue v) = g'' s v
   j' s (DoNotationBind b v) = h'' s b <> g'' s v
   j' s (DoNotationLet ds) = foldl (<>) r0 (map (f'' s) ds)
-  j' s (PositionedDoNotationElement _ e1) = j'' s e1
+  j' s (PositionedDoNotationElement _ _ e1) = j'' s e1
 
 everywhereWithContextOnValuesM :: (Functor m, Applicative m, Monad m) =>
   s ->
@@ -321,7 +321,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (thirdM (g'' s)) ds
   f' s (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f'' s) ds
   f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f'' s) ds
-  f' s (PositionedDeclaration pos d1) = PositionedDeclaration pos <$> f'' s d1
+  f' s (PositionedDeclaration pos com d1) = PositionedDeclaration pos com <$> f'' s d1
   f' _ other = return other
 
   g'' s = uncurry g' <=< g s
@@ -341,7 +341,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (TypedValue check v ty) = TypedValue check <$> g'' s v <*> pure ty
   g' s (Let ds v) = Let <$> mapM (f'' s) ds <*> g'' s v
   g' s (Do es) = Do <$> mapM (j'' s) es
-  g' s (PositionedValue pos v) = PositionedValue pos <$> g'' s v
+  g' s (PositionedValue pos com v) = PositionedValue pos com <$> g'' s v
   g' _ other = return other
 
   h'' s = uncurry h' <=< h s
@@ -351,7 +351,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   h' s (ArrayBinder bs) = ArrayBinder <$> mapM (h'' s) bs
   h' s (ConsBinder b1 b2) = ConsBinder <$> h'' s b1 <*> h'' s b2
   h' s (NamedBinder name b) = NamedBinder name <$> h'' s b
-  h' s (PositionedBinder pos b) = PositionedBinder pos <$> h'' s b
+  h' s (PositionedBinder pos com b) = PositionedBinder pos com <$> h'' s b
   h' _ other = return other
 
   i'' s = uncurry i' <=< i s
@@ -363,7 +363,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   j' s (DoNotationValue v) = DoNotationValue <$> g'' s v
   j' s (DoNotationBind b v) = DoNotationBind <$> h'' s b <*> g'' s v
   j' s (DoNotationLet ds) = DoNotationLet <$> mapM (f'' s) ds
-  j' s (PositionedDoNotationElement pos e1) = PositionedDoNotationElement pos <$> j'' s e1
+  j' s (PositionedDoNotationElement pos com e1) = PositionedDoNotationElement pos com <$> j'' s e1
 
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)

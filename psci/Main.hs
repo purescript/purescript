@@ -270,7 +270,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
       where getTypeName :: P.Declaration -> Maybe N.ProperName
             getTypeName (P.TypeSynonymDeclaration name _ _) = Just name
             getTypeName (P.DataDeclaration _ name _ _) = Just name
-            getTypeName (P.PositionedDeclaration _ d) = getTypeName d
+            getTypeName (P.PositionedDeclaration _ _ d) = getTypeName d
             getTypeName _ = Nothing
 
   identNames :: P.Module -> [N.Ident]
@@ -278,14 +278,14 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
     where getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
           getDeclName exts decl@(P.ValueDeclaration ident _ _ _)  | P.isExported exts decl = Just ident
           getDeclName exts decl@(P.ExternDeclaration _ ident _ _) | P.isExported exts decl = Just ident
-          getDeclName exts (P.PositionedDeclaration _ d) = getDeclName exts d
+          getDeclName exts (P.PositionedDeclaration _ _ d) = getDeclName exts d
           getDeclName _ _ = Nothing
 
   dctorNames :: P.Module -> [N.ProperName]
   dctorNames m = nub $ concat $ map (P.exportedDctors m) dnames
     where getDataDeclName :: P.Declaration -> Maybe N.ProperName
           getDataDeclName (P.DataDeclaration _ name _ _) = Just name
-          getDataDeclName (P.PositionedDeclaration _ d) = getDataDeclName d
+          getDataDeclName (P.PositionedDeclaration _ _ d) = getDataDeclName d
           getDataDeclName _ = Nothing
 
           dnames :: [N.ProperName]

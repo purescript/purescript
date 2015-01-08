@@ -35,8 +35,9 @@ import Control.Applicative
 import Control.Arrow ((+++))
 
 import Language.PureScript.Kinds
-import Language.PureScript.Parser.Common
 import Language.PureScript.AST
+import Language.PureScript.Comments
+import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
@@ -50,13 +51,14 @@ import qualified Text.Parsec.Expr as P
 -- |
 -- Read source position information
 --
-withSourceSpan :: (SourceSpan -> a -> a) -> P.Parsec s u a -> P.Parsec s u a
+withSourceSpan :: (SourceSpan -> [Comment] -> a -> a) -> P.Parsec [PositionedToken] u a -> P.Parsec [PositionedToken] u a
 withSourceSpan f p = do
   start <- P.getPosition
+  comments <- C.readComments
   x <- p
   end <- P.getPosition
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
-  return $ f sp x
+  return $ f sp comments x
   where
   toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 

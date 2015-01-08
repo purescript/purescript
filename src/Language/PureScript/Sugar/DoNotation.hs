@@ -36,7 +36,7 @@ desugarDoModule :: Module -> SupplyT (Either ErrorStack) Module
 desugarDoModule (Module mn ds exts) = Module mn <$> parU ds desugarDo <*> pure exts
 
 desugarDo :: Declaration -> SupplyT (Either ErrorStack) Declaration
-desugarDo (PositionedDeclaration pos d) = (PositionedDeclaration pos) <$> (rethrowWithPosition pos $ desugarDo d)
+desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (rethrowWithPosition pos $ desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in f d
@@ -49,7 +49,7 @@ desugarDo d =
 
   replace :: Expr -> SupplyT (Either ErrorStack) Expr
   replace (Do els) = go els
-  replace (PositionedValue pos v) = PositionedValue pos <$> rethrowWithPosition pos (replace v)
+  replace (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace v)
   replace other = return other
 
   go :: [DoNotationElement] -> SupplyT (Either ErrorStack) Expr
@@ -71,4 +71,4 @@ desugarDo d =
   go (DoNotationLet ds : rest) = do
     rest' <- go rest
     return $ Let ds rest'
-  go (PositionedDoNotationElement pos el : rest) = rethrowWithPosition pos $ PositionedValue pos <$> go (el : rest)
+  go (PositionedDoNotationElement pos com el : rest) = rethrowWithPosition pos $ PositionedValue pos com <$> go (el : rest)

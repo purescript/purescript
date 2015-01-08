@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Common where
 import Control.Applicative
 import Control.Monad (guard)
 
+import Language.PureScript.Comments
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
 import Language.PureScript.Names
@@ -125,6 +126,12 @@ indented = checkIndentation (>) P.<?> "indentation"
 --
 same :: P.Parsec s ParseState ()
 same = checkIndentation (==) P.<?> "no indentation"
+
+-- |
+-- Read the comments from the the next token, without consuming it
+--
+readComments :: P.Parsec [PositionedToken] u [Comment]
+readComments = P.lookAhead $ ptComments <$> P.anyToken
 
 -- |
 -- Run a parser

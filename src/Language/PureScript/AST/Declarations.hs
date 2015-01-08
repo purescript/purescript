@@ -25,6 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Comments
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
@@ -44,7 +45,7 @@ getModuleName (Module name _ _) = name
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
 isExported _ TypeInstanceDeclaration{} = True
-isExported exps (PositionedDeclaration _ d) = isExported exps d
+isExported exps (PositionedDeclaration _ _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
   matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
@@ -54,8 +55,8 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
   matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
   matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
-  matches (PositionedDeclaration _ d) r = d `matches` r
-  matches d (PositionedDeclarationRef _ r) = d `matches` r
+  matches (PositionedDeclaration _ _ d) r = d `matches` r
+  matches d (PositionedDeclarationRef _ _ r) = d `matches` r
   matches _ _ = False
 
 exportedDeclarations :: Module -> [Declaration]
@@ -68,7 +69,7 @@ isDctorExported :: ProperName -> Maybe [DeclarationRef] -> ProperName -> Bool
 isDctorExported _ Nothing _ = True
 isDctorExported ident (Just exps) ctor = test `any` exps
   where
-  test (PositionedDeclarationRef _ d) = test d
+  test (PositionedDeclarationRef _ _ d) = test d
   test (TypeRef ident' Nothing) = ident == ident'
   test (TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
   test _ = False
@@ -82,7 +83,7 @@ exportedDctors (Module _ decls exps) ident =
   where
   dctors = concatMap getDctors (flattenDecls decls)
   getDctors (DataDeclaration _ _ _ ctors) = map fst ctors
-  getDctors (PositionedDeclaration _ d) = getDctors d
+  getDctors (PositionedDeclaration _ _ d) = getDctors d
   getDctors _ = []
 
 -- |
@@ -108,7 +109,7 @@ data DeclarationRef
   -- |
   -- A declaration reference with source position information
   --
-  | PositionedDeclarationRef SourceSpan DeclarationRef
+  | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
   deriving (Show, D.Data, D.Typeable)
 
 instance Eq DeclarationRef where
@@ -116,8 +117,8 @@ instance Eq DeclarationRef where
   (ValueRef name)        == (ValueRef name')        = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
-  (PositionedDeclarationRef _ r) == r' = r == r'
-  r == (PositionedDeclarationRef _ r') = r == r'
+  (PositionedDeclarationRef _ _ r) == r' = r == r'
+  r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
 
 -- |
@@ -198,7 +199,7 @@ data Declaration
   -- |
   -- A declaration with source position information
   --
-  | PositionedDeclaration SourceSpan Declaration
+  | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, D.Data, D.Typeable)
 
 -- |
@@ -206,7 +207,7 @@ data Declaration
 --
 isValueDecl :: Declaration -> Bool
 isValueDecl ValueDeclaration{} = True
-isValueDecl (PositionedDeclaration _ d) = isValueDecl d
+isValueDecl (PositionedDeclaration _ _ d) = isValueDecl d
 isValueDecl _ = False
 
 -- |
@@ -215,7 +216,7 @@ isValueDecl _ = False
 isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
 isDataDecl TypeSynonymDeclaration{} = True
-isDataDecl (PositionedDeclaration _ d) = isDataDecl d
+isDataDecl (PositionedDeclaration _ _ d) = isDataDecl d
 isDataDecl _ = False
 
 -- |
@@ -223,7 +224,7 @@ isDataDecl _ = False
 --
 isImportDecl :: Declaration -> Bool
 isImportDecl ImportDeclaration{} = True
-isImportDecl (PositionedDeclaration _ d) = isImportDecl d
+isImportDecl (PositionedDeclaration _ _ d) = isImportDecl d
 isImportDecl _ = False
 
 -- |
@@ -231,7 +232,7 @@ isImportDecl _ = False
 --
 isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
-isExternDataDecl (PositionedDeclaration _ d) = isExternDataDecl d
+isExternDataDecl (PositionedDeclaration _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
@@ -239,7 +240,7 @@ isExternDataDecl _ = False
 --
 isExternInstanceDecl :: Declaration -> Bool
 isExternInstanceDecl ExternInstanceDeclaration{} = True
-isExternInstanceDecl (PositionedDeclaration _ d) = isExternInstanceDecl d
+isExternInstanceDecl (PositionedDeclaration _ _ d) = isExternInstanceDecl d
 isExternInstanceDecl _ = False
 
 -- |
@@ -247,7 +248,7 @@ isExternInstanceDecl _ = False
 --
 isFixityDecl :: Declaration -> Bool
 isFixityDecl FixityDeclaration{} = True
-isFixityDecl (PositionedDeclaration _ d) = isFixityDecl d
+isFixityDecl (PositionedDeclaration _ _ d) = isFixityDecl d
 isFixityDecl _ = False
 
 -- |
@@ -255,7 +256,7 @@ isFixityDecl _ = False
 --
 isExternDecl :: Declaration -> Bool
 isExternDecl ExternDeclaration{} = True
-isExternDecl (PositionedDeclaration _ d) = isExternDecl d
+isExternDecl (PositionedDeclaration _ _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
@@ -264,7 +265,7 @@ isExternDecl _ = False
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration TypeInstanceDeclaration{} = True
-isTypeClassDeclaration (PositionedDeclaration _ d) = isTypeClassDeclaration d
+isTypeClassDeclaration (PositionedDeclaration _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 -- |
@@ -383,7 +384,7 @@ data Expr
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourceSpan Expr deriving (Show, D.Data, D.Typeable)
+  | PositionedValue SourceSpan [Comment] Expr deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- An alternative in a case statement
@@ -418,4 +419,4 @@ data DoNotationElement
   -- |
   -- A do notation element with source position information
   --
-  | PositionedDoNotationElement SourceSpan DoNotationElement deriving (Show, D.Data, D.Typeable)
+  | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement deriving (Show, D.Data, D.Typeable)

@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Lexer
   , Token()
   , TokenParser()
   , lex
+  , anyToken
   , token
   , match
   , lparen
@@ -78,14 +79,10 @@ import Data.Functor.Identity
 import Control.Applicative
 
 import Language.PureScript.Parser.State
+import Language.PureScript.Comments
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
-
-data Comment
-  = LineComment String
-  | BlockComment String
-  deriving (Show, Eq, Ord)
   
 data Token
   = LParen
@@ -264,6 +261,9 @@ tokenParser :: PT.GenTokenParser String u Identity
 tokenParser = PT.makeTokenParser langDef
 
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
+ 
+anyToken :: TokenParser PositionedToken
+anyToken = P.token (prettyPrintToken . ptToken) ptSourcePos Just
  
 token :: (Token -> Maybe a) -> TokenParser a
 token f = P.token (prettyPrintToken . ptToken) ptSourcePos (f . ptToken)

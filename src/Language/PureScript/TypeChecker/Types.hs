@@ -296,7 +296,7 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then check val ty' else return val
   return $ TypedValue True val' ty'
-infer' (PositionedValue pos val) = rethrowWithPosition pos $ infer' val
+infer' (PositionedValue pos _ val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
@@ -322,9 +322,9 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
   let ds' = [(ident, LocalVariable, val') | (ident, (val', _)) <- ds1' ++ ds2']
   makeBindingGroupVisible $ bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos d : ds) ret j = rethrowWithPosition pos $ do
+inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = rethrowWithPosition pos $ do
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
-  return (PositionedDeclaration pos d' : ds', val')
+  return (PositionedDeclaration pos com d' : ds', val')
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
 
 -- |
@@ -394,7 +394,7 @@ inferBinder val (ConsBinder headBinder tailBinder) = do
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
-inferBinder val (PositionedBinder pos binder) =
+inferBinder val (PositionedBinder pos _ binder) =
   rethrowWithPosition pos $ inferBinder val binder
 
 -- |
@@ -563,7 +563,7 @@ check' val kt@(KindedType ty kind) = do
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   val' <- check' val ty
   return $ TypedValue True val' kt
-check' (PositionedValue pos val) ty =
+check' (PositionedValue pos _ val) ty =
   rethrowWithPosition pos $ check val ty
 check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
 

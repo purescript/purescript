@@ -84,7 +84,7 @@ superClasses :: P.Declaration -> [SuperMap]
 superClasses (P.TypeClassDeclaration sub _ supers@(_:_) _) =
   fmap (\(P.Qualified _ super, _) -> SuperMap (Right (super, sub))) supers
 superClasses (P.TypeClassDeclaration sub _ _ _) = [SuperMap (Left sub)]
-superClasses (P.PositionedDeclaration _ decl) = superClasses decl
+superClasses (P.PositionedDeclaration _ _ decl) = superClasses decl
 superClasses _ = []
 
 inputFile :: Parser FilePath
