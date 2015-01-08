@@ -17,7 +17,7 @@ module Language.PureScript.CoreFn.Ann where
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.Types
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 
 -- |
 -- Type alias for basic annotations

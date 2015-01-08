@@ -33,6 +33,7 @@ import Control.Monad.Error
 import System.FilePath ((</>))
 
 import Language.PureScript.AST as P
+import Language.PureScript.Comments as P
 import Language.PureScript.CodeGen as P
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P

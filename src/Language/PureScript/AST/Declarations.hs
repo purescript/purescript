@@ -25,7 +25,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 

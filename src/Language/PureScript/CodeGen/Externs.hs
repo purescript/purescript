@@ -30,7 +30,7 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 
 -- |
 -- Generate foreign imports for all declarations in a module

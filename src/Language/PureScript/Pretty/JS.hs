@@ -29,7 +29,7 @@ import qualified Control.Arrow as A
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Parser.Lexer (Comment(..))
+import Language.PureScript.Comments
 
 import Numeric
 

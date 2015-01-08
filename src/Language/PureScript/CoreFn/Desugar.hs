@@ -33,7 +33,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 import qualified Language.PureScript.AST as A
 
 -- |

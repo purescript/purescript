@@ -13,11 +13,10 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE TupleSections, DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 module Language.PureScript.Parser.Lexer 
   ( PositionedToken(..)
-  , Comment(..)
   , Token()
   , TokenParser()
   , lex
@@ -75,19 +74,13 @@ import Prelude hiding (lex)
 import Control.Monad (void, guard)
 import Data.Functor.Identity
 
-import qualified Data.Data as D
-
 import Control.Applicative
 
 import Language.PureScript.Parser.State
+import Language.PureScript.Comments
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
-
-data Comment
-  = LineComment String
-  | BlockComment String
-  deriving (Show, Eq, Ord, D.Data, D.Typeable)
   
 data Token
   = LParen

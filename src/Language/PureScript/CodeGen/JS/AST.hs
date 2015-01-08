@@ -19,7 +19,7 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Data.Data
 
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 
 -- |
 -- Built-in unary operators

@@ -35,8 +35,9 @@ import Control.Applicative
 import Control.Arrow ((+++))
 
 import Language.PureScript.Kinds
-import Language.PureScript.Parser.Common
 import Language.PureScript.AST
+import Language.PureScript.Comments
+import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer

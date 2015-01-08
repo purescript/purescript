@@ -20,7 +20,7 @@ import qualified Data.Data as D
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
-import Language.PureScript.Parser.Lexer
+import Language.PureScript.Comments
 
 -- |
 -- Data type for binders
