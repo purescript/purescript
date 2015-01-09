@@ -273,11 +273,11 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ unary     BitwiseNot           "~" ]
                   , [ unary     Negate               "-" ]
                   , [ unary     Positive             "+" ]
-                  , [ binary    Multiply             "*" ]
-                  , [ binary    Divide               "/" ]
-                  , [ binary    Modulus              "%" ]
-                  , [ binary    Add                  "+" ]
-                  , [ binary    Subtract             "-" ]
+                  , [ binary    Multiply             "*"
+                    , binary    Divide               "/"
+                    , binary    Modulus              "%" ]
+                  , [ binary    Add                  "+"
+                    , binary    Subtract             "-" ]
                   , [ binary    ShiftLeft            "<<" ]
                   , [ binary    ShiftRight           ">>" ]
                   , [ binary    ZeroFillShiftRight   ">>>" ]
