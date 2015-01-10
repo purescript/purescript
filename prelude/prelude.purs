@@ -8,7 +8,7 @@ module Prelude
   , ($), (#)
   , (:), cons
   , Show, show
-  , Functor, (<$>), (<#>), void
+  , Functor, (<$>), (<#>), void, fmap
   , Apply, (<*>)
   , Applicative, pure, liftA1
   , Bind, (>>=)
@@ -119,6 +119,9 @@ module Prelude
 
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  fmap :: forall f a b. (Functor f) => (a -> b) -> f a -> f b
+  fmap = (<$>)
 
   (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
   (<#>) fa f = f <$> fa
