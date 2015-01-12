@@ -215,7 +215,7 @@ isTypeInstanceDeclaration _ = False
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
-  <> help "The input .ps file(s)"
+  <> help "The input .purs file(s)"
 
 includeHeirarcy :: Parser Bool
 includeHeirarcy = switch $ 
