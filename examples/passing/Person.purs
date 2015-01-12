@@ -5,9 +5,11 @@ module Main where
   data Person = Person { name :: String, age :: Number }
 
   foreign import itoa 
-    "function itoa(n) {\
-    \  return n.toString();\
-    \}" :: Number -> String
+    """
+    function itoa(n) {
+      return n.toString();
+    }
+    """ :: Number -> String
 	  
   showPerson :: Person -> String
   showPerson = \p -> case p of

@@ -1,14 +1,16 @@
 module Main where
 
 foreign import testError
-  "function testError(f) {\
-  \  try {\
-  \    return f();\
-  \  } catch (e) {\
-  \    if (e instanceof Error) return 'success';\
-  \    throw new Error('Pattern match failure is not Error');\
-  \  }\
-  \}" :: (Unit -> Number) -> String
+  """
+  function testError(f) {
+    try {
+      return f();
+    } catch (e) {
+      if (e instanceof Error) return 'success';
+      throw new Error('Pattern match failure is not Error');
+    }
+  }
+  """ :: (Unit -> Number) -> String
 
 fn :: Number -> Number
 fn 0 = 0
