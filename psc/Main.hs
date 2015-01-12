@@ -147,7 +147,7 @@ useStdIn = switch $
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
-  <> help "The input .ps file(s)"
+  <> help "The input .purs file(s)"
 
 outputFile :: Parser (Maybe FilePath)
 outputFile = optional . strOption $
@@ -159,7 +159,7 @@ externsFile :: Parser (Maybe FilePath)
 externsFile = optional . strOption $
      short 'e'
   <> long "externs"
-  <> help "The output .e.ps file"
+  <> help "The output .e.purs file"
 
 noPrefix :: Parser Bool
 noPrefix = switch $ 

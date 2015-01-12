@@ -101,7 +101,7 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
-  <> help "The input .ps file(s)"
+  <> help "The input .purs file(s)"
 
 outputDirectory :: Parser FilePath
 outputDirectory = strOption $
