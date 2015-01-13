@@ -271,7 +271,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
                   , [ unary     Not                  "!" ]
                   , [ unary     BitwiseNot           "~" ]
-                  , [ unary     Negate               "-" ]
+                  , [ unary     Negate               "- " ]
                   , [ unary     Positive             "+" ]
                   , [ binary    Multiply             "*"
                     , binary    Divide               "/"
