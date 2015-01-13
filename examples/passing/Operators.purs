@@ -67,6 +67,12 @@ module Main where
   test17 :: Number
   test17 = negate (-1)
 
+  test18 :: Number
+  test18 = negate $ negate 1
+
+  test19 :: Number
+  test19 = negate $ negate (-1)
+
   main = do
     let t1 = test1 1 2 (\x y -> x + y)
     let t2 = test2
@@ -85,4 +91,6 @@ module Main where
     let t15 = test15 1 2
     let t16 = test16 1 2
     let t17 = test17
+    let t18 = test18
+    let t19 = test19
     trace "Done"

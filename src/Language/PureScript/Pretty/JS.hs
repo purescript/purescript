@@ -222,10 +222,10 @@ unary :: UnaryOperator -> String -> Operator PrinterState JS String
 unary op str = unary' op (const str)
 
 negateOperator :: Operator PrinterState JS String
-negateOperator = unary' Negate (\v -> if isNegative v then "- " else "-")
+negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
   where
-  isNegative (JSNumericLiteral num) | either (<0) (<0) num = True
-  isNegative _ = False
+  isNegate (JSUnary Negate _) = True
+  isNegate _ = False
 
 binary :: BinaryOperator -> String -> Operator PrinterState JS String
 binary op str = AssocL match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
