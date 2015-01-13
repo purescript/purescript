@@ -209,14 +209,23 @@ instanceOf = mkPattern match
   match (JSInstanceOf val ty) = Just (val, ty)
   match _ = Nothing
 
-unary :: UnaryOperator -> String -> Operator PrinterState JS String
-unary op str = Wrap match (++)
+unary' :: UnaryOperator -> (JS -> String) -> Operator PrinterState JS String
+unary' op mkStr = Wrap match (++)
   where
   match :: Pattern PrinterState JS (String, JS)
   match = mkPattern match'
     where
-    match' (JSUnary op' val) | op' == op = Just (str, val)
+    match' (JSUnary op' val) | op' == op = Just (mkStr val, val)
     match' _ = Nothing
+
+unary :: UnaryOperator -> String -> Operator PrinterState JS String
+unary op str = unary' op (const str)
+
+negateOperator :: Operator PrinterState JS String
+negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
+  where
+  isNegate (JSUnary Negate _) = True
+  isNegate _ = False
 
 binary :: BinaryOperator -> String -> Operator PrinterState JS String
 binary op str = AssocL match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
@@ -271,7 +280,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
                   , [ unary     Not                  "!" ]
                   , [ unary     BitwiseNot           "~" ]
-                  , [ unary     Negate               "-" ]
+                  , [ negateOperator ]
                   , [ unary     Positive             "+" ]
                   , [ binary    Multiply             "*"
                     , binary    Divide               "/"

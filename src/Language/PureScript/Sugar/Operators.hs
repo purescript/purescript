@@ -58,8 +58,6 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
 
-  go (UnaryMinus (NumericLiteral (Left n))) = NumericLiteral (Left $ negate n)
-  go (UnaryMinus (NumericLiteral (Right n))) = NumericLiteral (Right $ negate n)
   go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
   go other = other
 
