@@ -9,6 +9,7 @@ PureScript is a small strongly, statically typed programming language with expre
 - [Wiki](http://wiki.purescript.org)
 - [#purescript IRC @ FreeNode](http://webchat.freenode.net/?channels=purescript)
 - [Twitter](http://twitter.com/purescript)
+- [Google Group](https://groups.google.com/forum/#!forum/purescript)
 - [Try PureScript!](http://try.purescript.org/)
 - [Pursuit Search Engine](http://pursuit.purescript.org/)
 - [Release Notes](https://github.com/purescript/purescript/blob/master/RELEASE-0.6.md)
