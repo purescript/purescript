@@ -472,7 +472,8 @@ check' (ArrayLiteral vals) t@(TypeApp a ty) = do
   a =?= tyArray
   array <- ArrayLiteral <$> forM vals (`check` ty)
   return $ TypedValue True array t
-check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) | t == tyFunction = do
+check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
+  t =?= tyFunction
   Just moduleName <- checkCurrentModule <$> get
   ret' <- makeBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
   return $ TypedValue True (Abs (Left arg) ret') ty
