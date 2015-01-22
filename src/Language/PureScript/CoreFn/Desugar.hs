@@ -49,6 +49,11 @@ moduleToCoreFn env (A.Module mn decls (Just exps)) =
 moduleToCoreFn _ (A.Module{}) =
   error "Module exports were not elaborated before moduleToCoreFn"
 
+-- |
+-- Find module names from qualified references to values. This is used to
+-- ensure instances are imported from any module that is referenced by the
+-- current module, not just from those that are imported explicitly (#667).
+--
 findQualModules :: [A.Declaration] -> [ModuleName]
 findQualModules decls =
   let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
