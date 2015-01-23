@@ -28,11 +28,10 @@ import System.Process
 import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
-import qualified System.IO.UTF8 as U
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- U.readFile inputFile
+  text <- readFile inputFile
   return (inputFile, text)
 
 loadPrelude :: Either String (String, String, P.Environment)

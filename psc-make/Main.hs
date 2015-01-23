@@ -31,7 +31,6 @@ import System.IO.Error (tryIOError)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
 
 data PSCMakeOptions = PSCMakeOptions
@@ -48,7 +47,7 @@ data InputOptions = InputOptions
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
-  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> U.readFile inFile
+  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
   return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
 newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
@@ -66,27 +65,27 @@ instance P.MonadMake Make where
       True -> Just <$> getModificationTime path
       False -> return Nothing
   readTextFile path = makeIO $ do
-    U.putStrLn $ "Reading " ++ path
-    U.readFile path
+    putStrLn $ "Reading " ++ path
+    readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
-    U.putStrLn $ "Writing " ++ path
-    U.writeFile path text
+    putStrLn $ "Writing " ++ path
+    writeFile path text
   liftError = either throwError return
-  progress = makeIO . U.putStrLn
+  progress = makeIO . putStrLn
 
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions input outputDir opts usePrefix) = do
   modules <- P.parseModulesFromFiles (either (const "") id) <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
   case modules of
     Left err -> do
-      U.print err
+      print err
       exitFailure
     Right ms -> do
       e <- runMake $ P.make outputDir opts ms prefix
       case e of
         Left err -> do
-          U.putStrLn err
+          putStrLn err
           exitFailure
         Right _ -> do
           exitSuccess
