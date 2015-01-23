@@ -25,13 +25,12 @@ import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.Exit (exitFailure, exitSuccess)
-import System.IO (stderr)
+import System.IO (hPutStr, stderr)
 
 import Text.Parsec as Par (ParseError)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
 
 data HierarchyOptions = HierarchyOptions
@@ -56,14 +55,14 @@ runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
 readInput :: FilePath -> IO (Either Par.ParseError [P.Module])
 readInput filename = do
-  content <- U.readFile filename
+  content <- readFile filename
   return $ fmap (map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions input mOutput) = do
   modules <- readInput input
   case modules of
-    Left err -> U.hPutStr stderr (show err) >> exitFailure
+    Left err -> hPutStr stderr (show err) >> exitFailure
     Right ms -> do
       for_ ms $ \(P.Module moduleName decls _) ->
         let name = runModuleName moduleName
@@ -76,8 +75,8 @@ compile (HierarchyOptions input mOutput) = do
         in unless (null supers) $ case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
-            U.writeFile (output </> name) hier
-          Nothing -> U.putStrLn hier
+            writeFile (output </> name) hier
+          Nothing -> putStrLn hier
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]

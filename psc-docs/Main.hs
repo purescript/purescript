@@ -27,9 +27,8 @@ import Options.Applicative
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (stderr)
+import System.IO (hPutStr, stderr)
 
 
 data PSCDocsOptions = PSCDocsOptions
@@ -43,14 +42,14 @@ docgen (PSCDocsOptions showHierarchy input) = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
-      U.hPutStr stderr $ show err
+      hPutStr stderr $ show err
       exitFailure
     Right ms -> do
-      U.putStrLn . runDocs $ (renderModules showHierarchy) (map snd ms)
+      putStrLn . runDocs $ (renderModules showHierarchy) (map snd ms)
       exitSuccess
 
 parseFile :: FilePath -> IO (FilePath, String)
-parseFile input = (,) input <$> U.readFile input
+parseFile input = (,) input <$> readFile input
 
 type Docs = Writer [String] ()
 

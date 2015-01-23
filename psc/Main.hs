@@ -26,11 +26,10 @@ import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (stderr)
+import System.IO (hPutStr, hPutStrLn, stderr)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
 
 data PSCOptions = PSCOptions
@@ -51,7 +50,7 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
-  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> U.readFile inFile
+  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> readFile inFile
                    return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
 
 compile :: PSCOptions -> IO ()
@@ -59,19 +58,19 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
   modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
-      U.hPutStr stderr $ show err
+      hPutStr stderr $ show err
       exitFailure
     Right ms -> do
       case P.compile opts (map snd ms) prefix of
         Left err -> do
-          U.hPutStrLn stderr err
+          hPutStrLn stderr err
           exitFailure
         Right (js, exts, _) -> do
           case output of
-            Just path -> mkdirp path >> U.writeFile path js
-            Nothing -> U.putStrLn js
+            Just path -> mkdirp path >> writeFile path js
+            Nothing -> putStrLn js
           case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
+            Just path -> mkdirp path >> writeFile path exts
             Nothing -> return ()
           exitSuccess
   where

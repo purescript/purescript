@@ -42,7 +42,6 @@ import System.Exit
 import System.FilePath (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import System.IO.Error (tryIOError)
 import System.Process (readProcessWithExitCode)
-import qualified System.IO.UTF8 as U (writeFile, putStrLn, print, readFile)
 
 import qualified Text.Parsec as Par (ParseError)
 
@@ -129,7 +128,7 @@ getHistoryFilename = do
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
-  content <- U.readFile filename
+  content <- readFile filename
   return $ either (Left . show) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
@@ -138,7 +137,7 @@ loadModule filename = do
 loadAllModules :: [FilePath] -> IO (Either Par.ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
-    content <- U.readFile filename
+    content <- readFile filename
     return (Right filename, content)
   return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
 
@@ -329,12 +328,12 @@ instance P.MonadMake Make where
     if exists
       then Just <$> getModificationTime path
       else return Nothing
-  readTextFile path = makeIO $ U.readFile path
+  readTextFile path = makeIO $ readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
-    U.writeFile path text
+    writeFile path text
   liftError = either throwError return
-  progress s = unless (s == "Compiling $PSCI") $ makeIO . U.putStrLn $ s
+  progress s = unless (s == "Compiling $PSCI") $ makeIO . putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -579,9 +578,9 @@ loadUserConfig = do
   exists <- doesFileExist configFile
   if exists
   then do
-    ls <- lines <$> U.readFile configFile
+    ls <- lines <$> readFile configFile
     case mapM parseCommand ls of
-      Left err -> U.print err >> exitFailure
+      Left err -> print err >> exitFailure
       Right cs -> return $ Just cs
   else
     return Nothing
