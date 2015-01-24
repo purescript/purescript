@@ -120,7 +120,7 @@ accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
 valueToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Expr Ann -> SupplyT m JS
 valueToJs m (Literal _ l) =
   literalToValueJS m l
-valueToJs m (Var (_, _, _, Just (IsConstructor _ 0)) name) =
+valueToJs m (Var (_, _, _, Just (IsConstructor _ [])) name) =
   return $ JSAccessor "value" $ qualifiedToJS m id name
 valueToJs m (Var (_, _, _, Just (IsConstructor _ _)) name) =
   return $ JSAccessor "create" $ qualifiedToJS m id name
@@ -148,7 +148,7 @@ valueToJs m e@App{} = do
   args' <- mapM (valueToJs m) args
   case f of
     Var (_, _, _, Just IsNewtype) _ -> return (head args')
-    Var (_, _, _, Just (IsConstructor _ arity)) name | arity == length args ->
+    Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     Var (_, _, _, Just IsTypeClassConstructor) name ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
