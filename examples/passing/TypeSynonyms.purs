@@ -1,6 +1,6 @@
 module Main where
 
-  type Lens a b = 
+  type Lens a b =
     { get :: a -> b
     , set :: a -> b -> a
     }
@@ -14,7 +14,7 @@ module Main where
   type Pair a b = { fst :: a, snd :: b }
 
   fst :: forall a b. Lens (Pair a b) a
-  fst = 
+  fst =
     { get: \p -> p.fst
     , set: \p a -> { fst: a, snd: p.snd }
     }

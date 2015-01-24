@@ -81,7 +81,7 @@ bindToJs mp (NonRec ident val) = return <$> nonRecToJS mp ident val
 bindToJs mp (Rec vals) = forM vals (uncurry (nonRecToJS mp))
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for a single non-recursive 
+-- Generate code in the simplified Javascript intermediate representation for a single non-recursive
 -- declaration.
 --
 -- The main purpose of this function is to handle code generation for comments.
@@ -92,7 +92,7 @@ nonRecToJS m i e@(extractAnn -> (_, com, _, _)) | not (null com) =
 nonRecToJS mp ident val = do
   js <- valueToJs mp val
   return $ JSVariableIntroduction (identToJs ident) (Just js)
-  
+
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a

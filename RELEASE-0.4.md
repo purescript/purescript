@@ -8,17 +8,17 @@ This release saw major contributions from [a number of new contributors](https:/
 - Try out the latest features [here](http://tryps.functorial.com).
 
 ## Breaking Changes
- 
+
 - Multiple argument functions are no longer available.
 - When used in the browser, PureScript modules are now accessed through `window.PS.<ModuleName>`. The `PS` object name can be changed via the `--browser-namespace` compiler argument.
 - The `--run-main` argument has been replaced with `--main` which can now accept a module name in which to find the `main` function.
- 
+
 ### New Features
- 
+
 - Dead code elimination. The new compiler argument `--module=` can be used to specify one or more modules that should be kept in the generated code along with their dependencies. If no modules are specified, all code is exported.
- 
+
 ### Enhancements
- 
+
 - The `->` and `[]` types are now usable in type class instances.
 - The file path is included in syntax error messages.
 - Most reserved Javascript names (`return`, `const`, etc) are now usable.
@@ -28,9 +28,9 @@ This release saw major contributions from [a number of new contributors](https:/
 - It is no longer necessary to sort modules in order of dependencies manually.
 - Case statements matching data constructors no longer generate unnecessary constructor checks at runtime if there is only a single data constructor.
 - New optimizer rules were added to inline JavaScript's built-in operators.
- 
+
 ### Bug Fixes
- 
+
 - Floats parse correctly.
 - Using data constructors in pattern matches now works properly across modules.
 - PureScript modules no longer overwrite global objects with the same name.
@@ -43,7 +43,7 @@ This release saw major contributions from [a number of new contributors](https:/
 - A bug which allowed skolem variables to escape their scope was add (thanks to Brian McKenna).
 - Modules containing mutually recursive type synonyms and data declarations now compile correctly.
 - A number of bugs in the optimizer were addressed.
- 
+
 ### Libraries
 
 - The `Prelude` has been greatly expanded. Definitions for built-in JavaScript operators have been moved into the Prelude.

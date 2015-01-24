@@ -31,5 +31,5 @@ module Main where
                { "***": n } -> n
 
   test7 {a:    snoog , b     : blah } = blah
-    
+
   main = Debug.Trace.trace "Done"

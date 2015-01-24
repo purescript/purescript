@@ -14,5 +14,5 @@ module Main where
   data A = A
 
   parseTest A 0 = 0
-    
+
   main = Debug.Trace.trace "Done"

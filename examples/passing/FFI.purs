@@ -1,6 +1,6 @@
 module Main where
 
-foreign import foo 
+foreign import foo
   """
   function foo(s) {
     return s;

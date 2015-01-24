@@ -11,8 +11,8 @@ foreign import error
   }
   """ :: forall a. String -> a
 
-main = 
+main =
   let ts = tail [1, 2, 3] in
-  if ts == [2, 3] 
+  if ts == [2, 3]
   then Debug.Trace.trace "Done"
   else error "Incorrect result from 'tails'."

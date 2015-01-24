@@ -52,12 +52,12 @@ createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declara
 createBindingGroups moduleName = mapM f <=< handleDecls
 
   where
-  (f, _, _) = everywhereOnValuesTopDownM return handleExprs return 
-      
+  (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
+
   handleExprs :: Expr -> Either ErrorStack Expr
   handleExprs (Let ds val) = flip Let val <$> handleDecls ds
   handleExprs other = return other
-  
+
   -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
   --

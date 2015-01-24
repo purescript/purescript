@@ -5,7 +5,7 @@ module Main where
   mkValue :: Number -> Number
   mkValue id = id
 
-  foreign import error 
+  foreign import error
     """
     function error(msg) {
       throw msg;

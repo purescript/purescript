@@ -26,9 +26,9 @@ cp README                              build/purescript/
 cp ../LICENSE                          build/purescript/
 
 # Make the binary bundle
-pushd build 
+pushd build
 tar -zcvf ../win64.tar.gz purescript
-popd 
+popd
 
 # Calculate the MD5 hash
 md5sum win64.tar.gz > win64.md5
@@ -36,5 +36,5 @@ md5sum win64.tar.gz > win64.md5
 # Remove the staging directory
 rm -rf build/
 
-popd 
+popd
 
