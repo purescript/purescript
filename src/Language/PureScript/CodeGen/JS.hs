@@ -274,8 +274,8 @@ binderToJs _ varName done (VarBinder _ ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
 binderToJs m varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
   binderToJs m varName done b
-binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType _)) _ ctor bs) = do
-  js <- go 0 done bs
+binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+  js <- go (zip fields bs) done
   return $ case ctorType of
     ProductType -> js
     SumType ->
@@ -283,13 +283,13 @@ binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorT
                 (JSBlock js)
                 Nothing]
   where
-  go :: (Functor m, Applicative m, Monad m) => Integer -> [JS] -> [Binder Ann] -> SupplyT m [JS]
-  go _ done' [] = return done'
-  go index done' (binder:bs') = do
+  go :: (Functor m, Applicative m, Monad m) => [(Ident, Binder Ann)] -> [JS] -> SupplyT m [JS]
+  go [] done' = return done'
+  go ((field, binder) : remain) done' = do
     argVar <- freshName
-    done'' <- go (index + 1) done' bs'
+    done'' <- go remain done'
     js <- binderToJs m argVar done'' binder
-    return (JSVariableIntroduction argVar (Just (JSAccessor ("value" ++ show index) (JSVar varName))) : js)
+    return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
 binderToJs m varName done binder@(ConstructorBinder _ _ ctor _) | isCons ctor = do
   let (headBinders, tailBinder) = uncons [] binder
       numberOfHeadBinders = fromIntegral $ length headBinders
