@@ -104,7 +104,8 @@ declToCoreFn _ _ _ d@(A.DataDeclaration Newtype _ _ _) =
   error $ "Found newtype with multiple constructors: " ++ show d
 declToCoreFn _ ss com (A.DataDeclaration Data tyName _ ctors) =
   flip map ctors $ \(ctor, tys) ->
-    NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor (length tys)
+    let fields = (\n -> Ident $ "value_" ++ show n) `map` [0..length tys]
+    in NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
 declToCoreFn env ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn env ss []) ds
 declToCoreFn env ss com (A.ValueDeclaration name _ _ (Right e)) =
   [NonRec name (exprToCoreFn env ss com Nothing e)]

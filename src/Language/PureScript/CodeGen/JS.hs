@@ -81,7 +81,7 @@ bindToJs mp (NonRec ident val) = return <$> nonRecToJS mp ident val
 bindToJs mp (Rec vals) = forM vals (uncurry (nonRecToJS mp))
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for a single non-recursive 
+-- Generate code in the simplified Javascript intermediate representation for a single non-recursive
 -- declaration.
 --
 -- The main purpose of this function is to handle code generation for comments.
@@ -92,7 +92,7 @@ nonRecToJS m i e@(extractAnn -> (_, com, _, _)) | not (null com) =
 nonRecToJS mp ident val = do
   js <- valueToJs mp val
   return $ JSVariableIntroduction (identToJs ident) (Just js)
-  
+
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for a variable based on a
@@ -171,26 +171,23 @@ valueToJs _ (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
               JSObjectLiteral [("create",
                 JSFunction Nothing ["value"]
                   (JSBlock [JSReturn $ JSVar "value"]))])
-valueToJs _ (Constructor _ _ (ProperName ctor) 0) =
+valueToJs _ (Constructor _ _ (ProperName ctor) []) =
   return $ iife ctor [ JSFunction (Just ctor) [] (JSBlock [])
          , JSAssignment (JSAccessor "value" (JSVar ctor))
               (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
-valueToJs _ (Constructor _ _ (ProperName ctor) arity) =
-  return $ iife ctor [ makeConstructor ctor arity
-         , JSAssignment (JSAccessor "create" (JSVar ctor)) (go ctor 0 arity [])
+valueToJs _ (Constructor _ _ (ProperName ctor) fields) =
+  return $ iife ctor [ makeConstructor ctor fields
+         , JSAssignment (JSAccessor "create" (JSVar ctor)) (makeCreateFn ctor fields)
          ]
     where
-    makeConstructor :: String -> Int -> JS
-    makeConstructor ctorName n =
-      let args = [ "value" ++ show index | index <- [0..n-1] ]
-          body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
-      in JSFunction (Just ctorName) args (JSBlock body)
-    go :: String -> Int -> Int -> [JS] -> JS
-    go pn _ 0 values = JSUnary JSNew $ JSApp (JSVar pn) (reverse values)
-    go pn index n values =
-      JSFunction Nothing ["value" ++ show index]
-        (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
-
+    makeConstructor :: String -> [Ident] -> JS
+    makeConstructor ctorName fs =
+      let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fs ]
+      in JSFunction (Just ctorName) (identToJs `map` fs) (JSBlock body)
+    makeCreateFn :: String -> [Ident] -> JS
+    makeCreateFn ctorName fs =
+      let body = JSUnary JSNew $ JSApp (JSVar ctorName) (var `map` fs)
+      in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
 iife :: String -> [JS] -> JS
 iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
