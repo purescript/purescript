@@ -5,9 +5,11 @@ import Prelude
 tail = \(_:xs) -> xs
 
 foreign import error
-  "function error(msg) {\
-  \  throw msg;\
-  \}" :: forall a. String -> a
+  """
+  function error(msg) {
+    throw msg;
+  }
+  """ :: forall a. String -> a
 
 main = 
   let ts = tail [1, 2, 3] in
