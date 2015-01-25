@@ -49,7 +49,7 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
       tell [ unwords [ show assoc, show prec, ident ] ]
     declToPs (PositionedDeclaration _ com d) = mapM commentToPs com >> declToPs d
     declToPs _ = return ()
-    
+
     commentToPs :: Comment -> Writer [String] ()
     commentToPs (LineComment s) = tell ["-- " ++ s]
     commentToPs (BlockComment s) = tell ["{- " ++ s ++ " -}"]

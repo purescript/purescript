@@ -158,7 +158,7 @@ replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu ty
-  
+
 -- |
 -- Replace type wildcards with unknowns
 --

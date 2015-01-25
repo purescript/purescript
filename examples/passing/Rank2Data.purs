@@ -25,5 +25,5 @@ module Main where
   two = succ zero
   four = add two two
   fourNumber = runNat four
-   
+
   main = Debug.Trace.trace "Done"

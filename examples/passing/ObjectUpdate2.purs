@@ -7,7 +7,7 @@ foreign import x "var x = {};" :: forall r. X r
 blah :: forall r. X r -> X r
 blah x = x
 
-test = blah x 
+test = blah x
   { baz = "blah"
   }
 

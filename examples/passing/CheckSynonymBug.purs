@@ -2,7 +2,7 @@ module Main where
 
   import Prelude
 
-  type Foo a = [a]  
+  type Foo a = [a]
 
   foreign import length
     """

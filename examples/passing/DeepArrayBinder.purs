@@ -6,7 +6,7 @@ match2 :: [Number] -> Number
 match2 (x : y : xs) = x * y + match2 xs
 match2 _ = 0
 
-foreign import explode 
+foreign import explode
   """
   function explode() {
     throw new Error('Incorrect result');

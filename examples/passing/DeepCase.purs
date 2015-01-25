@@ -4,9 +4,9 @@ import Debug.Trace
 import Control.Monad.Eff
 import Control.Monad.ST
 
-f x y = 
+f x y =
   let
-    g = case y of 
+    g = case y of
 	  0 -> x
           x -> 1 + x * x
   in g + x + y

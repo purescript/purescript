@@ -115,25 +115,25 @@ runMain = optional $ noArgs <|> withArgs
   where
   defaultVal = "Main"
   noArgs     = flag' defaultVal (long "main")
-  withArgs   = strOption $ 
+  withArgs   = strOption $
         long "main"
      <> help (concat [
             "Generate code to run the main method in the specified module. ",
             "(no argument: \"", defaultVal, "\")"
         ])
-        
+
 noMagicDo :: Parser Bool
 noMagicDo = switch $
      long "no-magic-do"
   <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
-        
+
 noTco :: Parser Bool
-noTco = switch $ 
+noTco = switch $
      long "no-tco"
   <> help "Disable tail call optimizations"
 
 noPrelude :: Parser Bool
-noPrelude = switch $ 
+noPrelude = switch $
      long "no-prelude"
   <> help "Omit the Prelude"
 
@@ -161,22 +161,22 @@ externsFile = optional . strOption $
   <> help "The output .e.purs file"
 
 noPrefix :: Parser Bool
-noPrefix = switch $ 
+noPrefix = switch $
      short 'p'
   <> long "no-prefix"
   <> help "Do not include comment header"
 
 options :: Parser (P.Options P.Compile)
-options = P.Options <$> noPrelude 
-                    <*> noTco 
+options = P.Options <$> noPrelude
+                    <*> noTco
                     <*> noMagicDo
                     <*> runMain
                     <*> noOpts
                     <*> verboseErrors
                     <*> additionalOptions
   where
-  additionalOptions = 
-    P.CompileOptions <$> browserNamespace 
+  additionalOptions =
+    P.CompileOptions <$> browserNamespace
                      <*> many dceModule
                      <*> many codeGenModule
 
@@ -195,7 +195,7 @@ main = execParser opts >>= compile
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psc - Compiles PureScript to Javascript"
   footerInfo  = footer $ "psc " ++ showVersion Paths.version
-  
+
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
 

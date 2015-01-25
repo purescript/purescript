@@ -2,7 +2,7 @@ module Main where
 
   import Prelude
 
-  test = \x -> case x of 
+  test = \x -> case x of
     { str = "Foo", bool = true } -> true
     { str = "Bar", bool = b } -> b
     _ -> false
@@ -17,12 +17,12 @@ module Main where
     _ -> 0
 
 
-  h = \o -> case o of 
+  h = \o -> case o of
     a@[_,_,_] -> a
     _ -> []
 
   isDesc :: [Number] -> Boolean
   isDesc [x, y] | x > y = true
   isDesc _ = false
-    
+
   main = Debug.Trace.trace "Done"

@@ -150,7 +150,7 @@ executable psci
     ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any, 
+    build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any
     main-is: Main.hs
     buildable: True

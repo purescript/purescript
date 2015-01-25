@@ -34,8 +34,8 @@ import qualified Language.PureScript.Parser.Common as C (mark, same)
 -- Parses PSCI metacommands or expressions input from the user.
 --
 parseCommand :: String -> Either String Command
-parseCommand cmdString = 
-  case splitCommand cmdString of 
+parseCommand cmdString =
+  case splitCommand cmdString of
     Just ('?', _) -> return Help
     Just ('q', _) -> return Quit
     Just ('r', _) -> return Reset
@@ -52,7 +52,7 @@ parseCommand cmdString =
   parseRest p s = either (Left . show) Right $ do
     ts <- P.lex "" s
     P.runTokenParser "" (p <* eof) ts
-  
+
   trimEnd :: String -> String
   trimEnd = reverse . dropWhile isSpace . reverse
 
@@ -68,7 +68,7 @@ parseCommand cmdString =
   --
   psciExpression :: P.TokenParser Command
   psciExpression = Expression <$> P.parseValue
-  
+
   -- |
   -- PSCI version of @let@.
   -- This is essentially let from do-notation.

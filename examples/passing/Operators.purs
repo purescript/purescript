@@ -2,7 +2,7 @@ module Main where
 
   import Control.Monad.Eff
   import Debug.Trace
-  
+
   (?!) :: forall a. a -> a -> a
   (?!) x _ = x
 
@@ -29,7 +29,7 @@ module Main where
 
   test6 = ((\x -> x) `k` 2) 3
 
-  (<+>) :: String -> String -> String 
+  (<+>) :: String -> String -> String
   (<+>) = \s1 s2 -> s1 ++ s2
 
   test7 = "Hello" <+> "World!"
@@ -39,7 +39,7 @@ module Main where
 
   foo :: String -> String
   foo = \s -> s
- 
+
   test8 = foo @@ "Hello World"
 
   test9 = Main.foo @@ "Hello World"
@@ -52,7 +52,7 @@ module Main where
   test11 = [1, 2, 3] ... [4, 5, 6]
 
   test12 (<%>) a b = a <%> b
-  
+
   test13 = \(<%>) a b -> a <%> b
 
   test14 :: Number -> Number -> Boolean
@@ -61,7 +61,7 @@ module Main where
   test15 :: Number -> Number -> Boolean
   test15 a b = const false $ a `test14` b
 
-  test16 :: Number -> Number -> Number 
+  test16 :: Number -> Number -> Number
   test16 x y = x .|. y .&. y
 
   test17 :: Number

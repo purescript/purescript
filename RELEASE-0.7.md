@@ -12,7 +12,7 @@ positive _ = false
 but this is not:
 
 ```haskell
-positive n | n > 0 
+positive n | n > 0
   = true
 positive _ = false
 ```
@@ -32,20 +32,20 @@ positive _ = false
 
 ### Breaking Changes
 
-- 
+-
 
 ### New Features
 
-- 
+-
 
 ### Enhancements
 
-- 
+-
 
 ### Libraries
 
-- 
+-
 
 ### Documentation
 
-- 
+-

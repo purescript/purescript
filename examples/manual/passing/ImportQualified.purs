@@ -1,5 +1,5 @@
 module M1 where
-  
+
   trace x = x
 
 module Main where
@@ -8,5 +8,5 @@ module Main where
   import Control.Monad.Eff
   import M1
   import qualified Debug.Trace as T
-  
+
   main = T.trace (trace "Done")
