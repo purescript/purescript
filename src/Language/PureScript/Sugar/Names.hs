@@ -219,9 +219,12 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> Either ErrorStack ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) = return ((Just pos', bound), v)
   updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
-  updateValue (pos, bound) (Let ds val') =
+  updateValue (pos, bound) (Let ds val') = do
       let args = mapMaybe letBoundVariable ds
-      in return ((pos, args ++ bound), Let ds val')
+      unless (length (nub args) == length args) $ 
+        throwError $ maybe id (\p e -> positionError p <> e) pos $ mkErrorStack ("Overlapping names in let binding.") Nothing
+      return ((pos, args ++ bound), Let ds val')
+      where
   updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
     (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
   updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
