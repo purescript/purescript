@@ -52,6 +52,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty
+import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Monad
@@ -271,8 +272,8 @@ infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . strMsg $ "Constructor " ++ show c ++ " is undefined"
-    Just (_, _, ty) -> do ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
-                          return $ TypedValue True v ty'
+    Just (_, _, ty) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
+                          return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
   ret <- fresh
