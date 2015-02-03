@@ -582,18 +582,14 @@ containsTypeSynonyms = everythingOnTypes (||) go where
 checkProperties :: [(String, Expr)] -> Type -> Bool -> UnifyT Type Check [(String, Expr)]
 checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
-  go [] [] u@(TUnknown _) = do u =?= REmpty
-                               return []
+  go [] [] u@(TUnknown _) 
+    | lax = return []
+    | otherwise = do u =?= REmpty
+                     return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
   go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
-  go ((p,v):ps') [] u@(TUnknown _) = do
-    v'@(TypedValue _ _ ty) <- infer v
-    rest <- fresh
-    u =?= RCons p ty rest
-    ps'' <- go ps' [] rest
-    return $ (p, v') : ps''
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
