@@ -89,7 +89,7 @@ addTypeClass moduleName pn args implies ds =
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
-  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
+  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ } <- entries ]
   in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
 
 checkDuplicateTypeArguments :: [String] -> Check ()
