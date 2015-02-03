@@ -565,7 +565,7 @@ check' val kt@(KindedType ty kind) = do
   val' <- check' val ty
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
-  rethrowWithPosition pos $ check val ty
+  rethrowWithPosition pos $ check' val ty
 check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
 
 containsTypeSynonyms :: Type -> Bool
