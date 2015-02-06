@@ -320,6 +320,11 @@ data Expr
   --
   | ObjectLiteral [(String, Expr)]
   -- |
+  -- An object constructor (object literal with underscores). This will be removed during
+  -- desugaring and expanded into a lambda that returns an object literal.
+  --
+  | ObjectConstructor [(String, Maybe Expr)]
+  -- |
   -- An record property accessor expression
   --
   | Accessor String Expr
