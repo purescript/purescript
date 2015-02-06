@@ -437,7 +437,7 @@ parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* at)
                                <*> (C.indented *> parseBinder)
 
 parseNullBinder :: TokenParser Binder
-parseNullBinder = reserved "_" *> return NullBinder
+parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
 parseIdentifierAndBinder = do
