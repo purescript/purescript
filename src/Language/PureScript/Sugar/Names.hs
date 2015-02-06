@@ -107,9 +107,12 @@ addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Eith
 addType env mn name dctors = updateExportedModule env mn $ \m -> do
   let exTypes = exportedTypes m
   let exDctors = snd `concatMap` exTypes
+  let exClasses = exportedTypeClasses m
   when (any ((== name) . fst) exTypes) $ throwMultipleDefError "type" name
-  forM_ dctors $ \dctor ->
+  when (any (== name) exClasses) $ throwConflictingDefError "Type" "type class" name
+  forM_ dctors $ \dctor -> do
     when (any (== dctor) exDctors) $ throwMultipleDefError "data constructor" dctor
+    when (any (== dctor) exClasses) $ throwConflictingDefError "Data constructor" "type class" dctor
   return $ m { exportedTypes = (name, dctors) : exTypes }
 
 -- |
@@ -117,6 +120,10 @@ addType env mn name dctors = updateExportedModule env mn $ \m -> do
 --
 addTypeClass :: ExportEnvironment -> ModuleName -> ProperName -> Either ErrorStack ExportEnvironment
 addTypeClass env mn name = updateExportedModule env mn $ \m -> do
+  let exTypes = exportedTypes m
+  let exDctors = snd `concatMap` exTypes
+  when (any ((== name) . fst) exTypes) $ throwConflictingDefError "Type class" "type" name
+  when (any (== name) exDctors) $ throwConflictingDefError "Type class" "data constructor" name
   classes <- addExport "type class" (exportedTypeClasses m) name
   return $ m { exportedTypeClasses = classes }
 
@@ -534,4 +541,12 @@ resolveImport currentModule importModule exps imps impQual =
 throwMultipleDefError :: (Show a) => String -> a -> Either ErrorStack b
 throwMultipleDefError what name = throwError $
   mkErrorStack ("Multiple definitions for " ++ what ++ " '" ++ show name ++ "'") Nothing
+
+-- |
+-- Raises an error for when there is a conflicting definition for something, for example, a type
+-- class and data constructor of the same name.
+--
+throwConflictingDefError :: (Show a) => String -> String -> a -> Either ErrorStack b
+throwConflictingDefError what1 what2 name = throwError $
+  mkErrorStack (what1 ++ " '" ++ show name ++ "' cannot be defined in the same module as a " ++ what2 ++ " of the same name") Nothing
 
