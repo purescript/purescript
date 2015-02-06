@@ -54,8 +54,8 @@ data Exports = Exports
   , exportedTypeClasses :: [ProperName]
   -- |
   -- The values exported from each module
-  , exportedValues :: [Ident]
   --
+  , exportedValues :: [Ident]
   } deriving (Show)
 
 -- |
@@ -105,15 +105,26 @@ addEmptyModule env name =
 --
 addType :: ExportEnvironment -> ModuleName -> ProperName -> [ProperName] -> Either ErrorStack ExportEnvironment
 addType env mn name dctors = updateExportedModule env mn $ \m -> do
-  types' <- addExport (exportedTypes m) (name, dctors)
-  return $ m { exportedTypes = types' }
+  let exTypes = exportedTypes m
+  let exDctors = snd `concatMap` exTypes
+  let exClasses = exportedTypeClasses m
+  when (any ((== name) . fst) exTypes) $ throwMultipleDefError "type" name
+  when (any (== name) exClasses) $ throwConflictingDefError "Type" "type class" name
+  forM_ dctors $ \dctor -> do
+    when (any (== dctor) exDctors) $ throwMultipleDefError "data constructor" dctor
+    when (any (== dctor) exClasses) $ throwConflictingDefError "Data constructor" "type class" dctor
+  return $ m { exportedTypes = (name, dctors) : exTypes }
 
 -- |
 -- Adds a class to the export environment.
 --
 addTypeClass :: ExportEnvironment -> ModuleName -> ProperName -> Either ErrorStack ExportEnvironment
 addTypeClass env mn name = updateExportedModule env mn $ \m -> do
-  classes <- addExport (exportedTypeClasses m) name
+  let exTypes = exportedTypes m
+  let exDctors = snd `concatMap` exTypes
+  when (any ((== name) . fst) exTypes) $ throwConflictingDefError "Type class" "type" name
+  when (any (== name) exDctors) $ throwConflictingDefError "Type class" "data constructor" name
+  classes <- addExport "type class" (exportedTypeClasses m) name
   return $ m { exportedTypeClasses = classes }
 
 -- |
@@ -121,17 +132,17 @@ addTypeClass env mn name = updateExportedModule env mn $ \m -> do
 --
 addValue :: ExportEnvironment -> ModuleName -> Ident -> Either ErrorStack ExportEnvironment
 addValue env mn name = updateExportedModule env mn $ \m -> do
-  values <- addExport (exportedValues m) name
+  values <- addExport "value" (exportedValues m) name
   return $ m { exportedValues = values }
 
 -- |
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (Eq a, Show a) => [a] -> a -> Either ErrorStack [a]
-addExport exports name =
+addExport :: (Eq a, Show a) => String -> [a] -> a -> Either ErrorStack [a]
+addExport what exports name =
   if name `elem` exports
-  then throwError $ mkErrorStack ("Multiple definitions for '" ++ show name ++ "'") Nothing
+  then throwMultipleDefError what name
   else return $ name : exports
 
 -- |
@@ -221,7 +232,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue (pos, bound) (Abs (Left arg) val') = return ((pos, arg : bound), Abs (Left arg) val')
   updateValue (pos, bound) (Let ds val') = do
       let args = mapMaybe letBoundVariable ds
-      unless (length (nub args) == length args) $ 
+      unless (length (nub args) == length args) $
         throwError $ maybe id (\p e -> positionError p <> e) pos $ mkErrorStack ("Overlapping names in let binding.") Nothing
       return ((pos, args ++ bound), Let ds val')
       where
@@ -327,7 +338,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
   addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
-  addDecl mn env (PositionedDeclaration _ _ d) = addDecl mn env d
+  addDecl mn env (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ addDecl mn env d
   addDecl _  env _ = return env
 
 -- |
@@ -523,3 +534,19 @@ resolveImport currentModule importModule exps imps impQual =
       if item `elem` exports
       then return item
       else throwError $ mkErrorStack ("Cannot import unknown " ++ t ++  " '" ++ show item ++ "' from '" ++ show importModule ++ "'") Nothing
+
+-- |
+-- Raises an error for when there is more than one definition for something.
+--
+throwMultipleDefError :: (Show a) => String -> a -> Either ErrorStack b
+throwMultipleDefError what name = throwError $
+  mkErrorStack ("Multiple definitions for " ++ what ++ " '" ++ show name ++ "'") Nothing
+
+-- |
+-- Raises an error for when there is a conflicting definition for something, for example, a type
+-- class and data constructor of the same name.
+--
+throwConflictingDefError :: (Show a) => String -> String -> a -> Either ErrorStack b
+throwConflictingDefError what1 what2 name = throwError $
+  mkErrorStack (what1 ++ " '" ++ show name ++ "' cannot be defined in the same module as a " ++ what2 ++ " of the same name") Nothing
+
