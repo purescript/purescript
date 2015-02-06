@@ -26,20 +26,19 @@ import Language.PureScript.Names
 
 desugarObjectConstructors :: Module -> Module
 desugarObjectConstructors (Module mn ds exts) = Module mn (map desugarDecl ds) exts
+  where
 
-desugarDecl :: Declaration -> Declaration
-desugarDecl d =
-  let (f, _, _) = everywhereOnValues id desugarExpr id
-  in f d
+  desugarDecl :: Declaration -> Declaration
+  (desugarDecl, _, _) = everywhereOnValues id desugarExpr id
 
-desugarExpr :: Expr -> Expr
-desugarExpr (ObjectConstructor ps) =
-  let (props, args) = partition (isJust . snd) ps
-  in if null args
-     then ObjectLiteral $ second fromJust `map` props
-     else foldr (Abs . Left . Ident . fst) (ObjectLiteral (mkProp `map` ps)) (reverse args)
-desugarExpr e = e
+  desugarExpr :: Expr -> Expr
+  desugarExpr (ObjectConstructor ps) =
+    let (props, args) = partition (isJust . snd) ps
+    in if null args
+       then ObjectLiteral $ second fromJust `map` props
+       else foldr (Abs . Left . Ident . fst) (ObjectLiteral (mkProp `map` ps)) args
+  desugarExpr e = e
 
-mkProp :: (String, Maybe Expr) -> (String, Expr)
-mkProp (name, Just e) = (name, e)
-mkProp (name, Nothing) = (name, Var (Qualified Nothing (Ident name)))
+  mkProp :: (String, Maybe Expr) -> (String, Expr)
+  mkProp (name, Just e) = (name, e)
+  mkProp (name, Nothing) = (name, Var (Qualified Nothing (Ident name)))
