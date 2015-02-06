@@ -23,20 +23,21 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Supply
 
-import Language.PureScript.Sugar.Operators as S
-import Language.PureScript.Sugar.DoNotation as S
-import Language.PureScript.Sugar.CaseDeclarations as S
-import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
-import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.CaseDeclarations as S
+import Language.PureScript.Sugar.DoNotation as S
 import Language.PureScript.Sugar.Names as S
+import Language.PureScript.Sugar.ObjectWildcards as S
+import Language.PureScript.Sugar.Operators as S
+import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.TypeDeclarations as S
 
 -- |
 -- The desugaring pipeline proceeds as follows:
 --
---  * Introduce type synonyms for type class dictionaries
+--  * Remove signed literals in favour of `negate` applications
 --
---  * Rebracket user-defined binary operators
+--  * Desguar object literals with wildcards into lambdas
 --
 --  * Desugar do-notation using the @Prelude.Monad@ type class
 --
@@ -44,12 +45,17 @@ import Language.PureScript.Sugar.Names as S
 --
 --  * Desugar type declarations into value declarations with explicit type annotations
 --
---  * Group mutually recursive value and data declarations into binding groups.
---
 --  * Qualify any unqualified names and types
+--
+--  * Rebracket user-defined binary operators
+--
+--  * Introduce type synonyms for type class dictionaries
+--
+--  * Group mutually recursive value and data declarations into binding groups.
 --
 desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugar = map removeSignedLiterals
+          >>> map desugarObjectConstructors
           >>> mapM desugarDoModule
           >=> desugarCasesModule
           >=> lift . (desugarTypeDeclarationsModule

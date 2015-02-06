@@ -47,6 +47,7 @@ module Language.PureScript.Parser.Lexer
   , comma
   , semi
   , at
+  , underscore
   , semiSep
   , semiSep1
   , commaSep
@@ -105,6 +106,7 @@ data Token
   | Comma
   | Semi
   | At
+  | Underscore
   | LName String
   | UName String
   | Qualifier String
@@ -133,6 +135,7 @@ prettyPrintToken Dot               = "."
 prettyPrintToken Comma             = ","
 prettyPrintToken Semi              = ";"
 prettyPrintToken At                = "@"
+prettyPrintToken Underscore        = "_"
 prettyPrintToken (Indent n)        = "indentation at level " ++ show n
 prettyPrintToken (LName s)         = show s
 prettyPrintToken (UName s)         = show s
@@ -196,6 +199,7 @@ parseToken = P.choice
   , P.try $ P.char '.'    *> P.notFollowedBy symbolChar *> pure Dot
   , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
+  , P.try $ P.char '_'    *> P.notFollowedBy identLetter *> pure Underscore
   , LName         <$> parseLName
   , do uName <- parseUName
        (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
@@ -348,6 +352,9 @@ semi = match Semi
 
 at :: TokenParser ()
 at = match At
+
+underscore :: TokenParser ()
+underscore = match Underscore
 
 -- |
 -- Parse zero or more values separated by semicolons

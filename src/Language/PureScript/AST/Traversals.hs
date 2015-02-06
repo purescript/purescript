@@ -18,7 +18,7 @@ import Data.Monoid (Monoid(..), mconcat)
 
 import Control.Applicative
 import Control.Monad
-import Control.Arrow ((***), (+++))
+import Control.Arrow ((***), (+++), second)
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
@@ -46,6 +46,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (Parens v) = g (Parens (g' v))
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
   g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
+  g' (ObjectConstructor vs) = g (ObjectConstructor (map (second (fmap g')) vs))
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))

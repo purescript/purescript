@@ -285,11 +285,13 @@ parseArrayLiteral :: TokenParser Expr
 parseArrayLiteral = ArrayLiteral <$> squares (commaSep parseValue)
 
 parseObjectLiteral :: TokenParser Expr
-parseObjectLiteral = ObjectLiteral <$> braces (commaSep parseIdentifierAndValue)
+parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
 
-parseIdentifierAndValue :: TokenParser (String, Expr)
+parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
 parseIdentifierAndValue = (,) <$> (C.indented *> (lname <|> stringLiteral) <* C.indented <* colon)
-                              <*> (C.indented *> parseValue)
+                              <*> (C.indented *> val)
+  where
+  val = (Just <$> parseValue) <|> (underscore *> pure Nothing)
 
 parseAbs :: TokenParser Expr
 parseAbs = do
@@ -437,7 +439,7 @@ parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* at)
                                <*> (C.indented *> parseBinder)
 
 parseNullBinder :: TokenParser Binder
-parseNullBinder = reserved "_" *> return NullBinder
+parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
 parseIdentifierAndBinder = do
