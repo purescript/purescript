@@ -109,10 +109,10 @@ addType env mn name dctors = updateExportedModule env mn $ \m -> do
   let exDctors = snd `concatMap` exTypes
   let exClasses = exportedTypeClasses m
   when (any ((== name) . fst) exTypes) $ throwMultipleDefError "type" name
-  when (any (== name) exClasses) $ throwConflictingDefError "Type" "type class" name
+  when (name `elem` exClasses) $ throwConflictingDefError "Type" "type class" name
   forM_ dctors $ \dctor -> do
-    when (any (== dctor) exDctors) $ throwMultipleDefError "data constructor" dctor
-    when (any (== dctor) exClasses) $ throwConflictingDefError "Data constructor" "type class" dctor
+    when (dctor `elem` exDctors) $ throwMultipleDefError "data constructor" dctor
+    when (dctor `elem` exClasses) $ throwConflictingDefError "Data constructor" "type class" dctor
   return $ m { exportedTypes = (name, dctors) : exTypes }
 
 -- |
@@ -123,7 +123,7 @@ addTypeClass env mn name = updateExportedModule env mn $ \m -> do
   let exTypes = exportedTypes m
   let exDctors = snd `concatMap` exTypes
   when (any ((== name) . fst) exTypes) $ throwConflictingDefError "Type class" "type" name
-  when (any (== name) exDctors) $ throwConflictingDefError "Type class" "data constructor" name
+  when (name `elem` exDctors) $ throwConflictingDefError "Type class" "data constructor" name
   classes <- addExport "type class" (exportedTypeClasses m) name
   return $ m { exportedTypeClasses = classes }
 
