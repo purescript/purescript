@@ -21,7 +21,8 @@
 
 module Language.PureScript.Sugar.Operators (
   rebracket,
-  removeSignedLiterals
+  removeSignedLiterals,
+  desugarOperatorSections
 ) where
 
 import Language.PureScript.Names
@@ -148,3 +149,14 @@ matchOp op = do
   ident <- parseOp
   guard $ ident == op
 
+desugarOperatorSections :: Module -> Module
+desugarOperatorSections (Module mn ds exts) = Module mn (map goDecl ds) exts
+  where
+
+  goDecl :: Declaration -> Declaration
+  (goDecl, _, _) = everywhereOnValues id goExpr id
+
+  goExpr :: Expr -> Expr
+  goExpr (OperatorSection op (Left val)) = App (Var op) val
+  goExpr (OperatorSection op (Right val)) = Abs (Left $ Ident "_lhs") $ App (App (Var op) (Var (Qualified Nothing (Ident "_lhs")))) val
+  goExpr other = other

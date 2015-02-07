@@ -353,7 +353,14 @@ parseValueAtom = P.choice
             , parseIfThenElse
             , parseDo
             , parseLet
+            , P.try parseOperatorSection
             , Parens <$> parens parseValue ]
+
+parseOperatorSection :: TokenParser Expr
+parseOperatorSection = parens $ left <|> right
+  where
+  right = OperatorSection <$> parseIdentInfix <* indented <*> (Right <$> parseValueAtom)
+  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseIdentInfix
 
 parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
