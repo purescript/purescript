@@ -345,6 +345,7 @@ parseValueAtom = P.choice
             , P.try parseBooleanLiteral
             , parseArrayLiteral
             , P.try parseObjectLiteral
+            , P.try parseObjectGetter
             , parseAbs
             , P.try parseConstructor
             , P.try parseVar
@@ -354,11 +355,11 @@ parseValueAtom = P.choice
             , parseLet
             , Parens <$> parens parseValue ]
 
-parsePropertyUpdate :: TokenParser (String, Expr)
+parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
   name <- lname <|> stringLiteral
   _ <- C.indented *> equals
-  value <- C.indented *> parseValue
+  value <- C.indented *> (underscore *> pure Nothing) <|> (Just <$> parseValue)
   return (name, value)
 
 parseAccessor :: Expr -> TokenParser Expr
@@ -383,6 +384,9 @@ parseDoNotationElement = P.choice
             , parseDoNotationLet
             , P.try (DoNotationValue <$> parseValue) ]
 
+parseObjectGetter :: TokenParser Expr
+parseObjectGetter = ObjectGetter <$> parens (dot *> C.indented *> (lname <|> stringLiteral))
+
 -- |
 -- Parse a value
 --
@@ -394,7 +398,7 @@ parseValue = withSourceSpan PositionedValue
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
-                  , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
+                  , \v -> P.try $ flip ObjectUpdater <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
   postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.indented *> doubleColon) *> parsePolyType) <*> pure v
                   ]

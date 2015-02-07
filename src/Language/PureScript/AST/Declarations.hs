@@ -325,6 +325,11 @@ data Expr
   --
   | ObjectConstructor [(String, Maybe Expr)]
   -- |
+  -- An object property getter (e.g. `_.x`). This will be removed during
+  -- desugaring and expanded into a lambda that reads a property from an object.
+  --
+  | ObjectGetter String
+  -- |
   -- An record property accessor expression
   --
   | Accessor String Expr
@@ -332,6 +337,11 @@ data Expr
   -- Partial record update
   --
   | ObjectUpdate Expr [(String, Expr)]
+  -- |
+  -- Partial record updater. This will be removed during desugaring and
+  -- expanded into a lambda that returns an object update.
+  --
+  | ObjectUpdater Expr [(String, Maybe Expr)]
   -- |
   -- Function introduction
   --

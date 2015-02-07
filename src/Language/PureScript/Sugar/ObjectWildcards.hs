@@ -32,12 +32,18 @@ desugarObjectConstructors (Module mn ds exts) = Module mn (map desugarDecl ds) e
   (desugarDecl, _, _) = everywhereOnValues id desugarExpr id
 
   desugarExpr :: Expr -> Expr
-  desugarExpr (ObjectConstructor ps) =
+  desugarExpr (ObjectConstructor ps) = wrapLambda ObjectLiteral ps
+  desugarExpr (ObjectUpdater obj ps) = wrapLambda (ObjectUpdate obj) ps
+  desugarExpr (ObjectGetter prop) =
+    Abs (Left (Ident "obj")) (Accessor prop (Var (Qualified Nothing (Ident "obj"))))
+  desugarExpr e = e
+
+  wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Maybe Expr)] -> Expr
+  wrapLambda mkVal ps =
     let (props, args) = partition (isJust . snd) ps
     in if null args
-       then ObjectLiteral $ second fromJust `map` props
-       else foldr (Abs . Left . Ident . fst) (ObjectLiteral (mkProp `map` ps)) args
-  desugarExpr e = e
+       then mkVal $ second fromJust `map` props
+       else foldr (Abs . Left . Ident . fst) (mkVal (mkProp `map` ps)) args
 
   mkProp :: (String, Maybe Expr) -> (String, Expr)
   mkProp (name, Just e) = (name, e)
