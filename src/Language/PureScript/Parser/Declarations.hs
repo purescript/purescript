@@ -353,8 +353,8 @@ parseValueAtom = P.choice
             , parseIfThenElse
             , parseDo
             , parseLet
-            , P.try parseOperatorSection
-            , Parens <$> parens parseValue ]
+            , P.try $ Parens <$> parens parseValue
+            , parseOperatorSection ]
 
 parseOperatorSection :: TokenParser Expr
 parseOperatorSection = parens $ left <|> right
