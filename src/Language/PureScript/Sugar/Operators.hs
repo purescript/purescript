@@ -25,9 +25,10 @@ module Language.PureScript.Sugar.Operators (
   desugarOperatorSections
 ) where
 
-import Language.PureScript.Names
 import Language.PureScript.AST
 import Language.PureScript.Errors
+import Language.PureScript.Names
+import Language.PureScript.Supply
 
 import Control.Applicative
 import Control.Monad.State
@@ -149,14 +150,16 @@ matchOp op = do
   ident <- parseOp
   guard $ ident == op
 
-desugarOperatorSections :: Module -> Module
-desugarOperatorSections (Module mn ds exts) = Module mn (map goDecl ds) exts
+desugarOperatorSections :: Module -> SupplyT (Either ErrorStack) Module
+desugarOperatorSections (Module mn ds exts) = Module mn <$> mapM goDecl ds <*> pure exts
   where
 
-  goDecl :: Declaration -> Declaration
-  (goDecl, _, _) = everywhereOnValues id goExpr id
+  goDecl :: Declaration -> SupplyT (Either ErrorStack) Declaration
+  (goDecl, _, _) = everywhereOnValuesM return goExpr return
 
-  goExpr :: Expr -> Expr
-  goExpr (OperatorSection op (Left val)) = App (Var op) val
-  goExpr (OperatorSection op (Right val)) = Abs (Left $ Ident "_lhs") $ App (App (Var op) (Var (Qualified Nothing (Ident "_lhs")))) val
-  goExpr other = other
+  goExpr :: Expr -> SupplyT (Either ErrorStack) Expr
+  goExpr (OperatorSection op (Left val)) = return $ App (Var op) val
+  goExpr (OperatorSection op (Right val)) = do
+    arg <- Ident <$> freshName
+    return $ Abs (Left arg) $ App (App (Var op) (Var (Qualified Nothing arg))) val
+  goExpr other = return other
