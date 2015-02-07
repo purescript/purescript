@@ -1,9 +1,10 @@
 module Main where
 
-getX = _.x
+getX = (.x)
 
 point = { x: 1, y: 0 }
 
 main = do
   Debug.Trace.print $ getX point
-  Debug.Trace.trace $ _.value { value: "Done!" }
+  Debug.Trace.trace $ (." 123 string Prop Name ") { " 123 string Prop Name ": "OK" }
+  Debug.Trace.trace $ (.value) { value: "Done!" }

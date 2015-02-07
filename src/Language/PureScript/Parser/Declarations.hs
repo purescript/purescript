@@ -385,7 +385,7 @@ parseDoNotationElement = P.choice
             , P.try (DoNotationValue <$> parseValue) ]
 
 parseObjectGetter :: TokenParser Expr
-parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
+parseObjectGetter = ObjectGetter <$> parens (dot *> C.indented *> (lname <|> stringLiteral))
 
 -- |
 -- Parse a value
