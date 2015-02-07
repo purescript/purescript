@@ -345,6 +345,7 @@ parseValueAtom = P.choice
             , P.try parseBooleanLiteral
             , parseArrayLiteral
             , P.try parseObjectLiteral
+            , parseObjectGetter
             , parseAbs
             , P.try parseConstructor
             , P.try parseVar
@@ -382,6 +383,9 @@ parseDoNotationElement = P.choice
             [ P.try parseDoNotationBind
             , parseDoNotationLet
             , P.try (DoNotationValue <$> parseValue) ]
+
+parseObjectGetter :: TokenParser Expr
+parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
 
 -- |
 -- Parse a value

@@ -37,6 +37,8 @@ desugarObjectConstructors (Module mn ds exts) = Module mn (map desugarDecl ds) e
     in if null args
        then ObjectLiteral $ second fromJust `map` props
        else foldr (Abs . Left . Ident . fst) (ObjectLiteral (mkProp `map` ps)) args
+  desugarExpr (ObjectGetter prop) =
+    Abs (Left (Ident "obj")) (Accessor prop (Var (Qualified Nothing (Ident "obj"))))
   desugarExpr e = e
 
   mkProp :: (String, Maybe Expr) -> (String, Expr)
