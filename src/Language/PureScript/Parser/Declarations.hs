@@ -358,17 +358,17 @@ parseValueAtom = P.choice
             , parseOperatorSection ]
 
 -- |
--- Parse an identifier in backticks or an operator
+-- Parse an expression in backticks or an operator
 --
-parseIdentInfix :: TokenParser Expr
-parseIdentInfix = P.between tick tick parseValue 
-                  <|> Var <$> parseQualified (Op <$> symbol)
+parseInfixExpr :: TokenParser Expr
+parseInfixExpr = P.between tick tick parseValue 
+                 <|> Var <$> parseQualified (Op <$> symbol)
 
 parseOperatorSection :: TokenParser Expr
 parseOperatorSection = parens $ left <|> right
   where
-  right = OperatorSection <$> parseIdentInfix <* indented <*> (Right <$> parseValueAtom)
-  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseIdentInfix
+  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> parseValueAtom)
+  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseInfixExpr
 
 parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
@@ -419,7 +419,7 @@ parseValue = withSourceSpan PositionedValue
                   ]
   operators = [ [ P.Prefix (P.try (C.indented *> symbol' "-") >> return UnaryMinus)
                 ]
-              , [ P.Infix (P.try (C.indented *> parseIdentInfix P.<?> "operator") >>= \ident ->
+              , [ P.Infix (P.try (C.indented *> parseInfixExpr P.<?> "infix expression") >>= \ident ->
                     return (BinaryNoParens ident)) P.AssocRight
                 ]
               ]
