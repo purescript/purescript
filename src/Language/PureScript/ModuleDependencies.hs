@@ -54,7 +54,6 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 
   forValues :: Expr -> [ModuleName]
   forValues (Var (Qualified (Just mn) _)) = [mn]
-  forValues (BinaryNoParens (Qualified (Just mn) _) _ _) = [mn]
   forValues (Constructor (Qualified (Just mn) _)) = [mn]
   forValues (TypedValue _ _ ty) = forTypes ty
   forValues _ = []

@@ -240,10 +240,6 @@ renameInModule imports exports (Module mn decls exps) =
     (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
   updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
     (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (BinaryNoParens name'@(Qualified Nothing ident) v1 v2) | ident `notElem` bound =
-    (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
-  updateValue (pos, bound) (BinaryNoParens name'@(Qualified (Just _) _) v1 v2) =
-    (,) (pos, bound) <$> (BinaryNoParens <$> updateValueName name' pos <*> pure v1 <*> pure v2)
   updateValue s@(pos, _) (Constructor name) = (,) s <$> (Constructor <$> updateDataConstructorName name pos)
   updateValue s@(pos, _) (TypedValue check val ty) = (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)

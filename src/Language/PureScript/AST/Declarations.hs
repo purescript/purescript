@@ -305,7 +305,7 @@ data Expr
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | BinaryNoParens (Qualified Ident) Expr Expr
+  | BinaryNoParens Expr Expr Expr
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
@@ -315,7 +315,7 @@ data Expr
   -- Operator section. This will be removed during desugaring and replaced with a partially applied
   -- operator or lambda to flip the arguments.
   --
-  | OperatorSection (Qualified Ident) (Either Expr Expr)
+  | OperatorSection Expr (Either Expr Expr)
   -- |
   -- An array literal
   --
