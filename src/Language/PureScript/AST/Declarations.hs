@@ -346,7 +346,7 @@ data Expr
   -- Partial record updater. This will be removed during desugaring and
   -- expanded into a lambda that returns an object update.
   --
-  | ObjectUpdater Expr [(String, Maybe Expr)]
+  | ObjectUpdater (Maybe Expr) [(String, Maybe Expr)]
   -- |
   -- Function introduction
   --

@@ -36,7 +36,10 @@ desugarObjectConstructors (Module mn ds exts) = Module mn <$> mapM desugarDecl d
 
   desugarExpr :: Expr -> SupplyT (Either ErrorStack) Expr
   desugarExpr (ObjectConstructor ps) = wrapLambda ObjectLiteral ps
-  desugarExpr (ObjectUpdater obj ps) = wrapLambda (ObjectUpdate obj) ps
+  desugarExpr (ObjectUpdater (Just obj) ps) = wrapLambda (ObjectUpdate obj) ps
+  desugarExpr (ObjectUpdater Nothing ps) = do
+    obj <- Ident <$> freshName
+    Abs (Left obj) <$> wrapLambda (ObjectUpdate (Var (Qualified Nothing obj))) ps
   desugarExpr (ObjectGetter prop) = do
     arg <- Ident <$> freshName
     return $ Abs (Left arg) (Accessor prop (Var (Qualified Nothing arg)))

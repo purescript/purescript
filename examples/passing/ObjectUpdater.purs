@@ -30,3 +30,6 @@ main = do
 
   print $ point'.x === 100
   print $ point'.y === 10
+
+  let record2 = (_ { x = _ }) { x: 0 } 10
+  print $ record2.x === 10

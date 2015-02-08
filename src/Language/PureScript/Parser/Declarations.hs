@@ -355,7 +355,8 @@ parseValueAtom = P.choice
             , parseDo
             , parseLet
             , P.try $ Parens <$> parens parseValue
-            , parseOperatorSection ]
+            , parseOperatorSection
+            , P.try parseObjectUpdaterWildcard ]
 
 -- |
 -- Parse an expression in backticks or an operator
@@ -413,7 +414,7 @@ parseValue = withSourceSpan PositionedValue
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
-                  , \v -> P.try $ flip ObjectUpdater <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
+                  , P.try . parseUpdaterBody . Just ]
   postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.indented *> doubleColon) *> parsePolyType) <*> pure v
                   ]
@@ -423,6 +424,12 @@ parseValue = withSourceSpan PositionedValue
                     return (BinaryNoParens ident)) P.AssocRight
                 ]
               ]
+
+parseUpdaterBody :: Maybe Expr -> TokenParser Expr
+parseUpdaterBody v = ObjectUpdater v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
+
+parseObjectUpdaterWildcard :: TokenParser Expr
+parseObjectUpdaterWildcard = underscore *> C.indented *> parseUpdaterBody Nothing
 
 parseStringBinder :: TokenParser Binder
 parseStringBinder = StringBinder <$> stringLiteral
