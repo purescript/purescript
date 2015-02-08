@@ -361,7 +361,7 @@ parseValueAtom = P.choice
 -- Parse an expression in backticks or an operator
 --
 parseInfixExpr :: TokenParser Expr
-parseInfixExpr = P.between tick tick parseValue 
+parseInfixExpr = P.between tick tick parseValue
                  <|> Var <$> parseQualified (Op <$> symbol)
 
 parseOperatorSection :: TokenParser Expr
@@ -400,7 +400,7 @@ parseDoNotationElement = P.choice
             , P.try (DoNotationValue <$> parseValue) ]
 
 parseObjectGetter :: TokenParser Expr
-parseObjectGetter = ObjectGetter <$> parens (dot *> C.indented *> (lname <|> stringLiteral))
+parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
 
 -- |
 -- Parse a value
