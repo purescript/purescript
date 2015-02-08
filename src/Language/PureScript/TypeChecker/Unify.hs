@@ -130,6 +130,10 @@ unifyRows r1 r2 =
     rest <- fresh
     u1 =:= rowFromList (sd2, rest)
     u2 =:= rowFromList (sd1, rest)
+  unifyRows' sd1 (SaturatedTypeSynonym name args) sd2 r2' = do
+    r1' <- expandTypeSynonym name $ args
+    unifyRows (rowFromList (sd1, r1')) (rowFromList (sd2, r2'))
+  unifyRows' sd1 r1' sd2 r2'@(SaturatedTypeSynonym _ _) = unifyRows' sd2 r2' sd1 r1'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
