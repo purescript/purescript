@@ -37,7 +37,9 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Remove signed literals in favour of `negate` applications
 --
---  * Desguar object literals with wildcards into lambdas
+--  * Desugar object literals with wildcards into lambdas
+--
+--  * Desugar operator sections
 --
 --  * Desugar do-notation using the @Prelude.Monad@ type class
 --
@@ -56,7 +58,8 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugar = map removeSignedLiterals
           >>> map desugarObjectConstructors
-          >>> mapM desugarDoModule
+          >>> mapM desugarOperatorSections
+          >=> mapM desugarDoModule
           >=> desugarCasesModule
           >=> lift . (desugarTypeDeclarationsModule
                       >=> desugarImports

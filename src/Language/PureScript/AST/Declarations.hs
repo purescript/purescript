@@ -312,6 +312,11 @@ data Expr
   --
   | Parens Expr
   -- |
+  -- Operator section. This will be removed during desugaring and replaced with a partially applied
+  -- operator or lambda to flip the arguments.
+  --
+  | OperatorSection (Qualified Ident) (Either Expr Expr)
+  -- |
   -- An array literal
   --
   | ArrayLiteral [Expr]
