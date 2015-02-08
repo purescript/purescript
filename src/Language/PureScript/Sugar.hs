@@ -57,8 +57,8 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugar = map removeSignedLiterals
-          >>> map desugarObjectConstructors
-          >>> mapM desugarOperatorSections
+          >>> mapM desugarObjectConstructors
+          >=> mapM desugarOperatorSections
           >=> mapM desugarDoModule
           >=> desugarCasesModule
           >=> lift . (desugarTypeDeclarationsModule
