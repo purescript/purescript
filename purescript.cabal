@@ -159,7 +159,7 @@ executable psc-docs
     other-modules:
     ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
-executable hierarchy
+executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
                    process -any, mtl -any, parsec -any, filepath -any, directory -any
     main-is: Main.hs
