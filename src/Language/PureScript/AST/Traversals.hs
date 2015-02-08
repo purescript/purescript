@@ -45,6 +45,8 @@ everywhereOnValues f g h = (f', g', h')
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens op (g' v1) (g' v2))
   g' (Parens v) = g (Parens (g' v))
+  g' (OperatorSection op (Left v)) = g (OperatorSection op (Left $ g' v))
+  g' (OperatorSection op (Right v)) = g (OperatorSection op (Right $ g' v))
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
   g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
   g' (ObjectConstructor vs) = g (ObjectConstructor (map (second (fmap g')) vs))
@@ -102,6 +104,8 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens op <$> (g v1 >>= g') <*> (g v2 >>= g')
   g' (Parens v) = Parens <$> (g v >>= g')
+  g' (OperatorSection op (Left v)) = OperatorSection op . Left <$> (g v >>= g')
+  g' (OperatorSection op (Right v)) = OperatorSection op . Right <$> (g v >>= g')
   g' (ArrayLiteral vs) = ArrayLiteral <$> mapM (g' <=< g) vs
   g' (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g' <=< g)) vs
   g' (ObjectConstructor vs) = ObjectConstructor <$> mapM (sndM $ maybeM (g' <=< g)) vs
@@ -153,6 +157,8 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens op <$> g' v1 <*> g' v2) >>= g
   g' (Parens v) = (Parens <$> g' v) >>= g
+  g' (OperatorSection op (Left v)) = (OperatorSection op . Left <$> g' v) >>= g
+  g' (OperatorSection op (Right v)) = (OperatorSection op . Right <$> g' v) >>= g
   g' (ArrayLiteral vs) = (ArrayLiteral <$> mapM g' vs) >>= g
   g' (ObjectLiteral vs) = (ObjectLiteral <$> mapM (sndM g') vs) >>= g
   g' (ObjectConstructor vs) = (ObjectConstructor <$> mapM (sndM $ maybeM g') vs) >>= g
@@ -207,6 +213,8 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(UnaryMinus v1) = g v <> g' v1
   g' v@(BinaryNoParens _ v1 v2) = g v <> g' v1 <> g' v2
   g' v@(Parens v1) = g v <> g' v1
+  g' v@(OperatorSection _ (Left v1)) = g v <> g' v1
+  g' v@(OperatorSection _ (Right v1)) = g v <> g' v1
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
   g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
   g' v@(ObjectConstructor vs) = foldl (<>) (g v) (map g' (mapMaybe snd vs))
@@ -272,6 +280,8 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens _ v1 v2) = g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
+  g' s (OperatorSection _ (Left v)) = g'' s v
+  g' s (OperatorSection _ (Right v)) = g'' s v
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
   g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
   g' s (ObjectConstructor vs) = foldl (<>) r0 (map (g'' s) (mapMaybe snd vs))
@@ -340,6 +350,8 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens op <$> g'' s v1 <*> g'' s v2
   g' s (Parens v) = Parens <$> g'' s v
+  g' s (OperatorSection op (Left v)) = OperatorSection op . Left <$> g'' s v
+  g' s (OperatorSection op (Right v)) = OperatorSection op . Right <$> g'' s v
   g' s (ArrayLiteral vs) = ArrayLiteral <$> mapM (g'' s) vs
   g' s (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g'' s)) vs
   g' s (ObjectConstructor vs) = ObjectConstructor <$> mapM (sndM $ maybeM (g'' s)) vs
