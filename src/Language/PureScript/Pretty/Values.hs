@@ -73,8 +73,8 @@ literals = mkPattern' match
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
-  match (OperatorSection op (Right val)) = return $ "(" ++ show op ++ " " ++ prettyPrintValue val ++ ")"
-  match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ show op ++ ")"
+  match (OperatorSection op (Right val)) = return $ "(" ++ prettyPrintValue op ++ " " ++ prettyPrintValue val ++ ")"
+  match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ prettyPrintValue op ++ ")"
   match (TypeClassDictionary name _ _) = return $ "<<dict " ++ show name ++ ">>"
   match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
   match (TypedValue _ val _) = prettyPrintValue' val

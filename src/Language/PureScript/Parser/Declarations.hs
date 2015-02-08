@@ -41,6 +41,7 @@ import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
+import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
@@ -356,11 +357,18 @@ parseValueAtom = P.choice
             , P.try $ Parens <$> parens parseValue
             , parseOperatorSection ]
 
+-- |
+-- Parse an expression in backticks or an operator
+--
+parseInfixExpr :: TokenParser Expr
+parseInfixExpr = P.between tick tick parseValue 
+                 <|> Var <$> parseQualified (Op <$> symbol)
+
 parseOperatorSection :: TokenParser Expr
 parseOperatorSection = parens $ left <|> right
   where
-  right = OperatorSection <$> parseIdentInfix <* indented <*> (Right <$> parseValueAtom)
-  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseIdentInfix
+  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> parseValueAtom)
+  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseInfixExpr
 
 parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
@@ -411,7 +419,7 @@ parseValue = withSourceSpan PositionedValue
                   ]
   operators = [ [ P.Prefix (P.try (C.indented *> symbol' "-") >> return UnaryMinus)
                 ]
-              , [ P.Infix (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
+              , [ P.Infix (P.try (C.indented *> parseInfixExpr P.<?> "infix expression") >>= \ident ->
                     return (BinaryNoParens ident)) P.AssocRight
                 ]
               ]
