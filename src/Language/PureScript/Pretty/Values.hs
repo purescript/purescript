@@ -27,6 +27,7 @@ import Control.Monad.State
 import Control.Applicative
 
 import Language.PureScript.AST
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (prettyPrintType)
 
@@ -151,7 +152,7 @@ objectUpdate :: Pattern PrinterState Expr ([String], Expr)
 objectUpdate = mkPattern match
   where
   match (ObjectUpdate o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ prettyPrintValue val, o)
-  match (ObjectUpdater o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ maybe "_" prettyPrintValue val, o)
+  match (ObjectUpdater o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ maybe "_" prettyPrintValue val, fromMaybe (Var (Qualified Nothing $ Ident "_")) o)
   match _ = Nothing
 
 app :: Pattern PrinterState Expr (String, Expr)
