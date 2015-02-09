@@ -26,7 +26,7 @@ import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (hPutStr, hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -58,7 +58,7 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
   modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
-      hPutStr stderr $ show err
+      hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
       case P.compile opts (map snd ms) prefix of
