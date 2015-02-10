@@ -278,8 +278,11 @@
 
 This function returns its first argument, and can be used to assert type equalities.
 This can be useful when types are otherwise ambiguous. 
+
 E.g.
+
     main = print $ [] `asTypeOf` [0]
+
 If instead, we had written `main = print []`, the type of the argument `[]` would have
 been ambiguous, resulting in a compile-time error.
 
@@ -312,7 +315,9 @@ Flips the order of the arguments to a function of two arguments.
 #### `otherwise`
 
 An alias for `true`, which can be useful in guard clauses: 
+
 E.g.
+
     max x y | x >= y = x 
             | otherwise = y
 

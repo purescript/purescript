@@ -183,8 +183,8 @@ renderComments cs = do
   let raw = concatMap toLines cs
   
   if all hasPipe raw
-    then mapM_ (atIndent 0) (map stripPipes raw)
-    else mapM_ (atIndent 4) raw
+    then atIndent 0 . unlines . map stripPipes $ raw
+    else atIndent 4 $ unlines raw
   
   unless (null raw) spacer
   where
