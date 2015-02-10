@@ -422,6 +422,7 @@ symbol = token go P.<?> "symbol"
   go (Symbol s) = Just s
   go Colon      = Just ":"
   go LFatArrow  = Just "<="
+  go At         = Just "@"
   go _ = Nothing
 
 symbol' :: String -> TokenParser ()
