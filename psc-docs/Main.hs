@@ -22,6 +22,7 @@ import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
+import Data.Foldable (traverse_)
 
 import Options.Applicative
 
@@ -30,12 +31,10 @@ import qualified Paths_purescript as Paths
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
 
-
 data PSCDocsOptions = PSCDocsOptions
   { pscdIncludeHeir :: Bool
   , pscdInputFiles  :: [FilePath]
   }
-
 
 docgen :: PSCDocsOptions -> IO ()
 docgen (PSCDocsOptions showHierarchy input) = do
@@ -62,10 +61,16 @@ spacer = tell [""]
 headerLevel :: Int -> String -> Docs
 headerLevel level hdr = tell [replicate level '#' ++ ' ' : hdr]
 
+withIndent :: Int -> Docs -> Docs
+withIndent indent = censor (map (replicate indent ' ' ++ ))
+
 atIndent :: Int -> String -> Docs
 atIndent indent text =
   let ls = lines text in
-  forM_ ls $ \l -> tell [replicate indent ' ' ++ l]
+  withIndent indent (tell ls)
+
+ticks :: String -> String
+ticks = ("`" ++) . (++ "`")
 
 renderModules :: Bool -> [P.Module] -> Docs
 renderModules showHierarchy ms = do
@@ -109,7 +114,9 @@ renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
 renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
-  renderDeclaration 4 exps decl
+  traverse_ (headerLevel 4) (ticks `fmap` getDeclarationTitle decl)
+  spacer
+  renderDeclaration exps decl
   spacer
 
 renderTypeclassImage :: P.ModuleName -> Docs
@@ -117,53 +124,81 @@ renderTypeclassImage name =
   let name' = P.runModuleName name
   in tell ["![" ++ name' ++ "](images/" ++ name' ++ ".png)"]
 
-renderDeclaration :: Int -> Maybe [P.DeclarationRef] -> P.Declaration -> Docs
-renderDeclaration n _ (P.TypeDeclaration ident ty) =
-  atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
-renderDeclaration n _ (P.ExternDeclaration _ ident _ ty) =
-  atIndent n $ show ident ++ " :: " ++ prettyPrintType' ty
-renderDeclaration n exps (P.DataDeclaration dtype name args ctors) = do
+getDeclarationTitle :: P.Declaration -> Maybe String
+getDeclarationTitle (P.TypeDeclaration name _)                      = Just (show name)
+getDeclarationTitle (P.ExternDeclaration _ name _ _)                = Just (show name)
+getDeclarationTitle (P.DataDeclaration _ name _ _)                  = Just (show name)
+getDeclarationTitle (P.ExternDataDeclaration name _)                = Just (show name)
+getDeclarationTitle (P.TypeSynonymDeclaration name _ _)             = Just (show name)
+getDeclarationTitle (P.TypeClassDeclaration name _ _ _)   = Just (show name)
+getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _)        = Just (show name)
+getDeclarationTitle (P.PositionedDeclaration _ _ d)                 = getDeclarationTitle d
+getDeclarationTitle _                                               = Nothing
+
+renderDeclaration :: Maybe [P.DeclarationRef] -> P.Declaration -> Docs
+renderDeclaration _ (P.TypeDeclaration ident ty) =
+  atIndent 4 $ show ident ++ " :: " ++ prettyPrintType' ty
+renderDeclaration _ (P.ExternDeclaration _ ident _ ty) =
+  atIndent 4 $ show ident ++ " :: " ++ prettyPrintType' ty
+renderDeclaration exps (P.DataDeclaration dtype name args ctors) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
     exported = filter (P.isDctorExported name exps . fst) ctors
-  atIndent n $ show dtype ++ " " ++ typeName ++ (if null exported then "" else " where")
-  forM_ exported $ \(ctor, tys) ->
-    let ctorTy = foldr P.function typeApp tys
-    in atIndent (n + 2) $ P.runProperName ctor ++ " :: " ++ prettyPrintType' ctorTy
-renderDeclaration n _ (P.ExternDataDeclaration name kind) =
-  atIndent n $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
-renderDeclaration n _ (P.TypeSynonymDeclaration name args ty) = do
+  atIndent 4 $ show dtype ++ " " ++ typeName
+  zipWithM_ (\isFirst (ctor, tys) ->
+              atIndent 6 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map P.prettyPrintTypeAtom tys))
+            (True : repeat False) exported
+renderDeclaration _ (P.ExternDataDeclaration name kind) =
+  atIndent 4 $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
+renderDeclaration _ (P.TypeSynonymDeclaration name args ty) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
-  atIndent n $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
-renderDeclaration n exps (P.TypeClassDeclaration name args implies ds) = do
+  atIndent 4 $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
+renderDeclaration _ (P.TypeClassDeclaration name args implies ds) = do
   let impliesText = case implies of
                       [] -> ""
                       is -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) is) ++ ") <= "
       classApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
       className = prettyPrintType' classApp
-  atIndent n $ "class " ++ impliesText ++ className ++ " where"
-  mapM_ (renderDeclaration (n + 2) exps) ds
-renderDeclaration n _ (P.TypeInstanceDeclaration name constraints className tys _) = do
+  atIndent 4 $ "class " ++ impliesText ++ className ++ " where"
+  mapM_ renderClassMember ds
+  where
+    renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
+    renderClassMember (P.TypeDeclaration ident ty) = atIndent 6 $ show ident ++ " :: " ++ prettyPrintType' ty
+    renderClassMember _ = error "Invalid argument to renderClassMember."
+renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
                           cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
-  atIndent n $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
-renderDeclaration n exps (P.PositionedDeclaration _ com d) = do
-  renderComments n com
-  spacer
-  renderDeclaration n exps d
-renderDeclaration _ _ _ = return ()
+  atIndent 4 $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
+renderDeclaration exps (P.PositionedDeclaration _ com d) = do
+  renderComments com
+  renderDeclaration exps d
+renderDeclaration _ _ = return ()
 
-renderComments :: Int -> [P.Comment] -> Docs
-renderComments n cs = mapM_ (atIndent n) ls
+renderComments :: [P.Comment] -> Docs
+renderComments cs = do
+  let raw = concatMap toLines cs
+  
+  if all hasPipe raw
+    then mapM_ (atIndent 0) (map stripPipes raw)
+    else mapM_ (atIndent 4) raw
+  
+  unless (null raw) spacer
   where
-  ls = concatMap toLines cs
 
   toLines (P.LineComment s) = [s]
   toLines (P.BlockComment s) = lines s
+  
+  hasPipe s = case dropWhile (== ' ') s of { ('|':_) -> True; _ -> False }
+  
+  stripPipes = dropPipe . dropWhile (== ' ')
+
+  dropPipe ('|':' ':s) = s
+  dropPipe ('|':s) = s
+  dropPipe s = s
 
 toTypeVar :: (String, Maybe P.Kind) -> P.Type
 toTypeVar (s, Nothing) = P.TypeVar s
