@@ -141,6 +141,16 @@ loadAllModules files = do
     return (Right filename, content)
   return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
 
+-- |
+-- Load all modules, updating the application state
+--
+loadAllImportedModules :: PSCI ()
+loadAllImportedModules = do
+  files <- PSCI . lift $ fmap psciImportedFilenames get
+  modulesOrFirstError <- psciIO $ loadAllModules files
+  case modulesOrFirstError of
+    Left err -> psciIO $ print err
+    Right modules -> PSCI . lift . modify $ \st -> st { psciLoadedModules = modules } 
 
 -- |
 -- Expands tilde in path.
@@ -561,10 +571,12 @@ handleCommand (LoadFile filePath) = do
     PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
-  modulesOrFirstError <- psciIO $ loadAllModules files
-  case modulesOrFirstError of
-    Left err -> psciIO $ print err >> exitFailure
-    Right modules -> PSCI . lift $ put (PSCiState files defaultImports modules [])
+  PSCI . lift . modify $ \st -> st 
+    { psciImportedFilenames   = files
+    , psciImportedModuleNames = defaultImports
+    , psciLetBindings         = []
+    }
+  loadAllImportedModules
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
 handleCommand (Browse moduleName) = handleBrowse moduleName
@@ -609,7 +621,7 @@ loop (PSCiOptions singleLineMode files) = do
             Left err -> outputStrLn err >> go
             Right Nothing -> go
             Right (Just Quit) -> outputStrLn quitMessage
-            Right (Just c') -> runPSCI (handleCommand c') >> go
+            Right (Just c') -> runPSCI (loadAllImportedModules >> handleCommand c') >> go
 
 singleLineFlag :: Parser Bool
 singleLineFlag = switch $
