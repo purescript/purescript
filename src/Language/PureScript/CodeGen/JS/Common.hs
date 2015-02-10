@@ -135,7 +135,47 @@ nameIsJsReserved name =
               , "volatile"
               , "while"
               , "with"
-              , "yield" ]
+              , "yield" ] || properNameIsJsReserved name
 
 moduleNameToJs :: ModuleName -> String
-moduleNameToJs (ModuleName pns) = intercalate "_" (runProperName `map` pns)
+moduleNameToJs (ModuleName pns) =
+  let name = intercalate "_" (runProperName `map` pns)
+  in if properNameIsJsReserved name then "$$" ++ name else name
+
+-- |
+-- Checks whether a proper name is reserved in Javascript.
+--
+properNameIsJsReserved :: String -> Bool
+properNameIsJsReserved name =
+  name `elem` [ "Infinity"
+              , "NaN"
+              , "Object"
+              , "Function"
+              , "Boolean"
+              , "Error"
+              , "EvalError"
+              , "InternalError"
+              , "RangeError"
+              , "ReferenceError"
+              , "SyntaxError"
+              , "TypeError"
+              , "URIError"
+              , "Number"
+              , "Math"
+              , "Date"
+              , "String"
+              , "RegExp"
+              , "Array"
+              , "Int8Array"
+              , "Uint8Array"
+              , "Uint8ClampedArray"
+              , "Int16Array"
+              , "Uint16Array"
+              , "Int32Array"
+              , "Uint32Array"
+              , "Float32Array"
+              , "Float64Array"
+              , "ArrayBuffer"
+              , "DataView"
+              , "JSON"
+              , "Intl" ]
