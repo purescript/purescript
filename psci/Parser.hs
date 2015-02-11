@@ -76,7 +76,7 @@ parseCommand cmdString =
   -- we actually want the normal @let@.
   --
   psciLet :: P.TokenParser Command
-  psciLet = Let <$> (P.Let <$> (P.reserved "let" *> P.indented *> manyDecls))
+  psciLet = Let <$> (P.reserved "let" *> P.indented *> manyDecls)
     where
     manyDecls :: P.TokenParser [P.Declaration]
     manyDecls = C.mark (many1 (C.same *> P.parseDeclaration))
