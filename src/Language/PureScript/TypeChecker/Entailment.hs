@@ -228,10 +228,6 @@ typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
   go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
-  -- Technically, this case should result in solved variables. Until the constraint
-  -- solver runs in the UnifyT monad, this just means that some (unusual) instances
-  -- will not be found.
-  go _  (TypeVar _)     _  (TypeVar _)     = Just [] 
   go _  _               _  _               = Nothing
 typeHeadsAreEqual _ _ _ _ = Nothing
 
