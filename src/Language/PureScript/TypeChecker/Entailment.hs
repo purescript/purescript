@@ -20,6 +20,7 @@ module Language.PureScript.TypeChecker.Entailment (
 import Data.Function (on)
 import Data.List
 import Data.Maybe (maybeToList)
+import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
 import Control.Applicative
@@ -199,13 +200,35 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = Just []
-typeHeadsAreEqual _ _ t (TypeVar v) = Just [(v, t)]
+typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
+typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
+-- In this case, we might want type information to flow back to the typechecker.
+-- TODO: run this function in the UnifyT monad.
+typeHeadsAreEqual _ _ (TUnknown _)         _                    = Just []
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual m e (TypeApp h1 t1) (TypeApp h2 t2) = (++) <$> typeHeadsAreEqual m e h1 h2 <*> typeHeadsAreEqual m e t1 t2
+typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
+                                                                                  <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
   Right t1 -> typeHeadsAreEqual m e t1 t2
+typeHeadsAreEqual _ _ REmpty REmpty = Just []
+typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
+  let (s1, r1') = rowToList r1
+      (s2, r2') = rowToList r2
+      
+      int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+      sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+      sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int 
+          <*> go sd1 r1' sd2 r2'
+  where
+  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
+  go [] REmpty          [] REmpty          = Just [] 
+  go [] (TUnknown _)    _  _               = Just [] 
+  go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
+  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
+  go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
+  go _  _               _  _               = Nothing
 typeHeadsAreEqual _ _ _ _ = Nothing
 
 -- |
