@@ -202,6 +202,9 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
+-- In this case, we want might want type information to flow back to the typechecker.
+-- TODO: run this function in the UnifyT monad.
+typeHeadsAreEqual _ _ (TUnknown _)         _                    = Just []
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
                                                                                   <*> typeHeadsAreEqual m e t1 t2
@@ -221,10 +224,14 @@ typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
   go [] REmpty          [] REmpty          = Just [] 
+  go [] (TUnknown _)    _  _               = Just [] 
   go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
-  go _  (TUnknown _)    _  _               = Just []
-  go _  _               _  (TUnknown _)    = Just []
+  go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
+  -- Technically, this case should result in solved variables. Until the constraint
+  -- solver runs in the UnifyT monad, this just means that some (unusual) instances
+  -- will not be found.
+  go _  (TypeVar _)     _  (TypeVar _)     = Just [] 
   go _  _               _  _               = Nothing
 typeHeadsAreEqual _ _ _ _ = Nothing
 
