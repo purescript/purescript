@@ -52,7 +52,7 @@ data Command
   -- |
   -- Binds a value to a name
   --
-  | Let (Expr -> Expr)
+  | Let [Declaration]
   -- |
   -- Find the type of an expression
   --

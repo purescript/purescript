@@ -69,7 +69,7 @@ data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModuleNames :: [P.ModuleName]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
-  , psciLetBindings         :: [P.Expr -> P.Expr]
+  , psciLetBindings         :: [P.Declaration]
   }
 
 -- State helpers
@@ -95,8 +95,8 @@ updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modu
 -- |
 -- Updates the state to have more let bindings.
 --
-updateLets :: (P.Expr -> P.Expr) -> PSCiState -> PSCiState
-updateLets name st = st { psciLetBindings = name : psciLetBindings st }
+updateLets :: [P.Declaration] -> PSCiState -> PSCiState
+updateLets ds st = st { psciLetBindings = ds ++ psciLetBindings st }
 
 -- File helpers
 -- |
@@ -348,13 +348,13 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
-    itValue = foldl (\x f -> f x) val lets
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right itValue
+    itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right val
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module moduleName ((importDecl `map` imports) ++ decls) Nothing
+    P.Module moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
+
 
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
@@ -408,10 +408,10 @@ handleDeclaration val = do
 -- Takes a let declaration and updates the environment, then run a make. If the declaration fails,
 -- restore the pre-let environment.
 --
-handleLet :: (P.Expr -> P.Expr) -> PSCI ()
-handleLet l = do
+handleLet :: [P.Declaration] -> PSCI ()
+handleLet ds = do
   st <- PSCI $ lift get
-  let st' = updateLets l st
+  let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
   case e of
