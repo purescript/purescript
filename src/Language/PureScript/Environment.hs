@@ -140,7 +140,7 @@ data TypeKind
   -- |
   -- A scoped type variable
   --
-  | ScopedTypeVar Type
+  | ScopedTypeVar
    deriving (Show, Eq, Data, Typeable)
 
 -- |
