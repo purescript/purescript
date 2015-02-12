@@ -57,6 +57,12 @@ bindTypes newNames action = do
   return a
 
 -- |
+-- Temporarily bind a collection of names to types
+--
+withScopedTypeVars :: (Functor m, MonadState CheckState m) => ModuleName -> [(String, Kind)] -> m a -> m a
+withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar (TypeVar name)))) ks))
+
+-- |
 -- Temporarily make a collection of type class dictionaries available
 --
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a

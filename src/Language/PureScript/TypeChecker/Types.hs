@@ -129,16 +129,16 @@ typeDictionaryForBindingGroup moduleName vals = do
   return (untyped, typed, dict, untypedDict)
 
 checkTypedBindingGroupElement :: ModuleName -> (Ident, (Expr, Type, Bool)) -> TypeData ->  UnifyT Type Check (Ident, (Expr, Type))
-checkTypedBindingGroupElement moduleName (ident, (val', ty, checkType)) dict = do
+checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
   -- Replace type wildcards
   ty' <- replaceTypeWildcards ty
   -- Kind check
-  kind <- liftCheck $ kindOf moduleName ty
+  (kind, args) <- liftCheck $ kindOfWithScopedVars ty
   guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
   -- Check the type with the new names in scope
   ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
   val'' <- if checkType
-           then bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
+           then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
            else return (TypedValue False val' ty'')
   return (ident, (val'', ty''))
 
