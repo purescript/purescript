@@ -70,6 +70,9 @@ data Options mode = Options {
     --
   , optionsVerboseErrors :: Bool
     -- |
+    -- Remove the comments from the generated js
+  , optionsNoComments :: Bool
+    -- |
     -- Specify the namespace that PureScript modules will be exported to when running in the
     -- browser.
     --
@@ -80,10 +83,10 @@ data Options mode = Options {
 -- Default compiler options
 --
 defaultCompileOptions :: Options Compile
-defaultCompileOptions = Options False False False Nothing False False (CompileOptions "PS" [] [])
+defaultCompileOptions = Options False False False Nothing False False False (CompileOptions "PS" [] [])
 
 -- |
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False False Nothing False False MakeOptions
+defaultMakeOptions = Options False False False Nothing False False False MakeOptions

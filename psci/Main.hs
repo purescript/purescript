@@ -28,7 +28,7 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Error (ErrorT(..), MonadError)
-import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
@@ -150,7 +150,7 @@ loadAllImportedModules = do
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
     Left err -> psciIO $ print err
-    Right modules -> PSCI . lift . modify $ \st -> st { psciLoadedModules = modules } 
+    Right modules -> PSCI . lift . modify $ \st -> st { psciLoadedModules = modules }
 
 -- |
 -- Expands tilde in path.
@@ -314,7 +314,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options P.Make
-options = P.Options False False False Nothing False False P.MakeOptions
+options = P.Options False False False Nothing False False False P.MakeOptions
 
 -- |
 -- PSCI monad
@@ -322,27 +322,25 @@ options = P.Options False False False Nothing False False P.MakeOptions
 newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Functor, Applicative, Monad)
 
 psciIO :: IO a -> PSCI a
-psciIO io = PSCI (lift (lift io))
+psciIO io = PSCI . lift $ lift io
 
-newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadError String)
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ErrorT String IO) a }
+  deriving (Functor, Applicative, Monad, MonadError String, MonadReader (P.Options P.Make))
 
 runMake :: Make a -> IO (Either String a)
-runMake = runErrorT . unMake
+runMake = runErrorT . flip runReaderT options . unMake
 
 makeIO :: IO a -> Make a
-makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
+makeIO = Make . lift . ErrorT . fmap (either (Left . show) Right) . tryIOError
 
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do
     exists <- doesFileExist path
-    if exists
-      then Just <$> getModificationTime path
-      else return Nothing
+    traverse (const $ getModificationTime path) $ guard exists
   readTextFile path = makeIO $ readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
     writeFile path text
-  liftError = either throwError return
   progress s = unless (s == "Compiling $PSCI") $ makeIO . putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
@@ -402,7 +400,7 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
@@ -423,7 +421,7 @@ handleLet ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> PSCI $ lift (put st')
@@ -456,7 +454,7 @@ handleImport :: P.ModuleName -> PSCI ()
 handleImport moduleName = do
    st <- updateImports moduleName <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
-   e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
    case e of
      Left err -> PSCI $ outputStrLn err
      Right _  -> do
@@ -470,7 +468,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st val
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -504,7 +502,7 @@ handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
   let loadedModules = psciLoadedModules st
-  env <- psciIO . runMake $ P.make modulesDir options loadedModules []
+  env <- psciIO . runMake $ P.make modulesDir loadedModules []
   case env of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -520,7 +518,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir options (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
@@ -571,7 +569,7 @@ handleCommand (LoadFile filePath) = do
     PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 handleCommand Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
-  PSCI . lift . modify $ \st -> st 
+  PSCI . lift . modify $ \st -> st
     { psciImportedFilenames   = files
     , psciImportedModuleNames = defaultImports
     , psciLetBindings         = []

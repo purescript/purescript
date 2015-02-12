@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Language.PureScript.CoreFn.Binders where
 
@@ -44,4 +45,4 @@ data Binder a
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder a Ident (Binder a) deriving (Show, D.Data, D.Typeable)
+  | NamedBinder a Ident (Binder a) deriving (Show, D.Data, D.Typeable, Functor)

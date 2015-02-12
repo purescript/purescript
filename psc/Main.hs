@@ -18,6 +18,7 @@ module Main where
 
 import Control.Applicative
 import Control.Monad.Error
+import Control.Monad.Reader
 
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
@@ -61,7 +62,7 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
       hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      case P.compile opts (map snd ms) prefix of
+      case P.compile (map snd ms) prefix `runReaderT` opts of
         Left err -> do
           hPutStrLn stderr err
           exitFailure
@@ -137,6 +138,12 @@ noPrelude = switch $
      long "no-prelude"
   <> help "Omit the Prelude"
 
+comments :: Parser Bool
+comments = switch $
+     short 'c'
+  <> long "comments"
+  <> help "Include comments in the generated code."
+
 useStdIn :: Parser Bool
 useStdIn = switch $
      short 's'
@@ -173,6 +180,7 @@ options = P.Options <$> noPrelude
                     <*> runMain
                     <*> noOpts
                     <*> verboseErrors
+                    <*> comments
                     <*> additionalOptions
   where
   additionalOptions =

@@ -22,6 +22,7 @@ import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
 import Control.Monad
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Reader (runReaderT)
 import Control.Applicative
 import System.Exit
 import System.Process
@@ -38,7 +39,7 @@ loadPrelude :: Either String (String, String, P.Environment)
 loadPrelude =
   case P.parseModulesFromFiles id [("", P.prelude)] of
     Left parseError -> Left (show parseError)
-    Right ms -> P.compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) (map snd ms) []
+    Right ms -> runReaderT (P.compile (map snd ms) []) $ P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
@@ -46,7 +47,7 @@ compile opts inputFiles = do
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms -> return $ P.compile opts (map snd ms) []
+    Right ms -> return $ runReaderT (P.compile (map snd ms) []) opts
 
 assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do

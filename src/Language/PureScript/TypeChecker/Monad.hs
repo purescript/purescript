@@ -23,6 +23,7 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.Error
+import Control.Monad.Reader.Class
 import Control.Monad.State
 import Control.Monad.Unify
 
@@ -194,14 +195,16 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: Options mode -> Check a -> Either String (a, Environment)
-runCheck opts = runCheck' opts initEnvironment
+runCheck :: (MonadReader (Options mode) m, MonadError String m) => Check a -> m (a, Environment)
+runCheck = runCheck' initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: Options mode -> Environment -> Check a -> Either String (a, Environment)
-runCheck' opts env c = stringifyErrorStack (optionsVerboseErrors opts) $ do
+runCheck' :: (MonadReader (Options mode) m, MonadError String m) => Environment -> Check a -> m (a, Environment)
+runCheck' env c = do
+  verbose <- asks optionsVerboseErrors
+  stringifyErrorStack verbose $ do
   (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
   return (a, checkEnv s)
 
