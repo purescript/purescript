@@ -136,7 +136,12 @@ data TypeKind
   -- |
   -- A local type variable
   --
-  | LocalTypeVariable deriving (Show, Eq, Data, Typeable)
+  | LocalTypeVariable
+  -- |
+  -- A scoped type variable
+  --
+  | ScopedTypeVar
+   deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The type ('data' or 'newtype') of a data type declaration
