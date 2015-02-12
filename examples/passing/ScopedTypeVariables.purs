@@ -18,4 +18,17 @@ test2 = h
 test3 :: Number 
 test3 = ((\b -> b :: b) :: forall b. b -> b) 0
 
+test4 :: forall a. (a -> a) -> a -> a
+test4 = h
+  where
+  h :: forall b. (b -> b) -> b -> b
+  h f x = g (g x)
+    where
+    g :: b -> b
+    g y = j (f (f y))
+      where
+      j :: forall b. b -> b
+      j x = x
+
+
 main = Debug.Trace.trace "Done"
