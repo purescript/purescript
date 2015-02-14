@@ -202,9 +202,6 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
--- In this case, we might want type information to flow back to the typechecker.
--- TODO: run this function in the UnifyT monad.
-typeHeadsAreEqual _ _ (TUnknown _)         _                    = Just []
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
                                                                                   <*> typeHeadsAreEqual m e t1 t2
