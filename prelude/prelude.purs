@@ -15,9 +15,10 @@ module Prelude
   , Monad, return, liftM1, ap
   , Semiring, (+), zero, (*), one
   , Ring, (-)
-  -- , (%)
+  , (%)
   , negate
-  , DivisionRing, (/)
+  , ModuloRing, (/), mod
+  , DivisionRing
   , Num
   , Eq, (==), (/=), refEq, refIneq
   , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
@@ -204,7 +205,7 @@ module Prelude
 
   infixl 7 *
   infixl 7 /
-  -- infixl 7 %
+  infixl 7 %
 
   infixl 6 -
   infixl 6 +
@@ -223,11 +224,17 @@ module Prelude
   negate :: forall a. (Ring a) => a -> a
   negate a = zero - a
 
-  -- | Ring with division (possibly non-commutative field)
-  class (Ring a) <= DivisionRing a where
+  -- | Ring with modulo operation and division where
+  -- | ```a / b * b + (a `mod` b) = a```
+  class (Ring a) <= ModuloRing a where
     (/) :: a -> a -> a
+    mod :: a -> a -> a
 
-  -- | Definitely commutative field
+  -- | Ring where every nonzero element has a multiplicative inverse (possibly
+  -- | a non-commutative field) so that ```a `mod` b = zero```
+  class (ModuloRing a) <= DivisionRing a
+
+  -- | A commutative field
   class (DivisionRing a) <= Num a
 
   foreign import numAdd
@@ -275,6 +282,8 @@ module Prelude
     }
     """ :: Number -> Number -> Number
 
+  (%) = numMod
+
   instance semiringNumber :: Semiring Number where
     (+) = numAdd
     zero = 0
@@ -284,8 +293,11 @@ module Prelude
   instance ringNumber :: Ring Number where
     (-) = numSub
 
-  instance divisionRingNumber :: DivisionRing Number where
+  instance moduloRingNumber :: ModuloRing Number where
     (/) = numDiv
+    mod _ _ = 0
+
+  instance divisionRingNumber :: DivisionRing Number
 
   instance numNumber :: Num Number
 
