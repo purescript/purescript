@@ -15,6 +15,7 @@
 
 module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineVariables,
+  inlineValues,
   inlineOperator,
   inlineCommonOperators,
   etaConvert,
@@ -79,6 +80,14 @@ inlineVariables = everywhereOnJS $ removeFromBlock go
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
+inlineValues :: JS -> JS
+inlineValues = everywhereOnJS convert
+  where
+  convert :: JS -> JS
+  convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.zero fn = JSNumericLiteral (Left 0)
+  convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.one fn = JSNumericLiteral (Left 1)
+  convert other = other
+
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator (m, op) f = everywhereOnJS convert
   where
@@ -131,7 +140,7 @@ inlineCommonOperators = applyAll $
   binary dictName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isPreludeDict dictName dict = JSBinary op x y
     convert other = other
     isOp (JSAccessor longForm (JSAccessor prelude (JSVar _))) = prelude == C.prelude && longForm == identToJs (Op opString)
     isOp (JSIndexer (JSStringLiteral op') (JSVar prelude)) = prelude == C.prelude && opString == op'
@@ -140,20 +149,14 @@ inlineCommonOperators = applyAll $
   binaryFunction dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isOpDict dictName dict = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeFn fnName fn && isPreludeDict dictName dict = JSBinary op x y
     convert other = other
-    isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName == fnName'
-    isOp _ = False
   unary :: String -> String -> UnaryOperator -> JS -> JS
   unary dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp fn [dict]) [x]) | isOp fn && isOpDict dictName dict = JSUnary op x
+    convert (JSApp (JSApp fn [dict]) [x]) | isPreludeFn fnName fn && isPreludeDict dictName dict = JSUnary op x
     convert other = other
-    isOp (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
-    isOp _ = False
-  isOpDict dictName (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == dictName
-  isOpDict _ _ = False
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
     where
@@ -189,3 +192,11 @@ inlineCommonOperators = applyAll $
     go 0 acc (JSApp runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp fn acc)
     go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
+
+isPreludeDict :: String -> JS -> Bool
+isPreludeDict dictName (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == dictName
+isPreludeDict _ _ = False
+
+isPreludeFn :: String -> JS -> Bool
+isPreludeFn fnName (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
+isPreludeFn _ _ = False
