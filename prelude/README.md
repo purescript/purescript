@@ -6,6 +6,9 @@
 
 #### `Ordering`
 
+Represents the result of a comparison operation in which one item being
+compared can be less than, greater than, or equal to the other.
+
     data Ordering
       = LT 
       | GT 
@@ -28,15 +31,26 @@
 
 #### `Apply`
 
+Pass arguments into a Functor-wrapped function, returning a new wrapped
+result.
+
+`Just (+) <*> Just 5 <*> Nothing == Nothing`
+
     class (Functor f) <= Apply f where
       (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
 #### `Bind`
 
+Compose monadic actions together, passing the result of one as the 
+input to the next.
+
+
     class (Apply m) <= Bind m where
       (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
 #### `Bits`
+
+Bitwise operations on data.
 
     class Bits b where
       (.&.) :: b -> b -> b
@@ -48,6 +62,8 @@
       complement :: b -> b
 
 #### `BoolLike`
+
+Perform Boolean logic operators on data.
 
     class BoolLike b where
       (&&) :: b -> b -> b
@@ -61,11 +77,18 @@
 
 #### `Eq`
 
+Determine whether two data of the same type are equal.
+
     class Eq a where
       (==) :: a -> a -> Boolean
       (/=) :: a -> a -> Boolean
 
 #### `Functor`
+
+Apply a function to the data contained in a Functor type, returning a
+new wrapped result.
+
+`not <$> Just true == Just false`
 
     class Functor f where
       (<$>) :: forall a b. (a -> b) -> f a -> f b
@@ -75,6 +98,8 @@
     class (Applicative m, Bind m) <= Monad m where
 
 #### `Num`
+
+Perform arithmetic-like operations on data.
 
     class Num a where
       (+) :: a -> a -> a
@@ -86,10 +111,16 @@
 
 #### `Ord`
 
+Compare the ranking of two data of the same type.
+
+`compare 1 10 == LT`
+
     class (Eq a) <= Ord a where
       compare :: a -> a -> Ordering
 
 #### `Semigroup`
+
+Concatenation-like operation.
 
     class Semigroup a where
       (<>) :: a -> a -> a
@@ -100,6 +131,10 @@
       (<<<) :: forall b c d. a c d -> a b c -> a b d
 
 #### `Show`
+
+Converts data to a String.
+
+`show 1 == "1"`
 
     class Show a where
       show :: a -> String
@@ -125,6 +160,11 @@
 
 #### `boolLikeBoolean`
 
+Standard boolean AND and OR.
+
+`true && false == false`
+`true || false == true`
+
     instance boolLikeBoolean :: BoolLike Boolean
 
 #### `categoryArr`
@@ -133,21 +173,41 @@
 
 #### `eqArray`
 
+Determine whether two Arrays are equal.
+
+`[1, 2, 3] == [1, 2, 3]`
+
     instance eqArray :: (Eq a) => Eq [a]
 
 #### `eqBoolean`
+
+Determine whether two Booleans are equal.
+
+`true /= false`
 
     instance eqBoolean :: Eq Boolean
 
 #### `eqNumber`
 
+Determine whether two Numbers are equal.
+
+`1 == 1`
+
     instance eqNumber :: Eq Number
 
 #### `eqOrdering`
 
+Determine whether two Orderings are equal.
+
+`compare 1 2 == compare 1 100`
+
     instance eqOrdering :: Eq Ordering
 
 #### `eqString`
+
+Determine whether two Strings are equal.
+
+`"string" == "string"`
 
     instance eqString :: Eq String
 
@@ -165,25 +225,52 @@
 
 #### `numNumber`
 
+Standard arithmetic operations on Numbers. `%` is modulo.
+
     instance numNumber :: Num Number
 
 #### `ordArray`
+
+Compare the contents of two Arrays of the same type.  The first element
+of the left array is compared to the first argument of the right array, 
+second element with second element, etc, until the two compared elements
+are not equal.  If one array is a prefix of the other, the shorter array
+is less than the longer one.
+
+`compare [1, 2, 3] [5] == LT`
+`compare [1, 2, 3] [1, 2, 3, 4] == LT`
 
     instance ordArray :: (Ord a) => Ord [a]
 
 #### `ordBoolean`
 
+Compare two Booleans.  True is greater than false.
+
+`compare false true == LT`
+
     instance ordBoolean :: Ord Boolean
 
 #### `ordNumber`
+
+Compare the value of two Numbers.
+
+`compare 1 100 == LT`
 
     instance ordNumber :: Ord Number
 
 #### `ordString`
 
+Compare Strings ranked alphabetically (by character value).
+
+`compare "alphabetically" "bob" == LT`
+
     instance ordString :: Ord String
 
 #### `ordUnit`
+
+Compare two Units.  Always returns `EQ`.
+
+`compare unit unit == true`
 
     instance ordUnit :: Ord Unit
 
@@ -193,6 +280,10 @@
 
 #### `semigroupString`
 
+Concatenate two Strings.
+
+`"try" <> " purescript" == "try purescript"
+
     instance semigroupString :: Semigroup String
 
 #### `semigroupUnit`
@@ -201,17 +292,27 @@
 
 #### `semigroupoidArr`
 
+Function composition in right to left sense.
+
+`(f <<< g) x == f (g x)`
+
     instance semigroupoidArr :: Semigroupoid Prim.Function
 
 #### `showArray`
+
+`show [1, 2, 3] == "[1, 2, 3]"`
 
     instance showArray :: (Show a) => Show [a]
 
 #### `showBoolean`
 
+`show true == "true"`
+
     instance showBoolean :: Show Boolean
 
 #### `showNumber`
+
+`show 1 == "1"`
 
     instance showNumber :: Show Number
 
@@ -221,9 +322,13 @@
 
 #### `showString`
 
+`show "abc" == "abc"`
+
     instance showString :: Show String
 
 #### `showUnit`
+
+`show (Unit {}) == "Unit {}"`
 
     instance showUnit :: Show Unit
 
@@ -232,41 +337,84 @@
 
 #### `(#)`
 
+Applies the second argument to the first, making a forwards pipe.
+
+`"str" ++ "ing" # reverse == "gnirts"`
+
     (#) :: forall a b. a -> (a -> b) -> b
 
 #### `($)`
+
+Applies the first argument to the second, making a backward pipe.
+
+`reverse $ "str" ++ "ing" == "gnirts"`
 
     ($) :: forall a b. (a -> b) -> a -> b
 
 #### `(++)`
 
+Alias for (<>), typically used for String or Array concatenation as a
+style choice.
+
+`[1, 2, 3] ++ [4, 5] == [1, 2, 3, 4, 5]`
+
     (++) :: forall s. (Semigroup s) => s -> s -> s
 
 #### `(:)`
+
+Prepends an element to a list.
+
+`"try" : ["purescript", "today"] == ["try", "purescript", "today"]`
 
     (:) :: forall a. a -> [a] -> [a]
 
 #### `(<#>)`
 
+Reversed version of (<$>).
+
+`Just true <#> not == Just false`
+
     (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
 
 #### `(<)`
+
+Returns true if the left argument is "less than" the right argument.
+
+`1 < 10 == true`
 
     (<) :: forall a. (Ord a) => a -> a -> Boolean
 
 #### `(<=)`
 
+Returns true if the left argument is "greater than or equal to" the 
+right argument.
+
+`1 <= 1 == true`
+
     (<=) :: forall a. (Ord a) => a -> a -> Boolean
 
 #### `(>)`
+
+Returns true if the left argument is "greater than" the right argument.
+
+`1 > 10 == false`
 
     (>) :: forall a. (Ord a) => a -> a -> Boolean
 
 #### `(>=)`
 
+Returns true if the left argument is "less than or equal to" the 
+right argument.
+
+`1 >= 1 == true`
+
     (>=) :: forall a. (Ord a) => a -> a -> Boolean
 
 #### `(>>>)`
+
+Function composition in left to right sense.
+
+`(f >>> g) x == g (f x)`
 
     (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
 
@@ -296,19 +444,31 @@ been ambiguous, resulting in a compile-time error.
 
 Returns its first argument and ignores its second. 
 
+`const 7 "whatever" == 7`
+
     const :: forall a b. a -> b -> a
 
 #### `flip`
 
 Flips the order of the arguments to a function of two arguments. 
 
+`flip (/) 6 3 == 3 / 6`
+
     flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
 #### `liftA1`
 
+Apply a function to the data contained in an Applicative type, returning
+a new Applicative result.
+
+`liftA1 not (Just true) == Just false`
+
     liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
 
 #### `liftM1`
+
+Apply a function to the data in a Monad type, returning a new Monad 
+result.
 
     liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 
@@ -341,6 +501,10 @@ E.g.
 
 #### `void`
 
+Replace the contents of a Functor with Unit.
+
+`void (Just false) == Just unit`
+
     void :: forall f a. (Functor f) => f a -> f Unit
 
 
@@ -350,9 +514,13 @@ E.g.
 
 #### `Fn0`
 
+Function of 0 arguments using Javascript calling conventions.
+
     data Fn0 :: * -> *
 
 #### `Fn1`
+
+Function of 1 arguments using Javascript calling conventions.
 
     data Fn1 :: * -> * -> *
 
@@ -361,6 +529,8 @@ E.g.
     data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 
 #### `Fn2`
+
+Function of 2 arguments using Javascript calling conventions.
 
     data Fn2 :: * -> * -> * -> *
 
@@ -397,9 +567,14 @@ E.g.
 
 #### `mkFn0`
 
+Convert a purescript function of type `Unit -> a` to JS calling
+convention.
+
     mkFn0 :: forall a. (Unit -> a) -> Fn0 a
 
 #### `mkFn1`
+
+Convert a purescript function of 1 argument to JS calling convention.
 
     mkFn1 :: forall a b. (a -> b) -> Fn1 a b
 
@@ -408,6 +583,8 @@ E.g.
     mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
 
 #### `mkFn2`
+
+Convert a purescript function of 2 argument to JS calling convention.
 
     mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
 
@@ -441,13 +618,24 @@ E.g.
 
 #### `on`
 
+Apply a function to two arguments, then combine the results with a second
+function.
+
+`on (*) length "argument1" "arg2" == 9 * 4`
+
     on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 
 #### `runFn0`
 
+Run a function with 0 arguments and Javascript calling conventions 
+in purescript.  Useful for writing JS function bindings.
+
     runFn0 :: forall a. Fn0 a -> a
 
 #### `runFn1`
+
+Run a function with 1 argument and Javascript calling conventions 
+in purescript.  Useful for writing JS function bindings.
 
     runFn1 :: forall a b. Fn1 a b -> a -> b
 
@@ -456,6 +644,9 @@ E.g.
     runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 
 #### `runFn2`
+
+Run a function with 2 arguments and Javascript calling conventions 
+in purescript.  Useful for writing JS function bindings.
 
     runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
 
@@ -494,6 +685,8 @@ E.g.
 
 #### `unsafeIndex`
 
+Index into an Array.  No bounds checking is performed on the index.
+
     unsafeIndex :: forall a. [a] -> Number -> a
 
 
@@ -502,6 +695,8 @@ E.g.
 ### Types
 
 #### `Eff`
+
+Monad for executing native Javascript effects.
 
     data Eff :: # ! -> * -> *
 
@@ -537,6 +732,9 @@ E.g.
 
 #### `bindE`
 
+Compose effectful actions, passing the result of the first as the input
+to the second.
+
     bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 
 #### `forE`
@@ -549,9 +747,14 @@ E.g.
 
 #### `returnE`
 
+Wrap a pure value into an effectful context.
+
     returnE :: forall e a. a -> Eff e a
 
 #### `runPure`
+
+Run an effectful computation with no side effects, either because there 
+are none or because all possible side effects are handled.
 
     runPure :: forall a. Pure a -> a
 

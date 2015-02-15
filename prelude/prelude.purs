@@ -34,10 +34,14 @@ module Prelude
   otherwise = true
 
   -- | Flips the order of the arguments to a function of two arguments. 
+  -- |
+  -- | `flip (/) 6 3 == 3 / 6`
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
 
   -- | Returns its first argument and ignores its second. 
+  -- |
+  -- | `const 7 "whatever" == 7`
   const :: forall a b. a -> b -> a
   const a _ = a
 
@@ -59,9 +63,15 @@ module Prelude
   class Semigroupoid a where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
 
+  -- | Function composition in right to left sense.
+  -- |
+  -- | `(f <<< g) x == f (g x)`
   instance semigroupoidArr :: Semigroupoid (->) where
     (<<<) f g x = f (g x)
 
+  -- | Function composition in left to right sense.
+  -- |
+  -- | `(f >>> g) x == g (f x)`
   (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
   (>>>) f g = g <<< f
 
@@ -74,14 +84,23 @@ module Prelude
   infixr 0 $
   infixl 0 #
 
+  -- | Applies the first argument to the second, making a backward pipe.
+  -- |
+  -- | `reverse $ "str" ++ "ing" == "gnirts"`
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
+  -- | Applies the second argument to the first, making a forwards pipe.
+  -- |
+  -- | `"str" ++ "ing" # reverse == "gnirts"`
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
 
   infixr 6 :
 
+  -- | Prepends an element to a list.
+  -- |
+  -- | `"try" : ["purescript", "today"] == ["try", "purescript", "today"]`
   (:) :: forall a. a -> [a] -> [a]
   (:) = cons
 
@@ -94,6 +113,9 @@ module Prelude
     }
     """ :: forall a. a -> [a] -> [a]
 
+  -- | Converts data to a String.
+  -- |
+  -- | `show 1 == "1"`
   class Show a where
     show :: a -> String
 
@@ -104,12 +126,15 @@ module Prelude
     }
     """ :: String -> String
 
+  -- | `show (Unit {}) == "Unit {}"`
   instance showUnit :: Show Unit where
     show (Unit {}) = "Unit {}"
 
+  -- | `show "abc" == "abc"`
   instance showString :: Show String where
     show = showStringImpl
 
+  -- | `show true == "true"`
   instance showBoolean :: Show Boolean where
     show true = "true"
     show false = "false"
@@ -121,6 +146,7 @@ module Prelude
     }
     """ :: Number -> String
 
+  -- | `show 1 == "1"`
   instance showNumber :: Show Number where
     show = showNumberImpl
 
@@ -137,34 +163,56 @@ module Prelude
     }
     """ :: forall a. (a -> String) -> [a] -> String
 
+  -- | `show [1, 2, 3] == "[1, 2, 3]"`
   instance showArray :: (Show a) => Show [a] where
     show = showArrayImpl show
 
   infixl 4 <$>
   infixl 1 <#>
 
+  -- | Apply a function to the data contained in a Functor type, returning a
+  -- | new wrapped result.
+  -- | 
+  -- | `not <$> Just true == Just false`
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
 
+  -- | Reversed version of (<$>).
+  -- |
+  -- | `Just true <#> not == Just false`
   (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
   (<#>) fa f = f <$> fa
 
+  -- | Replace the contents of a Functor with Unit.
+  -- |
+  -- | `void (Just false) == Just unit`
   void :: forall f a. (Functor f) => f a -> f Unit
   void fa = const unit <$> fa
 
   infixl 4 <*>
 
+  -- | Pass arguments into a Functor-wrapped function, returning a new wrapped
+  -- | result.
+  -- |
+  -- | `Just (+) <*> Just 5 <*> Nothing == Nothing`
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
   class (Apply f) <= Applicative f where
     pure :: forall a. a -> f a
 
+  -- | Apply a function to the data contained in an Applicative type, returning
+  -- | a new Applicative result.
+  -- |
+  -- | `liftA1 not (Just true) == Just false`
   liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
   liftA1 f a = pure f <*> a
 
   infixl 1 >>=
 
+  -- | Compose monadic actions together, passing the result of one as the 
+  -- | input to the next.
+  -- |
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
@@ -173,6 +221,8 @@ module Prelude
   return :: forall m a. (Monad m) => a -> m a
   return = pure
 
+  -- | Apply a function to the data in a Monad type, returning a new Monad 
+  -- | result.
   liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
   liftM1 f a = do
     a' <- a
@@ -205,6 +255,7 @@ module Prelude
   infixl 6 -
   infixl 6 +
 
+  -- | Perform arithmetic-like operations on data.
   class Num a where
     (+) :: a -> a -> a
     (-) :: a -> a -> a
@@ -265,6 +316,7 @@ module Prelude
     }
     """ :: Number -> Number
 
+  -- | Standard arithmetic operations on Numbers. `%` is modulo.
   instance numNumber :: Num Number where
     (+) = numAdd
     (-) = numSub
@@ -281,6 +333,7 @@ module Prelude
   infix 4 ==
   infix 4 /=
 
+  -- | Determine whether two data of the same type are equal.
   class Eq a where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
@@ -307,14 +360,23 @@ module Prelude
     (==) (Unit {}) (Unit {}) = true
     (/=) (Unit {}) (Unit {}) = false
 
+  -- | Determine whether two Strings are equal.
+  -- |
+  -- | `"string" == "string"`
   instance eqString :: Eq String where
     (==) = refEq
     (/=) = refIneq
 
+  -- | Determine whether two Numbers are equal.
+  -- |
+  -- | `1 == 1`
   instance eqNumber :: Eq Number where
     (==) = refEq
     (/=) = refIneq
 
+  -- | Determine whether two Booleans are equal.
+  -- |
+  -- | `true /= false`
   instance eqBoolean :: Eq Boolean where
     (==) = refEq
     (/=) = refIneq
@@ -334,12 +396,20 @@ module Prelude
     }
     """ :: forall a. (a -> a -> Boolean) -> [a] -> [a] -> Boolean
 
+  -- | Determine whether two Arrays are equal.
+  -- |
+  -- | `[1, 2, 3] == [1, 2, 3]`
   instance eqArray :: (Eq a) => Eq [a] where
     (==) xs ys = eqArrayImpl (==) xs ys
     (/=) xs ys = not (xs == ys)
 
+  -- | Represents the result of a comparison operation in which one item being
+  -- | compared can be less than, greater than, or equal to the other.
   data Ordering = LT | GT | EQ
 
+  -- | Determine whether two Orderings are equal.
+  -- |
+  -- | `compare 1 2 == compare 1 100`
   instance eqOrdering :: Eq Ordering where
     (==) LT LT = true
     (==) GT GT = true
@@ -352,11 +422,17 @@ module Prelude
     show GT = "GT"
     show EQ = "EQ"
 
+  -- | Compare the ranking of two data of the same type.
+  -- |
+  -- | `compare 1 10 == LT`
   class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering
 
   infixl 4 <
-
+  
+  -- | Returns true if the left argument is "less than" the right argument.
+  -- | 
+  -- | `1 < 10 == true`
   (<) :: forall a. (Ord a) => a -> a -> Boolean
   (<) a1 a2 = case a1 `compare` a2 of
     LT -> true
@@ -364,6 +440,9 @@ module Prelude
 
   infixl 4 >
 
+  -- | Returns true if the left argument is "greater than" the right argument.
+  -- |
+  -- | `1 > 10 == false`
   (>) :: forall a. (Ord a) => a -> a -> Boolean
   (>) a1 a2 = case a1 `compare` a2 of
     GT -> true
@@ -371,13 +450,21 @@ module Prelude
 
   infixl 4 <=
 
+  -- | Returns true if the left argument is "greater than or equal to" the 
+  -- | right argument.
+  -- |
+  -- | `1 <= 1 == true`
   (<=) :: forall a. (Ord a) => a -> a -> Boolean
   (<=) a1 a2 = case a1 `compare` a2 of
     GT -> false
     _ -> true
 
   infixl 4 >=
-
+  
+  -- | Returns true if the left argument is "less than or equal to" the 
+  -- | right argument.
+  -- |
+  -- | `1 >= 1 == true`
   (>=) :: forall a. (Ord a) => a -> a -> Boolean
   (>=) a1 a2 = case a1 `compare` a2 of
     LT -> false
@@ -401,21 +488,41 @@ module Prelude
   unsafeCompare :: forall a. a -> a -> Ordering
   unsafeCompare = unsafeCompareImpl LT EQ GT
 
+  -- | Compare two Units.  Always returns `EQ`.
+  -- |
+  -- | `compare unit unit == true`
   instance ordUnit :: Ord Unit where
     compare (Unit {}) (Unit {}) = EQ
 
+  -- | Compare two Booleans.  True is greater than false.
+  -- |
+  -- | `compare false true == LT`
   instance ordBoolean :: Ord Boolean where
     compare false false = EQ
     compare false true  = LT
     compare true  true  = EQ
     compare true  false = GT
 
+  -- | Compare the value of two Numbers.
+  -- |
+  -- | `compare 1 100 == LT`
   instance ordNumber :: Ord Number where
     compare = unsafeCompare
 
+  -- | Compare Strings ranked alphabetically (by character value).
+  -- | 
+  -- | `compare "alphabetically" "bob" == LT`
   instance ordString :: Ord String where
     compare = unsafeCompare
 
+  -- | Compare the contents of two Arrays of the same type.  The first element
+  -- | of the left array is compared to the first argument of the right array, 
+  -- | second element with second element, etc, until the two compared elements
+  -- | are not equal.  If one array is a prefix of the other, the shorter array
+  -- | is less than the longer one.
+  -- |
+  -- | `compare [1, 2, 3] [5] == LT`
+  -- | `compare [1, 2, 3] [1, 2, 3, 4] == LT`
   instance ordArray :: (Ord a) => Ord [a] where
     compare [] [] = EQ
     compare [] _ = LT
@@ -428,6 +535,7 @@ module Prelude
   infixl 10 .|.
   infixl 10 .^.
 
+  -- | Bitwise operations on data.
   class Bits b where
     (.&.) :: b -> b -> b
     (.|.) :: b -> b -> b
@@ -510,6 +618,7 @@ module Prelude
   infixr 2 ||
   infixr 3 &&
 
+  -- | Perform Boolean logic operators on data.
   class BoolLike b where
     (&&) :: b -> b -> b
     (||) :: b -> b -> b
@@ -540,6 +649,10 @@ module Prelude
     }
     """ :: Boolean -> Boolean
 
+  -- | Standard boolean AND and OR.
+  -- |
+  -- | `true && false == false`
+  -- | `true || false == true`
   instance boolLikeBoolean :: BoolLike Boolean where
     (&&) = boolAnd
     (||) = boolOr
@@ -547,6 +660,7 @@ module Prelude
 
   infixr 5 <>
 
+  -- | Concatenation-like operation.
   class Semigroup a where
     (<>) :: a -> a -> a
 
@@ -562,6 +676,9 @@ module Prelude
   instance semigroupUnit :: Semigroup Unit where
     (<>) (Unit {}) (Unit {}) = Unit {}
 
+  -- | Concatenate two Strings.
+  -- |
+  -- | `"try" <> " purescript" == "try purescript"
   instance semigroupString :: Semigroup String where
     (<>) = concatString
 
@@ -570,16 +687,27 @@ module Prelude
 
   infixr 5 ++
 
+  -- | Alias for (<>), typically used for String or Array concatenation as a
+  -- | style choice.
+  -- |
+  -- | `[1, 2, 3] ++ [4, 5] == [1, 2, 3, 4, 5]`
   (++) :: forall s. (Semigroup s) => s -> s -> s
   (++) = (<>)
 
 module Data.Function where
 
+  -- | Apply a function to two arguments, then combine the results with a second
+  -- | function.
+  -- |
+  -- | `on (*) length "argument1" "arg2" == 9 * 4`
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
 
+  -- | Function of 0 arguments using Javascript calling conventions.
   foreign import data Fn0 :: * -> *
+  -- | Function of 1 arguments using Javascript calling conventions.
   foreign import data Fn1 :: * -> * -> *
+  -- | Function of 2 arguments using Javascript calling conventions.
   foreign import data Fn2 :: * -> * -> * -> *
   foreign import data Fn3 :: * -> * -> * -> * -> *
   foreign import data Fn4 :: * -> * -> * -> * -> * -> *
@@ -590,6 +718,8 @@ module Data.Function where
   foreign import data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
   foreign import data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 
+  -- | Convert a purescript function of type `Unit -> a` to JS calling
+  -- | convention.
   foreign import mkFn0
     """
     function mkFn0(fn) {
@@ -599,6 +729,7 @@ module Data.Function where
     }
     """ :: forall a. (Unit -> a) -> Fn0 a
 
+  -- | Convert a purescript function of 1 argument to JS calling convention.
   foreign import mkFn1
     """
     function mkFn1(fn) {
@@ -608,6 +739,7 @@ module Data.Function where
     }
     """ :: forall a b. (a -> b) -> Fn1 a b
 
+  -- | Convert a purescript function of 2 argument to JS calling convention.
   foreign import mkFn2
     """
     function mkFn2(fn) {
@@ -689,6 +821,8 @@ module Data.Function where
     }
     """ :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
 
+  -- | Run a function with 0 arguments and Javascript calling conventions 
+  -- | in purescript.  Useful for writing JS function bindings.
   foreign import runFn0
     """
     function runFn0(fn) {
@@ -696,6 +830,8 @@ module Data.Function where
     }
     """ :: forall a. Fn0 a -> a
 
+  -- | Run a function with 1 argument and Javascript calling conventions 
+  -- | in purescript.  Useful for writing JS function bindings.
   foreign import runFn1
     """
     function runFn1(fn) {
@@ -705,6 +841,8 @@ module Data.Function where
     }
     """ :: forall a b. Fn1 a b -> a -> b
 
+  -- | Run a function with 2 arguments and Javascript calling conventions 
+  -- | in purescript.  Useful for writing JS function bindings.
   foreign import runFn2
     """
     function runFn2(fn) {
@@ -878,6 +1016,7 @@ module Data.Function where
 
 module Prelude.Unsafe where
 
+  -- | Index into an Array.  No bounds checking is performed on the index.
   foreign import unsafeIndex
     """
     function unsafeIndex(xs) {
@@ -889,8 +1028,10 @@ module Prelude.Unsafe where
 
 module Control.Monad.Eff where
 
+  -- | Monad for executing native Javascript effects.
   foreign import data Eff :: # ! -> * -> *
 
+  -- | Wrap a pure value into an effectful context.
   foreign import returnE
     """
     function returnE(a) {
@@ -900,6 +1041,8 @@ module Control.Monad.Eff where
     }
     """ :: forall e a. a -> Eff e a
 
+  -- | Compose effectful actions, passing the result of the first as the input
+  -- | to the second.
   foreign import bindE
     """
     function bindE(a) {
@@ -913,6 +1056,8 @@ module Control.Monad.Eff where
 
   type Pure a = forall e. Eff e a
 
+  -- | Run an effectful computation with no side effects, either because there 
+  -- | are none or because all possible side effects are handled.
   foreign import runPure
     """
     function runPure(f) {
