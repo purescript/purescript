@@ -91,12 +91,12 @@ inlineOperator (m, op) f = everywhereOnJS convert
 
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll $
-  [ binary C.numNumber (C.+) Add
-  , binary C.numNumber (C.-) Subtract
-  , binary C.numNumber (C.*) Multiply
-  , binary C.numNumber (C./) Divide
-  , binary C.numNumber (C.%) Modulus
-  , unary  C.numNumber C.negate Negate
+  [ binary C.semiringNumber (C.+) Add
+  , binary C.semiringNumber (C.*) Multiply
+  , binary C.ringNumber (C.-) Subtract
+  , unary  C.ringNumber C.negate Negate
+  , binary C.divisionRingNumber (C./) Divide
+  --, binary C.numNumber (C.%) Modulus
 
   , binary C.ordNumber (C.<) LessThan
   , binary C.ordNumber (C.>) GreaterThan
