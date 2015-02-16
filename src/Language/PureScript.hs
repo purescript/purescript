@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell, FlexibleContexts #-}
 
 module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, prelude) where
 
@@ -22,6 +22,7 @@ import Data.Function (on)
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
+import qualified Data.Traversable as T (traverse)
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -29,6 +30,7 @@ import qualified Data.Set as S
 import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Monad.Error
+import Control.Monad.Reader
 
 import System.FilePath ((</>))
 
@@ -71,42 +73,47 @@ import qualified Language.PureScript.Constants as C
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
+compile :: (Functor m, Applicative m, MonadError String m, MonadReader (Options Compile) m)
+        => [Module] -> [String] -> m (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: Environment -> Options Compile -> [Module] -> [String] -> Either String (String, String, Environment)
-compile' env opts ms prefix = do
-  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude opts then ms else map importPrelude ms
+compile' :: (Functor m, Applicative m, MonadError String m, MonadReader (Options Compile) m)
+         => Environment -> [Module] -> [String] -> m (String, String, Environment)
+compile' env ms prefix = do
+  noPrelude <- asks optionsNoPrelude
+  additional <- asks optionsAdditional
+  mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
+  (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
   (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
-  (elaborated, env') <- runCheck' opts env $ forM desugared $ typeCheckModule mainModuleIdent
+  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
-  let entryPoints = moduleNameFromString `map` entryPointModules (optionsAdditional opts)
+  let entryPoints = moduleNameFromString `map` entryPointModules additional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
-  let codeGenModuleNames = moduleNameFromString `map` codeGenModules (optionsAdditional opts)
+  let codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
   let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-  let js = evalSupply nextVar $ concat <$> mapM (moduleToJs opts) modulesToCodeGen
+  js <- concat <$> (evalSupplyT nextVar $ T.traverse moduleToJs modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
-  js' <- generateMain env' opts js
+  js' <- generateMain env' js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
   return (pjs, exts, env')
-  where
-  mainModuleIdent = moduleNameFromString <$> optionsMain opts
 
-generateMain :: Environment -> Options Compile -> [JS] -> Either String [JS]
-generateMain env opts js =
-  case moduleNameFromString <$> optionsMain opts of
+generateMain :: (MonadError String m, MonadReader (Options Compile) m) => Environment -> [JS] -> m [JS]
+generateMain env js = do
+  main <- asks optionsMain
+  additional <- asks optionsAdditional
+  case moduleNameFromString <$> main of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
-        Left $ show mmi ++ "." ++ C.main ++ " is undefined"
-      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace (optionsAdditional opts))))) []]
+        throwError $ show mmi ++ "." ++ C.main ++ " is undefined"
+      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace additional)))) []]
     _ -> return js
 
 -- |
 -- A type class which collects the IO actions we need to be able to run in "make" mode
 --
-class MonadMake m where
+class (MonadReader (P.Options P.Make) m, MonadError String m) => MonadMake m where
   -- |
   -- Get a file timestamp
   --
@@ -121,11 +128,6 @@ class MonadMake m where
   -- Write a text file
   --
   writeTextFile :: FilePath -> String -> m ()
-
-  -- |
-  -- Report an error
-  --
-  liftError :: Either String a -> m a
 
   -- |
   -- Respond to a progress update
@@ -152,11 +154,13 @@ traverseEither f (Right y) = Right <$> f y
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m) => FilePath -> Options Make -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
-make outputDir opts ms prefix = do
+make :: (Functor m, Applicative m, Monad m, MonadMake m)
+     => FilePath -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
+make outputDir ms prefix = do
+  noPrelude <- asks optionsNoPrelude
   let filePathMap = M.fromList (map (\(fp, Module mn _ _) -> (mn, fp)) ms)
 
-  (sorted, graph) <- liftError $ sortModules $ map importPrim $ if optionsNoPrelude opts then map snd ms else map (importPrelude . snd) ms
+  (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
 
   toRebuild <- foldM (\s (Module moduleName' _ _) -> do
     let filePath = runModuleName moduleName'
@@ -176,15 +180,16 @@ make outputDir opts ms prefix = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  (desugared, nextVar) <- liftError $ stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
+  (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
-  evalSupplyT nextVar (go initEnvironment desugared)
+  evalSupplyT nextVar $ go initEnvironment desugared
 
   where
-  go :: (Functor m, Applicative m, Monad m, MonadMake m) => Environment -> [(Bool, Module)] -> SupplyT m Environment
+  go :: (Functor m, Applicative m, Monad m, MonadMake m)
+     => Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
-    (_, env') <- lift . liftError . runCheck' opts env $ typeCheckModule Nothing m
+    (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
 
     go env' ms'
   go env ((True, m@(Module moduleName' _ exps)) : ms') = do
@@ -194,15 +199,15 @@ make outputDir opts ms prefix = do
 
     lift . progress $ "Compiling " ++ runModuleName moduleName'
 
-    (Module _ elaborated _, env') <- lift . liftError . runCheck' opts env $ typeCheckModule Nothing m
+    (Module _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
 
-    regrouped <- lift . liftError . stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module moduleName' regrouped exps
     let corefn = CoreFn.moduleToCoreFn env' mod'
     let [renamed] = renameInModules [corefn]
 
-    pjs <- prettyPrintJS <$> moduleToJs opts renamed
+    pjs <- prettyPrintJS <$> moduleToJs renamed
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
     let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
 
@@ -220,10 +225,10 @@ make outputDir opts ms prefix = do
   rebuildIfNecessary graph toRebuild (Module moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- liftError . fmap (map snd) . either (Left . show) Right $ P.parseModulesFromFiles id [(externsFile, externs)]
+    externsModules <- fmap (map snd) . either (throwError . show) return $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
-      _ -> liftError . Left $ "Externs file " ++ externsFile ++ " was invalid"
+      _ -> throwError $ "Externs file " ++ externsFile ++ " was invalid"
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]

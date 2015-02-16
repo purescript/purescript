@@ -95,8 +95,8 @@ prettyPrintErrorStack printFullStack (ErrorStack es) =
 prettyPrintErrorStack printFullStack (MultipleErrors es) =
   unlines $ intersperse "" $ "Multiple errors:" : map (prettyPrintErrorStack printFullStack) es
 
-stringifyErrorStack :: Bool -> Either ErrorStack a -> Either String a
-stringifyErrorStack printFullStack = either (Left . prettyPrintErrorStack printFullStack) Right
+stringifyErrorStack :: (MonadError String m) => Bool -> Either ErrorStack a -> m a
+stringifyErrorStack printFullStack = either (throwError . prettyPrintErrorStack printFullStack) return
 
 isErrorNonEmpty :: CompileError -> Bool
 isErrorNonEmpty = not . null . compileErrorMessage
