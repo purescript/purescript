@@ -59,6 +59,13 @@
     class (Semigroupoid a) <= Category a where
       id :: forall t. a t t
 
+#### `DivisionRing`
+
+Ring where every nonzero element has a multiplicative inverse (possibly
+a non-commutative field) so that ```a `mod` b = zero```
+
+    class (ModuloRing a) <= DivisionRing a where
+
 #### `Eq`
 
     class Eq a where
@@ -70,24 +77,36 @@
     class Functor f where
       (<$>) :: forall a b. (a -> b) -> f a -> f b
 
+#### `ModuloRing`
+
+Ring with modulo operation and division where
+```a / b * b + (a `mod` b) = a```
+
+    class (Ring a) <= ModuloRing a where
+      (/) :: a -> a -> a
+      mod :: a -> a -> a
+
 #### `Monad`
 
     class (Applicative m, Bind m) <= Monad m where
 
 #### `Num`
 
-    class Num a where
-      (+) :: a -> a -> a
-      (-) :: a -> a -> a
-      (*) :: a -> a -> a
-      (/) :: a -> a -> a
-      (%) :: a -> a -> a
-      negate :: a -> a
+A commutative field
+
+    class (DivisionRing a) <= Num a where
 
 #### `Ord`
 
     class (Eq a) <= Ord a where
       compare :: a -> a -> Ordering
+
+#### `Ring`
+
+Addition, multiplication, and subtraction
+
+    class (Semiring a) <= Ring a where
+      (-) :: a -> a -> a
 
 #### `Semigroup`
 
@@ -98,6 +117,16 @@
 
     class Semigroupoid a where
       (<<<) :: forall b c d. a c d -> a b c -> a b d
+
+#### `Semiring`
+
+Addition and multiplication
+
+    class Semiring a where
+      (+) :: a -> a -> a
+      zero :: a
+      (*) :: a -> a -> a
+      one :: a
 
 #### `Show`
 
@@ -131,6 +160,10 @@
 
     instance categoryArr :: Category Prim.Function
 
+#### `divisionRingNumber`
+
+    instance divisionRingNumber :: DivisionRing Number
+
 #### `eqArray`
 
     instance eqArray :: (Eq a) => Eq [a]
@@ -158,6 +191,10 @@
 #### `functorArr`
 
     instance functorArr :: Functor (Prim.Function r)
+
+#### `moduloRingNumber`
+
+    instance moduloRingNumber :: ModuloRing Number
 
 #### `monadArr`
 
@@ -187,6 +224,10 @@
 
     instance ordUnit :: Ord Unit
 
+#### `ringNumber`
+
+    instance ringNumber :: Ring Number
+
 #### `semigroupArr`
 
     instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
@@ -202,6 +243,10 @@
 #### `semigroupoidArr`
 
     instance semigroupoidArr :: Semigroupoid Prim.Function
+
+#### `semiringNumber`
+
+    instance semiringNumber :: Semiring Number
 
 #### `showArray`
 
@@ -277,7 +322,7 @@
 #### `asTypeOf`
 
 This function returns its first argument, and can be used to assert type equalities.
-This can be useful when types are otherwise ambiguous. 
+This can be useful when types are otherwise ambiguous.
 
 E.g.
 
@@ -294,13 +339,13 @@ been ambiguous, resulting in a compile-time error.
 
 #### `const`
 
-Returns its first argument and ignores its second. 
+Returns its first argument and ignores its second.
 
     const :: forall a b. a -> b -> a
 
 #### `flip`
 
-Flips the order of the arguments to a function of two arguments. 
+Flips the order of the arguments to a function of two arguments.
 
     flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
@@ -312,13 +357,17 @@ Flips the order of the arguments to a function of two arguments.
 
     liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 
+#### `negate`
+
+    negate :: forall a. (Ring a) => a -> a
+
 #### `otherwise`
 
-An alias for `true`, which can be useful in guard clauses: 
+An alias for `true`, which can be useful in guard clauses:
 
 E.g.
 
-    max x y | x >= y = x 
+    max x y | x >= y = x
             | otherwise = y
 
     otherwise :: Boolean
