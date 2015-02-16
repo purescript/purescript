@@ -12,18 +12,18 @@ module Main where
   runNat = \nat -> case nat of
     Nat f -> f 0 (\n -> n + 1)
 
-  zero = Nat (\zero _ -> zero)
+  zero' = Nat (\zero' _ -> zero')
 
   succ = \n -> case n of
-    Nat f -> Nat (\zero succ -> succ (f zero succ))
+    Nat f -> Nat (\zero' succ -> succ (f zero' succ))
 
   add = \n m -> case n of
     Nat f -> case m of
-      Nat g -> Nat (\zero succ -> g (f zero succ) succ)
+      Nat g -> Nat (\zero' succ -> g (f zero' succ) succ)
 
-  one = succ zero
-  two = succ zero
+  one' = succ zero'
+  two = succ zero'
   four = add two two
   fourNumber = runNat four
 
-  main = Debug.Trace.trace "Done"
+  main = Debug.Trace.trace "Done'"
