@@ -86,6 +86,7 @@ inlineValues = everywhereOnJS convert
   convert :: JS -> JS
   convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.zero fn = JSNumericLiteral (Left 0)
   convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.one fn = JSNumericLiteral (Left 1)
+  convert (JSApp (JSApp fn [x]) [y]) | isPreludeFn (C.%) fn = JSBinary Modulus x y
   convert other = other
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
@@ -105,7 +106,6 @@ inlineCommonOperators = applyAll $
   , binary C.ringNumber (C.-) Subtract
   , unary  C.ringNumber C.negate Negate
   , binary C.moduloRingNumber (C./) Divide
-  --, binary C.numNumber (C.%) Modulus
 
   , binary C.ordNumber (C.<) LessThan
   , binary C.ordNumber (C.>) GreaterThan
@@ -140,11 +140,8 @@ inlineCommonOperators = applyAll $
   binary dictName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isOp fn && isPreludeDict dictName dict = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeDict dictName dict && isPreludeFn opString fn = JSBinary op x y
     convert other = other
-    isOp (JSAccessor longForm (JSAccessor prelude (JSVar _))) = prelude == C.prelude && longForm == identToJs (Op opString)
-    isOp (JSIndexer (JSStringLiteral op') (JSVar prelude)) = prelude == C.prelude && opString == op'
-    isOp _ = False
   binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
   binaryFunction dictName fnName op = everywhereOnJS convert
     where
@@ -199,4 +196,6 @@ isPreludeDict _ _ = False
 
 isPreludeFn :: String -> JS -> Bool
 isPreludeFn fnName (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
+isPreludeFn fnName (JSIndexer (JSStringLiteral fnName') (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
+isPreludeFn fnName (JSAccessor longForm (JSAccessor prelude (JSVar _))) = prelude == C.prelude && longForm == identToJs (Op fnName)
 isPreludeFn _ _ = False
