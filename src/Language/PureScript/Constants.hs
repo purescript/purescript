@@ -175,8 +175,8 @@ semiringNumber = "semiringNumber"
 ringNumber :: String
 ringNumber = "ringNumber"
 
-moduloRingNumber :: String
-moduloRingNumber = "moduloRingNumber"
+moduloSemiRingNumber :: String
+moduloSemiRingNumber = "moduloSemiRingNumber"
 
 numNumber :: String
 numNumber = "numNumber"
