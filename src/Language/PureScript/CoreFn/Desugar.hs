@@ -176,6 +176,9 @@ exprToCoreFn mn env ss com _  (A.TypeClassDictionaryConstructorApp name (A.Typed
   let args = map (exprToCoreFn mn env ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
       ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
   in foldl (App (ss, com, Nothing, Nothing)) ctor args
+exprToCoreFn _ _ ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
+  Abs (ss, com, ty, Nothing) (Ident "dict")
+    (Accessor nullAnn (runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
 exprToCoreFn mn env _ com ty (A.PositionedValue ss com1 v) =
   exprToCoreFn mn env (Just ss) (com ++ com1) ty v
 exprToCoreFn _ _ _ _ _ e =
