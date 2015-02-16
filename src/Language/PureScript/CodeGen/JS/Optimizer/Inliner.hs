@@ -105,7 +105,7 @@ inlineCommonOperators = applyAll $
   , binary C.semiringNumber (C.*) Multiply
   , binary C.ringNumber (C.-) Subtract
   , unary  C.ringNumber C.negate Negate
-  , binary C.moduloSemiRingNumber (C./) Divide
+  , binary C.moduloSemiringNumber (C./) Divide
 
   , binary C.ordNumber (C.<) LessThan
   , binary C.ordNumber (C.>) GreaterThan

@@ -64,7 +64,7 @@
 Ring where every nonzero element has a multiplicative inverse (possibly
 a non-commutative field) so that ```a `mod` b = zero```
 
-    class (Ring a, ModuloSemiRing a) <= DivisionRing a where
+    class (Ring a, ModuloSemiring a) <= DivisionRing a where
 
 #### `Eq`
 
@@ -77,12 +77,12 @@ a non-commutative field) so that ```a `mod` b = zero```
     class Functor f where
       (<$>) :: forall a b. (a -> b) -> f a -> f b
 
-#### `ModuloSemiRing`
+#### `ModuloSemiring`
 
 Semiring with modulo operation and division where
 ```a / b * b + (a `mod` b) = a```
 
-    class (Semiring a) <= ModuloSemiRing a where
+    class (Semiring a) <= ModuloSemiring a where
       (/) :: a -> a -> a
       mod :: a -> a -> a
 
@@ -192,9 +192,9 @@ Addition and multiplication
 
     instance functorArr :: Functor (Prim.Function r)
 
-#### `moduloSemiRingNumber`
+#### `moduloSemiringNumber`
 
-    instance moduloSemiRingNumber :: ModuloSemiRing Number
+    instance moduloSemiringNumber :: ModuloSemiring Number
 
 #### `monadArr`
 
