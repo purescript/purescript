@@ -14,10 +14,10 @@ module Prelude
   , Bind, (>>=)
   , Monad, return, liftM1, ap
   , Semiring, (+), zero, (*), one
+  , ModuloSemiring, (/), mod
   , Ring, (-)
   , (%)
   , negate
-  , ModuloRing, (/), mod
   , DivisionRing
   , Num
   , Eq, (==), (/=), refEq, refIneq
@@ -217,6 +217,12 @@ module Prelude
     (*)  :: a -> a -> a
     one  :: a
 
+  -- | Semiring with modulo operation and division where
+  -- | ```a / b * b + (a `mod` b) = a```
+  class (Semiring a) <= ModuloSemiring a where
+    (/) :: a -> a -> a
+    mod :: a -> a -> a
+
   -- | Addition, multiplication, and subtraction
   class (Semiring a) <= Ring a where
     (-) :: a -> a -> a
@@ -224,15 +230,9 @@ module Prelude
   negate :: forall a. (Ring a) => a -> a
   negate a = zero - a
 
-  -- | Ring with modulo operation and division where
-  -- | ```a / b * b + (a `mod` b) = a```
-  class (Ring a) <= ModuloRing a where
-    (/) :: a -> a -> a
-    mod :: a -> a -> a
-
   -- | Ring where every nonzero element has a multiplicative inverse (possibly
   -- | a non-commutative field) so that ```a `mod` b = zero```
-  class (ModuloRing a) <= DivisionRing a
+  class (Ring a, ModuloSemiring a) <= DivisionRing a
 
   -- | A commutative field
   class (DivisionRing a) <= Num a
@@ -293,7 +293,7 @@ module Prelude
   instance ringNumber :: Ring Number where
     (-) = numSub
 
-  instance moduloRingNumber :: ModuloRing Number where
+  instance moduloSemiringNumber :: ModuloSemiring Number where
     (/) = numDiv
     mod _ _ = 0
 
