@@ -185,18 +185,15 @@ valueToJs _ (Constructor _ _ (ProperName ctor) []) =
          , JSAssignment (JSAccessor "value" (JSVar ctor))
               (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
 valueToJs _ (Constructor _ _ (ProperName ctor) fields) =
-  return $ iife ctor [ makeConstructor ctor fields
-         , JSAssignment (JSAccessor "create" (JSVar ctor)) (makeCreateFn ctor fields)
-         ]
-    where
-    makeConstructor :: String -> [Ident] -> JS
-    makeConstructor ctorName fs =
-      let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fs ]
-      in JSFunction (Just ctorName) (identToJs `map` fs) (JSBlock body)
-    makeCreateFn :: String -> [Ident] -> JS
-    makeCreateFn ctorName fs =
-      let body = JSUnary JSNew $ JSApp (JSVar ctorName) (var `map` fs)
-      in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
+  let constructor =
+        let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fields ]
+        in JSFunction (Just ctor) (identToJs `map` fields) (JSBlock body)
+      createFn =
+        let body = JSUnary JSNew $ JSApp (JSVar ctor) (var `map` fields)
+        in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
+  in return $ iife ctor [ constructor
+                        , JSAssignment (JSAccessor "create" (JSVar ctor)) createFn
+                        ]
 iife :: String -> [JS] -> JS
 iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
