@@ -96,7 +96,7 @@ updateModules modules st = st { psciLoadedModules = psciLoadedModules st ++ modu
 -- Updates the state to have more let bindings.
 --
 updateLets :: [P.Declaration] -> PSCiState -> PSCiState
-updateLets ds st = st { psciLetBindings = ds ++ psciLetBindings st }
+updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 
 -- File helpers
 -- |
