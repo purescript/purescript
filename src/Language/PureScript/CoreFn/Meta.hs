@@ -18,6 +18,8 @@ module Language.PureScript.CoreFn.Meta where
 
 import qualified Data.Data as D
 
+import Language.PureScript.Names
+
 -- |
 -- Metadata annotations
 --
@@ -25,7 +27,7 @@ data Meta
   -- |
   -- The contained value is a data constructor
   --
-  = IsConstructor ConstructorType Arity
+  = IsConstructor ConstructorType [Ident]
   -- |
   -- The contained value is a newtype
   --
@@ -34,11 +36,6 @@ data Meta
   -- The contained value is a typeclass dictionary constructor
   --
   | IsTypeClassConstructor deriving (Show, D.Data, D.Typeable)
-
--- |
--- Type alias for constructor arity
---
-type Arity = Int
 
 -- |
 -- Data constructor metadata

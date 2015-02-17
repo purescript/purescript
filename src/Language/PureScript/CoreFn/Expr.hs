@@ -23,7 +23,6 @@ import qualified Data.Data as D
 
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Literals
-import Language.PureScript.CoreFn.Meta
 import Language.PureScript.Names
 
 -- |
@@ -35,9 +34,9 @@ data Expr a
   --
   = Literal a (Literal (Expr a))
   -- |
-  -- A data constructor (type name, constructor name, arity)
+  -- A data constructor (type name, constructor name, field names)
   --
-  | Constructor a ProperName ProperName Arity
+  | Constructor a ProperName ProperName [Ident]
   -- |
   -- A record property accessor
   --

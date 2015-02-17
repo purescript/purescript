@@ -41,7 +41,7 @@ data Environment = Environment {
   -- |
   -- Data constructors currently in scope, along with their associated data type constructors
   --
-  , dataConstructors :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type)
+  , dataConstructors :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type, [Ident])
   -- |
   -- Type synonyms currently in scope
   --
@@ -228,7 +228,7 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
 -- |
 -- Finds information about data constructors from the current environment.
 --
-lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type)
+lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type, [Ident])
 lookupConstructor env ctor =
   fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
@@ -237,5 +237,5 @@ lookupConstructor env ctor =
 --
 isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
 isNewtypeConstructor e ctor = case lookupConstructor e ctor of
-  (Newtype, _, _) -> True
-  (Data, _, _) -> False
+  (Newtype, _, _, _) -> True
+  (Data, _, _, _) -> False

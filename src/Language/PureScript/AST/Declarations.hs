@@ -398,6 +398,10 @@ data Expr
   --
   | TypeClassDictionary Bool Constraint [TypeClassDictionaryInScope]
   -- |
+  -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
+  --
+  | TypeClassDictionaryAccessor (Qualified ProperName) Ident
+  -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
   | SuperClassDictionary (Qualified ProperName) [Type]

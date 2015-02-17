@@ -21,24 +21,24 @@ module Language.PureScript.Sugar.TypeClasses
   ) where
 
 import Language.PureScript.AST hiding (isExported)
-import Language.PureScript.Names
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Supply
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
+import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Supply
+import Language.PureScript.Types
 
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
+import Control.Arrow (first, second)
 import Control.Monad.Error
 import Control.Monad.State
-import Control.Arrow (first, second)
 import Data.List ((\\), find)
-import Data.Monoid ((<>))
 import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.Monoid ((<>))
 
 import qualified Data.Map as M
 
@@ -158,12 +158,12 @@ desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
     modify (M.insert (mn, name) d)
-    return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+    return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
   go d@(TypeInstanceDeclaration name deps className tys members) = do
     desugared <- lift $ desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
-    return $ (expRef name className tys, [d, dictDecl])
+    return (expRef name className tys, [d, dictDecl])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos com) ds)
@@ -212,9 +212,10 @@ typeClassDictionaryDeclaration name args implies members =
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
-  ValueDeclaration ident TypeClassAccessorImport [] $ Right $
-    TypedValue False (Abs (Left $ Ident "dict") (Accessor (runIdent ident) (Var $ Qualified Nothing (Ident "dict")))) $
-    moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map (TypeVar . fst) args)] ty))
+  let className = Qualified (Just mn) name
+  in ValueDeclaration ident TypeClassAccessorImport [] $ Right $
+      TypedValue False (TypeClassDictionaryAccessor className ident) $
+      moveQuantifiersToFront (quantify (ConstrainedType [(className, map (TypeVar . fst) args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
   PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"

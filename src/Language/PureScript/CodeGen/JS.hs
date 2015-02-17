@@ -129,7 +129,7 @@ valueToJs :: (Functor m, Applicative m, Monad m, MonadReader (Options mode) m)
           => ModuleName -> Expr Ann -> SupplyT m JS
 valueToJs m (Literal _ l) =
   literalToValueJS m l
-valueToJs m (Var (_, _, _, Just (IsConstructor _ 0)) name) =
+valueToJs m (Var (_, _, _, Just (IsConstructor _ [])) name) =
   return $ JSAccessor "value" $ qualifiedToJS m id name
 valueToJs m (Var (_, _, _, Just (IsConstructor _ _)) name) =
   return $ JSAccessor "create" $ qualifiedToJS m id name
@@ -157,7 +157,7 @@ valueToJs m e@App{} = do
   args' <- mapM (valueToJs m) args
   case f of
     Var (_, _, _, Just IsNewtype) _ -> return (head args')
-    Var (_, _, _, Just (IsConstructor _ arity)) name | arity == length args ->
+    Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
     Var (_, _, _, Just IsTypeClassConstructor) name ->
       return $ JSUnary JSNew $ JSApp (qualifiedToJS m id name) args'
@@ -180,26 +180,20 @@ valueToJs _ (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
               JSObjectLiteral [("create",
                 JSFunction Nothing ["value"]
                   (JSBlock [JSReturn $ JSVar "value"]))])
-valueToJs _ (Constructor _ _ (ProperName ctor) 0) =
+valueToJs _ (Constructor _ _ (ProperName ctor) []) =
   return $ iife ctor [ JSFunction (Just ctor) [] (JSBlock [])
          , JSAssignment (JSAccessor "value" (JSVar ctor))
               (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
-valueToJs _ (Constructor _ _ (ProperName ctor) arity) =
-  return $ iife ctor [ makeConstructor ctor arity
-         , JSAssignment (JSAccessor "create" (JSVar ctor)) (go ctor 0 arity [])
-         ]
-    where
-    makeConstructor :: String -> Int -> JS
-    makeConstructor ctorName n =
-      let args = [ "value" ++ show index | index <- [0..n-1] ]
-          body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
-      in JSFunction (Just ctorName) args (JSBlock body)
-    go :: String -> Int -> Int -> [JS] -> JS
-    go pn _ 0 values = JSUnary JSNew $ JSApp (JSVar pn) (reverse values)
-    go pn index n values =
-      JSFunction Nothing ["value" ++ show index]
-        (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
-
+valueToJs _ (Constructor _ _ (ProperName ctor) fields) =
+  let constructor =
+        let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fields ]
+        in JSFunction (Just ctor) (identToJs `map` fields) (JSBlock body)
+      createFn =
+        let body = JSUnary JSNew $ JSApp (JSVar ctor) (var `map` fields)
+        in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
+  in return $ iife ctor [ constructor
+                        , JSAssignment (JSAccessor "create" (JSVar ctor)) createFn
+                        ]
 iife :: String -> [JS] -> JS
 iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
@@ -254,7 +248,7 @@ qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
 bindersToJs :: (Functor m, Applicative m, Monad m, MonadReader (Options mode) m)
             => ModuleName -> [CaseAlternative Ann] -> [JS] -> SupplyT m JS
 bindersToJs m binders vals = do
-  valNames <- replicateM (length vals) $ freshName
+  valNames <- replicateM (length vals) freshName
   let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
   jss <- forM binders $ \(CaseAlternative bs result) -> do
     ret <- guardsToJs result
@@ -291,8 +285,8 @@ binderToJs _ varName done (VarBinder _ ident) =
   return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
 binderToJs m varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
   binderToJs m varName done b
-binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType _)) _ ctor bs) = do
-  js <- go 0 done bs
+binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+  js <- go (zip fields bs) done
   return $ case ctorType of
     ProductType -> js
     SumType ->
@@ -301,13 +295,13 @@ binderToJs m varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorT
                 Nothing]
   where
   go :: (Functor m, Applicative m, Monad m, MonadReader (Options mode) m)
-     => Integer -> [JS] -> [Binder Ann] -> SupplyT m [JS]
-  go _ done' [] = return done'
-  go index done' (binder:bs') = do
+     => [(Ident, Binder Ann)] -> [JS] -> SupplyT m [JS]
+  go [] done' = return done'
+  go ((field, binder) : remain) done' = do
     argVar <- freshName
-    done'' <- go (index + 1) done' bs'
+    done'' <- go remain done'
     js <- binderToJs m argVar done'' binder
-    return (JSVariableIntroduction argVar (Just (JSAccessor ("value" ++ show index) (JSVar varName))) : js)
+    return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
 binderToJs m varName done binder@(ConstructorBinder _ _ ctor _) | isCons ctor = do
   let (headBinders, tailBinder) = uncons [] binder
       numberOfHeadBinders = fromIntegral $ length headBinders
