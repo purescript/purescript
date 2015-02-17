@@ -7,9 +7,9 @@ foreign import data C :: *
 foreign import t "var t = null;" :: T
 
 foreign import inst """
-  var inst = { 
-    show: function(t) { 
-      return 'Done'; 
+  var inst = {
+    show: function(t) {
+      return 'Done';
     }
   }""" :: C
 

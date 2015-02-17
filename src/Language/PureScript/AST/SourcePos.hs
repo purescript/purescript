@@ -48,6 +48,6 @@ data SourceSpan = SourceSpan
     --
   , spanEnd :: SourcePos
   } deriving (D.Data, D.Typeable)
-  
+
 instance Show SourceSpan where
   show sp = spanName sp ++ " " ++ show (spanStart sp) ++ " - " ++ show (spanEnd sp)

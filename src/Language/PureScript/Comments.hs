@@ -18,7 +18,7 @@
 module Language.PureScript.Comments where
 
 import qualified Data.Data as D
-    
+
 data Comment
   = LineComment String
   | BlockComment String

@@ -6,12 +6,14 @@ import Debug.Trace
 foreign import data Assert :: !
 
 foreign import assert
-  "function assert(x) {\
-  \  return function () {\
-  \    if (!x) throw new Error('assertion failed');\
-  \    return {};\
-  \  };\
-  \};" :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
+  """
+  function assert(x) {
+    return function() {
+      if (!x) throw new Error('assertion failed');
+      return {};
+    };
+  }
+  """ :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
 
 main = do
   assert (1 < 2)

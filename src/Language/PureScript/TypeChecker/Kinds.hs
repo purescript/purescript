@@ -14,19 +14,22 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, TupleSections #-}
 
 module Language.PureScript.TypeChecker.Kinds (
     kindOf,
+    kindOfWithScopedVars,
     kindsOf,
     kindsOfAll
 ) where
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
+
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 
+import Control.Arrow (second)
 import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.State
@@ -69,11 +72,19 @@ instance Unifiable Check Kind where
 -- Infer the kind of a single type
 --
 kindOf :: ModuleName -> Type -> Check Kind
-kindOf _ ty =
+kindOf _ ty = fst <$> kindOfWithScopedVars ty
+    
+-- |
+-- Infer the kind of a single type, returning the kinds of any scoped type variables
+--
+kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])   
+kindOfWithScopedVars ty = 
   rethrow (mkErrorStack "Error checking kind" (Just (TypeError ty)) <>) $
-    fmap (starIfUnknown . tidyUp) . liftUnify $ infer ty
+    fmap tidyUp . liftUnify $ infer ty
   where
-  tidyUp (k, sub) = sub $? k
+  tidyUp ((k, args), sub) = ( starIfUnknown (sub $? k)
+                            , map (second (starIfUnknown . (sub $?))) args
+                            )
 
 -- |
 -- Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
@@ -125,7 +136,7 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 --
 solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
 solveTypes isData ts kargs tyCon = do
-  ks <- mapM infer ts
+  ks <- mapM (fmap fst . infer) ts
   when isData $ do
     tyCon =?= foldr FunKind Star kargs
     forM_ ks $ \k -> k =?= Star
@@ -145,48 +156,64 @@ starIfUnknown k = k
 -- |
 -- Infer a kind for a type
 --
-infer :: Type -> UnifyT Kind Check Kind
+infer :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
 infer ty = rethrow (mkErrorStack "Error inferring type of value" (Just (TypeError ty)) <>) $ infer' ty
 
-infer' :: Type -> UnifyT Kind Check Kind
-infer' TypeWildcard = fresh
-infer' (TypeVar v) = do
-  Just moduleName <- checkCurrentModule <$> get
-  UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-infer' c@(TypeConstructor v) = do
-  env <- liftCheck getEnv
-  case M.lookup v (types env) of
-    Nothing -> UnifyT . lift . throwError $ mkErrorStack "Unknown type constructor" (Just (TypeError c))
-    Just (kind, _) -> return kind
-infer' (TypeApp t1 t2) = do
-  k0 <- fresh
-  k1 <- infer t1
-  k2 <- infer t2
-  k1 =?= FunKind k2 k0
-  return k0
+infer' :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
 infer' (ForAll ident ty _) = do
   k1 <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
+  (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
   k2 =?= Star
-  return Star
-infer' REmpty = do
-  k <- fresh
-  return $ Row k
-infer' (RCons _ ty row) = do
-  k1 <- infer ty
-  k2 <- infer row
-  k2 =?= Row k1
-  return $ Row k1
-infer' (ConstrainedType deps ty) = do
-  forM_ deps $ \(className, tys) -> do
-    _ <- infer $ foldl TypeApp (TypeConstructor className) tys
-    return ()
-  k <- infer ty
-  k =?= Star
-  return Star
+  return (Star, (ident, k1) : args)
 infer' (KindedType ty k) = do
-  k' <- infer ty
+  (k', args) <- infer ty
   k =?= k'
-  return k'
-infer' _ = error "Invalid argument to infer"
+  return (k', args)
+infer' other = (, []) <$> go other
+  where
+  go :: Type -> UnifyT Kind Check Kind
+  go (ForAll ident ty _) = do
+    k1 <- fresh
+    Just moduleName <- checkCurrentModule <$> get
+    k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
+    k2 =?= Star
+    return Star
+  go (KindedType ty k) = do
+    k' <- go ty
+    k =?= k'
+    return k'
+  go TypeWildcard = fresh
+  go (TypeVar v) = do
+    Just moduleName <- checkCurrentModule <$> get
+    UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+  go (Skolem v _ _) = do
+    Just moduleName <- checkCurrentModule <$> get
+    UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+  go c@(TypeConstructor v) = do
+    env <- liftCheck getEnv
+    case M.lookup v (types env) of
+      Nothing -> UnifyT . lift . throwError $ mkErrorStack "Unknown type constructor" (Just (TypeError c))
+      Just (kind, _) -> return kind
+  go (TypeApp t1 t2) = do
+    k0 <- fresh
+    k1 <- go t1
+    k2 <- go t2
+    k1 =?= FunKind k2 k0
+    return k0
+  go REmpty = do
+    k <- fresh
+    return $ Row k
+  go (RCons _ ty row) = do
+    k1 <- go ty
+    k2 <- go row
+    k2 =?= Row k1
+    return $ Row k1
+  go (ConstrainedType deps ty) = do
+    forM_ deps $ \(className, tys) -> do
+      _ <- go $ foldl TypeApp (TypeConstructor className) tys
+      return ()
+    k <- go ty
+    k =?= Star
+    return Star
+  go _ = error "Invalid argument to infer"

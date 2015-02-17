@@ -1,6 +1,6 @@
 module Main where
-  
-foo = bar 
+
+foo = bar
   where bar r = r + 1
 
 r = foo 2

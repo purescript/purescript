@@ -21,12 +21,14 @@
 
 module Language.PureScript.Sugar.Operators (
   rebracket,
-  removeSignedLiterals
+  removeSignedLiterals,
+  desugarOperatorSections
 ) where
 
-import Language.PureScript.Names
 import Language.PureScript.AST
 import Language.PureScript.Errors
+import Language.PureScript.Names
+import Language.PureScript.Supply
 
 import Control.Applicative
 import Control.Monad.State
@@ -103,7 +105,7 @@ customOperatorTable fixities =
   in
     map (map (\(name, f, _, a) -> (name, f, a))) groups
 
-type Chain = [Either Expr (Qualified Ident)]
+type Chain = [Either Expr Expr]
 
 matchOperators :: [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Expr -> Either ErrorStack Expr
 matchOperators ops = parseChains
@@ -112,11 +114,11 @@ matchOperators ops = parseChains
   parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
   parseChains other = return other
   extendChain :: Expr -> Chain
-  extendChain (BinaryNoParens name l r) = Left l : Right name : extendChain r
+  extendChain (BinaryNoParens op l r) = Left l : Right op : extendChain r
   extendChain other = [Left other]
   bracketChain :: Chain -> Either ErrorStack Expr
   bracketChain = either (Left . (`mkErrorStack` Nothing) . show) Right . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
-  opTable = [P.Infix (P.try (parseTicks >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft]
+  opTable = [P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]
 
@@ -134,17 +136,30 @@ parseValue = token (either Just (const Nothing)) P.<?> "expression"
 parseOp :: P.Parsec Chain () (Qualified Ident)
 parseOp = token (either (const Nothing) fromOp) P.<?> "operator"
   where
-  fromOp q@(Qualified _ (Op _)) = Just q
+  fromOp (Var q@(Qualified _ (Op _))) = Just q
   fromOp _ = Nothing
 
-parseTicks :: P.Parsec Chain () (Qualified Ident)
-parseTicks = token (either (const Nothing) fromOp) P.<?> "infix function"
+parseTicks :: P.Parsec Chain () Expr
+parseTicks = token (either (const Nothing) fromOther) P.<?> "infix function"
   where
-  fromOp q@(Qualified _ (Ident _)) = Just q
-  fromOp _ = Nothing
+  fromOther (Var (Qualified _ (Op _))) = Nothing
+  fromOther v = Just v
 
 matchOp :: Qualified Ident -> P.Parsec Chain () ()
 matchOp op = do
   ident <- parseOp
   guard $ ident == op
 
+desugarOperatorSections :: Module -> SupplyT (Either ErrorStack) Module
+desugarOperatorSections (Module mn ds exts) = Module mn <$> mapM goDecl ds <*> pure exts
+  where
+
+  goDecl :: Declaration -> SupplyT (Either ErrorStack) Declaration
+  (goDecl, _, _) = everywhereOnValuesM return goExpr return
+
+  goExpr :: Expr -> SupplyT (Either ErrorStack) Expr
+  goExpr (OperatorSection op (Left val)) = return $ App op val
+  goExpr (OperatorSection op (Right val)) = do
+    arg <- Ident <$> freshName
+    return $ Abs (Left arg) $ App (App op (Var (Qualified Nothing arg))) val
+  goExpr other = return other

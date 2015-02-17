@@ -105,6 +105,12 @@ not = "not"
 
 -- Prelude Values
 
+zero :: String
+zero = "zero"
+
+one :: String
+one = "one"
+
 return :: String
 return = "return"
 
@@ -162,6 +168,15 @@ applicativeEffDictionary = "applicativeEff"
 
 bindEffDictionary :: String
 bindEffDictionary = "bindEff"
+
+semiringNumber :: String
+semiringNumber = "semiringNumber"
+
+ringNumber :: String
+ringNumber = "ringNumber"
+
+moduloSemiringNumber :: String
+moduloSemiringNumber = "moduloSemiringNumber"
 
 numNumber :: String
 numNumber = "numNumber"

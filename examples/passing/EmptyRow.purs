@@ -1,6 +1,6 @@
 module Main where
 
-data Foo r = Foo { | r } 
+data Foo r = Foo { | r }
 
 test :: Foo ()
 test = Foo {}

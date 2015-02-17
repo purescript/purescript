@@ -21,9 +21,9 @@ module Main where
       | otherwise -> m
 
   testIndentation :: Number -> Number -> Number
-  testIndentation x y | x > 0 
+  testIndentation x y | x > 0
     = x + y
-                      | otherwise 
+                      | otherwise
     = y - x
 
   main = Debug.Trace.trace $ min "Done" "ZZZZ"

@@ -71,6 +71,7 @@ skolemizeTypesInValue :: String -> Int -> SkolemScope -> Expr -> Expr
 skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id go id in f
   where
   go (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
+  go (TypedValue check val ty) = TypedValue check val (skolemize ident sko scope ty)
   go other = other
 
 -- |

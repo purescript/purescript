@@ -6,20 +6,26 @@ import Debug.Trace
 foreign import data Assert :: !
 
 foreign import assert
-  "function assert(x) { return function (desc) {\
-  \  return function () {\
-  \    if (!x) throw new Error('assertion (' + desc + ') failed');\
-  \    return {};\
-  \  };\
-  \};};" :: forall e. Boolean -> String -> Eff (assert :: Assert | e) Unit
+  """
+  function assert(x) {
+    return function(desc) {
+      return function() {
+        if (!x) throw new Error('assertion (' + desc + ') failed');
+        return {};
+      };
+    };
+  }
+  """ :: forall e. Boolean -> String -> Eff (assert :: Assert | e) Unit
 
 bug :: Number -> Number -> Number
 bug a b = 0 - (a - b)
 
 foreign import explode
-  "function explode() {\
-  \  throw new Error('Assertion failed!');\
-  \}":: forall eff a. Eff eff a
+  """
+  function explode() {
+    throw new Error('Assertion failed!');
+  }
+  """ :: forall eff a. Eff eff a
 
 main = do
     assert (bug 0 2 == 2)       "bug 0 2 == 2"

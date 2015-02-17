@@ -26,6 +26,6 @@ class Clazz (a :: *) where
   def :: a
 
 instance clazzString :: Clazz String where
-  def = "test"	
+  def = "test"
 
 main = Debug.Trace.trace "Done"

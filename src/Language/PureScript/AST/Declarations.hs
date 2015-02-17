@@ -305,12 +305,17 @@ data Expr
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | BinaryNoParens (Qualified Ident) Expr Expr
+  | BinaryNoParens Expr Expr Expr
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
   | Parens Expr
+  -- |
+  -- Operator section. This will be removed during desugaring and replaced with a partially applied
+  -- operator or lambda to flip the arguments.
+  --
+  | OperatorSection Expr (Either Expr Expr)
   -- |
   -- An array literal
   --
@@ -320,6 +325,16 @@ data Expr
   --
   | ObjectLiteral [(String, Expr)]
   -- |
+  -- An object constructor (object literal with underscores). This will be removed during
+  -- desugaring and expanded into a lambda that returns an object literal.
+  --
+  | ObjectConstructor [(String, Maybe Expr)]
+  -- |
+  -- An object property getter (e.g. `_.x`). This will be removed during
+  -- desugaring and expanded into a lambda that reads a property from an object.
+  --
+  | ObjectGetter String
+  -- |
   -- An record property accessor expression
   --
   | Accessor String Expr
@@ -327,6 +342,11 @@ data Expr
   -- Partial record update
   --
   | ObjectUpdate Expr [(String, Expr)]
+  -- |
+  -- Partial record updater. This will be removed during desugaring and
+  -- expanded into a lambda that returns an object update.
+  --
+  | ObjectUpdater (Maybe Expr) [(String, Maybe Expr)]
   -- |
   -- Function introduction
   --

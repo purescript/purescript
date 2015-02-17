@@ -1,9 +1,11 @@
 module Main where
 
-foreign import foo 
-  "function foo(s) {\
-  \  return s;\
-  \}" :: String -> String
+foreign import foo
+  """
+  function foo(s) {
+    return s;
+  }
+  """ :: String -> String
 
 bar :: String -> String
 bar _ = foo "test"

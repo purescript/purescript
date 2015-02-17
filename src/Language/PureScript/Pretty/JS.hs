@@ -135,16 +135,16 @@ literals = mkPattern' match
     commentLines :: Comment -> [String]
     commentLines (LineComment s) = [s]
     commentLines (BlockComment s) = lines s
-    
-    asLine :: String -> StateT PrinterState Maybe String 
+
+    asLine :: String -> StateT PrinterState Maybe String
     asLine s = do
       i <- currentIndent
       return $ i ++ " * " ++ removeComments s ++ "\n"
-    
+
     removeComments :: String -> String
     removeComments ('*' : '/' : s) = removeComments s
     removeComments (c : s) = c : removeComments s
-    
+
     removeComments [] = []
   match (JSRaw js) = return js
   match _ = mzero

@@ -1,5 +1,5 @@
 name: purescript
-version: 0.6.4
+version: 0.6.7.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -93,6 +93,7 @@ library
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
                      Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeDeclarations
@@ -150,7 +151,7 @@ executable psci
     ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any, 
+    build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any
     main-is: Main.hs
     buildable: True
@@ -158,7 +159,7 @@ executable psc-docs
     other-modules:
     ghc-options: -Wall -fno-warn-warnings-deprecations -O2
 
-executable hierarchy
+executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
                    process -any, mtl -any, parsec -any, filepath -any, directory -any
     main-is: Main.hs
