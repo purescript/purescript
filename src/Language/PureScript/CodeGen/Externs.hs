@@ -45,10 +45,10 @@ moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWrite
 
     declToPs :: Declaration -> Writer [String] ()
     declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
-    declToPs (FixityDeclaration (Fixity assoc prec) op) =
+    declToPs (FixityDeclaration (Fixity assoc prec) op repl) =
       case find exportsOp exts of
         Nothing -> return ()
-        Just _ -> tell [ unwords [ show assoc, show prec, op ] ]
+        Just _ -> tell [ unwords $ [ show assoc, show prec, op ] ++ maybe [] (\s -> [ "as", s ]) repl ]
       where
       exportsOp :: DeclarationRef -> Bool
       exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r

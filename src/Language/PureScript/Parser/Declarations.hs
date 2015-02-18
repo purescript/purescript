@@ -142,7 +142,11 @@ parseFixityDeclaration = do
   fixity <- parseFixity
   indented
   name <- symbol
-  return $ FixityDeclaration fixity name
+  repl <- P.optionMaybe $ do
+    indented
+    reserved "as"
+    identifier
+  return $ FixityDeclaration fixity name repl
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
