@@ -13,7 +13,11 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, DoAndIfThenElse, FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
@@ -53,9 +57,8 @@ import qualified Paths_purescript as Paths
 import Commands as C
 import Parser
 
-
 data PSCiOptions = PSCiOptions
-  { psciSingleLineFlag :: Bool
+  { psciMultiLineMode :: Bool
   , psciInputFile      :: [FilePath]
   }
 
@@ -182,8 +185,6 @@ prologueMessage = intercalate "\n"
   , "                                       |_|        "
   , ""
   , ":? shows help"
-  , ""
-  , "Expressions are terminated using Ctrl+D"
   ]
 
 -- |
@@ -599,32 +600,33 @@ loadUserConfig = do
 -- The PSCI main loop.
 --
 loop :: PSCiOptions -> IO ()
-loop (PSCiOptions singleLineMode files) = do
+loop PSCiOptions{..} = do
   config <- loadUserConfig
-  modulesOrFirstError <- loadAllModules files
+  modulesOrFirstError <- loadAllModules psciInputFile
   case modulesOrFirstError of
     Left err -> print err >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
-      flip evalStateT (PSCiState files defaultImports modules []) . runInputT (setComplete completion settings) $ do
+      flip evalStateT (PSCiState psciInputFile defaultImports modules []) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
         traverse_ (mapM_ (runPSCI . handleCommand)) config
         go
       where
         go :: InputT (StateT PSCiState IO) ()
         go = do
-          c <- getCommand singleLineMode
+          c <- getCommand (not psciMultiLineMode)
           case c of
             Left err -> outputStrLn err >> go
             Right Nothing -> go
             Right (Just Quit) -> outputStrLn quitMessage
             Right (Just c') -> runPSCI (loadAllImportedModules >> handleCommand c') >> go
 
-singleLineFlag :: Parser Bool
-singleLineFlag = switch $
-     long "single-line-mode"
-  <> Opts.help "Run in single-line mode"
+multiLineMode :: Parser Bool
+multiLineMode = switch $
+     long "multi-line-mode"
+  <> short 'm'
+  <> Opts.help "Run in multi-line mode (use ^D to terminate commands)"
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
@@ -632,7 +634,7 @@ inputFile = strArgument $
   <> Opts.help "Optional .purs files to load on start"
 
 psciOptions :: Parser PSCiOptions
-psciOptions = PSCiOptions <$> singleLineFlag
+psciOptions = PSCiOptions <$> multiLineMode
                           <*> many inputFile
 
 main :: IO ()
