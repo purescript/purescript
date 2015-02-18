@@ -111,6 +111,7 @@ library
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
+                     Language.PureScript.Warnings
     exposed: True
     buildable: True
     hs-source-dirs: src
