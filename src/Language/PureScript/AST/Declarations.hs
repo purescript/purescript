@@ -180,9 +180,9 @@ data Declaration
   --
   | ExternInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type]
   -- |
-  -- A fixity declaration (fixity data, operator name)
+  -- A fixity declaration (fixity data, operator name, replacement)
   --
-  | FixityDeclaration Fixity String
+  | FixityDeclaration Fixity String (Maybe String)
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   --

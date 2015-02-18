@@ -31,6 +31,7 @@ import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
 
+import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error
 
@@ -217,10 +218,10 @@ typeCheckAll mainModuleName moduleName exps = go
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
     ds <- go rest
     return $ d : ds
-  go (d@(FixityDeclaration _ name) : rest) = do
+  go (d@(FixityDeclaration _ name repl) : rest) = do
     ds <- go rest
     env <- getEnv
-    guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
+    guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, fromMaybe (Op name) (Ident <$> repl)) $ names env
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
     tcds <- getTypeClassDictionaries
