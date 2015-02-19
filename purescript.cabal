@@ -34,7 +34,6 @@ library
                    transformers >= 0.4.0 && < 0.5,
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   monad-unify >= 0.2.2 && < 0.3,
                    file-embed >= 0.0.7 && < 0.0.8,
                    time -any
     exposed-modules: Language.PureScript
@@ -111,6 +110,8 @@ library
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
+
+                     Control.Monad.Unify
     exposed: True
     buildable: True
     hs-source-dirs: src
