@@ -31,21 +31,33 @@ import qualified Paths_purescript as Paths
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
 
+data Format = Markdown
+               | Ctags
+               | Etags 
+
 data PSCDocsOptions = PSCDocsOptions
-  { pscdIncludeHeir :: Bool
+  { pscdFormat :: Format
+  , pscdIncludeHier :: Bool
   , pscdInputFiles  :: [FilePath]
   }
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions showHierarchy input) = do
+docgen (PSCDocsOptions fmt showHierarchy input) = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
       hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      putStrLn . runDocs $ (renderModules showHierarchy) (map snd ms)
+      case fmt of
+       Markdown -> putStrLn $ runDocs $ (renderModules showHierarchy) (map snd ms)
+       Etags -> mapM_ ldump $ renderModEtags <$> pairs
+       Ctags -> ldump $ sort $ concat $ renderModCtags <$> pairs
       exitSuccess
+      where pairs :: [(String, P.Module)]
+            pairs = (\(k,m) -> ((fromMaybe "" k),m)) <$> ms
+            ldump :: [String] -> IO ()
+            ldump = mapM_ putStrLn
 
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input = (,) input <$> readFile input
@@ -71,6 +83,33 @@ atIndent indent text =
 
 ticks :: String -> String
 ticks = ("`" ++) . (++ "`")
+
+lineNumber :: P.Declaration -> Int
+lineNumber (P.PositionedDeclaration sp _ _) = P.sourcePosLine $ P.spanStart $ sp
+lineNumber _ = error "Not a PositionedDeclaration"
+
+taggable :: P.Declaration -> Bool
+taggable d = isTypeDeclaration d
+             || isTypeClassDeclaration d
+             || isTypeInstanceDeclaration d
+             || isValueDeclaration d
+
+taggables :: P.Module -> [P.Declaration]
+taggables mdl = filter taggable $ filter isPositionedDeclaration $ P.exportedDeclarations mdl
+  where isPositionedDeclaration (P.PositionedDeclaration _ _ _) = True
+        isPositionedDeclaration _ = False
+
+renderModEtags :: (String, P.Module) -> [String]
+renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tags
+  where tagsLen = foldl (\sofar l -> sofar+length l) 0 tags
+        tags = tagLine <$> taggables mdl
+        tagLine d = "\x7f" ++ getName d ++ "\x01" ++ show (lineNumber d) ++ ","
+
+
+renderModCtags :: (String, P.Module) -> [String]
+renderModCtags (path, mdl) = sort tags
+  where tags = tagLine <$> taggables mdl
+        tagLine d = getName d ++ "\t" ++ path ++ "\t" ++ show (lineNumber d)
 
 renderModules :: Bool -> [P.Module] -> Docs
 renderModules showHierarchy ms = do
@@ -251,13 +290,25 @@ inputFile = strArgument $
      metavar "FILE"
   <> help "The input .purs file(s)"
 
-includeHeirarcy :: Parser Bool
-includeHeirarcy = switch $
+includeHierarchy :: Parser Bool
+includeHierarchy = switch $
      long "hierarchy-images"
   <> help "Include markdown for type class hierarchy images in the output."
 
+readFormat :: String -> Format
+readFormat "etags" = Etags
+readFormat "ctags" = Ctags
+readFormat _ = Markdown
+
+format :: Parser Format
+format = option (str >>= pure . readFormat) $ value Markdown
+         <> long "format"
+         <> metavar "FORMAT"
+         <> help "Output format (markdown | etags | ctags)"
+
 pscDocsOptions :: Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> includeHeirarcy
+pscDocsOptions = PSCDocsOptions <$> format
+                                <*> includeHierarchy
                                 <*> many inputFile
 
 main :: IO ()
