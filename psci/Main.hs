@@ -31,7 +31,7 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Error (ErrorT(..), MonadError)
+import Control.Monad.Except (ExceptT(..), MonadError, runExceptT)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
@@ -325,14 +325,14 @@ newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Fu
 psciIO :: IO a -> PSCI a
 psciIO io = PSCI . lift $ lift io
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ErrorT String IO) a }
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT String IO) a }
   deriving (Functor, Applicative, Monad, MonadError String, MonadReader (P.Options P.Make))
 
 runMake :: Make a -> IO (Either String a)
-runMake = runErrorT . flip runReaderT options . unMake
+runMake = runExceptT . flip runReaderT options . unMake
 
 makeIO :: IO a -> Make a
-makeIO = Make . lift . ErrorT . fmap (either (Left . show) Right) . tryIOError
+makeIO = Make . lift . ExceptT . fmap (either (Left . show) Right) . tryIOError
 
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do
