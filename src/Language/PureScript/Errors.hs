@@ -20,7 +20,8 @@ import Data.Either (lefts, rights)
 import Data.List (intersperse, intercalate)
 import Data.Monoid
 
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Error (Error(..))
 import Control.Applicative ((<$>))
 
 import Language.PureScript.AST

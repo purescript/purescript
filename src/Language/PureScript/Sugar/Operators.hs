@@ -32,7 +32,8 @@ import Language.PureScript.Supply
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Error.Class
+import Control.Monad.Except
+import Control.Monad.Error (Error(..))
 
 import Data.Monoid ((<>))
 import Data.Function (on)

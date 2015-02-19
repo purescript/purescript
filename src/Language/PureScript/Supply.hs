@@ -24,7 +24,7 @@ import Data.Functor.Identity
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Error.Class
+import Control.Monad.Except
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a } deriving (Functor, Applicative, Monad, MonadTrans)
 

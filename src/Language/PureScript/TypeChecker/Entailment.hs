@@ -25,7 +25,8 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Arrow (Arrow(..))
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Error (Error(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Environment

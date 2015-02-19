@@ -32,7 +32,8 @@ import Data.Foldable (for_)
 import qualified Data.Map as M
 
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Error (Error(..))
 
 import Language.PureScript.Types
 import Language.PureScript.Names
