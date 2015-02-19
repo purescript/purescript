@@ -42,7 +42,8 @@ import Data.Monoid
 import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Error (Error(..))
 import Control.Monad.State
 import Control.Monad.Unify
 
