@@ -5,7 +5,7 @@ import Utils (taggables, getName, lineNumber)
 import Data.List (sort)
 
 dumpCtags :: [(String, P.Module)] -> [String]
-dumpCtags ms = sort $ concat $ map renderModCtags ms
+dumpCtags = sort . concat . (map renderModCtags)
 
 renderModCtags :: (String, P.Module) -> [String]
 renderModCtags (path, mdl) = sort tags

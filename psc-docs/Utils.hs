@@ -41,7 +41,7 @@ lineNumber (P.PositionedDeclaration sp _ _) = P.sourcePosLine $ P.spanStart sp
 lineNumber _ = error "Not a PositionedDeclaration"
 
 taggables :: P.Module -> [P.Declaration]
-taggables mdl = filter taggable $ filter isPositionedDeclaration $ P.exportedDeclarations mdl
+taggables = (filter taggable) . (filter isPositionedDeclaration) . P.exportedDeclarations
   where isPositionedDeclaration (P.PositionedDeclaration _ _ _) = True
         isPositionedDeclaration _ = False
         taggable :: P.Declaration -> Bool
