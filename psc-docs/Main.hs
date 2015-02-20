@@ -31,9 +31,11 @@ import qualified Paths_purescript as Paths
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
 
-data Format = Markdown
-               | Ctags
-               | Etags 
+
+-- Available output formats
+data Format = Markdown -- Output documentation in Markdown format
+               | Ctags -- Output ctags symbol index suitable for use with vi
+               | Etags -- Output etags symbol index suitable for use with emacs
 
 data PSCDocsOptions = PSCDocsOptions
   { pscdFormat :: Format
@@ -88,16 +90,15 @@ lineNumber :: P.Declaration -> Int
 lineNumber (P.PositionedDeclaration sp _ _) = P.sourcePosLine $ P.spanStart $ sp
 lineNumber _ = error "Not a PositionedDeclaration"
 
-taggable :: P.Declaration -> Bool
-taggable d = isTypeDeclaration d
-             || isTypeClassDeclaration d
-             || isTypeInstanceDeclaration d
-             || isValueDeclaration d
-
 taggables :: P.Module -> [P.Declaration]
 taggables mdl = filter taggable $ filter isPositionedDeclaration $ P.exportedDeclarations mdl
   where isPositionedDeclaration (P.PositionedDeclaration _ _ _) = True
         isPositionedDeclaration _ = False
+        taggable :: P.Declaration -> Bool
+        taggable d = isTypeDeclaration d
+             || isTypeClassDeclaration d
+             || isTypeInstanceDeclaration d
+             || isValueDeclaration d
 
 renderModEtags :: (String, P.Module) -> [String]
 renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tags
@@ -295,16 +296,17 @@ includeHierarchy = switch $
      long "hierarchy-images"
   <> help "Include markdown for type class hierarchy images in the output."
 
-readFormat :: String -> Format
-readFormat "etags" = Etags
-readFormat "ctags" = Ctags
-readFormat _ = Markdown
+instance Read Format where
+    readsPrec _ "etags" = [(Etags, "")]
+    readsPrec _ "ctags" = [(Ctags, "")]
+    readsPrec _ "markdown" = [(Markdown, "")]
+    readsPrec _ _ = []    
 
 format :: Parser Format
-format = option (str >>= pure . readFormat) $ value Markdown
+format = option auto $ value Markdown
          <> long "format"
          <> metavar "FORMAT"
-         <> help "Output format (markdown | etags | ctags)"
+         <> help "Set output FORMAT (markdown | etags | ctags)"
 
 pscDocsOptions :: Parser PSCDocsOptions
 pscDocsOptions = PSCDocsOptions <$> format
