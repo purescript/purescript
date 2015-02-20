@@ -17,11 +17,11 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
+import Data.String (IsString(..))
 import Data.List (intersperse, intercalate)
 import Data.Monoid
 
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Applicative ((<$>))
 
 import Language.PureScript.AST
@@ -74,9 +74,14 @@ instance Monoid ErrorStack where
   mappend (MultipleErrors es) x = MultipleErrors [ e <> x | e <- es ]
   mappend x (MultipleErrors es) = MultipleErrors [ x <> e | e <- es ]
 
-instance Error ErrorStack where
-  strMsg s = ErrorStack [CompileError s Nothing Nothing]
-  noMsg = ErrorStack []
+-- TODO: Remove strMsg, the IsString instance, and unnecessary
+-- OverloadedStrings pragmas. See #745
+-- | Create an ErrorStack from a string
+strMsg :: String -> ErrorStack
+strMsg s = ErrorStack [CompileError s Nothing Nothing]
+
+instance IsString ErrorStack where
+  fromString = strMsg
 
 prettyPrintErrorStack :: Bool -> ErrorStack -> String
 prettyPrintErrorStack printFullStack (ErrorStack es) =

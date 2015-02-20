@@ -31,7 +31,6 @@ import Data.Monoid
 import qualified Data.HashMap.Strict as H
 
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Monad.Unify
 
 import Language.PureScript.Environment

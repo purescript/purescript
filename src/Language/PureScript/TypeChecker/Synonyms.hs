@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, GADTs #-}
 
 module Language.PureScript.TypeChecker.Synonyms (
     saturateAllTypeSynonyms,
@@ -29,10 +29,10 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Monad.State
 
 import Language.PureScript.Environment
+import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
@@ -83,7 +83,7 @@ replaceAllTypeSynonyms' env d =
   in
     saturateAllTypeSynonyms syns d
 
-replaceAllTypeSynonyms :: (Error e, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+replaceAllTypeSynonyms :: (e ~ ErrorStack, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either (throwError . strMsg) return $ replaceAllTypeSynonyms' env d
@@ -99,12 +99,12 @@ expandTypeSynonym' env name args =
       replaceAllTypeSynonyms' env repl
     Nothing -> error "Type synonym was not defined"
 
-expandTypeSynonym :: (Error e, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
+expandTypeSynonym :: (e ~ ErrorStack, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
   either (throwError . strMsg) return $ expandTypeSynonym' env name args
 
-expandAllTypeSynonyms :: (Error e, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+expandAllTypeSynonyms :: (e ~ ErrorStack, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 expandAllTypeSynonyms = everywhereOnTypesTopDownM go
   where
   go (SaturatedTypeSynonym name args) = expandTypeSynonym name args

@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, OverloadedStrings #-}
 
 module Language.PureScript.TypeChecker.Types (
     typesOf
@@ -40,10 +40,10 @@ import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import qualified Data.Map as M
+import Data.String (IsString)
 
 import Control.Applicative
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Monad.State
 import Control.Monad.Unify
 
@@ -674,5 +674,5 @@ meet e1 e2 t1 t2 = do
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (Error e, MonadError e m) => [(String, Expr)] -> m ()
-ensureNoDuplicateProperties ps = guardWith (strMsg "Duplicate property names") $ length (nub . map fst $ ps) == length ps
+ensureNoDuplicateProperties :: (IsString e, MonadError e m) => [(String, Expr)] -> m ()
+ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps

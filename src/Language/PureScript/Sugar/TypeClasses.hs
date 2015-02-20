@@ -35,7 +35,6 @@ import qualified Language.PureScript.Constants as C
 import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Monad.State
 import Data.List ((\\), find)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
