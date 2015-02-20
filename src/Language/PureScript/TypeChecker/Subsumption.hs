@@ -23,7 +23,6 @@ import Data.Ord (comparing)
 
 import Control.Applicative
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 import Control.Monad.Unify
 
 import Language.PureScript.AST

@@ -22,7 +22,6 @@ import Data.Monoid ((<>))
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad.Except
-import Control.Monad.Error (Error(..))
 
 import qualified Data.Map as M
 
