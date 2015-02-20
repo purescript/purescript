@@ -24,7 +24,6 @@
 
 module Control.Monad.Unify where
 
-import Data.Maybe
 import Data.String (IsString)
 import Data.Monoid
 
@@ -89,7 +88,7 @@ defaultUnifyState = UnifyState 0 mempty
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
 newtype UnifyT t m a = UnifyT { unUnify :: (StateT (UnifyState t) m) a }
-  deriving (Functor, Monad, Applicative, MonadPlus)
+  deriving (Functor, Monad, Applicative, Alternative, MonadPlus)
 
 instance (MonadState s m) => MonadState s (UnifyT t m) where
   get = UnifyT . lift $ get
