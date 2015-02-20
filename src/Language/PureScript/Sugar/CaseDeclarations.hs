@@ -24,7 +24,7 @@ import Data.List (nub, groupBy)
 
 import Control.Applicative
 import Control.Monad ((<=<), forM, join, unless, replicateM)
-import Control.Monad.Error.Class
+import Control.Monad.Except (throwError)
 
 import Language.PureScript.Names
 import Language.PureScript.AST
