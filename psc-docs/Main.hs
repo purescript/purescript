@@ -158,18 +158,15 @@ renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _)
   fenced $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration exps (P.PositionedDeclaration _ com d) = do
   renderDeclaration exps d
-  spacer
   renderComments com
 renderDeclaration _ _ = return ()
 
 renderComments :: [P.Comment] -> Docs
 renderComments cs = do
   let raw = concatMap toLines cs
-
-  if all hasPipe raw
-    then atIndent 0 . unlines . map stripPipes $ raw
-    else atIndent 4 $ unlines raw
-
+  when (all hasPipe raw) $ do
+    spacer
+    atIndent 0 . unlines . map stripPipes $ raw
   where
 
   toLines (P.LineComment s) = [s]
