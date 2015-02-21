@@ -67,6 +67,15 @@ atIndent indent text =
   let ls = lines text in
   withIndent indent (tell ls)
 
+fenced :: String -> Docs
+fenced text = fencedBlock (tell $ lines text)
+
+fencedBlock :: Docs -> Docs
+fencedBlock inner = do
+  tell ["``` purescript"]
+  inner
+  tell ["```"]
+
 ticks :: String -> String
 ticks = ("`" ++) . (++ "`")
 
@@ -109,45 +118,48 @@ getDeclarationTitle _                                               = Nothing
 
 renderDeclaration :: Maybe [P.DeclarationRef] -> P.Declaration -> Docs
 renderDeclaration _ (P.TypeDeclaration ident ty) =
-  atIndent 4 $ show ident ++ " :: " ++ prettyPrintType' ty
+  fenced $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration _ (P.ExternDeclaration _ ident _ ty) =
-  atIndent 4 $ show ident ++ " :: " ++ prettyPrintType' ty
+  fenced $ show ident ++ " :: " ++ prettyPrintType' ty
 renderDeclaration exps (P.DataDeclaration dtype name args ctors) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
     exported = filter (P.isDctorExported name exps . fst) ctors
-  atIndent 4 $ show dtype ++ " " ++ typeName
-  zipWithM_ (\isFirst (ctor, tys) ->
-              atIndent 6 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map P.prettyPrintTypeAtom tys))
-            (True : repeat False) exported
+  fencedBlock $ do
+    tell [show dtype ++ " " ++ typeName]
+    zipWithM_ (\isFirst (ctor, tys) ->
+                atIndent 2 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map P.prettyPrintTypeAtom tys))
+              (True : repeat False) exported
 renderDeclaration _ (P.ExternDataDeclaration name kind) =
-  atIndent 4 $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
+  fenced $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
 renderDeclaration _ (P.TypeSynonymDeclaration name args ty) = do
   let
     typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
     typeName = prettyPrintType' typeApp
-  atIndent 4 $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
+  fenced $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
 renderDeclaration _ (P.TypeClassDeclaration name args implies ds) = do
   let impliesText = case implies of
                       [] -> ""
                       is -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) is) ++ ") <= "
       classApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
       className = prettyPrintType' classApp
-  atIndent 4 $ "class " ++ impliesText ++ className ++ " where"
-  mapM_ renderClassMember ds
+  fencedBlock $ do
+    tell ["class " ++ impliesText ++ className ++ " where"]
+    mapM_ renderClassMember ds
   where
     renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
-    renderClassMember (P.TypeDeclaration ident ty) = atIndent 6 $ show ident ++ " :: " ++ prettyPrintType' ty
+    renderClassMember (P.TypeDeclaration ident ty) = atIndent 2 $ show ident ++ " :: " ++ prettyPrintType' ty
     renderClassMember _ = error "Invalid argument to renderClassMember."
 renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _) = do
   let constraintsText = case constraints of
                           [] -> ""
                           cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
-  atIndent 4 $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
+  fenced $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
 renderDeclaration exps (P.PositionedDeclaration _ com d) = do
-  renderComments com
   renderDeclaration exps d
+  spacer
+  renderComments com
 renderDeclaration _ _ = return ()
 
 renderComments :: [P.Comment] -> Docs
@@ -158,7 +170,6 @@ renderComments cs = do
     then atIndent 0 . unlines . map stripPipes $ raw
     else atIndent 4 $ unlines raw
 
-  unless (null raw) spacer
   where
 
   toLines (P.LineComment s) = [s]
