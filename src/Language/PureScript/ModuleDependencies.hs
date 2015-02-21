@@ -41,7 +41,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 sortModules :: (MonadError String m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
-  let verts = map (\m@(Module _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
+  let verts = map (\m@(Module _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
   let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
   return (ms', moduleGraph)

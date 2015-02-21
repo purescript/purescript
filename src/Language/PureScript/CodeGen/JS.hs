@@ -49,14 +49,14 @@ import qualified Language.PureScript.Constants as C
 --
 moduleToJs :: (Functor m, Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
            => Module Ann -> m [JS]
-moduleToJs (Module name imps exps foreigns decls) = do
+moduleToJs (Module coms name imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [name]) $ imps
   let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
   jsDecls <- mapM (bindToJs name) decls
   optimized <- T.traverse (T.traverse optimize) jsDecls
   let isModuleEmpty = null exps
-  let moduleBody = JSStringLiteral "use strict" : jsImports ++ foreigns' ++ concat optimized
+  let moduleBody = JSComment coms (JSStringLiteral "use strict") : jsImports ++ foreigns' ++ concat optimized
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) exps
   return $ case additional of
     MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
@@ -197,7 +197,7 @@ valueToJs _ (Constructor _ _ (ProperName ctor) fields) =
   in return $ iife ctor [ constructor
                         , JSAssignment (JSAccessor "create" (JSVar ctor)) createFn
                         ]
-                        
+
 iife :: String -> [JS] -> JS
 iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 

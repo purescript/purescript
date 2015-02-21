@@ -161,13 +161,13 @@ desugarImports modules = do
   -- exported members remain. If the module does not explicitly export anything, everything is
   -- exported.
   filterModuleExports :: ExportEnvironment -> Module -> m ExportEnvironment
-  filterModuleExports env (Module mn _ (Just exps)) = filterExports mn exps env
+  filterModuleExports env (Module _ mn _ (Just exps)) = filterExports mn exps env
   filterModuleExports env _ = return env
 
   -- Rename and check all the names within a module. We tweak the global exports environment so
   -- the module has access to an unfiltered list of its own members.
   renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> m Module
-  renameInModule' unfilteredExports exports m@(Module mn _ _) =
+  renameInModule' unfilteredExports exports m@(Module _ mn _ _) =
     rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $ do
       let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
       let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
@@ -179,7 +179,7 @@ desugarImports modules = do
 -- as it will also make all data constructor exports explicit.
 --
 elaborateExports :: Exports -> Module -> Module
-elaborateExports exps (Module mn decls _) = Module mn decls (Just $
+elaborateExports exps (Module coms mn decls _) = Module coms mn decls (Just $
   map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (exportedTypes exps) ++
   map TypeClassRef (exportedTypeClasses exps) ++
   map ValueRef (exportedValues exps))
@@ -189,7 +189,7 @@ elaborateExports exps (Module mn decls _) = Module mn decls (Just $
 -- This ensures transitive instances are included when using a member from a module.
 --
 elaborateImports :: Module -> Module
-elaborateImports (Module mn decls exps) = Module mn decls' exps
+elaborateImports (Module coms mn decls exps) = Module coms mn decls' exps
   where
   decls' :: [Declaration]
   decls' =
@@ -206,8 +206,8 @@ elaborateImports (Module mn decls exps) = Module mn decls' exps
 -- qualified names are valid.
 --
 renameInModule :: forall m. (Applicative m, MonadError ErrorStack m) => ImportEnvironment -> ExportEnvironment -> Module -> m Module
-renameInModule imports exports (Module mn decls exps) =
-  Module mn <$> parU decls go <*> pure exps
+renameInModule imports exports (Module coms mn decls exps) =
+  Module coms mn <$> parU decls go <*> pure exps
   where
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
@@ -235,7 +235,7 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue (pos, bound) (Let ds val') = do
       let args = mapMaybe letBoundVariable ds
       unless (length (nub args) == length args) $
-        maybe id rethrowWithPosition pos $ 
+        maybe id rethrowWithPosition pos $
           throwError $ mkErrorStack ("Overlapping names in let binding.") Nothing
       return ((pos, args ++ bound), Let ds val')
       where
@@ -319,7 +319,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
 
   -- Add all of the exported declarations from a module to the global export environment
   addModule :: ExportEnvironment -> Module -> m ExportEnvironment
-  addModule env (Module mn ds _) = do
+  addModule env (Module _ mn ds _) = do
     env' <- addEmptyModule env mn
     rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $ foldM (addDecl mn) env' ds
 
@@ -409,7 +409,7 @@ findImports = foldl (findImports' Nothing) M.empty
 -- Constructs a local environment for a module.
 --
 resolveImports :: forall m. (Applicative m, MonadError ErrorStack m) => ExportEnvironment -> Module -> m ImportEnvironment
-resolveImports env (Module currentModule decls _) =
+resolveImports env (Module _ currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
 

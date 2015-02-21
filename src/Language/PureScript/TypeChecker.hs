@@ -276,15 +276,15 @@ typeCheckAll mainModuleName moduleName exps = go
 -- required by exported members are also exported.
 --
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
+typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
   forM_ exps $ \e -> do
     checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
-  return $ Module mn decls' (Just exps)
+  return $ Module coms mn decls' (Just exps)
   where
 
   checkMemberExport :: (Show a) => String -> (Type -> [a]) -> (a -> Bool) -> DeclarationRef -> Check ()

@@ -32,7 +32,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 
 desugarObjectConstructors :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> m Module
-desugarObjectConstructors (Module mn ds exts) = Module mn <$> mapM desugarDecl ds <*> pure exts
+desugarObjectConstructors (Module coms mn ds exts) = Module coms mn <$> mapM desugarDecl ds <*> pure exts
   where
 
   desugarDecl :: Declaration -> m Declaration

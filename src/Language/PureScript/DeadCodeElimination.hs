@@ -29,7 +29,7 @@ import Language.PureScript.Names
 eliminateDeadCode :: [ModuleName] -> [Module a] -> [Module a]
 eliminateDeadCode entryPoints ms = map go ms
   where
-  go (Module mn imps exps foreigns ds) = Module mn imps exps' foreigns' ds'
+  go (Module coms mn imps exps foreigns ds) = Module coms mn imps exps' foreigns' ds'
     where
     ds' = filter (isUsed mn graph vertexFor entryPointVertices) ds
     foreigns' = filter (isUsed' mn graph vertexFor entryPointVertices . foreignIdent) foreigns
@@ -61,7 +61,7 @@ type Key = (ModuleName, Ident)
 -- Find dependencies for each member in a module.
 --
 declarationsByModule :: Module a -> [(Key, [Key])]
-declarationsByModule (Module mn _ _ fs ds) =
+declarationsByModule (Module _ mn _ _ fs ds) =
   let fs' = map ((\name -> ((mn, name), [])) . foreignIdent) fs
   in fs' ++ concatMap go ds
   where

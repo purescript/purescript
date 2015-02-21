@@ -286,7 +286,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
             getTypeName _ = Nothing
 
   identNames :: P.Module -> [N.Ident]
-  identNames (P.Module _ ds exports) = nub [ ident | ident <- mapMaybe (getDeclName exports) (D.flattenDecls ds) ]
+  identNames (P.Module _ _ ds exports) = nub [ ident | ident <- mapMaybe (getDeclName exports) (D.flattenDecls ds) ]
     where getDeclName :: Maybe [P.DeclarationRef] -> P.Declaration -> Maybe P.Ident
           getDeclName exts decl@(P.ValueDeclaration ident _ _ _)  | P.isExported exts decl = Just ident
           getDeclName exts decl@(P.ExternDeclaration _ ident _ _) | P.isExported exts decl = Just ident
@@ -307,7 +307,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
           onlyDataDecls = (filter P.isDataDecl (P.exportedDeclarations m))
 
   moduleNames :: [P.Module] -> [String]
-  moduleNames ms = nub [show moduleName | P.Module moduleName _ _ <- ms]
+  moduleNames ms = nub [show moduleName | P.Module _ moduleName _ _ <- ms]
 
   sorter :: Completion -> Completion -> Ordering
   sorter (Completion _ d1 _) (Completion _ d2 _) = if ":" `isPrefixOf` d1 then LT else compare d1 d2
@@ -364,7 +364,7 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
+    P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
 
 
 -- |
@@ -377,7 +377,7 @@ createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
-    P.Module moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
+    P.Module [] moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
@@ -388,7 +388,7 @@ createTemporaryModuleForImports PSCiState{psciImportedModuleNames = imports} =
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     importDecl m = P.ImportDeclaration m P.Unqualified Nothing
   in
-    P.Module moduleName (importDecl `map` imports) Nothing
+    P.Module [] moduleName (importDecl `map` imports) Nothing
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
@@ -439,7 +439,7 @@ handleShowLoadedModules = do
   psciIO $ readModules loadedModules >>= putStrLn
   return ()
   where readModules = return . unlines . sort . nub . map toModuleName
-        toModuleName =  N.runModuleName . (\ (D.Module mdName _ _) -> mdName) . snd
+        toModuleName =  N.runModuleName . (\ (D.Module _ mdName _ _) -> mdName) . snd
 
 -- |
 -- Show the imported modules in psci.
@@ -510,7 +510,7 @@ handleBrowse moduleName = do
   case env of
     Left err -> PSCI $ outputStrLn err
     Right env' ->
-      if moduleName `notElem` (nub . map ((\ (P.Module modName _ _ ) -> modName) . snd)) loadedModules
+      if moduleName `notElem` (nub . map ((\ (P.Module _ modName _ _ ) -> modName) . snd)) loadedModules
         then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
         else printModuleSignatures moduleName env'
 
