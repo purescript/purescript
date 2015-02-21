@@ -18,7 +18,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Writer
 import Control.Arrow (first)
-import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
@@ -113,7 +112,7 @@ renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
       spacer
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
-renderTopLevel exps decls = forM_ (sortBy (compare `on` getName) decls) $ \decl -> do
+renderTopLevel exps decls = forM_ decls $ \decl -> do
   traverse_ (headerLevel 4) (ticks `fmap` getDeclarationTitle decl)
   spacer
   renderDeclaration exps decl
@@ -181,19 +180,19 @@ renderDeclaration _ _ = return ()
 renderComments :: [P.Comment] -> Docs
 renderComments cs = do
   let raw = concatMap toLines cs
-  
+
   if all hasPipe raw
     then atIndent 0 . unlines . map stripPipes $ raw
     else atIndent 4 $ unlines raw
-  
+
   unless (null raw) spacer
   where
 
   toLines (P.LineComment s) = [s]
   toLines (P.BlockComment s) = lines s
-  
+
   hasPipe s = case dropWhile (== ' ') s of { ('|':_) -> True; _ -> False }
-  
+
   stripPipes = dropPipe . dropWhile (== ' ')
 
   dropPipe ('|':' ':s) = s
