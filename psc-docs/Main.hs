@@ -43,7 +43,7 @@ docgen (PSCDocsOptions showHierarchy input) = do
       hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      putStrLn . runDocs $ (renderModules showHierarchy) (map snd ms)
+      putStrLn . runDocs $ renderModules showHierarchy (map snd ms)
       exitSuccess
 
 parseFile :: FilePath -> IO (FilePath, String)
@@ -78,45 +78,19 @@ renderModules showHierarchy ms = do
   mapM_ (renderModule showHierarchy) ms
 
 renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy mdl@(P.Module moduleName _ exps) =
-  let ds = P.exportedDeclarations mdl
-      hasTypes = any isTypeDeclaration ds
-      hasTypeclasses = any isTypeClassDeclaration ds
-      hasTypeclassInstances = any isTypeInstanceDeclaration ds
-      hasValues = any isValueDeclaration ds
-  in do
+renderModule showHierarchy mdl@(P.Module moduleName _ exps) = do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
-    when hasTypes $ do
-      headerLevel 3 "Types"
-      spacer
-      renderTopLevel exps (filter isTypeDeclaration ds)
-      spacer
-    when hasTypeclasses $ do
-      headerLevel 3 "Type Classes"
-      spacer
-      when showHierarchy $ do
-        renderTypeclassImage moduleName
-        spacer
-      renderTopLevel exps (filter isTypeClassDeclaration ds)
-      spacer
-    when hasTypeclassInstances $ do
-      headerLevel 3 "Type Class Instances"
-      spacer
-      renderTopLevel exps (filter isTypeInstanceDeclaration ds)
-      spacer
-    when hasValues $ do
-      headerLevel 3 "Values"
-      spacer
-      renderTopLevel exps (filter isValueDeclaration ds)
-      spacer
+    renderTopLevel exps (P.exportedDeclarations mdl)
+    spacer
 
 renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
-renderTopLevel exps decls = forM_ decls $ \decl -> do
-  traverse_ (headerLevel 4) (ticks `fmap` getDeclarationTitle decl)
-  spacer
-  renderDeclaration exps decl
-  spacer
+renderTopLevel exps decls = forM_ decls $ \decl ->
+  when (canRenderDecl decl) $ do
+    traverse_ (headerLevel 4) (ticks `fmap` getDeclarationTitle decl)
+    spacer
+    renderDeclaration exps decl
+    spacer
 
 renderTypeclassImage :: P.ModuleName -> Docs
 renderTypeclassImage name =
@@ -222,41 +196,29 @@ getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
 getName (P.PositionedDeclaration _ _ d) = getName d
 getName _ = error "Invalid argument to getName"
 
-isValueDeclaration :: P.Declaration -> Bool
-isValueDeclaration P.TypeDeclaration{} = True
-isValueDeclaration P.ExternDeclaration{} = True
-isValueDeclaration (P.PositionedDeclaration _ _ d) = isValueDeclaration d
-isValueDeclaration _ = False
-
-isTypeDeclaration :: P.Declaration -> Bool
-isTypeDeclaration P.DataDeclaration{} = True
-isTypeDeclaration P.ExternDataDeclaration{} = True
-isTypeDeclaration P.TypeSynonymDeclaration{} = True
-isTypeDeclaration (P.PositionedDeclaration _ _ d) = isTypeDeclaration d
-isTypeDeclaration _ = False
-
-isTypeClassDeclaration :: P.Declaration -> Bool
-isTypeClassDeclaration P.TypeClassDeclaration{} = True
-isTypeClassDeclaration (P.PositionedDeclaration _ _ d) = isTypeClassDeclaration d
-isTypeClassDeclaration _ = False
-
-isTypeInstanceDeclaration :: P.Declaration -> Bool
-isTypeInstanceDeclaration P.TypeInstanceDeclaration{} = True
-isTypeInstanceDeclaration (P.PositionedDeclaration _ _ d) = isTypeInstanceDeclaration d
-isTypeInstanceDeclaration _ = False
+canRenderDecl :: P.Declaration -> Bool
+canRenderDecl P.TypeDeclaration{} = True
+canRenderDecl P.ExternDeclaration{} = True
+canRenderDecl P.DataDeclaration{} = True
+canRenderDecl P.ExternDataDeclaration{} = True
+canRenderDecl P.TypeSynonymDeclaration{} = True
+canRenderDecl P.TypeClassDeclaration{} = True
+canRenderDecl P.TypeInstanceDeclaration{} = True
+canRenderDecl (P.PositionedDeclaration _ _ d) = canRenderDecl d
+canRenderDecl _ = False
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
   <> help "The input .purs file(s)"
 
-includeHeirarcy :: Parser Bool
-includeHeirarcy = switch $
+includeHierarcy :: Parser Bool
+includeHierarcy = switch $
      long "hierarchy-images"
   <> help "Include markdown for type class hierarchy images in the output."
 
 pscDocsOptions :: Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> includeHeirarcy
+pscDocsOptions = PSCDocsOptions <$> includeHierarcy
                                 <*> many inputFile
 
 main :: IO ()
