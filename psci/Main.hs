@@ -599,8 +599,7 @@ nodeFlagsFlag = option parser $
   <> metavar "NODE_OPTS"
   <> Opts.help "Flags to pass to node, separated by spaces"
   where
-    parser = words' <$> str
-    words' x = traceShow ("words", x) $ words x
+    parser = words <$> str
 
 psciOptions :: Parser PSCiOptions
 psciOptions = PSCiOptions <$> singleLineFlag
