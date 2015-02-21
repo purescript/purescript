@@ -58,8 +58,9 @@ import Commands as C
 import Parser
 
 data PSCiOptions = PSCiOptions
-  { psciMultiLineMode :: Bool
+  { psciMultiLineMode  :: Bool
   , psciInputFile      :: [FilePath]
+  , psciInputNodeFlags :: [String]
   }
 
 -- |
@@ -73,6 +74,7 @@ data PSCiState = PSCiState
   , psciImportedModuleNames :: [P.ModuleName]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
   , psciLetBindings         :: [P.Declaration]
+  , psciNodeFlags           :: [String]
   }
 
 -- State helpers
@@ -401,13 +403,14 @@ handleDeclaration :: P.Expr -> PSCI ()
 handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
+  let nodeArgs = psciNodeFlags st ++ [indexFile]
   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
     Left err -> PSCI $ outputStrLn err
     Right _ -> do
       psciIO $ writeFile indexFile "require('$PSCI').main();"
       process <- psciIO findNodeProcess
-      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node [indexFile] "") process
+      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
       case result of
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
@@ -608,7 +611,7 @@ loop PSCiOptions{..} = do
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
-      flip evalStateT (PSCiState psciInputFile defaultImports modules []) . runInputT (setComplete completion settings) $ do
+      flip evalStateT (PSCiState psciInputFile defaultImports modules [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
         traverse_ (mapM_ (runPSCI . handleCommand)) config
         go
@@ -633,9 +636,18 @@ inputFile = strArgument $
      metavar "FILE"
   <> Opts.help "Optional .purs files to load on start"
 
+nodeFlagsFlag :: Parser [String]
+nodeFlagsFlag = option parser $
+     long "node-opts"
+  <> metavar "NODE_OPTS"
+  <> Opts.help "Flags to pass to node, separated by spaces"
+  where
+    parser = words <$> str
+
 psciOptions :: Parser PSCiOptions
 psciOptions = PSCiOptions <$> multiLineMode
                           <*> many inputFile
+                          <*> nodeFlagsFlag
 
 main :: IO ()
 main = execParser opts >>= loop
