@@ -36,7 +36,7 @@ import Control.Monad.Supply.Class
 -- and all @DoNotationLet@ constructors with let expressions.
 --
 desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> m Module
-desugarDoModule (Module mn ds exts) = Module mn <$> parU ds desugarDo <*> pure exts
+desugarDoModule (Module coms mn ds exts) = Module coms mn <$> parU ds desugarDo <*> pure exts
 
 desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (rethrowWithPosition pos $ desugarDo d)

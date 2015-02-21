@@ -86,8 +86,10 @@ renderModules ms = do
   mapM_ renderModule ms
 
 renderModule :: P.Module -> Docs
-renderModule mdl@(P.Module moduleName _ exps) = do
+renderModule mdl@(P.Module coms moduleName _ exps) = do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
+    spacer
+    renderComments coms
     spacer
     renderTopLevel exps (P.exportedDeclarations mdl)
     spacer

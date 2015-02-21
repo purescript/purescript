@@ -42,13 +42,13 @@ import Language.PureScript.Errors
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
 createBindingGroupsModule :: (Functor m, Applicative m, MonadError ErrorStack m) => [Module] -> m [Module]
-createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> createBindingGroups name ds <*> pure exps
+createBindingGroupsModule = mapM $ \(Module coms name ds exps) -> Module coms name <$> createBindingGroups name ds <*> pure exps
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
+collapseBindingGroupsModule = map $ \(Module coms name ds exps) -> Module coms name (collapseBindingGroups ds) exps
 
 createBindingGroups :: (Functor m, Applicative m, MonadError ErrorStack m) => ModuleName -> [Declaration] -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls

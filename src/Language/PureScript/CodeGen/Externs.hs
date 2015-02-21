@@ -36,8 +36,8 @@ import Language.PureScript.Comments
 -- Generate foreign imports for all declarations in a module
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
-moduleToPs (Module moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
+moduleToPs (Module _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
+moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
   tell [ "module " ++ runModuleName moduleName ++ " where"]
   mapM_ declToPs ds
   mapM_ exportToPs exts

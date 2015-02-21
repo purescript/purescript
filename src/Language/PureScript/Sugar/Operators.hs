@@ -57,7 +57,7 @@ rebracket ms = do
   mapM (rebracketModule opTable) ms
 
 removeSignedLiterals :: Module -> Module
-removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
+removeSignedLiterals (Module coms mn ds exts) = Module coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
 
@@ -65,9 +65,9 @@ removeSignedLiterals (Module mn ds exts) = Module mn (map f' ds) exts
   go other = other
 
 rebracketModule :: (Applicative m, MonadError ErrorStack m) => [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> m Module
-rebracketModule opTable (Module mn ds exts) =
+rebracketModule opTable (Module coms mn ds exts) =
   let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
-  in Module mn <$> (map removeParens <$> parU ds f) <*> pure exts
+  in Module coms mn <$> (map removeParens <$> parU ds f) <*> pure exts
 
 removeParens :: Declaration -> Declaration
 removeParens =
@@ -78,7 +78,7 @@ removeParens =
   go val = val
 
 collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity)]
-collectFixities (Module moduleName ds _) = concatMap collect ds
+collectFixities (Module _ moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity)]
   collect (PositionedDeclaration pos _ (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
@@ -152,7 +152,7 @@ matchOp op = do
   guard $ ident == op
 
 desugarOperatorSections :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> m Module
-desugarOperatorSections (Module mn ds exts) = Module mn <$> mapM goDecl ds <*> pure exts
+desugarOperatorSections (Module coms mn ds exts) = Module coms mn <$> mapM goDecl ds <*> pure exts
   where
 
   goDecl :: Declaration -> m Declaration

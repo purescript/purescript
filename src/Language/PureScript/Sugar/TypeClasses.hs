@@ -55,9 +55,9 @@ desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError Error
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> Desugar m Module
-desugarModule (Module name decls (Just exps)) = do
+desugarModule (Module coms name decls (Just exps)) = do
   (newExpss, declss) <- unzip <$> parU decls (desugarDecl name exps)
-  return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
+  return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
@@ -230,7 +230,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (TypeClassDeclaration _ args implies tyDecls) <- 
+  (TypeClassDeclaration _ args implies tyDecls) <-
     maybe (throwError $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) return $
       M.lookup (qualify mn className) m
 

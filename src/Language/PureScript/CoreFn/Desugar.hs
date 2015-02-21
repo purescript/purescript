@@ -40,14 +40,14 @@ import qualified Language.PureScript.AST as A
 -- Desugars a module from AST to CoreFn representation.
 --
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
-moduleToCoreFn _ (A.Module _ _ Nothing) =
+moduleToCoreFn _ (A.Module _ _ _ Nothing) =
   error "Module exports were not elaborated before moduleToCoreFn"
-moduleToCoreFn env (A.Module mn decls (Just exps)) =
+moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn Nothing []) decls
-  in Module mn imports exps' externs decls'
+  in Module coms mn imports exps' externs decls'
 
   where
 
