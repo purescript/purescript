@@ -17,7 +17,7 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Reader
 
 import Data.Version (showVersion)
@@ -52,14 +52,14 @@ readInput InputOptions{..} = do
   content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
   return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ErrorT String IO) a }
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT String IO) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError String, MonadReader (P.Options P.Make))
 
 runMake :: P.Options P.Make -> Make a -> IO (Either String a)
-runMake opts = runErrorT . flip runReaderT opts . unMake
+runMake opts = runExceptT . flip runReaderT opts . unMake
 
 makeIO :: IO a -> Make a
-makeIO = Make . lift . ErrorT . fmap (either (Left . show) Right) . tryIOError
+makeIO = Make . lift . ExceptT . fmap (either (Left . show) Right) . tryIOError
 
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do

@@ -30,7 +30,7 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid
 import qualified Data.HashMap.Strict as H
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.Environment

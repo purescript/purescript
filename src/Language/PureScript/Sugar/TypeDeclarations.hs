@@ -22,8 +22,8 @@ module Language.PureScript.Sugar.TypeDeclarations (
 import Data.Monoid ((<>))
 
 import Control.Applicative
-import Control.Monad.Error.Class
 import Control.Monad (forM)
+import Control.Monad.Except (throwError)
 
 import Language.PureScript.AST
 import Language.PureScript.Names

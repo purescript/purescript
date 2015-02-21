@@ -22,7 +22,7 @@ import Data.Monoid
 import Data.Ord (comparing)
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.AST

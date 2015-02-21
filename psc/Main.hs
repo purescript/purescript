@@ -17,7 +17,7 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Reader
 
 import Data.Maybe (fromMaybe)

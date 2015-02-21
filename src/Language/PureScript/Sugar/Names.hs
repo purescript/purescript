@@ -21,7 +21,7 @@ import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Monoid ((<>))
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Monad.Error
+import Control.Monad.Except
 
 import qualified Data.Map as M
 
