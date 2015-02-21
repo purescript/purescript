@@ -25,8 +25,11 @@ import Data.Functor.Identity
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Except
+import Control.Monad.Reader
+import Control.Monad.Writer
 
-newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a } deriving (Functor, Applicative, Monad, MonadTrans)
+newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a } 
+  deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r)
 
 runSupplyT :: Integer -> SupplyT m a -> m (a, Integer)
 runSupplyT n = flip runStateT n . unSupplyT
@@ -41,7 +44,3 @@ runSupply n = runIdentity . runSupplyT n
 
 evalSupply :: Integer -> Supply a -> a
 evalSupply n = runIdentity . evalSupplyT n
-
-instance (MonadError e m) => MonadError e (SupplyT m) where
-  throwError = SupplyT . throwError
-  catchError e f = SupplyT $ catchError (unSupplyT e) (unSupplyT . f)
