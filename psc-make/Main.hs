@@ -17,9 +17,11 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Reader
 
 import Data.Version (showVersion)
+import Data.Traversable (traverse)
 
 import Options.Applicative as Opts
 
@@ -31,7 +33,6 @@ import System.IO.Error (tryIOError)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
 
 data PSCMakeOptions = PSCMakeOptions
@@ -48,45 +49,43 @@ data InputOptions = InputOptions
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = do
-  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> U.readFile inFile
+  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
   return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
-newtype Make a = Make { unMake :: ErrorT String IO a } deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT String IO) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError String, MonadReader (P.Options P.Make))
 
-runMake :: Make a -> IO (Either String a)
-runMake = runErrorT . unMake
+runMake :: P.Options P.Make -> Make a -> IO (Either String a)
+runMake opts = runExceptT . flip runReaderT opts . unMake
 
 makeIO :: IO a -> Make a
-makeIO = Make . ErrorT . fmap (either (Left . show) Right) . tryIOError
+makeIO = Make . lift . ExceptT . fmap (either (Left . show) Right) . tryIOError
 
 instance P.MonadMake Make where
   getTimestamp path = makeIO $ do
     exists <- doesFileExist path
-    case exists of
-      True -> Just <$> getModificationTime path
-      False -> return Nothing
+    traverse (const $ getModificationTime path) $ guard exists
   readTextFile path = makeIO $ do
-    U.putStrLn $ "Reading " ++ path
-    U.readFile path
+    putStrLn $ "Reading " ++ path
+    readFile path
   writeTextFile path text = makeIO $ do
     mkdirp path
-    U.putStrLn $ "Writing " ++ path
-    U.writeFile path text
-  liftError = either throwError return
-  progress = makeIO . U.putStrLn
+    putStrLn $ "Writing " ++ path
+    writeFile path text
+  progress = makeIO . putStrLn
 
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions input outputDir opts usePrefix) = do
   modules <- P.parseModulesFromFiles (either (const "") id) <$> readInput (InputOptions (P.optionsNoPrelude opts) input)
   case modules of
     Left err -> do
-      U.print err
+      print err
       exitFailure
     Right ms -> do
-      e <- runMake $ P.make outputDir opts ms prefix
+      e <- runMake opts $ P.make outputDir ms prefix
       case e of
         Left err -> do
-          U.putStrLn err
+          putStrLn err
           exitFailure
         Right _ -> do
           exitSuccess
@@ -101,7 +100,7 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
-  <> help "The input .ps file(s)"
+  <> help "The input .purs file(s)"
 
 outputDirectory :: Parser FilePath
 outputDirectory = strOption $
@@ -112,12 +111,12 @@ outputDirectory = strOption $
   <> help "The output directory"
 
 noTco :: Parser Bool
-noTco = switch $ 
+noTco = switch $
      long "no-tco"
   <> help "Disable tail call optimizations"
 
 noPrelude :: Parser Bool
-noPrelude = switch $ 
+noPrelude = switch $
      long "no-prelude"
   <> help "Omit the Prelude"
 
@@ -128,35 +127,42 @@ noMagicDo = switch $
 
 noOpts :: Parser Bool
 noOpts = switch $
-     long "verbose-errors"
+     long "no-opts"
   <> help "Skip the optimization phase."
+
+comments :: Parser Bool
+comments = switch $
+     short 'c'
+  <> long "comments"
+  <> help "Include comments in the generated code."
 
 verboseErrors :: Parser Bool
 verboseErrors = switch $
      short 'v'
-  <> long "no-opts"
+  <> long "verbose-errors"
   <> help "Display verbose error messages"
 
 noPrefix :: Parser Bool
-noPrefix = switch $ 
+noPrefix = switch $
      short 'p'
   <> long "no-prefix"
   <> help "Do not include comment header"
 
 
 options :: Parser (P.Options P.Make)
-options = P.Options <$> noPrelude 
-                    <*> noTco 
+options = P.Options <$> noPrelude
+                    <*> noTco
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts
+                    <*> comments
                     <*> verboseErrors
                     <*> pure P.MakeOptions
 
 pscMakeOptions :: Parser PSCMakeOptions
-pscMakeOptions = PSCMakeOptions <$> many inputFile 
-                                <*> outputDirectory 
-                                <*> options 
+pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> outputDirectory
+                                <*> options
                                 <*> (not <$> noPrefix)
 
 main :: IO ()
@@ -166,6 +172,6 @@ main = execParser opts >>= compile
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psc-make - Compiles PureScript to Javascript"
   footerInfo  = footer $ "psc-make " ++ showVersion Paths.version
-  
+
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden

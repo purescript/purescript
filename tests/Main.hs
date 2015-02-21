@@ -22,24 +22,24 @@ import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
 import Control.Monad
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Reader (runReaderT)
 import Control.Applicative
 import System.Exit
 import System.Process
 import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
-import qualified System.IO.UTF8 as U
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- U.readFile inputFile
+  text <- readFile inputFile
   return (inputFile, text)
 
 loadPrelude :: Either String (String, String, P.Environment)
-loadPrelude = 
+loadPrelude =
   case P.parseModulesFromFiles id [("", P.prelude)] of
     Left parseError -> Left (show parseError)
-    Right ms -> P.compile (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) (map snd ms) []
+    Right ms -> runReaderT (P.compile (map snd ms) []) $ P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
 compile opts inputFiles = do
@@ -47,7 +47,7 @@ compile opts inputFiles = do
   case modules of
     Left parseError ->
       return (Left $ show parseError)
-    Right ms -> return $ P.compile opts (map snd ms) []
+    Right ms -> return $ runReaderT (P.compile (map snd ms) []) opts
 
 assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do
@@ -86,7 +86,7 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 
 main :: IO ()
 main = do
-  putStrLn "Compiling Prelude" 
+  putStrLn "Compiling Prelude"
   case loadPrelude of
     Left err -> putStrLn err >> exitFailure
     Right (preludeJs, exts, _) -> do

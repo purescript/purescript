@@ -24,7 +24,6 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
-import Data.Monoid ((<>))
 import Control.Applicative ((<$>), (<*>), pure)
 import Control.Monad ((<=<))
 
@@ -52,12 +51,12 @@ createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declara
 createBindingGroups moduleName = mapM f <=< handleDecls
 
   where
-  (f, _, _) = everywhereOnValuesTopDownM return handleExprs return 
-      
+  (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
+
   handleExprs :: Expr -> Either ErrorStack Expr
   handleExprs (Let ds val) = flip Let val <$> handleDecls ds
   handleExprs other = return other
-  
+
   -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
   --
@@ -88,7 +87,7 @@ collapseBindingGroups = let (f, _, _) = everywhereOnValues id collapseBindingGro
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) = map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] (Right val)) ds
-  go (PositionedDeclaration pos d) = map (PositionedDeclaration pos) $ go d
+  go (PositionedDeclaration pos com d) = map (PositionedDeclaration pos com) $ go d
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -139,13 +138,13 @@ usedProperNames moduleName =
 
 getIdent :: Declaration -> Ident
 getIdent (ValueDeclaration ident _ _ _) = ident
-getIdent (PositionedDeclaration _ d) = getIdent d
+getIdent (PositionedDeclaration _ _ d) = getIdent d
 getIdent _ = error "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
 getProperName (DataDeclaration _ pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
-getProperName (PositionedDeclaration _ d) = getProperName d
+getProperName (PositionedDeclaration _ _ d) = getProperName d
 getProperName _ = error "Expected DataDeclaration"
 
 -- |
@@ -178,10 +177,10 @@ toBindingGroup moduleName (CyclicSCC ds') =
   toBinding (CyclicSCC ~(d:ds)) = cycleError d ds
 
   cycleError :: Declaration -> [Declaration] -> Either ErrorStack a
-  cycleError (PositionedDeclaration p d) ds = rethrowWithPosition p $ cycleError d ds
+  cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
   cycleError (ValueDeclaration n _ _ (Right e)) [] = Left $
     mkErrorStack ("Cycle in definition of " ++ show n) (Just (ExprError e))
-  cycleError d ds@(_:_) = rethrow (<> mkErrorStack ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing) $ cycleError d []
+  cycleError d ds@(_:_) = rethrow (mkCompileError ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing `combineErrors`) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
 
 toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration
@@ -195,11 +194,11 @@ toDataBindingGroup (CyclicSCC ds')
 
 isTypeSynonym :: Declaration -> Maybe ProperName
 isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
-isTypeSynonym (PositionedDeclaration _ d) = isTypeSynonym d
+isTypeSynonym (PositionedDeclaration _ _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
 fromValueDecl (ValueDeclaration ident nameKind [] (Right val)) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
-fromValueDecl (PositionedDeclaration _ d) = fromValueDecl d
+fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
 fromValueDecl _ = error "Expected ValueDeclaration"

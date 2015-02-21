@@ -17,10 +17,11 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
+import Data.String (IsString(..))
 import Data.List (intersperse, intercalate)
 import Data.Monoid
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Applicative ((<$>))
 
 import Language.PureScript.AST
@@ -67,15 +68,14 @@ data ErrorStack
   = ErrorStack { runErrorStack :: [CompileError] }
   | MultipleErrors [ErrorStack] deriving (Show)
 
-instance Monoid ErrorStack where
-  mempty = ErrorStack []
-  mappend (ErrorStack xs) (ErrorStack ys) = ErrorStack (xs ++ ys)
-  mappend (MultipleErrors es) x = MultipleErrors [ e <> x | e <- es ]
-  mappend x (MultipleErrors es) = MultipleErrors [ x <> e | e <- es ]
+-- TODO: Remove strMsg, the IsString instance, and unnecessary
+-- OverloadedStrings pragmas. See #745
+-- | Create an ErrorStack from a string
+strMsg :: String -> ErrorStack
+strMsg s = ErrorStack [CompileError s Nothing Nothing]
 
-instance Error ErrorStack where
-  strMsg s = ErrorStack [CompileError s Nothing Nothing]
-  noMsg = ErrorStack []
+instance IsString ErrorStack where
+  fromString = strMsg
 
 prettyPrintErrorStack :: Bool -> ErrorStack -> String
 prettyPrintErrorStack printFullStack (ErrorStack es) =
@@ -95,8 +95,8 @@ prettyPrintErrorStack printFullStack (ErrorStack es) =
 prettyPrintErrorStack printFullStack (MultipleErrors es) =
   unlines $ intersperse "" $ "Multiple errors:" : map (prettyPrintErrorStack printFullStack) es
 
-stringifyErrorStack :: Bool -> Either ErrorStack a -> Either String a
-stringifyErrorStack printFullStack = either (Left . prettyPrintErrorStack printFullStack) Right
+stringifyErrorStack :: (MonadError String m) => Bool -> Either ErrorStack a -> m a
+stringifyErrorStack printFullStack = either (throwError . prettyPrintErrorStack printFullStack) return
 
 isErrorNonEmpty :: CompileError -> Bool
 isErrorNonEmpty = not . null . compileErrorMessage
@@ -107,10 +107,13 @@ showError (CompileError msg (Just (ExprError val)) _) = "Error in expression " +
 showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ":\n" ++ msg
 
 mkErrorStack :: String -> Maybe ErrorSource -> ErrorStack
-mkErrorStack msg t = ErrorStack [CompileError msg t Nothing]
+mkErrorStack msg t = ErrorStack [mkCompileError msg t]
 
-positionError :: SourceSpan -> ErrorStack
-positionError pos = ErrorStack [CompileError "" Nothing (Just pos)]
+mkCompileError :: String -> Maybe ErrorSource -> CompileError
+mkCompileError msg t = CompileError msg t Nothing
+
+positionError :: SourceSpan -> CompileError
+positionError pos = CompileError "" Nothing (Just pos)
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
@@ -122,7 +125,7 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- Rethrow an error with source position information
 --
 rethrowWithPosition :: (MonadError ErrorStack m) => SourceSpan -> m a -> m a
-rethrowWithPosition pos = rethrow (positionError pos <>)
+rethrowWithPosition pos = rethrow (positionError pos `combineErrors`)
 
 -- |
 -- Collect errors in in parallel
@@ -138,3 +141,13 @@ parU xs f = forM xs (withError . f) >>= collectErrors
     [err] -> throwError err
     [] -> return $ rights es
     errs -> throwError $ MultipleErrors errs
+ 
+-- |
+-- Add an extra error string onto the top of each error stack in a list of possibly many errors
+--
+combineErrors :: CompileError -> ErrorStack -> ErrorStack
+combineErrors ce err = go (ErrorStack [ce]) err
+  where 
+  go (ErrorStack xs) (ErrorStack ys) = ErrorStack (xs ++ ys)
+  go (MultipleErrors es) x = MultipleErrors [ go e x | e <- es ]
+  go x (MultipleErrors es) = MultipleErrors [ go x e | e <- es ]

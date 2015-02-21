@@ -14,40 +14,40 @@ Many thanks to the [contributors](https://github.com/purescript/purescript/graph
         sum (x:xs) = x + sum xs
 
 - Basic support for type classes has been added. Polymorphic types of the form `forall a. (C a) => ...` will not be inferred but can be checked. Type inference still works if all type class instances can be determined. There is not yet support for functionality like GHC's `FlexibleInstances`, `FlexibleContexts` or `MultiParamTypesClasses`. For example:
- 
+
         class Truthy a where
           isTrue :: a -> Boolean
-  
+
         instance Truthy Boolean where
           isTrue b = b
-  
+
         instance Truthy String where
           isTrue "" = false
           isTrue _ = true
-  
+
         ifThenElse :: forall a b. (Truthy a) => a -> b -> b -> b
         ifThenElse a tr fa = if isTrue a then tr else fa
 
 - There is now support for `do` notation, using the `Monad` type class from the `Prelude` module. For example:
 
         data Maybe = Nothing | Just a
-        
+
         instance Prelude.Monad Maybe where
           ret = Just
           (>>=) Nothing _ = Nothing
           (>>=) (Just a) f = f a
-          
+
         test = do
           x <- Just 1
           y <- Just 2
           ret $ x + y
-          
+
 - There is now a better story for side-effects. The `Eff` module in the `Prelude` defines a monad `Eff e` where e is a row of effect types. The kind system now defines a new kind `!` of effects. Row polymorphism allows different native effects to be interleaved. For example:
 
         test = do
           trace "Testing"
           throwError "Error!"
-          
+
   has inferred type `forall eff. Eff (trace :: Trace | error :: Error String | eff)`.
   See the `/examples/passing/Eff.purs` file for a more in-depth set of examples.
   Supported native effects currently include `ST`, `Trace`, `Error` and `DOM` (via the `libraries/jquery` module).

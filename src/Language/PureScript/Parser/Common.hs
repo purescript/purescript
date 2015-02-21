@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Common where
 import Control.Applicative
 import Control.Monad (guard)
 
+import Language.PureScript.Comments
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
 import Language.PureScript.Names
@@ -88,12 +89,6 @@ buildPostfixParser fs first = do
       Just a' -> go a'
 
 -- |
--- Parse an identifier in backticks or an operator
---
-parseIdentInfix :: TokenParser (Qualified Ident)
-parseIdentInfix = P.between tick tick (parseQualified (Ident <$> identifier)) <|> (parseQualified (Op <$> symbol))
-
--- |
 -- Mark the current indentation level
 --
 mark :: P.Parsec s ParseState a -> P.Parsec s ParseState a
@@ -125,6 +120,12 @@ indented = checkIndentation (>) P.<?> "indentation"
 --
 same :: P.Parsec s ParseState ()
 same = checkIndentation (==) P.<?> "no indentation"
+
+-- |
+-- Read the comments from the the next token, without consuming it
+--
+readComments :: P.Parsec [PositionedToken] u [Comment]
+readComments = P.lookAhead $ ptComments <$> P.anyToken
 
 -- |
 -- Run a parser

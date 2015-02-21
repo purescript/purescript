@@ -6,9 +6,11 @@ module Main where
   test = \const _ -> const
 
   foreign import error
-    "function error(msg) {\
-    \  throw msg;\
-    \}" :: forall a. String -> a
+    """
+    function error(msg) {
+      throw msg;
+    }
+    """ :: forall a. String -> a
 
   main = do
     let value = test "Done" {}

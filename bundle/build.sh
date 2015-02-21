@@ -4,7 +4,7 @@ SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 
 OS=$1
 
-if [ -z $OS ] 
+if [ -z $OS ]
 then
   echo "Usage: build.sh osname"
   exit 1

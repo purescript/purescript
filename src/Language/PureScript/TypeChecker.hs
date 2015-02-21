@@ -27,12 +27,11 @@ import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
 import Data.List (nub, (\\), find, intercalate)
-import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
 
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Except
 
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -47,7 +46,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
-    rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
+    rethrow (mkCompileError ("Error in data constructor " ++ show dctor) Nothing `combineErrors`) $
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
@@ -57,7 +56,8 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType) (dataConstructors env) }
+  let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
+  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Type -> Kind -> Check ()
 addTypeSynonym moduleName name args ty kind = do
@@ -84,12 +84,12 @@ addTypeClass moduleName pn args implies ds =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
-  toPair (PositionedDeclaration _ d) = toPair d
+  toPair (PositionedDeclaration _ _ d) = toPair d
   toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
-  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
+  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ } <- entries ]
   in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
 
 checkDuplicateTypeArguments :: [String] -> Check ()
@@ -133,7 +133,7 @@ typeCheckAll mainModuleName moduleName exps = go
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
   go (DataDeclaration dtype name args dctors : rest) = do
-    rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in type constructor " ++ show name) Nothing `combineErrors`) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
@@ -147,7 +147,7 @@ typeCheckAll mainModuleName moduleName exps = go
     checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
     checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
   go (d@(DataBindingGroupDeclaration tys) : rest) = do
-    rethrow (strMsg "Error in data binding group" <>) $ do
+    rethrow (mkCompileError "Error in data binding group" Nothing `combineErrors`) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
@@ -163,13 +163,13 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
     where
     toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
-    toTypeSynonym (PositionedDeclaration _ d') = toTypeSynonym d'
+    toTypeSynonym (PositionedDeclaration _ _ d') = toTypeSynonym d'
     toTypeSynonym _ = Nothing
     toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
-    toDataDecl (PositionedDeclaration _ d') = toDataDecl d'
+    toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty : rest) = do
-    rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in type synonym " ++ show name) Nothing `combineErrors`) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
@@ -178,7 +178,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val) : rest) = do
-    d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
+    d <- rethrow (mkCompileError ("Error in declaration " ++ show name) Nothing `combineErrors`) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
@@ -187,7 +187,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
   go (ValueDeclaration{} : _) = error "Binders were not desugared"
   go (BindingGroupDeclaration vals : rest) = do
-    d <- rethrow (strMsg ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) <>) $ do
+    d <- rethrow (mkCompileError ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) Nothing `combineErrors`) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
@@ -207,7 +207,7 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ d : ds
   go (d@(ExternDeclaration importTy name _ ty) : rest) = do
-    rethrow (strMsg ("Error in foreign import declaration " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in foreign import declaration " ++ show name) Nothing `combineErrors`) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
       guardWith (strMsg "Expected kind *") $ kind == Star
@@ -239,10 +239,10 @@ typeCheckAll mainModuleName moduleName exps = go
     goInstance d dictName deps className tys rest
   go (d@(ExternInstanceDeclaration dictName deps className tys) : rest) = do
     goInstance d dictName deps className tys rest
-  go (PositionedDeclaration pos d : rest) =
+  go (PositionedDeclaration pos com d : rest) =
     rethrowWithPosition pos $ do
       (d' : rest') <- go (d : rest)
-      return (PositionedDeclaration pos d' : rest')
+      return (PositionedDeclaration pos com d' : rest')
   goInstance :: Declaration -> Ident -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Check [Declaration]
   goInstance d dictName deps className tys rest = do
     mapM_ (checkTypeClassInstance moduleName) tys
@@ -258,7 +258,7 @@ typeCheckAll mainModuleName moduleName exps = go
 
     exportsInstance :: DeclarationRef -> Bool
     exportsInstance (TypeInstanceRef name) | name == dictName = True
-    exportsInstance (PositionedDeclarationRef _ r) = exportsInstance r
+    exportsInstance (PositionedDeclarationRef _ _ r) = exportsInstance r
     exportsInstance _ = False
 
   -- |
@@ -346,10 +346,10 @@ typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
     runValueRef _ = error "non-ValueRef passed to runValueRef"
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
-    findClassMembers (PositionedDeclaration _ d) = findClassMembers d
+    findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
-    extractMemberName (PositionedDeclaration _ d) = extractMemberName d
+    extractMemberName (PositionedDeclaration _ _ d) = extractMemberName d
     extractMemberName (TypeDeclaration memberName _) = memberName
     extractMemberName _ = error "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

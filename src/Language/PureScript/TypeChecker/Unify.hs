@@ -27,10 +27,9 @@ module Language.PureScript.TypeChecker.Unify (
 
 import Data.List (nub, sort)
 import Data.Maybe (fromMaybe)
-import Data.Monoid
 import qualified Data.HashMap.Strict as H
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.Environment
@@ -61,7 +60,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing <>) $
+unifyTypes t1 t2 = rethrow (mkCompileError ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing `combineErrors`) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
@@ -130,6 +129,10 @@ unifyRows r1 r2 =
     rest <- fresh
     u1 =:= rowFromList (sd2, rest)
     u2 =:= rowFromList (sd1, rest)
+  unifyRows' sd1 (SaturatedTypeSynonym name args) sd2 r2' = do
+    r1' <- expandTypeSynonym name $ args
+    unifyRows (rowFromList (sd1, r1')) (rowFromList (sd2, r2'))
+  unifyRows' sd1 r1' sd2 r2'@(SaturatedTypeSynonym _ _) = unifyRows' sd2 r2' sd1 r1'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
@@ -149,6 +152,23 @@ unifiesWith e (SaturatedTypeSynonym name args) t2 =
     Left  _  -> False
     Right t1 -> unifiesWith e t1 t2
 unifiesWith e t1 t2@(SaturatedTypeSynonym _ _) = unifiesWith e t2 t1
+unifiesWith _ REmpty REmpty = True
+unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
+  let (s1, r1') = rowToList r1
+      (s2, r2') = rowToList r2
+      
+      int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+      sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+      sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+  in all (\(t1, t2) -> unifiesWith e t1 t2) int && go sd1 r1' sd2 r2'
+  where
+  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
+  go [] REmpty          [] REmpty          = True 
+  go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
+  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) = s1 == s2
+  go _  (TUnknown _)    _  _               = True
+  go _  _               _  (TUnknown _)    = True
+  go _  _               _  _               = False
 unifiesWith _ _ _ = False
 
 -- |
@@ -158,7 +178,7 @@ replaceVarWithUnknown :: String -> Type -> UnifyT Type Check Type
 replaceVarWithUnknown ident ty = do
   tu <- fresh
   return $ replaceTypeVars ident tu ty
-  
+
 -- |
 -- Replace type wildcards with unknowns
 --

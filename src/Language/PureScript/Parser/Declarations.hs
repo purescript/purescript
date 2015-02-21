@@ -35,11 +35,13 @@ import Control.Applicative
 import Control.Arrow ((+++))
 
 import Language.PureScript.Kinds
-import Language.PureScript.Parser.Common
 import Language.PureScript.AST
+import Language.PureScript.Comments
+import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
+import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
@@ -50,13 +52,14 @@ import qualified Text.Parsec.Expr as P
 -- |
 -- Read source position information
 --
-withSourceSpan :: (SourceSpan -> a -> a) -> P.Parsec s u a -> P.Parsec s u a
+withSourceSpan :: (SourceSpan -> [Comment] -> a -> a) -> P.Parsec [PositionedToken] u a -> P.Parsec [PositionedToken] u a
 withSourceSpan f p = do
   start <- P.getPosition
+  comments <- C.readComments
   x <- p
   end <- P.getPosition
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
-  return $ f sp x
+  return $ f sp comments x
   where
   toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
@@ -283,11 +286,13 @@ parseArrayLiteral :: TokenParser Expr
 parseArrayLiteral = ArrayLiteral <$> squares (commaSep parseValue)
 
 parseObjectLiteral :: TokenParser Expr
-parseObjectLiteral = ObjectLiteral <$> braces (commaSep parseIdentifierAndValue)
+parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
 
-parseIdentifierAndValue :: TokenParser (String, Expr)
+parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
 parseIdentifierAndValue = (,) <$> (C.indented *> (lname <|> stringLiteral) <* C.indented <* colon)
-                              <*> (C.indented *> parseValue)
+                              <*> (C.indented *> val)
+  where
+  val = (Just <$> parseValue) <|> (underscore *> pure Nothing)
 
 parseAbs :: TokenParser Expr
 parseAbs = do
@@ -341,6 +346,7 @@ parseValueAtom = P.choice
             , P.try parseBooleanLiteral
             , parseArrayLiteral
             , P.try parseObjectLiteral
+            , P.try parseObjectGetter
             , parseAbs
             , P.try parseConstructor
             , P.try parseVar
@@ -348,13 +354,28 @@ parseValueAtom = P.choice
             , parseIfThenElse
             , parseDo
             , parseLet
-            , Parens <$> parens parseValue ]
+            , P.try $ Parens <$> parens parseValue
+            , parseOperatorSection
+            , P.try parseObjectUpdaterWildcard ]
 
-parsePropertyUpdate :: TokenParser (String, Expr)
+-- |
+-- Parse an expression in backticks or an operator
+--
+parseInfixExpr :: TokenParser Expr
+parseInfixExpr = P.between tick tick parseValue
+                 <|> Var <$> parseQualified (Op <$> symbol)
+
+parseOperatorSection :: TokenParser Expr
+parseOperatorSection = parens $ left <|> right
+  where
+  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> parseValueAtom)
+  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseInfixExpr
+
+parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
   name <- lname <|> stringLiteral
   _ <- C.indented *> equals
-  value <- C.indented *> parseValue
+  value <- C.indented *> (underscore *> pure Nothing) <|> (Just <$> parseValue)
   return (name, value)
 
 parseAccessor :: Expr -> TokenParser Expr
@@ -379,6 +400,9 @@ parseDoNotationElement = P.choice
             , parseDoNotationLet
             , P.try (DoNotationValue <$> parseValue) ]
 
+parseObjectGetter :: TokenParser Expr
+parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
+
 -- |
 -- Parse a value
 --
@@ -390,16 +414,22 @@ parseValue = withSourceSpan PositionedValue
   where
   indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
   postfixTable1 = [ parseAccessor
-                  , \v -> P.try $ flip ObjectUpdate <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate))) <*> pure v ]
+                  , P.try . parseUpdaterBody . Just ]
   postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
                   , \v -> flip (TypedValue True) <$> (P.try (C.indented *> doubleColon) *> parsePolyType) <*> pure v
                   ]
   operators = [ [ P.Prefix (P.try (C.indented *> symbol' "-") >> return UnaryMinus)
                 ]
-              , [ P.Infix (P.try (C.indented *> C.parseIdentInfix P.<?> "operator") >>= \ident ->
+              , [ P.Infix (P.try (C.indented *> parseInfixExpr P.<?> "infix expression") >>= \ident ->
                     return (BinaryNoParens ident)) P.AssocRight
                 ]
               ]
+
+parseUpdaterBody :: Maybe Expr -> TokenParser Expr
+parseUpdaterBody v = ObjectUpdater v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
+
+parseObjectUpdaterWildcard :: TokenParser Expr
+parseObjectUpdaterWildcard = underscore *> C.indented *> parseUpdaterBody Nothing
 
 parseStringBinder :: TokenParser Binder
 parseStringBinder = StringBinder <$> stringLiteral
@@ -435,7 +465,7 @@ parseNamedBinder = NamedBinder <$> (C.parseIdent <* C.indented <* at)
                                <*> (C.indented *> parseBinder)
 
 parseNullBinder :: TokenParser Binder
-parseNullBinder = reserved "_" *> return NullBinder
+parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
 parseIdentifierAndBinder = do

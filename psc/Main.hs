@@ -17,7 +17,8 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.Reader
 
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
@@ -26,11 +27,10 @@ import Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (stderr)
+import System.IO (hPutStrLn, stderr)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
 
 data PSCOptions = PSCOptions
@@ -51,7 +51,7 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
-  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> U.readFile inFile
+  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> readFile inFile
                    return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
 
 compile :: PSCOptions -> IO ()
@@ -59,19 +59,19 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
   modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
   case modules of
     Left err -> do
-      U.hPutStr stderr $ show err
+      hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      case P.compile opts (map snd ms) prefix of
+      case P.compile (map snd ms) prefix `runReaderT` opts of
         Left err -> do
-          U.hPutStrLn stderr err
+          hPutStrLn stderr err
           exitFailure
         Right (js, exts, _) -> do
           case output of
-            Just path -> mkdirp path >> U.writeFile path js
-            Nothing -> U.putStrLn js
+            Just path -> mkdirp path >> writeFile path js
+            Nothing -> putStrLn js
           case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
+            Just path -> mkdirp path >> writeFile path exts
             Nothing -> return ()
           exitSuccess
   where
@@ -116,27 +116,33 @@ runMain = optional $ noArgs <|> withArgs
   where
   defaultVal = "Main"
   noArgs     = flag' defaultVal (long "main")
-  withArgs   = strOption $ 
+  withArgs   = strOption $
         long "main"
      <> help (concat [
             "Generate code to run the main method in the specified module. ",
             "(no argument: \"", defaultVal, "\")"
         ])
-        
+
 noMagicDo :: Parser Bool
 noMagicDo = switch $
      long "no-magic-do"
   <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
-        
+
 noTco :: Parser Bool
-noTco = switch $ 
+noTco = switch $
      long "no-tco"
   <> help "Disable tail call optimizations"
 
 noPrelude :: Parser Bool
-noPrelude = switch $ 
+noPrelude = switch $
      long "no-prelude"
   <> help "Omit the Prelude"
+
+comments :: Parser Bool
+comments = switch $
+     short 'c'
+  <> long "comments"
+  <> help "Include comments in the generated code."
 
 useStdIn :: Parser Bool
 useStdIn = switch $
@@ -147,7 +153,7 @@ useStdIn = switch $
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
-  <> help "The input .ps file(s)"
+  <> help "The input .purs file(s)"
 
 outputFile :: Parser (Maybe FilePath)
 outputFile = optional . strOption $
@@ -159,25 +165,26 @@ externsFile :: Parser (Maybe FilePath)
 externsFile = optional . strOption $
      short 'e'
   <> long "externs"
-  <> help "The output .e.ps file"
+  <> help "The output .e.purs file"
 
 noPrefix :: Parser Bool
-noPrefix = switch $ 
+noPrefix = switch $
      short 'p'
   <> long "no-prefix"
   <> help "Do not include comment header"
 
 options :: Parser (P.Options P.Compile)
-options = P.Options <$> noPrelude 
-                    <*> noTco 
+options = P.Options <$> noPrelude
+                    <*> noTco
                     <*> noMagicDo
                     <*> runMain
                     <*> noOpts
                     <*> verboseErrors
+                    <*> comments
                     <*> additionalOptions
   where
-  additionalOptions = 
-    P.CompileOptions <$> browserNamespace 
+  additionalOptions =
+    P.CompileOptions <$> browserNamespace
                      <*> many dceModule
                      <*> many codeGenModule
 
@@ -196,7 +203,7 @@ main = execParser opts >>= compile
   infoModList = fullDesc <> headerInfo <> footerInfo
   headerInfo  = header   "psc - Compiles PureScript to Javascript"
   footerInfo  = footer $ "psc " ++ showVersion Paths.version
-  
+
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
 

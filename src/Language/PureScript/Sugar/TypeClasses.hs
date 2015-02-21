@@ -21,23 +21,22 @@ module Language.PureScript.Sugar.TypeClasses
   ) where
 
 import Language.PureScript.AST hiding (isExported)
-import Language.PureScript.Names
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Sugar.CaseDeclarations
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Supply
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
+import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Supply
+import Language.PureScript.Types
 
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
-import Control.Monad.Error
-import Control.Monad.State
 import Control.Arrow (first, second)
+import Control.Monad.Except
+import Control.Monad.State
 import Data.List ((\\), find)
-import Data.Monoid ((<>))
 import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
@@ -158,15 +157,15 @@ desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
     modify (M.insert (mn, name) d)
-    return $ (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+    return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
   go d@(TypeInstanceDeclaration name deps className tys members) = do
     desugared <- lift $ desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
-    return $ (expRef name className tys, [d, dictDecl])
-  go (PositionedDeclaration pos d) = do
+    return (expRef name className tys, [d, dictDecl])
+  go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
-    return (dr, map (PositionedDeclaration pos) ds)
+    return (dr, map (PositionedDeclaration pos com) ds)
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified ProperName -> [Type] -> Maybe DeclarationRef
@@ -197,7 +196,7 @@ desugarDecl mn exps = go
 
 memberToNameAndType :: Declaration -> (Ident, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
-memberToNameAndType (PositionedDeclaration _ d) = memberToNameAndType d
+memberToNameAndType (PositionedDeclaration _ _ d) = memberToNameAndType d
 memberToNameAndType _ = error "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Declaration
@@ -212,11 +211,12 @@ typeClassDictionaryDeclaration name args implies members =
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
-  ValueDeclaration ident TypeClassAccessorImport [] $ Right $
-    TypedValue False (Abs (Left $ Ident "dict") (Accessor (runIdent ident) (Var $ Qualified Nothing (Ident "dict")))) $
-    moveQuantifiersToFront (quantify (ConstrainedType [(Qualified (Just mn) name, map (TypeVar . fst) args)] ty))
-typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos d) =
-  PositionedDeclaration pos $ typeClassMemberToDictionaryAccessor mn name args d
+  let className = Qualified (Just mn) name
+  in ValueDeclaration ident TypeClassAccessorImport [] $ Right $
+      TypedValue False (TypeClassDictionaryAccessor className ident) $
+      moveQuantifiersToFront (quantify (ConstrainedType [(className, map (TypeVar . fst) args)] ty))
+typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
+  PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type class definition"
 
 unit :: Type
@@ -224,7 +224,7 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
+  rethrow (mkCompileError ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") Nothing `combineErrors`) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
@@ -263,7 +263,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   where
 
   declName :: Declaration -> Maybe Ident
-  declName (PositionedDeclaration _ d) = declName d
+  declName (PositionedDeclaration _ _ d) = declName d
   declName (ValueDeclaration ident _ _ _) = Just ident
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
@@ -272,15 +272,15 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
     _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
     return val
-  memberToValue tys' (PositionedDeclaration pos d) = rethrowWithPosition pos $ do
+  memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d
-    return (PositionedValue pos val)
+    return (PositionedValue pos com val)
   memberToValue _ _ = error "Invalid declaration in type instance definition"
 
 typeClassMemberName :: Declaration -> String
 typeClassMemberName (TypeDeclaration ident _) = runIdent ident
 typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
-typeClassMemberName (PositionedDeclaration _ d) = typeClassMemberName d
+typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
 typeClassMemberName d = error $ "Invalid declaration in type class definition: " ++ show d
 
 superClassDictionaryNames :: [Constraint] -> [String]

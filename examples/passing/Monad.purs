@@ -17,12 +17,12 @@ module Main where
   maybe = { return : Just
 	  , bind : \ma f -> case ma of
 	      Nothing -> Nothing
-	      Just a -> f a 
+	      Just a -> f a
 	  }
 
   test :: forall m. Monad m -> m Number
   test = \m -> m.bind (m.return 1) (\n1 ->
-		 m.bind (m.return "Test") (\n2 -> 
+		 m.bind (m.return "Test") (\n2 ->
 		   m.return n1))
 
   test1 = test id

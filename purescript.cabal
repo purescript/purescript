@@ -1,5 +1,5 @@
 name: purescript
-version: 0.6.2
+version: 0.6.8
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -31,10 +31,9 @@ library
                    filepath -any,
                    mtl >= 2.1.0 && < 2.3.0,
                    parsec -any,
-                   transformers >= 0.3 && < 0.5,
-                   utf8-string -any,
+                   transformers >= 0.4.0 && < 0.5,
+                   utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   monad-unify >= 0.2.2 && < 0.3,
                    file-embed >= 0.0.7 && < 0.0.8,
                    time -any
     exposed-modules: Language.PureScript
@@ -66,6 +65,7 @@ library
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
+                     Language.PureScript.Comments
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment
                      Language.PureScript.Errors
@@ -92,6 +92,7 @@ library
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
                      Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeDeclarations
@@ -109,67 +110,69 @@ library
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
+
+                     Control.Monad.Unify
     exposed: True
     buildable: True
     hs-source-dirs: src
     other-modules: Paths_purescript
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, utf8-string -any
+                   transformers -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, utf8-string -any
+                   transformers -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   utf8-string -any, process -any
+                   process -any
 
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
     other-modules: Commands
                    Parser
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any, utf8-string -any,
+    build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
-executable hierarchy
-    build-depends: base >=4 && <5, purescript -any, utf8-string -any, optparse-applicative >= 0.10.0,
+executable psc-hierarchy
+    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
                    process -any, mtl -any, parsec -any, filepath -any, directory -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, utf8-string -any, process -any
+                   transformers -any, process -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True

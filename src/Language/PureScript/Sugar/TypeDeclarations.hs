@@ -19,11 +19,9 @@ module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarationsModule
 ) where
 
-import Data.Monoid ((<>))
-
 import Control.Applicative
-import Control.Monad.Error.Class
 import Control.Monad (forM)
+import Control.Monad.Except (throwError)
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -36,25 +34,25 @@ import Language.PureScript.Traversals
 --
 desugarTypeDeclarationsModule :: [Module] -> Either ErrorStack [Module]
 desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds exps) ->
-  rethrow (strMsg ("Error in module " ++ show name) <>) $
+  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
     Module name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |
 -- Replace all top level type declarations with type annotations
 --
 desugarTypeDeclarations :: [Declaration] -> Either ErrorStack [Declaration]
-desugarTypeDeclarations (PositionedDeclaration pos d : ds) = do
+desugarTypeDeclarations (PositionedDeclaration pos com d : ds) = do
   (d' : ds') <- rethrowWithPosition pos $ desugarTypeDeclarations (d : ds)
-  return (PositionedDeclaration pos d' : ds')
+  return (PositionedDeclaration pos com d' : ds')
 desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   (_, nameKind, val) <- fromValueDeclaration d
   desugarTypeDeclarations (ValueDeclaration name nameKind [] (Right (TypedValue True val ty)) : rest)
   where
   fromValueDeclaration :: Declaration -> Either ErrorStack (Ident, NameKind, Expr)
   fromValueDeclaration (ValueDeclaration name' nameKind [] (Right val)) | name == name' = return (name', nameKind, val)
-  fromValueDeclaration (PositionedDeclaration pos d') = do
+  fromValueDeclaration (PositionedDeclaration pos com d') = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
-    return (ident, nameKind, PositionedValue pos val)
+    return (ident, nameKind, PositionedValue pos com val)
   fromValueDeclaration _ = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (TypeDeclaration name _ : []) = throwError $ mkErrorStack ("Orphan type declaration for " ++ show name) Nothing
 desugarTypeDeclarations (ValueDeclaration name nameKind bs val : rest) = do

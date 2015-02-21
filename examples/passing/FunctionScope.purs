@@ -5,10 +5,12 @@ module Main where
   mkValue :: Number -> Number
   mkValue id = id
 
-  foreign import error 
-    "function error(msg) {\
-    \  throw msg;\
-    \}" :: forall a. String -> a
+  foreign import error
+    """
+    function error(msg) {
+      throw msg;
+    }
+    """ :: forall a. String -> a
 
   main = do
     let value = mkValue 1

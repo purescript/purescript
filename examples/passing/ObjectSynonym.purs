@@ -10,4 +10,4 @@ type Outer = { inner :: Inner }
 outer :: Outer
 outer = { inner: inner }
 
-main = Debug.Trace.trace "Done"  
+main = Debug.Trace.trace "Done"

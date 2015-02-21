@@ -33,7 +33,7 @@ instance applicativeMTrace :: Applicative MTrace where
 instance bindMTrace :: Bind MTrace where
   (>>=) m f = MTrace (runMTrace m >>= (runMTrace <<< f))
 
-instance monadMTrace :: Monad MTrace 
+instance monadMTrace :: Monad MTrace
 
 instance writerMTrace :: MonadWriter String MTrace where
   tell s = MTrace (trace s)

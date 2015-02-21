@@ -12,10 +12,14 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.ModuleDependencies (
   sortModules,
   ModuleGraph
 ) where
+
+import Control.Monad.Except
 
 import Data.Graph
 import Data.List (nub)
@@ -35,7 +39,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: [Module] -> Either String ([Module], ModuleGraph)
+sortModules :: (MonadError String m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
   let verts = map (\m@(Module _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
@@ -54,7 +58,6 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 
   forValues :: Expr -> [ModuleName]
   forValues (Var (Qualified (Just mn) _)) = [mn]
-  forValues (BinaryNoParens (Qualified (Just mn) _) _ _) = [mn]
   forValues (Constructor (Qualified (Just mn) _)) = [mn]
   forValues (TypedValue _ _ ty) = forTypes ty
   forValues _ = []
@@ -64,13 +67,10 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
   forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
   forTypes _ = []
 
-getModuleName :: Module -> ModuleName
-getModuleName (Module mn _ _) = mn
-
 -- |
 -- Convert a strongly connected component of the module graph to a module
 --
-toModule :: SCC Module -> Either String Module
+toModule :: (MonadError String m) => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = Left $ "Cycle in module dependencies: " ++ show (map getModuleName ms)
+toModule (CyclicSCC ms) = throwError $ "Cycle in module dependencies: " ++ show (map getModuleName ms)

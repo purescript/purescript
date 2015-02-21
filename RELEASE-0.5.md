@@ -54,7 +54,7 @@
 - The escape check was removed, since it was too restrictive (paf31)
 - The binary operator reordering step was greatly simplified (paf31)
 - The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)
-- Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb) 
+- Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb)
 - Unary minus and signed numeric literals are now supported again (paf31, garyb)
 - Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
 - Error messages now display source positions (paf31, garyb)
@@ -63,7 +63,7 @@
 - `(++)` is now an alias for the Semigroup operator `(<>)` (paf31)
 - Error messages for classes with undefined or missing members have been improved (garyb)
 - The SYB dependency was removed, and traversals rewritten by hand, for a large performance increase (paf31)
- 
+
 ### Bug Fixes
 
 - The subsumes relation has been fixed for object types (paf31)
@@ -94,6 +94,6 @@
 - The `grunt-purescript` plugin has been updated to provide support for new command line options.
 - There is a new `gulp-purescript` plugin available for compiling with Gulp.
 
-### Documentation 
+### Documentation
 
 - There is a new `hierarchy` executable which will generate `.dot` diagrams based on the type class hierarchy of a module. The Prelude docs have been updated to include such a type class diagram. (joneshf)
