@@ -19,8 +19,6 @@ module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarationsModule
 ) where
 
-import Data.Monoid ((<>))
-
 import Control.Applicative
 import Control.Monad (forM)
 import Control.Monad.Except (throwError)
@@ -36,7 +34,7 @@ import Language.PureScript.Traversals
 --
 desugarTypeDeclarationsModule :: [Module] -> Either ErrorStack [Module]
 desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds exps) ->
-  rethrow (strMsg ("Error in module " ++ show name) <>) $
+  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
     Module name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |

@@ -18,7 +18,6 @@ module Language.PureScript.Sugar.Names (
 
 import Data.List (nub)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
-import Data.Monoid ((<>))
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad.Except
@@ -166,7 +165,7 @@ desugarImports modules = do
   -- the module has access to an unfiltered list of its own members.
   renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> Either ErrorStack Module
   renameInModule' unfilteredExports exports m@(Module mn _ _) =
-    rethrow (strMsg ("Error in module " ++ show mn) <>) $ do
+    rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $ do
       let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
       let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
       imports <- resolveImports env m
@@ -233,7 +232,8 @@ renameInModule imports exports (Module mn decls exps) =
   updateValue (pos, bound) (Let ds val') = do
       let args = mapMaybe letBoundVariable ds
       unless (length (nub args) == length args) $
-        throwError $ maybe id (\p e -> positionError p <> e) pos $ mkErrorStack ("Overlapping names in let binding.") Nothing
+        maybe id rethrowWithPosition pos $ 
+          throwError $ mkErrorStack ("Overlapping names in let binding.") Nothing
       return ((pos, args ++ bound), Let ds val')
       where
   updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
@@ -318,7 +318,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addModule :: ExportEnvironment -> Module -> Either ErrorStack ExportEnvironment
   addModule env (Module mn ds _) = do
     env' <- addEmptyModule env mn
-    rethrow (strMsg ("Error in module " ++ show mn) <>) $ foldM (addDecl mn) env' ds
+    rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $ foldM (addDecl mn) env' ds
 
   -- Add a declaration from a module to the global export environment
   addDecl :: ModuleName -> ExportEnvironment -> Declaration -> Either ErrorStack ExportEnvironment
@@ -344,7 +344,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
 filterExports :: ModuleName -> [DeclarationRef] -> ExportEnvironment -> Either ErrorStack ExportEnvironment
 filterExports mn exps env = do
   let moduleExports = fromMaybe (error "Module is missing") (mn `M.lookup` env)
-  moduleExports' <- rethrow (strMsg ("Error in module " ++ show mn) <>) $ filterModule moduleExports
+  moduleExports' <- rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $ filterModule moduleExports
   return $ M.insert mn moduleExports' env
   where
 

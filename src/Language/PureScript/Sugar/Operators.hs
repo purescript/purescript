@@ -34,7 +34,6 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Except
 
-import Data.Monoid ((<>))
 import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
@@ -90,7 +89,7 @@ ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
   go [] = return ()
   go [_] = return ()
   go ((x@(Qualified (Just mn) name), _) : (y, pos) : _) | x == y =
-    rethrow (strMsg ("Error in module " ++ show mn) <>) $
+    rethrow (mkCompileError ("Error in module " ++ show mn) Nothing `combineErrors`) $
       rethrowWithPosition pos $
         throwError $ mkErrorStack ("Redefined fixity for " ++ show name) Nothing
   go (_ : rest) = go rest

@@ -38,7 +38,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List ((\\), find)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
-import Data.Monoid ((<>))
 
 import qualified Data.Map as M
 
@@ -225,7 +224,7 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
+  rethrow (mkCompileError ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") Nothing `combineErrors`) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class

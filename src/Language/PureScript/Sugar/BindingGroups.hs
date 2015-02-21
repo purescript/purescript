@@ -24,7 +24,6 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
-import Data.Monoid ((<>))
 import Control.Applicative ((<$>), (<*>), pure)
 import Control.Monad ((<=<))
 
@@ -181,7 +180,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
   cycleError (ValueDeclaration n _ _ (Right e)) [] = Left $
     mkErrorStack ("Cycle in definition of " ++ show n) (Just (ExprError e))
-  cycleError d ds@(_:_) = rethrow (<> mkErrorStack ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing) $ cycleError d []
+  cycleError d ds@(_:_) = rethrow (mkCompileError ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing `combineErrors`) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
 
 toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration

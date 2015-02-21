@@ -19,7 +19,6 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
-import Data.Monoid ((<>))
 import Data.List (nub, groupBy)
 
 import Control.Applicative
@@ -44,7 +43,7 @@ isLeft (Right _) = False
 --
 desugarCasesModule :: [Module] -> SupplyT (Either ErrorStack) [Module]
 desugarCasesModule ms = forM ms $ \(Module name ds exps) ->
-  rethrow (strMsg ("Error in module " ++ show name) <>) $
+  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
     Module name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]

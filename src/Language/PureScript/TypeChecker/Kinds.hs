@@ -24,7 +24,6 @@ module Language.PureScript.TypeChecker.Kinds (
 ) where
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
@@ -79,7 +78,7 @@ kindOf _ ty = fst <$> kindOfWithScopedVars ty
 --
 kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])   
 kindOfWithScopedVars ty = 
-  rethrow (mkErrorStack "Error checking kind" (Just (TypeError ty)) <>) $
+  rethrow (mkCompileError "Error checking kind" (Just (TypeError ty)) `combineErrors`) $
     fmap tidyUp . liftUnify $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (sub $? k)
@@ -157,7 +156,7 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
-infer ty = rethrow (mkErrorStack "Error inferring type of value" (Just (TypeError ty)) <>) $ infer' ty
+infer ty = rethrow (mkCompileError "Error inferring type of value" (Just (TypeError ty)) `combineErrors`) $ infer' ty
 
 infer' :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
 infer' (ForAll ident ty _) = do
