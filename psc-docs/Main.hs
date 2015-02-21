@@ -31,19 +31,18 @@ import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
 
 data PSCDocsOptions = PSCDocsOptions
-  { pscdIncludeHeir :: Bool
-  , pscdInputFiles  :: [FilePath]
+  { pscdInputFiles  :: [FilePath]
   }
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions showHierarchy input) = do
+docgen (PSCDocsOptions input) = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
       hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      putStrLn . runDocs $ renderModules showHierarchy (map snd ms)
+      putStrLn . runDocs $ renderModules (map snd ms)
       exitSuccess
 
 parseFile :: FilePath -> IO (FilePath, String)
@@ -71,14 +70,14 @@ atIndent indent text =
 ticks :: String -> String
 ticks = ("`" ++) . (++ "`")
 
-renderModules :: Bool -> [P.Module] -> Docs
-renderModules showHierarchy ms = do
+renderModules :: [P.Module] -> Docs
+renderModules ms = do
   headerLevel 1 "Module Documentation"
   spacer
-  mapM_ (renderModule showHierarchy) ms
+  mapM_ renderModule ms
 
-renderModule :: Bool -> P.Module -> Docs
-renderModule showHierarchy mdl@(P.Module moduleName _ exps) = do
+renderModule :: P.Module -> Docs
+renderModule mdl@(P.Module moduleName _ exps) = do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
     renderTopLevel exps (P.exportedDeclarations mdl)
@@ -212,14 +211,8 @@ inputFile = strArgument $
      metavar "FILE"
   <> help "The input .purs file(s)"
 
-includeHierarcy :: Parser Bool
-includeHierarcy = switch $
-     long "hierarchy-images"
-  <> help "Include markdown for type class hierarchy images in the output."
-
 pscDocsOptions :: Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> includeHierarcy
-                                <*> many inputFile
+pscDocsOptions = PSCDocsOptions <$> many inputFile
 
 main :: IO ()
 main = execParser opts >>= docgen
