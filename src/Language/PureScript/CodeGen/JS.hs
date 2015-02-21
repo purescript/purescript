@@ -29,6 +29,8 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Monad (foldM, replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks, lift)
+import Control.Monad.Supply
+import Control.Monad.Supply.Class
 
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
@@ -36,7 +38,6 @@ import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer
 import Language.PureScript.Options
-import Language.PureScript.Supply
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 

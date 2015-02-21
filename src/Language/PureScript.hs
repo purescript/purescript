@@ -48,7 +48,7 @@ import Language.PureScript.Parser as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Renamer as P
 import Language.PureScript.Sugar as P
-import Language.PureScript.Supply as P
+import Control.Monad.Supply as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
 import qualified Language.PureScript.CoreFn as CoreFn

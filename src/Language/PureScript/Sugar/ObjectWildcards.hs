@@ -12,12 +12,17 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Language.PureScript.Sugar.ObjectWildcards (
   desugarObjectConstructors
 ) where
 
 import Control.Applicative
 import Control.Arrow (second)
+import Control.Monad.Error.Class
+import Control.Monad.Supply.Class
 
 import Data.List (partition)
 import Data.Maybe (isJust, fromJust, catMaybes)
@@ -25,16 +30,15 @@ import Data.Maybe (isJust, fromJust, catMaybes)
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
-import Language.PureScript.Supply
 
-desugarObjectConstructors :: Module -> SupplyT (Either ErrorStack) Module
+desugarObjectConstructors :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> m Module
 desugarObjectConstructors (Module mn ds exts) = Module mn <$> mapM desugarDecl ds <*> pure exts
   where
 
-  desugarDecl :: Declaration -> SupplyT (Either ErrorStack) Declaration
+  desugarDecl :: Declaration -> m Declaration
   (desugarDecl, _, _) = everywhereOnValuesM return desugarExpr return
 
-  desugarExpr :: Expr -> SupplyT (Either ErrorStack) Expr
+  desugarExpr :: Expr -> m Expr
   desugarExpr (ObjectConstructor ps) = wrapLambda ObjectLiteral ps
   desugarExpr (ObjectUpdater (Just obj) ps) = wrapLambda (ObjectUpdate obj) ps
   desugarExpr (ObjectUpdater Nothing ps) = do
@@ -45,7 +49,7 @@ desugarObjectConstructors (Module mn ds exts) = Module mn <$> mapM desugarDecl d
     return $ Abs (Left arg) (Accessor prop (Var (Qualified Nothing arg)))
   desugarExpr e = return e
 
-  wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Maybe Expr)] -> SupplyT (Either ErrorStack) Expr
+  wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Maybe Expr)] -> m Expr
   wrapLambda mkVal ps =
     let (props, args) = partition (isJust . snd) ps
     in if null args
@@ -54,7 +58,7 @@ desugarObjectConstructors (Module mn ds exts) = Module mn <$> mapM desugarDecl d
         (args', ps') <- unzip <$> mapM mkProp ps
         return $ foldr (Abs . Left) (mkVal ps') (catMaybes args')
 
-  mkProp :: (String, Maybe Expr) -> SupplyT (Either ErrorStack) (Maybe Ident, (String, Expr))
+  mkProp :: (String, Maybe Expr) -> m (Maybe Ident, (String, Expr))
   mkProp (name, Just e) = return (Nothing, (name, e))
   mkProp (name, Nothing) = do
     arg <- Ident <$> freshName

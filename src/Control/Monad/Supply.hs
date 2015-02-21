@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.Supply
+-- Module      :  Control.Monad.Supply
 -- Copyright   :  (c) Phil Freeman 2014
 -- License     :  MIT
 --
@@ -18,7 +18,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Language.PureScript.Supply where
+module Control.Monad.Supply where
 
 import Data.Functor.Identity
 
@@ -41,15 +41,6 @@ runSupply n = runIdentity . runSupplyT n
 
 evalSupply :: Integer -> Supply a -> a
 evalSupply n = runIdentity . evalSupplyT n
-
-fresh :: (Monad m) => SupplyT m Integer
-fresh = SupplyT $ do
-  n <- get
-  put (n + 1)
-  return n
-
-freshName :: (Functor m, Monad m) => SupplyT m String
-freshName = ('_' :) . show <$> fresh
 
 instance (MonadError e m) => MonadError e (SupplyT m) where
   throwError = SupplyT . throwError
