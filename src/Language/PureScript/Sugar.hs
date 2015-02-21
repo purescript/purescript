@@ -13,15 +13,18 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Monad
 import Control.Category ((>>>))
-import Control.Monad.Trans.Class
+import Control.Applicative
+import Control.Monad.Error.Class
+import Control.Monad.Supply.Class
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.Supply
 
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
@@ -55,14 +58,14 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
-desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
+desugar :: (Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
 desugar = map removeSignedLiterals
           >>> mapM desugarObjectConstructors
           >=> mapM desugarOperatorSections
           >=> mapM desugarDoModule
           >=> desugarCasesModule
-          >=> lift . (desugarTypeDeclarationsModule
-                      >=> desugarImports
-                      >=> rebracket)
+          >=> desugarTypeDeclarationsModule
+          >=> desugarImports
+          >=> rebracket
           >=> desugarTypeClasses
-          >=> lift . createBindingGroupsModule
+          >=> createBindingGroupsModule

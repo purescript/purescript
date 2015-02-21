@@ -96,7 +96,6 @@ library
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeDeclarations
-                     Language.PureScript.Supply
                      Language.PureScript.Traversals
                      Language.PureScript.TypeChecker
                      Language.PureScript.TypeChecker.Entailment
@@ -112,6 +111,8 @@ library
                      Language.PureScript.Types
 
                      Control.Monad.Unify
+                     Control.Monad.Supply
+                     Control.Monad.Supply.Class
     exposed: True
     buildable: True
     hs-source-dirs: src

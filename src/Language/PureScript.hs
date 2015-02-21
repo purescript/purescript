@@ -13,9 +13,21 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, QuasiQuotes, TemplateHaskell, FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript (module P, compile, compile', RebuildPolicy(..), MonadMake(..), make, prelude) where
+module Language.PureScript 
+  ( module P
+  , compile
+  , compile'
+  , RebuildPolicy(..)
+  , MonadMake(..)
+  , make
+  , prelude
+  ) where
 
 import Data.FileEmbed (embedFile)
 import Data.Function (on)
@@ -48,7 +60,7 @@ import Language.PureScript.Parser as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Renamer as P
 import Language.PureScript.Sugar as P
-import Language.PureScript.Supply as P
+import Control.Monad.Supply as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
 import qualified Language.PureScript.CoreFn as CoreFn
@@ -154,7 +166,7 @@ traverseEither f (Right y) = Right <$> f y
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: (Functor m, Applicative m, Monad m, MonadMake m)
+make :: forall m. (Functor m, Applicative m, Monad m, MonadMake m)
      => FilePath -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
 make outputDir ms prefix = do
   noPrelude <- asks optionsNoPrelude
@@ -185,8 +197,7 @@ make outputDir ms prefix = do
   evalSupplyT nextVar $ go initEnvironment desugared
 
   where
-  go :: (Functor m, Applicative m, Monad m, MonadMake m)
-     => Environment -> [(Bool, Module)] -> SupplyT m Environment
+  go :: Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
     (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
@@ -216,7 +227,7 @@ make outputDir ms prefix = do
 
     go env' ms'
 
-  rebuildIfNecessary :: (Functor m, Monad m, MonadMake m) => M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
+  rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
   rebuildIfNecessary _ _ [] = return []
   rebuildIfNecessary graph toRebuild (m@(Module moduleName' _ _) : ms') | moduleName' `S.member` toRebuild = do
     let deps = fromMaybe [] $ moduleName' `M.lookup` graph

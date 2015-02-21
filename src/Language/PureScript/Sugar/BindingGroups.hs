@@ -14,6 +14,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.Sugar.BindingGroups (
     createBindingGroups,
     createBindingGroupsModule,
@@ -24,8 +26,9 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
-import Control.Applicative ((<$>), (<*>), pure)
+import Control.Applicative
 import Control.Monad ((<=<))
+import Control.Monad.Error.Class
 
 import qualified Data.Set as S
 
@@ -38,7 +41,7 @@ import Language.PureScript.Errors
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
-createBindingGroupsModule :: [Module] -> Either ErrorStack [Module]
+createBindingGroupsModule :: (Functor m, Applicative m, MonadError ErrorStack m) => [Module] -> m [Module]
 createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> createBindingGroups name ds <*> pure exps
 
 -- |
@@ -47,20 +50,20 @@ createBindingGroupsModule = mapM $ \(Module name ds exps) -> Module name <$> cre
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule = map $ \(Module name ds exps) -> Module name (collapseBindingGroups ds) exps
 
-createBindingGroups :: ModuleName -> [Declaration] -> Either ErrorStack [Declaration]
+createBindingGroups :: (Functor m, Applicative m, MonadError ErrorStack m) => ModuleName -> [Declaration] -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls
 
   where
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
-  handleExprs :: Expr -> Either ErrorStack Expr
+  handleExprs :: (Functor m, MonadError ErrorStack m) => Expr -> m Expr
   handleExprs (Let ds val) = flip Let val <$> handleDecls ds
   handleExprs other = return other
 
   -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
   --
-  handleDecls :: [Declaration] -> Either ErrorStack [Declaration]
+  handleDecls :: (Functor m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = filter isValueDecl ds
         dataDecls = filter isDataDecl ds
@@ -151,7 +154,7 @@ getProperName _ = error "Expected DataDeclaration"
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
 --
 --
-toBindingGroup :: ModuleName -> SCC Declaration -> Either ErrorStack Declaration
+toBindingGroup :: (Functor m, MonadError ErrorStack m) => ModuleName -> SCC Declaration -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
 toBindingGroup _ (CyclicSCC [d]) = return d
 toBindingGroup moduleName (CyclicSCC ds') =
@@ -172,24 +175,24 @@ toBindingGroup moduleName (CyclicSCC ds') =
   valueVerts :: [(Declaration, Ident, [Ident])]
   valueVerts = map (\d -> (d, getIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
-  toBinding :: SCC Declaration -> Either ErrorStack (Ident, NameKind, Expr)
+  toBinding :: (MonadError ErrorStack m) => SCC Declaration -> m (Ident, NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ~(d:ds)) = cycleError d ds
 
-  cycleError :: Declaration -> [Declaration] -> Either ErrorStack a
+  cycleError :: (MonadError ErrorStack m) => Declaration -> [Declaration] -> m a
   cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
-  cycleError (ValueDeclaration n _ _ (Right e)) [] = Left $
+  cycleError (ValueDeclaration n _ _ (Right e)) [] = throwError $
     mkErrorStack ("Cycle in definition of " ++ show n) (Just (ExprError e))
   cycleError d ds@(_:_) = rethrow (mkCompileError ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing `combineErrors`) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
 
-toDataBindingGroup :: SCC Declaration -> Either ErrorStack Declaration
+toDataBindingGroup :: (MonadError ErrorStack m) => SCC Declaration -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> Left $ mkErrorStack ("Cycle in type synonym " ++ show pn) Nothing
+  Just pn -> throwError $ mkErrorStack ("Cycle in type synonym " ++ show pn) Nothing
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = Left $ mkErrorStack "Cycle in type synonyms" Nothing
+  | all (isJust . isTypeSynonym) ds' = throwError $ mkErrorStack "Cycle in type synonyms" Nothing
   | otherwise = return $ DataBindingGroupDeclaration ds'
 
 isTypeSynonym :: Declaration -> Maybe ProperName
