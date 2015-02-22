@@ -93,7 +93,7 @@ toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
-  guardWith (errorMessage (OverlappingArgNames ident)) $ length (nub args) == length args
+  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds

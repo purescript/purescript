@@ -77,17 +77,26 @@ data ErrorMessage
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified ProperName) [Type] [DictionaryValue]
   | NoInstanceFound (Qualified ProperName) [Type]
-  | DuplicateLabel String Expr
+  | DuplicateLabel String (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
-  | OverlappingArgNames Ident
+  | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
+  | ExpectedType Kind
+  | IncorrectConstructorArity (Qualified ProperName)
+  | SubsumptionCheckFailed
+  | ExprDoesNotHaveType Expr Type
+  | PropertyIsMissing String Type
   | ErrorUnifyingTypes Type Type ErrorMessage
+  | CannotApplyFunction Type Expr
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
   | ErrorInSubsumption Type Type ErrorMessage
+  | ErrorCheckingType Expr Type ErrorMessage
   | ErrorCheckingKind Type ErrorMessage
+  | ErrorInferringType Expr ErrorMessage
+  | ErrorInApplication Expr Type Expr ErrorMessage
   | PositionedError SourceSpan ErrorMessage
   deriving (Show)
   
@@ -141,17 +150,26 @@ prettyPrintErrorMessage (ConstrainedTypeUnified t1 t2)  = "Cannot unify constrai
 prettyPrintErrorMessage (OverlappingInstances nm ts ds) = unlines (("Overlapping instances found for " ++ show nm ++ " " ++ unwords (map prettyPrintType ts) ++ ":")
                                                                   : map prettyPrintDictionaryValue ds)
 prettyPrintErrorMessage (NoInstanceFound nm ts)         = "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
-prettyPrintErrorMessage (DuplicateLabel l expr)         = "Duplicate label " ++ show l ++ " in row. Relevant expression: " ++ prettyPrintValue expr
+prettyPrintErrorMessage (DuplicateLabel l expr)         = "Duplicate label " ++ show l ++ " in row." ++ foldMap ((" Relevant expression: " ++) . prettyPrintValue) expr
 prettyPrintErrorMessage (DuplicateValueDeclaration nm)  = "Duplicate value declaration for " ++ show nm
 prettyPrintErrorMessage (ArgListLengthsDiffer ident)    = "Argument list lengths differ in declaration " ++ show ident
-prettyPrintErrorMessage (OverlappingArgNames ident)     = "Overlapping function argument names in declaration" ++ show ident
+prettyPrintErrorMessage (OverlappingArgNames ident)     = "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
 prettyPrintErrorMessage (MissingClassMember ident)      = "Member " ++ show ident ++ " has not been implemented"
+prettyPrintErrorMessage (ExpectedType kind)             = "Expected type of kind *, was " ++ prettyPrintKind kind
+prettyPrintErrorMessage (IncorrectConstructorArity nm)  = "Wrong number of arguments to constructor " ++ show nm
+prettyPrintErrorMessage SubsumptionCheckFailed          = "Unable to check type subsumption"
+prettyPrintErrorMessage (ExprDoesNotHaveType expr ty)   = "Expression " ++ prettyPrintValue expr ++ " does not have type " ++ prettyPrintType ty
+prettyPrintErrorMessage (PropertyIsMissing prop row)    = "Row " ++ prettyPrintRow row ++ " lacks required property " ++ show prop
+prettyPrintErrorMessage (CannotApplyFunction fn arg)    = "Cannot apply function of type " ++ prettyPrintType fn ++ " to argument " ++ prettyPrintValue arg
 prettyPrintErrorMessage (ErrorUnifyingTypes t1 t2 err)  = "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInExpression expr err)    = "Error in expression " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInSubsumption t1 t2 err)  = "Error checking that type " ++ prettyPrintType t1 ++ " subsumes type " ++ prettyPrintType t2 ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInInstance name ts err)   = "Error in type class instance " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorCheckingKind ty err)      = "Error checking kind of type " ++ prettyPrintType ty ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInferringType expr err)   = "Error inferring type of value " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorCheckingType expr ty err) = "Error checking value " ++ prettyPrintValue expr ++ " has type " ++ prettyPrintType ty ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInApplication f t a err)  = "Error applying function " ++ prettyPrintValue f ++ " of type " ++ prettyPrintType t ++ " to argument " ++ prettyPrintValue a ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ":\n" ++ prettyPrintErrorMessage err
 
 -- |
@@ -190,6 +208,8 @@ simplifyErrorMessage = unwrap Nothing
   unwrap pos (ErrorInInstance name ts err) = ErrorInInstance name ts (unwrap pos err)
   unwrap pos (ErrorInSubsumption t1 t2 err) = ErrorInSubsumption t1 t2 (unwrap pos err)
   unwrap pos (ErrorUnifyingTypes _ _ err) = unwrap pos err
+  unwrap pos (ErrorInferringType _ err) = unwrap pos err
+  unwrap pos (ErrorCheckingType _ _ err) = unwrap pos err
   unwrap pos (ErrorCheckingKind ty err) = ErrorCheckingKind ty (unwrap pos err)
   unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
   unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
