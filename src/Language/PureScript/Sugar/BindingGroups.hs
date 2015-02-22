@@ -78,6 +78,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
              filter isExternInstanceDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassDeclaration ds ++
+             filter isTypeClassInstanceDeclaration ds ++
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
              bindingGroupDecls

@@ -38,7 +38,7 @@ import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List ((\\), find)
+import Data.List ((\\), find, sortBy)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
@@ -56,8 +56,14 @@ desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> Desugar m Module
 desugarModule (Module coms name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> parU decls (desugarDecl name exps)
+  (newExpss, declss) <- unzip <$> parU (sortBy classesFirst decls) (desugarDecl name exps)
   return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
+  where
+  classesFirst :: Declaration -> Declaration -> Ordering
+  classesFirst d1 d2 
+    | isTypeClassDeclaration d1 && not (isTypeClassDeclaration d2) = LT
+    | not (isTypeClassDeclaration d1) && isTypeClassDeclaration d2 = GT
+    | otherwise = EQ
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
