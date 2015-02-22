@@ -56,7 +56,10 @@ moduleToJs (Module coms name imps exps foreigns decls) = do
   jsDecls <- mapM (bindToJs name) decls
   optimized <- T.traverse (T.traverse optimize) jsDecls
   let isModuleEmpty = null exps
-  let moduleBody = JSComment coms (JSStringLiteral "use strict") : jsImports ++ foreigns' ++ concat optimized
+  comments <- not <$> asks optionsNoComments
+  let strict = JSStringLiteral "use strict"
+  let header = if comments && not (null coms) then JSComment coms strict else strict
+  let moduleBody = header : jsImports ++ foreigns' ++ concat optimized
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) exps
   return $ case additional of
     MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
