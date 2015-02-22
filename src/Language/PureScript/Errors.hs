@@ -12,108 +12,145 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.String (IsString(..))
-import Data.List (intersperse, intercalate)
+import Data.List (intersperse)
 import Data.Monoid
+import Data.Foldable (fold, foldMap)
 
 import Control.Monad.Except
+import Control.Monad.Unify
 import Control.Applicative ((<$>))
 
 import Language.PureScript.AST
 import Language.PureScript.Pretty
 import Language.PureScript.Types
+import Language.PureScript.Names
+import Language.PureScript.Kinds
 
 -- |
--- Type for sources of type checking errors
+-- A type of error messages
 --
-data ErrorSource
-  -- |
-  -- An error which originated at a Expr
-  --
-  = ExprError Expr
-  -- |
-  -- An error which originated at a Type
-  --
-  | TypeError Type deriving (Show)
+data ErrorMessage 
+  = InfiniteType Type
+  | InfiniteKind Kind
+  | CannotReorderOperators
+  | MultipleFixities Ident
+  | OrphanTypeDeclaration Ident
+  | RedefinedModule ModuleName
+  | OverlappingNamesInLet
+  | UnknownModule ModuleName
+  | UnknownType (Qualified ProperName)
+  | UnknownTypeClass (Qualified ProperName)
+  | UnknownValue (Qualified Ident)
+  | UnknownDataConstructor (Qualified ProperName) (Maybe (Qualified ProperName))
+  | ConflictingImport String ModuleName
+  | ConflictingImports String ModuleName ModuleName  
+  | ConflictingTypeDecls ProperName
+  | ConflictingCtorDecls ProperName
+  | TypeConflictsWithClass ProperName
+  | CtorConflictsWithClass ProperName
+  | ClassConflictsWithType ProperName
+  | ClassConflictsWithCtor ProperName
+  | DuplicateClassExport ProperName
+  | DuplicateValueExport Ident
+  | ErrorInModule ModuleName ErrorMessage
+  | PositionedError SourceSpan ErrorMessage
+  deriving (Show, Eq)
+  
+instance UnificationError Type ErrorMessage where
+  occursCheckFailed = InfiniteType
+  
+instance UnificationError Kind ErrorMessage where
+  occursCheckFailed = InfiniteKind
 
 -- |
--- Compilation errors
+-- Pretty print an ErrorMessage
 --
-data CompileError
-  = CompileError
-      { -- |
-        -- Error message
-        --
-        compileErrorMessage :: String
-        -- |
-        -- The value where the error occurred
-        --
-      , compileErrorValue :: Maybe ErrorSource
-        -- |
-        -- Optional source position information
-        --
-      , compileErrorPosition :: Maybe SourceSpan
-      }
-  deriving (Show)
+prettyPrintErrorMessage :: ErrorMessage -> String
+prettyPrintErrorMessage CannotReorderOperators          = "Unable to reorder operators"
+prettyPrintErrorMessage OverlappingNamesInLet           = "Overlapping names in let binding."
+prettyPrintErrorMessage (InfiniteType ty)               = "Infinite type detected: " ++ prettyPrintType ty
+prettyPrintErrorMessage (InfiniteKind ki)               = "Infinite kind detected: " ++ prettyPrintKind ki
+prettyPrintErrorMessage (MultipleFixities name)         = "Multiple fixity declarations for " ++ show name
+prettyPrintErrorMessage (OrphanTypeDeclaration pn)      = "Orphan type declaration for: " ++ show pn
+prettyPrintErrorMessage (RedefinedModule name)          = "Module " ++ show name ++ " has been defined multiple times"
+prettyPrintErrorMessage (UnknownModule mn)              = "Unknown module: " ++ show mn
+prettyPrintErrorMessage (UnknownType name)              = "Unknown type: " ++ show name
+prettyPrintErrorMessage (UnknownTypeClass name)         = "Unknown type class: " ++ show name
+prettyPrintErrorMessage (UnknownValue name)             = "Unknown value: " ++ show name
+prettyPrintErrorMessage (UnknownDataConstructor dc tc)  = "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
+prettyPrintErrorMessage (ConflictingImport nm mn)       = "Declaration " ++ nm ++ " conflicts with import " ++ show mn 
+prettyPrintErrorMessage (ConflictingImports nm m1 m2)   = "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
+prettyPrintErrorMessage (ConflictingTypeDecls nm)       = "Conflicting type declarations for " ++ show nm
+prettyPrintErrorMessage (ConflictingCtorDecls nm)       = "Conflicting data constructor declarations for " ++ show nm
+prettyPrintErrorMessage (TypeConflictsWithClass nm)     = "Type " ++ show nm ++ " conflicts with type class declaration of the same name"
+prettyPrintErrorMessage (CtorConflictsWithClass nm)     = "Data constructor " ++ show nm ++ " conflicts with type class declaration of the same name"
+prettyPrintErrorMessage (ClassConflictsWithType nm)     = "Type class " ++ show nm ++ " conflicts with type declaration of the same name"
+prettyPrintErrorMessage (ClassConflictsWithCtor nm)     = "Type class " ++ show nm ++ " conflicts with data constructor declaration of the same name"
+prettyPrintErrorMessage (DuplicateClassExport nm)       = "Duplicate export declaration for type class " ++ show nm
+prettyPrintErrorMessage (DuplicateValueExport nm)       = "Duplicate export declaration for value " ++ show nm
+prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ": " ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ": \n" ++ prettyPrintErrorMessage err
 
 -- |
 -- A stack trace for an error
 --
-data ErrorStack
-  = ErrorStack { runErrorStack :: [CompileError] }
-  | MultipleErrors [ErrorStack] deriving (Show)
+newtype MultipleErrors = MultipleErrors 
+  { runMultipleErrors :: [ErrorMessage] } deriving (Show, Eq, Monoid)
 
--- TODO: Remove strMsg, the IsString instance, and unnecessary
--- OverloadedStrings pragmas. See #745
--- | Create an ErrorStack from a string
-strMsg :: String -> ErrorStack
-strMsg s = ErrorStack [CompileError s Nothing Nothing]
-
-instance IsString ErrorStack where
-  fromString = strMsg
-
-prettyPrintErrorStack :: Bool -> ErrorStack -> String
-prettyPrintErrorStack printFullStack (ErrorStack es) =
-  case mconcat $ map (Last . compileErrorPosition) es of
-    Last (Just sourcePos) -> "Error at " ++ show sourcePos ++ ": \n" ++ prettyPrintErrorStack'
-    _ -> prettyPrintErrorStack'
+-- |
+-- Simplify an error message
+--
+simplifyErrorMessage :: ErrorMessage -> ErrorMessage
+simplifyErrorMessage = unwrap Nothing
   where
-  prettyPrintErrorStack' :: String
-  prettyPrintErrorStack'
-    | printFullStack = intercalate "\n" (map showError (filter isErrorNonEmpty es))
-    | otherwise =
-      let
-        es' = filter isErrorNonEmpty es
-      in case length es' of
-        1 -> showError (head es')
-        _ -> showError (head es') ++ "\n" ++ showError (last es')
-prettyPrintErrorStack printFullStack (MultipleErrors es) =
-  unlines $ intersperse "" $ "Multiple errors:" : map (prettyPrintErrorStack printFullStack) es
+  unwrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
+  unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
+  unwrap _   (PositionedError pos err) = unwrap (Just pos) err
+  unwrap pos other = wrap pos other
+  
+  wrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
+  wrap Nothing    = id
+  wrap (Just pos) = PositionedError pos
 
-stringifyErrorStack :: (MonadError String m) => Bool -> Either ErrorStack a -> m a
-stringifyErrorStack printFullStack = either (throwError . prettyPrintErrorStack printFullStack) return
+-- |
+-- Create an error set from a single error message
+--
+errorMessage :: ErrorMessage -> MultipleErrors
+errorMessage err = MultipleErrors [err]
 
-isErrorNonEmpty :: CompileError -> Bool
-isErrorNonEmpty = not . null . compileErrorMessage
+-- |
+-- Lift a function on ErrorMessage to a function on MultipleErrors
+--
+onErrorMessages :: (ErrorMessage -> ErrorMessage) -> MultipleErrors -> MultipleErrors
+onErrorMessages f = MultipleErrors . map f . runMultipleErrors
 
-showError :: CompileError -> String
-showError (CompileError msg Nothing _) = msg
-showError (CompileError msg (Just (ExprError val)) _) = "Error in expression " ++ prettyPrintValue val ++ ":\n" ++ msg
-showError (CompileError msg (Just (TypeError ty)) _) = "Error in type " ++ prettyPrintType ty ++ ":\n" ++ msg
+-- |
+-- Pretty print a single error, simplifying if necessary
+--
+prettyPrintSingleError :: Bool -> ErrorMessage -> String
+prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else simplifyErrorMessage e)
 
-mkErrorStack :: String -> Maybe ErrorSource -> ErrorStack
-mkErrorStack msg t = ErrorStack [mkCompileError msg t]
+-- |
+-- Pretty print multiple errors
+--
+prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
+prettyPrintMultipleErrors full  (MultipleErrors [e]) = 
+  prettyPrintSingleError full e 
+prettyPrintMultipleErrors full  (MultipleErrors es) =
+  unlines $ intersperse "" $ "Multiple errors:" : map (prettyPrintSingleError full) es
 
-mkCompileError :: String -> Maybe ErrorSource -> CompileError
-mkCompileError msg t = CompileError msg t Nothing
-
-positionError :: SourceSpan -> CompileError
-positionError pos = CompileError "" Nothing (Just pos)
+-- |
+-- Interpret multiple errors in a monad supporting errors
+--
+interpretMultipleErrors :: (MonadError String m) => Bool -> Either MultipleErrors a -> m a
+interpretMultipleErrors printFullStack = either (throwError . prettyPrintMultipleErrors printFullStack) return
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
@@ -124,30 +161,19 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- |
 -- Rethrow an error with source position information
 --
-rethrowWithPosition :: (MonadError ErrorStack m) => SourceSpan -> m a -> m a
-rethrowWithPosition pos = rethrow (positionError pos `combineErrors`)
+rethrowWithPosition :: (MonadError MultipleErrors m) => SourceSpan -> m a -> m a
+rethrowWithPosition pos = rethrow (onErrorMessages (PositionedError pos))
 
 -- |
 -- Collect errors in in parallel
 --
-parU :: (MonadError ErrorStack m, Functor m) => [a] -> (a -> m b) -> m [b]
+parU :: (MonadError MultipleErrors m, Functor m) => [a] -> (a -> m b) -> m [b]
 parU xs f = forM xs (withError . f) >>= collectErrors
   where
-  withError :: (MonadError ErrorStack m, Functor m) => m a -> m (Either ErrorStack a)
+  withError :: (MonadError MultipleErrors m, Functor m) => m a -> m (Either MultipleErrors a)
   withError u = catchError (Right <$> u) (return . Left)
 
-  collectErrors :: (MonadError ErrorStack m, Functor m) => [Either ErrorStack a] -> m [a]
+  collectErrors :: (MonadError MultipleErrors m, Functor m) => [Either MultipleErrors a] -> m [a]
   collectErrors es = case lefts es of
-    [err] -> throwError err
     [] -> return $ rights es
-    errs -> throwError $ MultipleErrors errs
- 
--- |
--- Add an extra error string onto the top of each error stack in a list of possibly many errors
---
-combineErrors :: CompileError -> ErrorStack -> ErrorStack
-combineErrors ce err = go (ErrorStack [ce]) err
-  where 
-  go (ErrorStack xs) (ErrorStack ys) = ErrorStack (xs ++ ys)
-  go (MultipleErrors es) x = MultipleErrors [ go e x | e <- es ]
-  go x (MultipleErrors es) = MultipleErrors [ go x e | e <- es ]
+    errs -> throwError $ fold errs

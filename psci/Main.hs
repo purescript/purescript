@@ -531,7 +531,7 @@ handleKindOf typ = do
           let chk = P.CheckState env' 0 0 (Just mName)
               k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
           case k of
-            Left errStack   -> PSCI . outputStrLn . P.prettyPrintErrorStack False $ errStack
+            Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
         Nothing -> PSCI $ outputStrLn "Could not find kind"
 

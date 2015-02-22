@@ -96,9 +96,9 @@ compile' env ms prefix = do
   additional <- asks optionsAdditional
   mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
   (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
-  (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ desugar sorted
+  (desugared, nextVar) <- interpretMultipleErrors True $ runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
-  regrouped <- stringifyErrorStack True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  regrouped <- interpretMultipleErrors True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
   let entryPoints = moduleNameFromString `map` entryPointModules additional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
@@ -192,7 +192,7 @@ make outputDir ms prefix = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  (desugared, nextVar) <- stringifyErrorStack True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
+  (desugared, nextVar) <- interpretMultipleErrors True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
   evalSupplyT nextVar $ go initEnvironment desugared
 
@@ -212,7 +212,7 @@ make outputDir ms prefix = do
 
     (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
 
-    regrouped <- stringifyErrorStack True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- interpretMultipleErrors True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module coms moduleName' regrouped exps
     let corefn = CoreFn.moduleToCoreFn env' mod'

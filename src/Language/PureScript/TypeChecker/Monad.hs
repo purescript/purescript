@@ -109,7 +109,7 @@ makeBindingGroupVisible action = do
 -- |
 -- Lookup the type of a value by name in the @Environment@
 --
-lookupVariable :: (e ~ ErrorStack, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m Type
+lookupVariable :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m Type
 lookupVariable currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
@@ -119,7 +119,7 @@ lookupVariable currentModule (Qualified moduleName var) = do
 -- |
 -- Lookup the visibility of a value by name in the @Environment@
 --
-getVisibility :: (e ~ ErrorStack, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m NameVisibility
+getVisibility :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m NameVisibility
 getVisibility currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
@@ -129,7 +129,7 @@ getVisibility currentModule (Qualified moduleName var) = do
 -- |
 -- Assert that a name is visible
 --
-checkVisibility :: (e ~ ErrorStack, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m ()
+checkVisibility :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified Ident -> m ()
 checkVisibility currentModule name@(Qualified _ var) = do
   vis <- getVisibility currentModule name
   case vis of
@@ -139,7 +139,7 @@ checkVisibility currentModule name@(Qualified _ var) = do
 -- |
 -- Lookup the kind of a type by name in the @Environment@
 --
-lookupTypeVariable :: (e ~ ErrorStack, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified ProperName -> m Kind
+lookupTypeVariable :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m) => ModuleName -> Qualified ProperName -> m Kind
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
@@ -171,8 +171,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either ErrorStack) a }
-  deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError ErrorStack)
+newtype Check a = Check { unCheck :: StateT CheckState (Either MultipleErrors) a }
+  deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError MultipleErrors)
 
 -- |
 -- Get the current @Environment@
@@ -204,9 +204,9 @@ runCheck = runCheck' initEnvironment
 runCheck' :: (MonadReader (Options mode) m, MonadError String m) => Environment -> Check a -> m (a, Environment)
 runCheck' env c = do
   verbose <- asks optionsVerboseErrors
-  stringifyErrorStack verbose $ do
-  (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
-  return (a, checkEnv s)
+  interpretMultipleErrors verbose $ do
+    (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
+    return (a, checkEnv s)
 
 -- |
 -- Make an assertion, failing with an error message

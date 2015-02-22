@@ -58,7 +58,7 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
-desugar :: (Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
+desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugar = map removeSignedLiterals
           >>> mapM desugarObjectConstructors
           >=> mapM desugarOperatorSections

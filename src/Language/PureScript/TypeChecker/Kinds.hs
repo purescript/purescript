@@ -192,7 +192,7 @@ infer' other = (, []) <$> go other
   go c@(TypeConstructor v) = do
     env <- liftCheck getEnv
     case M.lookup v (types env) of
-      Nothing -> UnifyT . lift . throwError $ mkErrorStack "Unknown type constructor" (Just (TypeError c))
+      Nothing -> UnifyT . lift . throwError $ mkMultipleErrors "Unknown type constructor" (Just (TypeError c))
       Just (kind, _) -> return kind
   go (TypeApp t1 t2) = do
     k0 <- fresh

@@ -35,10 +35,10 @@ import Control.Monad.Supply.Class
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
 -- and all @DoNotationLet@ constructors with let expressions.
 --
-desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> m Module
+desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
 desugarDoModule (Module coms mn ds exts) = Module coms mn <$> parU ds desugarDo <*> pure exts
 
-desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError ErrorStack m) => Declaration -> m Declaration
+desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (rethrowWithPosition pos $ desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
@@ -61,7 +61,7 @@ desugarDo d =
   go (DoNotationValue val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
-  go [DoNotationBind _ _] = throwError $ mkErrorStack "Bind statement cannot be the last statement in a do block" Nothing
+  go [DoNotationBind _ _] = throwError $ mkMultipleErrors "Bind statement cannot be the last statement in a do block" Nothing
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
@@ -70,7 +70,7 @@ desugarDo d =
     rest' <- go rest
     ident <- Ident <$> freshName
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
-  go [DoNotationLet _] = throwError $ mkErrorStack "Let statement cannot be the last statement in a do block" Nothing
+  go [DoNotationLet _] = throwError $ mkMultipleErrors "Let statement cannot be the last statement in a do block" Nothing
   go (DoNotationLet ds : rest) = do
     rest' <- go rest
     return $ Let ds rest'

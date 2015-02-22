@@ -83,7 +83,7 @@ replaceAllTypeSynonyms' env d =
   in
     saturateAllTypeSynonyms syns d
 
-replaceAllTypeSynonyms :: (e ~ ErrorStack, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+replaceAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either (throwError . strMsg) return $ replaceAllTypeSynonyms' env d
@@ -99,12 +99,12 @@ expandTypeSynonym' env name args =
       replaceAllTypeSynonyms' env repl
     Nothing -> error "Type synonym was not defined"
 
-expandTypeSynonym :: (e ~ ErrorStack, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
+expandTypeSynonym :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
   either (throwError . strMsg) return $ expandTypeSynonym' env name args
 
-expandAllTypeSynonyms :: (e ~ ErrorStack, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+expandAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 expandAllTypeSynonyms = everywhereOnTypesTopDownM go
   where
   go (SaturatedTypeSynonym name args) = expandTypeSynonym name args

@@ -568,7 +568,7 @@ check' val kt@(KindedType ty kind) = do
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
   rethrowWithPosition pos $ check' val ty
-check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
+check' val ty = throwError $ mkMultipleErrors ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everythingOnTypes (||) go where
@@ -589,8 +589,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
-  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
+                      | otherwise = throwError $ mkMultipleErrors ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
+  go ((p,_):_) [] REmpty = throwError $ mkMultipleErrors ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
@@ -603,7 +603,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ExprError (ObjectLiteral ps)))
+  go _ _ _ = throwError $ mkMultipleErrors ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ExprError (ObjectLiteral ps)))
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
