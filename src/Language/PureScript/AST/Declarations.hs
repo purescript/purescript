@@ -261,11 +261,18 @@ isExternDecl (PositionedDeclaration _ _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
--- Test if a declaration is a type class or instance declaration
+-- Test if a declaration is a type class instance declaration
+--
+isTypeClassInstanceDeclaration :: Declaration -> Bool
+isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
+isTypeClassInstanceDeclaration (PositionedDeclaration _ _ d) = isTypeClassInstanceDeclaration d
+isTypeClassInstanceDeclaration _ = False
+
+-- |
+-- Test if a declaration is a type class declaration
 --
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration (PositionedDeclaration _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
