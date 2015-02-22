@@ -40,19 +40,19 @@ import Language.PureScript.Types
 -- |
 -- Build a type substitution for a type synonym
 --
-buildTypeSubstitution :: Qualified ProperName -> Int -> Type -> Either String (Maybe Type)
+buildTypeSubstitution :: Qualified ProperName -> Int -> Type -> Either ErrorMessage (Maybe Type)
 buildTypeSubstitution name n = go n []
   where
-  go :: Int -> [Type] -> Type -> Either String (Maybe Type)
+  go :: Int -> [Type] -> Type -> Either ErrorMessage (Maybe Type)
   go 0 args (TypeConstructor ctor) | name == ctor = return (Just $ SaturatedTypeSynonym ctor args)
-  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ "Partially applied type synonym " ++ show name
+  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ PartiallyAppliedSynonym name
   go m args (TypeApp f arg) = go (m - 1) (arg:args) f
   go _ _ _ = return Nothing
 
 -- |
 -- Replace all instances of a specific type synonym with the @SaturatedTypeSynonym@ data constructor
 --
-saturateTypeSynonym :: Qualified ProperName -> Int -> Type -> Either String Type
+saturateTypeSynonym :: Qualified ProperName -> Int -> Type -> Either ErrorMessage Type
 saturateTypeSynonym name n = everywhereOnTypesTopDownM replace
   where
   replace t = fromMaybe t <$> buildTypeSubstitution name n t
@@ -60,7 +60,7 @@ saturateTypeSynonym name n = everywhereOnTypesTopDownM replace
 -- |
 -- Replace all type synonyms with the @SaturatedTypeSynonym@ data constructor
 --
-saturateAllTypeSynonyms :: [(Qualified ProperName, Int)] -> Type -> Either String Type
+saturateAllTypeSynonyms :: [(Qualified ProperName, Int)] -> Type -> Either ErrorMessage Type
 saturateAllTypeSynonyms syns d = foldM (\result (name, n) -> saturateTypeSynonym name n result) d syns
 
 -- |
@@ -76,7 +76,7 @@ desaturateAllTypeSynonyms = everywhereOnTypes replaceSaturatedTypeSynonym
 -- Replace fully applied type synonyms with the @SaturatedTypeSynonym@ data constructor, which helps generate
 -- better error messages during unification.
 --
-replaceAllTypeSynonyms' :: Environment -> Type -> Either String Type
+replaceAllTypeSynonyms' :: Environment -> Type -> Either ErrorMessage Type
 replaceAllTypeSynonyms' env d =
   let
     syns = map (\(name, (args, _)) -> (name, length args)) . M.toList $ typeSynonyms env
@@ -86,12 +86,12 @@ replaceAllTypeSynonyms' env d =
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  either (throwError . strMsg) return $ replaceAllTypeSynonyms' env d
+  either (throwError . errorMessage) return $ replaceAllTypeSynonyms' env d
 
 -- |
 -- Replace a type synonym and its arguments with the aliased type
 --
-expandTypeSynonym' :: Environment -> Qualified ProperName -> [Type] -> Either String Type
+expandTypeSynonym' :: Environment -> Qualified ProperName -> [Type] -> Either ErrorMessage Type
 expandTypeSynonym' env name args =
   case M.lookup name (typeSynonyms env) of
     Just (synArgs, body) -> do
@@ -102,7 +102,7 @@ expandTypeSynonym' env name args =
 expandTypeSynonym :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
-  either (throwError . strMsg) return $ expandTypeSynonym' env name args
+  either (throwError . errorMessage) return $ expandTypeSynonym' env name args
 
 expandAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 expandAllTypeSynonyms = everywhereOnTypesTopDownM go

@@ -181,18 +181,17 @@ toBindingGroup moduleName (CyclicSCC ds') =
 
   cycleError :: (MonadError MultipleErrors m) => Declaration -> [Declaration] -> m a
   cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
-  cycleError (ValueDeclaration n _ _ (Right e)) [] = throwError $
-    mkMultipleErrors ("Cycle in definition of " ++ show n) (Just (ExprError e))
-  cycleError d ds@(_:_) = rethrow (mkCompileError ("The following are not yet defined here: " ++ unwords (map (show . getIdent) ds)) Nothing `combineErrors`) $ cycleError d []
+  cycleError (ValueDeclaration n _ _ (Right _)) [] = throwError . errorMessage $ CycleInDeclaration n
+  cycleError d ds@(_:_) = rethrow (onErrorMessages (NotYetDefined (map getIdent ds))) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
 
 toDataBindingGroup :: (MonadError MultipleErrors m) => SCC Declaration -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError $ mkMultipleErrors ("Cycle in type synonym " ++ show pn) Nothing
+  Just pn -> throwError . errorMessage $ CycleInTypeSynonym (Just pn)
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError $ mkMultipleErrors "Cycle in type synonyms" Nothing
+  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing
   | otherwise = return $ DataBindingGroupDeclaration ds'
 
 isTypeSynonym :: Declaration -> Maybe ProperName

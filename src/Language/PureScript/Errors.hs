@@ -59,9 +59,20 @@ data ErrorMessage
   | ClassConflictsWithCtor ProperName
   | DuplicateClassExport ProperName
   | DuplicateValueExport Ident
+  | InvalidDoBind
+  | InvalidDoLet
+  | CycleInDeclaration Ident
+  | CycleInTypeSynonym (Maybe ProperName)
+  | NameIsUndefined Ident
+  | NameNotInScope Ident
+  | UndefinedTypeVariable ProperName
+  | PartiallyAppliedSynonym (Qualified ProperName)
+  | NotYetDefined [Ident] ErrorMessage
+  | EscapedSkolem (Maybe Expr)
+  | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | PositionedError SourceSpan ErrorMessage
-  deriving (Show, Eq)
+  deriving (Show)
   
 instance UnificationError Type ErrorMessage where
   occursCheckFailed = InfiniteType
@@ -73,6 +84,8 @@ instance UnificationError Kind ErrorMessage where
 -- Pretty print an ErrorMessage
 --
 prettyPrintErrorMessage :: ErrorMessage -> String
+prettyPrintErrorMessage InvalidDoBind                   = "Bind statement cannot be the last statement in a do block"
+prettyPrintErrorMessage InvalidDoLet                    = "Let statement cannot be the last statement in a do block"
 prettyPrintErrorMessage CannotReorderOperators          = "Unable to reorder operators"
 prettyPrintErrorMessage OverlappingNamesInLet           = "Overlapping names in let binding."
 prettyPrintErrorMessage (InfiniteType ty)               = "Infinite type detected: " ++ prettyPrintType ty
@@ -95,14 +108,23 @@ prettyPrintErrorMessage (ClassConflictsWithType nm)     = "Type class " ++ show 
 prettyPrintErrorMessage (ClassConflictsWithCtor nm)     = "Type class " ++ show nm ++ " conflicts with data constructor declaration of the same name"
 prettyPrintErrorMessage (DuplicateClassExport nm)       = "Duplicate export declaration for type class " ++ show nm
 prettyPrintErrorMessage (DuplicateValueExport nm)       = "Duplicate export declaration for value " ++ show nm
-prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ": " ++ prettyPrintErrorMessage err
-prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ": \n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (CycleInDeclaration nm)         = "Cycle in declaration of " ++ show nm
+prettyPrintErrorMessage (NotYetDefined names err)       = "The following are not yet defined here: " ++ unwords (map show names) ++ "\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (CycleInTypeSynonym pn)         = "Cycle in type synonym" ++ foldMap ((" " ++) . show) pn
+prettyPrintErrorMessage (NameIsUndefined ident)         = show ident ++ " is undefined"
+prettyPrintErrorMessage (NameNotInScope ident)          = show ident ++ " may not be defined in the current scope"
+prettyPrintErrorMessage (UndefinedTypeVariable name)    = "Type variable " ++ show name ++ " is undefined"
+prettyPrintErrorMessage (PartiallyAppliedSynonym name)  = "Partially applied type synonym " ++ show name
+prettyPrintErrorMessage (EscapedSkolem binding)         = "Rigid/skolem type variable " ++ foldMap (("bound by " ++) . prettyPrintValue) binding ++ " has escaped."
+prettyPrintErrorMessage (ErrorInExpression expr err)    = "Error in expression " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ":\n" ++ prettyPrintErrorMessage err
 
 -- |
 -- A stack trace for an error
 --
 newtype MultipleErrors = MultipleErrors 
-  { runMultipleErrors :: [ErrorMessage] } deriving (Show, Eq, Monoid)
+  { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
 
 -- |
 -- Simplify an error message
@@ -111,7 +133,9 @@ simplifyErrorMessage :: ErrorMessage -> ErrorMessage
 simplifyErrorMessage = unwrap Nothing
   where
   unwrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
+  unwrap pos (ErrorInExpression _ err) = unwrap pos err
   unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
+  unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
   unwrap _   (PositionedError pos err) = unwrap (Just pos) err
   unwrap pos other = wrap pos other
   

@@ -89,7 +89,7 @@ skolemEscapeCheck root@TypedValue{} =
   let (_, f, _, _, _) = everythingWithContextOnValues [] [] (++) def go def def def
   in case f root of
        [] -> return ()
-       ((binding, val) : _) -> throwError $ mkMultipleErrors ("Rigid/skolem type variable " ++ maybe "" (("bound by " ++) . prettyPrintValue) binding ++ " has escaped.") (Just (ExprError val))
+       ((binding, val) : _) -> throwError . errorMessage . ErrorInExpression val $ EscapedSkolem binding
   where
   def s _ = (s, [])
 
@@ -112,4 +112,4 @@ skolemEscapeCheck root@TypedValue{} =
     where
     go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = First (Just val)
     go' _ = mempty
-skolemEscapeCheck val = throwError $ mkMultipleErrors "Untyped value passed to skolemEscapeCheck" (Just (ExprError val))
+skolemEscapeCheck val = error "Untyped value passed to skolemEscapeCheck"

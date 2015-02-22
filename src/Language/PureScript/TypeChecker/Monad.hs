@@ -113,7 +113,7 @@ lookupVariable :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, Monad
 lookupVariable currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
-    Nothing -> throwError . strMsg $ show var ++ " is undefined"
+    Nothing -> throwError . errorMessage $ NameIsUndefined var
     Just (ty, _, _) -> return ty
 
 -- |
@@ -123,7 +123,7 @@ getVisibility :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadE
 getVisibility currentModule (Qualified moduleName var) = do
   env <- getEnv
   case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
-    Nothing -> throwError . strMsg $ show var ++ " is undefined"
+    Nothing -> throwError . errorMessage $ NameIsUndefined var
     Just (_, _, vis) -> return vis
 
 -- |
@@ -133,7 +133,7 @@ checkVisibility :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, Mona
 checkVisibility currentModule name@(Qualified _ var) = do
   vis <- getVisibility currentModule name
   case vis of
-    Undefined -> throwError . strMsg $ show var ++ " may not be defined in the current scope."
+    Undefined -> throwError . errorMessage $ NameNotInScope var
     _ -> return ()
 
 -- |
@@ -143,7 +143,7 @@ lookupTypeVariable :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, M
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
-    Nothing -> throwError . strMsg $ "Type variable " ++ show name ++ " is undefined"
+    Nothing -> throwError . errorMessage $ UndefinedTypeVariable name
     Just (k, _) -> return k
 
 -- |

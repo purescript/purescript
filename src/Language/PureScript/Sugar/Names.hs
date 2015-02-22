@@ -364,7 +364,7 @@ filterExports mn exps env = do
   filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> m [(ProperName, [ProperName])]
   filterTypes expTys result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterTypes expTys result r
   filterTypes expTys result (TypeRef name expDcons) = do
-    dcons <- maybe (throwError . errorMessage $ UnknownType name) return $ name `lookup` expTys
+    dcons <- maybe (throwError . errorMessage . UnknownType $ Qualified (Just mn) name) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
     return $ (name, dcons') : result
   filterTypes _ result _ = return result
@@ -374,7 +374,7 @@ filterExports mn exps env = do
   filterDcons tcon exps' result name =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage $ UnknownDataConstructor name (Just tcon)
+    else throwError . errorMessage $ UnknownDataConstructor (Qualified (Just mn) name) (Just (Qualified (Just mn) tcon))
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
   filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> m [ProperName]
@@ -382,7 +382,7 @@ filterExports mn exps env = do
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage $ UnknownTypeClass name
+    else throwError . errorMessage . UnknownTypeClass $ Qualified (Just mn) name
   filterClasses _ result _ = return result
 
   -- Ensure the exported values exist in the module and add them to the set of exports
@@ -391,7 +391,7 @@ filterExports mn exps env = do
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage $ UnknownValue name
+    else throwError . errorMessage . UnknownValue $ Qualified (Just mn) name
   filterValues _ result _ = return result
 
 -- |
@@ -511,7 +511,7 @@ resolveImport currentModule importModule exps imps impQual =
   updateImports m name = case M.lookup (Qualified impQual name) m of
     Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
-    Just x@(Qualified (Just mn) _) -> throwError . errorMessage $ err
+    Just (Qualified (Just mn) _) -> throwError . errorMessage $ err
       where
       err = if mn == currentModule || importModule == currentModule
             then ConflictingImport (show name) mn
