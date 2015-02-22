@@ -31,36 +31,12 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
-
--- |
--- A simplified representation of expressions which are used to represent type
--- class dictionaries at runtime, which can be compared for equality
---
-data DictionaryValue
-  -- |
-  -- A dictionary which is brought into scope by a local constraint
-  --
-  = LocalDictionaryValue (Qualified Ident)
-  -- |
-  -- A dictionary which is brought into scope by an instance declaration
-  --
-  | GlobalDictionaryValue (Qualified Ident)
-  -- |
-  -- A dictionary which depends on other dictionaries
-  --
-  | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
-  -- |
-  -- A subclass dictionary
-  --
-  | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
-  deriving (Show, Ord, Eq)
 
 -- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
@@ -140,16 +116,9 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       checkOverlaps :: [DictionaryValue] -> Check Expr
       checkOverlaps dicts =
         case [ (d1, d2) | d1 <- dicts, d2 <- dicts, d1 `overlapping` d2 ] of
-          (d1, d2) : _ -> throwError . strMsg $ unlines
-            [ "Overlapping instances found for " ++ show className ++ " " ++ unwords (map prettyPrintType tys) ++ "."
-            , "For example:"
-            , prettyPrintDictionaryValue d1
-            , "and:"
-            , prettyPrintDictionaryValue d2
-            ]
+          ds@(_ : _) -> throwError . errorMessage $ OverlappingInstances className tys (map fst ds)
           _ -> case chooseSimplestDictionaries dicts of
-                 [] -> throwError . strMsg $
-                         "No instance found for " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)
+                 [] -> throwError . errorMessage $ NoInstanceFound className tys
                  d : _ -> return $ dictionaryValueToValue d
       -- Choose the simplest DictionaryValues from a list of candidates
       -- The reason for this function is as follows:
@@ -180,18 +149,6 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       overlapping SubclassDictionaryValue{} _ = False
       overlapping _ SubclassDictionaryValue{} = False
       overlapping _ _ = True
-      -- |
-      -- Render a DictionaryValue fit for human consumption in error messages
-      --
-      prettyPrintDictionaryValue :: DictionaryValue -> String
-      prettyPrintDictionaryValue = unlines . indented 0
-        where
-        indented n (LocalDictionaryValue _)           = [spaces n ++ "Dictionary in scope"]
-        indented n (GlobalDictionaryValue nm)         = [spaces n ++ show nm]
-        indented n (DependentDictionaryValue nm args) = (spaces n ++ show nm ++ " via") : concatMap (indented (n + 2)) args
-        indented n (SubclassDictionaryValue sup nm _) = (spaces n ++ show nm ++ " via superclass") : indented (n + 2) sup
-
-        spaces n = replicate n ' ' ++ "- "
 
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))

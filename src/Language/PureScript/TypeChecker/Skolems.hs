@@ -31,7 +31,6 @@ import Control.Monad.Unify
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
@@ -112,4 +111,4 @@ skolemEscapeCheck root@TypedValue{} =
     where
     go' val@(TypedValue _ _ (ForAll _ _ (Just sco'))) | sco == sco' = First (Just val)
     go' _ = mempty
-skolemEscapeCheck val = error "Untyped value passed to skolemEscapeCheck"
+skolemEscapeCheck _ = error "Untyped value passed to skolemEscapeCheck"

@@ -32,6 +32,7 @@ import Language.PureScript.Pretty
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import Language.PureScript.TypeClassDictionaries
 
 -- |
 -- A type of error messages
@@ -49,6 +50,7 @@ data ErrorMessage
   | UnknownTypeClass (Qualified ProperName)
   | UnknownValue (Qualified Ident)
   | UnknownDataConstructor (Qualified ProperName) (Maybe (Qualified ProperName))
+  | UnknownTypeConstructor (Qualified ProperName)
   | ConflictingImport String ModuleName
   | ConflictingImports String ModuleName ModuleName  
   | ConflictingTypeDecls ProperName
@@ -69,8 +71,23 @@ data ErrorMessage
   | PartiallyAppliedSynonym (Qualified ProperName)
   | NotYetDefined [Ident] ErrorMessage
   | EscapedSkolem (Maybe Expr)
+  | UnspecifiedSkolemScope
+  | TypesDoNotUnify Type Type
+  | KindsDoNotUnify Kind Kind
+  | ConstrainedTypeUnified Type Type
+  | OverlappingInstances (Qualified ProperName) [Type] [DictionaryValue]
+  | NoInstanceFound (Qualified ProperName) [Type]
+  | DuplicateLabel String Expr
+  | DuplicateValueDeclaration Ident
+  | ArgListLengthsDiffer Ident
+  | OverlappingArgNames Ident
+  | MissingClassMember Ident
+  | ErrorUnifyingTypes Type Type ErrorMessage
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
+  | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
+  | ErrorInSubsumption Type Type ErrorMessage
+  | ErrorCheckingKind Type ErrorMessage
   | PositionedError SourceSpan ErrorMessage
   deriving (Show)
   
@@ -87,16 +104,18 @@ prettyPrintErrorMessage :: ErrorMessage -> String
 prettyPrintErrorMessage InvalidDoBind                   = "Bind statement cannot be the last statement in a do block"
 prettyPrintErrorMessage InvalidDoLet                    = "Let statement cannot be the last statement in a do block"
 prettyPrintErrorMessage CannotReorderOperators          = "Unable to reorder operators"
+prettyPrintErrorMessage UnspecifiedSkolemScope          = "Skolem variable scope is unspecified"
 prettyPrintErrorMessage OverlappingNamesInLet           = "Overlapping names in let binding."
 prettyPrintErrorMessage (InfiniteType ty)               = "Infinite type detected: " ++ prettyPrintType ty
 prettyPrintErrorMessage (InfiniteKind ki)               = "Infinite kind detected: " ++ prettyPrintKind ki
 prettyPrintErrorMessage (MultipleFixities name)         = "Multiple fixity declarations for " ++ show name
 prettyPrintErrorMessage (OrphanTypeDeclaration pn)      = "Orphan type declaration for: " ++ show pn
 prettyPrintErrorMessage (RedefinedModule name)          = "Module " ++ show name ++ " has been defined multiple times"
-prettyPrintErrorMessage (UnknownModule mn)              = "Unknown module: " ++ show mn
-prettyPrintErrorMessage (UnknownType name)              = "Unknown type: " ++ show name
-prettyPrintErrorMessage (UnknownTypeClass name)         = "Unknown type class: " ++ show name
-prettyPrintErrorMessage (UnknownValue name)             = "Unknown value: " ++ show name
+prettyPrintErrorMessage (UnknownModule mn)              = "Unknown module " ++ show mn
+prettyPrintErrorMessage (UnknownType name)              = "Unknown type " ++ show name
+prettyPrintErrorMessage (UnknownTypeClass name)         = "Unknown type class " ++ show name
+prettyPrintErrorMessage (UnknownValue name)             = "Unknown value " ++ show name
+prettyPrintErrorMessage (UnknownTypeConstructor name)   = "Unknown type constructor " ++ show name
 prettyPrintErrorMessage (UnknownDataConstructor dc tc)  = "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
 prettyPrintErrorMessage (ConflictingImport nm mn)       = "Declaration " ++ nm ++ " conflicts with import " ++ show mn 
 prettyPrintErrorMessage (ConflictingImports nm m1 m2)   = "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
@@ -116,15 +135,49 @@ prettyPrintErrorMessage (NameNotInScope ident)          = show ident ++ " may no
 prettyPrintErrorMessage (UndefinedTypeVariable name)    = "Type variable " ++ show name ++ " is undefined"
 prettyPrintErrorMessage (PartiallyAppliedSynonym name)  = "Partially applied type synonym " ++ show name
 prettyPrintErrorMessage (EscapedSkolem binding)         = "Rigid/skolem type variable " ++ foldMap (("bound by " ++) . prettyPrintValue) binding ++ " has escaped."
+prettyPrintErrorMessage (TypesDoNotUnify t1 t2)         = "Cannot unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2
+prettyPrintErrorMessage (KindsDoNotUnify k1 k2)         = "Cannot unify " ++ prettyPrintKind k1 ++ " with " ++ prettyPrintKind k2
+prettyPrintErrorMessage (ConstrainedTypeUnified t1 t2)  = "Cannot unify constrained type " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2
+prettyPrintErrorMessage (OverlappingInstances nm ts ds) = unlines (("Overlapping instances found for " ++ show nm ++ " " ++ unwords (map prettyPrintType ts) ++ ":")
+                                                                  : map prettyPrintDictionaryValue ds)
+prettyPrintErrorMessage (NoInstanceFound nm ts)         = "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
+prettyPrintErrorMessage (DuplicateLabel l expr)         = "Duplicate label " ++ show l ++ " in row. Relevant expression: " ++ prettyPrintValue expr
+prettyPrintErrorMessage (DuplicateValueDeclaration nm)  = "Duplicate value declaration for " ++ show nm
+prettyPrintErrorMessage (ArgListLengthsDiffer ident)    = "Argument list lengths differ in declaration " ++ show ident
+prettyPrintErrorMessage (OverlappingArgNames ident)     = "Overlapping function argument names in declaration" ++ show ident
+prettyPrintErrorMessage (MissingClassMember ident)      = "Member " ++ show ident ++ " has not been implemented"
+prettyPrintErrorMessage (ErrorUnifyingTypes t1 t2 err)  = "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInExpression expr err)    = "Error in expression " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInSubsumption t1 t2 err)  = "Error checking that type " ++ prettyPrintType t1 ++ " subsumes type " ++ prettyPrintType t2 ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInInstance name ts err)   = "Error in type class instance " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorCheckingKind ty err)      = "Error checking kind of type " ++ prettyPrintType ty ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ":\n" ++ prettyPrintErrorMessage err
 
+-- |
+-- Render a DictionaryValue fit for human consumption in error messages
+--
+prettyPrintDictionaryValue :: DictionaryValue -> String
+prettyPrintDictionaryValue = unlines . indented 0
+  where
+  indented n (LocalDictionaryValue _)           = [spaces n ++ "Dictionary in scope"]
+  indented n (GlobalDictionaryValue nm)         = [spaces n ++ show nm]
+  indented n (DependentDictionaryValue nm args) = (spaces n ++ show nm ++ " via") : concatMap (indented (n + 2)) args
+  indented n (SubclassDictionaryValue sup nm _) = (spaces n ++ show nm ++ " via superclass") : indented (n + 2) sup
+
+  spaces n = replicate n ' ' ++ "- "
+  
 -- |
 -- A stack trace for an error
 --
 newtype MultipleErrors = MultipleErrors 
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
+  
+instance UnificationError Type MultipleErrors where
+  occursCheckFailed = errorMessage . occursCheckFailed
+  
+instance UnificationError Kind MultipleErrors where
+  occursCheckFailed = errorMessage . occursCheckFailed
 
 -- |
 -- Simplify an error message
@@ -134,6 +187,10 @@ simplifyErrorMessage = unwrap Nothing
   where
   unwrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
   unwrap pos (ErrorInExpression _ err) = unwrap pos err
+  unwrap pos (ErrorInInstance name ts err) = ErrorInInstance name ts (unwrap pos err)
+  unwrap pos (ErrorInSubsumption t1 t2 err) = ErrorInSubsumption t1 t2 (unwrap pos err)
+  unwrap pos (ErrorUnifyingTypes _ _ err) = unwrap pos err
+  unwrap pos (ErrorCheckingKind ty err) = ErrorCheckingKind ty (unwrap pos err)
   unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
   unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
   unwrap _   (PositionedError pos err) = unwrap (Just pos) err

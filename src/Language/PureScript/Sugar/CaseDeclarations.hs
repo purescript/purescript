@@ -46,7 +46,7 @@ isLeft (Right _) = False
 --
 desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module coms name ds exps) ->
-  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
+  rethrow (onErrorMessages (ErrorInModule name)) $
     Module coms name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
@@ -93,14 +93,14 @@ toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
-  guardWith (strMsg "Overlapping function argument names") $ length (nub args) == length args
+  guardWith (errorMessage (OverlappingArgNames ident)) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
-      throwError $ mkMultipleErrors ("Argument list lengths differ in declaration " ++ show ident) Nothing
+      throwError . errorMessage $ ArgListLengthsDiffer ident
   unless (not (null bs) || isLeft result) $
-      throwError $ mkMultipleErrors ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
+      throwError . errorMessage $ DuplicateValueDeclaration ident
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
 toDecls (PositionedDeclaration pos com d : ds) = do

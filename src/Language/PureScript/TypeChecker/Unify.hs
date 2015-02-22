@@ -34,7 +34,6 @@ import Control.Monad.Unify
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Synonyms
@@ -60,7 +59,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (mkCompileError ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing `combineErrors`) $
+unifyTypes t1 t2 = rethrow (onErrorMessages (ErrorUnifyingTypes t1 t2)) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
@@ -82,11 +81,11 @@ unifyTypes t1 t2 = rethrow (mkCompileError ("Error unifying type " ++ prettyPrin
     sko <- newSkolemConstant
     let sk = skolemize ident sko sc ty1
     sk `unifyTypes` ty2
-  unifyTypes' ForAll{} _ = throwError . strMsg $ "Skolem variable scope is unspecified"
+  unifyTypes' ForAll{} _ = throwError . errorMessage $ UnspecifiedSkolemScope
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
-  unifyTypes' (TypeConstructor c1) (TypeConstructor c2) =
-    guardWith (strMsg ("Cannot unify " ++ show c1 ++ " with " ++ show c2 ++ ".")) (c1 == c2)
+  unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
+    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
@@ -97,9 +96,9 @@ unifyTypes t1 t2 = rethrow (mkCompileError ("Error unifying type " ++ prettyPrin
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
-  unifyTypes' t@(ConstrainedType _ _) _ = throwError . strMsg $ "Attempted to unify a constrained type " ++ prettyPrintType t ++ " with another type."
+  unifyTypes' ty1@(ConstrainedType _ _) ty2 = throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
-  unifyTypes' t3 t4 = throwError . strMsg $ "Cannot unify " ++ prettyPrintType t3 ++ " with " ++ prettyPrintType t4 ++ "."
+  unifyTypes' t3 t4 = throwError . errorMessage $ TypesDoNotUnify t3 t4
 
 -- |
 -- Unify two rows, updating the current substitution
@@ -136,7 +135,7 @@ unifyRows r1 r2 =
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
-  unifyRows' sd3 r3 sd4 r4 = throwError . strMsg $ "Cannot unify (" ++ prettyPrintRow (rowFromList (sd3, r3)) ++ ") with (" ++ prettyPrintRow (rowFromList (sd4, r4)) ++ ")"
+  unifyRows' sd3 r3 sd4 r4 = throwError . errorMessage $ TypesDoNotUnify (rowFromList (sd3, r3)) (rowFromList (sd4, r4))
 
 -- |
 -- Check that two types unify

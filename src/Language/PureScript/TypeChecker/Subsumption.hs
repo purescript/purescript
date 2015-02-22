@@ -20,14 +20,12 @@ module Language.PureScript.TypeChecker.Subsumption (
 import Data.List (sortBy)
 import Data.Ord (comparing)
 
-import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Synonyms
@@ -38,12 +36,7 @@ import Language.PureScript.Types
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
 subsumes :: Maybe Expr -> Type -> Type -> UnifyT Type Check (Maybe Expr)
-subsumes val ty1 ty2 = rethrow (mkCompileError errorMessage (ExprError <$> val) `combineErrors`) $ subsumes' val ty1 ty2
-  where
-  errorMessage = "Error checking that type "
-    ++ prettyPrintType ty1
-    ++ " subsumes type "
-    ++ prettyPrintType ty2
+subsumes val ty1 ty2 = rethrow (onErrorMessages (ErrorInSubsumption ty1 ty2)) $ subsumes' val ty1 ty2
 
 -- |
 -- Check whether one type subsumes another
@@ -58,7 +51,7 @@ subsumes' val ty1 (ForAll ident ty2 sco) =
       sko <- newSkolemConstant
       let sk = skolemize ident sko sco' ty2
       subsumes val ty1 sk
-    Nothing -> throwError . strMsg $ "Skolem variable scope is unspecified"
+    Nothing -> throwError . errorMessage $ UnspecifiedSkolemScope
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
   _ <- subsumes Nothing arg2 arg1
   _ <- subsumes Nothing ret1 ret2

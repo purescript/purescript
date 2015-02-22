@@ -27,7 +27,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 import Language.PureScript.Sugar.CaseDeclarations
 import Control.Monad.Supply.Class
 import Language.PureScript.Types
@@ -226,16 +225,16 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (mkCompileError ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") Nothing `combineErrors`) $ do
+  rethrow (onErrorMessages (ErrorInInstance className tys)) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
   (TypeClassDeclaration _ args implies tyDecls) <-
-    maybe (throwError $ mkMultipleErrors ("Type class " ++ show className ++ " is undefined") Nothing) return $
+    maybe (throwError . errorMessage $ UnknownTypeClass className) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
-    x : _ -> throwError $ mkMultipleErrors ("Member '" ++ show x ++ "' has not been implemented") Nothing
+    member : _ -> throwError . errorMessage $ MissingClassMember member
     [] -> do
 
       let instanceTys = map memberToNameAndType tyDecls
@@ -272,7 +271,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- maybe (throwError $ mkMultipleErrors ("Type class does not define member '" ++ show ident ++ "'") Nothing) return $ lookup ident tys'
+    _ <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d
