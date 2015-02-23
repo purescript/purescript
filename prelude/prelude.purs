@@ -61,10 +61,10 @@ module Prelude
   infixr 9 >>>
   infixr 9 <<<
 
-  -- | Semigroupoids are Categories, less `id`, which is to say they consist of objects and
-  -- | morphisms between them which can be composed.
+  -- | A `Semigroupoid` is similar to a [`Category`](#Category) but does not require an identity
+  -- | element `id`, just composable morphisms.
   -- |
-  -- | Semigroupoids should obey the following rule:
+  -- | `Semigroupoid`s should obey the following rule:
   -- |
   -- | Association
   -- |     forall p q r. p <<< (q <<< r) = (p <<< q) <<< r
@@ -78,13 +78,10 @@ module Prelude
   (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
   (>>>) f g = g <<< f
 
-  -- | Categories consist of objects and composable morphisms between them, and as such are
-  -- | semigroupoids, but unlike semigroupoids must have an identity element.
+  -- | `Category`s consist of objects and composable morphisms between them, and as such are
+  -- | [`Semigroupoids`](#Semigroupoid), but unlike `semigroupoids` must have an identity element.
   -- |
-  -- | Categories should obey the following rules.
-  -- |
-  -- | Association (as semigroupoids)
-  -- |     forall p q r. p <<< (q <<< r) = (p <<< q) <<< r
+  -- | `Category`s should obey the following rules.
   -- |
   -- | Left Identity
   -- |     forall p. id <<< p = p
@@ -170,10 +167,10 @@ module Prelude
   infixl 4 <$>
   infixl 1 <#>
 
-  -- | A Functor is intuitively a type which can be mapped over, and more formally a mapping
-  -- | between categories that preserves structure.
+  -- | A `Functor` is intuitively a type which can be mapped over, and more formally a mapping
+  -- | between [`Category`](#Category)s that preserves structure.
   -- |
-  -- | Functors should obey the following rules.
+  -- | `Functor`s should obey the following rules.
   -- |
   -- | Identity
   -- |     (<$>) id = id
@@ -192,10 +189,10 @@ module Prelude
 
   infixl 4 <*>
 
-  -- | Applys are intuitively Applicatives less `pure`, and more formally a strong lax semi-
-  -- | -monoidal endofunctor.
+  -- | `Apply`s are intuitively [`Applicative`](#Applicative)s less `pure`, and more formally a
+  -- | strong lax semi-monoidal endofunctor.
   -- |
-  -- | Applys should obey the following rules.
+  -- | `Apply`s should obey the following rules.
   -- |
   -- | Associative Composition
   -- |     forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)
@@ -203,10 +200,10 @@ module Prelude
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
-  -- | Applicatives are Functors which can be "applied" by sequencing composition (<*>) or embedding
-  -- | pure expressions (pure).
+  -- | `Applicative`s are [`Functor`](#Functor)s which can be "applied" by sequencing composition
+  -- | (`<*>`) or embedding pure expressions (`pure`).
   -- |
-  -- | Applicatives should obey the following rules.
+  -- | `Applicative`s should obey the following rules.
   -- |
   -- | Identity
   -- |     forall v. (pure id) <*> v = v
@@ -228,23 +225,20 @@ module Prelude
 
   infixl 1 >>=
 
-  -- | A Bind is an Apply with a bind operation which sequentially composes actions.
+  -- | A `Bind` is an [`Apply`](#Apply) with a bind operation which sequentially composes actions.
   -- |
-  -- | A Bind should obey the following rule.
+  -- | `Bind`s should obey the following rule.
   -- |
-  -- | Associative (as Bind)
+  -- | Associativity
   -- |     forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)
   -- |
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
-  -- | Monad is a class which can be intuitively thought of as an abstract datatype of actions or
+  -- | `Monad` is a class which can be intuitively thought of as an abstract datatype of actions or
   -- | more formally though of as a monoid in the category of endofunctors.
   -- |
-  -- | A Monad should obey the following rules.
-  -- |
-  -- | Associative (as Bind)
-  -- |     forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)
+  -- | `Monad`s should obey the following rules.
   -- |
   -- | Left Identity
   -- |     forall f x. pure x >>= f = f x
