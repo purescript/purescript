@@ -19,7 +19,7 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intersperse)
+import Data.List (intersperse, intercalate)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
 
@@ -43,7 +43,9 @@ data ErrorMessage
   | CannotReorderOperators
   | MultipleFixities Ident
   | OrphanTypeDeclaration Ident
+  | OrphanFixityDeclaration String
   | RedefinedModule ModuleName
+  | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownModule ModuleName
   | UnknownType (Qualified ProperName)
@@ -61,6 +63,7 @@ data ErrorMessage
   | ClassConflictsWithCtor ProperName
   | DuplicateClassExport ProperName
   | DuplicateValueExport Ident
+  | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
@@ -89,6 +92,10 @@ data ErrorMessage
   | PropertyIsMissing String Type
   | ErrorUnifyingTypes Type Type ErrorMessage
   | CannotApplyFunction Type Expr
+  | TypeSynonymInstance
+  | InvalidNewtype
+  | InvalidInstanceHead Type
+  | TransitiveExportError DeclarationRef [DeclarationRef]
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
@@ -97,6 +104,13 @@ data ErrorMessage
   | ErrorCheckingKind Type ErrorMessage
   | ErrorInferringType Expr ErrorMessage
   | ErrorInApplication Expr Type Expr ErrorMessage
+  | ErrorInDataConstructor ProperName ErrorMessage
+  | ErrorInTypeConstructor ProperName ErrorMessage
+  | ErrorInBindingGroup [Ident] ErrorMessage
+  | ErrorInDataBindingGroup ErrorMessage
+  | ErrorInTypeSynonym ProperName ErrorMessage
+  | ErrorInValueDeclaration Ident ErrorMessage
+  | ErrorInForeignImport Ident ErrorMessage
   | PositionedError SourceSpan ErrorMessage
   deriving (Show)
   
@@ -118,8 +132,10 @@ prettyPrintErrorMessage OverlappingNamesInLet           = "Overlapping names in 
 prettyPrintErrorMessage (InfiniteType ty)               = "Infinite type detected: " ++ prettyPrintType ty
 prettyPrintErrorMessage (InfiniteKind ki)               = "Infinite kind detected: " ++ prettyPrintKind ki
 prettyPrintErrorMessage (MultipleFixities name)         = "Multiple fixity declarations for " ++ show name
-prettyPrintErrorMessage (OrphanTypeDeclaration pn)      = "Orphan type declaration for: " ++ show pn
+prettyPrintErrorMessage (OrphanTypeDeclaration nm)      = "Orphan type declaration for " ++ show nm
+prettyPrintErrorMessage (OrphanFixityDeclaration op)    = "Orphan fixity declaration for " ++ show op
 prettyPrintErrorMessage (RedefinedModule name)          = "Module " ++ show name ++ " has been defined multiple times"
+prettyPrintErrorMessage (RedefinedIdent name)           = "Name " ++ show name ++ " has been defined multiple times"
 prettyPrintErrorMessage (UnknownModule mn)              = "Unknown module " ++ show mn
 prettyPrintErrorMessage (UnknownType name)              = "Unknown type " ++ show name
 prettyPrintErrorMessage (UnknownTypeClass name)         = "Unknown type class " ++ show name
@@ -151,6 +167,7 @@ prettyPrintErrorMessage (OverlappingInstances nm ts ds) = unlines (("Overlapping
                                                                   : map prettyPrintDictionaryValue ds)
 prettyPrintErrorMessage (NoInstanceFound nm ts)         = "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
 prettyPrintErrorMessage (DuplicateLabel l expr)         = "Duplicate label " ++ show l ++ " in row." ++ foldMap ((" Relevant expression: " ++) . prettyPrintValue) expr
+prettyPrintErrorMessage (DuplicateTypeArgument name)    = "Duplicate type argument " ++ show name
 prettyPrintErrorMessage (DuplicateValueDeclaration nm)  = "Duplicate value declaration for " ++ show nm
 prettyPrintErrorMessage (ArgListLengthsDiffer ident)    = "Argument list lengths differ in declaration " ++ show ident
 prettyPrintErrorMessage (OverlappingArgNames ident)     = "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
@@ -161,6 +178,10 @@ prettyPrintErrorMessage SubsumptionCheckFailed          = "Unable to check type 
 prettyPrintErrorMessage (ExprDoesNotHaveType expr ty)   = "Expression " ++ prettyPrintValue expr ++ " does not have type " ++ prettyPrintType ty
 prettyPrintErrorMessage (PropertyIsMissing prop row)    = "Row " ++ prettyPrintRow row ++ " lacks required property " ++ show prop
 prettyPrintErrorMessage (CannotApplyFunction fn arg)    = "Cannot apply function of type " ++ prettyPrintType fn ++ " to argument " ++ prettyPrintValue arg
+prettyPrintErrorMessage TypeSynonymInstance             = "Type synonym instances are disallowed"
+prettyPrintErrorMessage InvalidNewtype                  = "Newtypes must define a single constructor with a single argument"
+prettyPrintErrorMessage (InvalidInstanceHead ty)        = "Invalid type " ++ prettyPrintType ty ++ " in class instance head"
+prettyPrintErrorMessage (TransitiveExportError x ys)    = "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: " ++ intercalate ", " (map prettyPrintExport ys)
 prettyPrintErrorMessage (ErrorUnifyingTypes t1 t2 err)  = "Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2 ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInExpression expr err)    = "Error in expression " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInModule mn err)          = "Error in module " ++ show mn ++ ":\n" ++ prettyPrintErrorMessage err
@@ -170,6 +191,13 @@ prettyPrintErrorMessage (ErrorCheckingKind ty err)      = "Error checking kind o
 prettyPrintErrorMessage (ErrorInferringType expr err)   = "Error inferring type of value " ++ prettyPrintValue expr ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorCheckingType expr ty err) = "Error checking value " ++ prettyPrintValue expr ++ " has type " ++ prettyPrintType ty ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (ErrorInApplication f t a err)  = "Error applying function " ++ prettyPrintValue f ++ " of type " ++ prettyPrintType t ++ " to argument " ++ prettyPrintValue a ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInDataConstructor nm err) = "Error in data constructor " ++ show nm ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInTypeConstructor nm err) = "Error in type constructor " ++ show nm ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInBindingGroup nms err)   = "Error in binding group " ++ intercalate ", " (map show nms) ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInDataBindingGroup err)   = "Error in data binding group:\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInTypeSynonym name err)   = "Error in type synonym " ++ show name ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInValueDeclaration n err) = "Error in value declaration " ++ show n ++ ":\n" ++ prettyPrintErrorMessage err
+prettyPrintErrorMessage (ErrorInForeignImport nm err)   = "Error in foreign import " ++ show nm ++ ":\n" ++ prettyPrintErrorMessage err
 prettyPrintErrorMessage (PositionedError pos err)       = "Error at " ++ show pos ++ ":\n" ++ prettyPrintErrorMessage err
 
 -- |
@@ -184,6 +212,16 @@ prettyPrintDictionaryValue = unlines . indented 0
   indented n (SubclassDictionaryValue sup nm _) = (spaces n ++ show nm ++ " via superclass") : indented (n + 2) sup
 
   spaces n = replicate n ' ' ++ "- "
+  
+-- |
+-- Pretty print and export declaration
+--  
+prettyPrintExport :: DeclarationRef -> String
+prettyPrintExport (TypeRef pn _) = show pn
+prettyPrintExport (ValueRef ident) = show ident
+prettyPrintExport (TypeClassRef pn) = show pn
+prettyPrintExport (TypeInstanceRef ident) = show ident
+prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
   
 -- |
 -- A stack trace for an error
@@ -212,6 +250,14 @@ simplifyErrorMessage = unwrap Nothing
   unwrap pos (ErrorCheckingType _ _ err) = unwrap pos err
   unwrap pos (ErrorCheckingKind ty err) = ErrorCheckingKind ty (unwrap pos err)
   unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
+  unwrap pos (ErrorInApplication _ _ _ err) = unwrap pos err
+  unwrap pos (ErrorInDataConstructor nm err) = ErrorInDataConstructor nm (unwrap pos err)
+  unwrap pos (ErrorInTypeConstructor nm err) = ErrorInTypeConstructor nm (unwrap pos err)
+  unwrap pos (ErrorInBindingGroup nms err) = ErrorInBindingGroup nms (unwrap pos err)
+  unwrap pos (ErrorInDataBindingGroup err) = ErrorInDataBindingGroup (unwrap pos err)
+  unwrap pos (ErrorInTypeSynonym nm err) = ErrorInTypeSynonym nm (unwrap pos err)
+  unwrap pos (ErrorInValueDeclaration nm err) = ErrorInValueDeclaration nm (unwrap pos err)
+  unwrap pos (ErrorInForeignImport nm err) = ErrorInForeignImport nm (unwrap pos err)
   unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
   unwrap _   (PositionedError pos err) = unwrap (Just pos) err
   unwrap pos other = wrap pos other
