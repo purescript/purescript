@@ -207,7 +207,7 @@ prettyPrintErrorMessage e =
   go e ++ "\n\nSee " ++ wikiUri ++ " for more information, or to contribute content related to this error."
   where
   wikiUri :: String
-  wikiUri = "http://wiki.purescript.org/Error-Code-" ++ errorCode e
+  wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
       
   go :: ErrorMessage -> String
   go InvalidDoBind                   = "Bind statement cannot be the last statement in a do block"
