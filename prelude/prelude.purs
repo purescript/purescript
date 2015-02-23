@@ -170,6 +170,17 @@ module Prelude
   infixl 4 <$>
   infixl 1 <#>
 
+  -- | A Functor is intuitively a type which can be mapped over, and more formally a mapping
+  -- | between categories that preserves structure.
+  -- |
+  -- | Functors should obey the following rules.
+  -- |
+  -- | Identity
+  -- |     (<$>) id = id
+  -- |
+  -- | Composition
+  -- |     forall f g. (<$>) (f . g) = ((<$>) f) . ((<$>) g)
+  -- |
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
 
@@ -181,9 +192,34 @@ module Prelude
 
   infixl 4 <*>
 
+  -- | Applys are intuitively Applicatives less `pure`, and more formally a strong lax semi-
+  -- | -monoidal endofunctor.
+  -- |
+  -- | Applys should obey the following rules.
+  -- |
+  -- | Associative Composition
+  -- |     forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)
+  -- |
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
+  -- | Applicatives are Functors which can be "applied" by sequencing composition (<*>) or embedding
+  -- | pure expressions (pure).
+  -- |
+  -- | Applicatives should obey the following rules.
+  -- |
+  -- | Identity
+  -- |     forall v. (pure id) <*> v = v
+  -- |
+  -- | Composition
+  -- |     forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)
+  -- |
+  -- | Homomorphism
+  -- |     forall f x. (pure f) <*> (pure x) = pure (f x)
+  -- |
+  -- | Interchange
+  -- |     forall u y. u <*> (pure y) = (pure (($) y)) <*> u
+  -- |
   class (Apply f) <= Applicative f where
     pure :: forall a. a -> f a
 
@@ -192,9 +228,30 @@ module Prelude
 
   infixl 1 >>=
 
+  -- | A Bind is an Apply with a bind operation which sequentially composes actions.
+  -- |
+  -- | A Bind should obey the following rule.
+  -- |
+  -- | Associative (as Bind)
+  -- |     forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)
+  -- |
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
+  -- | Monad is a class which can be intuitively thought of as an abstract datatype of actions or
+  -- | more formally though of as a monoid in the category of endofunctors.
+  -- |
+  -- | A Monad should obey the following rules.
+  -- |
+  -- | Associative (as Bind)
+  -- |     forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)
+  -- |
+  -- | Left Identity
+  -- |     forall f x. pure x >>= f = f x
+  -- |
+  -- | Right Identity
+  -- |     forall x. x >>= pure = x
+  -- |
   class (Applicative m, Bind m) <= Monad m
 
   return :: forall m a. (Monad m) => a -> m a
