@@ -79,7 +79,7 @@ module Prelude
   (>>>) f g = g <<< f
 
   -- | `Category`s consist of objects and composable morphisms between them, and as such are
-  -- | [`Semigroupoids`](#Semigroupoid), but unlike `semigroupoids` must have an identity element.
+  -- | [`Semigroupoids`](#semigroupoid), but unlike `semigroupoids` must have an identity element.
   -- |
   -- | `Category`s should obey the following rules.
   -- |
@@ -168,7 +168,7 @@ module Prelude
   infixl 1 <#>
 
   -- | A `Functor` is intuitively a type which can be mapped over, and more formally a mapping
-  -- | between [`Category`](#Category)s that preserves structure.
+  -- | between [`Category`](#category)s that preserves structure.
   -- |
   -- | `Functor`s should obey the following rules.
   -- |
@@ -189,7 +189,7 @@ module Prelude
 
   infixl 4 <*>
 
-  -- | `Apply`s are intuitively [`Applicative`](#Applicative)s less `pure`, and more formally a
+  -- | `Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
   -- | strong lax semi-monoidal endofunctor.
   -- |
   -- | `Apply`s should obey the following rules.
@@ -200,7 +200,7 @@ module Prelude
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
-  -- | `Applicative`s are [`Functor`](#Functor)s which can be "applied" by sequencing composition
+  -- | `Applicative`s are [`Functor`](#functor)s which can be "applied" by sequencing composition
   -- | (`<*>`) or embedding pure expressions (`pure`).
   -- |
   -- | `Applicative`s should obey the following rules.
@@ -225,7 +225,7 @@ module Prelude
 
   infixl 1 >>=
 
-  -- | A `Bind` is an [`Apply`](#Apply) with a bind operation which sequentially composes actions.
+  -- | A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially composes actions.
   -- |
   -- | `Bind`s should obey the following rule.
   -- |
