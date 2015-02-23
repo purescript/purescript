@@ -1,4 +1,4 @@
-../dist/build/psc-docs/psc-docs --hierarchy-images prelude.purs > README.md
+../dist/build/psc-docs/psc-docs prelude.purs > README.md
 ../dist/build/psc-hierarchy/psc-hierarchy prelude.purs -o prelude
 
 mkdir -p images
