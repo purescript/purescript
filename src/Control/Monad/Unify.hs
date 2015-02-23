@@ -82,7 +82,7 @@ data UnifyState t = UnifyState {
 defaultUnifyState :: (Partial t) => UnifyState t
 defaultUnifyState = UnifyState 0 mempty
 
--- \
+-- |
 -- A class for errors which support unification errors
 --
 class UnificationError t e where
