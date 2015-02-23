@@ -204,7 +204,7 @@ errorCode (PositionedError _ e)         = errorCode e
 --
 prettyPrintErrorMessage :: ErrorMessage -> String
 prettyPrintErrorMessage e =
-  go e ++ "\n\nUse --verbose-errors, or see " ++ wikiUri ++ " for more information."
+  go e ++ "\n\nSee " ++ wikiUri ++ " for more information, or to contribute content related to this error."
   where
   wikiUri :: String
   wikiUri = "http://wiki.purescript.org/Error-Code-" ++ errorCode e
@@ -395,7 +395,11 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- Rethrow an error with source position information
 --
 rethrowWithPosition :: (MonadError MultipleErrors m) => SourceSpan -> m a -> m a
-rethrowWithPosition pos = rethrow (onErrorMessages (PositionedError pos))
+rethrowWithPosition pos = rethrow (onErrorMessages withPosition)
+  where
+  withPosition :: ErrorMessage -> ErrorMessage
+  withPosition (PositionedError _ err) = withPosition err
+  withPosition err = PositionedError pos err
 
 -- |
 -- Collect errors in in parallel
