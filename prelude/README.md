@@ -56,7 +56,7 @@ class Semigroupoid a where
   (<<<) :: forall b c d. a c d -> a b c -> a b d
 ```
 
-A `Semigroupoid` is similar to a [`Category`](#Category) but does not require an identity
+A `Semigroupoid` is similar to a [`Category`](#category) but does not require an identity
 element `id`, just composable morphisms.
 
 `Semigroupoid`s should obey the following rule:

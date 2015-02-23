@@ -61,7 +61,7 @@ module Prelude
   infixr 9 >>>
   infixr 9 <<<
 
-  -- | A `Semigroupoid` is similar to a [`Category`](#Category) but does not require an identity
+  -- | A `Semigroupoid` is similar to a [`Category`](#category) but does not require an identity
   -- | element `id`, just composable morphisms.
   -- |
   -- | `Semigroupoid`s should obey the following rule:
