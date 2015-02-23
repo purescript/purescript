@@ -38,7 +38,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Pretty
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
@@ -65,7 +64,7 @@ instance Unifiable Check Kind where
   FunKind k1 k2 =?= FunKind k3 k4 = do
     k1 =?= k3
     k2 =?= k4
-  k1 =?= k2 = UnifyT . lift . throwError . strMsg $ "Cannot unify " ++ prettyPrintKind k1 ++ " with " ++ prettyPrintKind k2 ++ "."
+  k1 =?= k2 = UnifyT . lift . throwError . errorMessage $ KindsDoNotUnify k1 k2
 
 -- |
 -- Infer the kind of a single type
@@ -78,7 +77,7 @@ kindOf _ ty = fst <$> kindOfWithScopedVars ty
 --
 kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])   
 kindOfWithScopedVars ty = 
-  rethrow (mkCompileError "Error checking kind" (Just (TypeError ty)) `combineErrors`) $
+  rethrow (onErrorMessages (ErrorCheckingKind ty)) $
     fmap tidyUp . liftUnify $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (sub $? k)
@@ -156,7 +155,7 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
-infer ty = rethrow (mkCompileError "Error inferring type of value" (Just (TypeError ty)) `combineErrors`) $ infer' ty
+infer ty = rethrow (onErrorMessages (ErrorCheckingKind ty)) $ infer' ty
 
 infer' :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
 infer' (ForAll ident ty _) = do
@@ -189,10 +188,10 @@ infer' other = (, []) <$> go other
   go (Skolem v _ _) = do
     Just moduleName <- checkCurrentModule <$> get
     UnifyT . lift $ lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go c@(TypeConstructor v) = do
+  go (TypeConstructor v) = do
     env <- liftCheck getEnv
     case M.lookup v (types env) of
-      Nothing -> UnifyT . lift . throwError $ mkErrorStack "Unknown type constructor" (Just (TypeError c))
+      Nothing -> UnifyT . lift . throwError . errorMessage $ UnknownTypeConstructor v
       Just (kind, _) -> return kind
   go (TypeApp t1 t2) = do
     k0 <- fresh

@@ -20,11 +20,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Control.Monad.Unify where
 
-import Data.String (IsString)
 import Data.Monoid
 
 import Control.Applicative
@@ -85,9 +83,15 @@ defaultUnifyState :: (Partial t) => UnifyState t
 defaultUnifyState = UnifyState 0 mempty
 
 -- |
+-- A class for errors which support unification errors
+--
+class UnificationError t e where
+  occursCheckFailed :: t -> e
+
+-- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype UnifyT t m a = UnifyT { unUnify :: (StateT (UnifyState t) m) a }
+newtype UnifyT t m a = UnifyT { unUnify :: StateT (UnifyState t) m a }
   deriving (Functor, Monad, Applicative, Alternative, MonadPlus)
 
 instance (MonadState s m) => MonadState s (UnifyT t m) where
@@ -113,7 +117,7 @@ substituteOne u t = Substitution $ M.singleton u t
 -- |
 -- Replace a unification variable with the specified value in the current substitution
 --
-(=:=) :: (IsString e, Monad m, MonadError e m, Unifiable m t) => Unknown -> t -> UnifyT t m ()
+(=:=) :: (UnificationError t e, Monad m, MonadError e m, Unifiable m t) => Unknown -> t -> UnifyT t m ()
 (=:=) u t' = do
   st <- UnifyT get
   let sub = unifyCurrentSubstitution st
@@ -128,10 +132,10 @@ substituteOne u t = Substitution $ M.singleton u t
 -- |
 -- Perform the occurs check, to make sure a unification variable does not occur inside a value
 --
-occursCheck :: (IsString e, Monad m, MonadError e m, Partial t) => Unknown -> t -> UnifyT t m ()
+occursCheck :: (UnificationError t e, Monad m, MonadError e m, Partial t) => Unknown -> t -> UnifyT t m ()
 occursCheck u t =
   case isUnknown t of
-    Nothing -> when (u `elem` unknowns t) $ UnifyT . lift . throwError $ "Occurs check fails"
+    Nothing -> when (u `elem` unknowns t) $ UnifyT . lift . throwError $ occursCheckFailed t
     _ -> return ()
 
 -- |

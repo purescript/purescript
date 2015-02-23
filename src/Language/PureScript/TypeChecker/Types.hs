@@ -39,7 +39,6 @@ import Data.Either (lefts, rights)
 import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
-import Data.String (IsString)
 
 import Control.Applicative
 import Control.Monad.Except
@@ -51,7 +50,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Pretty
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
@@ -184,7 +182,7 @@ replaceTypeClassDictionaries mn =
 -- Check the kind of a type, failing if it is not of kind *.
 --
 checkTypeKind :: Kind -> UnifyT t Check ()
-checkTypeKind kind = guardWith (strMsg $ "Expected type of kind *, was " ++ prettyPrintKind kind) $ kind == Star
+checkTypeKind kind = guardWith (errorMessage (ExpectedType kind)) $ kind == Star
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -207,7 +205,7 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
 infer :: Expr -> UnifyT Type Check Expr
-infer val = rethrow (mkCompileError "Error inferring type of value" (Just (ExprError val)) `combineErrors`) $ infer' val
+infer val = rethrow (onErrorMessages (ErrorInferringType val)) $ infer' val
 
 -- |
 -- Infer a type for a value
@@ -269,7 +267,7 @@ infer' (Var var) = do
 infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . strMsg $ "Constructor " ++ show c ++ " is undefined"
+    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
@@ -365,8 +363,8 @@ inferBinder val (ConstructorBinder ctor binders) = do
           return M.empty
         go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
           M.union <$> inferBinder obj binder <*> go binders' ret
-        go _ _ = throwError . strMsg $ "Wrong number of arguments to constructor " ++ show ctor
-    _ -> throwError . strMsg $ "Constructor " ++ show ctor ++ " is not defined"
+        go _ _ = throwError . errorMessage $ IncorrectConstructorArity ctor
+    _ -> throwError . errorMessage $ UnknownDataConstructor ctor Nothing
 inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
@@ -404,7 +402,7 @@ inferBinder val (PositionedBinder pos _ binder) =
 checkBinders :: [Type] -> Type -> [CaseAlternative] -> UnifyT Type Check [CaseAlternative]
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders result : bs) = do
-  guardWith (strMsg "Overlapping binders in case statement") $
+  guardWith (errorMessage $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (nub ns) == length ns
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
@@ -427,13 +425,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
 check :: Expr -> Type -> UnifyT Type Check Expr
-check val ty = rethrow (mkCompileError errorMessage (Just (ExprError val)) `combineErrors`) $ check' val ty
-  where
-  errorMessage =
-    "Error checking type of term " ++
-    prettyPrintValue val ++
-    " against type " ++
-    prettyPrintType ty
+check val ty = rethrow (onErrorMessages (ErrorCheckingType val ty)) $ check' val ty
 
 -- |
 -- Check the type of a value
@@ -490,7 +482,7 @@ check' v@(Var var) ty = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
-    Nothing -> throwError . strMsg $ "Unable to check type subsumption"
+    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
     Just v'' -> return $ TypedValue True v'' ty'
 check' (SuperClassDictionary className tys) _ = do
   {-
@@ -513,7 +505,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
-    Nothing -> throwError . strMsg $ "Unable to check type subsumption"
+    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
     Just val'' -> do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val'' ty2') else return val''
       return $ TypedValue checkType (TypedValue True val''' ty1') ty2'
@@ -551,7 +543,7 @@ check' (Accessor prop val) ty = do
 check' (Constructor c) ty = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . strMsg $ "Constructor " ++ show c ++ " is undefined"
+    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
@@ -568,7 +560,7 @@ check' val kt@(KindedType ty kind) = do
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
   rethrowWithPosition pos $ check' val ty
-check' val ty = throwError $ mkErrorStack ("Expr does not have type " ++ prettyPrintType ty) (Just (ExprError val))
+check' val ty = throwError . errorMessage $ ExprDoesNotHaveType val ty
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everythingOnTypes (||) go where
@@ -589,8 +581,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError $ mkErrorStack ("Object does not have property " ++ p) (Just (ExprError (ObjectLiteral ps)))
-  go ((p,_):_) [] REmpty = throwError $ mkErrorStack ("Property " ++ p ++ " is not present in closed object type " ++ prettyPrintRow row) (Just (ExprError (ObjectLiteral ps)))
+                      | otherwise = throwError . errorMessage $ PropertyIsMissing p row
+  go ((p,_):_) [] REmpty = throwError . errorMessage $ PropertyIsMissing p row
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
@@ -603,19 +595,15 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError $ mkErrorStack ("Object does not have type " ++ prettyPrintType (TypeApp tyObject row)) (Just (ExprError (ObjectLiteral ps)))
+  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType (ObjectLiteral ps) (TypeApp tyObject row)
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = rethrow (mkCompileError errorMessage (Just (ExprError fn)) `combineErrors`) $ do
+checkFunctionApplication fn fnTy arg ret = rethrow (onErrorMessages (ErrorInApplication fn fnTy arg)) $ do
   subst <- unifyCurrentSubstitution <$> UnifyT get
   checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
-  where
-  errorMessage = "Error applying function of type "
-    ++ prettyPrintType fnTy
-    ++ " to argument " ++ prettyPrintValue arg
 
 -- |
 -- Check the type of a function application
@@ -651,9 +639,7 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
-checkFunctionApplication' _ fnTy arg _ = throwError . strMsg $ "Cannot apply a function of type "
-  ++ prettyPrintType fnTy
-  ++ " to argument " ++ prettyPrintValue arg
+checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
 
 -- |
 -- Compute the meet of two types, i.e. the most general type which both types subsume.
@@ -673,5 +659,9 @@ meet e1 e2 t1 t2 = do
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (IsString e, MonadError e m) => [(String, Expr)] -> m ()
-ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps
+ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(String, Expr)] -> m ()
+ensureNoDuplicateProperties ps = 
+  let ls = map fst ps in
+  case ls \\ nub ls of
+    l : _ -> throwError . errorMessage $ DuplicateLabel l Nothing
+    _ -> return ()

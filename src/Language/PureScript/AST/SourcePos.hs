@@ -30,7 +30,7 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (D.Data, D.Typeable)
+  } deriving (Eq, D.Data, D.Typeable)
 
 instance Show SourcePos where
   show sp = "line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
@@ -47,7 +47,7 @@ data SourceSpan = SourceSpan
     -- End of the span
     --
   , spanEnd :: SourcePos
-  } deriving (D.Data, D.Typeable)
+  } deriving (Eq, D.Data, D.Typeable)
 
 instance Show SourceSpan where
   show sp = spanName sp ++ " " ++ show (spanStart sp) ++ " - " ++ show (spanEnd sp)

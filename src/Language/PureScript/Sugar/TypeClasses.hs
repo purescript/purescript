@@ -27,7 +27,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 import Language.PureScript.Sugar.CaseDeclarations
 import Control.Monad.Supply.Class
 import Language.PureScript.Types
@@ -51,10 +50,10 @@ type Desugar = StateT MemberMap
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
+desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
-desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> Desugar m Module
+desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> Desugar m Module
 desugarModule (Module coms name decls (Just exps)) = do
   (newExpss, declss) <- unzip <$> parU (sortBy classesFirst decls) (desugarDecl name exps)
   return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
@@ -160,7 +159,7 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --       return new Sub(fooString, "");
 --   };
 -}
-desugarDecl :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => ModuleName -> [DeclarationRef] -> Declaration -> Desugar m (Maybe DeclarationRef, [Declaration])
+desugarDecl :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => ModuleName -> [DeclarationRef] -> Declaration -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
@@ -230,18 +229,18 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type
 unit :: Type
 unit = TypeApp tyObject REmpty
 
-typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
+typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (mkCompileError ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") Nothing `combineErrors`) $ do
+  rethrow (onErrorMessages (ErrorInInstance className tys)) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
   (TypeClassDeclaration _ args implies tyDecls) <-
-    maybe (throwError $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) return $
+    maybe (throwError . errorMessage $ UnknownTypeClass className) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
-    x : _ -> throwError $ mkErrorStack ("Member '" ++ show x ++ "' has not been implemented") Nothing
+    member : _ -> throwError . errorMessage $ MissingClassMember member
     [] -> do
 
       let instanceTys = map memberToNameAndType tyDecls
@@ -276,9 +275,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
 
-  memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
+  memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- maybe (throwError $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) return $ lookup ident tys'
+    _ <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d

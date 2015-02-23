@@ -44,17 +44,17 @@ isLeft (Right _) = False
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
+desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module coms name ds exps) ->
-  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
+  rethrow (onErrorMessages (ErrorInModule name)) $
     Module coms name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
-desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
+desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
 
-  replace :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Expr -> m Expr
+  replace :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Expr -> m Expr
   replace (Abs (Right binder) val) = do
     ident <- Ident <$> freshName
     return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
@@ -63,10 +63,10 @@ desugarAbs = flip parU f
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
+desugarCases :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
-    desugarRest :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
+    desugarRest :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
@@ -89,18 +89,18 @@ inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
+toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
-  guardWith (strMsg "Overlapping function argument names") $ length (nub args) == length args
+  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
-      throwError $ mkErrorStack ("Argument list lengths differ in declaration " ++ show ident) Nothing
+      throwError . errorMessage $ ArgListLengthsDiffer ident
   unless (not (null bs) || isLeft result) $
-      throwError $ mkErrorStack ("Duplicate value declaration '" ++ show ident ++ "'") Nothing
+      throwError . errorMessage $ DuplicateValueDeclaration ident
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
 toDecls (PositionedDeclaration pos com d : ds) = do
@@ -117,7 +117,7 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let argPattern = length . fst . head $ alternatives
   args <- map Ident <$> replicateM argPattern freshName

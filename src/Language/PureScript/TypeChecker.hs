@@ -26,8 +26,9 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\), find, intercalate)
+import Data.List (nub, (\\))
 import Data.Foldable (for_)
+
 import qualified Data.Map as M
 
 import Control.Monad.State
@@ -46,7 +47,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
-    rethrow (mkCompileError ("Error in data constructor " ++ show dctor) Nothing `combineErrors`) $
+    rethrow (onErrorMessages (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
@@ -70,7 +71,7 @@ valueIsNotDefined :: ModuleName -> Ident -> Check ()
 valueIsNotDefined moduleName name = do
   env <- getEnv
   case M.lookup (moduleName, name) (names env) of
-    Just _ -> throwError . strMsg $ show name ++ " is already defined"
+    Just _ -> throwError . errorMessage $ RedefinedIdent name
     Nothing -> return ()
 
 addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
@@ -94,7 +95,7 @@ addTypeClassDictionaries entries =
 
 checkDuplicateTypeArguments :: [String] -> Check ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
-  throwError . strMsg $ "Duplicate type argument '" ++ dup ++ "'"
+  throwError . errorMessage $ DuplicateTypeArgument dup
   where
   firstDup :: Maybe String
   firstDup = listToMaybe $ args \\ nub args
@@ -103,10 +104,10 @@ checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
-  when (ctor `M.member` typeSynonyms env) . throwError . strMsg $ "Type synonym instances are disallowed"
+  when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
   return ()
 checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError $ mkErrorStack "Type class instance head is invalid." (Just (TypeError ty))
+checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
 -- Check that type synonyms are fully-applied in a type
@@ -133,7 +134,7 @@ typeCheckAll mainModuleName moduleName exps = go
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
   go (DataDeclaration dtype name args dctors : rest) = do
-    rethrow (mkCompileError ("Error in type constructor " ++ show name) Nothing `combineErrors`) $ do
+    rethrow (onErrorMessages (ErrorInTypeConstructor name)) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
@@ -144,10 +145,10 @@ typeCheckAll mainModuleName moduleName exps = go
     where
     checkNewtype :: [(ProperName, [Type])] -> Check ()
     checkNewtype [(_, [_])] = return ()
-    checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
-    checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
+    checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype
+    checkNewtype _ = throwError . errorMessage $ InvalidNewtype
   go (d@(DataBindingGroupDeclaration tys) : rest) = do
-    rethrow (mkCompileError "Error in data binding group" Nothing `combineErrors`) $ do
+    rethrow (onErrorMessages ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
@@ -169,7 +170,7 @@ typeCheckAll mainModuleName moduleName exps = go
     toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty : rest) = do
-    rethrow (mkCompileError ("Error in type synonym " ++ show name) Nothing `combineErrors`) $ do
+    rethrow (onErrorMessages (ErrorInTypeSynonym name)) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
@@ -178,7 +179,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val) : rest) = do
-    d <- rethrow (mkCompileError ("Error in declaration " ++ show name) Nothing `combineErrors`) $ do
+    d <- rethrow (onErrorMessages (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
@@ -187,7 +188,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
   go (ValueDeclaration{} : _) = error "Binders were not desugared"
   go (BindingGroupDeclaration vals : rest) = do
-    d <- rethrow (mkCompileError ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) Nothing `combineErrors`) $ do
+    d <- rethrow (onErrorMessages (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
@@ -207,19 +208,19 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ d : ds
   go (d@(ExternDeclaration importTy name _ ty) : rest) = do
-    rethrow (mkCompileError ("Error in foreign import declaration " ++ show name) Nothing `combineErrors`) $ do
+    rethrow (onErrorMessages (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
-      guardWith (strMsg "Expected kind *") $ kind == Star
+      guardWith (errorMessage (ExpectedType kind)) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
-        Just _ -> throwError . strMsg $ show name ++ " is already defined"
+        Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
     ds <- go rest
     return $ d : ds
   go (d@(FixityDeclaration _ name) : rest) = do
     ds <- go rest
     env <- getEnv
-    guardWith (strMsg ("Fixity declaration with no binding: " ++ name)) $ M.member (moduleName, Op name) $ names env
+    guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
     tcds <- getTypeClassDictionaries
@@ -277,7 +278,7 @@ typeCheckAll mainModuleName moduleName exps = go
 --
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
 typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = do
+typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
   forM_ exps $ \e -> do
@@ -287,63 +288,54 @@ typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = do
   return $ Module coms mn decls' (Just exps)
   where
 
-  checkMemberExport :: (Show a) => String -> (Type -> [a]) -> (a -> Bool) -> DeclarationRef -> Check ()
-  checkMemberExport thing extract test (ValueRef name) = do
+  checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> Check ()
+  checkMemberExport extract dr@(ValueRef name) = do
     ty <- lookupVariable mn (Qualified (Just mn) name)
-    case find test (extract ty) of
-      Just hiddenType -> throwError . strMsg $
-        "Error in module '" ++ show mn ++ "':\n\
-        \Exporting declaration '" ++ show name ++ "' requires " ++ thing ++ " '" ++ show hiddenType ++ "' to be exported as well"
-      Nothing -> return ()
-  checkMemberExport _ _ _ _ = return ()
+    case filter (not . exported) (extract ty) of
+      [] -> return ()
+      hidden -> throwError . errorMessage $ TransitiveExportError dr hidden
+      where
+      exported e = any (exports e) exps
+      exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
+      exports (ValueRef id1) (ValueRef id2) = id1 == id2
+      exports (TypeClassRef pn1) (TypeClassRef pn2) = pn1 == pn2
+      exports (TypeInstanceRef id1) (TypeInstanceRef id2) = id1 == id2
+      exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
+      exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
+      exports _ _ = False
+  checkMemberExport _ _ = return ()
 
   -- Check that all the type constructors defined in the current module that appear in member types
   -- have also been exported from the module
   checkTypesAreExported :: DeclarationRef -> Check ()
-  checkTypesAreExported = checkMemberExport "type" findTcons isTconHidden
+  checkTypesAreExported = checkMemberExport findTcons
     where
-    findTcons :: Type -> [ProperName]
+    findTcons :: Type -> [DeclarationRef]
     findTcons = everythingOnTypes (++) go
       where
-      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [name]
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [TypeRef name (error "Data constructors unused in checkTypesAreExported")]
       go _ = []
-    isTconHidden :: ProperName -> Bool
-    isTconHidden tyName = all go exps
-      where
-      go (TypeRef tyName' _) = tyName' /= tyName
-      go _ = True
 
   -- Check that all the classes defined in the current module that appear in member types have also
   -- been exported from the module
   checkClassesAreExported :: DeclarationRef -> Check ()
-  checkClassesAreExported = checkMemberExport "class" findClasses isClassHidden
+  checkClassesAreExported = checkMemberExport findClasses
     where
-    findClasses :: Type -> [ProperName]
+    findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (extractCurrentModuleClass . fst) cs
+      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . fst) cs
       go _ = []
     extractCurrentModuleClass :: Qualified ProperName -> Maybe ProperName
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
     extractCurrentModuleClass _ = Nothing
-    isClassHidden :: ProperName -> Bool
-    isClassHidden clsName = all go exps
-      where
-      go (TypeClassRef clsName') = clsName' /= clsName
-      go _ = True
 
   checkClassMembersAreExported :: DeclarationRef -> Check ()
-  checkClassMembersAreExported (TypeClassRef name) = do
+  checkClassMembersAreExported dr@(TypeClassRef name) = do
     let members = ValueRef `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
-    unless (null missingMembers) $
-      throwError . strMsg $
-        "Error in module '" ++ show mn ++ "':\n\
-        \Class '" ++ show name ++ "' is exported but is missing member exports for '" ++ intercalate "', '" (map (show . runValueRef) missingMembers) ++ "'"
+    unless (null missingMembers) $ throwError . errorMessage $ TransitiveExportError dr members
     where
-    runValueRef :: DeclarationRef -> Ident
-    runValueRef (ValueRef refName) = refName
-    runValueRef _ = error "non-ValueRef passed to runValueRef"
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
