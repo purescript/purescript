@@ -66,8 +66,8 @@ module Prelude
   -- |
   -- | `Semigroupoid`s should obey the following rule:
   -- |
-  -- | Association
-  -- |     forall p q r. p <<< (q <<< r) = (p <<< q) <<< r
+  -- | Association:
+  -- |     `forall p q r. p <<< (q <<< r) = (p <<< q) <<< r`
   -- |
   class Semigroupoid a where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
@@ -83,11 +83,11 @@ module Prelude
   -- |
   -- | `Category`s should obey the following rules.
   -- |
-  -- | Left Identity
-  -- |     forall p. id <<< p = p
+  -- | Left Identity:
+  -- |     `forall p. id <<< p = p`
   -- |
-  -- | Right Identity
-  -- |     forall p. p <<< id = p
+  -- | Right Identity:
+  -- |     `forall p. p <<< id = p`
   -- |
   class (Semigroupoid a) <= Category a where
     id :: forall t. a t t
@@ -172,11 +172,11 @@ module Prelude
   -- |
   -- | `Functor`s should obey the following rules.
   -- |
-  -- | Identity
-  -- |     (<$>) id = id
+  -- | Identity:
+  -- |     `(<$>) id = id`
   -- |
-  -- | Composition
-  -- |     forall f g. (<$>) (f . g) = ((<$>) f) . ((<$>) g)
+  -- | Composition:
+  -- |     `forall f g. (<$>) (f . g) = ((<$>) f) . ((<$>) g)`
   -- |
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
@@ -194,8 +194,8 @@ module Prelude
   -- |
   -- | `Apply`s should obey the following rules.
   -- |
-  -- | Associative Composition
-  -- |     forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)
+  -- | Associative Composition:
+  -- |     `forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)`
   -- |
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
@@ -205,17 +205,17 @@ module Prelude
   -- |
   -- | `Applicative`s should obey the following rules.
   -- |
-  -- | Identity
-  -- |     forall v. (pure id) <*> v = v
+  -- | Identity:
+  -- |     `forall v. (pure id) <*> v = v`
   -- |
-  -- | Composition
-  -- |     forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)
+  -- | Composition:
+  -- |     `forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)`
   -- |
-  -- | Homomorphism
-  -- |     forall f x. (pure f) <*> (pure x) = pure (f x)
+  -- | Homomorphism:
+  -- |     `forall f x. (pure f) <*> (pure x) = pure (f x)`
   -- |
-  -- | Interchange
-  -- |     forall u y. u <*> (pure y) = (pure (($) y)) <*> u
+  -- | Interchange:
+  -- |     `forall u y. u <*> (pure y) = (pure (($) y)) <*> u`
   -- |
   class (Apply f) <= Applicative f where
     pure :: forall a. a -> f a
@@ -229,8 +229,8 @@ module Prelude
   -- |
   -- | `Bind`s should obey the following rule.
   -- |
-  -- | Associativity
-  -- |     forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)
+  -- | Associativity:
+  -- |     `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
   -- |
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
@@ -240,11 +240,11 @@ module Prelude
   -- |
   -- | `Monad`s should obey the following rules.
   -- |
-  -- | Left Identity
-  -- |     forall f x. pure x >>= f = f x
+  -- | Left Identity:
+  -- |     `forall f x. pure x >>= f = f x`
   -- |
-  -- | Right Identity
-  -- |     forall x. x >>= pure = x
+  -- | Right Identity:
+  -- |     `forall x. x >>= pure = x`
   -- |
   class (Applicative m, Bind m) <= Monad m
 
