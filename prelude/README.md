@@ -87,7 +87,7 @@ class (Semigroupoid a) <= Category a where
 ```
 
 `Category`s consist of objects and composable morphisms between them, and as such are
-[`Semigroupoids`](#Semigroupoid), but unlike `semigroupoids` must have an identity element.
+[`Semigroupoids`](#semigroupoid), but unlike `semigroupoids` must have an identity element.
 
 `Category`s should obey the following rules.
 
@@ -184,7 +184,7 @@ class Functor f where
 ```
 
 A `Functor` is intuitively a type which can be mapped over, and more formally a mapping
-between [`Category`](#Category)s that preserves structure.
+between [`Category`](#category)s that preserves structure.
 
 `Functor`s should obey the following rules.
 
@@ -216,7 +216,7 @@ class (Functor f) <= Apply f where
   (<*>) :: forall a b. f (a -> b) -> f a -> f b
 ```
 
-`Apply`s are intuitively [`Applicative`](#Applicative)s less `pure`, and more formally a
+`Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
 strong lax semi-monoidal endofunctor.
 
 `Apply`s should obey the following rules.
@@ -232,7 +232,7 @@ class (Apply f) <= Applicative f where
   pure :: forall a. a -> f a
 ```
 
-`Applicative`s are [`Functor`](#Functor)s which can be "applied" by sequencing composition
+`Applicative`s are [`Functor`](#functor)s which can be "applied" by sequencing composition
 (`<*>`) or embedding pure expressions (`pure`).
 
 `Applicative`s should obey the following rules.
@@ -264,7 +264,7 @@ class (Apply m) <= Bind m where
   (>>=) :: forall a b. m a -> (a -> m b) -> m b
 ```
 
-A `Bind` is an [`Apply`](#Apply) with a bind operation which sequentially composes actions.
+A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially composes actions.
 
 `Bind`s should obey the following rule.
 
