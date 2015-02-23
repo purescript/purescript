@@ -61,6 +61,14 @@ module Prelude
   infixr 9 >>>
   infixr 9 <<<
 
+  -- | Semigroupoids are Categories, less `id`, which is to say they consist of objects and
+  -- | morphisms between them which can be composed.
+  -- |
+  -- | Semigroupoids should obey the following rule:
+  -- |
+  -- | Association
+  -- |     forall p q r. p <<< (q <<< r) = (p <<< q) <<< r
+  -- |
   class Semigroupoid a where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
 
@@ -70,6 +78,20 @@ module Prelude
   (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
   (>>>) f g = g <<< f
 
+  -- | Categories consist of objects and composable morphisms between them, and as such are
+  -- | semigroupoids, but unlike semigroupoids must have an identity element.
+  -- |
+  -- | Categories should obey the following rules.
+  -- |
+  -- | Association (as semigroupoids)
+  -- |     forall p q r. p <<< (q <<< r) = (p <<< q) <<< r
+  -- |
+  -- | Left Identity
+  -- |     forall p. id <<< p = p
+  -- |
+  -- | Right Identity
+  -- |     forall p. p <<< id = p
+  -- |
   class (Semigroupoid a) <= Category a where
     id :: forall t. a t t
 
