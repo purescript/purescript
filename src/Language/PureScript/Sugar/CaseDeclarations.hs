@@ -14,23 +14,25 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.Sugar.CaseDeclarations (
     desugarCases,
     desugarCasesModule
 ) where
 
-import Data.Monoid ((<>))
 import Data.List (nub, groupBy)
 
 import Control.Applicative
 import Control.Monad ((<=<), forM, join, unless, replicateM)
-import Control.Monad.Error.Class
+import Control.Monad.Except (throwError)
+import Control.Monad.Error.Class (MonadError)
+import Control.Monad.Supply.Class
 
 import Language.PureScript.Names
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Supply
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
@@ -42,17 +44,17 @@ isLeft (Right _) = False
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: [Module] -> SupplyT (Either ErrorStack) [Module]
-desugarCasesModule ms = forM ms $ \(Module name ds exps) ->
-  rethrow (strMsg ("Error in module " ++ show name) <>) $
-    Module name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
+desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
+desugarCasesModule ms = forM ms $ \(Module coms name ds exps) ->
+  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
+    Module coms name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
-desugarAbs :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
+desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
 desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
 
-  replace :: Expr -> SupplyT (Either ErrorStack) Expr
+  replace :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Expr -> m Expr
   replace (Abs (Right binder) val) = do
     ident <- Ident <$> freshName
     return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
@@ -61,10 +63,10 @@ desugarAbs = flip parU f
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
+desugarCases :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
-    desugarRest :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
+    desugarRest :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
@@ -87,7 +89,7 @@ inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: [Declaration] -> SupplyT (Either ErrorStack) [Declaration]
+toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   let args = map (\(VarBinder arg) -> arg) bs
       body = foldr (Abs . Left) val args
@@ -115,7 +117,7 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> SupplyT (Either ErrorStack) Declaration
+makeCaseDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let argPattern = length . fst . head $ alternatives
   args <- map Ident <$> replicateM argPattern freshName

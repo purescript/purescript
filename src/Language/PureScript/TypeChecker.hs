@@ -27,12 +27,11 @@ import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
 import Data.List (nub, (\\), find, intercalate)
-import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import qualified Data.Map as M
 
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Except
 
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -47,7 +46,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
-    rethrow (strMsg ("Error in data constructor " ++ show dctor) <>) $
+    rethrow (mkCompileError ("Error in data constructor " ++ show dctor) Nothing `combineErrors`) $
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
@@ -134,7 +133,7 @@ typeCheckAll mainModuleName moduleName exps = go
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
   go (DataDeclaration dtype name args dctors : rest) = do
-    rethrow (strMsg ("Error in type constructor " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in type constructor " ++ show name) Nothing `combineErrors`) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
@@ -148,7 +147,7 @@ typeCheckAll mainModuleName moduleName exps = go
     checkNewtype [(_, _)] = throwError . strMsg $ "newtypes constructors must have a single argument"
     checkNewtype _ = throwError . strMsg $ "newtypes must have a single constructor"
   go (d@(DataBindingGroupDeclaration tys) : rest) = do
-    rethrow (strMsg "Error in data binding group" <>) $ do
+    rethrow (mkCompileError "Error in data binding group" Nothing `combineErrors`) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
@@ -170,7 +169,7 @@ typeCheckAll mainModuleName moduleName exps = go
     toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty : rest) = do
-    rethrow (strMsg ("Error in type synonym " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in type synonym " ++ show name) Nothing `combineErrors`) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
@@ -179,7 +178,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ TypeSynonymDeclaration name args ty : ds
   go (TypeDeclaration _ _ : _) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val) : rest) = do
-    d <- rethrow (strMsg ("Error in declaration " ++ show name) <>) $ do
+    d <- rethrow (mkCompileError ("Error in declaration " ++ show name) Nothing `combineErrors`) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
@@ -188,7 +187,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
   go (ValueDeclaration{} : _) = error "Binders were not desugared"
   go (BindingGroupDeclaration vals : rest) = do
-    d <- rethrow (strMsg ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) <>) $ do
+    d <- rethrow (mkCompileError ("Error in binding group " ++ show (map (\(ident, _, _) -> ident) vals)) Nothing `combineErrors`) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
@@ -208,7 +207,7 @@ typeCheckAll mainModuleName moduleName exps = go
     ds <- go rest
     return $ d : ds
   go (d@(ExternDeclaration importTy name _ ty) : rest) = do
-    rethrow (strMsg ("Error in foreign import declaration " ++ show name) <>) $ do
+    rethrow (mkCompileError ("Error in foreign import declaration " ++ show name) Nothing `combineErrors`) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
       guardWith (strMsg "Expected kind *") $ kind == Star
@@ -277,15 +276,15 @@ typeCheckAll mainModuleName moduleName exps = go
 -- required by exported members are also exported.
 --
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule _ (Module _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module mn decls (Just exps)) = do
+typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
   forM_ exps $ \e -> do
     checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
-  return $ Module mn decls' (Just exps)
+  return $ Module coms mn decls' (Just exps)
   where
 
   checkMemberExport :: (Show a) => String -> (Type -> [a]) -> (a -> Bool) -> DeclarationRef -> Check ()

@@ -30,14 +30,15 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
 -- |
--- A module declaration, consisting of a module name, a list of declarations, and a list of the
--- declarations that are explicitly exported. If the export list is Nothing, everything is exported.
+-- A module declaration, consisting of comments about the module, a module name,
+-- a list of declarations, and a list of the declarations that are
+-- explicitly exported. If the export list is Nothing, everything is exported.
 --
-data Module = Module ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
+data Module = Module [Comment] ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
 
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
-getModuleName (Module name _ _) = name
+getModuleName (Module _ name _ _) = name
 
 -- |
 -- Test if a declaration is exported, given a module's export list.
@@ -60,7 +61,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches _ _ = False
 
 exportedDeclarations :: Module -> [Declaration]
-exportedDeclarations (Module _ decls exps) = filter (isExported exps) (flattenDecls decls)
+exportedDeclarations (Module _ _ decls exps) = filter (isExported exps) (flattenDecls decls)
 
 -- |
 -- Test if a data constructor for a given type is exported, given a module's export list.
@@ -78,7 +79,7 @@ isDctorExported ident (Just exps) ctor = test `any` exps
 -- Return the exported data constructors for a given type.
 --
 exportedDctors :: Module -> ProperName -> [ProperName]
-exportedDctors (Module _ decls exps) ident =
+exportedDctors (Module _ _ decls exps) ident =
   filter (isDctorExported ident exps) dctors
   where
   dctors = concatMap getDctors (flattenDecls decls)
@@ -260,11 +261,18 @@ isExternDecl (PositionedDeclaration _ _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
--- Test if a declaration is a type class or instance declaration
+-- Test if a declaration is a type class instance declaration
+--
+isTypeClassInstanceDeclaration :: Declaration -> Bool
+isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
+isTypeClassInstanceDeclaration (PositionedDeclaration _ _ d) = isTypeClassInstanceDeclaration d
+isTypeClassInstanceDeclaration _ = False
+
+-- |
+-- Test if a declaration is a type class declaration
 --
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration TypeInstanceDeclaration{} = True
 isTypeClassDeclaration (PositionedDeclaration _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 

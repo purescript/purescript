@@ -15,12 +15,14 @@
 module Language.PureScript.CoreFn.Module where
 
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.Comments
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
 import Language.PureScript.Types
 
 data Module a = Module
-  { moduleName :: ModuleName
+  { moduleComments :: [Comment]
+  , moduleName :: ModuleName
   , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]

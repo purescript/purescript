@@ -18,11 +18,10 @@ module Language.PureScript.TypeChecker.Subsumption (
 ) where
 
 import Data.List (sortBy)
-import Data.Monoid
 import Data.Ord (comparing)
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.AST
@@ -39,7 +38,7 @@ import Language.PureScript.Types
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
 subsumes :: Maybe Expr -> Type -> Type -> UnifyT Type Check (Maybe Expr)
-subsumes val ty1 ty2 = rethrow (mkErrorStack errorMessage (ExprError <$> val) <>) $ subsumes' val ty1 ty2
+subsumes val ty1 ty2 = rethrow (mkCompileError errorMessage (ExprError <$> val) `combineErrors`) $ subsumes' val ty1 ty2
   where
   errorMessage = "Error checking that type "
     ++ prettyPrintType ty1

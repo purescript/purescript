@@ -379,6 +379,12 @@ module Prelude
     show LT = "LT"
     show GT = "GT"
     show EQ = "EQ"
+    
+  instance semigroupOrdening :: Semigroup Ordering where
+    (<>) LT _ = LT
+    (<>) GT _ = GT
+    (<>) EQ y = y
+
 
   class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering

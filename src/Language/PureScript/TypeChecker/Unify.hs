@@ -27,10 +27,9 @@ module Language.PureScript.TypeChecker.Unify (
 
 import Data.List (nub, sort)
 import Data.Maybe (fromMaybe)
-import Data.Monoid
 import qualified Data.HashMap.Strict as H
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Unify
 
 import Language.PureScript.Environment
@@ -61,7 +60,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (mkErrorStack ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing <>) $
+unifyTypes t1 t2 = rethrow (mkCompileError ("Error unifying type " ++ prettyPrintType t1 ++ " with type " ++ prettyPrintType t2) Nothing `combineErrors`) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()

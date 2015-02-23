@@ -1,5 +1,5 @@
 name: purescript
-version: 0.6.7.1
+version: 0.6.8
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -31,10 +31,9 @@ library
                    filepath -any,
                    mtl >= 2.1.0 && < 2.3.0,
                    parsec -any,
-                   transformers >= 0.3 && < 0.5,
+                   transformers >= 0.4.0 && < 0.5,
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   monad-unify >= 0.2.2 && < 0.3,
                    file-embed >= 0.0.7 && < 0.0.8,
                    time -any
     exposed-modules: Language.PureScript
@@ -97,7 +96,6 @@ library
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeDeclarations
-                     Language.PureScript.Supply
                      Language.PureScript.Traversals
                      Language.PureScript.TypeChecker
                      Language.PureScript.TypeChecker.Entailment
@@ -111,11 +109,15 @@ library
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
+
+                     Control.Monad.Unify
+                     Control.Monad.Supply
+                     Control.Monad.Supply.Class
     exposed: True
     buildable: True
     hs-source-dirs: src
     other-modules: Paths_purescript
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -125,7 +127,7 @@ executable psc
     buildable: True
     hs-source-dirs: psc
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -135,7 +137,7 @@ executable psc-make
     buildable: True
     hs-source-dirs: psc-make
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -148,7 +150,7 @@ executable psci
     hs-source-dirs: psci
     other-modules: Commands
                    Parser
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
@@ -157,7 +159,7 @@ executable psc-docs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
@@ -166,7 +168,7 @@ executable psc-hierarchy
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
-    ghc-options: -Wall -fno-warn-warnings-deprecations -O2
+    ghc-options: -Wall -O2
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,

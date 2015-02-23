@@ -242,13 +242,14 @@ parseLocalDeclaration = positioned (P.choice
 --
 parseModule :: TokenParser Module
 parseModule = do
+  comments <- C.readComments
   reserved "module"
   indented
   name <- moduleName
   exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   reserved "where"
   decls <- mark (P.many (same *> parseDeclaration))
-  return $ Module name decls exports
+  return $ Module comments name decls exports
 
 -- |
 -- Parse a collection of modules

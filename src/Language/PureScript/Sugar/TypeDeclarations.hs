@@ -14,16 +14,17 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarations,
     desugarTypeDeclarationsModule
 ) where
 
-import Data.Monoid ((<>))
-
 import Control.Applicative
-import Control.Monad.Error.Class
 import Control.Monad (forM)
+import Control.Monad.Except (throwError)
+import Control.Monad.Error.Class (MonadError)
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -34,15 +35,15 @@ import Language.PureScript.Traversals
 -- |
 -- Replace all top level type declarations in a module with type annotations
 --
-desugarTypeDeclarationsModule :: [Module] -> Either ErrorStack [Module]
-desugarTypeDeclarationsModule ms = forM ms $ \(Module name ds exps) ->
-  rethrow (strMsg ("Error in module " ++ show name) <>) $
-    Module name <$> desugarTypeDeclarations ds <*> pure exps
+desugarTypeDeclarationsModule :: (Functor m, Applicative m, MonadError ErrorStack m) => [Module] -> m [Module]
+desugarTypeDeclarationsModule ms = forM ms $ \(Module coms name ds exps) ->
+  rethrow (mkCompileError ("Error in module " ++ show name) Nothing `combineErrors`) $
+    Module coms name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |
 -- Replace all top level type declarations with type annotations
 --
-desugarTypeDeclarations :: [Declaration] -> Either ErrorStack [Declaration]
+desugarTypeDeclarations :: (Functor m, Applicative m, MonadError ErrorStack m) => [Declaration] -> m [Declaration]
 desugarTypeDeclarations (PositionedDeclaration pos com d : ds) = do
   (d' : ds') <- rethrowWithPosition pos $ desugarTypeDeclarations (d : ds)
   return (PositionedDeclaration pos com d' : ds')
@@ -50,7 +51,7 @@ desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
   (_, nameKind, val) <- fromValueDeclaration d
   desugarTypeDeclarations (ValueDeclaration name nameKind [] (Right (TypedValue True val ty)) : rest)
   where
-  fromValueDeclaration :: Declaration -> Either ErrorStack (Ident, NameKind, Expr)
+  fromValueDeclaration :: (Functor m, Applicative m, MonadError ErrorStack m) => Declaration -> m (Ident, NameKind, Expr)
   fromValueDeclaration (ValueDeclaration name' nameKind [] (Right val)) | name == name' = return (name', nameKind, val)
   fromValueDeclaration (PositionedDeclaration pos com d') = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'

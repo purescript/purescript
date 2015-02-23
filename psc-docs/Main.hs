@@ -37,12 +37,11 @@ data Format = Markdown -- Output documentation in Markdown format
 
 data PSCDocsOptions = PSCDocsOptions
   { pscdFormat :: Format
-  , pscdIncludeHier :: Bool
   , pscdInputFiles  :: [FilePath]
   }
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt showHierarchy input) = do
+docgen (PSCDocsOptions fmt input) = do
   e <- parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
@@ -50,7 +49,7 @@ docgen (PSCDocsOptions fmt showHierarchy input) = do
       exitFailure
     Right ms -> do
       case fmt of
-       Markdown -> dumpMarkdown showHierarchy $ map snd ms
+       Markdown -> dumpMarkdown $ map snd ms
        Etags -> ldump $ dumpEtags $ pairs ms
        Ctags -> ldump $ dumpCtags $ pairs ms
       exitSuccess
@@ -68,11 +67,6 @@ inputFile = strArgument $
      metavar "FILE"
   <> help "The input .purs file(s)"
 
-includeHierarchy :: Parser Bool
-includeHierarchy = switch $
-     long "hierarchy-images"
-  <> help "Include markdown for type class hierarchy images in the output."
-
 instance Read Format where
     readsPrec _ "etags" = [(Etags, "")]
     readsPrec _ "ctags" = [(Ctags, "")]
@@ -87,7 +81,6 @@ format = option auto $ value Markdown
 
 pscDocsOptions :: Parser PSCDocsOptions
 pscDocsOptions = PSCDocsOptions <$> format
-                                <*> includeHierarchy
                                 <*> many inputFile
 
 main :: IO ()

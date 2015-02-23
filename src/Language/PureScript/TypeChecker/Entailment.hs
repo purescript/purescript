@@ -25,9 +25,10 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Arrow (Arrow(..))
-import Control.Monad.Error
+import Control.Monad.Except
 
 import Language.PureScript.AST
+import Language.PureScript.Errors
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty

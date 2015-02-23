@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, OverloadedStrings #-}
 
 module Language.PureScript.TypeChecker.Types (
     typesOf
@@ -38,11 +38,11 @@ module Language.PureScript.TypeChecker.Types (
 import Data.Either (lefts, rights)
 import Data.List
 import Data.Maybe (fromMaybe)
-import Data.Monoid
 import qualified Data.Map as M
+import Data.String (IsString)
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Unify
 
@@ -207,7 +207,7 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
 infer :: Expr -> UnifyT Type Check Expr
-infer val = rethrow (mkErrorStack "Error inferring type of value" (Just (ExprError val)) <>) $ infer' val
+infer val = rethrow (mkCompileError "Error inferring type of value" (Just (ExprError val)) `combineErrors`) $ infer' val
 
 -- |
 -- Infer a type for a value
@@ -427,7 +427,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
 check :: Expr -> Type -> UnifyT Type Check Expr
-check val ty = rethrow (mkErrorStack errorMessage (Just (ExprError val)) <>) $ check' val ty
+check val ty = rethrow (mkCompileError errorMessage (Just (ExprError val)) `combineErrors`) $ check' val ty
   where
   errorMessage =
     "Error checking type of term " ++
@@ -609,7 +609,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = rethrow (mkErrorStack errorMessage (Just (ExprError fn)) <>) $ do
+checkFunctionApplication fn fnTy arg ret = rethrow (mkCompileError errorMessage (Just (ExprError fn)) `combineErrors`) $ do
   subst <- unifyCurrentSubstitution <$> UnifyT get
   checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
   where
@@ -673,5 +673,5 @@ meet e1 e2 t1 t2 = do
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (Error e, MonadError e m) => [(String, Expr)] -> m ()
-ensureNoDuplicateProperties ps = guardWith (strMsg "Duplicate property names") $ length (nub . map fst $ ps) == length ps
+ensureNoDuplicateProperties :: (IsString e, MonadError e m) => [(String, Expr)] -> m ()
+ensureNoDuplicateProperties ps = guardWith "Duplicate property names" $ length (nub . map fst $ ps) == length ps

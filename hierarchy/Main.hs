@@ -64,7 +64,7 @@ compile (HierarchyOptions input mOutput) = do
   case modules of
     Left err -> hPutStr stderr (show err) >> exitFailure
     Right ms -> do
-      for_ ms $ \(P.Module moduleName decls _) ->
+      for_ ms $ \(P.Module _ moduleName decls _) ->
         let name = runModuleName moduleName
             tcs = filter P.isTypeClassDeclaration decls
             supers = sort . nub . filter (not . null) $ fmap superClasses tcs

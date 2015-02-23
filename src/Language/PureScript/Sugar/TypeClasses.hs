@@ -14,6 +14,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.Sugar.TypeClasses
   ( desugarTypeClasses
   , typeClassMemberName
@@ -27,36 +29,41 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types (prettyPrintTypeAtom)
 import Language.PureScript.Sugar.CaseDeclarations
-import Language.PureScript.Supply
+import Control.Monad.Supply.Class
 import Language.PureScript.Types
 
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
 import Control.Arrow (first, second)
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.State
-import Data.List ((\\), find)
+import Data.List ((\\), find, sortBy)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
-import Data.Monoid ((<>))
 
 import qualified Data.Map as M
 
 type MemberMap = M.Map (ModuleName, ProperName) Declaration
 
-type Desugar = StateT MemberMap (SupplyT (Either ErrorStack))
+type Desugar = StateT MemberMap
 
 -- |
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: [Module] -> SupplyT (Either ErrorStack) [Module]
+desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [Module] -> m [Module]
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
-desugarModule :: Module -> Desugar Module
-desugarModule (Module name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> parU decls (desugarDecl name exps)
-  return $ Module name (concat declss) $ Just (exps ++ catMaybes newExpss)
+desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Module -> Desugar m Module
+desugarModule (Module coms name decls (Just exps)) = do
+  (newExpss, declss) <- unzip <$> parU (sortBy classesFirst decls) (desugarDecl name exps)
+  return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
+  where
+  classesFirst :: Declaration -> Declaration -> Ordering
+  classesFirst d1 d2 
+    | isTypeClassDeclaration d1 && not (isTypeClassDeclaration d2) = LT
+    | not (isTypeClassDeclaration d1) && isTypeClassDeclaration d2 = GT
+    | otherwise = EQ
 desugarModule _ = error "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
@@ -153,7 +160,7 @@ desugarModule _ = error "Exports should have been elaborated in name desugaring"
 --       return new Sub(fooString, "");
 --   };
 -}
-desugarDecl :: ModuleName -> [DeclarationRef] -> Declaration -> Desugar (Maybe DeclarationRef, [Declaration])
+desugarDecl :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => ModuleName -> [DeclarationRef] -> Declaration -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
@@ -161,7 +168,7 @@ desugarDecl mn exps = go
     return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
   go d@(TypeInstanceDeclaration name deps className tys members) = do
-    desugared <- lift $ desugarCases members
+    desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
   go (PositionedDeclaration pos com d) = do
@@ -223,14 +230,14 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type
 unit :: Type
 unit = TypeApp tyObject REmpty
 
-typeInstanceDictionaryDeclaration :: Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar Declaration
+typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (strMsg ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") <>) $ do
+  rethrow (mkCompileError ("Error in type class instance " ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ":") Nothing `combineErrors`) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (TypeClassDeclaration _ args implies tyDecls) <- lift . lift $
-    maybe (Left $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) Right $
+  (TypeClassDeclaration _ args implies tyDecls) <-
+    maybe (throwError $ mkErrorStack ("Type class " ++ show className ++ " is undefined") Nothing) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
@@ -269,9 +276,9 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   declName (TypeDeclaration ident _) = Just ident
   declName _ = Nothing
 
-  memberToValue :: [(Ident, Type)] -> Declaration -> Desugar Expr
+  memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError ErrorStack m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- lift . lift . maybe (Left $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) Right $ lookup ident tys'
+    _ <- maybe (throwError $ mkErrorStack ("Type class does not define member '" ++ show ident ++ "'") Nothing) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d
