@@ -77,7 +77,7 @@ assertDoesNotCompile preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " does not compile"
   assert preludeExterns (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) inputFile $ \e ->
     case e of
-      Left _ -> return Nothing
+      Left err -> putStrLn err >> return Nothing
       Right _ -> return $ Just "Should not have compiled"
 
 findNodeProcess :: IO (Maybe String)
