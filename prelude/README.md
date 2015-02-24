@@ -12,10 +12,11 @@ otherwise :: Boolean
 
 An alias for `true`, which can be useful in guard clauses:
 
-E.g.
-
+```purescript
     max x y | x >= y = x
             | otherwise = y
+```
+
 
 #### `flip`
 
@@ -25,9 +26,9 @@ flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
 Flips the order of the arguments to a function of two arguments.
 
-E.g.
-
+```purescript
     flip const 1 2 = const 2 1 = 2
+```
 
 
 #### `const`
@@ -38,9 +39,9 @@ const :: forall a b. a -> b -> a
 
 Returns its first argument and ignores its second.
 
-E.g.
-
-    const 1 2 = 1
+```purescript
+    const 1 "hello" = 1
+```
 
 
 #### `asTypeOf`
@@ -52,9 +53,9 @@ asTypeOf :: forall a. a -> a -> a
 This function returns its first argument, and can be used to assert type equalities.
 This can be useful when types are otherwise ambiguous.
 
-E.g.
-
+```purescript
     main = print $ [] `asTypeOf` [0]
+```
 
 If instead, we had written `main = print []`, the type of the argument `[]` would have
 been ambiguous, resulting in a compile-time error.
@@ -123,13 +124,13 @@ instance categoryArr :: Category Prim.Function
 
 Applies a function to its argument
 
-E.g.
+```purescript
+    (+) 1 ((*) 2 (const 1 2)) = (+) 1 $ (*) 2 $ const 1 2
+```
 
-    const $ 1 2 = const 1 2 = 1
-
-`($)` is different from [`(#)`](#-2) because it is right-infix instance instead of left.
-Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
-like (((a # b) # c) # d ...).
+`($)` is different from [`(#)`](#-2) because it is right-infix instead of left. Right-infix
+operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse like
+`(((a # b) # c) # d ...)`.
 
 
 #### `(#)`
@@ -140,13 +141,13 @@ like (((a # b) # c) # d ...).
 
 Applies a function to its argument
 
-E.g.
+```purescript
+    (((3 + 1) * 2) + 4) = 3 # ((+) 1) # ((*) 2) # ((+) 4)
+```
 
-    3 # ((+) 1) = 3 + 1 = 4
-
-`(#)` is different from [`($)`](#-1) because it is left-infix instance instead of right.
-Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
-like (((a # b) # c) # d ...).
+`(#)` is different from [`($)`](#-1) because it is left-infix instead of right. Right-infix
+operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse like
+`(((a # b) # c) # d ...)`.
 
 
 #### `(:)`
@@ -157,9 +158,9 @@ like (((a # b) # c) # d ...).
 
 Attaches an element to the front of a list.
 
-E.g.
-
+```purescript
     1 : [2, 3, 4] = [1, 2, 3, 4]
+```
 
 
 #### `cons`
