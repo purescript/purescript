@@ -39,10 +39,20 @@ module Prelude
   otherwise = true
 
   -- | Flips the order of the arguments to a function of two arguments.
+  -- |
+  -- | E.g.
+  -- |
+  -- |     flip const 1 2 = const 2 1 = 2
+  -- |
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
 
   -- | Returns its first argument and ignores its second.
+  -- |
+  -- | E.g.
+  -- |
+  -- |     const 1 2 = 1
+  -- |
   const :: forall a b. a -> b -> a
   const a _ = a
 
@@ -98,14 +108,40 @@ module Prelude
   infixr 0 $
   infixl 0 #
 
+  -- | Applies a function to its argument
+  -- |
+  -- | E.g.
+  -- |
+  -- |     const $ 1 2 = const 1 2 = 1
+  -- |
+  -- | `($)` is different from [`(#)`](#-2) because it is right-infix instance instead of left.
+  -- | Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
+  -- | like (((a # b) # c) # d ...).
+  -- |
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
+  -- | Applies a function to its argument
+  -- |
+  -- | E.g.
+  -- |
+  -- |     3 # ((+) 1) = 3 + 1 = 4
+  -- |
+  -- | `(#)` is different from [`($)`](#-1) because it is left-infix instance instead of right.
+  -- | Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
+  -- | like (((a # b) # c) # d ...).
+  -- |
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
 
   infixr 6 :
 
+  -- | Attaches an element to the front of a list.
+  -- |
+  -- | E.g.
+  -- |
+  -- |     1 : [2, 3, 4] = [1, 2, 3, 4]
+  -- |
   (:) :: forall a. a -> [a] -> [a]
   (:) = cons
 
@@ -452,7 +488,7 @@ module Prelude
     show LT = "LT"
     show GT = "GT"
     show EQ = "EQ"
-    
+
   instance semigroupOrdening :: Semigroup Ordering where
     (<>) LT _ = LT
     (<>) GT _ = GT
