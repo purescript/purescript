@@ -89,8 +89,9 @@ renderModule :: P.Module -> Docs
 renderModule mdl@(P.Module coms moduleName _ exps) = do
     headerLevel 2 $ "Module " ++ P.runModuleName moduleName
     spacer
-    renderComments coms
-    spacer
+    unless (null coms) $ do
+      renderComments coms
+      spacer
     renderTopLevel exps (P.exportedDeclarations mdl)
     spacer
 
