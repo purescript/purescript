@@ -25,6 +25,11 @@ flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
 Flips the order of the arguments to a function of two arguments.
 
+E.g.
+
+    flip const 1 2 = const 2 1 = 2
+
+
 #### `const`
 
 ``` purescript
@@ -32,6 +37,11 @@ const :: forall a b. a -> b -> a
 ```
 
 Returns its first argument and ignores its second.
+
+E.g.
+
+    const 1 2 = 1
+
 
 #### `asTypeOf`
 
@@ -111,6 +121,16 @@ instance categoryArr :: Category Prim.Function
 ($) :: forall a b. (a -> b) -> a -> b
 ```
 
+Applies a function to its argument
+
+E.g.
+
+    const $ 1 2 = const 1 2 = 1
+
+`($)` is different from [`(#)`](#-2) because it is right-infix instance instead of left.
+Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
+like (((a # b) # c) # d ...).
+
 
 #### `(#)`
 
@@ -118,12 +138,28 @@ instance categoryArr :: Category Prim.Function
 (#) :: forall a b. a -> (a -> b) -> b
 ```
 
+Applies a function to its argument
+
+E.g.
+
+    3 # ((+) 1) = 3 + 1 = 4
+
+`(#)` is different from [`($)`](#-1) because it is left-infix instance instead of right.
+Right-infix operators parse like (a $ (b $ (c $ (d ...)))) whereas left-infix operators parse
+like (((a # b) # c) # d ...).
+
 
 #### `(:)`
 
 ``` purescript
 (:) :: forall a. a -> [a] -> [a]
 ```
+
+Attaches an element to the front of a list.
+
+E.g.
+
+    1 : [2, 3, 4] = [1, 2, 3, 4]
 
 
 #### `cons`
