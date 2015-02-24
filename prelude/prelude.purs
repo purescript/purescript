@@ -113,7 +113,11 @@ module Prelude
   -- |
   -- | ```purescript
   -- | length $ groupBy productCategory $ filter isInStock products
-  -- |   is equivalent to
+  -- | ```
+  -- |
+  -- | is equivalent to
+  -- |
+  -- | ```purescript
   -- | length (groupBy productCategory (filter isInStock (products)))
   -- | ```
   -- |
@@ -127,7 +131,11 @@ module Prelude
   -- |
   -- | ```purescript
   -- | products # groupBy productCategory # filter isInStock # length
-  -- |   is equivalent to
+  -- | ```
+  -- |
+  -- | is equivalent to
+  -- |
+  -- | ```purescript
   -- | length (groupBy productCategory (filter isInStock (products)))
   -- | ```
   -- |

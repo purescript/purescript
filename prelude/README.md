@@ -125,8 +125,13 @@ instance categoryArr :: Category Prim.Function
 Applies a function to its argument
 
 ```purescript
-length $ groupBy productCategory $ filter isInStock products =
-length (groupby productcategory (filter isinstock (products)))
+length $ groupBy productCategory $ filter isInStock products
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
@@ -142,8 +147,13 @@ length (groupby productcategory (filter isinstock (products)))
 Applies a function to its argument
 
 ```purescript
-products # groupby productcategory # filter isinstock # length =
-length (groupby productcategory (filter isinstock (products)))
+products # groupBy productCategory # filter isInStock # length
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
