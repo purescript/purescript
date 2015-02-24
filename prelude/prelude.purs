@@ -77,8 +77,7 @@ module Prelude
   -- |
   -- | `Semigroupoid`s should obey the following rule:
   -- |
-  -- | Association:
-  -- |     `forall p q r. p <<< (q <<< r) = (p <<< q) <<< r`
+  -- | - Associativity: `p <<< (q <<< r) = (p <<< q) <<< r`
   -- |
   class Semigroupoid a where
     (<<<) :: forall b c d. a c d -> a b c -> a b d
@@ -94,11 +93,8 @@ module Prelude
   -- |
   -- | `Category`s should obey the following rules.
   -- |
-  -- | Left Identity:
-  -- |     `forall p. id <<< p = p`
-  -- |
-  -- | Right Identity:
-  -- |     `forall p. p <<< id = p`
+  -- | - Left Identity: `id <<< p = p`
+  -- | - Right Identity: `p <<< id = p`
   -- |
   class (Semigroupoid a) <= Category a where
     id :: forall t. a t t
@@ -219,11 +215,8 @@ module Prelude
   -- |
   -- | `Functor`s should obey the following rules.
   -- |
-  -- | Identity:
-  -- |     `(<$>) id = id`
-  -- |
-  -- | Composition:
-  -- |     `forall f g. (<$>) (f . g) = ((<$>) f) . ((<$>) g)`
+  -- | - Identity: `(<$>) id = id`
+  -- | - Composition: `(<$>) (f <<< g) = (<$> f) <<< (<$> g)`
   -- |
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
@@ -239,10 +232,9 @@ module Prelude
   -- | `Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
   -- | strong lax semi-monoidal endofunctor.
   -- |
-  -- | `Apply`s should obey the following rules.
+  -- | `Apply`s should obey the following rule.
   -- |
-  -- | Associative Composition:
-  -- |     `forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)`
+  -- | - Associative Composition: `(<<<) <$> f <*> g <*> h = f <*> (g <*> h)`
   -- |
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
@@ -252,17 +244,10 @@ module Prelude
   -- |
   -- | `Applicative`s should obey the following rules.
   -- |
-  -- | Identity:
-  -- |     `forall v. (pure id) <*> v = v`
-  -- |
-  -- | Composition:
-  -- |     `forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)`
-  -- |
-  -- | Homomorphism:
-  -- |     `forall f x. (pure f) <*> (pure x) = pure (f x)`
-  -- |
-  -- | Interchange:
-  -- |     `forall u y. u <*> (pure y) = (pure (($) y)) <*> u`
+  -- | - Identity: `(pure id) <*> v = v`
+  -- | - Composition: `(pure <<<) <*> f <*> g <*> h = f <*> (g <*> h)`
+  -- | - Homomorphism: `(pure f) <*> (pure x) = pure (f x)`
+  -- | - Interchange: `u <*> (pure y) = (pure ($ y)) <*> u`
   -- |
   class (Apply f) <= Applicative f where
     pure :: forall a. a -> f a
@@ -276,8 +261,7 @@ module Prelude
   -- |
   -- | `Bind`s should obey the following rule.
   -- |
-  -- | Associativity:
-  -- |     `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+  -- | - Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
   -- |
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
@@ -287,11 +271,8 @@ module Prelude
   -- |
   -- | `Monad`s should obey the following rules.
   -- |
-  -- | Left Identity:
-  -- |     `forall f x. pure x >>= f = f x`
-  -- |
-  -- | Right Identity:
-  -- |     `forall x. x >>= pure = x`
+  -- | - Left Identity: `pure x >>= f = f x`
+  -- | - Right Identity: `x >>= pure = x`
   -- |
   class (Applicative m, Bind m) <= Monad m
 
@@ -330,28 +311,43 @@ module Prelude
   infixl 6 -
   infixl 6 +
 
-  -- | Addition and multiplication
+  -- | Addition and multiplication, satisfying the following laws:
+  -- |
+  -- | - `a` is a commutative monoid under addition
+  -- | - `a` is a monoid under multiplication
+  -- | - multiplication distributes over addition
+  -- | - multiplication by `zero` annihilates `a`
+  -- |
   class Semiring a where
     (+)  :: a -> a -> a
     zero :: a
     (*)  :: a -> a -> a
     one  :: a
 
-  -- | Semiring with modulo operation and division where
-  -- | ```a / b * b + (a `mod` b) = a```
+  -- | Addition, multiplication, modulo operation and division, satisfying:
+  -- |
+  -- | - ```a / b * b + (a `mod` b) = a```
+  -- |
   class (Semiring a) <= ModuloSemiring a where
     (/) :: a -> a -> a
     mod :: a -> a -> a
 
-  -- | Addition, multiplication, and subtraction
+  -- | Addition, multiplication, and subtraction.
+  -- |
+  -- | Has the same laws as `Semiring` but additionally satisfying:
+  -- |
+  -- | - `a` is an abelian group under addition
+  -- |
   class (Semiring a) <= Ring a where
     (-) :: a -> a -> a
 
   negate :: forall a. (Ring a) => a -> a
   negate a = zero - a
 
-  -- | Ring where every nonzero element has a multiplicative inverse (possibly
-  -- | a non-commutative field) so that ```a `mod` b = zero```
+  -- | Ring where every nonzero element has a multiplicative inverse so that:
+  -- |
+  -- | - ```a `mod` b = zero```
+  -- |
   class (Ring a, ModuloSemiring a) <= DivisionRing a
 
   -- | A commutative field
@@ -429,6 +425,7 @@ module Prelude
   infix 4 ==
   infix 4 /=
 
+  -- | Class for types that have an equality comparison.
   class Eq a where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
@@ -505,7 +502,14 @@ module Prelude
     (<>) GT _ = GT
     (<>) EQ y = y
 
-
+  -- | Class for types that have ordered comparisons.
+  -- |
+  -- | Represents a partially ordered set satisfying the following laws:
+  -- |
+  -- | - Reflexivity: `a <= a`
+  -- | - Antisymmetry: if `a <= b` and `b <= a` then `a = b`
+  -- | - Transitivity: if `a <= b` and `b <= c` then `a <= c`
+  -- |
   class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering
 
