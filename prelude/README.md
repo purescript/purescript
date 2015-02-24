@@ -12,10 +12,11 @@ otherwise :: Boolean
 
 An alias for `true`, which can be useful in guard clauses:
 
-E.g.
+```purescript
+max x y | x >= y = x
+        | otherwise = y
+```
 
-    max x y | x >= y = x
-            | otherwise = y
 
 #### `flip`
 
@@ -25,6 +26,11 @@ flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
 Flips the order of the arguments to a function of two arguments.
 
+```purescript
+flip const 1 2 = const 2 1 = 2
+```
+
+
 #### `const`
 
 ``` purescript
@@ -32,6 +38,11 @@ const :: forall a b. a -> b -> a
 ```
 
 Returns its first argument and ignores its second.
+
+```purescript
+const 1 "hello" = 1
+```
+
 
 #### `asTypeOf`
 
@@ -42,9 +53,9 @@ asTypeOf :: forall a. a -> a -> a
 This function returns its first argument, and can be used to assert type equalities.
 This can be useful when types are otherwise ambiguous.
 
-E.g.
-
-    main = print $ [] `asTypeOf` [0]
+```purescript
+main = print $ [] `asTypeOf` [0]
+```
 
 If instead, we had written `main = print []`, the type of the argument `[]` would have
 been ambiguous, resulting in a compile-time error.
@@ -111,6 +122,21 @@ instance categoryArr :: Category Prim.Function
 ($) :: forall a b. (a -> b) -> a -> b
 ```
 
+Applies a function to its argument
+
+```purescript
+length $ groupBy productCategory $ filter isInStock products
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
+```
+
+`($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
+`a $ b $ c $ d x` = `a (b (c (d x)))`
+
 
 #### `(#)`
 
@@ -118,11 +144,32 @@ instance categoryArr :: Category Prim.Function
 (#) :: forall a b. a -> (a -> b) -> b
 ```
 
+Applies a function to its argument
+
+```purescript
+products # groupBy productCategory # filter isInStock # length
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
+```
+
+`(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
+`x # a # b # c # d` = `(((x a) b) c) d`
+
 
 #### `(:)`
 
 ``` purescript
 (:) :: forall a. a -> [a] -> [a]
+```
+
+Attaches an element to the front of a list.
+
+```purescript
+1 : [2, 3, 4] = [1, 2, 3, 4]
 ```
 
 
