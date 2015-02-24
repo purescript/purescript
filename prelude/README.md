@@ -2,8 +2,6 @@
 
 ## Module Prelude
 
-
-
 #### `otherwise`
 
 ``` purescript
@@ -12,10 +10,11 @@ otherwise :: Boolean
 
 An alias for `true`, which can be useful in guard clauses:
 
-E.g.
+```purescript
+max x y | x >= y = x
+        | otherwise = y
+```
 
-    max x y | x >= y = x
-            | otherwise = y
 
 #### `flip`
 
@@ -25,6 +24,11 @@ flip :: forall a b c. (a -> b -> c) -> b -> a -> c
 
 Flips the order of the arguments to a function of two arguments.
 
+```purescript
+flip const 1 2 = const 2 1 = 2
+```
+
+
 #### `const`
 
 ``` purescript
@@ -32,6 +36,11 @@ const :: forall a b. a -> b -> a
 ```
 
 Returns its first argument and ignores its second.
+
+```purescript
+const 1 "hello" = 1
+```
+
 
 #### `asTypeOf`
 
@@ -42,9 +51,9 @@ asTypeOf :: forall a. a -> a -> a
 This function returns its first argument, and can be used to assert type equalities.
 This can be useful when types are otherwise ambiguous.
 
-E.g.
-
-    main = print $ [] `asTypeOf` [0]
+```purescript
+main = print $ [] `asTypeOf` [0]
+```
 
 If instead, we had written `main = print []`, the type of the argument `[]` would have
 been ambiguous, resulting in a compile-time error.
@@ -61,8 +70,7 @@ element `id`, just composable morphisms.
 
 `Semigroupoid`s should obey the following rule:
 
-Association:
-    `forall p q r. p <<< (q <<< r) = (p <<< q) <<< r`
+- Association: `forall p q r. p <<< (q <<< r) = (p <<< q) <<< r`
 
 
 #### `semigroupoidArr`
@@ -91,11 +99,8 @@ class (Semigroupoid a) <= Category a where
 
 `Category`s should obey the following rules.
 
-Left Identity:
-    `forall p. id <<< p = p`
-
-Right Identity:
-    `forall p. p <<< id = p`
+- Left Identity: `forall p. id <<< p = p`
+- Right Identity: `forall p. p <<< id = p`
 
 
 #### `categoryArr`
@@ -111,6 +116,21 @@ instance categoryArr :: Category Prim.Function
 ($) :: forall a b. (a -> b) -> a -> b
 ```
 
+Applies a function to its argument
+
+```purescript
+length $ groupBy productCategory $ filter isInStock products
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
+```
+
+`($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
+`a $ b $ c $ d x` = `a (b (c (d x)))`
+
 
 #### `(#)`
 
@@ -118,11 +138,32 @@ instance categoryArr :: Category Prim.Function
 (#) :: forall a b. a -> (a -> b) -> b
 ```
 
+Applies a function to its argument
+
+```purescript
+products # groupBy productCategory # filter isInStock # length
+```
+
+is equivalent to
+
+```purescript
+length (groupBy productCategory (filter isInStock (products)))
+```
+
+`(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
+`x # a # b # c # d` = `(((x a) b) c) d`
+
 
 #### `(:)`
 
 ``` purescript
 (:) :: forall a. a -> [a] -> [a]
+```
+
+Attaches an element to the front of a list.
+
+```purescript
+1 : [2, 3, 4] = [1, 2, 3, 4]
 ```
 
 
@@ -188,11 +229,8 @@ between [`Category`](#category)s that preserves structure.
 
 `Functor`s should obey the following rules.
 
-Identity:
-    `(<$>) id = id`
-
-Composition:
-    `forall f g. (<$>) (f . g) = ((<$>) f) . ((<$>) g)`
+- Identity: `(<$>) id = id`
+- Composition: `forall f g. (<$>) (f . g) = (<$> f) . (<$> g)`
 
 
 #### `(<#>)`
@@ -219,10 +257,9 @@ class (Functor f) <= Apply f where
 `Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
 strong lax semi-monoidal endofunctor.
 
-`Apply`s should obey the following rules.
+`Apply`s should obey the following rule.
 
-Associative Composition:
-    `forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)`
+- Associative Composition: `forall f g h. (.) <$> f <*> g <*> h = f <*> (g <*> h)`
 
 
 #### `Applicative`
@@ -237,17 +274,10 @@ class (Apply f) <= Applicative f where
 
 `Applicative`s should obey the following rules.
 
-Identity:
-    `forall v. (pure id) <*> v = v`
-
-Composition:
-    `forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)`
-
-Homomorphism:
-    `forall f x. (pure f) <*> (pure x) = pure (f x)`
-
-Interchange:
-    `forall u y. u <*> (pure y) = (pure (($) y)) <*> u`
+- Identity: `forall v. (pure id) <*> v = v`
+- Composition: `forall f g h. (pure (.)) <*> f <*> g <*> h = f <*> (g <*> h)`
+- Homomorphism: `forall f x. (pure f) <*> (pure x) = pure (f x)`
+- Interchange: `forall u y. u <*> (pure y) = (pure ($ y)) <*> u`
 
 
 #### `liftA1`
@@ -268,8 +298,7 @@ A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially compos
 
 `Bind`s should obey the following rule.
 
-Associativity:
-    `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+- Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
 
 
 #### `Monad`
@@ -283,11 +312,8 @@ more formally though of as a monoid in the category of endofunctors.
 
 `Monad`s should obey the following rules.
 
-Left Identity:
-    `forall f x. pure x >>= f = f x`
-
-Right Identity:
-    `forall x. x >>= pure = x`
+- Left Identity: `forall f x. pure x >>= f = f x`
+- Right Identity: `forall x. x >>= pure = x`
 
 
 #### `return`
@@ -356,7 +382,12 @@ class Semiring a where
   one :: a
 ```
 
-Addition and multiplication
+Addition and multiplication, satisfying the following laws:
+
+- `a` is a commutative monoid under addition
+- `a` is a monoid under multiplication
+- multiplication distributes over addition
+- multiplication by `zero` annihilates `a`
 
 #### `ModuloSemiring`
 
@@ -366,8 +397,10 @@ class (Semiring a) <= ModuloSemiring a where
   mod :: a -> a -> a
 ```
 
-Semiring with modulo operation and division where
-```a / b * b + (a `mod` b) = a```
+Addition, multiplication, modulo operation and division, satisfying:
+
+- ```a / b * b + (a `mod` b) = a```
+
 
 #### `Ring`
 
@@ -376,7 +409,12 @@ class (Semiring a) <= Ring a where
   (-) :: a -> a -> a
 ```
 
-Addition, multiplication, and subtraction
+Addition, multiplication, and subtraction.
+
+Has the same laws as `Semiring` but additionally satisfying:
+
+- `a` is an abelian group under addition
+
 
 #### `negate`
 
@@ -391,8 +429,9 @@ negate :: forall a. (Ring a) => a -> a
 class (Ring a, ModuloSemiring a) <= DivisionRing a where
 ```
 
-Ring where every nonzero element has a multiplicative inverse (possibly
-a non-commutative field) so that ```a `mod` b = zero```
+Ring where every nonzero element has a multiplicative inverse so that:
+
+- ```a `mod` b = zero```
 
 #### `Num`
 
@@ -460,6 +499,7 @@ class Eq a where
   (/=) :: a -> a -> Boolean
 ```
 
+Equality comparisons.
 
 #### `refEq`
 
@@ -547,6 +587,14 @@ instance semigroupOrdening :: Semigroup Ordering
 class (Eq a) <= Ord a where
   compare :: a -> a -> Ordering
 ```
+
+Ordered comparisons.
+
+Represents a partially ordered set satisfying the following laws:
+
+- Reflexivity: `a <= a`
+- Antisymmetry: if `a <= b` and `b <= a` then `a = b`
+- Transitivity: if `a <= b` and `b <= c` then `a <= c`
 
 
 #### `(<)`
@@ -688,8 +736,6 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 
 
 ## Module Data.Function
-
-
 
 #### `on`
 
@@ -932,8 +978,6 @@ runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b ->
 
 ## Module Prelude.Unsafe
 
-
-
 #### `unsafeIndex`
 
 ``` purescript
@@ -943,8 +987,6 @@ unsafeIndex :: forall a. [a] -> Number -> a
 
 
 ## Module Control.Monad.Eff
-
-
 
 #### `Eff`
 
@@ -1047,8 +1089,6 @@ foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 
 ## Module Control.Monad.Eff.Unsafe
 
-
-
 #### `unsafeInterleaveEff`
 
 ``` purescript
@@ -1058,8 +1098,6 @@ unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 
 
 ## Module Debug.Trace
-
-
 
 #### `Trace`
 
@@ -1084,8 +1122,6 @@ print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 
 
 ## Module Control.Monad.ST
-
-
 
 #### `ST`
 
