@@ -576,10 +576,10 @@ instance showOrdering :: Show Ordering
 ```
 
 
-#### `semigroupOrdening`
+#### `semigroupOrdering`
 
 ``` purescript
-instance semigroupOrdening :: Semigroup Ordering
+instance semigroupOrdering :: Semigroup Ordering
 ```
 
 
