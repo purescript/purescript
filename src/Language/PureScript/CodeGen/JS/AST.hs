@@ -19,113 +19,33 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Data.Data
 
+import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Comments
 
 -- |
 -- Built-in unary operators
 --
-data UnaryOperator
+data JSUnaryOp
   -- |
   -- Numeric negation
   --
-  = Negate
+  = JSNegate
   -- |
   -- Boolean negation
   --
-  | Not
+  | JSNot
   -- |
   -- Bitwise negation
   --
-  | BitwiseNot
+  | JSBitwiseNot
   -- |
   -- Numeric unary \'plus\'
   --
-  | Positive
+  | JSPositive
   -- |
   -- Constructor
   --
   | JSNew deriving (Show, Eq, Data, Typeable)
-
--- |
--- Built-in binary operators
---
-data BinaryOperator
-  -- |
-  -- Numeric addition
-  --
-  = Add
-  -- |
-  -- Numeric subtraction
-  --
-  | Subtract
-  -- |
-  -- Numeric multiplication
-  --
-  | Multiply
-  -- |
-  -- Numeric division
-  --
-  | Divide
-  -- |
-  -- Remainder
-  --
-  | Modulus
-  -- |
-  -- Generic equality test
-  --
-  | EqualTo
-  -- |
-  -- Generic inequality test
-  --
-  | NotEqualTo
-  -- |
-  -- Numeric less-than
-  --
-  | LessThan
-  -- |
-  -- Numeric less-than-or-equal
-  --
-  | LessThanOrEqualTo
-  -- |
-  -- Numeric greater-than
-  --
-  | GreaterThan
-  -- |
-  -- Numeric greater-than-or-equal
-  --
-  | GreaterThanOrEqualTo
-  -- |
-  -- Boolean and
-  --
-  | And
-  -- |
-  -- Boolean or
-  --
-  | Or
-  -- |
-  -- Bitwise and
-  --
-  | BitwiseAnd
-  -- |
-  -- Bitwise or
-  --
-  | BitwiseOr
-  -- |
-  -- Bitwise xor
-  --
-  | BitwiseXor
-  -- |
-  -- Bitwise left shift
-  --
-  | ShiftLeft
-  -- |
-  -- Bitwise right shift
-  --
-  | ShiftRight
-  -- |
-  -- Bitwise right shift with zero-fill
-  --
-  | ZeroFillShiftRight deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- Data type for simplified Javascript expressions
@@ -146,11 +66,11 @@ data JS
   -- |
   -- A unary operator application
   --
-  | JSUnary UnaryOperator JS
+  | JSUnary JSUnaryOp JS
   -- |
   -- A binary operator application
   --
-  | JSBinary BinaryOperator JS JS
+  | JSBinary BinaryOp JS JS
   -- |
   -- An array literal
   --

@@ -14,10 +14,14 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Language.PureScript.CoreFn.Literals where
 
 import qualified Data.Data as D
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 -- |
 -- Data type for literal values. Parameterised so it can be used for Exprs and
@@ -43,4 +47,4 @@ data Literal a
   -- |
   -- An object literal
   --
-  | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable, Functor)
+  | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable, Functor, F.Foldable, T.Traversable)

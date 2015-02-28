@@ -27,8 +27,9 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.CoreImp.Operators
+import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
 shouldInline :: JS -> Bool
@@ -104,20 +105,20 @@ inlineCommonOperators = applyAll $
   [ binary C.semiringNumber (C.+) Add
   , binary C.semiringNumber (C.*) Multiply
   , binary C.ringNumber (C.-) Subtract
-  , unary  C.ringNumber C.negate Negate
+  , unary  C.ringNumber C.negate JSNegate
   , binary C.moduloSemiringNumber (C./) Divide
 
   , binary C.ordNumber (C.<) LessThan
   , binary C.ordNumber (C.>) GreaterThan
-  , binary C.ordNumber (C.<=) LessThanOrEqualTo
-  , binary C.ordNumber (C.>=) GreaterThanOrEqualTo
+  , binary C.ordNumber (C.<=) LessThanOrEqual
+  , binary C.ordNumber (C.>=) GreaterThanOrEqual
 
-  , binary C.eqNumber (C.==) EqualTo
-  , binary C.eqNumber (C./=) NotEqualTo
-  , binary C.eqString (C.==) EqualTo
-  , binary C.eqString (C./=) NotEqualTo
-  , binary C.eqBoolean (C.==) EqualTo
-  , binary C.eqBoolean (C./=) NotEqualTo
+  , binary C.eqNumber (C.==) Equal
+  , binary C.eqNumber (C./=) NotEqual
+  , binary C.eqString (C.==) Equal
+  , binary C.eqString (C./=) NotEqual
+  , binary C.eqBoolean (C.==) Equal
+  , binary C.eqBoolean (C./=) NotEqual
 
   , binary C.semigroupString (C.<>) Add
   , binary C.semigroupString (C.++) Add
@@ -128,27 +129,27 @@ inlineCommonOperators = applyAll $
   , binary         C.bitsNumber (C..&.) BitwiseAnd
   , binary         C.bitsNumber (C..|.) BitwiseOr
   , binary         C.bitsNumber (C..^.) BitwiseXor
-  , unary          C.bitsNumber C.complement BitwiseNot
+  , unary          C.bitsNumber C.complement JSBitwiseNot
 
   , binary C.boolLikeBoolean (C.&&) And
   , binary C.boolLikeBoolean (C.||) Or
-  , unary  C.boolLikeBoolean C.not Not
+  , unary  C.boolLikeBoolean C.not JSNot
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
-  binary :: String -> String -> BinaryOperator -> JS -> JS
+  binary :: String -> String -> BinaryOp -> JS -> JS
   binary dictName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeDict dictName dict && isPreludeFn opString fn = JSBinary op x y
     convert other = other
-  binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
+  binaryFunction :: String -> String -> BinaryOp -> JS -> JS
   binaryFunction dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeFn fnName fn && isPreludeDict dictName dict = JSBinary op x y
     convert other = other
-  unary :: String -> String -> UnaryOperator -> JS -> JS
+  unary :: String -> String -> JSUnaryOp -> JS -> JS
   unary dictName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS

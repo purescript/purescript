@@ -66,6 +66,11 @@ library
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
+                     Language.PureScript.CoreImp
+                     Language.PureScript.CoreImp.AST
+                     Language.PureScript.CoreImp.Desugar
+                     Language.PureScript.CoreImp.Module
+                     Language.PureScript.CoreImp.Operators
                      Language.PureScript.Comments
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment

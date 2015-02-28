@@ -19,6 +19,8 @@ module Language.PureScript.CodeGen.JS.Optimizer.Blocks
   ) where
 
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.CoreImp.Operators
+
 
 -- |
 -- Collapse blocks which appear nested directly below another block
