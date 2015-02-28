@@ -384,8 +384,8 @@ class Semiring a where
 
 Addition and multiplication, satisfying the following laws:
 
-- `a` is a commutative monoid under addition
-- `a` is a monoid under multiplication
+- `a` is a commutative monoid under addition with identity element zero
+- `a` is a monoid under multiplication with identity element one
 - multiplication distributes over addition
 - multiplication by `zero` annihilates `a`
 
