@@ -27,6 +27,7 @@ module Language.PureScript
   , MonadMake(..)
   , make
   , prelude
+  , version
   ) where
 
 import Data.FileEmbed (embedFile)
@@ -34,6 +35,7 @@ import Data.Function (on)
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
+import Data.Version (Version)
 import qualified Data.Traversable as T (traverse)
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Map as M
@@ -65,6 +67,8 @@ import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
 import qualified Language.PureScript.CoreFn as CoreFn
 import qualified Language.PureScript.Constants as C
+
+import qualified Paths_purescript as Paths
 
 -- |
 -- Compile a collection of modules
@@ -267,3 +271,6 @@ importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
 
 prelude :: String
 prelude = BU.toString $(embedFile "prelude/prelude.purs")
+
+version :: Version
+version = Paths.version
