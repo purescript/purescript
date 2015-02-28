@@ -178,6 +178,7 @@ moduleToJs (CI.Module coms mn imps exps foreigns stmnts) = do
   exprToJS (CI.AnonFunction _ args stmnts') = do
     body <- JSBlock <$> mapM statmentToJS stmnts'
     return $ JSFunction Nothing (identToJs `map` args) body
+  exprToJS (CI.App _ f []) = flip JSApp [] <$> exprToJS f
   exprToJS e@CI.App{} = do
     let (f, args) = unApp e []
     args' <- mapM exprToJS args
@@ -190,7 +191,7 @@ moduleToJs (CI.Module coms mn imps exps foreigns stmnts) = do
       _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> exprToJS f
     where
     unApp :: CI.Expr CI.Ann -> [CI.Expr CI.Ann] -> (CI.Expr CI.Ann, [CI.Expr CI.Ann])
-    unApp (CI.App _ val [arg]) args = unApp val (arg : args)
+    unApp (CI.App _ val args1) args2 = unApp val (args1 ++ args2)
     unApp other args = (other, args)
   exprToJS (CI.Var (_, _, _, Just (CI.IsConstructor _ [])) ident) =
     return $ JSAccessor "value" $ qualifiedToJS id ident
