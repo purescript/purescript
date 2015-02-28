@@ -35,7 +35,8 @@ library
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    file-embed >= 0.0.7 && < 0.0.8,
-                   time -any
+                   time -any,
+                   boxes >= 0.1.4 && < 0.2.0
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
