@@ -640,6 +640,7 @@ nodeFlagsFlag :: Parser [String]
 nodeFlagsFlag = option parser $
      long "node-opts"
   <> metavar "NODE_OPTS"
+  <> value []
   <> Opts.help "Flags to pass to node, separated by spaces"
   where
     parser = words <$> str
