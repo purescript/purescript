@@ -212,7 +212,6 @@ typeClassDictionaryDeclaration name args implies members =
         | (superclass, tyArgs) <- implies
         ]
       members' = map memberToNameAndType members
-  --in TypeSynonymDeclaration name args (TypeApp tyObject $ rowFromList (mtys, REmpty))
   in DataDeclaration Data name args [(name, superclasses ++ members')]
 
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> [Ident] -> Declaration -> Declaration
@@ -286,8 +285,8 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
-    return val
+    ty <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
+    return $ TypedValue True val ty
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d
     return (PositionedValue pos com val)

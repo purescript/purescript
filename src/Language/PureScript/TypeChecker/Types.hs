@@ -507,7 +507,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   case val' of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
     Just val'' -> do
-      val''' <- if checkType then withScopedTypeVars moduleName args (check val'' ty2') else return val''
+      val''' <- if checkType then withScopedTypeVars moduleName args (check val'' ty1') else return val''
       return $ TypedValue checkType (TypedValue True val''' ty1') ty2'
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
