@@ -147,7 +147,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [Type])]
+  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [(Ident, Type)])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --

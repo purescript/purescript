@@ -392,7 +392,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map (f . snd) . snd) dctors)
   forDecls (ExternDeclaration _ _ _ ty) = f ty
   forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)

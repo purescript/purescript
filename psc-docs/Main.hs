@@ -60,7 +60,7 @@ docgen (PSCDocsOptions fmt input) = do
         pairs = map (\(k,m) -> (fromMaybe "" k,m))
         ldump :: [String] -> IO ()
         ldump = mapM_ putStrLn
-    
+
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input = (,) input <$> readFile input
 
@@ -148,7 +148,7 @@ renderDeclaration exps (P.DataDeclaration dtype name args ctors) = do
   fencedBlock $ do
     tell [show dtype ++ " " ++ typeName]
     zipWithM_ (\isFirst (ctor, tys) ->
-                atIndent 2 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map P.prettyPrintTypeAtom tys))
+                atIndent 2 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map (P.prettyPrintTypeAtom . snd) tys))
               (True : repeat False) exported
 renderDeclaration _ (P.ExternDataDeclaration name kind) =
   fenced $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
@@ -242,13 +242,13 @@ instance Read Format where
     readsPrec _ "etags" = [(Etags, "")]
     readsPrec _ "ctags" = [(Ctags, "")]
     readsPrec _ "markdown" = [(Markdown, "")]
-    readsPrec _ _ = []    
+    readsPrec _ _ = []
 
 format :: Parser Format
 format = option auto $ value Markdown
          <> long "format"
          <> metavar "FORMAT"
-         <> help "Set output FORMAT (markdown | etags | ctags)"  
+         <> help "Set output FORMAT (markdown | etags | ctags)"
 
 pscDocsOptions :: Parser PSCDocsOptions
 pscDocsOptions = PSCDocsOptions <$> format <*> many inputFile

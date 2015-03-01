@@ -31,6 +31,7 @@ import Data.Foldable (for_)
 
 import qualified Data.Map as M
 
+import Control.Arrow (second)
 import Control.Monad.State
 import Control.Monad.Except
 
@@ -42,22 +43,22 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 
-addDataType :: ModuleName -> DataDeclType -> ProperName -> [(String, Maybe Kind)] -> [(ProperName, [Type])] -> Kind -> Check ()
+addDataType :: ModuleName -> DataDeclType -> ProperName -> [(String, Maybe Kind)] -> [(ProperName, [(Ident, Type)])] -> Kind -> Check ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
-  forM_ dctors $ \(dctor, tys) ->
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map (second (map snd)) dctors)) (types env) }
+  forM_ dctors $ \(dctor, dctorArgs) ->
     rethrow (onErrorMessages (ErrorInDataConstructor dctor)) $
-      addDataConstructor moduleName dtype name (map fst args) dctor tys
+      addDataConstructor moduleName dtype name (map fst args) dctor dctorArgs
 
-addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
-addDataConstructor moduleName dtype name args dctor tys = do
+addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [(Ident, Type)] -> Check ()
+addDataConstructor moduleName dtype name args dctor dctorArgs = do
+  let (fields, tys) = unzip dctorArgs
   env <- getEnv
   mapM_ checkTypeSynonyms tys
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Type -> Kind -> Check ()
@@ -137,13 +138,13 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (onErrorMessages (ErrorInTypeConstructor name)) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
+      ctorKind <- kindsOf True moduleName name args (concatMap (map snd . snd) dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     ds <- go rest
     return $ DataDeclaration dtype name args dctors : ds
     where
-    checkNewtype :: [(ProperName, [Type])] -> Check ()
+    checkNewtype :: [(ProperName, [(Ident, Type)])] -> Check ()
     checkNewtype [(_, [_])] = return ()
     checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype
     checkNewtype _ = throwError . errorMessage $ InvalidNewtype
@@ -151,7 +152,7 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (onErrorMessages ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap (map snd . snd) dctors)) dataDecls)
       forM_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` ctorKind
