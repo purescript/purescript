@@ -523,9 +523,6 @@ check' (ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
   return $ TypedValue True (ObjectLiteral ps') t
-check' (TypeClassDictionaryConstructorApp name ps) t = do
-  ps' <- check' ps t
-  return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
 check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
@@ -660,7 +657,7 @@ meet e1 e2 t1 t2 = do
 -- Ensure a set of property names and value does not contain duplicate labels
 --
 ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(String, Expr)] -> m ()
-ensureNoDuplicateProperties ps = 
+ensureNoDuplicateProperties ps =
   let ls = map fst ps in
   case ls \\ nub ls of
     l : _ -> throwError . errorMessage $ DuplicateLabel l Nothing

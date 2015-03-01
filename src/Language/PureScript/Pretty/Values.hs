@@ -47,11 +47,6 @@ literals = mkPattern' match
   match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
   match (ObjectConstructor ps) = prettyPrintObject' ps
   match (ObjectGetter prop) = return $ "(." ++ prop ++ ")"
-  match (TypeClassDictionaryConstructorApp className ps) = concat <$> sequence
-    [ return (show className ++ "(\n")
-    , match ps
-    , return ")"
-    ]
   match (Constructor name) = return $ show name
   match (Case values binders) = concat <$> sequence
     [ return "case "
