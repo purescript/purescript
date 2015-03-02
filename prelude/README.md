@@ -72,6 +72,8 @@ element `id`, just composable morphisms.
 
 - Associativity: `p <<< (q <<< r) = (p <<< q) <<< r`
 
+One example of a `Semigroupoid` is the function type constructor `(->)`, with `(<<<)` defined
+as function composition.
 
 #### `semigroupoidArr`
 
@@ -86,6 +88,7 @@ instance semigroupoidArr :: Semigroupoid Prim.Function
 (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
 ```
 
+Forwards composition, or `(<<<)` with its arguments reversed.
 
 #### `Category`
 
@@ -160,12 +163,9 @@ length (groupBy productCategory (filter isInStock (products)))
 (:) :: forall a. a -> [a] -> [a]
 ```
 
-Attaches an element to the front of a list.
+An infix alias for `cons`.
 
-```purescript
-1 : [2, 3, 4] = [1, 2, 3, 4]
-```
-
+Note, the running time of this function is `O(n)`.
 
 #### `cons`
 
@@ -173,6 +173,13 @@ Attaches an element to the front of a list.
 cons :: forall a. a -> [a] -> [a]
 ```
 
+Attaches an element to the front of an array, creating a new array.
+
+```purescript
+cons 1 [2, 3, 4] = [1, 2, 3, 4]
+```
+
+Note, the running time of this function is `O(n)`.
 
 #### `Show`
 
@@ -181,6 +188,10 @@ class Show a where
   show :: a -> String
 ```
 
+The `Show` type class represents those types which can be converted into a human-readable `String` representation.
+
+While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code 
+which evaluates to the same value as the expression `x`.
 
 #### `showUnit`
 
@@ -224,10 +235,12 @@ class Functor f where
   (<$>) :: forall a b. (a -> b) -> f a -> f b
 ```
 
-A `Functor` is intuitively a type which can be mapped over, and more formally a mapping
-between [`Category`](#category)s that preserves structure.
+A `Functor` is a type constructor which supports a mapping operation `(<$>)`.
 
-`Functor`s should obey the following rules.
+`(<$>)` can be used to turn functions `a -> b` into functions `f a -> f b` whose argument and return
+types use the type constructor `f` to represent some computational context.
+
+`Functor` instances should satisfy the following laws:
 
 - Identity: `(<$>) id = id`
 - Composition: `(<$>) (f <<< g) = (<$> f) <<< (<$> g)`
@@ -239,6 +252,11 @@ between [`Category`](#category)s that preserves structure.
 (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
 ```
 
+`(<#>)` is `(<$>)` with its arguments flipped. For example:
+
+```purescript
+[1, 2, 3] <#> \n -> n * n
+```
 
 #### `void`
 
@@ -246,6 +264,16 @@ between [`Category`](#category)s that preserves structure.
 void :: forall f a. (Functor f) => f a -> f Unit
 ```
 
+The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and 
+keeping only the type information provided by the type constructor itself.
+
+`void` is often useful when using `do` notation to change the return type of a monadic computation:
+
+```purescript
+main = forE 1 10 \n -> void do
+  print n
+  print (n * n)
+```
 
 #### `Apply`
 
@@ -254,13 +282,24 @@ class (Functor f) <= Apply f where
   (<*>) :: forall a b. f (a -> b) -> f a -> f b
 ```
 
-`Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
-strong lax semi-monoidal endofunctor.
+The `Apply` class provides the `(<*>)` which is used to apply a function to an argument under a type constructor.
 
-`Apply`s should obey the following rule.
+`Apply` can be used to lift functions of two or more arguments to work on values wrapped with the type constructor `f`.
+It might also be understood in terms of the `lift2` function:
+
+```purescript
+lift2 :: forall f a b c. (Apply f) => (a -> b -> c) -> f a -> f b -> f c
+lift2 f a b = f <$> a <*> b
+```
+
+`(<*>)` is recovered from `lift2` as `lift2 ($)`. That is, `(<*>)` lifts the function application operator `($)` to arguments
+wrapped with the type constructor `f`.
+
+`Apply` instances should satisfy the following law:
 
 - Associative Composition: `(<<<) <$> f <*> g <*> h = f <*> (g <*> h)`
 
+Formally, `Apply` represents a strong lax semi-monoidal endofunctor.
 
 #### `Applicative`
 
@@ -269,10 +308,14 @@ class (Apply f) <= Applicative f where
   pure :: forall a. a -> f a
 ```
 
-`Applicative`s are [`Functor`](#functor)s which can be "applied" by sequencing composition
-(`<*>`) or embedding pure expressions (`pure`).
+The `Applicative` type class extends the [`Apply`](#apply) type class with a `pure` function, which can be used to
+create values of type `f a` from values of type `a`.
 
-`Applicative`s should obey the following rules.
+Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`, 
+and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of 
+_zero_ arguments. That is, `Applicative` functors support a lifting operation for any number of function arguments.
+
+`Applicative` instances should satisfy the following laws:
 
 - Identity: `(pure id) <*> v = v`
 - Composition: `(pure <<<) <*> f <*> g <*> h = f <*> (g <*> h)`
@@ -286,6 +329,15 @@ class (Apply f) <= Applicative f where
 liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
 ```
 
+`liftA1` provides a default implementation of `(<$>)` for any [`Applicative`](#applicative) functor,
+without using `(<$>)` as provided by the [`Functor`](#functor)-[`Applicative`](#applicative) superclass relationship.
+
+`liftA1` can therefore be used to write [`Functor`](#functor) instances as follows:
+
+```purescript
+instance functorF :: Functor F where
+  (<$>) = liftA1
+```
 
 #### `Bind`
 
@@ -294,12 +346,33 @@ class (Apply m) <= Bind m where
   (>>=) :: forall a b. m a -> (a -> m b) -> m b
 ```
 
-A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially composes actions.
+The `Bind` type class extends the [`Apply`](#apply) type class with a "bind" operation `(>>=)` which composes computations
+in sequence, using the return value of one computation to determine the next computation.
 
-`Bind`s should obey the following rule.
+The `>>=` operator can also be expressed using `do` notation, as follows:
 
-- Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+```purescript
+x >>= f = do y <- x
+             f y
+```
 
+where the function argument of `f` is given the name `y`.
+
+`Bind` instances should satisfy the following law:
+
+- Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
+
+Or, expressed using `do` notation: 
+
+- Associativity: `do { z <- do { y <- x ; f y } ; g z } = do { k <- x ; do { y <- f k ; g y } }`
+
+Associativity tells us that we can regroup operations which use do-notation, so that we can unambiguously write, for example:
+
+```purescript
+do x <- m1
+   y <- m2 x
+   m3 x y
+```
 
 #### `Monad`
 
@@ -307,13 +380,18 @@ A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially compos
 class (Applicative m, Bind m) <= Monad m where
 ```
 
-`Monad` is a class which can be intuitively thought of as an abstract datatype of actions or
-more formally though of as a monoid in the category of endofunctors.
+The `Monad` type class combines the operations of the `Bind` and `Applicative` type classes. Therefore, `Monad` instances
+represent type constructors which support sequential composition, and also lifting of functions of arbitrary arity.
 
-`Monad`s should obey the following rules.
+`Monad` instances should satisfy the following laws:
 
 - Left Identity: `pure x >>= f = f x`
 - Right Identity: `x >>= pure = x`
+
+Or, expressed using `do` notation: 
+
+- Left Identity: `do { y <- pure x ; f y } = f x`
+- Right Identity: `do { y <- x ; pure y } = x`
 
 
 #### `return`
@@ -322,6 +400,7 @@ more formally though of as a monoid in the category of endofunctors.
 return :: forall m a. (Monad m) => a -> m a
 ```
 
+`return` is an alias for `pure`.
 
 #### `liftM1`
 
@@ -329,6 +408,15 @@ return :: forall m a. (Monad m) => a -> m a
 liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 ```
 
+`liftM1` provides a default implementation of `(<$>)` for any [`Monad`](#monad),
+without using `(<$>)` as provided by the [`Functor`](#functor)-[`Monad`](#monad) superclass relationship.
+
+`liftM1` can therefore be used to write [`Functor`](#functor) instances as follows:
+
+```purescript
+instance functorF :: Functor F where
+  (<$>) = liftM1
+```
 
 #### `ap`
 
@@ -336,6 +424,15 @@ liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
 ```
 
+`ap` provides a default implementation of `(<*>)` for any [`Monad`](#monad),
+without using `(<*>)` as provided by the [`Apply`](#apply)-[`Monad`](#monad) superclass relationship.
+
+`ap` can therefore be used to write [`Apply`](#apply) instances as follows:
+
+```purescript
+instance applyF :: Apply F where
+  (<*>) = ap
+```
 
 #### `functorArr`
 
@@ -384,8 +481,8 @@ class Semiring a where
 
 Addition and multiplication, satisfying the following laws:
 
-- `a` is a commutative monoid under addition with identity element zero
-- `a` is a monoid under multiplication with identity element one
+- `a` is a commutative monoid under addition
+- `a` is a monoid under multiplication
 - multiplication distributes over addition
 - multiplication by `zero` annihilates `a`
 
@@ -485,6 +582,10 @@ newtype Unit
   = Unit {  }
 ```
 
+The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
+
+`Unit` is often used, wrapped in a monadic type constructor, as the return type of a computation where only
+the _effects_ are important.
 
 #### `unit`
 
@@ -492,6 +593,7 @@ newtype Unit
 unit :: Unit
 ```
 
+`unit` is the sole inhabitant of the `Unit` type.
 
 #### `Eq`
 
@@ -501,7 +603,16 @@ class Eq a where
   (/=) :: a -> a -> Boolean
 ```
 
-Class for types that have an equality comparison.
+The `Eq` type class represents types which support decidable equality.
+
+`Eq` instances should satisfy the following laws:
+
+- Reflexivity: `x == x = true`
+- Symmetry: `x == y = y == x`
+- Transitivity: if `x == y` and `y == z` then `x == z`
+- Negation: `x /= y = not (x == y)`
+
+`(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
 
 #### `refEq`
 
@@ -561,6 +672,11 @@ data Ordering
   | EQ 
 ```
 
+The `Ordering` data type represents the three possible outcomes of comparing two values:
+
+`LT` - The first value is _less than_ the second.
+`GT` - The first value is _greater than_ the second.
+`EQ` - The first value is _equal to_ or _incomparable to_ the second.
 
 #### `eqOrdering`
 
@@ -590,9 +706,9 @@ class (Eq a) <= Ord a where
   compare :: a -> a -> Ordering
 ```
 
-Class for types that have ordered comparisons.
+The `Ord` type class represents types which support comparisons.
 
-Represents a partially ordered set satisfying the following laws:
+`Ord` instances should satisfy the laws of _partially orderings_:
 
 - Reflexivity: `a <= a`
 - Antisymmetry: if `a <= b` and `b <= a` then `a = b`
@@ -605,6 +721,7 @@ Represents a partially ordered set satisfying the following laws:
 (<) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _strictly less than_ another.
 
 #### `(>)`
 
@@ -612,6 +729,7 @@ Represents a partially ordered set satisfying the following laws:
 (>) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _strictly greater than_ another.
 
 #### `(<=)`
 
@@ -619,6 +737,7 @@ Represents a partially ordered set satisfying the following laws:
 (<=) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _non-strictly less than_ another.
 
 #### `(>=)`
 
@@ -626,6 +745,7 @@ Represents a partially ordered set satisfying the following laws:
 (>=) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _non-strictly greater than_ another.
 
 #### `ordUnit`
 
@@ -675,6 +795,7 @@ class Bits b where
   complement :: b -> b
 ```
 
+The `Bits` type class identifies types which support bitwise operations.
 
 #### `bitsNumber`
 
@@ -692,6 +813,10 @@ class BoolLike b where
   not :: b -> b
 ```
 
+The `BoolLike` type class identifies types which support Boolean operations.
+
+`BoolLike` instances are required to satisfy the laws of a _Boolean algebra_.
+
 
 #### `boolLikeBoolean`
 
@@ -707,6 +832,13 @@ class Semigroup a where
   (<>) :: a -> a -> a
 ```
 
+The `Semigroup` type class identifies an associative operation on a type.
+
+`Semigroup` instances are required to satisfy the following law:
+
+- Associativity: `(x <> y) <> z = x <> (y <> z)`
+
+For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
 
 #### `semigroupUnit`
 
@@ -735,6 +867,7 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 (++) :: forall s. (Semigroup s) => s -> s -> s
 ```
 
+`(++)` is an alias for `(<>)`.
 
 
 ## Module Data.Function
