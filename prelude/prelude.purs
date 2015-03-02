@@ -146,14 +146,19 @@ module Prelude
 
   infixr 6 :
 
-  -- | Attaches an element to the front of an array, creating a new array.
+  -- | An infix alias for `cons`.
   -- |
-  -- | ```purescript
-  -- | 1 : [2, 3, 4] = [1, 2, 3, 4]
-  -- | ```
+  -- | Note, the running time of this function is `O(n)`.
   (:) :: forall a. a -> [a] -> [a]
   (:) = cons
 
+  -- | Attaches an element to the front of an array, creating a new array.
+  -- |
+  -- | ```purescript
+  -- | cons 1 [2, 3, 4] = [1, 2, 3, 4]
+  -- | ```
+  -- |
+  -- | Note, the running time of this function is `O(n)`.
   foreign import cons
     """
     function cons(e) {
@@ -318,7 +323,7 @@ module Prelude
   -- | 
   -- | `Bind` instances should satisfy the following law:
   -- |
-  -- | - Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+  -- | - Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
   -- |
   -- | Or, expressed using `do` notation: 
   -- | 
@@ -526,10 +531,10 @@ module Prelude
   -- |
   -- | `Eq` instances should satisfy the following laws:
   -- | 
-  -- | - Reflexivity: `forall x. x == x = true`
-  -- | - Symmetry: `forall x y. x == y = y == x`
+  -- | - Reflexivity: `x == x = true`
+  -- | - Symmetry: `x == y = y == x`
   -- | - Transitivity: if `x == y` and `y == z` then `x == z`
-  -- | - Negation: `forall x y. x /= y = not (x == y)`
+  -- | - Negation: `x /= y = not (x == y)`
   -- |
   -- | `(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
   class Eq a where
@@ -829,7 +834,7 @@ module Prelude
   -- | 
   -- | `Semigroup` instances are required to satisfy the following law:
   -- | 
-  -- | - Associativity: `forall x y z. (x <> y) <> z = x <> (y <> z)`
+  -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
   -- | 
   -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
   class Semigroup a where

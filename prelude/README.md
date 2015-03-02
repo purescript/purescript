@@ -163,11 +163,9 @@ length (groupBy productCategory (filter isInStock (products)))
 (:) :: forall a. a -> [a] -> [a]
 ```
 
-Attaches an element to the front of an array, creating a new array.
+An infix alias for `cons`.
 
-```purescript
-1 : [2, 3, 4] = [1, 2, 3, 4]
-```
+Note, the running time of this function is `O(n)`.
 
 #### `cons`
 
@@ -175,6 +173,13 @@ Attaches an element to the front of an array, creating a new array.
 cons :: forall a. a -> [a] -> [a]
 ```
 
+Attaches an element to the front of an array, creating a new array.
+
+```purescript
+cons 1 [2, 3, 4] = [1, 2, 3, 4]
+```
+
+Note, the running time of this function is `O(n)`.
 
 #### `Show`
 
@@ -355,7 +360,7 @@ where the function argument of `f` is given the name `y`.
 
 `Bind` instances should satisfy the following law:
 
-- Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+- Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
 
 Or, expressed using `do` notation: 
 
@@ -602,10 +607,10 @@ The `Eq` type class represents types which support decidable equality.
 
 `Eq` instances should satisfy the following laws:
 
-- Reflexivity: `forall x. x == x = true`
-- Symmetry: `forall x y. x == y = y == x`
+- Reflexivity: `x == x = true`
+- Symmetry: `x == y = y == x`
 - Transitivity: if `x == y` and `y == z` then `x == z`
-- Negation: `forall x y. x /= y = not (x == y)`
+- Negation: `x /= y = not (x == y)`
 
 `(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
 
@@ -831,7 +836,7 @@ The `Semigroup` type class identifies an associative operation on a type.
 
 `Semigroup` instances are required to satisfy the following law:
 
-- Associativity: `forall x y z. (x <> y) <> z = x <> (y <> z)`
+- Associativity: `(x <> y) <> z = x <> (y <> z)`
 
 For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
 
