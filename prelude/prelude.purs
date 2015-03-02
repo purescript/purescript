@@ -1370,7 +1370,7 @@ module Control.Monad.Eff.Unsafe where
 
   -- | Change the type of an effectful computation, allowing it to be run in another context.
   -- | 
-  -- | Note: use of this function can result in arbitrary side-effects/
+  -- | Note: use of this function can result in arbitrary side-effects.
   foreign import unsafeInterleaveEff
     """
     function unsafeInterleaveEff(f) {
