@@ -878,6 +878,14 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 ```
 
+The `on` function is used to change the domain of a binary operator.
+
+For example, given a function `height :: Person -> Number`, we can create a function which compares two people by height:
+
+```purescript
+taller :: (>) `on` height
+```
+
 
 #### `Fn0`
 
@@ -885,6 +893,7 @@ on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 data Fn0 :: * -> *
 ```
 
+A function of zero arguments
 
 #### `Fn1`
 
@@ -892,6 +901,7 @@ data Fn0 :: * -> *
 data Fn1 :: * -> * -> *
 ```
 
+A function of one argument
 
 #### `Fn2`
 
@@ -899,6 +909,7 @@ data Fn1 :: * -> * -> *
 data Fn2 :: * -> * -> * -> *
 ```
 
+A function of two arguments
 
 #### `Fn3`
 
@@ -906,6 +917,7 @@ data Fn2 :: * -> * -> * -> *
 data Fn3 :: * -> * -> * -> * -> *
 ```
 
+A function of three arguments
 
 #### `Fn4`
 
@@ -913,6 +925,7 @@ data Fn3 :: * -> * -> * -> * -> *
 data Fn4 :: * -> * -> * -> * -> * -> *
 ```
 
+A function of four arguments
 
 #### `Fn5`
 
@@ -920,6 +933,7 @@ data Fn4 :: * -> * -> * -> * -> * -> *
 data Fn5 :: * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of five arguments
 
 #### `Fn6`
 
@@ -927,6 +941,7 @@ data Fn5 :: * -> * -> * -> * -> * -> * -> *
 data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of six arguments
 
 #### `Fn7`
 
@@ -934,6 +949,7 @@ data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
 data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of seven arguments
 
 #### `Fn8`
 
@@ -941,6 +957,7 @@ data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of eight arguments
 
 #### `Fn9`
 
@@ -948,6 +965,7 @@ data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of nine arguments
 
 #### `Fn10`
 
@@ -955,6 +973,7 @@ data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of ten arguments
 
 #### `mkFn0`
 
@@ -962,6 +981,7 @@ data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 mkFn0 :: forall a. (Unit -> a) -> Fn0 a
 ```
 
+Create a function of no arguments
 
 #### `mkFn1`
 
@@ -969,6 +989,7 @@ mkFn0 :: forall a. (Unit -> a) -> Fn0 a
 mkFn1 :: forall a b. (a -> b) -> Fn1 a b
 ```
 
+Create a function of one argument
 
 #### `mkFn2`
 
@@ -976,6 +997,7 @@ mkFn1 :: forall a b. (a -> b) -> Fn1 a b
 mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
 ```
 
+Create a function of two arguments from a curried function
 
 #### `mkFn3`
 
@@ -983,6 +1005,7 @@ mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
 mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
 ```
 
+Create a function of three arguments from a curried function
 
 #### `mkFn4`
 
@@ -990,6 +1013,7 @@ mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
 mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
 ```
 
+Create a function of four arguments from a curried function
 
 #### `mkFn5`
 
@@ -997,6 +1021,7 @@ mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
 mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
 ```
 
+Create a function of five arguments from a curried function
 
 #### `mkFn6`
 
@@ -1004,6 +1029,7 @@ mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
 mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
 ```
 
+Create a function of six arguments from a curried function
 
 #### `mkFn7`
 
@@ -1011,6 +1037,7 @@ mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d 
 mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
 ```
 
+Create a function of seven arguments from a curried function
 
 #### `mkFn8`
 
@@ -1018,6 +1045,7 @@ mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a
 mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
 ```
 
+Create a function of eight arguments from a curried function
 
 #### `mkFn9`
 
@@ -1025,6 +1053,7 @@ mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -
 mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
 ```
 
+Create a function of nine arguments from a curried function
 
 #### `mkFn10`
 
@@ -1032,6 +1061,7 @@ mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i 
 mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
 ```
 
+Create a function of ten arguments from a curried function
 
 #### `runFn0`
 
@@ -1039,6 +1069,7 @@ mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h ->
 runFn0 :: forall a. Fn0 a -> a
 ```
 
+Apply a function of no arguments
 
 #### `runFn1`
 
@@ -1046,6 +1077,7 @@ runFn0 :: forall a. Fn0 a -> a
 runFn1 :: forall a b. Fn1 a b -> a -> b
 ```
 
+Apply a function of one argument
 
 #### `runFn2`
 
@@ -1053,6 +1085,7 @@ runFn1 :: forall a b. Fn1 a b -> a -> b
 runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
 ```
 
+Apply a function of two arguments
 
 #### `runFn3`
 
@@ -1060,6 +1093,7 @@ runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
 runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
 ```
 
+Apply a function of three arguments
 
 #### `runFn4`
 
@@ -1067,6 +1101,7 @@ runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
 runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
 ```
 
+Apply a function of four arguments
 
 #### `runFn5`
 
@@ -1074,6 +1109,7 @@ runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
 runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
 ```
 
+Apply a function of five arguments
 
 #### `runFn6`
 
@@ -1081,6 +1117,7 @@ runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
 runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
 ```
 
+Apply a function of six arguments
 
 #### `runFn7`
 
@@ -1088,6 +1125,7 @@ runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f 
 runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
 ```
 
+Apply a function of seven arguments
 
 #### `runFn8`
 
@@ -1095,6 +1133,7 @@ runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -
 runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
 ```
 
+Apply a function of eight arguments
 
 #### `runFn9`
 
@@ -1102,6 +1141,7 @@ runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d ->
 runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
 ```
 
+Apply a function of nine arguments
 
 #### `runFn10`
 
@@ -1109,6 +1149,7 @@ runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> 
 runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 ```
 
+Apply a function of ten arguments
 
 
 ## Module Prelude.Unsafe
@@ -1119,6 +1160,9 @@ runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b ->
 unsafeIndex :: forall a. [a] -> Number -> a
 ```
 
+Find the element of an array at the specified index.
+
+Note: this function can cause unpredictable failure at runtime if the index is out-of-bounds.
 
 
 ## Module Control.Monad.Eff
@@ -1129,20 +1173,11 @@ unsafeIndex :: forall a. [a] -> Number -> a
 data Eff :: # ! -> * -> *
 ```
 
+The `Eff` type constructor is used to represent _native_ effects.
 
-#### `returnE`
+See [Handling Native Effects with the Eff Monad](https://github.com/purescript/purescript/wiki/Handling-Native-Effects-with-the-Eff-Monad) for more details.
 
-``` purescript
-returnE :: forall e a. a -> Eff e a
-```
-
-
-#### `bindE`
-
-``` purescript
-bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
-```
-
+The first type parameter is a row of effects which represents the contexts in which a computation can be run, and the second type parameter is the return type.
 
 #### `Pure`
 
@@ -1150,6 +1185,9 @@ bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 type Pure a = forall e. Eff e a
 ```
 
+The `Pure` type synonym represents _pure_ computations, i.e. ones in which all effects have been handled.
+
+The `runPure` function can be used to run pure computations and obtain their result.
 
 #### `runPure`
 
@@ -1157,6 +1195,10 @@ type Pure a = forall e. Eff e a
 runPure :: forall a. Pure a -> a
 ```
 
+Run a pure computation and return its result.
+
+Note: since this function has a rank-2 type, it may cause problems to apply this function using the `$` operator. The recommended approach
+is to use parentheses instead.
 
 #### `functorEff`
 
@@ -1199,6 +1241,10 @@ instance monadEff :: Monad (Eff e)
 untilE :: forall e. Eff e Boolean -> Eff e Unit
 ```
 
+Loop until a condition becomes `true`.
+
+`untilE b` is an effectful computation which repeatedly runs the effectful computation `b`, 
+until its return value is `true`.
 
 #### `whileE`
 
@@ -1206,6 +1252,10 @@ untilE :: forall e. Eff e Boolean -> Eff e Unit
 whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 ```
 
+Loop while a condition is `true`.
+
+`whileE b m` is effectful computation which runs the effectful computation `b`. If its result is 
+`true`, it runs the effectful computation `m` and loops. If not, the computation ends.
 
 #### `forE`
 
@@ -1213,6 +1263,10 @@ whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 ```
 
+Loop over a consecutive collection of numbers.
+
+`forE lo hi f` runs the computation returned by the function `f` for each of the inputs
+between `lo` (inclusive) and `hi` (exclusive).
 
 #### `foreachE`
 
@@ -1220,6 +1274,9 @@ forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 ```
 
+Loop over an array of values.
+
+`foreach xs f` runs the computation returned by the function `f` for each of the inputs `xs`.
 
 
 ## Module Control.Monad.Eff.Unsafe
@@ -1230,6 +1287,9 @@ foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 ```
 
+Change the type of an effectful computation, allowing it to be run in another context.
+
+Note: use of this function can result in arbitrary side-effects/
 
 
 ## Module Debug.Trace
@@ -1240,6 +1300,7 @@ unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 data Trace :: !
 ```
 
+The `Trace` effect represents those computations which write to the console.
 
 #### `trace`
 
@@ -1247,6 +1308,7 @@ data Trace :: !
 trace :: forall r. String -> Eff (trace :: Trace | r) Unit
 ```
 
+Write a `String` to the console.
 
 #### `print`
 
@@ -1254,6 +1316,7 @@ trace :: forall r. String -> Eff (trace :: Trace | r) Unit
 print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 ```
 
+Write a value to the console, using its `Show` instance to produce a `String`.
 
 
 ## Module Control.Monad.ST
@@ -1264,6 +1327,11 @@ print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 data ST :: * -> !
 ```
 
+The `ST` effect represents _local mutation_, i.e. mutation which does not "escape" into the surrounding computation.
+
+An `ST` computation is parameterized by a phantom type which is used to restrict the set of reference cells it is allowed to access.
+
+The `runST` function can be used to handle the `ST` effect.
 
 #### `STRef`
 
@@ -1271,6 +1339,7 @@ data ST :: * -> !
 data STRef :: * -> * -> *
 ```
 
+The type `STRef s a` represents a mutable reference holding a value of type `a`, which can be used with the `ST s` effect.
 
 #### `newSTRef`
 
@@ -1278,6 +1347,7 @@ data STRef :: * -> * -> *
 newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 ```
 
+Create a new mutable reference.
 
 #### `readSTRef`
 
@@ -1285,6 +1355,7 @@ newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 ```
 
+Read the current value of a mutable reference.
 
 #### `modifySTRef`
 
@@ -1292,6 +1363,7 @@ readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 ```
 
+Modify the value of a mutable reference by applying a function to the current value.
 
 #### `writeSTRef`
 
@@ -1299,6 +1371,7 @@ modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 ```
 
+Set the value of a mutable reference.
 
 #### `runST`
 
@@ -1306,6 +1379,12 @@ writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 ```
 
+Run an `ST` computation.
+
+Note: the type of `runST` uses a rank-2 type to constrain the phantom type `s`, such that the computation must not leak any mutable references
+to the surrounding computation.
+
+It may cause problems to apply this function using the `$` operator. The recommended approach is to use parentheses instead.
 
 #### `pureST`
 
@@ -1313,6 +1392,10 @@ runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
 ```
 
+A convenience function which combines `runST` with `runPure`, which can be used when the only required effect is `ST`.
+
+Note: since this function has a rank-2 type, it may cause problems to apply this function using the `$` operator. The recommended approach
+is to use parentheses instead.
 
 
 
