@@ -883,7 +883,8 @@ The `on` function is used to change the domain of a binary operator.
 For example, given a function `height :: Person -> Number`, we can create a function which compares two people by height:
 
 ```purescript
-taller :: (>) `on` height
+taller :: Person -> Person -> Boolean
+taller = (>) `on` height
 ```
 
 

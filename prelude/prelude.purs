@@ -871,7 +871,8 @@ module Data.Function where
   -- | For example, given a function `height :: Person -> Number`, we can create a function which compares two people by height:
   -- | 
   -- | ```purescript
-  -- | taller :: (>) `on` height
+  -- | taller :: Person -> Person -> Boolean
+  -- | taller = (>) `on` height
   -- | ```
   -- | 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
