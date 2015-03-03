@@ -229,7 +229,7 @@ module Prelude
   -- | `Functor` instances should satisfy the following laws:
   -- |
   -- | - Identity: `(<$>) id = id`
-  -- | - Composition: `(<$>) (f <<< g) = (<$> f) <<< (<$> g)`
+  -- | - Composition: `(<$>) (f <<< g) = (f <$>) <<< (g <$>)`
   -- |
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b

@@ -243,7 +243,7 @@ types use the type constructor `f` to represent some computational context.
 `Functor` instances should satisfy the following laws:
 
 - Identity: `(<$>) id = id`
-- Composition: `(<$>) (f <<< g) = (<$> f) <<< (<$> g)`
+- Composition: `(<$>) (f <<< g) = (f <$>) <<< (g <$>)`
 
 
 #### `(<#>)`
