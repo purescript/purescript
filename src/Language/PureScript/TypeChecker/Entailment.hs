@@ -36,6 +36,7 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Language.PureScript.Sugar.TypeClasses (classDictionaryName)
 import qualified Language.PureScript.Constants as C
 
 -- |
@@ -101,7 +102,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       dictionaryValueToValue (GlobalDictionaryValue fnName) = Var fnName
       dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
       dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
-        App (Accessor (C.__superclass_ ++ show superclassName ++ "_" ++ show index)
+        App (Accessor (runIdent $ classDictionaryName superclassName index)
                       (dictionaryValueToValue dict))
             valUndefined
       -- Ensure that a substitution is valid
@@ -161,7 +162,7 @@ typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String
 typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
+typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2
                                                                                   <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
@@ -170,16 +171,16 @@ typeHeadsAreEqual _ _ REmpty REmpty = Just []
 typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
-      
+
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int 
+  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int
           <*> go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-  go [] REmpty          [] REmpty          = Just [] 
-  go [] (TUnknown _)    _  _               = Just [] 
+  go [] REmpty          [] REmpty          = Just []
+  go [] (TUnknown _)    _  _               = Just []
   go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
   go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]

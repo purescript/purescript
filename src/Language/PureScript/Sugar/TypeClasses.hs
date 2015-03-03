@@ -16,7 +16,10 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 
-module Language.PureScript.Sugar.TypeClasses (desugarTypeClasses) where
+module Language.PureScript.Sugar.TypeClasses
+  ( desugarTypeClasses
+  , classDictionaryName
+  ) where
 
 import Language.PureScript.AST hiding (isExported)
 import Language.PureScript.Environment
@@ -302,6 +305,10 @@ typeClassMemberNames = map go
 
 superClassDictionaryNames :: [Constraint] -> [Ident]
 superClassDictionaryNames supers =
-  [ Ident (C.__superclass_ ++ show pn ++ "_" ++ show (index :: Integer))
-  | (index, (pn, _)) <- zip [0..] supers
-  ]
+  [ classDictionaryName pn index | (index, (pn, _)) <- zip [0..] supers ]
+
+classDictionaryName :: Qualified ProperName -> Integer -> Ident
+classDictionaryName pn index = Ident (map replaceDot (show pn) ++ "_" ++ show index)
+  where
+  replaceDot '.' = '_'
+  replaceDot c = c

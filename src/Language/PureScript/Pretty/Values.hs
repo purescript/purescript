@@ -71,9 +71,9 @@ literals = mkPattern' match
     ]
   match (OperatorSection op (Right val)) = return $ "(" ++ prettyPrintValue op ++ " " ++ prettyPrintValue val ++ ")"
   match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ prettyPrintValue op ++ ")"
-  match (TypeClassDictionary name _ _) = return $ "<<dict " ++ show name ++ ">>"
+  match (TypeClassDictionary _ cstr _) = return $ "<<dict " ++ show cstr ++ ">>"
   match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
-  match (TypedValue _ val _) = prettyPrintValue' val
+  match (TypedValue _ val ty) = return $ "(" ++ prettyPrintValue val ++ ") :: " ++ prettyPrintType ty
   match (PositionedValue _ _ val) = prettyPrintValue' val
   match _ = mzero
 
