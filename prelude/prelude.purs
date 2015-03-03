@@ -234,7 +234,7 @@ module Prelude
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
 
-  -- | `(<#>)` is `(<$>)` with its arguments flipped. For example:
+  -- | `(<#>)` is `(<$>)` with its arguments reversed. For example:
   -- | 
   -- | ```purescript
   -- | [1, 2, 3] <#> \n -> n * n
@@ -868,13 +868,12 @@ module Data.Function where
 
   -- | The `on` function is used to change the domain of a binary operator.
   -- | 
-  -- | For example, given a function `height :: Person -> Number`, we can create a function which compares two people by height:
+  -- | For example, we can create a function which compares two records based on the values of their `x` properties:
   -- | 
   -- | ```purescript
-  -- | taller :: Person -> Person -> Boolean
-  -- | taller = (>) `on` height
+  -- | compareX :: forall r. { x :: Number | r } -> { x :: Number | r } -> Ordering
+  -- | compareX = compare `on` _.x
   -- | ```
-  -- | 
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
 
