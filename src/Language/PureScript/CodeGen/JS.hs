@@ -80,7 +80,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   importToJs mn' = do
     additional <- asks optionsAdditional
     let moduleBody = case additional of
-          MakeOptions -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn')]
+          MakeOptions -> JSApp (JSVar "require") [JSStringLiteral ("../" ++ runModuleName mn')]
           CompileOptions ns _ _ -> JSAccessor (moduleNameToJs mn') (JSVar ns)
     return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
 
