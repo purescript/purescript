@@ -155,7 +155,7 @@ options = P.Options <$> noPrelude
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts
-                    <*> comments
+                    <*> (not <$> comments)
                     <*> verboseErrors
                     <*> pure P.MakeOptions
 
