@@ -139,7 +139,7 @@ module Prelude
   -- | ```
   -- |
   -- | `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
-  -- | `x # a # b # c # d` = `(((x a) b) c) d`
+  -- | `x # a # b # c # d` = `(((x # a) # b) # c) # d`
   -- |
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
