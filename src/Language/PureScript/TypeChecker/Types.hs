@@ -201,6 +201,13 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    return (foldl App val (map (flip (TypeClassDictionary True) dicts) constraints), ty')
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
+-- | Instantiate a TypedValue
+instantiate :: Expr -> UnifyT Type Check Expr
+instantiate (TypedValue c val ty) = do
+  (val', ty') <- instantiatePolyTypeWithUnknowns val ty
+  return (TypedValue c val' ty')
+instantiate _ = error "Expected TypedValue in instantiate"
+
 -- |
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
@@ -271,10 +278,10 @@ infer' v@(Constructor c) = do
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
-  ts <- mapM infer vals
+  vals' <- mapM (instantiate <=< infer) vals
   ret <- fresh
-  binders' <- checkBinders (map (\(TypedValue _ _ t) -> t) ts) ret binders
-  return $ TypedValue True (Case ts binders') ret
+  binders' <- checkBinders (map (\(TypedValue _ _ t) -> t) vals') ret binders
+  return $ TypedValue True (Case vals' binders') ret
 infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
@@ -510,7 +517,7 @@ check' (TypedValue checkType val ty1) ty2 = do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val'' ty2') else return val''
       return $ TypedValue checkType (TypedValue True val''' ty1') ty2'
 check' (Case vals binders) ret = do
-  vals' <- mapM infer vals
+  vals' <- mapM (instantiate <=< infer) vals
   let ts = map (\(TypedValue _ _ t) -> t) vals'
   binders' <- checkBinders ts ret binders
   return $ TypedValue True (Case vals' binders') ret
