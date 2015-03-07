@@ -180,7 +180,7 @@ options = P.Options <$> noPrelude
                     <*> runMain
                     <*> noOpts
                     <*> verboseErrors
-                    <*> comments
+                    <*> (not <$> comments)
                     <*> additionalOptions
   where
   additionalOptions =
