@@ -132,7 +132,7 @@ length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
-`a $ b $ c $ d x` = `a (b (c (d x)))`
+`a $ b $ c $ d x` = `a $ (b $ (c $ (d $ x)))` = `a (b (c (d x)))`
 
 
 #### `(#)`
@@ -154,7 +154,7 @@ length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
-`x # a # b # c # d` = `(((x a) b) c) d`
+`x # a # b # c # d` = `(((x # a) # b) # c) # d` = `d (c (b (a x)))`
 
 
 #### `(:)`
