@@ -506,9 +506,9 @@ check' (TypedValue checkType val ty1) ty2 = do
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
-    Just val'' -> do
-      val''' <- if checkType then withScopedTypeVars moduleName args (check val'' ty2') else return val''
-      return $ TypedValue checkType (TypedValue True val''' ty1') ty2'
+    Just _ -> do
+      val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
+      return $ TypedValue checkType val''' ty2'
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
   let ts = map (\(TypedValue _ _ t) -> t) vals'
@@ -660,7 +660,7 @@ meet e1 e2 t1 t2 = do
 -- Ensure a set of property names and value does not contain duplicate labels
 --
 ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(String, Expr)] -> m ()
-ensureNoDuplicateProperties ps = 
+ensureNoDuplicateProperties ps =
   let ls = map fst ps in
   case ls \\ nub ls of
     l : _ -> throwError . errorMessage $ DuplicateLabel l Nothing

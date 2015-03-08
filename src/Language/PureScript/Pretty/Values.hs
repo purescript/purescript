@@ -29,7 +29,7 @@ import Control.Applicative
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (prettyPrintType)
+import Language.PureScript.Pretty.Types (prettyPrintType, prettyPrintTypeAtom)
 
 literals :: Pattern PrinterState Expr String
 literals = mkPattern' match
@@ -76,7 +76,7 @@ literals = mkPattern' match
     ]
   match (OperatorSection op (Right val)) = return $ "(" ++ prettyPrintValue op ++ " " ++ prettyPrintValue val ++ ")"
   match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ prettyPrintValue op ++ ")"
-  match (TypeClassDictionary name _ _) = return $ "<<dict " ++ show name ++ ">>"
+  match (TypeClassDictionary _ (name, tys) _) = return $ "<<dict " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ">>"
   match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
   match (TypedValue _ val _) = prettyPrintValue' val
   match (PositionedValue _ _ val) = prettyPrintValue' val
