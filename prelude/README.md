@@ -72,6 +72,8 @@ element `id`, just composable morphisms.
 
 - Associativity: `p <<< (q <<< r) = (p <<< q) <<< r`
 
+One example of a `Semigroupoid` is the function type constructor `(->)`, with `(<<<)` defined
+as function composition.
 
 #### `semigroupoidArr`
 
@@ -86,6 +88,7 @@ instance semigroupoidArr :: Semigroupoid Prim.Function
 (>>>) :: forall a b c d. (Semigroupoid a) => a b c -> a c d -> a b d
 ```
 
+Forwards composition, or `(<<<)` with its arguments reversed.
 
 #### `Category`
 
@@ -129,7 +132,7 @@ length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
-`a $ b $ c $ d x` = `a (b (c (d x)))`
+`a $ b $ c $ d x` = `a $ (b $ (c $ (d $ x)))` = `a (b (c (d x)))`
 
 
 #### `(#)`
@@ -151,7 +154,7 @@ length (groupBy productCategory (filter isInStock (products)))
 ```
 
 `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
-`x # a # b # c # d` = `(((x a) b) c) d`
+`x # a # b # c # d` = `(((x # a) # b) # c) # d` = `d (c (b (a x)))`
 
 
 #### `(:)`
@@ -160,12 +163,9 @@ length (groupBy productCategory (filter isInStock (products)))
 (:) :: forall a. a -> [a] -> [a]
 ```
 
-Attaches an element to the front of a list.
+An infix alias for `cons`.
 
-```purescript
-1 : [2, 3, 4] = [1, 2, 3, 4]
-```
-
+Note, the running time of this function is `O(n)`.
 
 #### `cons`
 
@@ -173,6 +173,13 @@ Attaches an element to the front of a list.
 cons :: forall a. a -> [a] -> [a]
 ```
 
+Attaches an element to the front of an array, creating a new array.
+
+```purescript
+cons 1 [2, 3, 4] = [1, 2, 3, 4]
+```
+
+Note, the running time of this function is `O(n)`.
 
 #### `Show`
 
@@ -181,6 +188,10 @@ class Show a where
   show :: a -> String
 ```
 
+The `Show` type class represents those types which can be converted into a human-readable `String` representation.
+
+While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code 
+which evaluates to the same value as the expression `x`.
 
 #### `showUnit`
 
@@ -224,13 +235,15 @@ class Functor f where
   (<$>) :: forall a b. (a -> b) -> f a -> f b
 ```
 
-A `Functor` is intuitively a type which can be mapped over, and more formally a mapping
-between [`Category`](#category)s that preserves structure.
+A `Functor` is a type constructor which supports a mapping operation `(<$>)`.
 
-`Functor`s should obey the following rules.
+`(<$>)` can be used to turn functions `a -> b` into functions `f a -> f b` whose argument and return
+types use the type constructor `f` to represent some computational context.
+
+`Functor` instances should satisfy the following laws:
 
 - Identity: `(<$>) id = id`
-- Composition: `(<$>) (f <<< g) = (<$> f) <<< (<$> g)`
+- Composition: `(<$>) (f <<< g) = (f <$>) <<< (g <$>)`
 
 
 #### `(<#>)`
@@ -239,6 +252,11 @@ between [`Category`](#category)s that preserves structure.
 (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
 ```
 
+`(<#>)` is `(<$>)` with its arguments reversed. For example:
+
+```purescript
+[1, 2, 3] <#> \n -> n * n
+```
 
 #### `void`
 
@@ -246,6 +264,16 @@ between [`Category`](#category)s that preserves structure.
 void :: forall f a. (Functor f) => f a -> f Unit
 ```
 
+The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and 
+keeping only the type information provided by the type constructor itself.
+
+`void` is often useful when using `do` notation to change the return type of a monadic computation:
+
+```purescript
+main = forE 1 10 \n -> void do
+  print n
+  print (n * n)
+```
 
 #### `Apply`
 
@@ -254,13 +282,24 @@ class (Functor f) <= Apply f where
   (<*>) :: forall a b. f (a -> b) -> f a -> f b
 ```
 
-`Apply`s are intuitively [`Applicative`](#applicative)s less `pure`, and more formally a
-strong lax semi-monoidal endofunctor.
+The `Apply` class provides the `(<*>)` which is used to apply a function to an argument under a type constructor.
 
-`Apply`s should obey the following rule.
+`Apply` can be used to lift functions of two or more arguments to work on values wrapped with the type constructor `f`.
+It might also be understood in terms of the `lift2` function:
+
+```purescript
+lift2 :: forall f a b c. (Apply f) => (a -> b -> c) -> f a -> f b -> f c
+lift2 f a b = f <$> a <*> b
+```
+
+`(<*>)` is recovered from `lift2` as `lift2 ($)`. That is, `(<*>)` lifts the function application operator `($)` to arguments
+wrapped with the type constructor `f`.
+
+`Apply` instances should satisfy the following law:
 
 - Associative Composition: `(<<<) <$> f <*> g <*> h = f <*> (g <*> h)`
 
+Formally, `Apply` represents a strong lax semi-monoidal endofunctor.
 
 #### `Applicative`
 
@@ -269,10 +308,14 @@ class (Apply f) <= Applicative f where
   pure :: forall a. a -> f a
 ```
 
-`Applicative`s are [`Functor`](#functor)s which can be "applied" by sequencing composition
-(`<*>`) or embedding pure expressions (`pure`).
+The `Applicative` type class extends the [`Apply`](#apply) type class with a `pure` function, which can be used to
+create values of type `f a` from values of type `a`.
 
-`Applicative`s should obey the following rules.
+Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`, 
+and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of 
+_zero_ arguments. That is, `Applicative` functors support a lifting operation for any number of function arguments.
+
+`Applicative` instances should satisfy the following laws:
 
 - Identity: `(pure id) <*> v = v`
 - Composition: `(pure <<<) <*> f <*> g <*> h = f <*> (g <*> h)`
@@ -286,6 +329,15 @@ class (Apply f) <= Applicative f where
 liftA1 :: forall f a b. (Applicative f) => (a -> b) -> f a -> f b
 ```
 
+`liftA1` provides a default implementation of `(<$>)` for any [`Applicative`](#applicative) functor,
+without using `(<$>)` as provided by the [`Functor`](#functor)-[`Applicative`](#applicative) superclass relationship.
+
+`liftA1` can therefore be used to write [`Functor`](#functor) instances as follows:
+
+```purescript
+instance functorF :: Functor F where
+  (<$>) = liftA1
+```
 
 #### `Bind`
 
@@ -294,12 +346,33 @@ class (Apply m) <= Bind m where
   (>>=) :: forall a b. m a -> (a -> m b) -> m b
 ```
 
-A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially composes actions.
+The `Bind` type class extends the [`Apply`](#apply) type class with a "bind" operation `(>>=)` which composes computations
+in sequence, using the return value of one computation to determine the next computation.
 
-`Bind`s should obey the following rule.
+The `>>=` operator can also be expressed using `do` notation, as follows:
 
-- Associativity: `forall f g x. (x >>= f) >>= g = x >>= (\k => f k >>= g)`
+```purescript
+x >>= f = do y <- x
+             f y
+```
 
+where the function argument of `f` is given the name `y`.
+
+`Bind` instances should satisfy the following law:
+
+- Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
+
+Or, expressed using `do` notation: 
+
+- Associativity: `do { z <- do { y <- x ; f y } ; g z } = do { k <- x ; do { y <- f k ; g y } }`
+
+Associativity tells us that we can regroup operations which use do-notation, so that we can unambiguously write, for example:
+
+```purescript
+do x <- m1
+   y <- m2 x
+   m3 x y
+```
 
 #### `Monad`
 
@@ -307,13 +380,18 @@ A `Bind` is an [`Apply`](#apply) with a bind operation which sequentially compos
 class (Applicative m, Bind m) <= Monad m where
 ```
 
-`Monad` is a class which can be intuitively thought of as an abstract datatype of actions or
-more formally though of as a monoid in the category of endofunctors.
+The `Monad` type class combines the operations of the `Bind` and `Applicative` type classes. Therefore, `Monad` instances
+represent type constructors which support sequential composition, and also lifting of functions of arbitrary arity.
 
-`Monad`s should obey the following rules.
+`Monad` instances should satisfy the following laws:
 
 - Left Identity: `pure x >>= f = f x`
 - Right Identity: `x >>= pure = x`
+
+Or, expressed using `do` notation: 
+
+- Left Identity: `do { y <- pure x ; f y } = f x`
+- Right Identity: `do { y <- x ; pure y } = x`
 
 
 #### `return`
@@ -322,6 +400,7 @@ more formally though of as a monoid in the category of endofunctors.
 return :: forall m a. (Monad m) => a -> m a
 ```
 
+`return` is an alias for `pure`.
 
 #### `liftM1`
 
@@ -329,6 +408,15 @@ return :: forall m a. (Monad m) => a -> m a
 liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 ```
 
+`liftM1` provides a default implementation of `(<$>)` for any [`Monad`](#monad),
+without using `(<$>)` as provided by the [`Functor`](#functor)-[`Monad`](#monad) superclass relationship.
+
+`liftM1` can therefore be used to write [`Functor`](#functor) instances as follows:
+
+```purescript
+instance functorF :: Functor F where
+  (<$>) = liftM1
+```
 
 #### `ap`
 
@@ -336,6 +424,15 @@ liftM1 :: forall m a b. (Monad m) => (a -> b) -> m a -> m b
 ap :: forall m a b. (Monad m) => m (a -> b) -> m a -> m b
 ```
 
+`ap` provides a default implementation of `(<*>)` for any [`Monad`](#monad),
+without using `(<*>)` as provided by the [`Apply`](#apply)-[`Monad`](#monad) superclass relationship.
+
+`ap` can therefore be used to write [`Apply`](#apply) instances as follows:
+
+```purescript
+instance applyF :: Apply F where
+  (<*>) = ap
+```
 
 #### `functorArr`
 
@@ -384,8 +481,8 @@ class Semiring a where
 
 Addition and multiplication, satisfying the following laws:
 
-- `a` is a commutative monoid under addition with identity element zero
-- `a` is a monoid under multiplication with identity element one
+- `a` is a commutative monoid under addition
+- `a` is a monoid under multiplication
 - multiplication distributes over addition
 - multiplication by `zero` annihilates `a`
 
@@ -485,6 +582,10 @@ newtype Unit
   = Unit {  }
 ```
 
+The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
+
+`Unit` is often used, wrapped in a monadic type constructor, as the return type of a computation where only
+the _effects_ are important.
 
 #### `unit`
 
@@ -492,6 +593,7 @@ newtype Unit
 unit :: Unit
 ```
 
+`unit` is the sole inhabitant of the `Unit` type.
 
 #### `Eq`
 
@@ -501,7 +603,16 @@ class Eq a where
   (/=) :: a -> a -> Boolean
 ```
 
-Class for types that have an equality comparison.
+The `Eq` type class represents types which support decidable equality.
+
+`Eq` instances should satisfy the following laws:
+
+- Reflexivity: `x == x = true`
+- Symmetry: `x == y = y == x`
+- Transitivity: if `x == y` and `y == z` then `x == z`
+- Negation: `x /= y = not (x == y)`
+
+`(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
 
 #### `refEq`
 
@@ -561,6 +672,11 @@ data Ordering
   | EQ 
 ```
 
+The `Ordering` data type represents the three possible outcomes of comparing two values:
+
+`LT` - The first value is _less than_ the second.
+`GT` - The first value is _greater than_ the second.
+`EQ` - The first value is _equal to_ or _incomparable to_ the second.
 
 #### `eqOrdering`
 
@@ -590,9 +706,9 @@ class (Eq a) <= Ord a where
   compare :: a -> a -> Ordering
 ```
 
-Class for types that have ordered comparisons.
+The `Ord` type class represents types which support comparisons.
 
-Represents a partially ordered set satisfying the following laws:
+`Ord` instances should satisfy the laws of _partially orderings_:
 
 - Reflexivity: `a <= a`
 - Antisymmetry: if `a <= b` and `b <= a` then `a = b`
@@ -605,6 +721,7 @@ Represents a partially ordered set satisfying the following laws:
 (<) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _strictly less than_ another.
 
 #### `(>)`
 
@@ -612,6 +729,7 @@ Represents a partially ordered set satisfying the following laws:
 (>) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _strictly greater than_ another.
 
 #### `(<=)`
 
@@ -619,6 +737,7 @@ Represents a partially ordered set satisfying the following laws:
 (<=) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _non-strictly less than_ another.
 
 #### `(>=)`
 
@@ -626,6 +745,7 @@ Represents a partially ordered set satisfying the following laws:
 (>=) :: forall a. (Ord a) => a -> a -> Boolean
 ```
 
+Test whether one value is _non-strictly greater than_ another.
 
 #### `ordUnit`
 
@@ -675,6 +795,7 @@ class Bits b where
   complement :: b -> b
 ```
 
+The `Bits` type class identifies types which support bitwise operations.
 
 #### `bitsNumber`
 
@@ -692,6 +813,10 @@ class BoolLike b where
   not :: b -> b
 ```
 
+The `BoolLike` type class identifies types which support Boolean operations.
+
+`BoolLike` instances are required to satisfy the laws of a _Boolean algebra_.
+
 
 #### `boolLikeBoolean`
 
@@ -707,6 +832,13 @@ class Semigroup a where
   (<>) :: a -> a -> a
 ```
 
+The `Semigroup` type class identifies an associative operation on a type.
+
+`Semigroup` instances are required to satisfy the following law:
+
+- Associativity: `(x <> y) <> z = x <> (y <> z)`
+
+For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
 
 #### `semigroupUnit`
 
@@ -735,6 +867,7 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 (++) :: forall s. (Semigroup s) => s -> s -> s
 ```
 
+`(++)` is an alias for `(<>)`.
 
 
 ## Module Data.Function
@@ -745,6 +878,14 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 ```
 
+The `on` function is used to change the domain of a binary operator.
+
+For example, we can create a function which compares two records based on the values of their `x` properties:
+
+```purescript
+compareX :: forall r. { x :: Number | r } -> { x :: Number | r } -> Ordering
+compareX = compare `on` _.x
+```
 
 #### `Fn0`
 
@@ -752,6 +893,7 @@ on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
 data Fn0 :: * -> *
 ```
 
+A function of zero arguments
 
 #### `Fn1`
 
@@ -759,6 +901,7 @@ data Fn0 :: * -> *
 data Fn1 :: * -> * -> *
 ```
 
+A function of one argument
 
 #### `Fn2`
 
@@ -766,6 +909,7 @@ data Fn1 :: * -> * -> *
 data Fn2 :: * -> * -> * -> *
 ```
 
+A function of two arguments
 
 #### `Fn3`
 
@@ -773,6 +917,7 @@ data Fn2 :: * -> * -> * -> *
 data Fn3 :: * -> * -> * -> * -> *
 ```
 
+A function of three arguments
 
 #### `Fn4`
 
@@ -780,6 +925,7 @@ data Fn3 :: * -> * -> * -> * -> *
 data Fn4 :: * -> * -> * -> * -> * -> *
 ```
 
+A function of four arguments
 
 #### `Fn5`
 
@@ -787,6 +933,7 @@ data Fn4 :: * -> * -> * -> * -> * -> *
 data Fn5 :: * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of five arguments
 
 #### `Fn6`
 
@@ -794,6 +941,7 @@ data Fn5 :: * -> * -> * -> * -> * -> * -> *
 data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of six arguments
 
 #### `Fn7`
 
@@ -801,6 +949,7 @@ data Fn6 :: * -> * -> * -> * -> * -> * -> * -> *
 data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of seven arguments
 
 #### `Fn8`
 
@@ -808,6 +957,7 @@ data Fn7 :: * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of eight arguments
 
 #### `Fn9`
 
@@ -815,6 +965,7 @@ data Fn8 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of nine arguments
 
 #### `Fn10`
 
@@ -822,6 +973,7 @@ data Fn9 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 ```
 
+A function of ten arguments
 
 #### `mkFn0`
 
@@ -829,6 +981,7 @@ data Fn10 :: * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> * -> *
 mkFn0 :: forall a. (Unit -> a) -> Fn0 a
 ```
 
+Create a function of no arguments
 
 #### `mkFn1`
 
@@ -836,6 +989,7 @@ mkFn0 :: forall a. (Unit -> a) -> Fn0 a
 mkFn1 :: forall a b. (a -> b) -> Fn1 a b
 ```
 
+Create a function of one argument
 
 #### `mkFn2`
 
@@ -843,6 +997,7 @@ mkFn1 :: forall a b. (a -> b) -> Fn1 a b
 mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
 ```
 
+Create a function of two arguments from a curried function
 
 #### `mkFn3`
 
@@ -850,6 +1005,7 @@ mkFn2 :: forall a b c. (a -> b -> c) -> Fn2 a b c
 mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
 ```
 
+Create a function of three arguments from a curried function
 
 #### `mkFn4`
 
@@ -857,6 +1013,7 @@ mkFn3 :: forall a b c d. (a -> b -> c -> d) -> Fn3 a b c d
 mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
 ```
 
+Create a function of four arguments from a curried function
 
 #### `mkFn5`
 
@@ -864,6 +1021,7 @@ mkFn4 :: forall a b c d e. (a -> b -> c -> d -> e) -> Fn4 a b c d e
 mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
 ```
 
+Create a function of five arguments from a curried function
 
 #### `mkFn6`
 
@@ -871,6 +1029,7 @@ mkFn5 :: forall a b c d e f. (a -> b -> c -> d -> e -> f) -> Fn5 a b c d e f
 mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d e f g
 ```
 
+Create a function of six arguments from a curried function
 
 #### `mkFn7`
 
@@ -878,6 +1037,7 @@ mkFn6 :: forall a b c d e f g. (a -> b -> c -> d -> e -> f -> g) -> Fn6 a b c d 
 mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a b c d e f g h
 ```
 
+Create a function of seven arguments from a curried function
 
 #### `mkFn8`
 
@@ -885,6 +1045,7 @@ mkFn7 :: forall a b c d e f g h. (a -> b -> c -> d -> e -> f -> g -> h) -> Fn7 a
 mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -> Fn8 a b c d e f g h i
 ```
 
+Create a function of eight arguments from a curried function
 
 #### `mkFn9`
 
@@ -892,6 +1053,7 @@ mkFn8 :: forall a b c d e f g h i. (a -> b -> c -> d -> e -> f -> g -> h -> i) -
 mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j) -> Fn9 a b c d e f g h i j
 ```
 
+Create a function of nine arguments from a curried function
 
 #### `mkFn10`
 
@@ -899,6 +1061,7 @@ mkFn9 :: forall a b c d e f g h i j. (a -> b -> c -> d -> e -> f -> g -> h -> i 
 mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k) -> Fn10 a b c d e f g h i j k
 ```
 
+Create a function of ten arguments from a curried function
 
 #### `runFn0`
 
@@ -906,6 +1069,7 @@ mkFn10 :: forall a b c d e f g h i j k. (a -> b -> c -> d -> e -> f -> g -> h ->
 runFn0 :: forall a. Fn0 a -> a
 ```
 
+Apply a function of no arguments
 
 #### `runFn1`
 
@@ -913,6 +1077,7 @@ runFn0 :: forall a. Fn0 a -> a
 runFn1 :: forall a b. Fn1 a b -> a -> b
 ```
 
+Apply a function of one argument
 
 #### `runFn2`
 
@@ -920,6 +1085,7 @@ runFn1 :: forall a b. Fn1 a b -> a -> b
 runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
 ```
 
+Apply a function of two arguments
 
 #### `runFn3`
 
@@ -927,6 +1093,7 @@ runFn2 :: forall a b c. Fn2 a b c -> a -> b -> c
 runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
 ```
 
+Apply a function of three arguments
 
 #### `runFn4`
 
@@ -934,6 +1101,7 @@ runFn3 :: forall a b c d. Fn3 a b c d -> a -> b -> c -> d
 runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
 ```
 
+Apply a function of four arguments
 
 #### `runFn5`
 
@@ -941,6 +1109,7 @@ runFn4 :: forall a b c d e. Fn4 a b c d e -> a -> b -> c -> d -> e
 runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
 ```
 
+Apply a function of five arguments
 
 #### `runFn6`
 
@@ -948,6 +1117,7 @@ runFn5 :: forall a b c d e f. Fn5 a b c d e f -> a -> b -> c -> d -> e -> f
 runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f -> g
 ```
 
+Apply a function of six arguments
 
 #### `runFn7`
 
@@ -955,6 +1125,7 @@ runFn6 :: forall a b c d e f g. Fn6 a b c d e f g -> a -> b -> c -> d -> e -> f 
 runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -> f -> g -> h
 ```
 
+Apply a function of seven arguments
 
 #### `runFn8`
 
@@ -962,6 +1133,7 @@ runFn7 :: forall a b c d e f g h. Fn7 a b c d e f g h -> a -> b -> c -> d -> e -
 runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d -> e -> f -> g -> h -> i
 ```
 
+Apply a function of eight arguments
 
 #### `runFn9`
 
@@ -969,6 +1141,7 @@ runFn8 :: forall a b c d e f g h i. Fn8 a b c d e f g h i -> a -> b -> c -> d ->
 runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j
 ```
 
+Apply a function of nine arguments
 
 #### `runFn10`
 
@@ -976,6 +1149,7 @@ runFn9 :: forall a b c d e f g h i j. Fn9 a b c d e f g h i j -> a -> b -> c -> 
 runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 ```
 
+Apply a function of ten arguments
 
 
 ## Module Prelude.Unsafe
@@ -986,6 +1160,9 @@ runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b ->
 unsafeIndex :: forall a. [a] -> Number -> a
 ```
 
+Find the element of an array at the specified index.
+
+Note: this function can cause unpredictable failure at runtime if the index is out-of-bounds.
 
 
 ## Module Control.Monad.Eff
@@ -996,20 +1173,11 @@ unsafeIndex :: forall a. [a] -> Number -> a
 data Eff :: # ! -> * -> *
 ```
 
+The `Eff` type constructor is used to represent _native_ effects.
 
-#### `returnE`
+See [Handling Native Effects with the Eff Monad](https://github.com/purescript/purescript/wiki/Handling-Native-Effects-with-the-Eff-Monad) for more details.
 
-``` purescript
-returnE :: forall e a. a -> Eff e a
-```
-
-
-#### `bindE`
-
-``` purescript
-bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
-```
-
+The first type parameter is a row of effects which represents the contexts in which a computation can be run, and the second type parameter is the return type.
 
 #### `Pure`
 
@@ -1017,6 +1185,9 @@ bindE :: forall e a b. Eff e a -> (a -> Eff e b) -> Eff e b
 type Pure a = forall e. Eff e a
 ```
 
+The `Pure` type synonym represents _pure_ computations, i.e. ones in which all effects have been handled.
+
+The `runPure` function can be used to run pure computations and obtain their result.
 
 #### `runPure`
 
@@ -1024,6 +1195,10 @@ type Pure a = forall e. Eff e a
 runPure :: forall a. Pure a -> a
 ```
 
+Run a pure computation and return its result.
+
+Note: since this function has a rank-2 type, it may cause problems to apply this function using the `$` operator. The recommended approach
+is to use parentheses instead.
 
 #### `functorEff`
 
@@ -1066,6 +1241,10 @@ instance monadEff :: Monad (Eff e)
 untilE :: forall e. Eff e Boolean -> Eff e Unit
 ```
 
+Loop until a condition becomes `true`.
+
+`untilE b` is an effectful computation which repeatedly runs the effectful computation `b`, 
+until its return value is `true`.
 
 #### `whileE`
 
@@ -1073,6 +1252,10 @@ untilE :: forall e. Eff e Boolean -> Eff e Unit
 whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 ```
 
+Loop while a condition is `true`.
+
+`whileE b m` is effectful computation which runs the effectful computation `b`. If its result is 
+`true`, it runs the effectful computation `m` and loops. If not, the computation ends.
 
 #### `forE`
 
@@ -1080,6 +1263,10 @@ whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 ```
 
+Loop over a consecutive collection of numbers.
+
+`forE lo hi f` runs the computation returned by the function `f` for each of the inputs
+between `lo` (inclusive) and `hi` (exclusive).
 
 #### `foreachE`
 
@@ -1087,6 +1274,9 @@ forE :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 ```
 
+Loop over an array of values.
+
+`foreach xs f` runs the computation returned by the function `f` for each of the inputs `xs`.
 
 
 ## Module Control.Monad.Eff.Unsafe
@@ -1097,6 +1287,9 @@ foreachE :: forall e a. [a] -> (a -> Eff e Unit) -> Eff e Unit
 unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 ```
 
+Change the type of an effectful computation, allowing it to be run in another context.
+
+Note: use of this function can result in arbitrary side-effects.
 
 
 ## Module Debug.Trace
@@ -1107,6 +1300,7 @@ unsafeInterleaveEff :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
 data Trace :: !
 ```
 
+The `Trace` effect represents those computations which write to the console.
 
 #### `trace`
 
@@ -1114,6 +1308,7 @@ data Trace :: !
 trace :: forall r. String -> Eff (trace :: Trace | r) Unit
 ```
 
+Write a `String` to the console.
 
 #### `print`
 
@@ -1121,6 +1316,7 @@ trace :: forall r. String -> Eff (trace :: Trace | r) Unit
 print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 ```
 
+Write a value to the console, using its `Show` instance to produce a `String`.
 
 
 ## Module Control.Monad.ST
@@ -1131,6 +1327,11 @@ print :: forall a r. (Show a) => a -> Eff (trace :: Trace | r) Unit
 data ST :: * -> !
 ```
 
+The `ST` effect represents _local mutation_, i.e. mutation which does not "escape" into the surrounding computation.
+
+An `ST` computation is parameterized by a phantom type which is used to restrict the set of reference cells it is allowed to access.
+
+The `runST` function can be used to handle the `ST` effect.
 
 #### `STRef`
 
@@ -1138,6 +1339,7 @@ data ST :: * -> !
 data STRef :: * -> * -> *
 ```
 
+The type `STRef s a` represents a mutable reference holding a value of type `a`, which can be used with the `ST s` effect.
 
 #### `newSTRef`
 
@@ -1145,6 +1347,7 @@ data STRef :: * -> * -> *
 newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 ```
 
+Create a new mutable reference.
 
 #### `readSTRef`
 
@@ -1152,6 +1355,7 @@ newSTRef :: forall a h r. a -> Eff (st :: ST h | r) (STRef h a)
 readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 ```
 
+Read the current value of a mutable reference.
 
 #### `modifySTRef`
 
@@ -1159,6 +1363,7 @@ readSTRef :: forall a h r. STRef h a -> Eff (st :: ST h | r) a
 modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 ```
 
+Modify the value of a mutable reference by applying a function to the current value.
 
 #### `writeSTRef`
 
@@ -1166,6 +1371,7 @@ modifySTRef :: forall a h r. STRef h a -> (a -> a) -> Eff (st :: ST h | r) a
 writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 ```
 
+Set the value of a mutable reference.
 
 #### `runST`
 
@@ -1173,6 +1379,12 @@ writeSTRef :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 ```
 
+Run an `ST` computation.
+
+Note: the type of `runST` uses a rank-2 type to constrain the phantom type `s`, such that the computation must not leak any mutable references
+to the surrounding computation.
+
+It may cause problems to apply this function using the `$` operator. The recommended approach is to use parentheses instead.
 
 #### `pureST`
 
@@ -1180,6 +1392,10 @@ runST :: forall a r. (forall h. Eff (st :: ST h | r) a) -> Eff r a
 pureST :: forall a. (forall h r. Eff (st :: ST h | r) a) -> a
 ```
 
+A convenience function which combines `runST` with `runPure`, which can be used when the only required effect is `ST`.
+
+Note: since this function has a rank-2 type, it may cause problems to apply this function using the `$` operator. The recommended approach
+is to use parentheses instead.
 
 
 
