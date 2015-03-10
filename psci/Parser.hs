@@ -22,6 +22,7 @@ import Prelude hiding (lex)
 import Commands
 
 import Data.Char (isSpace)
+import Data.List (isPrefixOf)
 
 import Control.Applicative hiding (many)
 
@@ -36,16 +37,20 @@ import qualified Language.PureScript.Parser.Common as C (mark, same)
 parseCommand :: String -> Either String Command
 parseCommand cmdString =
   case splitCommand cmdString of
-    Just ('?', _) -> return Help
-    Just ('q', _) -> return Quit
-    Just ('r', _) -> return Reset
-    Just ('i', moduleName) -> Import <$> parseRest P.moduleName moduleName
-    Just ('b', moduleName) -> Browse <$> parseRest P.moduleName moduleName
-    Just ('m', filename) -> return $ LoadFile (trimEnd filename)
-    Just ('s', command) -> return $ Show (trimEnd command)
-    Just ('t', expr) -> TypeOf <$> parseRest P.parseValue expr
-    Just ('k', ty) -> KindOf <$> parseRest P.parseType ty
-    Just _ -> Left $ "Unrecognized command. Type :? for help."
+    Just (cmd, arg)
+      | matches "?" -> return Help
+      | matches "help" -> return Help
+      | matches "quit" -> return Quit
+      | matches "reset" -> return Reset
+      | matches "import" -> Import <$> parseRest P.moduleName arg
+      | matches "browse" -> Browse <$> parseRest P.moduleName arg
+      | matches "module" -> return $ LoadFile (trimEnd arg)
+      | matches "show" -> return $ Show (trimEnd cmd)
+      | matches "type" -> TypeOf <$> parseRest P.parseValue arg
+      | matches "kind" -> KindOf <$> parseRest P.parseType arg
+      | otherwise -> Left $ "Unrecognized command. Type :? for help."
+      where
+      matches = isPrefixOf cmd
     Nothing -> parseRest (psciLet <|> psciExpression) cmdString
   where
   parseRest :: P.TokenParser a -> String -> Either String a
@@ -53,14 +58,19 @@ parseCommand cmdString =
     ts <- P.lex "" s
     P.runTokenParser "" (p <* eof) ts
 
+  trimStart :: String -> String
+  trimStart = dropWhile isSpace
+
   trimEnd :: String -> String
-  trimEnd = reverse . dropWhile isSpace . reverse
+  trimEnd = reverse . trimStart . reverse
 
   -- |
-  -- Split a command into a command char and the trailing string
+  -- Tries to split a command into a directive and the argument.
   --
-  splitCommand :: String -> Maybe (Char, String)
-  splitCommand (':' : c : s) = Just (c, dropWhile isSpace s)
+  splitCommand :: String -> Maybe (String, String)
+  splitCommand (':' : cmd) = Just (directive, trimStart arg)
+    where
+    (directive, arg) = break isSpace cmd
   splitCommand _ = Nothing
 
   -- |
