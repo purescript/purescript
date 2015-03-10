@@ -15,8 +15,7 @@
 
 module Directive where
 
-import Control.Applicative
-import Data.List (find, isPrefixOf)
+import Data.List (isPrefixOf)
 
 data Directive
   = Help
@@ -47,7 +46,10 @@ commands Show = ["show"]
 -- Tries to parse given string into a directive.
 --
 parseDirective :: String -> Maybe Directive
-parseDirective cmd = fst <$> find (matches . snd) mapping
+parseDirective cmd =
+  case filter (matches . snd) mapping of
+    [directive] -> Just $ fst directive
+    _ -> Nothing
   where
   mapping :: [(Directive, [String])]
   mapping = zip directives (map commands directives)
