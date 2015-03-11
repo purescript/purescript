@@ -45,6 +45,9 @@ parseCommand cmdString =
     ts <- P.lex "" s
     P.runTokenParser "" (p <* eof) ts
 
+  trim :: String -> String
+  trim = trimEnd . trimStart
+
   trimStart :: String -> String
   trimStart = dropWhile isSpace
 
@@ -59,8 +62,8 @@ parseCommand cmdString =
       Just D.Reset -> return C.Reset
       Just D.Import -> C.Import <$> parseRest P.moduleName arg
       Just D.Browse -> C.Browse <$> parseRest P.moduleName arg
-      Just D.Load -> return $ C.LoadFile (trimEnd arg)
-      Just D.Show -> return $ C.Show (trimEnd arg)
+      Just D.Load -> return $ C.LoadFile (trim arg)
+      Just D.Show -> return $ C.Show (trim arg)
       Just D.Type -> C.TypeOf <$> parseRest P.parseValue arg
       Just D.Kind -> C.KindOf <$> parseRest P.parseType arg
       Nothing -> Left $ "Unrecognized command. Type :? for help."
