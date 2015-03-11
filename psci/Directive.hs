@@ -15,7 +15,7 @@
 
 module Directive where
 
-import Data.List (isPrefixOf)
+import Data.List (nub, isPrefixOf)
 
 data Directive
   = Help
@@ -27,6 +27,7 @@ data Directive
   | Type
   | Kind
   | Show
+  deriving Eq
 
 -- |
 -- Maps given directive relating command strings.
@@ -78,4 +79,4 @@ help =
 -- List of all avaliable directives.
 --
 directives :: [Directive]
-directives = map (\(dir, _, _) -> dir) help
+directives = nub . map (\(dir, _, _) -> dir) $ help
