@@ -214,10 +214,14 @@ data CompletionContext = Command String | FilePath String | Module | Identifier
 -- Decide what kind of completion we need based on input.
 completionContext :: String -> String -> Maybe CompletionContext
 completionContext cmd@"" _ = Just $ Multiple [Command cmd, Identifier]
-completionContext cmd@(":") _ = Just $ Command cmd
-completionContext (':' : cmd) word = do
-  context =<< D.parseDirective (takeWhile (not . isSpace) cmd)
+completionContext (':' : cmd) word =
+  case D.parseDirective dstr of
+    Just directive | dstr `elem` D.commands directive -> context directive
+    _ -> Just $ Command cmd
   where
+  dstr :: String
+  dstr = takeWhile (not . isSpace) cmd
+
   context :: D.Directive -> Maybe CompletionContext
   context D.Import = Just Module
   context D.Browse = Just Module
@@ -254,7 +258,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
   getCompletion Type = (map Left) <$> getTypeNames
   getCompletion (Fixed list) = return $ (map Left) list
   getCompletion (Multiple contexts) = concat <$> mapM getCompletion contexts
-  getCompletion (Command cmd) = return . map Left . nub $ matching
+  getCompletion (Command cmd) = return . map (Left . (":" ++)) . nub $ matching
     where
     matching :: [String]
     matching = filter (isPrefixOf cmd) . concatMap (D.commands) $ D.directives
