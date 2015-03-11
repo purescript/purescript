@@ -54,7 +54,8 @@ import qualified Language.PureScript.AST as D
 import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
 
-import Commands as C
+import qualified Commands as C
+import qualified Directive as D
 import Parser
 
 data PSCiOptions = PSCiOptions
@@ -170,9 +171,17 @@ expandTilde p = return p
 --
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
-  intercalate "\n    " (map line C.help)
-  where line :: (String, String, String) -> String
-        line (cmd, arg, desc) = intercalate " " [cmd, arg, replicate (11 - length arg) ' ', desc]
+  intercalate "\n    " (map line D.help)
+  where
+    line :: (D.Directive, String, String) -> String
+    line (dir, arg, desc) = intercalate " "
+          [ cmd
+          , replicate (11 - length cmd) ' '
+          , arg
+          , replicate (11 - length arg) ' '
+          , desc
+          ]
+      where cmd = ":" ++ head (D.commands dir) 
 
 -- |
 -- The welcome prologue.
@@ -205,19 +214,24 @@ data CompletionContext = Command String | FilePath String | Module | Identifier
 -- Decide what kind of completion we need based on input.
 completionContext :: String -> String -> Maybe CompletionContext
 completionContext cmd@"" _ = Just $ Multiple [Command cmd, Identifier]
-completionContext cmd@(':' : _ ) _
-  | cmd `elem` C.commands || cmd == ":" = Just $ Command cmd
-completionContext (':' : c : _) word = case c of
-  'i' -> Just Module
-  'b' -> Just Module
-  'm' -> Just $ FilePath word
-  'q' -> Nothing
-  'r' -> Nothing
-  '?' -> Nothing
-  's' -> Just $ Fixed ["import", "loaded"]
-  't' -> Just Identifier
-  'k' -> Just Type
-  _   -> Nothing
+completionContext (':' : cmd) word =
+  case D.parseDirective dstr of
+    Just directive | dstr `elem` D.commands directive -> context directive
+    _ -> Just $ Command cmd
+  where
+  dstr :: String
+  dstr = takeWhile (not . isSpace) cmd
+
+  context :: D.Directive -> Maybe CompletionContext
+  context D.Import = Just Module
+  context D.Browse = Just Module
+  context D.Load = Just $ FilePath word
+  context D.Quit = Nothing
+  context D.Reset = Nothing
+  context D.Help = Nothing
+  context D.Show = Just $ Fixed ["import", "loaded"]
+  context D.Type = Just Identifier
+  context D.Kind = Just Type
 completionContext _ _ = Just Identifier
 
 -- |
@@ -238,13 +252,16 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
     return $ sortBy sorter completions
 
   getCompletion :: CompletionContext -> StateT PSCiState IO [Either String Completion]
-  getCompletion (Command s) = return $ (map Left) $ nub $ filter (isPrefixOf s) C.commands
   getCompletion (FilePath f) = (map Right) <$> listFiles f
   getCompletion Module = (map Left) <$> getModuleNames
   getCompletion Identifier = (map Left) <$> ((++) <$> getIdentNames <*> getDctorNames)
   getCompletion Type = (map Left) <$> getTypeNames
   getCompletion (Fixed list) = return $ (map Left) list
   getCompletion (Multiple contexts) = concat <$> mapM getCompletion contexts
+  getCompletion (Command cmd) = return . map (Left . (":" ++)) . nub $ matching
+    where
+    matching :: [String]
+    matching = filter (isPrefixOf cmd) . concatMap (D.commands) $ D.directives
 
   getLoadedModules :: StateT PSCiState IO [P.Module]
   getLoadedModules = map snd . psciLoadedModules <$> get
@@ -540,7 +557,7 @@ handleKindOf typ = do
 -- |
 -- Parses the input and returns either a Metacommand or an expression.
 --
-getCommand :: Bool -> InputT (StateT PSCiState IO) (Either String (Maybe Command))
+getCommand :: Bool -> InputT (StateT PSCiState IO) (Either String (Maybe C.Command))
 getCommand singleLineMode = do
   firstLine <- getInputLine "> "
   case firstLine of
@@ -555,12 +572,12 @@ getCommand singleLineMode = do
 -- |
 -- Performs an action for each meta-command given, and also for expressions..
 --
-handleCommand :: Command -> PSCI ()
-handleCommand (Expression val) = handleDeclaration val
-handleCommand Help = PSCI $ outputStrLn helpMessage
-handleCommand (Import moduleName) = handleImport moduleName
-handleCommand (Let l) = handleLet l
-handleCommand (LoadFile filePath) = do
+handleCommand :: C.Command -> PSCI ()
+handleCommand (C.Expression val) = handleDeclaration val
+handleCommand C.Help = PSCI $ outputStrLn helpMessage
+handleCommand (C.Import moduleName) = handleImport moduleName
+handleCommand (C.Let l) = handleLet l
+handleCommand (C.LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
   exists <- psciIO $ doesFileExist absPath
   if exists then do
@@ -571,7 +588,7 @@ handleCommand (LoadFile filePath) = do
       Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
   else
     PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
-handleCommand Reset = do
+handleCommand C.Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st -> st
     { psciImportedFilenames   = files
@@ -579,14 +596,14 @@ handleCommand Reset = do
     , psciLetBindings         = []
     }
   loadAllImportedModules
-handleCommand (TypeOf val) = handleTypeOf val
-handleCommand (KindOf typ) = handleKindOf typ
-handleCommand (Browse moduleName) = handleBrowse moduleName
-handleCommand (Show "loaded") = handleShowLoadedModules
-handleCommand (Show "import") = handleShowImportedModules
+handleCommand (C.TypeOf val) = handleTypeOf val
+handleCommand (C.KindOf typ) = handleKindOf typ
+handleCommand (C.Browse moduleName) = handleBrowse moduleName
+handleCommand (C.Show "loaded") = handleShowLoadedModules
+handleCommand (C.Show "import") = handleShowImportedModules
 handleCommand _ = PSCI $ outputStrLn "Unknown command"
 
-loadUserConfig :: IO (Maybe [Command])
+loadUserConfig :: IO (Maybe [C.Command])
 loadUserConfig = do
   configFile <- (</> ".psci") <$> getCurrentDirectory
   exists <- doesFileExist configFile
@@ -622,7 +639,7 @@ loop PSCiOptions{..} = do
           case c of
             Left err -> outputStrLn err >> go
             Right Nothing -> go
-            Right (Just Quit) -> outputStrLn quitMessage
+            Right (Just C.Quit) -> outputStrLn quitMessage
             Right (Just c') -> runPSCI (loadAllImportedModules >> handleCommand c') >> go
 
 multiLineMode :: Parser Bool
