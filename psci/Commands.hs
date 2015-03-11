@@ -32,7 +32,7 @@ data Command
   -- |
   -- Import a module from a loaded file
   --
-  | Import ModuleName
+  | Import ImportedModule
   -- |
   -- Browse a module
   --
@@ -65,3 +65,5 @@ data Command
   -- Show command
   --
   | Show String
+
+type ImportedModule = (ModuleName, ImportDeclarationType, Maybe ModuleName)

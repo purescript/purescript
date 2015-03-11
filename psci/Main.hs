@@ -72,11 +72,15 @@ data PSCiOptions = PSCiOptions
 --
 data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
-  , psciImportedModuleNames :: [P.ModuleName]
+  , psciImportedModules     :: [C.ImportedModule]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }
+
+psciImportedModuleNames :: PSCiState -> [P.ModuleName]
+psciImportedModuleNames (PSCiState{psciImportedModules = is}) =
+  map (\(mn, _, _) -> mn) is
 
 -- State helpers
 
@@ -89,8 +93,8 @@ updateImportedFiles filename st = st { psciImportedFilenames = filename : psciIm
 -- |
 -- Updates the state to have more imported modules.
 --
-updateImports :: P.ModuleName -> PSCiState -> PSCiState
-updateImports name st = st { psciImportedModuleNames = name : psciImportedModuleNames st }
+updateImportedModules :: C.ImportedModule -> PSCiState -> PSCiState
+updateImportedModules im st = st { psciImportedModules = im : psciImportedModules st }
 
 -- |
 -- Updates the state to have more loaded files.
@@ -108,8 +112,8 @@ updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 -- |
 -- Load the necessary modules.
 --
-defaultImports :: [P.ModuleName]
-defaultImports = [P.ModuleName [P.ProperName "Prelude"]]
+defaultImports :: [C.ImportedModule]
+defaultImports = [(P.ModuleName [P.ProperName "Prelude"], D.Unqualified, Nothing)]
 
 -- |
 -- Locates the node executable.
@@ -181,7 +185,7 @@ helpMessage = "The following commands are available:\n\n    " ++
           , replicate (11 - length arg) ' '
           , desc
           ]
-      where cmd = ":" ++ head (D.commands dir) 
+      where cmd = ":" ++ head (D.commands dir)
 
 -- |
 -- The welcome prologue.
@@ -370,10 +374,9 @@ mkdirp = createDirectoryIfMissing True . takeDirectory
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetBindings = lets} val =
+createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
     trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
@@ -388,10 +391,9 @@ createTemporaryModule exec PSCiState{psciImportedModuleNames = imports, psciLetB
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
+createTemporaryModuleForKind PSCiState{psciImportedModules = imports} typ =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module [] moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
@@ -400,12 +402,14 @@ createTemporaryModuleForKind PSCiState{psciImportedModuleNames = imports} typ =
 -- Makes a volatile module to execute the current imports.
 --
 createTemporaryModuleForImports :: PSCiState -> P.Module
-createTemporaryModuleForImports PSCiState{psciImportedModuleNames = imports} =
+createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    importDecl m = P.ImportDeclaration m P.Unqualified Nothing
   in
     P.Module [] moduleName (importDecl `map` imports) Nothing
+
+importDecl :: C.ImportedModule -> P.Declaration
+importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
@@ -463,17 +467,36 @@ handleShowLoadedModules = do
 --
 handleShowImportedModules :: PSCI ()
 handleShowImportedModules = do
-  PSCiState { psciImportedModuleNames = importedModuleNames } <- PSCI $ lift get
-  psciIO $ readModules importedModuleNames >>= putStrLn
+  PSCiState { psciImportedModules = importedModules } <- PSCI $ lift get
+  psciIO $ showModules importedModules >>= putStrLn
   return ()
-  where readModules = return . unlines . sort . map N.runModuleName
+  where
+  showModules = return . unlines . sort . map showModule
+  showModule (mn, declType, asQ) =
+    case asQ of
+      Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
+      Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
+  showDeclType D.Unqualified = ""
+  showDeclType (D.Qualifying refs) = refsList refs
+  showDeclType (D.Hiding refs) = "hiding " ++ refsList refs
+  refsList refs = "(" ++ commaList (map showRef refs) ++ ")"
+
+  showRef :: P.DeclarationRef -> String
+  showRef (D.TypeRef pn dctors) = show pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
+  showRef (D.ValueRef ident) = show ident
+  showRef (D.TypeClassRef pn) = show pn
+  showRef (D.TypeInstanceRef ident) = show ident
+  showRef (D.PositionedDeclarationRef _ _ ref) = showRef ref
+
+  commaList :: [String] -> String
+  commaList = intercalate ", "
 
 -- |
 -- Imports a module, preserving the initial state on failure.
 --
-handleImport :: P.ModuleName -> PSCI ()
-handleImport moduleName = do
-   st <- updateImports moduleName <$> PSCI (lift get)
+handleImport :: C.ImportedModule -> PSCI ()
+handleImport im = do
+   st <- updateImportedModules im <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
    e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
    case e of
@@ -575,7 +598,7 @@ getCommand singleLineMode = do
 handleCommand :: C.Command -> PSCI ()
 handleCommand (C.Expression val) = handleDeclaration val
 handleCommand C.Help = PSCI $ outputStrLn helpMessage
-handleCommand (C.Import moduleName) = handleImport moduleName
+handleCommand (C.Import im) = handleImport im
 handleCommand (C.Let l) = handleLet l
 handleCommand (C.LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
@@ -592,7 +615,7 @@ handleCommand C.Reset = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st -> st
     { psciImportedFilenames   = files
-    , psciImportedModuleNames = defaultImports
+    , psciImportedModules     = defaultImports
     , psciLetBindings         = []
     }
   loadAllImportedModules

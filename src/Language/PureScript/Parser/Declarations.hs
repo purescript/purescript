@@ -24,6 +24,7 @@ module Language.PureScript.Parser.Declarations (
     parseGuard,
     parseBinder,
     parseBinderNoParens,
+    parseImportDeclarationTail,
 ) where
 
 import Prelude hiding (lex)
@@ -148,6 +149,13 @@ parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
   reserved "import"
   indented
+  (mn, declType, asQ) <- parseImportDeclarationTail
+  return $ ImportDeclaration mn declType asQ
+
+-- |
+-- The part of an import statement following the 'import'.
+parseImportDeclarationTail :: TokenParser (ModuleName, ImportDeclarationType, (Maybe ModuleName))
+parseImportDeclarationTail =
   qualImport <|> stdImport
   where
   stdImport = do
@@ -157,10 +165,10 @@ parseImportDeclaration = do
     stdImportHiding mn = do
       reserved "hiding"
       declType <- importDeclarationType Hiding
-      return $ ImportDeclaration mn declType Nothing
+      return (mn, declType, Nothing)
     stdImportQualifying mn = do
       declType <- importDeclarationType Qualifying
-      return $ ImportDeclaration mn declType Nothing
+      return (mn, declType, Nothing)
   qualImport = do
     reserved "qualified"
     indented
@@ -168,7 +176,7 @@ parseImportDeclaration = do
     declType <- importDeclarationType Qualifying
     reserved "as"
     asQ <- moduleName
-    return $ ImportDeclaration moduleName' declType (Just asQ)
+    return (moduleName', declType, Just asQ)
   importDeclarationType expectedType = do
     idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
     return $ fromMaybe Unqualified (expectedType <$> idents)

@@ -60,7 +60,7 @@ parseCommand cmdString =
       Just D.Help -> return C.Help
       Just D.Quit -> return C.Quit
       Just D.Reset -> return C.Reset
-      Just D.Import -> C.Import <$> parseRest P.moduleName arg
+      Just D.Import -> C.Import <$> parseRest P.parseImportDeclarationTail arg
       Just D.Browse -> C.Browse <$> parseRest P.moduleName arg
       Just D.Load -> return $ C.LoadFile (trim arg)
       Just D.Show -> return $ C.Show (trim arg)
