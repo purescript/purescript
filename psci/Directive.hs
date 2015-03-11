@@ -30,7 +30,7 @@ data Directive
   deriving Eq
 
 -- |
--- Maps given directive relating command strings.
+-- Maps given directive to relating command strings.
 --
 commands :: Directive -> [String]
 commands Help = ["?", "help"]
