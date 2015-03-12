@@ -21,7 +21,6 @@ data Directive
   = Help
   | Quit
   | Reset
-  | Import
   | Browse
   | Load
   | Type
@@ -36,7 +35,6 @@ commands :: Directive -> [String]
 commands Help = ["?", "help"]
 commands Quit = ["quit"]
 commands Reset = ["reset"]
-commands Import = ["import"]
 commands Browse = ["browse"]
 commands Load = ["load", "module"]
 commands Type = ["type"]
@@ -66,7 +64,6 @@ help =
   [ (Help,   "",         "Show this help menu")
   , (Quit,   "",         "Quit PSCi")
   , (Reset,  "",         "Reset")
-  , (Import, "<module>", "Import <module> for use in PSCI")
   , (Browse, "<module>", "Browse <module>")
   , (Load,   "<file>",   "Load <file> for importing")
   , (Type,   "<expr>",   "Show the type of <expr>")

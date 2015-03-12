@@ -227,7 +227,6 @@ completionContext (':' : cmd) word =
   dstr = takeWhile (not . isSpace) cmd
 
   context :: D.Directive -> Maybe CompletionContext
-  context D.Import = Just Module
   context D.Browse = Just Module
   context D.Load = Just $ FilePath word
   context D.Quit = Nothing
@@ -473,9 +472,10 @@ handleShowImportedModules = do
   where
   showModules = return . unlines . sort . map showModule
   showModule (mn, declType, asQ) =
-    case asQ of
+    "import " ++ case asQ of
       Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
       Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
+
   showDeclType D.Unqualified = ""
   showDeclType (D.Qualifying refs) = refsList refs
   showDeclType (D.Hiding refs) = "hiding " ++ refsList refs

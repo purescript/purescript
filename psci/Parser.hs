@@ -38,7 +38,7 @@ parseCommand :: String -> Either String C.Command
 parseCommand cmdString =
   case cmdString of
     (':' : cmd) -> parseDirective cmd
-    _ -> parseRest (psciLet <|> psciExpression) cmdString
+    _ -> parseRest (psciImport <|> psciLet <|> psciExpression) cmdString
   where
   parseRest :: P.TokenParser a -> String -> Either String a
   parseRest p s = either (Left . show) Right $ do
@@ -60,7 +60,6 @@ parseCommand cmdString =
       Just D.Help -> return C.Help
       Just D.Quit -> return C.Quit
       Just D.Reset -> return C.Reset
-      Just D.Import -> C.Import <$> parseRest P.parseImportDeclarationTail arg
       Just D.Browse -> C.Browse <$> parseRest P.moduleName arg
       Just D.Load -> return $ C.LoadFile (trim arg)
       Just D.Show -> return $ C.Show (trim arg)
@@ -86,3 +85,6 @@ parseCommand cmdString =
     where
     manyDecls :: P.TokenParser [P.Declaration]
     manyDecls = C.mark (many1 (C.same *> P.parseDeclaration))
+
+  psciImport :: P.TokenParser C.Command
+  psciImport = C.Import <$> P.parseImportDeclaration'

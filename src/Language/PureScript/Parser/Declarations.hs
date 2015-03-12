@@ -24,7 +24,7 @@ module Language.PureScript.Parser.Declarations (
     parseGuard,
     parseBinder,
     parseBinderNoParens,
-    parseImportDeclarationTail,
+    parseImportDeclaration',
 ) where
 
 import Prelude hiding (lex)
@@ -147,15 +147,13 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
-  reserved "import"
-  indented
-  (mn, declType, asQ) <- parseImportDeclarationTail
+  (mn, declType, asQ) <- parseImportDeclaration'
   return $ ImportDeclaration mn declType asQ
 
--- |
--- The part of an import statement following the 'import'.
-parseImportDeclarationTail :: TokenParser (ModuleName, ImportDeclarationType, (Maybe ModuleName))
-parseImportDeclarationTail =
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, (Maybe ModuleName))
+parseImportDeclaration' = do
+  reserved "import"
+  indented
   qualImport <|> stdImport
   where
   stdImport = do
