@@ -40,3 +40,5 @@ main = do
 
     assert (4 % (9 / 3) == 1)   "4 % (9 / 3) == 1"
     assert ((4 % 9) / 2 == 2)   "(4 % 9) / 2 == 2"
+
+    assert (not (1 < 0) == true)   "not (1 < 0) == true"
