@@ -113,7 +113,7 @@ updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 -- Load the necessary modules.
 --
 defaultImports :: [C.ImportedModule]
-defaultImports = [(P.ModuleName [P.ProperName "Prelude"], D.Unqualified, Nothing)]
+defaultImports = [(P.ModuleName [P.ProperName "Prelude"], D.Implicit, Nothing)]
 
 -- |
 -- Locates the node executable.
@@ -476,8 +476,8 @@ handleShowImportedModules = do
       Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
       Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
 
-  showDeclType D.Unqualified = ""
-  showDeclType (D.Qualifying refs) = refsList refs
+  showDeclType D.Implicit = ""
+  showDeclType (D.Explicit refs) = refsList refs
   showDeclType (D.Hiding refs) = "hiding " ++ refsList refs
   refsList refs = "(" ++ commaList (map showRef refs) ++ ")"
 

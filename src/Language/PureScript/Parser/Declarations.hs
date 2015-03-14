@@ -165,19 +165,19 @@ parseImportDeclaration' = do
       declType <- importDeclarationType Hiding
       return (mn, declType, Nothing)
     stdImportQualifying mn = do
-      declType <- importDeclarationType Qualifying
+      declType <- importDeclarationType Explicit
       return (mn, declType, Nothing)
   qualImport = do
     reserved "qualified"
     indented
     moduleName' <- moduleName
-    declType <- importDeclarationType Qualifying
+    declType <- importDeclarationType Explicit
     reserved "as"
     asQ <- moduleName
     return (moduleName', declType, Just asQ)
   importDeclarationType expectedType = do
     idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
-    return $ fromMaybe Unqualified (expectedType <$> idents)
+    return $ fromMaybe Implicit (expectedType <$> idents)
 
 
 parseDeclarationRef :: TokenParser DeclarationRef

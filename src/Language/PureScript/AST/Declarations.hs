@@ -127,15 +127,15 @@ instance Eq DeclarationRef where
 --
 data ImportDeclarationType
   -- |
-  -- Unqualified import
+  -- An import with no explicit list: `import M`
   --
-  = Unqualified
+  = Implicit
   -- |
-  -- Qualified import with a list of references to import
+  -- An import with an explicit list of references to import: `import M (foo)`
   --
-  | Qualifying [DeclarationRef]
+  | Explicit [DeclarationRef]
   -- |
-  -- Import with hiding clause with a list of references to hide
+  -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
   deriving (Show, D.Data, D.Typeable)
