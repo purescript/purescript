@@ -66,4 +66,13 @@ data Command
   --
   | Show String
 
+-- | All of the data that is contained by an ImportDeclaration in the AST.
+-- That is:
+--
+-- * A module name, the name of the module which is being imported
+-- * An ImportDeclarationType which specifies whether there is an explicit
+--   import list, a hiding list, or neither.
+-- * If the module is imported qualified, its qualified name in the importing
+--   module. Otherwise, Nothing.
+--
 type ImportedModule = (ModuleName, ImportDeclarationType, Maybe ModuleName)
