@@ -15,46 +15,85 @@
 
 module Directive where
 
-import Data.List (nub, isPrefixOf)
+import Data.Maybe (fromJust, listToMaybe)
+import Data.List (isPrefixOf)
+import Data.Tuple (swap)
 
-data Directive
-  = Help
-  | Quit
-  | Reset
-  | Browse
-  | Load
-  | Type
-  | Kind
-  | Show
-  deriving Eq
+import Types
 
 -- |
--- Maps given directive to relating command strings.
+-- List of all avaliable directives.
 --
-commands :: Directive -> [String]
-commands Help = ["?", "help"]
-commands Quit = ["quit"]
-commands Reset = ["reset"]
-commands Browse = ["browse"]
-commands Load = ["load", "module"]
-commands Type = ["type"]
-commands Kind = ["kind"]
-commands Show = ["show"]
+directives :: [Directive]
+directives = map fst directiveStrings
 
 -- |
--- Tries to parse given string into a directive.
+-- A mapping of directives to the different strings that can be used to invoke
+-- them.
 --
-parseDirective :: String -> Maybe Directive
-parseDirective cmd =
-  case filter (matches . snd) mapping of
-    [directive] -> Just $ fst directive
-    _ -> Nothing
+directiveStrings :: [(Directive, [String])]
+directiveStrings =
+    [ (Help   , ["?", "help"])
+    , (Quit   , ["quit"])
+    , (Reset  , ["reset"])
+    , (Browse , ["browse"])
+    , (Load   , ["load", "module"])
+    , (Type   , ["type"])
+    , (Kind   , ["kind"])
+    , (Show   , ["show"])
+    ]
+
+-- |
+-- Like directiveStrings, but the other way around.
+--
+directiveStrings' :: [(String, Directive)]
+directiveStrings' = concatMap go directiveStrings
   where
-  mapping :: [(Directive, [String])]
-  mapping = zip directives (map commands directives)
+  go (dir, strs) = map (\s -> (s, dir)) strs
 
-  matches :: [String] -> Bool
-  matches = any (cmd `isPrefixOf`)
+-- |
+-- List of all directive strings.
+--
+strings :: [String]
+strings = concatMap snd directiveStrings
+
+-- |
+-- Returns all possible string representations of a directive.
+--
+stringsFor :: Directive -> [String]
+stringsFor d = fromJust (lookup d directiveStrings)
+
+-- |
+-- Returns the default string representation of a directive.
+--
+stringFor :: Directive -> String
+stringFor = head . stringsFor
+
+-- |
+-- Returns the list of directives which could be expanded from the string
+-- argument, together with the string alias that matched.
+--
+directivesFor' :: String -> [(Directive, String)]
+directivesFor' str = go directiveStrings'
+  where
+  go = map swap . filter ((str `isPrefixOf`) . fst)
+
+directivesFor :: String -> [Directive]
+directivesFor = map fst . directivesFor'
+
+directiveStringsFor :: String -> [String]
+directiveStringsFor = map snd . directivesFor'
+
+parseDirective :: String -> Maybe Directive
+parseDirective = listToMaybe . directivesFor
+
+-- |
+-- True if the given directive takes an argument, false otherwise.
+hasArgument :: Directive -> Bool
+hasArgument Help = False
+hasArgument Quit = False
+hasArgument Reset = False
+hasArgument _ = True
 
 -- |
 -- The help menu.
@@ -72,8 +111,3 @@ help =
   , (Show,   "loaded",   "Show loaded modules")
   ]
 
--- |
--- List of all avaliable directives.
---
-directives :: [Directive]
-directives = nub . map (\(dir, _, _) -> dir) $ help

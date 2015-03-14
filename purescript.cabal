@@ -148,10 +148,12 @@ executable psci
 
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psci
-    other-modules: Commands
+    hs-source-dirs: psci psci/main
+    other-modules: Types
                    Parser
                    Directive
+                   Completion
+                   PSCi
     ghc-options: -Wall -O2
 
 executable psc-docs
@@ -182,3 +184,14 @@ test-suite tests
     main-is: Main.hs
     buildable: True
     hs-source-dirs: tests
+
+test-suite psci-tests
+    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
+                   mtl -any, optparse-applicative >= 0.10.0, parsec -any,
+                   haskeline >= 0.7.0.0, purescript -any, transformers -any,
+                   process -any, HUnit -any
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: psci psci/tests
+    ghc-options: -Wall

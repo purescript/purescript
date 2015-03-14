@@ -19,22 +19,23 @@ module Parser
 
 import Prelude hiding (lex)
 
-import qualified Commands as C
-import qualified Directive as D
-
 import Data.Char (isSpace)
+import Data.List (intercalate)
 
 import Control.Applicative hiding (many)
 
 import Text.Parsec hiding ((<|>))
 
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Parser.Common as C (mark, same)
+import Language.PureScript.Parser.Common (mark, same)
+
+import qualified Directive as D
+import Types
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
-parseCommand :: String -> Either String C.Command
+parseCommand :: String -> Either String Command
 parseCommand cmdString =
   case cmdString of
     (':' : cmd) -> parseDirective cmd
@@ -45,7 +46,7 @@ parseRest p s = either (Left . show) Right $ do
   ts <- P.lex "" s
   P.runTokenParser "" (p <* eof) ts
 
-psciCommand :: P.TokenParser C.Command
+psciCommand :: P.TokenParser Command
 psciCommand = choice (map try parsers)
   where
   parsers =
@@ -64,25 +65,31 @@ trimStart = dropWhile isSpace
 trimEnd :: String -> String
 trimEnd = reverse . trimStart . reverse
 
-parseDirective :: String -> Either String C.Command
+parseDirective :: String -> Either String Command
 parseDirective cmd =
-  case D.parseDirective dstr of
-    Just D.Help -> return C.Help
-    Just D.Quit -> return C.Quit
-    Just D.Reset -> return C.Reset
-    Just D.Browse -> C.Browse <$> parseRest P.moduleName arg
-    Just D.Load -> return $ C.LoadFile (trim arg)
-    Just D.Show -> return $ C.Show (trim arg)
-    Just D.Type -> C.TypeOf <$> parseRest P.parseValue arg
-    Just D.Kind -> C.KindOf <$> parseRest P.parseType arg
-    Nothing -> Left $ "Unrecognized command. Type :? for help."
-  where (dstr, arg) = break isSpace cmd
+  case D.directivesFor' dstr of
+    [(d, _)] -> commandFor d
+    []       -> Left "Unrecognized directive. Type :? for help."
+    ds       -> Left ("Ambiguous directive. Possible matches: " ++
+                  intercalate ", " (map snd ds) ++ ". Type :? for help.")
+  where
+  (dstr, arg) = break isSpace cmd
+
+  commandFor d = case d of
+    Help   -> return ShowHelp
+    Quit   -> return QuitPSCi
+    Reset  -> return ResetState
+    Browse -> BrowseModule <$> parseRest P.moduleName arg
+    Load   -> return $ LoadFile (trim arg)
+    Show   -> ShowInfo <$> parseReplQuery' (trim arg)
+    Type   -> TypeOf <$> parseRest P.parseValue arg
+    Kind   -> KindOf <$> parseRest P.parseType arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
 --
-psciExpression :: P.TokenParser C.Command
-psciExpression = C.Expression <$> P.parseValue
+psciExpression :: P.TokenParser Command
+psciExpression = Expression <$> P.parseValue
 
 -- |
 -- PSCI version of @let@.
@@ -90,21 +97,21 @@ psciExpression = C.Expression <$> P.parseValue
 -- However, since we don't support the @Eff@ monad,
 -- we actually want the normal @let@.
 --
-psciLet :: P.TokenParser C.Command
-psciLet = C.Decls <$> (P.reserved "let" *> P.indented *> manyDecls)
+psciLet :: P.TokenParser Command
+psciLet = Decls <$> (P.reserved "let" *> P.indented *> manyDecls)
   where
   manyDecls :: P.TokenParser [P.Declaration]
-  manyDecls = C.mark (many1 (C.same *> P.parseLocalDeclaration))
+  manyDecls = mark (many1 (same *> P.parseLocalDeclaration))
 
 -- | Imports must be handled separately from other declarations, so that
 -- :show import works, for example.
-psciImport :: P.TokenParser C.Command
-psciImport = C.Import <$> P.parseImportDeclaration'
+psciImport :: P.TokenParser Command
+psciImport = Import <$> P.parseImportDeclaration'
 
 -- | Any other declaration that we don't need a 'special case' parser for
 -- (like let or import declarations).
-psciOtherDeclaration :: P.TokenParser C.Command
-psciOtherDeclaration = C.Decls . (:[]) <$> do
+psciOtherDeclaration :: P.TokenParser Command
+psciOtherDeclaration = Decls . (:[]) <$> do
   decl <- discardPositionInfo <$> P.parseDeclaration
   if acceptable decl
     then return decl
@@ -123,3 +130,10 @@ acceptable (P.ExternInstanceDeclaration _ _ _ _) = True
 acceptable (P.TypeClassDeclaration _ _ _ _) = True
 acceptable (P.TypeInstanceDeclaration _ _ _ _ _) = True
 acceptable _ = False
+
+parseReplQuery' :: String -> Either String ReplQuery
+parseReplQuery' str =
+  case parseReplQuery str of
+    Nothing -> Left ("Don't know how to show " ++ str ++ ". Try one of: " ++
+                      intercalate ", " replQueryStrings ++ ".")
+    Just query -> Right query

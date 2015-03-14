@@ -105,4 +105,3 @@ main = do
       forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
         assertDoesNotCompile preludeExterns (failing ++ pathSeparator : inputFile)
       exitSuccess
-
