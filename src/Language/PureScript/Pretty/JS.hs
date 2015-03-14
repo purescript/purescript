@@ -273,25 +273,25 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         ++ "(" ++ intercalate ", " args ++ ") "
                         ++ ret ]
                   , [ Wrap typeOf $ \_ s -> "typeof " ++ s ]
-                  , [ unary     Not                  "!" ]
-                  , [ unary     BitwiseNot           "~" ]
-                  , [ negateOperator ]
-                  , [ unary     Positive             "+" ]
+                  , [ unary     Not                  "!"
+                    , unary     BitwiseNot           "~"
+                    , unary     Positive             "+"
+                    , negateOperator ]
                   , [ binary    Multiply             "*"
                     , binary    Divide               "/"
                     , binary    Modulus              "%" ]
                   , [ binary    Add                  "+"
                     , binary    Subtract             "-" ]
-                  , [ binary    ShiftLeft            "<<" ]
-                  , [ binary    ShiftRight           ">>" ]
-                  , [ binary    ZeroFillShiftRight   ">>>" ]
-                  , [ binary    LessThan             "<" ]
-                  , [ binary    LessThanOrEqualTo    "<=" ]
-                  , [ binary    GreaterThan          ">" ]
-                  , [ binary    GreaterThanOrEqualTo ">=" ]
-                  , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
-                  , [ binary    EqualTo              "===" ]
-                  , [ binary    NotEqualTo           "!==" ]
+                  , [ binary    ShiftLeft            "<<"
+                    , binary    ShiftRight           ">>"
+                    , binary    ZeroFillShiftRight   ">>>" ]
+                  , [ binary    LessThan             "<"
+                    , binary    LessThanOrEqualTo    "<="
+                    , binary    GreaterThan          ">"
+                    , binary    GreaterThanOrEqualTo ">="
+                    , AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
+                  , [ binary    EqualTo              "==="
+                    , binary    NotEqualTo           "!==" ]
                   , [ binary    BitwiseAnd           "&" ]
                   , [ binary    BitwiseXor           "^" ]
                   , [ binary    BitwiseOr            "|" ]
