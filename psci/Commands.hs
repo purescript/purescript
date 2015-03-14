@@ -50,9 +50,9 @@ data Command
   --
   | Reset
   -- |
-  -- Binds a value to a name
+  -- Add some declarations to the current evaluation context.
   --
-  | Let [Declaration]
+  | Decls [Declaration]
   -- |
   -- Find the type of an expression
   --

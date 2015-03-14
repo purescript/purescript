@@ -437,11 +437,11 @@ handleDeclaration val = do
         Nothing                        -> PSCI $ outputStrLn "Couldn't find node.js"
 
 -- |
--- Takes a let declaration and updates the environment, then run a make. If the declaration fails,
--- restore the pre-let environment.
+-- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,
+-- restore the original environment.
 --
-handleLet :: [P.Declaration] -> PSCI ()
-handleLet ds = do
+handleDecls :: [P.Declaration] -> PSCI ()
+handleDecls ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
@@ -599,7 +599,7 @@ handleCommand :: C.Command -> PSCI ()
 handleCommand (C.Expression val) = handleDeclaration val
 handleCommand C.Help = PSCI $ outputStrLn helpMessage
 handleCommand (C.Import im) = handleImport im
-handleCommand (C.Let l) = handleLet l
+handleCommand (C.Decls l) = handleDecls l
 handleCommand (C.LoadFile filePath) = do
   absPath <- psciIO $ expandTilde filePath
   exists <- psciIO $ doesFileExist absPath
