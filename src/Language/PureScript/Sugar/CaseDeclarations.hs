@@ -119,27 +119,32 @@ toTuple _ = error "Not a value declaration"
 
 makeCaseDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
-  let argPattern = length . fst . head $ alternatives
-  args <- mapM argName (foldl1 (zipWith resolveIdents) namedArgs)
+  let namedArgs = map findName . fst <$> alternatives
+  args <- mapM argName $ foldl1 resolveNames namedArgs
   let
     vars = map (Var . Qualified Nothing) args
     binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
     value = foldr (Abs . Left) (Case vars binders) args
   return $ ValueDeclaration ident Value [] (Right value)
   where
-  namedArgs = findNames . fst <$> alternatives
-  findNames names = findName <$> names
+  findName :: Binder -> Maybe Ident
   findName (VarBinder name) = Just name
+  findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 
+  argName :: (MonadSupply m) => Maybe Ident -> m Ident
   argName (Just name) = return name
   argName Nothing = do
     name <- freshName
     return (Ident name)
 
-  resolveIdents (Just a) (Just b)
+  resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
+  resolveNames = zipWith resolveName
+
+  resolveName :: Maybe Ident -> Maybe Ident -> Maybe Ident
+  resolveName (Just a) (Just b)
     | a == b = Just a
     | otherwise = Nothing
-  resolveIdents Nothing Nothing = Nothing
-  resolveIdents (Just a) Nothing = Just a
-  resolveIdents Nothing (Just b) = Just b
+  resolveName Nothing Nothing = Nothing
+  resolveName (Just a) Nothing = Just a
+  resolveName Nothing (Just b) = Just b
