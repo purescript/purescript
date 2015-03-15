@@ -26,7 +26,6 @@ import Control.Monad.Except
 import Control.Monad.Reader.Class
 import Control.Monad.State
 import Control.Monad.Unify
-import Control.Monad.Writer
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -35,7 +34,6 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import Language.PureScript.Warnings
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -173,7 +171,7 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either MultipleErrors) (Writer MultipleWarnings a) }
+newtype Check a = Check { unCheck :: StateT CheckState (Either MultipleErrors) a }
   deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError MultipleErrors)
 
 -- |
