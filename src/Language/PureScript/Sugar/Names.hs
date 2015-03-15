@@ -199,7 +199,7 @@ elaborateImports (Module coms mn decls exps) = Module coms mn decls' exps
   fqValues (Var (Qualified (Just mn') _)) = [mn']
   fqValues _ = []
   mkImport :: ModuleName -> Declaration
-  mkImport mn' = ImportDeclaration mn' (Qualifying []) Nothing
+  mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
@@ -417,7 +417,7 @@ resolveImports env (Module _ currentModule decls _) =
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
   scope :: M.Map ModuleName (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
-  scope = M.insert currentModule (Nothing, Unqualified, Nothing) (findImports decls)
+  scope = M.insert currentModule (Nothing, Implicit, Nothing) (findImports decls)
 
   resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)) -> m ImportEnvironment
   resolveImport' imp (mn, (pos, typ, impQual)) = do
@@ -437,8 +437,8 @@ resolveImport currentModule importModule exps imps impQual =
   where
 
   resolveByType :: ImportDeclarationType -> m ImportEnvironment
-  resolveByType Unqualified = importAll importExplicit
-  resolveByType (Qualifying explImports) = (checkedRefs >=> foldM importExplicit imps) explImports
+  resolveByType Implicit = importAll importExplicit
+  resolveByType (Explicit explImports) = (checkedRefs >=> foldM importExplicit imps) explImports
   resolveByType (Hiding hiddenImports) = do
     hiddenImports' <- checkedRefs hiddenImports
     importAll (importNonHidden hiddenImports')

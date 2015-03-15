@@ -32,7 +32,7 @@ data Command
   -- |
   -- Import a module from a loaded file
   --
-  | Import ModuleName
+  | Import ImportedModule
   -- |
   -- Browse a module
   --
@@ -50,9 +50,9 @@ data Command
   --
   | Reset
   -- |
-  -- Binds a value to a name
+  -- Add some declarations to the current evaluation context.
   --
-  | Let [Declaration]
+  | Decls [Declaration]
   -- |
   -- Find the type of an expression
   --
@@ -65,3 +65,14 @@ data Command
   -- Show command
   --
   | Show String
+
+-- | All of the data that is contained by an ImportDeclaration in the AST.
+-- That is:
+--
+-- * A module name, the name of the module which is being imported
+-- * An ImportDeclarationType which specifies whether there is an explicit
+--   import list, a hiding list, or neither.
+-- * If the module is imported qualified, its qualified name in the importing
+--   module. Otherwise, Nothing.
+--
+type ImportedModule = (ModuleName, ImportDeclarationType, Maybe ModuleName)

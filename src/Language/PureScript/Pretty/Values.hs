@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Pretty.Values
--- Copyright   :  Kinds.hs(c) Phil Freeman 2013
+-- Copyright   :  (c) Phil Freeman 2013
 -- License     :  MIT
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>

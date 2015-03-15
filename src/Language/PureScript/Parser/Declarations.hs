@@ -24,6 +24,8 @@ module Language.PureScript.Parser.Declarations (
     parseGuard,
     parseBinder,
     parseBinderNoParens,
+    parseImportDeclaration',
+    parseLocalDeclaration
 ) where
 
 import Prelude hiding (lex)
@@ -146,6 +148,11 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
+  (mn, declType, asQ) <- parseImportDeclaration'
+  return $ ImportDeclaration mn declType asQ
+
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, (Maybe ModuleName))
+parseImportDeclaration' = do
   reserved "import"
   indented
   qualImport <|> stdImport
@@ -157,21 +164,21 @@ parseImportDeclaration = do
     stdImportHiding mn = do
       reserved "hiding"
       declType <- importDeclarationType Hiding
-      return $ ImportDeclaration mn declType Nothing
+      return (mn, declType, Nothing)
     stdImportQualifying mn = do
-      declType <- importDeclarationType Qualifying
-      return $ ImportDeclaration mn declType Nothing
+      declType <- importDeclarationType Explicit
+      return (mn, declType, Nothing)
   qualImport = do
     reserved "qualified"
     indented
     moduleName' <- moduleName
-    declType <- importDeclarationType Qualifying
+    declType <- importDeclarationType Explicit
     reserved "as"
     asQ <- moduleName
-    return $ ImportDeclaration moduleName' declType (Just asQ)
+    return (moduleName', declType, Just asQ)
   importDeclarationType expectedType = do
     idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
-    return $ fromMaybe Unqualified (expectedType <$> idents)
+    return $ fromMaybe Implicit (expectedType <$> idents)
 
 
 parseDeclarationRef :: TokenParser DeclarationRef
