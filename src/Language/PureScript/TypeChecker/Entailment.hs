@@ -19,7 +19,7 @@ module Language.PureScript.TypeChecker.Entailment (
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, fromMaybe)
 import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
@@ -79,7 +79,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         -- Make sure the types unify with the types in the superclass implication
         , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
-        , args' <- maybeToList $ mapM ((`lookup` subst) . fst) args
+        , let args' = map (\(arg, _) -> fromMaybe (TypeVar arg) $ lookup arg subst) args
         , suDict <- go True subclassName args' ]
 
       -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -160,6 +160,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
 typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
+typeHeadsAreEqual _ _ (TypeVar v)          t                               = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
                                                                                   <*> typeHeadsAreEqual m e t1 t2
