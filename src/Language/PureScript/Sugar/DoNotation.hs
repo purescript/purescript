@@ -44,11 +44,8 @@ desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in f d
   where
-  prelude :: ModuleName
-  prelude = ModuleName [ProperName C.prelude]
-
   bind :: Expr
-  bind = Var (Qualified (Just prelude) (Op (C.>>=)))
+  bind = Var (Qualified Nothing (Op (C.>>=)))
 
   replace :: Expr -> m Expr
   replace (Do els) = go els
