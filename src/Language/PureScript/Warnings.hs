@@ -42,7 +42,7 @@ import qualified Text.PrettyPrint.Boxes as Box
 data WarningMessage
  = UnusedTypeVariable ProperName
  | ShadowedTypeVariable ProperName
- | PositionedWarning
+ | PositionedWarning SourceSpan WarningMessage
  deriving (Show)
 
 -- |
@@ -51,7 +51,7 @@ data WarningMessage
 warningCode :: WarningMessage -> String
 warningCode (UnusedTypeVariable _)   = "UnusedTypeVariable"
 warningCode (ShadowedTypeVariable _) = "ShadowedTypeVariable"
-warningCode PositionedWarning        = "PositionedWarning"
+warningCode (PositionedWarning _ w)  = warningCode w
 
 -- |
 -- A stack trace for a warning
