@@ -50,6 +50,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Options
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
@@ -67,8 +68,8 @@ import qualified Language.PureScript.Constants as C
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
-typesOf mainModuleName moduleName vals = do
+typesOf :: Options mode -> Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
+typesOf opts mainModuleName moduleName vals = do
   tys <- fmap tidyUp . liftUnify $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> do
@@ -83,7 +84,7 @@ typesOf mainModuleName moduleName vals = do
 
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
-    val' <- replaceTypeClassDictionaries moduleName val
+    val' <- replaceTypeClassDictionaries opts moduleName val
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
@@ -168,14 +169,14 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 -- |
 -- Replace type class dictionary placeholders with inferred type class dictionaries
 --
-replaceTypeClassDictionaries :: ModuleName -> Expr -> Check Expr
-replaceTypeClassDictionaries mn =
+replaceTypeClassDictionaries :: Options mode -> ModuleName -> Expr -> Check Expr
+replaceTypeClassDictionaries opts mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
   where
   go (TypeClassDictionary trySuperclasses constraint dicts) = do
     env <- getEnv
-    entails env mn dicts constraint trySuperclasses
+    entails opts env mn dicts constraint trySuperclasses
   go other = return other
 
 -- |

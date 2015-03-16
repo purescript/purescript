@@ -18,6 +18,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Language.PureScript
   ( module P
@@ -96,18 +97,17 @@ compile = compile' initEnvironment
 compile' :: (Functor m, Applicative m, MonadError String m, MonadReader (Options Compile) m)
          => Environment -> [Module] -> [String] -> m (String, String, Environment)
 compile' env ms prefix = do
-  noPrelude <- asks optionsNoPrelude
-  additional <- asks optionsAdditional
-  mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
-  (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
+  opts@Options{..} <- ask
+  let mainModuleIdent = fmap moduleNameFromString optionsMain
+  (sorted, _) <- sortModules $ map importPrim $ if optionsNoPrelude then ms else map importPrelude ms
   (desugared, nextVar) <- interpretMultipleErrors True $ runSupplyT 0 $ desugar sorted
-  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
+  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule opts mainModuleIdent
   regrouped <- interpretMultipleErrors True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
-  let entryPoints = moduleNameFromString `map` entryPointModules additional
+  let entryPoints = moduleNameFromString `map` entryPointModules optionsAdditional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
-  let codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
+  let codeGenModuleNames = moduleNameFromString `map` codeGenModules optionsAdditional
   let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   js <- concat <$> (evalSupplyT nextVar $ T.traverse moduleToJs modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
@@ -173,10 +173,10 @@ traverseEither f (Right y) = Right <$> f y
 make :: forall m. (Functor m, Applicative m, Monad m, MonadMake m)
      => FilePath -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
 make outputDir ms prefix = do
-  noPrelude <- asks optionsNoPrelude
+  Options{..} <- ask
   let filePathMap = M.fromList (map (\(fp, Module _ mn _ _) -> (mn, fp)) ms)
 
-  (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
+  (sorted, graph) <- sortModules $ map importPrim $ if optionsNoPrelude then map snd ms else map (importPrelude . snd) ms
 
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
     let filePath = runModuleName moduleName'
@@ -204,17 +204,19 @@ make outputDir ms prefix = do
   go :: Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
-    (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
-
+    opts <- ask
+    (_, env') <- lift . runCheck' env $ typeCheckModule opts Nothing m
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
+    opts <- ask
+    
     let filePath = runModuleName moduleName'
         jsFile = outputDir </> filePath </> "index.js"
         externsFile = outputDir </> filePath </> "externs.purs"
 
     lift . progress $ "Compiling " ++ runModuleName moduleName'
 
-    (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
+    (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule opts Nothing m
 
     regrouped <- interpretMultipleErrors True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 

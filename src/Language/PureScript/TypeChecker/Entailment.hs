@@ -34,6 +34,7 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Environment
 import Language.PureScript.Names
+import Language.PureScript.Options
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
@@ -45,8 +46,8 @@ import qualified Language.PureScript.Constants as C
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
+entails :: Options mode -> Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
+entails opts env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
     sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
@@ -61,7 +62,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       checkOverlaps $ go trySuperclasses 0 className tys
       where
       go :: Bool -> Integer -> Qualified ProperName -> [Type] -> [DictionaryValue]
-      go _ depth _ _ | depth > 1000 = []
+      go _ depth _ _ | depth > optionsMaxSearchDepth opts = []
       go trySuperclasses' depth className' tys' = 
         -- Look for regular type instances
         [ mkDictionary (canonicalizeDictionary tcd) args
