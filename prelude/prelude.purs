@@ -20,7 +20,7 @@ module Prelude
   , negate
   , DivisionRing
   , Num
-  , Eq, (==), (/=), refEq, refIneq
+  , Eq, (==), (/=)
   , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
   , Bits, (.&.), (.|.), (.^.), shl, shr, zshr, complement
   , BoolLike, (&&), (||)
@@ -170,7 +170,7 @@ module Prelude
 
   -- | The `Show` type class represents those types which can be converted into a human-readable `String` representation.
   -- |
-  -- | While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code 
+  -- | While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code
   -- | which evaluates to the same value as the expression `x`.
   class Show a where
     show :: a -> String
@@ -222,7 +222,7 @@ module Prelude
   infixl 1 <#>
 
   -- | A `Functor` is a type constructor which supports a mapping operation `(<$>)`.
-  -- | 
+  -- |
   -- | `(<$>)` can be used to turn functions `a -> b` into functions `f a -> f b` whose argument and return
   -- | types use the type constructor `f` to represent some computational context.
   -- |
@@ -235,14 +235,14 @@ module Prelude
     (<$>) :: forall a b. (a -> b) -> f a -> f b
 
   -- | `(<#>)` is `(<$>)` with its arguments reversed. For example:
-  -- | 
+  -- |
   -- | ```purescript
   -- | [1, 2, 3] <#> \n -> n * n
   -- | ```
   (<#>) :: forall f a b. (Functor f) => f a -> (a -> b) -> f b
   (<#>) fa f = f <$> fa
 
-  -- | The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and 
+  -- | The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and
   -- | keeping only the type information provided by the type constructor itself.
   -- |
   -- | `void` is often useful when using `do` notation to change the return type of a monadic computation:
@@ -258,7 +258,7 @@ module Prelude
   infixl 4 <*>
 
   -- | The `Apply` class provides the `(<*>)` which is used to apply a function to an argument under a type constructor.
-  -- | 
+  -- |
   -- | `Apply` can be used to lift functions of two or more arguments to work on values wrapped with the type constructor `f`.
   -- | It might also be understood in terms of the `lift2` function:
   -- |
@@ -266,7 +266,7 @@ module Prelude
   -- | lift2 :: forall f a b c. (Apply f) => (a -> b -> c) -> f a -> f b -> f c
   -- | lift2 f a b = f <$> a <*> b
   -- | ```
-  -- | 
+  -- |
   -- | `(<*>)` is recovered from `lift2` as `lift2 ($)`. That is, `(<*>)` lifts the function application operator `($)` to arguments
   -- | wrapped with the type constructor `f`.
   -- |
@@ -280,9 +280,9 @@ module Prelude
 
   -- | The `Applicative` type class extends the [`Apply`](#apply) type class with a `pure` function, which can be used to
   -- | create values of type `f a` from values of type `a`.
-  -- | 
-  -- | Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`, 
-  -- | and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of 
+  -- |
+  -- | Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`,
+  -- | and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of
   -- | _zero_ arguments. That is, `Applicative` functors support a lifting operation for any number of function arguments.
   -- |
   -- | `Applicative` instances should satisfy the following laws:
@@ -297,9 +297,9 @@ module Prelude
 
   -- | `liftA1` provides a default implementation of `(<$>)` for any [`Applicative`](#applicative) functor,
   -- | without using `(<$>)` as provided by the [`Functor`](#functor)-[`Applicative`](#applicative) superclass relationship.
-  -- | 
+  -- |
   -- | `liftA1` can therefore be used to write [`Functor`](#functor) instances as follows:
-  -- | 
+  -- |
   -- | ```purescript
   -- | instance functorF :: Functor F where
   -- |   (<$>) = liftA1
@@ -311,26 +311,26 @@ module Prelude
 
   -- | The `Bind` type class extends the [`Apply`](#apply) type class with a "bind" operation `(>>=)` which composes computations
   -- | in sequence, using the return value of one computation to determine the next computation.
-  -- | 
+  -- |
   -- | The `>>=` operator can also be expressed using `do` notation, as follows:
-  -- | 
+  -- |
   -- | ```purescript
   -- | x >>= f = do y <- x
   -- |              f y
   -- | ```
-  -- | 
+  -- |
   -- | where the function argument of `f` is given the name `y`.
-  -- | 
+  -- |
   -- | `Bind` instances should satisfy the following law:
   -- |
   -- | - Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
   -- |
-  -- | Or, expressed using `do` notation: 
-  -- | 
+  -- | Or, expressed using `do` notation:
+  -- |
   -- | - Associativity: `do { z <- do { y <- x ; f y } ; g z } = do { k <- x ; do { y <- f k ; g y } }`
-  -- | 
+  -- |
   -- | Associativity tells us that we can regroup operations which use do-notation, so that we can unambiguously write, for example:
-  -- | 
+  -- |
   -- | ```purescript
   -- | do x <- m1
   -- |    y <- m2 x
@@ -347,11 +347,11 @@ module Prelude
   -- | - Left Identity: `pure x >>= f = f x`
   -- | - Right Identity: `x >>= pure = x`
   -- |
-  -- | Or, expressed using `do` notation: 
-  -- | 
+  -- | Or, expressed using `do` notation:
+  -- |
   -- | - Left Identity: `do { y <- pure x ; f y } = f x`
   -- | - Right Identity: `do { y <- x ; pure y } = x`
-  -- | 
+  -- |
   class (Applicative m, Bind m) <= Monad m
 
   -- | `return` is an alias for `pure`.
@@ -360,9 +360,9 @@ module Prelude
 
   -- | `liftM1` provides a default implementation of `(<$>)` for any [`Monad`](#monad),
   -- | without using `(<$>)` as provided by the [`Functor`](#functor)-[`Monad`](#monad) superclass relationship.
-  -- | 
+  -- |
   -- | `liftM1` can therefore be used to write [`Functor`](#functor) instances as follows:
-  -- | 
+  -- |
   -- | ```purescript
   -- | instance functorF :: Functor F where
   -- |   (<$>) = liftM1
@@ -374,9 +374,9 @@ module Prelude
 
   -- | `ap` provides a default implementation of `(<*>)` for any [`Monad`](#monad),
   -- | without using `(<*>)` as provided by the [`Apply`](#apply)-[`Monad`](#monad) superclass relationship.
-  -- | 
+  -- |
   -- | `ap` can therefore be used to write [`Apply`](#apply) instances as follows:
-  -- | 
+  -- |
   -- | ```purescript
   -- | instance applyF :: Apply F where
   -- |   (<*>) = ap
@@ -515,7 +515,7 @@ module Prelude
   instance numNumber :: Num Number
 
   -- | The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
-  -- | 
+  -- |
   -- | `Unit` is often used, wrapped in a monadic type constructor, as the return type of a computation where only
   -- | the _effects_ are important.
   newtype Unit = Unit {}
@@ -530,13 +530,13 @@ module Prelude
   -- | The `Eq` type class represents types which support decidable equality.
   -- |
   -- | `Eq` instances should satisfy the following laws:
-  -- | 
+  -- |
   -- | - Reflexivity: `x == x = true`
   -- | - Symmetry: `x == y = y == x`
   -- | - Transitivity: if `x == y` and `y == z` then `x == z`
   -- | - Negation: `x /= y = not (x == y)`
   -- |
-  -- | `(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
+  -- | `(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.
   class Eq a where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
@@ -595,7 +595,7 @@ module Prelude
     (/=) xs ys = not (xs == ys)
 
   -- | The `Ordering` data type represents the three possible outcomes of comparing two values:
-  -- | 
+  -- |
   -- | `LT` - The first value is _less than_ the second.
   -- | `GT` - The first value is _greater than_ the second.
   -- | `EQ` - The first value is _equal to_ or _incomparable to_ the second.
@@ -790,9 +790,9 @@ module Prelude
   infixr 3 &&
 
   -- | The `BoolLike` type class identifies types which support Boolean operations.
-  -- | 
+  -- |
   -- | `BoolLike` instances are required to satisfy the laws of a _Boolean algebra_.
-  -- | 
+  -- |
   class BoolLike b where
     (&&) :: b -> b -> b
     (||) :: b -> b -> b
@@ -831,12 +831,12 @@ module Prelude
   infixr 5 <>
 
   -- | The `Semigroup` type class identifies an associative operation on a type.
-  -- | 
+  -- |
   -- | `Semigroup` instances are required to satisfy the following law:
-  -- | 
+  -- |
   -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
-  -- | 
-  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
+  -- |
+  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
   class Semigroup a where
     (<>) :: a -> a -> a
 
@@ -867,9 +867,9 @@ module Prelude
 module Data.Function where
 
   -- | The `on` function is used to change the domain of a binary operator.
-  -- | 
+  -- |
   -- | For example, we can create a function which compares two records based on the values of their `x` properties:
-  -- | 
+  -- |
   -- | ```purescript
   -- | compareX :: forall r. { x :: Number | r } -> { x :: Number | r } -> Ordering
   -- | compareX = compare `on` _.x
@@ -1221,7 +1221,7 @@ module Data.Function where
 module Prelude.Unsafe where
 
   -- | Find the element of an array at the specified index.
-  -- | 
+  -- |
   -- | Note: this function can cause unpredictable failure at runtime if the index is out-of-bounds.
   foreign import unsafeIndex
     """
@@ -1232,7 +1232,7 @@ module Prelude.Unsafe where
     }
     """ :: forall a. [a] -> Number -> a
 
-module Control.Monad.Eff 
+module Control.Monad.Eff
   ( Eff()
   , Pure()
   , runPure
@@ -1297,8 +1297,8 @@ module Control.Monad.Eff
   instance monadEff :: Monad (Eff e)
 
   -- | Loop until a condition becomes `true`.
-  -- | 
-  -- | `untilE b` is an effectful computation which repeatedly runs the effectful computation `b`, 
+  -- |
+  -- | `untilE b` is an effectful computation which repeatedly runs the effectful computation `b`,
   -- | until its return value is `true`.
   foreign import untilE
     """
@@ -1311,8 +1311,8 @@ module Control.Monad.Eff
     """ :: forall e. Eff e Boolean -> Eff e Unit
 
   -- | Loop while a condition is `true`.
-  -- | 
-  -- | `whileE b m` is effectful computation which runs the effectful computation `b`. If its result is 
+  -- |
+  -- | `whileE b m` is effectful computation which runs the effectful computation `b`. If its result is
   -- | `true`, it runs the effectful computation `m` and loops. If not, the computation ends.
   foreign import whileE
     """
@@ -1329,7 +1329,7 @@ module Control.Monad.Eff
     """ :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 
   -- | Loop over a consecutive collection of numbers.
-  -- | 
+  -- |
   -- | `forE lo hi f` runs the computation returned by the function `f` for each of the inputs
   -- | between `lo` (inclusive) and `hi` (exclusive).
   foreign import forE
@@ -1348,7 +1348,7 @@ module Control.Monad.Eff
     """ :: forall e. Number -> Number -> (Number -> Eff e Unit) -> Eff e Unit
 
   -- | Loop over an array of values.
-  -- | 
+  -- |
   -- | `foreach xs f` runs the computation returned by the function `f` for each of the inputs `xs`.
   foreign import foreachE
     """
@@ -1368,7 +1368,7 @@ module Control.Monad.Eff.Unsafe where
   import Control.Monad.Eff
 
   -- | Change the type of an effectful computation, allowing it to be run in another context.
-  -- | 
+  -- |
   -- | Note: use of this function can result in arbitrary side-effects.
   foreign import unsafeInterleaveEff
     """
@@ -1404,9 +1404,9 @@ module Control.Monad.ST where
   import Control.Monad.Eff
 
   -- | The `ST` effect represents _local mutation_, i.e. mutation which does not "escape" into the surrounding computation.
-  -- | 
+  -- |
   -- | An `ST` computation is parameterized by a phantom type which is used to restrict the set of reference cells it is allowed to access.
-  -- | 
+  -- |
   -- | The `runST` function can be used to handle the `ST` effect.
   foreign import data ST :: * -> !
 
@@ -1458,10 +1458,10 @@ module Control.Monad.ST where
     """ :: forall a h r. STRef h a -> a -> Eff (st :: ST h | r) a
 
   -- | Run an `ST` computation.
-  -- | 
+  -- |
   -- | Note: the type of `runST` uses a rank-2 type to constrain the phantom type `s`, such that the computation must not leak any mutable references
   -- | to the surrounding computation.
-  -- | 
+  -- |
   -- | It may cause problems to apply this function using the `$` operator. The recommended approach is to use parentheses instead.
   foreign import runST
     """
