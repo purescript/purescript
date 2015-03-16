@@ -73,6 +73,9 @@ data Options mode = Options {
     -- Remove the comments from the generated js
   , optionsNoComments :: Bool
     -- |
+    -- The maximum search depth when looking for type class instances
+  , optionsMaxSearchDepth :: Integer
+    -- |
     -- Specify the namespace that PureScript modules will be exported to when running in the
     -- browser.
     --
@@ -83,10 +86,10 @@ data Options mode = Options {
 -- Default compiler options
 --
 defaultCompileOptions :: Options Compile
-defaultCompileOptions = Options False False False Nothing False False False (CompileOptions "PS" [] [])
+defaultCompileOptions = Options False False False Nothing False False False 1000 (CompileOptions "PS" [] [])
 
 -- |
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False False Nothing False False False MakeOptions
+defaultMakeOptions = Options False False False Nothing False False False 1000 MakeOptions
