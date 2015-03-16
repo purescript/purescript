@@ -62,8 +62,8 @@ entails opts env moduleName context = solve (sortedNubBy canonicalizeDictionary 
       checkOverlaps $ go trySuperclasses 0 className tys
       where
       go :: Bool -> Integer -> Qualified ProperName -> [Type] -> [DictionaryValue]
-      go _ depth _ _ | depth > optionsMaxSearchDepth opts = []
-      go trySuperclasses' depth className' tys' = 
+      go _ workDone _ _ | workDone > optionsMaxSearchDepth opts = []
+      go trySuperclasses' workDone className' tys' = 
         -- Look for regular type instances
         [ mkDictionary (canonicalizeDictionary tcd) args
         | tcd <- context'
@@ -86,7 +86,7 @@ entails opts env moduleName context = solve (sortedNubBy canonicalizeDictionary 
         , subst <- matchResultToList . (>>= (maybeToMatchResult . verifySubstitution)) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
         , let args' = map (\(arg, _) -> fromMaybe (TypeVar arg) $ lookup arg subst) args
-        , suDict <- go True (depth + 1) subclassName args' ]
+        , suDict <- go True (workDone + 1) subclassName args' ]
         
         where
         -- Create dictionaries for subgoals which still need to be solved by calling go recursively
@@ -95,8 +95,11 @@ entails opts env moduleName context = solve (sortedNubBy canonicalizeDictionary 
         solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> [Maybe [DictionaryValue]]
         solveSubgoals _ Nothing = return Nothing
         solveSubgoals subst (Just subgoals) = do
-          dict <- mapM (uncurry (go True (depth + 1)) . second (map (replaceAllTypeVars subst))) subgoals
+          dict <- mapM (uncurry (go True workDone') . second (map (replaceAllTypeVars subst))) subgoals
           return $ Just dict
+          where
+          -- Amortize the future work done over all subgoals
+          workDone' = ((workDone + 1) * fromIntegral (length subgoals + 1))
           
       -- Make a dictionary from subgoal dictionaries by applying the correct function
       mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
