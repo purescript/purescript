@@ -40,3 +40,19 @@ main = do
 
     assert (4 % (9 / 3) == 1)   "4 % (9 / 3) == 1"
     assert ((4 % 9) / 2 == 2)   "(4 % 9) / 2 == 2"
+
+    assert (not (1 < 0) == true) "not (1 < 0) == true"
+    assert (not (complement (1 + 10) == 8) == true) "not (complement (1 + 10) == 8) == true"
+    assert (not ((negate 1) < 0) == false) "not ((negate 1) < 0) == false"
+
+    assert (negate (1 + 10) == -11) "negate (1 + 10) == -11"
+
+    assert (2 * 3 / 4 == 1.5) "2 * 3 / 4 == 1.5"
+    assert (1 * 2 * 3 * 4 * 5 / 6 == 20) "1 * 2 * 3 * 4 * 5 / 6 == 20"
+    assert (complement (2 / 3 * 4) == -3) "complement (2 / 3 * 4) == -3"
+
+    assert (1 + 10 - 5 == 6) "1 + 10 - 5 == 6"
+    assert (1 + 10 * 5 == 51) "1 + 10 * 5 == 51"
+    assert (10 * 5 - 1 == 49) "10 * 5 - 1 == 49"
+
+    trace "Success!"
