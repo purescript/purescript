@@ -85,13 +85,19 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
-  convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
+  convert (TypeApp o r) | o == tyObject && prettyRow r = PrettyPrintObject r
   convert other = other
   convertForAlls (ForAll ident ty _) = go [ident] ty
     where
     go idents (ForAll ident' ty' _) = go (ident' : idents) ty'
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
+
+  prettyRow :: Type -> Bool
+  prettyRow (RCons _ _ r) = prettyRow r
+  prettyRow REmpty = True
+  prettyRow (TypeVar _) = True
+  prettyRow _ = False
 
 matchTypeAtom :: Pattern () Type String
 matchTypeAtom = typeLiterals <+> fmap parens matchType
