@@ -107,7 +107,7 @@ prettyPrintSingleWarning full e = prettyPrintWarningMessage (if full then e else
   indent = Box.moveRight 2
 
   -- |
-  -- Render a DictionaryValue fit for human consumption in error messages
+  -- Render a DictionaryValue fit for human consumption in warning messages
   --
   prettyPrintDictionaryValue :: DictionaryValue -> Box.Box
   prettyPrintDictionaryValue (LocalDictionaryValue _)           = line "Dictionary in scope"
