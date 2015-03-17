@@ -50,6 +50,18 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
   -- Desugar a declaration into a variable introduction or named function
   -- declaration.
   decl :: Ident -> CF.Expr Ann -> m (Statement Ann)
+  decl ident d@(CF.Abs ann@(_, _, _, Just IsTypeClassConstructor) _ _) =
+    let (args, body) = unapply [] d
+    in Function ann ident args <$> mkAssignments body
+    where
+    unapply :: [Ident] -> CF.Expr Ann -> ([Ident], CF.Expr Ann)
+    unapply args (CF.Abs _ arg body) = unapply (arg:args) body
+    unapply args body = (reverse args, body)
+    mkAssignments :: CF.Expr Ann -> m [Statement Ann]
+    mkAssignments (CF.Literal _ (ObjectLiteral props)) =
+      forM props $ \(k, v) ->
+        Assignment nullAnn (Accessor nullAnn (str k) (var $ Op "this")) <$> value v
+    mkAssignments _ = error "Unexpected non-object contents in IsTypeClassConstructor function"
   decl ident (CF.Abs ann arg body) = Function ann ident [arg] <$> block body
   decl ident val = VarDecl nullAnn ident <$> value val
 
