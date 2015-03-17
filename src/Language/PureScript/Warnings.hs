@@ -70,3 +70,91 @@ warningMessage war = MultipleWarnings [war]
 --
 onWarningMessages :: (WarningMessage -> WarningMessage) -> MultipleWarnings -> MultipleWarnings
 onWarningMessages f = MultipleWarnings . map f . runMultipleWarnings
+
+-- |
+-- Pretty print a single warning, simplifying if necessary
+--
+prettyPrintSingleWarning :: Bool -> WarningMessage -> Box.Box
+prettyPrintSingleWarning full e = prettyPrintWarningMessage (if full then e else simplifyWarningMessage e)
+  where
+  -- |
+  -- Pretty print a WarningMessage
+  --
+  prettyPrintWarningMessage :: WarningMessage -> Box.Box
+  prettyPrintWarningMessage em =
+    paras
+      [ go em
+      , line ("See " ++ wikiUri ++ " for more information, or to contribute content related to this warning.") 
+      ]
+    where
+    wikiUri :: String
+    wikiUri = "https://github.com/purescript/purescript/wiki/Warning-Code-" ++ warningCode e
+      
+    go :: WarningMessage -> Box.Box
+    go (UnusedTypeVariable name)       = line $ "Unused type variable " ++ show name
+    go (ShadowedTypeVariable name)     = line $ "Shadowed type variable " ++ show name
+    go (PositionedWarning pos war)     = paras [ line $ "Warning at " ++ show pos ++ ":"
+                                               , indent $ go war
+                                               ]
+
+  line :: String -> Box.Box
+  line = Box.text
+
+  paras :: [Box.Box] -> Box.Box
+  paras = Box.vcat Box.left
+
+  indent :: Box.Box -> Box.Box
+  indent = Box.moveRight 2
+
+  -- |
+  -- Render a DictionaryValue fit for human consumption in error messages
+  --
+  prettyPrintDictionaryValue :: DictionaryValue -> Box.Box
+  prettyPrintDictionaryValue (LocalDictionaryValue _)           = line "Dictionary in scope"
+  prettyPrintDictionaryValue (GlobalDictionaryValue nm)         = line (show nm)
+  prettyPrintDictionaryValue (DependentDictionaryValue nm args) = paras [ line $ (show nm) ++ " via"
+                                                                        , indent $ paras $ map prettyPrintDictionaryValue args
+                                                                        ]
+  prettyPrintDictionaryValue (SubclassDictionaryValue sup nm _) = paras [ line $ (show nm) ++ " via superclass"
+                                                                        , indent $ prettyPrintDictionaryValue sup
+                                                                        ]
+  
+  -- |
+  -- Pretty print and export declaration
+  --  
+  prettyPrintExport :: DeclarationRef -> String
+  prettyPrintExport (TypeRef pn _) = show pn
+  prettyPrintExport (ValueRef ident) = show ident
+  prettyPrintExport (TypeClassRef pn) = show pn
+  prettyPrintExport (TypeInstanceRef ident) = show ident
+  prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
+
+  -- |
+  -- Simplify a warning message
+  --
+  simplifyWarningMessage :: WarningMessage -> WarningMessage
+  simplifyWarningMessage = unwrap Nothing
+    where
+    unwrap :: Maybe SourceSpan -> WarningMessage -> WarningMessage
+    unwrap _   (PositionedWarning pos err) = unwrap (Just pos) err
+    unwrap pos other = wrap pos other
+  
+    wrap :: Maybe SourceSpan -> WarningMessage -> WarningMessage
+    wrap Nothing    = id
+    wrap (Just pos) = PositionedWarning pos
+
+-- |
+-- Pretty print multiple warnings
+--
+prettyPrintMultipleWarnings :: Bool -> MultipleWarnings -> String
+prettyPrintMultipleWarnings full  (MultipleWarnings [e]) = renderBox $
+  prettyPrintSingleWarning full e 
+prettyPrintMultipleWarnings full  (MultipleWarnings es) = renderBox $
+  Box.vcat Box.left [ Box.text "Multiple warnings:"
+                    , Box.vsep 1 Box.left $ map (Box.moveRight 2 . prettyPrintSingleWarning full) es
+                    ]
+
+renderBox :: Box.Box -> String
+renderBox = unlines . map trimEnd . lines . Box.render
+  where
+  trimEnd = reverse . dropWhile (== ' ') . reverse

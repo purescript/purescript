@@ -110,6 +110,7 @@ library
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
+                     Language.PureScript.Warnings
 
                      Control.Monad.Unify
                      Control.Monad.Supply
