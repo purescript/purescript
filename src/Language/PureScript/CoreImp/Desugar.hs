@@ -144,7 +144,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
       argVar <- Ident <$> freshName
       done'' <- go remain done'
       stmnts <- binder argVar done'' b
-      return (VarDecl nullAnn argVar (Accessor nullAnn (var field) (var varName)) : stmnts)
+      return (VarDecl nullAnn argVar (Accessor nullAnn (str $ runIdent field) (var varName)) : stmnts)
   binder varName done b@(CF.ConstructorBinder _ _ ctor _) | isCons ctor = do
     let (headBinders, tailBinder) = uncons [] b
         numberOfHeadBinders = fromIntegral $ length headBinders
