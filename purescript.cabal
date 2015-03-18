@@ -160,8 +160,9 @@ executable psc-docs
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
-    other-modules: CTags
-                   ETags
+    other-modules: Ctags
+                   Etags
+                   Tags
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
