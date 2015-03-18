@@ -15,6 +15,11 @@ module Main where
   typed :: { foo :: Number }
   typed = { foo: 0 }
 
+  type Foo = (foo :: Number)
+
+  typed2 :: Object Foo
+  typed2 = { foo: 0 }
+
   test2 = \x -> x."!@#"
 
   test3 = typed."foo"
