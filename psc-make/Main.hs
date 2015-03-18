@@ -148,6 +148,11 @@ noPrefix = switch $
   <> long "no-prefix"
   <> help "Do not include comment header"
 
+maxSearchDepth :: Parser Integer
+maxSearchDepth = option auto $
+     long "max-search-depth"
+  <> Opts.value (P.optionsMaxSearchDepth P.defaultMakeOptions)
+  <> help "The maximum depth when searching for type class instances"
 
 options :: Parser (P.Options P.Make)
 options = P.Options <$> noPrelude
@@ -157,6 +162,7 @@ options = P.Options <$> noPrelude
                     <*> noOpts
                     <*> (not <$> comments)
                     <*> verboseErrors
+                    <*> maxSearchDepth
                     <*> pure P.MakeOptions
 
 pscMakeOptions :: Parser PSCMakeOptions

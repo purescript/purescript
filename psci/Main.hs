@@ -337,7 +337,7 @@ completion = completeWordWithPrev Nothing " \t\n\r" findCompletions
 -- | Compilation options.
 --
 options :: P.Options P.Make
-options = P.Options False False False Nothing False False False P.MakeOptions
+options = P.defaultMakeOptions
 
 -- |
 -- PSCI monad

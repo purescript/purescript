@@ -38,6 +38,7 @@ import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.AST
+import Language.PureScript.Options
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -128,8 +129,8 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 --  * Process module imports
 --
-typeCheckAll :: Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
-typeCheckAll mainModuleName moduleName exps = go
+typeCheckAll :: Options mode -> Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
+typeCheckAll opts mainModuleName moduleName exps = go
   where
   go :: [Declaration] -> Check [Declaration]
   go [] = return []
@@ -181,7 +182,7 @@ typeCheckAll mainModuleName moduleName exps = go
   go (ValueDeclaration name nameKind [] (Right val) : rest) = do
     d <- rethrow (onErrorMessages (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
-      [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
+      [(_, (val', ty))] <- typesOf opts mainModuleName moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
     ds <- go rest
@@ -191,7 +192,7 @@ typeCheckAll mainModuleName moduleName exps = go
     d <- rethrow (onErrorMessages (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
-      tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
+      tys <- typesOf opts mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
       vals' <- forM [ (name, val, nameKind, ty)
                     | (name, nameKind, _) <- vals
                     , (name', (val, ty)) <- tys
@@ -276,11 +277,11 @@ typeCheckAll mainModuleName moduleName exps = go
 -- Type check an entire module and ensure all types and classes defined within the module that are
 -- required by exported members are also exported.
 --
-typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
+typeCheckModule :: Options mode -> Maybe ModuleName -> Module -> Check Module
+typeCheckModule _ _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule opts mainModuleName (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
-  decls' <- typeCheckAll mainModuleName mn exps decls
+  decls' <- typeCheckAll opts mainModuleName mn exps decls
   forM_ exps $ \e -> do
     checkTypesAreExported e
     checkClassMembersAreExported e

@@ -13,13 +13,16 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveFunctor #-}
+
 module Language.PureScript.TypeChecker.Entailment (
     entails
 ) where
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (maybeToList)
+import Data.Monoid
+import Data.Maybe (fromMaybe)
 import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
@@ -31,6 +34,7 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Environment
 import Language.PureScript.Names
+import Language.PureScript.Options
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
@@ -42,8 +46,8 @@ import qualified Language.PureScript.Constants as C
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
+entails :: Options mode -> Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
+entails opts env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
     sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
@@ -55,16 +59,18 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     filterModule _ = False
 
     solve context' (className, tys) trySuperclasses =
-      checkOverlaps $ go trySuperclasses className tys
+      checkOverlaps $ go trySuperclasses 0 className tys
       where
-      go trySuperclasses' className' tys' =
+      go :: Bool -> Integer -> Qualified ProperName -> [Type] -> [DictionaryValue]
+      go _ workDone _ _ | workDone > optionsMaxSearchDepth opts = []
+      go trySuperclasses' workDone className' tys' = 
         -- Look for regular type instances
         [ mkDictionary (canonicalizeDictionary tcd) args
         | tcd <- context'
         -- Make sure the type class name matches the one we are trying to satisfy
         , className' == tcdClassName tcd
         -- Make sure the type unifies with the type in the type instance definition
-        , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
+        , subst <- matchResultToList . (>>= (maybeToMatchResult . verifySubstitution)) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
         -- Solve any necessary subgoals
         , args <- solveSubgoals subst (tcdDependencies tcd) ] ++
 
@@ -77,19 +83,24 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         -- Make sure the type class name matches the superclass name
         , className' == superclass
         -- Make sure the types unify with the types in the superclass implication
-        , subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
+        , subst <- matchResultToList . (>>= (maybeToMatchResult . verifySubstitution)) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
         -- Finally, satisfy the subclass constraint
-        , args' <- maybeToList $ mapM ((`lookup` subst) . fst) args
-        , suDict <- go True subclassName args' ]
-
-      -- Create dictionaries for subgoals which still need to be solved by calling go recursively
-      -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
-      -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-      solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> [Maybe [DictionaryValue]]
-      solveSubgoals _ Nothing = return Nothing
-      solveSubgoals subst (Just subgoals) = do
-        dict <- mapM (uncurry (go True) . second (map (replaceAllTypeVars subst))) subgoals
-        return $ Just dict
+        , let args' = map (\(arg, _) -> fromMaybe (TypeVar arg) $ lookup arg subst) args
+        , suDict <- go True (workDone + 1) subclassName args' ]
+        
+        where
+        -- Create dictionaries for subgoals which still need to be solved by calling go recursively
+        -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
+        -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
+        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> [Maybe [DictionaryValue]]
+        solveSubgoals _ Nothing = return Nothing
+        solveSubgoals subst (Just subgoals) = do
+          dict <- mapM (uncurry (go True workDone') . second (map (replaceAllTypeVars subst))) subgoals
+          return $ Just dict
+          where
+          -- Amortize the future work done over all subgoals
+          workDone' = ((workDone + 1) * fromIntegral (length subgoals + 1))
+          
       -- Make a dictionary from subgoal dictionaries by applying the correct function
       mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
       mkDictionary fnName Nothing = LocalDictionaryValue fnName
@@ -153,20 +164,51 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
+-- | This is like Maybe, but we want to distinguish partial matches which unify an unknown from full matches,
+-- | because we want at least one match to be non-partial to ensure progress.
+data MatchResult a = Failed | Partial a | Success a deriving (Show, Eq, Ord, Functor)
+
+instance (Monoid a) => Monoid (MatchResult a) where
+  mempty = pure mempty
+  mappend = liftA2 mappend
+
+instance Applicative MatchResult where
+  pure = Success
+  Failed    <*> _         = Failed
+  _         <*> Failed    = Failed
+  Partial f <*> Partial x = Partial (f x)
+  Partial f <*> Success x = Success (f x)
+  Success f <*> Partial x = Success (f x)
+  Success f <*> Success x = Success (f x)
+  
+instance Monad MatchResult where
+  return = Success
+  Failed >>= _ = Failed
+  Partial a >>= f = f a
+  Success a >>= f = f a
+ 
+matchResultToList :: MatchResult a -> [a] 
+matchResultToList (Success a) = [a]
+matchResultToList _ = []
+ 
+maybeToMatchResult :: Maybe a -> MatchResult a
+maybeToMatchResult = maybe Failed Success
+  
 -- |
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
-typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
-typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
-typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> MatchResult [(String, Type)]
+typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Success []
+typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Success [(v, t)]
+typeHeadsAreEqual _ _ (TypeVar v)          t                               = Partial [(v, t)]
+typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Success []
 typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
                                                                                   <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
-  Left  _  -> Nothing
+  Left  _  -> Failed
   Right t1 -> typeHeadsAreEqual m e t1 t2
-typeHeadsAreEqual _ _ REmpty REmpty = Just []
+typeHeadsAreEqual _ _ REmpty REmpty = Success []
 typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
@@ -177,14 +219,14 @@ typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int 
           <*> go sd1 r1' sd2 r2'
   where
-  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-  go [] REmpty          [] REmpty          = Just [] 
-  go [] (TUnknown _)    _  _               = Just [] 
-  go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
-  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
-  go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
-  go _  _               _  _               = Nothing
-typeHeadsAreEqual _ _ _ _ = Nothing
+  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> MatchResult [(String, Type)]
+  go [] REmpty          [] REmpty          = Success [] 
+  go [] (TUnknown _)    _  _               = Success [] 
+  go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Success []
+  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Success []
+  go sd r               [] (TypeVar v)     = Success [(v, rowFromList (sd, r))]
+  go _  _               _  _               = Failed
+typeHeadsAreEqual _ _ _ _ = Failed
 
 -- |
 -- Check all values in a list pairwise match a predicate
