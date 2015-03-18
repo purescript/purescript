@@ -151,30 +151,21 @@ moduleToJs (CI.Module coms mn imps exps foreigns stmnts) = do
     return $ iife ctor [ JSFunction (Just ctor) [] (JSBlock [])
            , JSAssignment (JSAccessor "value" (JSVar ctor))
                 (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
-  exprToJS (CI.Constructor _ _ (ProperName ctor) fields) =
+  exprToJS (CI.Constructor (_, _, _, meta) _ (ProperName ctor) fields) =
     let constructor =
-          let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fields ]
+          let body = [ JSAssignment (accessor f (JSVar "this")) (var f) | f <- fields ]
           in JSFunction (Just ctor) (identToJs `map` fields) (JSBlock body)
         createFn =
           let body = JSUnary JSNew $ JSApp (JSVar ctor) (var `map` fields)
           in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
-    in return $ iife ctor [ constructor
-                          , JSAssignment (JSAccessor "create" (JSVar ctor)) createFn
-                          ]
+    in return $
+      if meta == Just CI.IsTypeClassConstructor
+      then constructor
+      else iife ctor [constructor, JSAssignment (JSAccessor "create" (JSVar ctor)) createFn]
   exprToJS (CI.Accessor _ prop expr) =
     JSIndexer <$> exprToJS prop <*> exprToJS expr
   exprToJS (CI.Indexer _ index expr) =
     JSIndexer <$> exprToJS index <*> exprToJS expr
-  exprToJS e@(CI.AnonFunction (_, _, _, Just CI.IsTypeClassConstructor) _ _) =
-    let args = unAbs e
-    in return $ JSFunction Nothing (map identToJs args) (JSBlock $ map assign args)
-    where
-    unAbs :: CI.Expr CI.Ann -> [Ident]
-    unAbs (CI.AnonFunction _ [arg] [CI.Return _ val]) = arg : unAbs val
-    unAbs _ = []
-    assign :: Ident -> JS
-    assign name = JSAssignment (accessorString (runIdent name) (JSVar "this"))
-                               (var name)
   exprToJS (CI.AnonFunction _ args stmnts') = do
     body <- JSBlock <$> mapM statmentToJS stmnts'
     return $ JSFunction Nothing (identToJs `map` args) body

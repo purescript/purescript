@@ -35,7 +35,7 @@ data Meta
   -- |
   -- The contained value is a typeclass dictionary constructor
   --
-  | IsTypeClassConstructor deriving (Show, D.Data, D.Typeable)
+  | IsTypeClassConstructor deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- Data constructor metadata
@@ -48,4 +48,4 @@ data ConstructorType
   -- |
   -- The constructor is for a type with multiple construcors
   --
-  | SumType deriving (Show, D.Data, D.Typeable)
+  | SumType deriving (Show, Eq, D.Data, D.Typeable)
