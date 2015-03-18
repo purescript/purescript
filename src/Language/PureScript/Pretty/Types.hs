@@ -93,6 +93,9 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
 
+  -- Object type application should be sugared into record syntax. However,
+  -- this may produce illegal code when object is applied to non-trivial row
+  -- (e.g. type alias). This function checks whether row is of sugarable form.
   prettyRow :: Type -> Bool
   prettyRow (RCons _ _ r) = prettyRow r
   prettyRow REmpty = True
