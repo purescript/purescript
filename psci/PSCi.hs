@@ -124,17 +124,36 @@ expandTilde p = return p
 --
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
-  intercalate "\n    " (map line D.help)
+  intercalate "\n    " (map line D.help) ++
+  "\n\n" ++ extraHelp
   where
-    line :: (Directive, String, String) -> String
-    line (dir, arg, desc) = intercalate " "
-          [ cmd
-          , replicate (11 - length cmd) ' '
-          , arg
-          , replicate (11 - length arg) ' '
-          , desc
-          ]
-      where cmd = ":" ++ D.stringFor dir
+  line :: (Directive, String, String) -> String
+  line (dir, arg, desc) =
+    let cmd = ':' : D.stringFor dir
+    in intercalate " "
+        [ cmd
+        , replicate (11 - length cmd) ' '
+        , arg
+        , replicate (11 - length arg) ' '
+        , desc
+        ]
+
+  extraHelp = unlines
+    [ "Once a file has been loaded, values and types in the module(s) that it"
+    , "contains are available fully qualified:"
+    , ""
+    , "    > :type Data.Function.on"
+    , "    forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c"
+    , ""
+    , "Alternatively, you can import a loaded module in order to bring types and"
+    , "values into the current scope - then, you can use them unqualified."
+    , ""
+    , "Modules can be imported normally, as in PureScript code, eg:"
+    , ""
+    , "    > import Control.Monad"
+    , "    > import Prelude.Unsafe (unsafeIndex)"
+    , "    > import qualified Data.List as L"
+    ]
 
 -- |
 -- The welcome prologue.
