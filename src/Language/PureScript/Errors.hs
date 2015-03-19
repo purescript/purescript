@@ -488,12 +488,6 @@ renderBox = unlines . map trimEnd . lines . Box.render
   trimEnd = reverse . dropWhile (== ' ') . reverse
 
 -- |
--- Interpret multiple errors in a monad supporting errors
---
-interpretMultipleErrors :: (MonadError String m) => Bool -> Either MultipleErrors a -> m a
-interpretMultipleErrors printFullStack = either (throwError . prettyPrintMultipleErrors printFullStack) return
-
--- |
 -- Rethrow an error with a more detailed error message in the case of failure
 --
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a

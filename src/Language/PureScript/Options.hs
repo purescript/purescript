@@ -70,6 +70,10 @@ data Options mode = Options {
     --
   , optionsVerboseErrors :: Bool
     -- |
+    -- Verbose warning message
+    --
+  , optionsVerboseWarnings :: Bool
+    -- |
     -- Remove the comments from the generated js
   , optionsNoComments :: Bool
     -- |
@@ -83,10 +87,10 @@ data Options mode = Options {
 -- Default compiler options
 --
 defaultCompileOptions :: Options Compile
-defaultCompileOptions = Options False False False Nothing False False False (CompileOptions "PS" [] [])
+defaultCompileOptions = Options False False False Nothing False False False False (CompileOptions "PS" [] [])
 
 -- |
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False False Nothing False False False MakeOptions
+defaultMakeOptions = Options False False False Nothing False False False False MakeOptions
