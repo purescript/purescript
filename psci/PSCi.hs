@@ -138,22 +138,10 @@ helpMessage = "The following commands are available:\n\n    " ++
         , desc
         ]
 
-  extraHelp = unlines
-    [ "Once a file has been loaded, values and types in the module(s) that it"
-    , "contains are available fully qualified:"
-    , ""
-    , "    > :type Data.Function.on"
-    , "    forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c"
-    , ""
-    , "Alternatively, you can import a loaded module in order to bring types and"
-    , "values into the current scope - then, you can use them unqualified."
-    , ""
-    , "Modules can be imported normally, as in PureScript code, eg:"
-    , ""
-    , "    > import Control.Monad"
-    , "    > import Prelude.Unsafe (unsafeIndex)"
-    , "    > import qualified Data.List as L"
-    ]
+  extraHelp =
+    "Further information is available on the PureScript wiki:\n" ++
+    " --> https://github.com/purescript/purescript/wiki/psci"
+
 
 -- |
 -- The welcome prologue.
