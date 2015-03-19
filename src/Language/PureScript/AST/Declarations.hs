@@ -78,12 +78,12 @@ isDctorExported ident (Just exps) ctor = test `any` exps
 -- |
 -- Return the exported data constructors for a given type.
 --
-exportedDctors :: Module -> ProperName -> [ProperName]
+exportedDctors :: Module -> ProperName -> [(ProperName, [Type])]
 exportedDctors (Module _ _ decls exps) ident =
-  filter (isDctorExported ident exps) dctors
+  filter (isDctorExported ident exps . fst) dctors
   where
   dctors = concatMap getDctors (flattenDecls decls)
-  getDctors (DataDeclaration _ _ _ ctors) = map fst ctors
+  getDctors (DataDeclaration _ _ _ ctors) = ctors
   getDctors (PositionedDeclaration _ _ d) = getDctors d
   getDctors _ = []
 

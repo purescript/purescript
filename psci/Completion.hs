@@ -218,7 +218,7 @@ dctorNames m = nubOnFst $ concatMap dctors dnames
   onlyDataDecls = (filter P.isDataDecl (P.exportedDeclarations m))
 
   dctors :: (N.ProperName, P.Declaration) -> [(N.ProperName, P.Declaration)]
-  dctors (name, decl) = map (\n -> (n, decl)) (P.exportedDctors m name)
+  dctors (name, decl) = map (\n -> (n, decl)) (map fst (P.exportedDctors m name))
 
 moduleNames :: [P.Module] -> [String]
 moduleNames ms = nub [show moduleName | P.Module _ moduleName _ _ <- ms]
