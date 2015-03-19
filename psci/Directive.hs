@@ -102,12 +102,12 @@ help :: [(Directive, String, String)]
 help =
   [ (Help,   "",         "Show this help menu")
   , (Quit,   "",         "Quit PSCi")
-  , (Reset,  "",         "Reset")
-  , (Browse, "<module>", "Browse <module>")
+  , (Reset,  "",         "Discard all imported modules and declared bindings")
+  , (Browse, "<module>", "See all functions in <module>")
   , (Load,   "<file>",   "Load <file> for importing")
   , (Type,   "<expr>",   "Show the type of <expr>")
   , (Kind,   "<type>",   "Show the kind of <type>")
-  , (Show,   "import",   "Show imported modules")
-  , (Show,   "loaded",   "Show loaded modules")
+  , (Show,   "import",   "Show all imported modules")
+  , (Show,   "loaded",   "Show all loaded modules")
   ]
 

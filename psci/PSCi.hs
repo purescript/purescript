@@ -124,17 +124,24 @@ expandTilde p = return p
 --
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
-  intercalate "\n    " (map line D.help)
+  intercalate "\n    " (map line D.help) ++
+  "\n\n" ++ extraHelp
   where
-    line :: (Directive, String, String) -> String
-    line (dir, arg, desc) = intercalate " "
-          [ cmd
-          , replicate (11 - length cmd) ' '
-          , arg
-          , replicate (11 - length arg) ' '
-          , desc
-          ]
-      where cmd = ":" ++ D.stringFor dir
+  line :: (Directive, String, String) -> String
+  line (dir, arg, desc) =
+    let cmd = ':' : D.stringFor dir
+    in intercalate " "
+        [ cmd
+        , replicate (11 - length cmd) ' '
+        , arg
+        , replicate (11 - length arg) ' '
+        , desc
+        ]
+
+  extraHelp =
+    "Further information is available on the PureScript wiki:\n" ++
+    " --> https://github.com/purescript/purescript/wiki/psci"
+
 
 -- |
 -- The welcome prologue.
