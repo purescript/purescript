@@ -52,12 +52,14 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
   decl :: Ident -> CF.Expr Ann -> m (Decl Ann)
   decl ident d@(CF.Abs ann@(_, _, _, Just IsTypeClassConstructor) _ _) =
     let name = ProperName (runIdent ident)
-    in return $ VarDecl nullAnn ident $ Constructor ann name name (unapply [] d)
+    in return $ Constructor ann name ident (unapply [] d)
     where
     unapply :: [Ident] -> CF.Expr Ann -> [Ident]
     unapply args (CF.Abs _ arg body) = unapply (arg:args) body
     unapply args _ = reverse args
   decl ident (CF.Abs ann arg body) = Function ann ident [arg] <$> block body
+  decl ident (CF.Constructor ann tyName args) =
+    return $ Constructor ann tyName ident args
   decl ident val = VarDecl nullAnn ident <$> value val
 
   -- Desugar an CoreFn expression into a CoreImp expression or list of
@@ -65,8 +67,6 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
   expr :: CF.Expr Ann -> m (Either (Expr Ann) [Statement Ann])
   expr (CF.Literal ann lit) =
     Left . Literal ann <$> traverse value lit
-  expr (CF.Constructor ann tyName dctorName args) =
-    return . Left $ Constructor ann tyName dctorName args
   expr (CF.Accessor ann prop val) =
     Left . Accessor ann (str prop) <$> value val
   expr (CF.ObjectUpdate ann obj props) =
@@ -83,6 +83,8 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
     body' <- block body
     binds' <- concat <$> mapM bind binds
     return . Right $ Decl `map` binds' ++ body'
+  expr (CF.Constructor{}) =
+    error "Constructor in an unsupported position when desugaring CoreFn->CoreImp"
 
   -- Desugar a CoreFn expression into a block. Values are `return`ed.
   block :: CF.Expr Ann -> m [Statement Ann]

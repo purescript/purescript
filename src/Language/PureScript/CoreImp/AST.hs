@@ -32,10 +32,6 @@ data Expr a
   --
   = Literal a (Literal (Expr a))
   -- |
-  -- A data constructor (type name, constructor name, field names)
-  --
-  | Constructor a ProperName ProperName [Ident]
-  -- |
   -- An object property accessor expression (prop, obj)
   --
   | Accessor a (Expr a) (Expr a)
@@ -84,7 +80,11 @@ data Decl a
   -- |
   -- A variable declaratation and initial value
   --
-  | VarDecl a Ident (Expr a) deriving (Show, Data, Typeable, Functor)
+  | VarDecl a Ident (Expr a)
+  -- |
+  -- A data constructor (type name, constructor name, field names)
+  --
+  | Constructor a ProperName Ident [Ident] deriving (Show, Data, Typeable, Functor)
 
 -- |
 -- Block/module level statements
