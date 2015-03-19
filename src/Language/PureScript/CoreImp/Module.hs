@@ -26,7 +26,7 @@ data Module a = Module
   , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
-  , moduleStatements :: [Statement a]
+  , moduleDecls :: [Decl a]
   } deriving (Show)
 
 type ForeignDecl = (Ident, Maybe JS, Type)

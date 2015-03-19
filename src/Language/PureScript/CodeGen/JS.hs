@@ -14,7 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -49,11 +48,11 @@ import qualified Language.PureScript.CoreImp as CI
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
            => CI.Module CI.Ann -> m [JS]
-moduleToJs (CI.Module coms mn imps exps foreigns stmnts) = do
+moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
   let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
-  jsDecls <- mapM statmentToJS stmnts
+  jsDecls <- mapM declToJS decls
   optimized <- T.traverse optimize jsDecls
   let isModuleEmpty = null exps
   comments <- not <$> asks optionsNoComments
@@ -105,15 +104,17 @@ moduleToJs (CI.Module coms mn imps exps foreigns stmnts) = do
   accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
                       | otherwise = JSAccessor prop
 
-  statmentToJS :: CI.Statement CI.Ann -> m JS
-  statmentToJS (CI.Expr e) =
-    exprToJS e
-  statmentToJS (CI.Function _ ident args body) =
+  declToJS :: CI.Decl CI.Ann -> m JS
+  declToJS (CI.VarDecl _ ident expr) =
+    JSVariableIntroduction (identToJs ident) . Just <$> exprToJS expr
+  declToJS (CI.Function _ ident args body) =
     JSFunction (Just $ identToJs ident)
                (identToJs `map` args) .
                JSBlock <$> mapM statmentToJS body
-  statmentToJS (CI.VarDecl _ ident expr) =
-    JSVariableIntroduction (identToJs ident) . Just <$> exprToJS expr
+
+  statmentToJS :: CI.Statement CI.Ann -> m JS
+  statmentToJS (CI.Expr e) = exprToJS e
+  statmentToJS (CI.Decl d) = declToJS d
   statmentToJS (CI.Assignment _ assignee expr) =
     JSAssignment <$> exprToJS assignee <*> exprToJS expr
   statmentToJS (CI.Loop _ cond body) =

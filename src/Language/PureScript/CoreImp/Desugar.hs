@@ -43,13 +43,13 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
 
   where
 
-  bind :: CF.Bind Ann -> m [Statement Ann]
+  bind :: CF.Bind Ann -> m [Decl Ann]
   bind (CF.NonRec ident val) = fmap return (decl ident val)
   bind (CF.Rec vals) = uncurry decl `mapM` vals
 
   -- Desugar a declaration into a variable introduction or named function
   -- declaration.
-  decl :: Ident -> CF.Expr Ann -> m (Statement Ann)
+  decl :: Ident -> CF.Expr Ann -> m (Decl Ann)
   decl ident d@(CF.Abs ann@(_, _, _, Just IsTypeClassConstructor) _ _) =
     let name = ProperName (runIdent ident)
     in return $ VarDecl nullAnn ident $ Constructor ann name name (unapply [] d)
@@ -82,7 +82,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
   expr (CF.Let _ binds body) = do
     body' <- block body
     binds' <- concat <$> mapM bind binds
-    return . Right $ binds' ++ body'
+    return . Right $ Decl `map` binds' ++ body'
 
   -- Desugar a CoreFn expression into a block. Values are `return`ed.
   block :: CF.Expr Ann -> m [Statement Ann]
@@ -105,7 +105,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
     body <- forM binders $ \(CF.CaseAlternative bs result) -> do
       res <- guards result
       go valNames res bs
-    return $ assignments ++ concat body ++ [Throw nullAnn "Pattern match failed"]
+    return $ map Decl assignments ++ concat body ++ [Throw nullAnn "Pattern match failed"]
     where
       go :: [Ident] -> [Statement Ann] -> [CF.Binder Ann] -> m [Statement Ann]
       go _ done [] = return done
@@ -124,7 +124,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
   binder varName done (CF.LiteralBinder _ l) =
     literalBinder varName done l
   binder varName done (CF.VarBinder _ ident) =
-    return (VarDecl nullAnn ident (var varName) : done)
+    return $ Decl (VarDecl nullAnn ident (var varName)) : done
   binder varName done (CF.ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binder varName done b
   binder varName done (CF.ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
@@ -139,21 +139,21 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
       argVar <- Ident <$> freshName
       done'' <- go remain done'
       stmnts <- binder argVar done'' b
-      return (VarDecl nullAnn argVar (Accessor nullAnn (str $ runIdent field) (var varName)) : stmnts)
+      return $ Decl (VarDecl nullAnn argVar (Accessor nullAnn (str $ runIdent field) (var varName))) : stmnts
   binder varName done b@(CF.ConstructorBinder _ _ ctor _) | isCons ctor = do
     let (headBinders, tailBinder) = uncons [] b
         numberOfHeadBinders = fromIntegral $ length headBinders
     stmnts1 <- foldM (\done' (headBinder, index) -> do
       headVar <- Ident <$> freshName
       stmntss <- binder headVar done' headBinder
-      return (VarDecl nullAnn headVar (Indexer nullAnn (int index) (var varName)) : stmntss)) done (zip headBinders [0..])
+      return (Decl (VarDecl nullAnn headVar (Indexer nullAnn (int index) (var varName))) : stmntss)) done (zip headBinders [0..])
     tailVar <- Ident <$> freshName
     stmnts2 <- binder tailVar stmnts1 tailBinder
     return
       [
       IfElse nullAnn
         (BinaryOp nullAnn GreaterThanOrEqual (Accessor nullAnn (str "length") (var varName)) (int numberOfHeadBinders))
-        (VarDecl nullAnn tailVar (App nullAnn (Accessor nullAnn (str "slice") (var varName)) [int numberOfHeadBinders]) : stmnts2)
+        (Decl (VarDecl nullAnn tailVar (App nullAnn (Accessor nullAnn (str "slice") (var varName)) [int numberOfHeadBinders])) : stmnts2)
         Nothing
       ]
     where
@@ -164,7 +164,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
     error $ "Invalid ConstructorBinder in binder: " ++ show b
   binder varName done (CF.NamedBinder _ ident b) = do
     stmnts <- binder varName done b
-    return (VarDecl nullAnn ident (var varName) : stmnts)
+    return $ Decl (VarDecl nullAnn ident (var varName)) : stmnts
 
   literalBinder :: Ident -> [Statement Ann] -> Literal (CF.Binder Ann) -> m [Statement Ann]
   literalBinder varName done (NumericLiteral n) =
@@ -183,7 +183,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
       propVar <- Ident <$> freshName
       done'' <- go done' bs'
       stmnts <- binder propVar done'' b
-      return $ VarDecl nullAnn propVar (Accessor nullAnn (str prop) (var varName)) : stmnts
+      return $ Decl (VarDecl nullAnn propVar (Accessor nullAnn (str prop) (var varName))) : stmnts
   literalBinder varName done (ArrayLiteral bs) = do
     stmnts <- go done 0 bs
     return [IfElse nullAnn (BinaryOp nullAnn Equal (Accessor nullAnn (str "length") (var varName)) (int (fromIntegral $ length bs))) stmnts Nothing]
@@ -194,7 +194,7 @@ moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
       elVar <- Ident <$> freshName
       done'' <- go done' (index + 1) bs'
       stmnts <- binder elVar done'' b
-      return (VarDecl nullAnn elVar (Indexer nullAnn (int index) (var varName)) : stmnts)
+      return $ Decl (VarDecl nullAnn elVar (Indexer nullAnn (int index) (var varName))) : stmnts
 
 var :: Ident -> Expr Ann
 var = Var nullAnn . Qualified Nothing

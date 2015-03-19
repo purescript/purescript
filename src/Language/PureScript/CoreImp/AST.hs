@@ -74,6 +74,19 @@ data Expr a
   | IsTagOf a (Qualified ProperName) (Expr a) deriving (Show, Data, Typeable, Functor)
 
 -- |
+-- Variable or function declaration
+--
+data Decl a
+  -- |
+  -- A function introduction (name, arguments, body)
+  --
+  = Function a Ident [Ident] [Statement a]
+  -- |
+  -- A variable declaratation and initial value
+  --
+  | VarDecl a Ident (Expr a) deriving (Show, Data, Typeable, Functor)
+
+-- |
 -- Block/module level statements
 --
 data Statement a
@@ -82,13 +95,9 @@ data Statement a
   --
   = Expr (Expr a)
   -- |
-  -- A function introduction (name, arguments, body)
+  -- A variable or function declaration
   --
-  | Function a Ident [Ident] [Statement a]
-  -- |
-  -- A variable declaratation and initial value
-  --
-  | VarDecl a Ident (Expr a)
+  | Decl (Decl a)
   -- |
   -- A variable assignment (assignee, value)
   --
