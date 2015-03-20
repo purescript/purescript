@@ -21,4 +21,5 @@ A small strongly typed programming language with expressive types that compiles 
 ## Help!
 
 - [#purescript IRC @ FreeNode](http://webchat.freenode.net/?channels=purescript)
+- [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
 - [Google Group](https://groups.google.com/forum/#!forum/purescript)
