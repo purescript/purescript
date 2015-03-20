@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn.Meta
+-- Module      :  Language.PureScript.Core.Meta
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -14,7 +14,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Language.PureScript.CoreFn.Meta where
+module Language.PureScript.Core.Meta where
 
 import qualified Data.Data as D
 

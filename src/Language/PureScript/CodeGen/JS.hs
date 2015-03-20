@@ -35,6 +35,7 @@ import Control.Monad.Supply.Class
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CodeGen.JS.Optimizer
+import Language.PureScript.Core
 import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Names
 import Language.PureScript.Options
@@ -47,7 +48,7 @@ import qualified Language.PureScript.CoreImp as CI
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => CI.Module CI.Ann -> m [JS]
+           => CI.Module Ann -> m [JS]
 moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
@@ -104,14 +105,14 @@ moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
   accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
                       | otherwise = JSAccessor prop
 
-  declToJS :: CI.Decl CI.Ann -> m JS
+  declToJS :: CI.Decl Ann -> m JS
   declToJS (CI.VarDecl _ ident expr) =
     JSVariableIntroduction (identToJs ident) . Just <$> exprToJS expr
   declToJS (CI.Function _ ident args body) =
     JSFunction (Just $ identToJs ident)
                (identToJs `map` args) .
                JSBlock <$> mapM statmentToJS body
-  declToJS (CI.Constructor (_, _, _, Just CI.IsNewtype) _ ctor _) =
+  declToJS (CI.Constructor (_, _, _, Just IsNewtype) _ ctor _) =
     return $ JSVariableIntroduction (identToJs ctor) (Just $
                 JSObjectLiteral [("create",
                   JSFunction Nothing ["value"]
@@ -129,13 +130,13 @@ moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
           let body = JSUnary JSNew $ JSApp (var ctor) (var `map` fields)
           in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
     in return $
-      if meta == Just CI.IsTypeClassConstructor
+      if meta == Just IsTypeClassConstructor
       then constructor
       else iifeDecl (identToJs ctor) [ constructor
                                      , JSAssignment (JSAccessor "create" (var ctor)) createFn
                                      ]
 
-  statmentToJS :: CI.Statement CI.Ann -> m JS
+  statmentToJS :: CI.Statement Ann -> m JS
   statmentToJS (CI.Expr e) = exprToJS e
   statmentToJS (CI.Decl d) = declToJS d
   statmentToJS (CI.Assignment _ assignee expr) =
@@ -158,12 +159,12 @@ moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
   statmentToJS (CI.Comment _ coms') =
     return $ JSComment coms' (JSBlock []) -- whoops
 
-  loopStatementToJS :: CI.LoopStatement CI.Ann -> m JS
+  loopStatementToJS :: CI.LoopStatement Ann -> m JS
   loopStatementToJS (CI.Break _ lbl) = return . JSBreak $ fromMaybe "" lbl
   loopStatementToJS (CI.Continue _ lbl) = return . JSContinue $ fromMaybe "" lbl
   loopStatementToJS (CI.Statement s) = statmentToJS s
 
-  exprToJS :: CI.Expr CI.Ann -> m JS
+  exprToJS :: CI.Expr Ann -> m JS
   exprToJS (CI.Literal _ lit) =
     literalToValueJS lit
   exprToJS (CI.Accessor _ prop expr) =
@@ -178,19 +179,19 @@ moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
     let (f, args) = unApp e []
     args' <- mapM exprToJS args
     case f of
-      CI.Var (_, _, _, Just CI.IsNewtype) _ -> return (head args')
-      CI.Var (_, _, _, Just (CI.IsConstructor _ fields)) name | length args == length fields ->
+      CI.Var (_, _, _, Just IsNewtype) _ -> return (head args')
+      CI.Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ JSUnary JSNew $ JSApp (qualifiedToJS id name) args'
-      CI.Var (_, _, _, Just CI.IsTypeClassConstructor) name ->
+      CI.Var (_, _, _, Just IsTypeClassConstructor) name ->
         return $ JSUnary JSNew $ JSApp (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> exprToJS f
     where
-    unApp :: CI.Expr CI.Ann -> [CI.Expr CI.Ann] -> (CI.Expr CI.Ann, [CI.Expr CI.Ann])
+    unApp :: CI.Expr Ann -> [CI.Expr Ann] -> (CI.Expr Ann, [CI.Expr Ann])
     unApp (CI.App _ val args1) args2 = unApp val (args1 ++ args2)
     unApp other args = (other, args)
-  exprToJS (CI.Var (_, _, _, Just (CI.IsConstructor _ [])) ident) =
+  exprToJS (CI.Var (_, _, _, Just (IsConstructor _ [])) ident) =
     return $ JSAccessor "value" $ qualifiedToJS id ident
-  exprToJS (CI.Var (_, _, _, Just (CI.IsConstructor _ _)) ident) =
+  exprToJS (CI.Var (_, _, _, Just (IsConstructor _ _)) ident) =
     return $ JSAccessor "create" $ qualifiedToJS id ident
   exprToJS (CI.Var _ ident) =
     return $ varToJs ident
@@ -216,12 +217,12 @@ moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
   iifeDecl :: String -> [JS] -> JS
   iifeDecl v exprs = JSVariableIntroduction v (Just $ iife v exprs)
 
-  literalToValueJS :: CI.Literal (CI.Expr CI.Ann) -> m JS
-  literalToValueJS (CI.NumericLiteral n) = return $ JSNumericLiteral n
-  literalToValueJS (CI.StringLiteral s) = return $ JSStringLiteral s
-  literalToValueJS (CI.BooleanLiteral b) = return $ JSBooleanLiteral b
-  literalToValueJS (CI.ArrayLiteral xs) = JSArrayLiteral <$> mapM exprToJS xs
-  literalToValueJS (CI.ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM exprToJS) ps
+  literalToValueJS :: Literal (CI.Expr Ann) -> m JS
+  literalToValueJS (NumericLiteral n) = return $ JSNumericLiteral n
+  literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
+  literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral b
+  literalToValueJS (ArrayLiteral xs) = JSArrayLiteral <$> mapM exprToJS xs
+  literalToValueJS (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM exprToJS) ps
 
   -- |
   -- Shallow copy an object.

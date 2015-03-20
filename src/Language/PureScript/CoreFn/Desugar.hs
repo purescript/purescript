@@ -23,11 +23,9 @@ import Control.Arrow (second, (***))
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
-import Language.PureScript.CoreFn.Ann
+import Language.PureScript.Core
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
-import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
 import Language.PureScript.Names

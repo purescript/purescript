@@ -22,9 +22,7 @@ import Data.Traversable (traverse)
 import Control.Monad (replicateM, forM, foldM)
 import Control.Monad.Supply.Class
 
-import Language.PureScript.CoreFn.Ann
-import Language.PureScript.CoreFn.Meta
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.Core
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Module
 import Language.PureScript.CoreImp.Operators

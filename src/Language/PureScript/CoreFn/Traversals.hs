@@ -16,9 +16,9 @@ module Language.PureScript.CoreFn.Traversals where
 
 import Control.Arrow (second, (***), (+++))
 
+import Language.PureScript.Core.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

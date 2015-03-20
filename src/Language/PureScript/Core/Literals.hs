@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn.Literals
+-- Module      :  Language.PureScript.Core.Literals
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -17,7 +17,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 
-module Language.PureScript.CoreFn.Literals where
+module Language.PureScript.Core.Literals where
 
 import qualified Data.Data as D
 import qualified Data.Foldable as F

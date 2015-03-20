@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreImp
+-- Module      :  Language.PureScript.Core
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -8,15 +8,14 @@
 -- Stability   :  experimental
 -- Portability :
 --
--- | The core imperative representation
+-- | Types and values used throughout the core representations
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CoreImp (
+module Language.PureScript.Core (
   module C
 ) where
 
-import Language.PureScript.CoreImp.AST as C
-import Language.PureScript.CoreImp.Desugar as C
-import Language.PureScript.CoreImp.Module as C
-import Language.PureScript.CoreImp.Operators as C
+import Language.PureScript.Core.Ann as C
+import Language.PureScript.Core.Literals as C
+import Language.PureScript.Core.Meta as C

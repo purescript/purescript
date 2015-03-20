@@ -19,7 +19,7 @@ module Language.PureScript.CoreFn.Binders where
 
 import qualified Data.Data as D
 
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.Core.Literals
 import Language.PureScript.Names
 
 -- |

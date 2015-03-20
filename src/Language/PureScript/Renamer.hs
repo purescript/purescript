@@ -24,6 +24,7 @@ import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import Language.PureScript.Core
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Traversals

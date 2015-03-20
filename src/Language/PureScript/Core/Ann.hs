@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn.Ann
+-- Module      :  Language.PureScript.Core.Ann
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -12,12 +12,12 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CoreFn.Ann where
+module Language.PureScript.Core.Ann where
 
 import Language.PureScript.AST.SourcePos
-import Language.PureScript.CoreFn.Meta
-import Language.PureScript.Types
 import Language.PureScript.Comments
+import Language.PureScript.Core.Meta
+import Language.PureScript.Types
 
 -- |
 -- Type alias for basic annotations

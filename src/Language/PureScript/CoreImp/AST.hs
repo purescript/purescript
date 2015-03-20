@@ -19,7 +19,7 @@ module Language.PureScript.CoreImp.AST where
 import Data.Data
 
 import Language.PureScript.Comments
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.Core.Literals
 import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Names
 

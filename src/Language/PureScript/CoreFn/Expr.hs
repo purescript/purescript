@@ -21,8 +21,8 @@ import Control.Arrow ((***))
 
 import qualified Data.Data as D
 
+import Language.PureScript.Core.Literals
 import Language.PureScript.CoreFn.Binders
-import Language.PureScript.CoreFn.Literals
 import Language.PureScript.Names
 
 -- |
