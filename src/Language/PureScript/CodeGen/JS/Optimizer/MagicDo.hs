@@ -23,7 +23,6 @@ import Data.Maybe (fromJust, isJust)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Names
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C

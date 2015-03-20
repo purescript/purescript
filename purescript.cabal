@@ -61,16 +61,15 @@ library
                      Language.PureScript.Core.Ann
                      Language.PureScript.Core.Literals
                      Language.PureScript.Core.Meta
+                     Language.PureScript.Core.Module
                      Language.PureScript.CoreFn
                      Language.PureScript.CoreFn.Binders
                      Language.PureScript.CoreFn.Desugar
                      Language.PureScript.CoreFn.Expr
-                     Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
                      Language.PureScript.CoreImp
                      Language.PureScript.CoreImp.AST
                      Language.PureScript.CoreImp.Desugar
-                     Language.PureScript.CoreImp.Module
                      Language.PureScript.CoreImp.Operators
                      Language.PureScript.Comments
                      Language.PureScript.DeadCodeElimination

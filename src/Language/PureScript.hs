@@ -65,6 +65,7 @@ import Language.PureScript.Sugar as P
 import Control.Monad.Supply as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
+import qualified Language.PureScript.Core as CR
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreImp as CI
 import qualified Language.PureScript.Constants as C
@@ -109,7 +110,7 @@ compile' env ms prefix = do
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
-  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CF.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
+  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CR.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   js <- concat <$> evalSupplyT nextVar (T.traverse (CI.moduleToCoreImp >=> moduleToJs) modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   js' <- generateMain env' js

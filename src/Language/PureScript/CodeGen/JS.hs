@@ -41,15 +41,15 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
-import qualified Language.PureScript.CoreImp as CI
+import qualified Language.PureScript.CoreImp.AST as CI
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => CI.Module Ann -> m [JS]
-moduleToJs (CI.Module coms mn imps exps foreigns decls) = do
+           => Module (CI.Decl Ann) JS -> m [JS]
+moduleToJs (Module coms mn imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
   let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns

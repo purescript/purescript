@@ -23,10 +23,10 @@ import Control.Arrow (second, (***))
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
+import Language.PureScript.CodeGen.JS
 import Language.PureScript.Core
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
@@ -37,7 +37,7 @@ import qualified Language.PureScript.AST as A
 -- |
 -- Desugars a module from AST to CoreFn representation.
 --
-moduleToCoreFn :: Environment -> A.Module -> Module Ann
+moduleToCoreFn :: Environment -> A.Module -> Module (Bind Ann) JS
 moduleToCoreFn _ (A.Module _ _ _ Nothing) =
   error "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
@@ -211,7 +211,7 @@ importToCoreFn _ = Nothing
 -- |
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
-externToCoreFn :: A.Declaration -> Maybe ForeignDecl
+externToCoreFn :: A.Declaration -> Maybe (ForeignDecl JS)
 externToCoreFn (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
 externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d

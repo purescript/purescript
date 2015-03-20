@@ -18,5 +18,4 @@ module Language.PureScript.CoreImp (
 
 import Language.PureScript.CoreImp.AST as C
 import Language.PureScript.CoreImp.Desugar as C
-import Language.PureScript.CoreImp.Module as C
 import Language.PureScript.CoreImp.Operators as C

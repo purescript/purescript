@@ -19,3 +19,4 @@ module Language.PureScript.Core (
 import Language.PureScript.Core.Ann as C
 import Language.PureScript.Core.Literals as C
 import Language.PureScript.Core.Meta as C
+import Language.PureScript.Core.Module as C

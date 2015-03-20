@@ -24,7 +24,6 @@ import Control.Monad.Supply.Class
 
 import Language.PureScript.Core
 import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Module
 import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Names
 
@@ -34,9 +33,9 @@ import qualified Language.PureScript.CoreFn as CF
 -- |
 -- Desugars a module from CoreFn to CoreImp representation.
 --
-moduleToCoreImp :: forall m. (Applicative m, Monad m, MonadSupply m)
-                => CF.Module Ann -> m (Module Ann)
-moduleToCoreImp (CF.Module coms mn imps exps externs decls) =
+moduleToCoreImp :: forall m a. (Applicative m, Monad m, MonadSupply m)
+                => Module (CF.Bind Ann) a -> m (Module (Decl Ann) a)
+moduleToCoreImp (Module coms mn imps exps externs decls) =
   Module coms mn imps exps externs . concat <$> mapM bind decls
 
   where
