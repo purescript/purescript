@@ -19,12 +19,12 @@ import Data.Maybe (fromMaybe)
 import Language.PureScript.Core.Literals
 import Language.PureScript.CoreImp.AST
 
-everywhereOnValues :: (Decl a -> Decl a) ->
-                      (Expr a -> Expr a) ->
-                      (Statement a -> Statement a) ->
-                      (LoopStatement a -> LoopStatement a) ->
-                      (Decl a -> Decl a, Expr a -> Expr a, Statement a -> Statement a, LoopStatement a -> LoopStatement a)
-everywhereOnValues f g h i = (f', g', h', i')
+everywhere :: (Decl a -> Decl a) ->
+              (Expr a -> Expr a) ->
+              (Statement a -> Statement a) ->
+              (LoopStatement a -> LoopStatement a) ->
+              (Decl a -> Decl a, Expr a -> Expr a, Statement a -> Statement a, LoopStatement a -> LoopStatement a)
+everywhere f g h i = (f', g', h', i')
   where
   f' (Function ann name args ss) = f (Function ann name args (map h' ss))
   f' (VarDecl ann name e) = f (VarDecl ann name (g' e))
@@ -55,13 +55,49 @@ everywhereOnValues f g h i = (f', g', h', i')
   i' l@(Continue{}) = i l
   i' (Statement s) = i (Statement (h' s))
 
-everythingOnValues :: (r -> r -> r) ->
-                      (Decl a -> r) ->
-                      (Expr a -> r) ->
-                      (Statement a -> r) ->
-                      (LoopStatement a -> r) ->
-                      (Decl a -> r, Expr a -> r, Statement a -> r, LoopStatement a -> r)
-everythingOnValues (<>) f g h i = (f', g', h', i')
+everywhereTopDown :: (Decl a -> Decl a) ->
+                     (Expr a -> Expr a) ->
+                     (Statement a -> Statement a) ->
+                     (LoopStatement a -> LoopStatement a) ->
+                     (Decl a -> Decl a, Expr a -> Expr a, Statement a -> Statement a, LoopStatement a -> LoopStatement a)
+everywhereTopDown f g h i = (f', g', h', i')
+  where
+  f' (Function ann name args ss) = Function ann name args (map (h' . h) ss)
+  f' (VarDecl ann name e) = VarDecl ann name (g' (g e))
+  f' d@(Constructor{}) = f d
+
+  g' (Literal ann l) = Literal ann (modifyLiteral (g' . g) l)
+  g' (Accessor ann e1 e2) = Accessor ann (g' (g e1)) (g' (g e2))
+  g' (Indexer ann e1 e2) = Indexer ann (g' (g e1)) (g' (g e2))
+  g' (AnonFunction ann args ss) = AnonFunction ann args (map (h' . h) ss)
+  g' (App ann e1 es) = App ann (g' (g e1)) (map (g' . g) es)
+  g' e@(Var{}) = g e
+  g' (ObjectUpdate ann e1 es) = ObjectUpdate ann (g' (g e1)) (map (second (g' . g)) es)
+  g' (UnaryOp ann op e1) = UnaryOp ann op (g' (g e1))
+  g' (BinaryOp ann op e1 e2) = BinaryOp ann op (g' (g e1)) (g' (g e2))
+  g' (IsTagOf ann tag e1) = IsTagOf ann tag (g' (g e1))
+
+  h' (Expr e) = Expr (g' (g e))
+  h' (Decl d) = Decl (f' (f d))
+  h' (Assignment ann e1 e2) = Assignment ann (g' (g e1)) (g' (g e2))
+  h' (Loop ann e ls) = Loop ann (g' (g e)) (map (i' . i) ls)
+  h' (IfElse ann e ss mss) = IfElse ann (g' (g e)) (map (h' . h) ss) (fmap (map (h' . h)) mss)
+  h' (Return ann e) = Return ann (g' (g e))
+  h' s@(Throw{}) = h s
+  h' (Label ann lbl s) = Label ann lbl (h' (h s))
+  h' s@(Comment{}) = h s
+
+  i' l@(Break{}) = i l
+  i' l@(Continue{}) = i l
+  i' (Statement s) = Statement (h' (h s))
+
+everything :: (r -> r -> r) ->
+              (Decl a -> r) ->
+              (Expr a -> r) ->
+              (Statement a -> r) ->
+              (LoopStatement a -> r) ->
+              (Decl a -> r, Expr a -> r, Statement a -> r, LoopStatement a -> r)
+everything (<>) f g h i = (f', g', h', i')
   where
   f' d@(Function _ _ _ ss) = foldl (<>) (f d) (map h' ss)
   f' d@(VarDecl _ _ e) = f d <> g' e
