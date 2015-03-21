@@ -155,8 +155,8 @@ options = P.Options <$> noPrelude
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts
-                    <*> (not <$> comments)
                     <*> verboseErrors
+                    <*> (not <$> comments)
                     <*> pure P.MakeOptions
 
 pscMakeOptions :: Parser PSCMakeOptions
