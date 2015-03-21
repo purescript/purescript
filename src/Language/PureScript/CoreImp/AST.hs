@@ -24,6 +24,23 @@ import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Names
 
 -- |
+-- Variable or function declaration
+--
+data Decl a
+  -- |
+  -- A function introduction (name, arguments, body)
+  --
+  = Function a Ident [Ident] [Statement a]
+  -- |
+  -- A variable declaratation and initial value
+  --
+  | VarDecl a Ident (Expr a)
+  -- |
+  -- A data constructor (type name, constructor name, field names)
+  --
+  | Constructor a ProperName Ident [Ident] deriving (Show, Data, Typeable, Functor)
+
+-- |
 -- Values and expressions
 --
 data Expr a
@@ -68,23 +85,6 @@ data Expr a
   -- particular data constructor
   --
   | IsTagOf a (Qualified ProperName) (Expr a) deriving (Show, Data, Typeable, Functor)
-
--- |
--- Variable or function declaration
---
-data Decl a
-  -- |
-  -- A function introduction (name, arguments, body)
-  --
-  = Function a Ident [Ident] [Statement a]
-  -- |
-  -- A variable declaratation and initial value
-  --
-  | VarDecl a Ident (Expr a)
-  -- |
-  -- A data constructor (type name, constructor name, field names)
-  --
-  | Constructor a ProperName Ident [Ident] deriving (Show, Data, Typeable, Functor)
 
 -- |
 -- Block/module level statements

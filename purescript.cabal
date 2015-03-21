@@ -71,6 +71,7 @@ library
                      Language.PureScript.CoreImp.AST
                      Language.PureScript.CoreImp.Desugar
                      Language.PureScript.CoreImp.Operators
+                     Language.PureScript.CoreImp.Traversals
                      Language.PureScript.Comments
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment

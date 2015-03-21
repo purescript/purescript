@@ -29,7 +29,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (NonRec name e) = f (NonRec name (g' e))
   f' (Rec es) = f (Rec (map (second g') es))
 
-  g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
+  g' (Literal ann e) = g (Literal ann (modifyLiteral g' e))
   g' (Accessor ann prop e) = g (Accessor ann prop (g' e))
   g' (ObjectUpdate ann obj vs) = g (ObjectUpdate ann (g' obj) (map (fmap g') vs))
   g' (Abs ann name e) = g (Abs ann name (g' e))
@@ -38,7 +38,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (Let ann ds e) = g (Let ann (map f' ds) (g' e))
   g' e = g e
 
-  h' (LiteralBinder a b) = h (LiteralBinder a (handleLiteral h' b))
+  h' (LiteralBinder a b) = h (LiteralBinder a (modifyLiteral h' b))
   h' (NamedBinder a name b) = h (NamedBinder a name (h' b))
   h' b = h b
 
@@ -46,11 +46,6 @@ everywhereOnValues f g h = (f', g', h')
     ca { caseAlternativeBinders = map h' (caseAlternativeBinders ca)
        , caseAlternativeResult = (map (g' *** g') +++ g') (caseAlternativeResult ca)
        }
-
-  handleLiteral :: (a -> a) -> Literal a -> Literal a
-  handleLiteral i (ArrayLiteral ls) = ArrayLiteral (map i ls)
-  handleLiteral i (ObjectLiteral ls) = ObjectLiteral (map (fmap i) ls)
-  handleLiteral _ other = other
 
 everythingOnValues :: (r -> r -> r) ->
                       (Bind a -> r) ->
@@ -79,7 +74,3 @@ everythingOnValues (<>) f g h i = (f', g', h', i')
 
   i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val
   i' ca@(CaseAlternative bs (Left gs)) = foldl (<>) (i ca) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
-
-  extractLiteral (ArrayLiteral xs) = xs
-  extractLiteral (ObjectLiteral xs) = map snd xs
-  extractLiteral _ = []

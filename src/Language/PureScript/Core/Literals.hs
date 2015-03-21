@@ -48,3 +48,21 @@ data Literal a
   -- An object literal
   --
   | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable, Functor, F.Foldable, T.Traversable)
+
+-- |
+-- Extracts any values from a literal.
+--
+extractLiteral :: Literal a -> [a]
+extractLiteral (ArrayLiteral xs) = xs
+extractLiteral (ObjectLiteral xs) = map snd xs
+extractLiteral _ = []
+
+-- |
+-- Maps over any values within a literal.
+--
+modifyLiteral :: (a -> b) -> Literal a -> Literal b
+modifyLiteral _ (NumericLiteral n) = NumericLiteral n
+modifyLiteral _ (StringLiteral s) = StringLiteral s
+modifyLiteral _ (BooleanLiteral b) = BooleanLiteral b
+modifyLiteral f (ArrayLiteral ls) = ArrayLiteral (map f ls)
+modifyLiteral f (ObjectLiteral ls) = ObjectLiteral (map (fmap f) ls)
