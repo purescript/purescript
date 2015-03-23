@@ -1,0 +1,37 @@
+module Main where
+
+example1 :: String
+example1 = do
+  "Do"
+  " notation"
+  " for"
+  " Semigroup"
+  where
+  (>>=) x f = x <> f unit
+
+(*>) :: forall f a b. (Apply f) => f a -> f b -> f b
+(*>) fa fb = const id <$> fa <*> fb
+
+newtype Const a b = Const a
+
+runConst :: forall a b. Const a b -> a
+runConst (Const a) = a
+
+instance functorConst :: Functor (Const a) where
+  (<$>) _ (Const a) = Const a
+
+instance applyConst :: (Semigroup a) => Apply (Const a) where
+  (<*>) (Const a1) (Const a2) = Const (a1 <> a2)
+
+example2 :: Const String Unit
+example2 = do
+  Const "Do"
+  Const " notation"
+  Const " for"
+  Const " Apply"
+  where
+  (>>=) x f = x *> f unit
+
+main = do
+  Debug.Trace.trace example1
+  Debug.Trace.trace $ runConst example2
