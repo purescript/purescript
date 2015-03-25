@@ -23,7 +23,6 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.Except
-import Control.Monad.Reader.Class
 import Control.Monad.State
 import Control.Monad.Unify
 
@@ -31,7 +30,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Options
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -195,18 +193,16 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: (MonadReader (Options mode) m, MonadError String m) => Check a -> m (a, Environment)
+runCheck :: (MonadError MultipleErrors m) => Check a -> m (a, Environment)
 runCheck = runCheck' initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: (MonadReader (Options mode) m, MonadError String m) => Environment -> Check a -> m (a, Environment)
-runCheck' env c = do
-  verbose <- asks optionsVerboseErrors
-  interpretMultipleErrors verbose $ do
-    (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
-    return (a, checkEnv s)
+runCheck' :: (MonadError MultipleErrors m) => Environment -> Check a -> m (a, Environment)
+runCheck' env c = interpretMultipleErrors $ do
+  (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
+  return (a, checkEnv s)
 
 -- |
 -- Make an assertion, failing with an error message

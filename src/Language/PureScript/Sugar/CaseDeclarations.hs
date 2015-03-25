@@ -24,7 +24,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
 import Data.List (nub, groupBy)
 
 import Control.Applicative
-import Control.Monad ((<=<), forM, join, unless, replicateM)
+import Control.Monad ((<=<), forM, join, unless)
 import Control.Monad.Except (throwError)
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Supply.Class

@@ -89,20 +89,20 @@ import qualified Paths_purescript as Paths
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: (Functor m, Applicative m, MonadError String m, MonadReader (Options Compile) m)
+compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadReader (Options Compile) m)
         => [Module] -> [String] -> m (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: (Functor m, Applicative m, MonadError String m, MonadReader (Options Compile) m)
+compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadReader (Options Compile) m)
          => Environment -> [Module] -> [String] -> m (String, String, Environment)
 compile' env ms prefix = do
   noPrelude <- asks optionsNoPrelude
   additional <- asks optionsAdditional
   mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
   (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
-  (desugared, nextVar) <- interpretMultipleErrors True $ runSupplyT 0 $ desugar sorted
+  (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
-  regrouped <- interpretMultipleErrors True $ createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
+  regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
   let entryPoints = moduleNameFromString `map` entryPointModules additional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
@@ -115,21 +115,21 @@ compile' env ms prefix = do
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
   return (pjs, exts, env')
 
-generateMain :: (MonadError String m, MonadReader (Options Compile) m) => Environment -> [JS] -> m [JS]
+generateMain :: (MonadError MultipleErrors m, MonadReader (Options Compile) m) => Environment -> [JS] -> m [JS]
 generateMain env js = do
   main <- asks optionsMain
   additional <- asks optionsAdditional
   case moduleNameFromString <$> main of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
-        throwError $ show mmi ++ "." ++ C.main ++ " is undefined"
+        throwError . errorMessage $ NameIsUndefined (Ident C.main)
       return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace additional)))) []]
     _ -> return js
 
 -- |
 -- A type class which collects the IO actions we need to be able to run in "make" mode
 --
-class (MonadReader (P.Options P.Make) m, MonadError String m) => MonadMake m where
+class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m) => MonadMake m where
   -- |
   -- Get a file timestamp
   --
@@ -196,7 +196,7 @@ make outputDir ms prefix = do
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
 
-  (desugared, nextVar) <- interpretMultipleErrors True $ runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
+  (desugared, nextVar) <- runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
 
   evalSupplyT nextVar $ go initEnvironment desugared
 
@@ -216,7 +216,7 @@ make outputDir ms prefix = do
 
     (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
 
-    regrouped <- interpretMultipleErrors True . createBindingGroups moduleName' . collapseBindingGroups $ elaborated
+    regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module coms moduleName' regrouped exps
     let corefn = CoreFn.moduleToCoreFn env' mod'
@@ -240,10 +240,10 @@ make outputDir ms prefix = do
   rebuildIfNecessary graph toRebuild (Module _ moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- fmap (map snd) . either (throwError . show) return $ P.parseModulesFromFiles id [(externsFile, externs)]
+    externsModules <- fmap (map snd) . either (throwError . errorMessage . ErrorParsingExterns) return $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
-      _ -> throwError $ "Externs file " ++ externsFile ++ " was invalid"
+      _ -> throwError . errorMessage . InvalidExternsFile $ externsFile
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]

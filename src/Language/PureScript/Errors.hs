@@ -36,11 +36,18 @@ import Language.PureScript.TypeClassDictionaries
 
 import qualified Text.PrettyPrint.Boxes as Box
 
+import qualified Text.Parsec as P
+
 -- |
 -- A type of error messages
 --
 data ErrorMessage 
-  = InfiniteType Type
+  = ErrorParsingExterns P.ParseError
+  | InvalidExternsFile FilePath
+  | CannotGetFileInfo FilePath
+  | CannotReadFile FilePath
+  | CannotWriteFile FilePath
+  | InfiniteType Type
   | InfiniteKind Kind
   | CannotReorderOperators
   | MultipleFixities Ident
@@ -70,6 +77,7 @@ data ErrorMessage
   | InvalidDoLet
   | CycleInDeclaration Ident
   | CycleInTypeSynonym (Maybe ProperName)
+  | CycleInModules [ModuleName]
   | NameIsUndefined Ident
   | NameNotInScope Ident
   | UndefinedTypeVariable ProperName
@@ -126,6 +134,11 @@ instance UnificationError Kind ErrorMessage where
 -- Get the error code for a particular error type
 --
 errorCode :: ErrorMessage -> String
+errorCode (ErrorParsingExterns _)       = "ErrorParsingExterns"
+errorCode (InvalidExternsFile _)        = "InvalidExternsFile"
+errorCode (CannotGetFileInfo _)         = "CannotGetFileInfo"
+errorCode (CannotReadFile _)            = "CannotReadFile"
+errorCode (CannotWriteFile _)           = "CannotWriteFile"
 errorCode (InfiniteType _)              = "InfiniteType"
 errorCode (InfiniteKind _)              = "InfiniteKind"
 errorCode CannotReorderOperators        = "CannotReorderOperators"
@@ -156,6 +169,7 @@ errorCode InvalidDoBind                 = "InvalidDoBind"
 errorCode InvalidDoLet                  = "InvalidDoLet"
 errorCode (CycleInDeclaration _)        = "CycleInDeclaration"
 errorCode (CycleInTypeSynonym _)        = "CycleInTypeSynonym"
+errorCode (CycleInModules _)            = "CycleInModules"
 errorCode (NameIsUndefined _)           = "NameIsUndefined"
 errorCode (NameNotInScope _)            = "NameNotInScope"
 errorCode (UndefinedTypeVariable _)     = "UndefinedTypeVariable"
@@ -245,6 +259,21 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
       
     go :: ErrorMessage -> Box.Box
+    go (CannotGetFileInfo path)        = paras [ line "Unable to read file info: "
+                                               , indent . line $ path
+                                               ]
+    go (CannotReadFile path)           = paras [ line "Unable to read file: "
+                                               , indent . line $ path
+                                               ]
+    go (CannotWriteFile path)          = paras [ line "Unable to write file: "
+                                               , indent . line $ path
+                                               ]
+    go (ErrorParsingExterns err)       = paras [ line "Error parsing externs files: "
+                                               , indent . line . show $ err
+                                               ]
+    go (InvalidExternsFile path)       = paras [ line "Externs file is invalid: "
+                                               , indent . line $ path
+                                               ]
     go InvalidDoBind                   = line "Bind statement cannot be the last statement in a do block"
     go InvalidDoLet                    = line "Let statement cannot be the last statement in a do block"
     go CannotReorderOperators          = line "Unable to reorder operators"
@@ -278,6 +307,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     go (DuplicateClassExport nm)       = line $ "Duplicate export declaration for type class " ++ show nm
     go (DuplicateValueExport nm)       = line $ "Duplicate export declaration for value " ++ show nm
     go (CycleInDeclaration nm)         = line $ "Cycle in declaration of " ++ show nm
+    go (CycleInModules mns)            = line $ "Cycle in module dependencies: " ++ intercalate ", " (map show mns)
     go (NotYetDefined names err)       = paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
                                                , indent $ go err
                                                ]
@@ -490,8 +520,8 @@ renderBox = unlines . map trimEnd . lines . Box.render
 -- |
 -- Interpret multiple errors in a monad supporting errors
 --
-interpretMultipleErrors :: (MonadError String m) => Bool -> Either MultipleErrors a -> m a
-interpretMultipleErrors printFullStack = either (throwError . prettyPrintMultipleErrors printFullStack) return
+interpretMultipleErrors :: (MonadError MultipleErrors m) => Either MultipleErrors a -> m a
+interpretMultipleErrors = either throwError return
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure

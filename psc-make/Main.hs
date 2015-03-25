@@ -52,27 +52,29 @@ readInput InputOptions{..} = do
   content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
   return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT String IO) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError String, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT P.MultipleErrors IO) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadReader (P.Options P.Make))
 
-runMake :: P.Options P.Make -> Make a -> IO (Either String a)
+runMake :: P.Options P.Make -> Make a -> IO (Either P.MultipleErrors a)
 runMake opts = runExceptT . flip runReaderT opts . unMake
 
-makeIO :: IO a -> Make a
-makeIO = Make . lift . ExceptT . fmap (either (Left . show) Right) . tryIOError
+makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
+makeIO f io = do
+  e <- liftIO $ tryIOError io
+  either (throwError . P.errorMessage . f) return e
 
 instance P.MonadMake Make where
-  getTimestamp path = makeIO $ do
+  getTimestamp path = makeIO (const (P.CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO $ do
+  readTextFile path = makeIO (const (P.CannotReadFile path))$ do
     putStrLn $ "Reading " ++ path
     readFile path
-  writeTextFile path text = makeIO $ do
+  writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
     mkdirp path
     putStrLn $ "Writing " ++ path
     writeFile path text
-  progress = makeIO . putStrLn
+  progress = liftIO . putStrLn
 
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions input outputDir opts usePrefix) = do
@@ -84,8 +86,8 @@ compile (PSCMakeOptions input outputDir opts usePrefix) = do
     Right ms -> do
       e <- runMake opts $ P.make outputDir ms prefix
       case e of
-        Left err -> do
-          putStrLn err
+        Left errs -> do
+          putStrLn (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
         Right _ -> do
           exitSuccess
