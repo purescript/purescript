@@ -50,12 +50,11 @@ library
                      Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.JS.Common
                      Language.PureScript.CodeGen.JS.Optimizer
-                     Language.PureScript.CodeGen.JS.Optimizer.Blocks
                      Language.PureScript.CodeGen.JS.Optimizer.Common
                      Language.PureScript.CodeGen.JS.Optimizer.Inliner
                      Language.PureScript.CodeGen.JS.Optimizer.MagicDo
                      Language.PureScript.CodeGen.JS.Optimizer.TCO
-                     Language.PureScript.CodeGen.JS.Optimizer.Unused
+                     Language.PureScript.Comments
                      Language.PureScript.Constants
                      Language.PureScript.Core
                      Language.PureScript.Core.Ann
@@ -71,8 +70,11 @@ library
                      Language.PureScript.CoreImp.AST
                      Language.PureScript.CoreImp.Desugar
                      Language.PureScript.CoreImp.Operators
+                     Language.PureScript.CoreImp.Optimizer
+                     Language.PureScript.CoreImp.Optimizer.Common
+                     Language.PureScript.CoreImp.Optimizer.Nesting
+                     Language.PureScript.CoreImp.Optimizer.Unused
                      Language.PureScript.CoreImp.Traversals
-                     Language.PureScript.Comments
                      Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment
                      Language.PureScript.Errors
