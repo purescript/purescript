@@ -38,7 +38,7 @@ data Decl a
   -- |
   -- A data constructor (type name, constructor name, field names)
   --
-  | Constructor a ProperName Ident [Ident] deriving (Show, Data, Typeable, Functor)
+  | Constructor a ProperName Ident [Ident] deriving (Show, Eq, Data, Typeable, Functor)
 
 -- |
 -- Values and expressions
@@ -84,7 +84,7 @@ data Expr a
   -- Runtime value tag test, used for checking if a value was produced by a
   -- particular data constructor
   --
-  | IsTagOf a (Qualified ProperName) (Expr a) deriving (Show, Data, Typeable, Functor)
+  | IsTagOf a (Qualified ProperName) (Expr a) deriving (Show, Eq, Data, Typeable, Functor)
 
 -- |
 -- Block/module level statements
@@ -125,7 +125,7 @@ data Statement a
   -- |
   -- Comment
   --
-  | Comment a [Comment] deriving (Show, Data, Typeable, Functor)
+  | Comment a [Comment] deriving (Show, Eq, Data, Typeable, Functor)
 
 -- |
 -- Statement label, used for breaking out of nested loops
@@ -147,4 +147,4 @@ data LoopStatement a
   -- |
   -- Standard statement
   --
-  | Statement (Statement a) deriving (Show, Data, Typeable, Functor)
+  | Statement (Statement a) deriving (Show, Eq, Data, Typeable, Functor)

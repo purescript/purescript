@@ -47,7 +47,7 @@ data Literal a
   -- |
   -- An object literal
   --
-  | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable, Functor, F.Foldable, T.Traversable)
+  | ObjectLiteral [(String, a)] deriving (Show, Eq, D.Data, D.Typeable, Functor, F.Foldable, T.Traversable)
 
 -- |
 -- Extracts any values from a literal.
