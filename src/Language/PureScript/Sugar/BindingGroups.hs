@@ -157,7 +157,6 @@ getProperName _ = error "Expected DataDeclaration"
 --
 toBindingGroup :: (Functor m, MonadError MultipleErrors m) => ModuleName -> SCC Declaration -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
-toBindingGroup _ (CyclicSCC [d]) = return d
 toBindingGroup moduleName (CyclicSCC ds') =
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
