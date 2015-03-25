@@ -43,6 +43,7 @@ import qualified Text.Parsec as P
 --
 data ErrorMessage 
   = ErrorParsingExterns P.ParseError
+  | ErrorParsingPrelude P.ParseError
   | InvalidExternsFile FilePath
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
@@ -135,6 +136,7 @@ instance UnificationError Kind ErrorMessage where
 --
 errorCode :: ErrorMessage -> String
 errorCode (ErrorParsingExterns _)       = "ErrorParsingExterns"
+errorCode (ErrorParsingPrelude _)       = "ErrorParsingPrelude"
 errorCode (InvalidExternsFile _)        = "InvalidExternsFile"
 errorCode (CannotGetFileInfo _)         = "CannotGetFileInfo"
 errorCode (CannotReadFile _)            = "CannotReadFile"
@@ -269,6 +271,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
                                                , indent . line $ path
                                                ]
     go (ErrorParsingExterns err)       = paras [ line "Error parsing externs files: "
+                                               , indent . line . show $ err
+                                               ]
+    go (ErrorParsingPrelude err)       = paras [ line "Error parsing prelude: "
                                                , indent . line . show $ err
                                                ]
     go (InvalidExternsFile path)       = paras [ line "Externs file is invalid: "
