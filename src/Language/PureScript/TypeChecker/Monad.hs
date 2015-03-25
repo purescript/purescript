@@ -23,6 +23,7 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.Except
+import Control.Monad.Writer
 import Control.Monad.Reader.Class
 import Control.Monad.State
 import Control.Monad.Unify
@@ -34,6 +35,7 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Language.PureScript.Warnings
 
 -- |
 -- Temporarily bind a collection of names to values
@@ -171,8 +173,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either MultipleErrors) a }
-  deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError MultipleErrors)
+newtype CheckT m a = CheckT { unCheck :: StateT CheckState m a }
+  deriving (Functor, Monad, Applicative, MonadState CheckState) --MonadError MultipleErrors, MonadWriter MultipleWarnings)
 
 -- |
 -- Get the current @Environment@
@@ -195,18 +197,18 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: (MonadReader (Options mode) m, MonadError String m) => Check a -> m (a, Environment)
+runCheck :: (MonadReader (Options mode) m, MonadError e m, MonadWriter w m) => CheckT m a -> m (a, Environment)
 runCheck = runCheck' initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: (MonadReader (Options mode) m, MonadError String m) => Environment -> Check a -> m (a, Environment)
+runCheck' :: (MonadReader (Options mode) m, MonadError e m, MonadWriter w m) => Environment -> CheckT m a -> m (a, Environment)
 runCheck' env c = do
-  verbose <- asks optionsVerboseErrors
-  interpretMultipleErrors verbose $ do
-    (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
-    return (a, checkEnv s)
+  verboseErr <- asks optionsVerboseErrors
+  verboseWar <- asks optionsVerboseWarnings
+  (a, s) <- runStateT (unCheck c) (CheckState env 0 0 Nothing) 
+  return (a, checkEnv s)
 
 -- |
 -- Make an assertion, failing with an error message
@@ -218,7 +220,7 @@ guardWith e False = throwError e
 -- |
 -- Generate new type class dictionary name
 --
-freshDictionaryName :: Check Int
+freshDictionaryName :: (Functor m, MonadError e m, MonadWriter w m) => CheckT m Int
 freshDictionaryName = do
   n <- checkNextDictName <$> get
   modify $ \s -> s { checkNextDictName = succ (checkNextDictName s) }
@@ -227,13 +229,13 @@ freshDictionaryName = do
 -- |
 -- Lift a computation in the @Check@ monad into the substitution monad.
 --
-liftCheck :: Check a -> UnifyT t Check a
+liftCheck :: (MonadError e m, MonadWriter w m) => CheckT m a -> UnifyT t (CheckT m) a
 liftCheck = UnifyT . lift
 
 -- |
 -- Run a computation in the substitution monad, generating a return value and the final substitution.
 --
-liftUnify :: (Partial t) => UnifyT t Check a -> Check (a, Substitution t)
+liftUnify :: (Partial t, MonadError e m, MonadWriter w m) => UnifyT t (CheckT m) a -> CheckT m (a, Substitution t)
 liftUnify unify = do
   st <- get
   (a, ust) <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
