@@ -29,6 +29,8 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (ExceptT(..), MonadError, runExceptT)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Control.Monad.Trans.Class
@@ -180,24 +182,26 @@ newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Fu
 psciIO :: IO a -> PSCI a
 psciIO io = PSCI . lift $ lift io
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT String IO) a }
-  deriving (Functor, Applicative, Monad, MonadError String, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT P.MultipleErrors IO) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadReader (P.Options P.Make))
 
-runMake :: Make a -> IO (Either String a)
+runMake :: Make a -> IO (Either P.MultipleErrors a)
 runMake = runExceptT . flip runReaderT options . unMake
 
-makeIO :: IO a -> Make a
-makeIO = Make . lift . ExceptT . fmap (either (Left . show) Right) . tryIOError
+makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
+makeIO f io = do
+  e <- liftIO $ tryIOError io
+  either (throwError . P.errorMessage . f) return e
 
 instance P.MonadMake Make where
-  getTimestamp path = makeIO $ do
+  getTimestamp path = makeIO (const (P.CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO $ readFile path
-  writeTextFile path text = makeIO $ do
+  readTextFile path = makeIO (const (P.CannotReadFile path)) $ readFile path
+  writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
     mkdirp path
     writeFile path text
-  progress s = unless (s == "Compiling $PSCI") $ makeIO . putStrLn $ s
+  progress s = unless (s == "Compiling $PSCI") $ liftIO . putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -259,7 +263,7 @@ handleDeclaration val = do
   let nodeArgs = psciNodeFlags st ++ [indexFile]
   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
-    Left err -> PSCI $ outputStrLn err
+    Left errs -> printErrors errs
     Right _ -> do
       psciIO $ writeFile indexFile "require('$PSCI').main();"
       process <- psciIO findNodeProcess
@@ -280,7 +284,7 @@ handleDecls ds = do
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
   case e of
-    Left err -> PSCI $ outputStrLn err
+    Left err -> printErrors err
     Right _ -> PSCI $ lift (put st')
 
 -- |
@@ -333,7 +337,7 @@ handleImport im = do
    let m = createTemporaryModuleForImports st
    e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
    case e of
-     Left err -> PSCI $ outputStrLn err
+     Left errs -> printErrors errs
      Right _  -> do
        PSCI $ lift $ put st
        return ()
@@ -347,7 +351,7 @@ handleTypeOf val = do
   let m = createTemporaryModule False st val
   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
-    Left err -> PSCI $ outputStrLn err
+    Left errs -> printErrors errs
     Right env' ->
       case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
@@ -381,11 +385,15 @@ handleBrowse moduleName = do
   let loadedModules = psciLoadedModules st
   env <- psciIO . runMake $ P.make modulesDir loadedModules []
   case env of
-    Left err -> PSCI $ outputStrLn err
+    Left errs -> printErrors errs
     Right env' ->
       if moduleName `notElem` (nub . map ((\ (P.Module _ modName _ _ ) -> modName) . snd)) loadedModules
         then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
         else printModuleSignatures moduleName env'
+
+-- | Pretty-print errors
+printErrors :: P.MultipleErrors -> PSCI ()
+printErrors = PSCI . outputStrLn . P.prettyPrintMultipleErrors False
 
 -- |
 -- Takes a value and prints its kind
@@ -397,7 +405,7 @@ handleKindOf typ = do
       mName = P.ModuleName [P.ProperName "$PSCI"]
   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
   case e of
-    Left err -> PSCI $ outputStrLn err
+    Left errs -> printErrors errs
     Right env' ->
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do

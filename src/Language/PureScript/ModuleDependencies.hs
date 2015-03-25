@@ -28,6 +28,7 @@ import Data.Maybe (mapMaybe)
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.Errors
 
 -- |
 -- A list of modules with their dependencies
@@ -39,7 +40,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: (MonadError String m) => [Module] -> m ([Module], ModuleGraph)
+sortModules :: (MonadError MultipleErrors m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
   let verts = map (\m@(Module _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
@@ -70,7 +71,7 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 -- |
 -- Convert a strongly connected component of the module graph to a module
 --
-toModule :: (MonadError String m) => SCC Module -> m Module
+toModule :: (MonadError MultipleErrors m) => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = throwError $ "Cycle in module dependencies: " ++ show (map getModuleName ms)
+toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)

@@ -63,8 +63,8 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
       exitFailure
     Right ms -> do
       case P.compile (map snd ms) prefix `runReaderT` opts of
-        Left err -> do
-          hPutStrLn stderr err
+        Left errs -> do
+          hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
         Right (js, exts, _) -> do
           case output of

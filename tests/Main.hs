@@ -35,21 +35,21 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
   return (inputFile, text)
 
-loadPrelude :: Either String (String, String, P.Environment)
+loadPrelude :: Either P.MultipleErrors (String, String, P.Environment)
 loadPrelude =
   case P.parseModulesFromFiles id [("", P.prelude)] of
-    Left parseError -> Left (show parseError)
+    Left parseError -> Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> runReaderT (P.compile (map snd ms) []) $ P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }
 
-compile :: P.Options P.Compile -> [FilePath] -> IO (Either String (String, String, P.Environment))
+compile :: P.Options P.Compile -> [FilePath] -> IO (Either P.MultipleErrors (String, String, P.Environment))
 compile opts inputFiles = do
   modules <- P.parseModulesFromFiles id <$> readInput inputFiles
   case modules of
     Left parseError ->
-      return (Left $ show parseError)
+      return . Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> return $ runReaderT (P.compile (map snd ms) []) opts
 
-assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either String (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
+assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either P.MultipleErrors (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do
   e <- compile opts [preludeExterns, inputFile]
   maybeErr <- f e
@@ -64,7 +64,7 @@ assertCompiles preludeJs preludeExterns inputFile = do
                               { P.optionsMain = Just "Main"
                               , P.optionsAdditional = P.CompileOptions "Tests" ["Main"] ["Main"]
                               }
-  assert preludeExterns options inputFile $ either (return . Just) $ \(js, _, _) -> do
+  assert preludeExterns options inputFile $ either (return . Just . P.prettyPrintMultipleErrors False) $ \(js, _, _) -> do
     process <- findNodeProcess
     result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
     case result of
@@ -77,7 +77,7 @@ assertDoesNotCompile preludeExterns inputFile = do
   putStrLn $ "Assert " ++ inputFile ++ " does not compile"
   assert preludeExterns (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) inputFile $ \e ->
     case e of
-      Left err -> putStrLn err >> return Nothing
+      Left errs -> putStrLn  (P.prettyPrintMultipleErrors False errs) >> return Nothing
       Right _ -> return $ Just "Should not have compiled"
 
 findNodeProcess :: IO (Maybe String)
@@ -88,7 +88,7 @@ main :: IO ()
 main = do
   putStrLn "Compiling Prelude"
   case loadPrelude of
-    Left err -> putStrLn err >> exitFailure
+    Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right (preludeJs, exts, _) -> do
       tmp <- getTemporaryDirectory
       let preludeExterns = tmp ++ pathSeparator : "prelude.externs"
