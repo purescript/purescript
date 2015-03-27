@@ -51,6 +51,7 @@ import System.FilePath ((</>))
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
 import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen.JS as C
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
@@ -105,7 +106,7 @@ compile' env ms prefix = do
   (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let corefn = map (CF.moduleToCoreFn env') regrouped
+  let corefn = map (flip ($) JSRaw . CF.moduleToCoreFn env') regrouped
   let entryPoints = moduleNameFromString `map` entryPointModules additional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
@@ -221,7 +222,7 @@ make outputDir ms prefix = do
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module coms moduleName' regrouped exps
-    let corefn = CF.moduleToCoreFn env' mod'
+    let corefn = CF.moduleToCoreFn env' mod' JSRaw
     let [renamed] = renameInModules [corefn]
 
     pjs <- prettyPrintJS <$> (CI.moduleToCoreImp >=> moduleToJs) renamed
