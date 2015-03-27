@@ -71,9 +71,9 @@ data ForeignImportType
   --
   = ForeignImport
   -- |
-  -- A foreign import which contains inline Javascript as a string literal
+  -- A foreign import which contains inline foreign code as a string literal
   --
-  | InlineJavascript deriving (Show, Eq, Data, Typeable)
+  | InlineForeign deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The visibility of a name in scope

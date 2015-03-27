@@ -44,7 +44,6 @@ import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Names
-import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
 import qualified Language.PureScript.Parser.Common as C
@@ -126,9 +125,9 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
            tys <- P.many (indented *> noWildcards parseTypeAtom)
            return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
-           js <- P.optionMaybe (JSRaw <$> stringLiteral)
+           raw <- P.optionMaybe stringLiteral
            ty <- indented *> doubleColon *> noWildcards parsePolyType
-           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty))
+           return $ ExternDeclaration (if isJust raw then InlineForeign else ForeignImport) ident raw ty))
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =

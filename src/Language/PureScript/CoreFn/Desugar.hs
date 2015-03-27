@@ -23,7 +23,6 @@ import Control.Arrow (second, (***))
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
-import Language.PureScript.CodeGen.JS
 import Language.PureScript.Core
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
@@ -33,17 +32,18 @@ import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDic
 import Language.PureScript.Types
 import Language.PureScript.Comments
 import qualified Language.PureScript.AST as A
+import qualified Language.PureScript.CoreImp.AST as CI
 
 -- |
 -- Desugars a module from AST to CoreFn representation.
 --
-moduleToCoreFn :: Environment -> A.Module -> Module (Bind Ann) JS
-moduleToCoreFn _ (A.Module _ _ _ Nothing) =
+moduleToCoreFn :: (Eq a) => Environment -> A.Module -> (String -> a) -> Module (Bind Ann) a
+moduleToCoreFn _ (A.Module _ _ _ Nothing) _ =
   error "Module exports were not elaborated before moduleToCoreFn"
-moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
+moduleToCoreFn env (A.Module coms mn decls (Just exps)) f =
   let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
       exps' = nub $ concatMap exportToCoreFn exps
-      externs = nub $ mapMaybe externToCoreFn decls
+      externs = nub $ mapMaybe (externToCoreFn f) decls
       decls' = concatMap (declToCoreFn Nothing []) decls
   in Module coms mn imports exps' externs decls'
 
@@ -211,11 +211,11 @@ importToCoreFn _ = Nothing
 -- |
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
-externToCoreFn :: A.Declaration -> Maybe (ForeignDecl JS)
-externToCoreFn (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
-externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
-externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
-externToCoreFn _ = Nothing
+externToCoreFn :: (Eq a) => (String -> a) -> A.Declaration -> Maybe (ForeignDecl a)
+externToCoreFn f (A.ExternDeclaration _ name raw ty) = Just (name, maybe Nothing (Just . f) raw, ty)
+externToCoreFn _ (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
+externToCoreFn f (A.PositionedDeclaration _ _ d) = externToCoreFn f d
+externToCoreFn _ _ = Nothing
 
 -- |
 -- Desugars export declarations references from AST to CoreFn representation.
