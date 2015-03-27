@@ -127,7 +127,7 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
    <|> (do ident <- parseIdent
            raw <- P.optionMaybe stringLiteral
            ty <- indented *> doubleColon *> noWildcards parsePolyType
-           return $ ExternDeclaration (if isJust raw then InlineForeign else ForeignImport) ident raw ty))
+           return $ ExternDeclaration (if isJust raw then InlineForeign else ForeignImport) ident (ForeignCode <$> raw) ty))
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =

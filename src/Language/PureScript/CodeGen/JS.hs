@@ -32,6 +32,7 @@ import Control.Arrow ((&&&))
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
+import Language.PureScript.AST.Declarations (ForeignCode(..))
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CodeGen.JS.Optimizer
@@ -48,11 +49,11 @@ import qualified Language.PureScript.CoreImp.AST as CI
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => Module (CI.Decl Ann) JS -> m [JS]
+           => Module (CI.Decl Ann) ForeignCode -> m [JS]
 moduleToJs (Module coms mn imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
-  let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
+  let foreigns' = mapMaybe (\(_, js, _) -> JSRaw . runForeignCode <$> js) foreigns
   jsDecls <- mapM declToJS decls
   optimized <- T.traverse optimize jsDecls
   let isModuleEmpty = null exps

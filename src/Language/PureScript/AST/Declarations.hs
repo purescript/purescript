@@ -170,7 +170,7 @@ data Declaration
   -- |
   -- A foreign import declaration (type, name, optional inline code, type)
   --
-  | ExternDeclaration ForeignImportType Ident (Maybe String) Type
+  | ExternDeclaration ForeignImportType Ident (Maybe ForeignCode) Type
   -- |
   -- A data type foreign import (name, kind)
   --
@@ -201,6 +201,8 @@ data Declaration
   --
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, D.Data, D.Typeable)
+
+newtype ForeignCode = ForeignCode { runForeignCode :: String } deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- Test if a declaration is a value declaration
