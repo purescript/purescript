@@ -26,7 +26,6 @@ import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
-import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Environment
 
 -- |
@@ -169,9 +168,9 @@ data Declaration
   --
   | BindingGroupDeclaration [(Ident, NameKind, Expr)]
   -- |
-  -- A foreign import declaration (type, name, optional inline Javascript, type)
+  -- A foreign import declaration (type, name, optional inline code, type)
   --
-  | ExternDeclaration ForeignImportType Ident (Maybe JS) Type
+  | ExternDeclaration ForeignImportType Ident (Maybe ForeignCode) Type
   -- |
   -- A data type foreign import (name, kind)
   --
@@ -202,6 +201,8 @@ data Declaration
   --
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, D.Data, D.Typeable)
+
+newtype ForeignCode = ForeignCode { runForeignCode :: String } deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- Test if a declaration is a value declaration

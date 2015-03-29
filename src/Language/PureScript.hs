@@ -51,6 +51,7 @@ import System.FilePath ((</>))
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
 import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen.JS as C
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
@@ -65,7 +66,9 @@ import Language.PureScript.Sugar as P
 import Control.Monad.Supply as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
-import qualified Language.PureScript.CoreFn as CoreFn
+import qualified Language.PureScript.Core as CR
+import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.CoreImp as CI
 import qualified Language.PureScript.Constants as C
 
 import qualified Paths_purescript as Paths
@@ -103,13 +106,13 @@ compile' env ms prefix = do
   (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let corefn = map (CoreFn.moduleToCoreFn env') regrouped
+  let corefn = map (CF.moduleToCoreFn env') regrouped
   let entryPoints = moduleNameFromString `map` entryPointModules additional
   let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
   let renamed = renameInModules elim
   let codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
-  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-  js <- concat <$> (evalSupplyT nextVar $ T.traverse moduleToJs modulesToCodeGen)
+  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CR.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
+  js <- concat <$> evalSupplyT nextVar (T.traverse (CI.moduleToCoreImp >=> moduleToJs) modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   js' <- generateMain env' js
   let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
@@ -219,10 +222,10 @@ make outputDir ms prefix = do
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module coms moduleName' regrouped exps
-    let corefn = CoreFn.moduleToCoreFn env' mod'
+    let corefn = CF.moduleToCoreFn env' mod'
     let [renamed] = renameInModules [corefn]
 
-    pjs <- prettyPrintJS <$> moduleToJs renamed
+    pjs <- prettyPrintJS <$> (CI.moduleToCoreImp >=> moduleToJs) renamed
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
     let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
 

@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn
+-- Module      :  Language.PureScript.Core
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -8,15 +8,15 @@
 -- Stability   :  experimental
 -- Portability :
 --
--- | The core functional representation
+-- | Types and values used throughout the core representations
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CoreFn (
+module Language.PureScript.Core (
   module C
 ) where
 
-import Language.PureScript.CoreFn.Binders as C
-import Language.PureScript.CoreFn.Desugar as C
-import Language.PureScript.CoreFn.Expr as C
-import Language.PureScript.CoreFn.Traversals as C
+import Language.PureScript.Core.Ann as C
+import Language.PureScript.Core.Literals as C
+import Language.PureScript.Core.Meta as C
+import Language.PureScript.Core.Module as C

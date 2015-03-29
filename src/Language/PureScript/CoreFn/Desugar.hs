@@ -23,12 +23,9 @@ import Control.Arrow (second, (***))
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
-import Language.PureScript.CoreFn.Ann
+import Language.PureScript.Core
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
-import Language.PureScript.CoreFn.Meta
-import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
@@ -39,7 +36,7 @@ import qualified Language.PureScript.AST as A
 -- |
 -- Desugars a module from AST to CoreFn representation.
 --
-moduleToCoreFn :: Environment -> A.Module -> Module Ann
+moduleToCoreFn :: Environment -> A.Module -> Module (Bind Ann) A.ForeignCode
 moduleToCoreFn _ (A.Module _ _ _ Nothing) =
   error "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
@@ -63,7 +60,7 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   declToCoreFn ss com (A.DataDeclaration Data tyName _ ctors) =
     flip map ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName fields
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec name (exprToCoreFn ss com Nothing e)]
@@ -197,7 +194,7 @@ findQualModules decls =
   fqValues (A.Var (Qualified (Just mn) _)) = [mn]
   fqValues (A.Constructor (Qualified (Just mn) _)) = [mn]
   fqValues _ = []
-  
+
   fqBinders :: A.Binder -> [ModuleName]
   fqBinders (A.ConstructorBinder (Qualified (Just mn) _) _) = [mn]
   fqBinders _ = []
@@ -213,8 +210,8 @@ importToCoreFn _ = Nothing
 -- |
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
-externToCoreFn :: A.Declaration -> Maybe ForeignDecl
-externToCoreFn (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
+externToCoreFn :: A.Declaration -> Maybe (ForeignDecl A.ForeignCode)
+externToCoreFn (A.ExternDeclaration _ name code ty) = Just (name, code, ty)
 externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
