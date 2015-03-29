@@ -23,6 +23,7 @@ import Data.Traversable (traverse)
 import Control.Monad
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Reader (runReaderT)
+import Control.Monad.Writer (runWriterT)
 import Control.Applicative
 import System.Exit
 import System.Process
@@ -39,7 +40,7 @@ loadPrelude :: Either P.MultipleErrors (String, String, P.Environment)
 loadPrelude =
   case P.parseModulesFromFiles id [("", P.prelude)] of
     Left parseError -> Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
-    Right ms -> runReaderT (P.compile (map snd ms) []) $ P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }
+    Right ms -> fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either P.MultipleErrors (String, String, P.Environment))
 compile opts inputFiles = do
@@ -47,7 +48,7 @@ compile opts inputFiles = do
   case modules of
     Left parseError ->
       return . Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
-    Right ms -> return $ runReaderT (P.compile (map snd ms) []) opts
+    Right ms -> return $ fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) opts
 
 assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either P.MultipleErrors (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile f = do

@@ -107,6 +107,7 @@ data ErrorMessage
   | InvalidNewtype
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
+  | ShadowedName Ident
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
@@ -198,6 +199,7 @@ errorCode TypeSynonymInstance           = "TypeSynonymInstance"
 errorCode InvalidNewtype                = "InvalidNewtype"
 errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
 errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
+errorCode (ShadowedName _)              = "ShadowedName"
 errorCode (NotYetDefined _ e)           = errorCode e
 errorCode (ErrorUnifyingTypes _ _ e)    = errorCode e
 errorCode (ErrorInExpression _ e)       = errorCode e
@@ -228,6 +230,10 @@ instance UnificationError Type MultipleErrors where
   
 instance UnificationError Kind MultipleErrors where
   occursCheckFailed = errorMessage . occursCheckFailed
+
+-- | Check whether a collection of errors is empty or not.
+nonEmpty :: MultipleErrors -> Bool
+nonEmpty = not . null . runMultipleErrors
 
 -- |
 -- Create an error set from a single error message
@@ -374,6 +380,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
                                                ]
     go (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
                                                  : map (line . prettyPrintExport) ys
+    go (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
     go (ErrorUnifyingTypes t1 t2 err)  = paras [ line "Error unifying type "
                                                , indent $ line $ prettyPrintType t1
                                                , line "with type"
@@ -510,10 +517,21 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full  (MultipleErrors [e]) = renderBox $
-  prettyPrintSingleError full e 
-prettyPrintMultipleErrors full  (MultipleErrors es) = renderBox $
-  Box.vcat Box.left [ Box.text "Multiple errors:"
+prettyPrintMultipleErrors = prettyPrintMultipleErrorsWith "Error:" "Multiple errors:"
+    
+-- |
+-- Pretty print multiple warnings
+--
+prettyPrintMultipleWarnings :: Bool -> MultipleErrors -> String
+prettyPrintMultipleWarnings = prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:"    
+    
+prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> String
+prettyPrintMultipleErrorsWith intro _ full  (MultipleErrors [e]) = renderBox $
+  Box.vcat Box.left [ Box.text intro
+                    , prettyPrintSingleError full e
+                    ]
+prettyPrintMultipleErrorsWith _ intro full  (MultipleErrors es) = renderBox $
+  Box.vcat Box.left [ Box.text intro
                     , Box.vsep 1 Box.left $ map (Box.moveRight 2 . prettyPrintSingleError full) es
                     ]
 

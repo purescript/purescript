@@ -19,6 +19,7 @@ module Main where
 import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.Writer
 
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
@@ -31,7 +32,6 @@ import System.IO (hPutStrLn, stderr)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-
 
 data PSCOptions = PSCOptions
   { pscInput     :: [FilePath]
@@ -54,6 +54,11 @@ readInput InputOptions{..}
   | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> readFile inFile
                    return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
 
+type PSC = ReaderT (P.Options P.Compile) (WriterT P.MultipleErrors (Either P.MultipleErrors))
+
+runPSC :: P.Options P.Compile -> PSC a -> Either P.MultipleErrors (a, P.MultipleErrors)
+runPSC opts rwe = runWriterT (runReaderT rwe opts)
+
 compile :: PSCOptions -> IO ()
 compile (PSCOptions input opts stdin output externs usePrefix) = do
   modules <- P.parseModulesFromFiles (fromMaybe "") <$> readInput (InputOptions (P.optionsNoPrelude opts) stdin input)
@@ -62,11 +67,13 @@ compile (PSCOptions input opts stdin output externs usePrefix) = do
       hPutStrLn stderr $ show err
       exitFailure
     Right ms -> do
-      case P.compile (map snd ms) prefix `runReaderT` opts of
+      case runPSC opts (P.compile (map snd ms) prefix) of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
-        Right (js, exts, _) -> do
+        Right ((js, exts, _), warnings) -> do
+          when (P.nonEmpty warnings) $ 
+            hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
           case output of
             Just path -> mkdirp path >> writeFile path js
             Nothing -> putStrLn js
