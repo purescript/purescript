@@ -96,12 +96,19 @@ bindLocalTypeVariables moduleName bindings =
 -- |
 -- Update the visibility of all names to Defined
 --
-makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
-makeBindingGroupVisible action = do
-  orig <- get
-  modify $ \st -> st { checkEnv = (checkEnv st) { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names . checkEnv $ st) } }
+makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m () 
+makeBindingGroupVisible = modifyEnv $ \e -> e { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names e) }
+
+-- | Update the visibility of all names to Defined in the scope of the provided action
+withBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
+withBindingGroupVisible action = preservingNames $ makeBindingGroupVisible >> action
+
+-- | Perform an action while preserving the names from the @Environment@.
+preservingNames :: (Functor m, MonadState CheckState m) => m a -> m a
+preservingNames action = do
+  orig <- gets (names . checkEnv)
   a <- action
-  modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
+  modifyEnv $ \e -> e { names = orig }
   return a
 
 -- |
