@@ -61,9 +61,6 @@ module Main where
   test15 :: Number -> Number -> Boolean
   test15 a b = const false $ a `test14` b
 
-  test16 :: Number -> Number -> Number
-  test16 x y = x .|. y .&. y
-
   test17 :: Number
   test17 = negate (-1)
 
@@ -94,7 +91,6 @@ module Main where
     let t13 = test13 k 1 2
     let t14 = test14 1 2
     let t15 = test15 1 2
-    let t16 = test16 1 2
     let t17 = test17
     let t18 = test18
     let t19 = test19

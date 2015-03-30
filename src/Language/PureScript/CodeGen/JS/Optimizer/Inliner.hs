@@ -124,14 +124,6 @@ inlineCommonOperators = applyAll $
   , binary C.semigroupString (C.<>) Add
   , binary C.semigroupString (C.++) Add
 
-  , binaryFunction C.bitsNumber C.shl ShiftLeft
-  , binaryFunction C.bitsNumber C.shr ShiftRight
-  , binaryFunction C.bitsNumber C.zshr ZeroFillShiftRight
-  , binary         C.bitsNumber (C..&.) BitwiseAnd
-  , binary         C.bitsNumber (C..|.) BitwiseOr
-  , binary         C.bitsNumber (C..^.) BitwiseXor
-  , unary          C.bitsNumber C.complement BitwiseNot
-
   , binary C.latticeBoolean (C.&&) And
   , binary C.latticeBoolean (C.||) Or
   , binaryFunction C.latticeBoolean C.inf And

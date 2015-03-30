@@ -65,15 +65,6 @@ module Language.PureScript.Constants where
 (/=) :: String
 (/=) = "/="
 
-(.&.) :: String
-(.&.) = ".&."
-
-(.|.) :: String
-(.|.) = ".|."
-
-(.^.) :: String
-(.^.) = ".^."
-
 (&&) :: String
 (&&) = "&&"
 
@@ -87,18 +78,6 @@ unsafeIndex = "unsafeIndex"
 
 negate :: String
 negate = "negate"
-
-shl :: String
-shl = "shl"
-
-shr :: String
-shr = "shr"
-
-zshr :: String
-zshr = "zshr"
-
-complement :: String
-complement = "complement"
 
 not :: String
 not = "not"
@@ -204,9 +183,6 @@ eqString = "eqString"
 
 eqBoolean :: String
 eqBoolean = "eqBoolean"
-
-bitsNumber :: String
-bitsNumber = "bitsNumber"
 
 boundedBoolean :: String
 boundedBoolean = "boundedBoolean"
