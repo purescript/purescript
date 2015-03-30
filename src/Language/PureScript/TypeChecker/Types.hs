@@ -247,7 +247,7 @@ infer' (Accessor prop val) = do
 infer' (Abs (Left arg) ret) = do
   ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
-  makeBindingGroupVisible $ bindLocalVariables moduleName [(arg, ty, Defined)] $ do
+  withBindingGroupVisible $ bindLocalVariables moduleName [(arg, ty, Defined)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
     return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
 infer' (Abs (Right _) _) = error "Binder was not desugared"
@@ -298,7 +298,7 @@ infer' (PositionedValue pos _ val) = rethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
-inferLetBinding seen [] ret j = (,) seen <$> makeBindingGroupVisible (j ret)
+inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
@@ -320,7 +320,9 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
   ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
   let ds' = [(ident, LocalVariable, val') | (ident, (val', _)) <- ds1' ++ ds2']
-  makeBindingGroupVisible $ bindNames dict $ inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
+  bindNames dict $ do
+    makeBindingGroupVisible
+    inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
 inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = rethrowWithPosition pos $ do
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos com d' : ds', val')
@@ -442,7 +444,7 @@ check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
-  val' <- makeBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
+  val' <- withBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular False) (map (Qualified Nothing) dictNames)
       constraints) $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
@@ -468,7 +470,7 @@ check' (ArrayLiteral vals) t@(TypeApp a ty) = do
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
   t =?= tyFunction
   Just moduleName <- checkCurrentModule <$> get
-  ret' <- makeBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
+  ret' <- withBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
   return $ TypedValue True (Abs (Left arg) ret') ty
 check' (Abs (Right _) _) _ = error "Binder was not desugared"
 check' (App f arg) ret = do
