@@ -1,5 +1,6 @@
 module Prelude
-  ( otherwise
+  ( Unit(..), unit
+  , otherwise
   , flip
   , const
   , asTypeOf
@@ -13,15 +14,15 @@ module Prelude
   , Applicative, pure, liftA1
   , Bind, (>>=)
   , Monad, return, liftM1, ap
+  , Semigroup, (<>), (++)
   , Semiring, (+), zero, (*), one
   , ModuloSemiring, (/), mod
-  , Ring, (-)
+  , Ring, (-), negate
   , (%)
-  , negate
-  , DivisionRing
   , Num
+  , DivisionRing
   , Eq, (==), (/=)
-  , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
+  , Ordering(..), Ord, compare, (<), (>), (<=), (>=)
   , Bounded, top, bottom
   , Lattice, sup, inf, (||), (&&)
   , BoundedLattice
@@ -29,9 +30,17 @@ module Prelude
   , DistributiveLattice
   , BooleanAlgebra
   , Bits, (.&.), (.|.), (.^.), shl, shr, zshr, complement
-  , Semigroup, (<>), (++)
-  , Unit(..), unit
   ) where
+
+  -- | The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
+  -- |
+  -- | `Unit` is often used, wrapped in a monadic type constructor, as the return type of a computation where only
+  -- | the _effects_ are important.
+  newtype Unit = Unit {}
+
+  -- | `unit` is the sole inhabitant of the `Unit` type.
+  unit :: Unit
+  unit = Unit {}
 
   -- | An alias for `true`, which can be useful in guard clauses:
   -- |
@@ -39,7 +48,6 @@ module Prelude
   -- | max x y | x >= y = x
   -- |         | otherwise = y
   -- | ```
-  -- |
   otherwise :: Boolean
   otherwise = true
 
@@ -48,7 +56,6 @@ module Prelude
   -- | ```purescript
   -- | flip const 1 2 = const 2 1 = 2
   -- | ```
-  -- |
   flip :: forall a b c. (a -> b -> c) -> b -> a -> c
   flip f b a = f a b
 
@@ -57,7 +64,6 @@ module Prelude
   -- | ```purescript
   -- | const 1 "hello" = 1
   -- | ```
-  -- |
   const :: forall a b. a -> b -> a
   const a _ = a
 
@@ -102,7 +108,6 @@ module Prelude
   -- |
   -- | - Left Identity: `id <<< p = p`
   -- | - Right Identity: `p <<< id = p`
-  -- |
   class (Semigroupoid a) <= Category a where
     id :: forall t. a t t
 
@@ -126,7 +131,6 @@ module Prelude
   -- |
   -- | `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
   -- | `a $ b $ c $ d x` = `a $ (b $ (c $ (d $ x)))` = `a (b (c (d x)))`
-  -- |
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
@@ -144,7 +148,6 @@ module Prelude
   -- |
   -- | `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
   -- | `x # a # b # c # d` = `(((x # a) # b) # c) # d` = `d (c (b (a x)))`
-  -- |
   (#) :: forall a b. a -> (a -> b) -> b
   (#) x f = f x
 
@@ -179,22 +182,26 @@ module Prelude
   class Show a where
     show :: a -> String
 
-  foreign import showStringImpl
-    """
-    function showStringImpl(s) {
-      return JSON.stringify(s);
-    }
-    """ :: String -> String
+  instance showBoolean :: Show Boolean where
+    show true = "true"
+    show false = "false"
 
-  instance showUnit :: Show Unit where
-    show (Unit {}) = "Unit {}"
+  instance showNumber :: Show Number where
+    show = showNumberImpl
 
   instance showString :: Show String where
     show = showStringImpl
 
-  instance showBoolean :: Show Boolean where
-    show true = "true"
-    show false = "false"
+  instance showUnit :: Show Unit where
+    show _ = "unit"
+
+  instance showArray :: (Show a) => Show [a] where
+    show = showArrayImpl show
+
+  instance showOrdering :: Show Ordering where
+    show LT = "LT"
+    show GT = "GT"
+    show EQ = "EQ"
 
   foreign import showNumberImpl
     """
@@ -203,8 +210,12 @@ module Prelude
     }
     """ :: Number -> String
 
-  instance showNumber :: Show Number where
-    show = showNumberImpl
+  foreign import showStringImpl
+    """
+    function showStringImpl(s) {
+      return JSON.stringify(s);
+    }
+    """ :: String -> String
 
   foreign import showArrayImpl
     """
@@ -219,9 +230,6 @@ module Prelude
     }
     """ :: forall a. (a -> String) -> [a] -> String
 
-  instance showArray :: (Show a) => Show [a] where
-    show = showArrayImpl show
-
   infixl 4 <$>
   infixl 1 <#>
 
@@ -234,9 +242,11 @@ module Prelude
   -- |
   -- | - Identity: `(<$>) id = id`
   -- | - Composition: `(<$>) (f <<< g) = (f <$>) <<< (g <$>)`
-  -- |
   class Functor f where
     (<$>) :: forall a b. (a -> b) -> f a -> f b
+
+  instance functorArr :: Functor ((->) r) where
+    (<$>) = (<<<)
 
   -- | `(<#>)` is `(<$>)` with its arguments reversed. For example:
   -- |
@@ -282,6 +292,9 @@ module Prelude
   class (Functor f) <= Apply f where
     (<*>) :: forall a b. f (a -> b) -> f a -> f b
 
+  instance applyArr :: Apply ((->) r) where
+    (<*>) f g x = f x (g x)
+
   -- | The `Applicative` type class extends the [`Apply`](#apply) type class with a `pure` function, which can be used to
   -- | create values of type `f a` from values of type `a`.
   -- |
@@ -295,9 +308,15 @@ module Prelude
   -- | - Composition: `(pure <<<) <*> f <*> g <*> h = f <*> (g <*> h)`
   -- | - Homomorphism: `(pure f) <*> (pure x) = pure (f x)`
   -- | - Interchange: `u <*> (pure y) = (pure ($ y)) <*> u`
-  -- |
   class (Apply f) <= Applicative f where
     pure :: forall a. a -> f a
+
+  instance applicativeArr :: Applicative ((->) r) where
+    pure = const
+
+  -- | `return` is an alias for `pure`.
+  return :: forall m a. (Applicative m) => a -> m a
+  return = pure
 
   -- | `liftA1` provides a default implementation of `(<$>)` for any [`Applicative`](#applicative) functor,
   -- | without using `(<$>)` as provided by the [`Functor`](#functor)-[`Applicative`](#applicative) superclass relationship.
@@ -343,6 +362,9 @@ module Prelude
   class (Apply m) <= Bind m where
     (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
+  instance bindArr :: Bind ((->) r) where
+    (>>=) m f x = f (m x) x
+
   -- | The `Monad` type class combines the operations of the `Bind` and `Applicative` type classes. Therefore, `Monad` instances
   -- | represent type constructors which support sequential composition, and also lifting of functions of arbitrary arity.
   -- |
@@ -355,12 +377,9 @@ module Prelude
   -- |
   -- | - Left Identity: `do { y <- pure x ; f y } = f x`
   -- | - Right Identity: `do { y <- x ; pure y } = x`
-  -- |
   class (Applicative m, Bind m) <= Monad m
 
-  -- | `return` is an alias for `pure`.
-  return :: forall m a. (Monad m) => a -> m a
-  return = pure
+  instance monadArr :: Monad ((->) r)
 
   -- | `liftM1` provides a default implementation of `(<$>)` for any [`Monad`](#monad),
   -- | without using `(<$>)` as provided by the [`Functor`](#functor)-[`Monad`](#monad) superclass relationship.
@@ -391,26 +410,48 @@ module Prelude
     a' <- a
     return (f' a')
 
-  instance functorArr :: Functor ((->) r) where
-    (<$>) = (<<<)
+  infixr 5 <>
+  infixr 5 ++
 
-  instance applyArr :: Apply ((->) r) where
-    (<*>) f g x = f x (g x)
+  -- | The `Semigroup` type class identifies an associative operation on a type.
+  -- |
+  -- | `Semigroup` instances are required to satisfy the following law:
+  -- |
+  -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
+  -- |
+  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
+  class Semigroup a where
+    (<>) :: a -> a -> a
 
-  instance applicativeArr :: Applicative ((->) r) where
-    pure = const
+  -- | `(++)` is an alias for `(<>)`.
+  (++) :: forall s. (Semigroup s) => s -> s -> s
+  (++) = (<>)
 
-  instance bindArr :: Bind ((->) r) where
-    (>>=) m f x = f (m x) x
+  instance semigroupString :: Semigroup String where
+    (<>) = concatString
 
-  instance monadArr :: Monad ((->) r)
+  instance semigroupUnit :: Semigroup Unit where
+    (<>) _ _ = unit
 
-  infixl 7 *
-  infixl 7 /
-  infixl 7 %
+  instance semigroupArr :: (Semigroup s') => Semigroup (s -> s') where
+    (<>) f g = \x -> f x <> g x
 
-  infixl 6 -
+  instance semigroupOrdering :: Semigroup Ordering where
+    (<>) LT _ = LT
+    (<>) GT _ = GT
+    (<>) EQ y = y
+
+  foreign import concatString
+    """
+    function concatString(s1) {
+      return function(s2) {
+        return s1 + s2;
+      };
+    }
+    """ :: String -> String -> String
+
   infixl 6 +
+  infixl 7 *
 
   -- | Addition and multiplication, satisfying the following laws:
   -- |
@@ -418,29 +459,56 @@ module Prelude
   -- | - `a` is a monoid under multiplication
   -- | - multiplication distributes over addition
   -- | - multiplication by `zero` annihilates `a`
-  -- |
   class Semiring a where
     (+)  :: a -> a -> a
     zero :: a
     (*)  :: a -> a -> a
     one  :: a
 
+  instance semiringNumber :: Semiring Number where
+    (+) = numAdd
+    zero = 0
+    (*) = numMul
+    one = 1
+
+  instance semiringUnit :: Semiring Unit where
+    (+) _ _ = unit
+    zero = unit
+    (*) _ _ = unit
+    one = unit
+
+  infixl 7 /
+
   -- | Addition, multiplication, modulo operation and division, satisfying:
   -- |
   -- | - ```a / b * b + (a `mod` b) = a```
-  -- |
   class (Semiring a) <= ModuloSemiring a where
     (/) :: a -> a -> a
     mod :: a -> a -> a
+
+  instance moduloSemiringNumber :: ModuloSemiring Number where
+    (/) = numDiv
+    mod _ _ = 0
+
+  instance moduloSemiringUnit :: ModuloSemiring Unit where
+    (/) _ _ = unit
+    mod _ _ = unit
+
+  infixl 6 -
 
   -- | Addition, multiplication, and subtraction.
   -- |
   -- | Has the same laws as `Semiring` but additionally satisfying:
   -- |
   -- | - `a` is an abelian group under addition
-  -- |
   class (Semiring a) <= Ring a where
     (-) :: a -> a -> a
+
+  instance ringNumber :: Ring Number where
+    (-) = numSub
+
+  instance ringUnit :: Ring Unit where
+    (-) _ _ = unit
 
   negate :: forall a. (Ring a) => a -> a
   negate a = zero - a
@@ -448,26 +516,27 @@ module Prelude
   -- | Ring where every nonzero element has a multiplicative inverse so that:
   -- |
   -- | - ```a `mod` b = zero```
-  -- |
   class (Ring a, ModuloSemiring a) <= DivisionRing a
+
+  instance divisionRingNumber :: DivisionRing Number
+
+  instance divisionRingUnit :: DivisionRing Unit
 
   -- | A commutative field
   class (DivisionRing a) <= Num a
+
+  instance numNumber :: Num Number
+
+  instance numUnit :: Num Unit
+
+  infixl 7 %
+  (%) = numMod
 
   foreign import numAdd
     """
     function numAdd(n1) {
       return function(n2) {
         return n1 + n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numSub
-    """
-    function numSub(n1) {
-      return function(n2) {
-        return n1 - n2;
       };
     }
     """ :: Number -> Number -> Number
@@ -490,6 +559,15 @@ module Prelude
     }
     """ :: Number -> Number -> Number
 
+  foreign import numSub
+    """
+    function numSub(n1) {
+      return function(n2) {
+        return n1 - n2;
+      };
+    }
+    """ :: Number -> Number -> Number
+
   foreign import numMod
     """
     function numMod(n1) {
@@ -498,35 +576,6 @@ module Prelude
       };
     }
     """ :: Number -> Number -> Number
-
-  (%) = numMod
-
-  instance semiringNumber :: Semiring Number where
-    (+) = numAdd
-    zero = 0
-    (*) = numMul
-    one = 1
-
-  instance ringNumber :: Ring Number where
-    (-) = numSub
-
-  instance moduloSemiringNumber :: ModuloSemiring Number where
-    (/) = numDiv
-    mod _ _ = 0
-
-  instance divisionRingNumber :: DivisionRing Number
-
-  instance numNumber :: Num Number
-
-  -- | The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
-  -- |
-  -- | `Unit` is often used, wrapped in a monadic type constructor, as the return type of a computation where only
-  -- | the _effects_ are important.
-  newtype Unit = Unit {}
-
-  -- | `unit` is the sole inhabitant of the `Unit` type.
-  unit :: Unit
-  unit = Unit {}
 
   infix 4 ==
   infix 4 /=
@@ -544,6 +593,26 @@ module Prelude
   class Eq a where
     (==) :: a -> a -> Boolean
     (/=) :: a -> a -> Boolean
+
+  instance eqBoolean :: Eq Boolean where
+    (==) = refEq
+    (/=) = refIneq
+
+  instance eqNumber :: Eq Number where
+    (==) = refEq
+    (/=) = refIneq
+
+  instance eqString :: Eq String where
+    (==) = refEq
+    (/=) = refIneq
+
+  instance eqUnit :: Eq Unit where
+    (==) _ _ = true
+    (/=) _ _ = false
+
+  instance eqArray :: (Eq a) => Eq [a] where
+    (==) = eqArrayImpl (==)
+    (/=) xs ys = not (xs == ys)
 
   foreign import refEq
     """
@@ -563,22 +632,6 @@ module Prelude
     }
     """ :: forall a. a -> a -> Boolean
 
-  instance eqUnit :: Eq Unit where
-    (==) (Unit {}) (Unit {}) = true
-    (/=) (Unit {}) (Unit {}) = false
-
-  instance eqString :: Eq String where
-    (==) = refEq
-    (/=) = refIneq
-
-  instance eqNumber :: Eq Number where
-    (==) = refEq
-    (/=) = refIneq
-
-  instance eqBoolean :: Eq Boolean where
-    (==) = refEq
-    (/=) = refIneq
-
   foreign import eqArrayImpl
     """
     function eqArrayImpl(f) {
@@ -594,33 +647,12 @@ module Prelude
     }
     """ :: forall a. (a -> a -> Boolean) -> [a] -> [a] -> Boolean
 
-  instance eqArray :: (Eq a) => Eq [a] where
-    (==) xs ys = eqArrayImpl (==) xs ys
-    (/=) xs ys = not (xs == ys)
-
   -- | The `Ordering` data type represents the three possible outcomes of comparing two values:
   -- |
   -- | `LT` - The first value is _less than_ the second.
   -- | `GT` - The first value is _greater than_ the second.
   -- | `EQ` - The first value is _equal to_ or _incomparable to_ the second.
   data Ordering = LT | GT | EQ
-
-  instance eqOrdering :: Eq Ordering where
-    (==) LT LT = true
-    (==) GT GT = true
-    (==) EQ EQ = true
-    (==) _  _  = false
-    (/=) x y = not (x == y)
-
-  instance showOrdering :: Show Ordering where
-    show LT = "LT"
-    show GT = "GT"
-    show EQ = "EQ"
-
-  instance semigroupOrdering :: Semigroup Ordering where
-    (<>) LT _ = LT
-    (<>) GT _ = GT
-    (<>) EQ y = y
 
   -- | The `Ord` type class represents types which support comparisons.
   -- |
@@ -629,11 +661,43 @@ module Prelude
   -- | - Reflexivity: `a <= a`
   -- | - Antisymmetry: if `a <= b` and `b <= a` then `a = b`
   -- | - Transitivity: if `a <= b` and `b <= c` then `a <= c`
-  -- |
   class (Eq a) <= Ord a where
     compare :: a -> a -> Ordering
 
+  instance ordBoolean :: Ord Boolean where
+    compare false false = EQ
+    compare false true  = LT
+    compare true  true  = EQ
+    compare true  false = GT
+
+  instance ordNumber :: Ord Number where
+    compare = unsafeCompare
+
+  instance ordString :: Ord String where
+    compare = unsafeCompare
+
+  instance ordUnit :: Ord Unit where
+    compare _ _ = EQ
+
+  instance ordArray :: (Ord a) => Ord [a] where
+    compare [] [] = EQ
+    compare [] _ = LT
+    compare _ [] = GT
+    compare (x:xs) (y:ys) = case compare x y of
+      EQ -> compare xs ys
+      other -> other
+
+  instance eqOrdering :: Eq Ordering where
+    (==) LT LT = true
+    (==) GT GT = true
+    (==) EQ EQ = true
+    (==) _  _  = false
+    (/=) x y = not (x == y)
+
   infixl 4 <
+  infixl 4 >
+  infixl 4 <=
+  infixl 4 >=
 
   -- | Test whether one value is _strictly less than_ another.
   (<) :: forall a. (Ord a) => a -> a -> Boolean
@@ -641,15 +705,11 @@ module Prelude
     LT -> true
     _ -> false
 
-  infixl 4 >
-
   -- | Test whether one value is _strictly greater than_ another.
   (>) :: forall a. (Ord a) => a -> a -> Boolean
   (>) a1 a2 = case a1 `compare` a2 of
     GT -> true
     _ -> false
-
-  infixl 4 <=
 
   -- | Test whether one value is _non-strictly less than_ another.
   (<=) :: forall a. (Ord a) => a -> a -> Boolean
@@ -657,13 +717,14 @@ module Prelude
     GT -> false
     _ -> true
 
-  infixl 4 >=
-
   -- | Test whether one value is _non-strictly greater than_ another.
   (>=) :: forall a. (Ord a) => a -> a -> Boolean
   (>=) a1 a2 = case a1 `compare` a2 of
     LT -> false
     _ -> true
+
+  unsafeCompare :: forall a. a -> a -> Ordering
+  unsafeCompare = unsafeCompareImpl LT EQ GT
 
   foreign import unsafeCompareImpl
     """
@@ -680,32 +741,6 @@ module Prelude
     }
     """ :: forall a. Ordering -> Ordering -> Ordering -> a -> a -> Ordering
 
-  unsafeCompare :: forall a. a -> a -> Ordering
-  unsafeCompare = unsafeCompareImpl LT EQ GT
-
-  instance ordUnit :: Ord Unit where
-    compare (Unit {}) (Unit {}) = EQ
-
-  instance ordBoolean :: Ord Boolean where
-    compare false false = EQ
-    compare false true  = LT
-    compare true  true  = EQ
-    compare true  false = GT
-
-  instance ordNumber :: Ord Number where
-    compare = unsafeCompare
-
-  instance ordString :: Ord String where
-    compare = unsafeCompare
-
-  instance ordArray :: (Ord a) => Ord [a] where
-    compare [] [] = EQ
-    compare [] _ = LT
-    compare _ [] = GT
-    compare (x:xs) (y:ys) = case compare x y of
-      EQ -> compare xs ys
-      other -> other
-
   -- | The `Bounded` type class represents types that are finite partially
   -- | ordered sets.
   -- |
@@ -719,6 +754,10 @@ module Prelude
   instance boundedBoolean :: Bounded Boolean where
     top = true
     bottom = false
+
+  instance boundedUnit :: Bounded Unit where
+    top = unit
+    bottom = unit
 
   -- | The `Lattice` type class represents types that are partially ordered
   -- | sets with a supremum (`sup` or `||`) and infimum (`inf` or `&&`).
@@ -745,6 +784,17 @@ module Prelude
   instance latticeBoolean :: Lattice Boolean where
     sup = boolOr
     inf = boolAnd
+
+  infixr 2 ||
+  infixr 3 &&
+
+  -- | The `sup` operator.
+  (||) :: forall a. (Lattice a) => a -> a -> a
+  (||) = sup
+
+  -- | The `inf` operator.
+  (&&) :: forall a. (Lattice a) => a -> a -> a
+  (&&) = inf
 
   -- | The `BoundedLattice` type class represents types that are finite
   -- | lattices.
@@ -799,17 +849,14 @@ module Prelude
 
   instance booleanAlgebraBoolean :: BooleanAlgebra Boolean
 
-  infixr 2 ||
-
-  -- | The `sup` operator.
-  (||) :: forall a. (Lattice a) => a -> a -> a
-  (||) = sup
-
-  infixr 3 &&
-
-  -- | The `inf` operator.
-  (&&) :: forall a. (Lattice a) => a -> a -> a
-  (&&) = inf
+  foreign import boolOr
+    """
+    function boolOr(b1) {
+      return function(b2) {
+        return b1 || b2;
+      };
+    }
+    """ :: Boolean -> Boolean -> Boolean
 
   foreign import boolAnd
     """
@@ -820,57 +867,12 @@ module Prelude
     }
     """  :: Boolean -> Boolean -> Boolean
 
-  foreign import boolOr
-    """
-    function boolOr(b1) {
-      return function(b2) {
-        return b1 || b2;
-      };
-    }
-    """ :: Boolean -> Boolean -> Boolean
-
   foreign import boolNot
     """
     function boolNot(b) {
       return !b;
     }
     """ :: Boolean -> Boolean
-
-  infixr 5 <>
-
-  -- | The `Semigroup` type class identifies an associative operation on a type.
-  -- |
-  -- | `Semigroup` instances are required to satisfy the following law:
-  -- |
-  -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
-  -- |
-  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
-  class Semigroup a where
-    (<>) :: a -> a -> a
-
-  foreign import concatString
-    """
-    function concatString(s1) {
-      return function(s2) {
-        return s1 + s2;
-      };
-    }
-    """ :: String -> String -> String
-
-  instance semigroupUnit :: Semigroup Unit where
-    (<>) (Unit {}) (Unit {}) = Unit {}
-
-  instance semigroupString :: Semigroup String where
-    (<>) = concatString
-
-  instance semigroupArr :: (Semigroup s') => Semigroup (s -> s') where
-    (<>) f g = \x -> f x <> g x
-
-  infixr 5 ++
-
-  -- | `(++)` is an alias for `(<>)`.
-  (++) :: forall s. (Semigroup s) => s -> s -> s
-  (++) = (<>)
 
   infixl 10 .&.
   infixl 10 .|.
@@ -886,32 +888,14 @@ module Prelude
     zshr :: b -> Number -> b
     complement :: b -> b
 
-  foreign import numShl
-    """
-    function numShl(n1) {
-      return function(n2) {
-        return n1 << n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numShr
-    """
-    function numShr(n1) {
-      return function(n2) {
-        return n1 >> n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numZshr
-    """
-    function numZshr(n1) {
-      return function(n2) {
-        return n1 >>> n2;
-      };
-    }
-    """ :: Number -> Number -> Number
+  instance bitsNumber :: Bits Number where
+    (.&.) = numAnd
+    (.|.) = numOr
+    (.^.) = numXor
+    shl = numShl
+    shr = numShr
+    zshr = numZshr
+    complement = numComplement
 
   foreign import numAnd
     """
@@ -940,21 +924,39 @@ module Prelude
     }
     """ :: Number -> Number -> Number
 
+  foreign import numShl
+    """
+    function numShl(n1) {
+      return function(n2) {
+        return n1 << n2;
+      };
+    }
+    """ :: Number -> Number -> Number
+
+  foreign import numShr
+    """
+    function numShr(n1) {
+      return function(n2) {
+        return n1 >> n2;
+      };
+    }
+    """ :: Number -> Number -> Number
+
+  foreign import numZshr
+    """
+    function numZshr(n1) {
+      return function(n2) {
+        return n1 >>> n2;
+      };
+    }
+    """ :: Number -> Number -> Number
+
   foreign import numComplement
     """
     function numComplement(n) {
       return ~n;
     }
     """ :: Number -> Number
-
-  instance bitsNumber :: Bits Number where
-    (.&.) = numAnd
-    (.|.) = numOr
-    (.^.) = numXor
-    shl = numShl
-    shr = numShr
-    zshr = numZshr
-    complement = numComplement
 
 module Data.Function where
 
