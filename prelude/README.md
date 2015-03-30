@@ -119,16 +119,16 @@ instance categoryArr :: Category Prim.Function
 ($) :: forall a b. (a -> b) -> a -> b
 ```
 
-Applies a function to its argument
+Applies a function to its argument.
 
 ```purescript
-length $ groupBy productCategory $ filter isInStock products
+length $ groupBy productCategory $ filter isInStock $ products
 ```
 
 is equivalent to
 
 ```purescript
-length (groupBy productCategory (filter isInStock (products)))
+length (groupBy productCategory (filter isInStock products))
 ```
 
 `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
@@ -141,16 +141,16 @@ length (groupBy productCategory (filter isInStock (products)))
 (#) :: forall a b. a -> (a -> b) -> b
 ```
 
-Applies a function to its argument
+Applies an argument to a function.
 
 ```purescript
-products # groupBy productCategory # filter isInStock # length
+products # filter isInStock # groupBy productCategory # length
 ```
 
 is equivalent to
 
 ```purescript
-length (groupBy productCategory (filter isInStock (products)))
+length (groupBy productCategory (filter isInStock products))
 ```
 
 `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
@@ -190,7 +190,7 @@ class Show a where
 
 The `Show` type class represents those types which can be converted into a human-readable `String` representation.
 
-While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code 
+While not required, it is recommended that for any expression `x`, the string `show x` be executable PureScript code
 which evaluates to the same value as the expression `x`.
 
 #### `showUnit`
@@ -264,7 +264,7 @@ types use the type constructor `f` to represent some computational context.
 void :: forall f a. (Functor f) => f a -> f Unit
 ```
 
-The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and 
+The `void` function is used to ignore the type wrapped by a [`Functor`](#functor), replacing it with `Unit` and
 keeping only the type information provided by the type constructor itself.
 
 `void` is often useful when using `do` notation to change the return type of a monadic computation:
@@ -311,8 +311,8 @@ class (Apply f) <= Applicative f where
 The `Applicative` type class extends the [`Apply`](#apply) type class with a `pure` function, which can be used to
 create values of type `f a` from values of type `a`.
 
-Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`, 
-and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of 
+Where [`Apply`](#apply) provides the ability to lift functions of two or more arguments to functions whose arguments are wrapped using `f`,
+and [`Functor`](#functor) provides the ability to lift functions of one argument, `pure` can be seen as the function which lifts functions of
 _zero_ arguments. That is, `Applicative` functors support a lifting operation for any number of function arguments.
 
 `Applicative` instances should satisfy the following laws:
@@ -362,7 +362,7 @@ where the function argument of `f` is given the name `y`.
 
 - Associativity: `(x >>= f) >>= g = x >>= (\k => f k >>= g)`
 
-Or, expressed using `do` notation: 
+Or, expressed using `do` notation:
 
 - Associativity: `do { z <- do { y <- x ; f y } ; g z } = do { k <- x ; do { y <- f k ; g y } }`
 
@@ -388,7 +388,7 @@ represent type constructors which support sequential composition, and also lifti
 - Left Identity: `pure x >>= f = f x`
 - Right Identity: `x >>= pure = x`
 
-Or, expressed using `do` notation: 
+Or, expressed using `do` notation:
 
 - Left Identity: `do { y <- pure x ; f y } = f x`
 - Right Identity: `do { y <- x ; pure y } = x`
@@ -612,21 +612,7 @@ The `Eq` type class represents types which support decidable equality.
 - Transitivity: if `x == y` and `y == z` then `x == z`
 - Negation: `x /= y = not (x == y)`
 
-`(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.  
-
-#### `refEq`
-
-``` purescript
-refEq :: forall a. a -> a -> Boolean
-```
-
-
-#### `refIneq`
-
-``` purescript
-refIneq :: forall a. a -> a -> Boolean
-```
-
+`(/=)` may be implemented in terms of `(==)`, but it might give a performance improvement to implement it separately.
 
 #### `eqUnit`
 
@@ -782,48 +768,169 @@ instance ordArray :: (Ord a) => Ord [a]
 ```
 
 
-#### `Bits`
+#### `Bounded`
 
 ``` purescript
-class Bits b where
-  (.&.) :: b -> b -> b
-  (.|.) :: b -> b -> b
-  (.^.) :: b -> b -> b
-  shl :: b -> Number -> b
-  shr :: b -> Number -> b
-  zshr :: b -> Number -> b
-  complement :: b -> b
+class (Ord a) <= Bounded a where
+  top :: a
+  bottom :: a
 ```
 
-The `Bits` type class identifies types which support bitwise operations.
+The `Bounded` type class represents types that are finite partially
+ordered sets.
 
-#### `bitsNumber`
+Instances should satisfy the following law in addition to the `Ord` laws:
+
+- Ordering: `bottom <= a <= top`
+
+#### `boundedBoolean`
 
 ``` purescript
-instance bitsNumber :: Bits Number
+instance boundedBoolean :: Bounded Boolean
 ```
 
 
-#### `BoolLike`
+#### `Lattice`
 
 ``` purescript
-class BoolLike b where
-  (&&) :: b -> b -> b
-  (||) :: b -> b -> b
-  not :: b -> b
+class (Ord a) <= Lattice a where
+  sup :: a -> a -> a
+  inf :: a -> a -> a
 ```
 
-The `BoolLike` type class identifies types which support Boolean operations.
+The `Lattice` type class represents types that are partially ordered
+sets with a supremum (`sup` or `||`) and infimum (`inf` or `&&`).
 
-`BoolLike` instances are required to satisfy the laws of a _Boolean algebra_.
+Instances should satisfy the following laws in addition to the `Ord`
+laws:
 
+- Associativity:
+  - `a || (b || c) = (a || b) || c`
+  - `a && (b && c) = (a && b) && c`
+- Commutativity:
+  - `a || b = b || a`
+  - `a && b = b && a`
+- Absorption:
+  - `a || (a && b) = a`
+  - `a && (a || b) = a`
+- Idempotent:
+  - `a || a = a`
+  - `a && a = a`
 
-#### `boolLikeBoolean`
+#### `latticeBoolean`
 
 ``` purescript
-instance boolLikeBoolean :: BoolLike Boolean
+instance latticeBoolean :: Lattice Boolean
 ```
 
+
+#### `BoundedLattice`
+
+``` purescript
+class (Bounded a, Lattice a) <= BoundedLattice a where
+```
+
+The `BoundedLattice` type class represents types that are finite
+lattices.
+
+Instances should satisfy the following law in addition to the `Lattice`
+and `Bounded` laws:
+
+- Identity:
+  - `a || bottom = a`
+  - `a && top = a`
+- Annihiliation:
+  - `a || top = top`
+  - `a && bottom = bottom`
+
+#### `boundedLatticeBoolean`
+
+``` purescript
+instance boundedLatticeBoolean :: BoundedLattice Boolean
+```
+
+
+#### `ComplementedLattice`
+
+``` purescript
+class (BoundedLattice a) <= ComplementedLattice a where
+  not :: a -> a
+```
+
+The `ComplementedLattice` type class represents types that are lattices
+where every member is also uniquely complemented.
+
+Instances should satisfy the following law in addition to the
+`BoundedLattice` laws:
+
+- Complemented:
+  - `not a || a == top`
+  - `not a && a == bottom`
+- Double negation:
+  - `not <<< not == id`
+
+#### `complementedLatticeBoolean`
+
+``` purescript
+instance complementedLatticeBoolean :: ComplementedLattice Boolean
+```
+
+
+#### `DistributiveLattice`
+
+``` purescript
+class (Lattice a) <= DistributiveLattice a where
+```
+
+The `DistributiveLattice` type class represents types that are lattices
+where the `&&` and `||` distribute over each other.
+
+Instances should satisfy the following law in addition to the `Lattice`
+laws:
+
+- Distributivity: `x && (y || z) = (x && y) || (x && z)`
+
+#### `distributiveLatticeBoolean`
+
+``` purescript
+instance distributiveLatticeBoolean :: DistributiveLattice Boolean
+```
+
+
+#### `BooleanAlgebra`
+
+``` purescript
+class (ComplementedLattice a, DistributiveLattice a) <= BooleanAlgebra a where
+```
+
+The `BooleanAlgebra` type class represents types that are Boolean
+algebras, also known as Boolean lattices.
+
+Instances should satisfy the `ComplementedLattice` and
+`DistributiveLattice` laws.
+
+#### `booleanAlgebraBoolean`
+
+``` purescript
+instance booleanAlgebraBoolean :: BooleanAlgebra Boolean
+```
+
+
+#### `(||)`
+
+``` purescript
+(||) :: forall a. (Lattice a) => a -> a -> a
+```
+
+The `sup` operator.
+
+#### `(&&)`
+
+``` purescript
+(&&) :: forall a. (Lattice a) => a -> a -> a
+```
+
+The `inf` operator.
 
 #### `Semigroup`
 
@@ -838,7 +945,7 @@ The `Semigroup` type class identifies an associative operation on a type.
 
 - Associativity: `(x <> y) <> z = x <> (y <> z)`
 
-For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation. 
+For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
 
 #### `semigroupUnit`
 
@@ -868,6 +975,28 @@ instance semigroupArr :: (Semigroup s') => Semigroup (s -> s')
 ```
 
 `(++)` is an alias for `(<>)`.
+
+#### `Bits`
+
+``` purescript
+class Bits b where
+  (.&.) :: b -> b -> b
+  (.|.) :: b -> b -> b
+  (.^.) :: b -> b -> b
+  shl :: b -> Number -> b
+  shr :: b -> Number -> b
+  zshr :: b -> Number -> b
+  complement :: b -> b
+```
+
+The `Bits` type class identifies types which support bitwise operations.
+
+#### `bitsNumber`
+
+``` purescript
+instance bitsNumber :: Bits Number
+```
+
 
 
 ## Module Data.Function
@@ -1243,7 +1372,7 @@ untilE :: forall e. Eff e Boolean -> Eff e Unit
 
 Loop until a condition becomes `true`.
 
-`untilE b` is an effectful computation which repeatedly runs the effectful computation `b`, 
+`untilE b` is an effectful computation which repeatedly runs the effectful computation `b`,
 until its return value is `true`.
 
 #### `whileE`
@@ -1254,7 +1383,7 @@ whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 
 Loop while a condition is `true`.
 
-`whileE b m` is effectful computation which runs the effectful computation `b`. If its result is 
+`whileE b m` is effectful computation which runs the effectful computation `b`. If its result is
 `true`, it runs the effectful computation `m` and loops. If not, the computation ends.
 
 #### `forE`

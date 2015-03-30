@@ -103,6 +103,12 @@ complement = "complement"
 not :: String
 not = "not"
 
+sup :: String
+sup = "sup"
+
+inf :: String
+inf = "inf"
+
 -- Prelude Values
 
 zero :: String
@@ -110,6 +116,12 @@ zero = "zero"
 
 one :: String
 one = "one"
+
+bottom :: String
+bottom = "bottom"
+
+top :: String
+top = "top"
 
 return :: String
 return = "return"
@@ -196,8 +208,14 @@ eqBoolean = "eqBoolean"
 bitsNumber :: String
 bitsNumber = "bitsNumber"
 
-boolLikeBoolean :: String
-boolLikeBoolean = "boolLikeBoolean"
+boundedBoolean :: String
+boundedBoolean = "boundedBoolean"
+
+latticeBoolean :: String
+latticeBoolean = "latticeBoolean"
+
+complementedLatticeBoolean :: String
+complementedLatticeBoolean = "complementedLatticeBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"

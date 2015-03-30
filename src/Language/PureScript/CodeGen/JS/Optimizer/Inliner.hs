@@ -86,6 +86,8 @@ inlineValues = everywhereOnJS convert
   convert :: JS -> JS
   convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.zero fn = JSNumericLiteral (Left 0)
   convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.one fn = JSNumericLiteral (Left 1)
+  convert (JSApp fn [dict]) | isPreludeDict C.boundedBoolean dict && isPreludeFn C.bottom fn = JSBooleanLiteral False
+  convert (JSApp fn [dict]) | isPreludeDict C.boundedBoolean dict && isPreludeFn C.top fn = JSBooleanLiteral True
   convert (JSApp (JSApp fn [x]) [y]) | isPreludeFn (C.%) fn = JSBinary Modulus x y
   convert other = other
 
@@ -130,9 +132,11 @@ inlineCommonOperators = applyAll $
   , binary         C.bitsNumber (C..^.) BitwiseXor
   , unary          C.bitsNumber C.complement BitwiseNot
 
-  , binary C.boolLikeBoolean (C.&&) And
-  , binary C.boolLikeBoolean (C.||) Or
-  , unary  C.boolLikeBoolean C.not Not
+  , binary C.latticeBoolean (C.&&) And
+  , binary C.latticeBoolean (C.||) Or
+  , binaryFunction C.latticeBoolean C.inf And
+  , binaryFunction C.latticeBoolean C.sup Or
+  , unary  C.complementedLatticeBoolean C.not Not
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where

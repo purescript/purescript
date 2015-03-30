@@ -22,9 +22,13 @@ module Prelude
   , Num
   , Eq, (==), (/=)
   , Ord, Ordering(..), compare, (<), (>), (<=), (>=)
+  , Bounded, top, bottom
+  , Lattice, sup, inf, (||), (&&)
+  , BoundedLattice
+  , ComplementedLattice, not
+  , DistributiveLattice
+  , BooleanAlgebra
   , Bits, (.&.), (.|.), (.^.), shl, shr, zshr, complement
-  , BoolLike, (&&), (||)
-  , not
   , Semigroup, (<>), (++)
   , Unit(..), unit
   ) where
@@ -108,16 +112,16 @@ module Prelude
   infixr 0 $
   infixl 0 #
 
-  -- | Applies a function to its argument
+  -- | Applies a function to its argument.
   -- |
   -- | ```purescript
-  -- | length $ groupBy productCategory $ filter isInStock products
+  -- | length $ groupBy productCategory $ filter isInStock $ products
   -- | ```
   -- |
   -- | is equivalent to
   -- |
   -- | ```purescript
-  -- | length (groupBy productCategory (filter isInStock (products)))
+  -- | length (groupBy productCategory (filter isInStock products))
   -- | ```
   -- |
   -- | `($)` is different from [`(#)`](#-2) because it is right-infix instead of left, so
@@ -126,16 +130,16 @@ module Prelude
   ($) :: forall a b. (a -> b) -> a -> b
   ($) f x = f x
 
-  -- | Applies a function to its argument
+  -- | Applies an argument to a function.
   -- |
   -- | ```purescript
-  -- | products # groupBy productCategory # filter isInStock # length
+  -- | products # filter isInStock # groupBy productCategory # length
   -- | ```
   -- |
   -- | is equivalent to
   -- |
   -- | ```purescript
-  -- | length (filter isInStock (groupBy productCategory (products)))
+  -- | length (groupBy productCategory (filter isInStock products))
   -- | ```
   -- |
   -- | `(#)` is different from [`($)`](#-1) because it is left-infix instead of right, so
@@ -702,6 +706,172 @@ module Prelude
       EQ -> compare xs ys
       other -> other
 
+  -- | The `Bounded` type class represents types that are finite partially
+  -- | ordered sets.
+  -- |
+  -- | Instances should satisfy the following law in addition to the `Ord` laws:
+  -- |
+  -- | - Ordering: `bottom <= a <= top`
+  class (Ord a) <= Bounded a where
+    top :: a
+    bottom :: a
+
+  instance boundedBoolean :: Bounded Boolean where
+    top = true
+    bottom = false
+
+  -- | The `Lattice` type class represents types that are partially ordered
+  -- | sets with a supremum (`sup` or `||`) and infimum (`inf` or `&&`).
+  -- |
+  -- | Instances should satisfy the following laws in addition to the `Ord`
+  -- | laws:
+  -- |
+  -- | - Associativity:
+  -- |   - `a || (b || c) = (a || b) || c`
+  -- |   - `a && (b && c) = (a && b) && c`
+  -- | - Commutativity:
+  -- |   - `a || b = b || a`
+  -- |   - `a && b = b && a`
+  -- | - Absorption:
+  -- |   - `a || (a && b) = a`
+  -- |   - `a && (a || b) = a`
+  -- | - Idempotent:
+  -- |   - `a || a = a`
+  -- |   - `a && a = a`
+  class (Ord a) <= Lattice a where
+    sup :: a -> a -> a
+    inf :: a -> a -> a
+
+  instance latticeBoolean :: Lattice Boolean where
+    sup = boolOr
+    inf = boolAnd
+
+  -- | The `BoundedLattice` type class represents types that are finite
+  -- | lattices.
+  -- |
+  -- | Instances should satisfy the following law in addition to the `Lattice`
+  -- | and `Bounded` laws:
+  -- |
+  -- | - Identity:
+  -- |   - `a || bottom = a`
+  -- |   - `a && top = a`
+  -- | - Annihiliation:
+  -- |   - `a || top = top`
+  -- |   - `a && bottom = bottom`
+  class (Bounded a, Lattice a) <= BoundedLattice a
+
+  instance boundedLatticeBoolean :: BoundedLattice Boolean
+
+  -- | The `ComplementedLattice` type class represents types that are lattices
+  -- | where every member is also uniquely complemented.
+  -- |
+  -- | Instances should satisfy the following law in addition to the
+  -- | `BoundedLattice` laws:
+  -- |
+  -- | - Complemented:
+  -- |   - `not a || a == top`
+  -- |   - `not a && a == bottom`
+  -- | - Double negation:
+  -- |   - `not <<< not == id`
+  class (BoundedLattice a) <= ComplementedLattice a where
+    not :: a -> a
+
+  instance complementedLatticeBoolean :: ComplementedLattice Boolean where
+    not = boolNot
+
+  -- | The `DistributiveLattice` type class represents types that are lattices
+  -- | where the `&&` and `||` distribute over each other.
+  -- |
+  -- | Instances should satisfy the following law in addition to the `Lattice`
+  -- | laws:
+  -- |
+  -- | - Distributivity: `x && (y || z) = (x && y) || (x && z)`
+  class (Lattice a) <= DistributiveLattice a
+
+  instance distributiveLatticeBoolean :: DistributiveLattice Boolean
+
+  -- | The `BooleanAlgebra` type class represents types that are Boolean
+  -- | algebras, also known as Boolean lattices.
+  -- |
+  -- | Instances should satisfy the `ComplementedLattice` and
+  -- | `DistributiveLattice` laws.
+  class (ComplementedLattice a, DistributiveLattice a) <= BooleanAlgebra a
+
+  instance booleanAlgebraBoolean :: BooleanAlgebra Boolean
+
+  infixr 2 ||
+
+  -- | The `sup` operator.
+  (||) :: forall a. (Lattice a) => a -> a -> a
+  (||) = sup
+
+  infixr 3 &&
+
+  -- | The `inf` operator.
+  (&&) :: forall a. (Lattice a) => a -> a -> a
+  (&&) = inf
+
+  foreign import boolAnd
+    """
+    function boolAnd(b1) {
+      return function(b2) {
+        return b1 && b2;
+      };
+    }
+    """  :: Boolean -> Boolean -> Boolean
+
+  foreign import boolOr
+    """
+    function boolOr(b1) {
+      return function(b2) {
+        return b1 || b2;
+      };
+    }
+    """ :: Boolean -> Boolean -> Boolean
+
+  foreign import boolNot
+    """
+    function boolNot(b) {
+      return !b;
+    }
+    """ :: Boolean -> Boolean
+
+  infixr 5 <>
+
+  -- | The `Semigroup` type class identifies an associative operation on a type.
+  -- |
+  -- | `Semigroup` instances are required to satisfy the following law:
+  -- |
+  -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
+  -- |
+  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
+  class Semigroup a where
+    (<>) :: a -> a -> a
+
+  foreign import concatString
+    """
+    function concatString(s1) {
+      return function(s2) {
+        return s1 + s2;
+      };
+    }
+    """ :: String -> String -> String
+
+  instance semigroupUnit :: Semigroup Unit where
+    (<>) (Unit {}) (Unit {}) = Unit {}
+
+  instance semigroupString :: Semigroup String where
+    (<>) = concatString
+
+  instance semigroupArr :: (Semigroup s') => Semigroup (s -> s') where
+    (<>) f g = \x -> f x <> g x
+
+  infixr 5 ++
+
+  -- | `(++)` is an alias for `(<>)`.
+  (++) :: forall s. (Semigroup s) => s -> s -> s
+  (++) = (<>)
+
   infixl 10 .&.
   infixl 10 .|.
   infixl 10 .^.
@@ -785,84 +955,6 @@ module Prelude
     shr = numShr
     zshr = numZshr
     complement = numComplement
-
-  infixr 2 ||
-  infixr 3 &&
-
-  -- | The `BoolLike` type class identifies types which support Boolean operations.
-  -- |
-  -- | `BoolLike` instances are required to satisfy the laws of a _Boolean algebra_.
-  -- |
-  class BoolLike b where
-    (&&) :: b -> b -> b
-    (||) :: b -> b -> b
-    not :: b -> b
-
-  foreign import boolAnd
-    """
-    function boolAnd(b1) {
-      return function(b2) {
-        return b1 && b2;
-      };
-    }
-    """  :: Boolean -> Boolean -> Boolean
-
-  foreign import boolOr
-    """
-    function boolOr(b1) {
-      return function(b2) {
-        return b1 || b2;
-      };
-    }
-    """ :: Boolean -> Boolean -> Boolean
-
-  foreign import boolNot
-    """
-    function boolNot(b) {
-      return !b;
-    }
-    """ :: Boolean -> Boolean
-
-  instance boolLikeBoolean :: BoolLike Boolean where
-    (&&) = boolAnd
-    (||) = boolOr
-    not = boolNot
-
-  infixr 5 <>
-
-  -- | The `Semigroup` type class identifies an associative operation on a type.
-  -- |
-  -- | `Semigroup` instances are required to satisfy the following law:
-  -- |
-  -- | - Associativity: `(x <> y) <> z = x <> (y <> z)`
-  -- |
-  -- | For example, the `String` type is an instance of `Semigroup`, where `(<>)` is defined to be string concatenation.
-  class Semigroup a where
-    (<>) :: a -> a -> a
-
-  foreign import concatString
-    """
-    function concatString(s1) {
-      return function(s2) {
-        return s1 + s2;
-      };
-    }
-    """ :: String -> String -> String
-
-  instance semigroupUnit :: Semigroup Unit where
-    (<>) (Unit {}) (Unit {}) = Unit {}
-
-  instance semigroupString :: Semigroup String where
-    (<>) = concatString
-
-  instance semigroupArr :: (Semigroup s') => Semigroup (s -> s') where
-    (<>) f g = \x -> f x <> g x
-
-  infixr 5 ++
-
-  -- | `(++)` is an alias for `(<>)`.
-  (++) :: forall s. (Semigroup s) => s -> s -> s
-  (++) = (<>)
 
 module Data.Function where
 
