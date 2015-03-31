@@ -29,7 +29,6 @@ module Prelude
   , ComplementedLattice, not
   , DistributiveLattice
   , BooleanAlgebra
-  , Bits, (.&.), (.|.), (.^.), shl, shr, zshr, complement
   ) where
 
   -- | The `Unit` type has a single inhabitant, called `unit`. It represents values with no computational content.
@@ -873,90 +872,6 @@ module Prelude
       return !b;
     }
     """ :: Boolean -> Boolean
-
-  infixl 10 .&.
-  infixl 10 .|.
-  infixl 10 .^.
-
-  -- | The `Bits` type class identifies types which support bitwise operations.
-  class Bits b where
-    (.&.) :: b -> b -> b
-    (.|.) :: b -> b -> b
-    (.^.) :: b -> b -> b
-    shl :: b -> Number -> b
-    shr :: b -> Number -> b
-    zshr :: b -> Number -> b
-    complement :: b -> b
-
-  instance bitsNumber :: Bits Number where
-    (.&.) = numAnd
-    (.|.) = numOr
-    (.^.) = numXor
-    shl = numShl
-    shr = numShr
-    zshr = numZshr
-    complement = numComplement
-
-  foreign import numAnd
-    """
-    function numAnd(n1) {
-      return function(n2) {
-        return n1 & n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numOr
-    """
-    function numOr(n1) {
-      return function(n2) {
-        return n1 | n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numXor
-    """
-    function numXor(n1) {
-      return function(n2) {
-        return n1 ^ n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numShl
-    """
-    function numShl(n1) {
-      return function(n2) {
-        return n1 << n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numShr
-    """
-    function numShr(n1) {
-      return function(n2) {
-        return n1 >> n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numZshr
-    """
-    function numZshr(n1) {
-      return function(n2) {
-        return n1 >>> n2;
-      };
-    }
-    """ :: Number -> Number -> Number
-
-  foreign import numComplement
-    """
-    function numComplement(n) {
-      return ~n;
-    }
-    """ :: Number -> Number
 
 module Data.Function where
 
