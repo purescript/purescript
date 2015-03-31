@@ -35,12 +35,6 @@ main = do
     assert (6 / (3 * 2) == 1)   "6 / (3 * 2) == 1"
     assert ((6 / 3) * 2 == 4)   "(6 / 3) * 2 == 4"
 
-    assert (6 % (2 * 2) == 2)   "6 % (2 * 2) == 2"
-    assert ((6 % 2) * 2 == 0)   "(6 % 2) * 2 == 0"
-
-    assert (4 % (9 / 3) == 1)   "4 % (9 / 3) == 1"
-    assert ((4 % 9) / 2 == 2)   "(4 % 9) / 2 == 2"
-
     assert (not (1 < 0) == true) "not (1 < 0) == true"
     assert (not ((negate 1) < 0) == false) "not ((negate 1) < 0) == false"
 

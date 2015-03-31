@@ -1,18 +1,28 @@
 module Main where
 
-  import Prelude
+foreign import jsMod
+  """
+  function jsMod(x) {
+    return function (y) {
+      return x % y;
+    };
+  }
+  """ :: Number -> Number -> Number
 
-  gcd :: Number -> Number -> Number
-  gcd 0 x = x
-  gcd x 0 = x
-  gcd x y | x > y = gcd (x % y) y
-  gcd x y = gcd (y % x) x
+infixl 7 %
+(%) = jsMod
 
-  guardsTest (x:xs) | x > 0 = guardsTest xs
-  guardsTest xs = xs
+gcd :: Number -> Number -> Number
+gcd 0 x = x
+gcd x 0 = x
+gcd x y | x > y = gcd (x % y) y
+gcd x y = gcd (y % x) x
 
-  data A = A
+guardsTest (x:xs) | x > 0 = guardsTest xs
+guardsTest xs = xs
 
-  parseTest A 0 = 0
+data A = A
 
-  main = Debug.Trace.trace "Done"
+parseTest A 0 = 0
+
+main = Debug.Trace.trace "Done"
