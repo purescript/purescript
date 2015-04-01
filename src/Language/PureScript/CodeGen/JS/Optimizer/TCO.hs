@@ -15,6 +15,8 @@
 
 module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
+import Data.Monoid
+
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
 
@@ -30,10 +32,13 @@ tco' = everywhereOnJS convert
   where
   tcoLabel :: String
   tcoLabel = "tco"
+
   tcoVar :: String -> String
   tcoVar arg = "__tco_" ++ arg
+
   copyVar :: String -> String
   copyVar arg = "__copy_" ++ arg
+
   convert :: JS -> JS
   convert js@(JSVariableIntroduction name (Just fn@JSFunction {})) =
     let
@@ -46,6 +51,7 @@ tco' = everywhereOnJS convert
               JSVariableIntroduction name (Just (replace (toLoop name allArgs body')))
         | otherwise -> js
   convert js = js
+
   collectAllFunctionArgs :: [[String]] -> (JS -> JS) -> JS -> ([[String]], JS, JS -> JS)
   collectAllFunctionArgs allArgs f (JSFunction ident args (JSBlock (body@(JSReturn _):_))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction ident (map copyVar args) (JSBlock [b]))) body
@@ -56,25 +62,35 @@ tco' = everywhereOnJS convert
   collectAllFunctionArgs allArgs f (JSReturn (JSFunction ident args body@(JSBlock _))) =
     (args : allArgs, body, f . JSReturn . JSFunction ident (map copyVar args))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
+
   isTailCall :: String -> JS -> Bool
   isTailCall ident js =
     let
       numSelfCalls = everythingOnJS (+) countSelfCalls js
       numSelfCallsInTailPosition = everythingOnJS (+) countSelfCallsInTailPosition js
       numSelfCallsUnderFunctions = everythingOnJS (+) countSelfCallsUnderFunctions js
+      numSelfCallWithFnArgs = everythingOnJS (+) countSelfCallsWithFnArgs js
     in
       numSelfCalls > 0
       && numSelfCalls == numSelfCallsInTailPosition
       && numSelfCallsUnderFunctions == 0
+      && numSelfCallWithFnArgs == 0
     where
     countSelfCalls :: JS -> Int
     countSelfCalls (JSApp (JSVar ident') _) | ident == ident' = 1
     countSelfCalls _ = 0
+    
     countSelfCallsInTailPosition :: JS -> Int
     countSelfCallsInTailPosition (JSReturn ret) | isSelfCall ident ret = 1
     countSelfCallsInTailPosition _ = 0
+    
+    countSelfCallsUnderFunctions :: JS -> Int
     countSelfCallsUnderFunctions (JSFunction _ _ js') = everythingOnJS (+) countSelfCalls js'
     countSelfCallsUnderFunctions _ = 0
+    
+    countSelfCallsWithFnArgs :: JS -> Int
+    countSelfCallsWithFnArgs ret = if isSelfCallWithFnArgs ident ret [] then 1 else 0
+
   toLoop :: String -> [String] -> JS -> JS
   toLoop ident allArgs js = JSBlock $
         map (\arg -> JSVariableIntroduction arg (Just (JSVar (copyVar arg)))) allArgs ++
@@ -94,10 +110,19 @@ tco' = everywhereOnJS convert
     collectSelfCallArgs :: [[JS]] -> JS -> [[JS]]
     collectSelfCallArgs allArgumentValues (JSApp fn args') = collectSelfCallArgs (args' : allArgumentValues) fn
     collectSelfCallArgs allArgumentValues _ = allArgumentValues
+
   isSelfCall :: String -> JS -> Bool
-  isSelfCall ident (JSApp (JSVar ident') args) | ident == ident' && not (any isFunction args) = True
-  isSelfCall ident (JSApp fn args) | not (any isFunction args) = isSelfCall ident fn
+  isSelfCall ident (JSApp (JSVar ident') _) = ident == ident'
+  isSelfCall ident (JSApp fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
-  isFunction :: JS -> Bool
-  isFunction (JSFunction _ _ _) = True
-  isFunction _ = False
+
+  isSelfCallWithFnArgs :: String -> JS -> [JS] -> Bool
+  isSelfCallWithFnArgs ident (JSVar ident') args | ident == ident' && any hasFunction args = True
+  isSelfCallWithFnArgs ident (JSApp fn args) acc = isSelfCallWithFnArgs ident fn (args ++ acc)
+  isSelfCallWithFnArgs _ _ _ = False
+    
+  hasFunction :: JS -> Bool 
+  hasFunction = getAny . everythingOnJS mappend (Any . isFunction)
+    where
+    isFunction (JSFunction _ _ _) = True
+    isFunction _ = False
