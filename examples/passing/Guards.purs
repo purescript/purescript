@@ -1,29 +1,39 @@
 module Main where
 
-  import Prelude
+foreign import jsMod
+  """
+  function jsMod(x) {
+    return function (y) {
+      return x % y;
+    };
+  }
+  """ :: Number -> Number -> Number
 
-  collatz = \x -> case x of
-    y | y % 2 == 0 -> y / 2
-    y -> y * 3 + 1
+infixl 7 %
+(%) = jsMod
 
-  -- Guards have access to current scope
-  collatz2 = \x y -> case x of
-    z | y > 0 -> z / 2
-    z -> z * 3 + 1
+collatz = \x -> case x of
+  y | y % 2 == 0 -> y / 2
+  y -> y * 3 + 1
 
-  min :: forall a. (Ord a) => a -> a -> a
-  min n m | n < m     = n
-          | otherwise = m
+-- Guards have access to current scope
+collatz2 = \x y -> case x of
+  z | y > 0 -> z / 2
+  z -> z * 3 + 1
 
-  max :: forall a. (Ord a) => a -> a -> a
-  max n m = case unit of
-    _ | m < n     -> n
-      | otherwise -> m
+min :: forall a. (Ord a) => a -> a -> a
+min n m | n < m     = n
+        | otherwise = m
 
-  testIndentation :: Number -> Number -> Number
-  testIndentation x y | x > 0
-    = x + y
-                      | otherwise
-    = y - x
+max :: forall a. (Ord a) => a -> a -> a
+max n m = case unit of
+  _ | m < n     -> n
+    | otherwise -> m
 
-  main = Debug.Trace.trace $ min "Done" "ZZZZ"
+testIndentation :: Number -> Number -> Number
+testIndentation x y | x > 0
+  = x + y
+                    | otherwise
+  = y - x
+
+main = Debug.Trace.trace $ min "Done" "ZZZZ"
