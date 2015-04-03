@@ -84,12 +84,19 @@ inlineValues :: JS -> JS
 inlineValues = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.zero fn = JSNumericLiteral (Left 0)
-  convert (JSApp fn [dict]) | isPreludeDict C.semiringNumber dict && isPreludeFn C.one fn = JSNumericLiteral (Left 1)
-  convert (JSApp fn [dict]) | isPreludeDict C.boundedBoolean dict && isPreludeFn C.bottom fn = JSBooleanLiteral False
-  convert (JSApp fn [dict]) | isPreludeDict C.boundedBoolean dict && isPreludeFn C.top fn = JSBooleanLiteral True
-  convert (JSApp (JSApp fn [x]) [y]) | isPreludeFn (C.%) fn = JSBinary Modulus x y
+  convert (JSApp fn [dict]) | isDict semiringNumber dict && isFn fnZero fn = JSNumericLiteral (Left 0)
+                            | isDict semiringNumber dict && isFn fnOne fn = JSNumericLiteral (Left 1)
+                            | isDict semiringInt dict && isFn fnZero fn = JSNumericLiteral (Left 0)
+                            | isDict semiringInt dict && isFn fnOne fn = JSNumericLiteral (Left 1)
+                            | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral False
+                            | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral True
+  convert (JSApp fn [value]) | isFn fromNumber fn = JSBinary BitwiseOr value (JSNumericLiteral (Left 0))
   convert other = other
+  fnZero = (C.prelude, C.zero)
+  fnOne = (C.prelude, C.one)
+  fnBottom = (C.prelude, C.bottom)
+  fnTop = (C.prelude, C.top)
+  fromNumber = (C.dataInt, C.fromNumber)
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator (m, op) f = everywhereOnJS convert
@@ -103,52 +110,84 @@ inlineOperator (m, op) f = everywhereOnJS convert
 
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll $
-  [ binary C.semiringNumber (C.+) Add
-  , binary C.semiringNumber (C.*) Multiply
-  , binary C.ringNumber (C.-) Subtract
-  , unary  C.ringNumber C.negate Negate
-  , binary C.moduloSemiringNumber (C./) Divide
+  [ binary semiringNumber (C.+) Add
+  , binary semiringNumber (C.*) Multiply
+  , binary semiringInt (C.+) Add
+  , binary semiringInt (C.*) Multiply
 
-  , binary C.ordNumber (C.<) LessThan
-  , binary C.ordNumber (C.>) GreaterThan
-  , binary C.ordNumber (C.<=) LessThanOrEqualTo
-  , binary C.ordNumber (C.>=) GreaterThanOrEqualTo
+  , binary ringNumber (C.-) Subtract
+  , unary  ringNumber C.negate Negate
+  , binary ringInt (C.-) Subtract
+  , unary  ringInt C.negate Negate
 
-  , binary C.eqNumber (C.==) EqualTo
-  , binary C.eqNumber (C./=) NotEqualTo
-  , binary C.eqString (C.==) EqualTo
-  , binary C.eqString (C./=) NotEqualTo
-  , binary C.eqBoolean (C.==) EqualTo
-  , binary C.eqBoolean (C./=) NotEqualTo
+  , binary moduloSemiringNumber (C./) Divide
 
-  , binary C.semigroupString (C.<>) Add
-  , binary C.semigroupString (C.++) Add
+  , binary eqNumber (C.==) EqualTo
+  , binary eqNumber (C./=) NotEqualTo
+  , binary eqInt (C.==) EqualTo
+  , binary eqInt (C./=) NotEqualTo
+  , binary eqString (C.==) EqualTo
+  , binary eqString (C./=) NotEqualTo
+  , binary eqBoolean (C.==) EqualTo
+  , binary eqBoolean (C./=) NotEqualTo
 
-  , binary C.latticeBoolean (C.&&) And
-  , binary C.latticeBoolean (C.||) Or
-  , binaryFunction C.latticeBoolean C.inf And
-  , binaryFunction C.latticeBoolean C.sup Or
-  , unary  C.complementedLatticeBoolean C.not Not
+  , binary ordNumber (C.<) LessThan
+  , binary ordNumber (C.>) GreaterThan
+  , binary ordNumber (C.<=) LessThanOrEqualTo
+  , binary ordNumber (C.>=) GreaterThanOrEqualTo
+  , binary ordInt (C.<) LessThan
+  , binary ordInt (C.>) GreaterThan
+  , binary ordInt (C.<=) LessThanOrEqualTo
+  , binary ordInt (C.>=) GreaterThanOrEqualTo
+
+  , binary semigroupString (C.<>) Add
+  , binary semigroupString (C.++) Add
+
+  , binary latticeBoolean (C.&&) And
+  , binary latticeBoolean (C.||) Or
+  , binaryFunction latticeBoolean C.inf And
+  , binaryFunction latticeBoolean C.sup Or
+  , unary complementedLatticeBoolean C.not Not
+
+  , binary' C.dataIntBits (C..|.) BitwiseOr
+  , binary' C.dataIntBits (C..&.) BitwiseAnd
+  , binary' C.dataIntBits (C..^.) BitwiseXor
+  , binary' C.dataIntBits C.shl ShiftLeft
+  , binary' C.dataIntBits C.shr ShiftRight
+  , binary' C.dataIntBits C.zshr ZeroFillShiftRight
+  , unary'  C.dataIntBits C.complement BitwiseNot
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
-  binary :: String -> String -> BinaryOperator -> JS -> JS
-  binary dictName opString op = everywhereOnJS convert
+  binary :: (String, String) -> String -> BinaryOperator -> JS -> JS
+  binary dict opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeDict dictName dict && isPreludeFn opString fn = JSBinary op x y
+    convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isDict dict dict' && isPreludeFn opString fn = JSBinary op x y
     convert other = other
-  binaryFunction :: String -> String -> BinaryOperator -> JS -> JS
-  binaryFunction dictName fnName op = everywhereOnJS convert
+  binary' :: String -> String -> BinaryOperator -> JS -> JS
+  binary' moduleName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y]) | isPreludeFn fnName fn && isPreludeDict dictName dict = JSBinary op x y
+    convert (JSApp (JSApp fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary op x y
     convert other = other
-  unary :: String -> String -> UnaryOperator -> JS -> JS
-  unary dictName fnName op = everywhereOnJS convert
+  binaryFunction :: (String, String) -> String -> BinaryOperator -> JS -> JS
+  binaryFunction dict fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp fn [dict]) [x]) | isPreludeFn fnName fn && isPreludeDict dictName dict = JSUnary op x
+    convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isPreludeFn fnName fn && isDict dict dict' = JSBinary op x y
+    convert other = other
+  unary :: (String, String) -> String -> UnaryOperator -> JS -> JS
+  unary dict fnName op = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert (JSApp (JSApp fn [dict']) [x]) | isPreludeFn fnName fn && isDict dict dict' = JSUnary op x
+    convert other = other
+  unary' :: String -> String -> UnaryOperator -> JS -> JS
+  unary' moduleName fnName op = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert (JSApp fn [x]) | isFn (moduleName, fnName) fn = JSUnary op x
     convert other = other
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
@@ -186,12 +225,59 @@ inlineCommonOperators = applyAll $
     go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
-isPreludeDict :: String -> JS -> Bool
-isPreludeDict dictName (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == dictName
-isPreludeDict _ _ = False
+isDict :: (String, String) -> JS -> Bool
+isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
+isDict _ _ = False
+
+isFn :: (String, String) -> JS -> Bool
+isFn (moduleName, fnName) (JSAccessor x (JSVar y)) = x == fnName && y == moduleName
+isFn (moduleName, fnName) (JSIndexer (JSStringLiteral x) (JSVar y)) = x == fnName && y == moduleName
+isFn _ _ = False
 
 isPreludeFn :: String -> JS -> Bool
-isPreludeFn fnName (JSAccessor fnName' (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
-isPreludeFn fnName (JSIndexer (JSStringLiteral fnName') (JSVar prelude)) = prelude == C.prelude && fnName' == fnName
-isPreludeFn fnName (JSAccessor longForm (JSAccessor prelude (JSVar _))) = prelude == C.prelude && longForm == identToJs (Op fnName)
-isPreludeFn _ _ = False
+isPreludeFn fnName = isFn (C.prelude, fnName)
+
+semiringNumber :: (String, String)
+semiringNumber = (C.prelude, C.semiringNumber)
+
+semiringInt :: (String, String)
+semiringInt = (C.dataInt, C.semiringInt)
+
+ringNumber :: (String, String)
+ringNumber = (C.prelude, C.ringNumber)
+
+ringInt :: (String, String)
+ringInt = (C.dataInt, C.ringInt)
+
+moduloSemiringNumber :: (String, String)
+moduloSemiringNumber = (C.prelude, C.moduloSemiringNumber)
+
+eqNumber :: (String, String)
+eqNumber = (C.prelude, C.eqNumber)
+
+eqInt :: (String, String)
+eqInt = (C.dataInt, C.eqInt)
+
+eqString :: (String, String)
+eqString = (C.prelude, C.eqNumber)
+
+eqBoolean :: (String, String)
+eqBoolean = (C.prelude, C.eqNumber)
+
+ordNumber :: (String, String)
+ordNumber = (C.prelude, C.ordNumber)
+
+ordInt :: (String, String)
+ordInt = (C.dataInt, C.ordInt)
+
+semigroupString :: (String, String)
+semigroupString = (C.prelude, C.semigroupString)
+
+boundedBoolean :: (String, String)
+boundedBoolean = (C.prelude, C.boundedBoolean)
+
+latticeBoolean :: (String, String)
+latticeBoolean = (C.prelude, C.latticeBoolean)
+
+complementedLatticeBoolean :: (String, String)
+complementedLatticeBoolean = (C.prelude, C.complementedLatticeBoolean)

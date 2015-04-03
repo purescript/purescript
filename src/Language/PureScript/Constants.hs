@@ -15,7 +15,7 @@
 
 module Language.PureScript.Constants where
 
--- Prelude Operators
+-- Operators
 
 ($) :: String
 ($) = "$"
@@ -74,7 +74,16 @@ module Language.PureScript.Constants where
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
--- Prelude Operator Functions
+(.|.) :: String
+(.|.) = ".|."
+
+(.&.) :: String
+(.&.) = ".&."
+
+(.^.) :: String
+(.^.) = ".^."
+
+-- Functions
 
 negate :: String
 negate = "negate"
@@ -87,6 +96,24 @@ sup = "sup"
 
 inf :: String
 inf = "inf"
+
+mod :: String
+mod = "mod"
+
+shl :: String
+shl = "shl"
+
+shr :: String
+shr = "shr"
+
+zshr :: String
+zshr = "zshr"
+
+complement :: String
+complement = "complement"
+
+fromNumber :: String
+fromNumber = "fromNumber"
 
 -- Prelude Values
 
@@ -163,20 +190,32 @@ bindEffDictionary = "bindEff"
 semiringNumber :: String
 semiringNumber = "semiringNumber"
 
+semiringInt :: String
+semiringInt = "semiringInt"
+
 ringNumber :: String
 ringNumber = "ringNumber"
+
+ringInt :: String
+ringInt = "ringInt"
 
 moduloSemiringNumber :: String
 moduloSemiringNumber = "moduloSemiringNumber"
 
-numNumber :: String
-numNumber = "numNumber"
+moduloSemiringInt :: String
+moduloSemiringInt = "moduloSemiringInt"
 
 ordNumber :: String
 ordNumber = "ordNumber"
 
+ordInt :: String
+ordInt = "ordInt"
+
 eqNumber :: String
 eqNumber = "eqNumber"
+
+eqInt :: String
+eqInt = "eqInt"
 
 eqString :: String
 eqString = "eqString"
@@ -231,3 +270,9 @@ st = "Control_Monad_ST"
 
 dataFunction :: String
 dataFunction = "Data_Function"
+
+dataInt :: String
+dataInt = "Data_Int"
+
+dataIntBits :: String
+dataIntBits = "Data_Int_Bits"
