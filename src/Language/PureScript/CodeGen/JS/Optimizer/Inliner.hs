@@ -91,12 +91,15 @@ inlineValues = everywhereOnJS convert
                             | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral False
                             | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral True
   convert (JSApp fn [value]) | isFn fromNumber fn = JSBinary BitwiseOr value (JSNumericLiteral (Left 0))
+  convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y])
+    | isDict moduloSemiringInt dict && isFn fnDivide fn = JSBinary BitwiseOr (JSBinary Divide x y) (JSNumericLiteral (Left 0))
   convert other = other
   fnZero = (C.prelude, C.zero)
   fnOne = (C.prelude, C.one)
   fnBottom = (C.prelude, C.bottom)
   fnTop = (C.prelude, C.top)
   fromNumber = (C.dataInt, C.fromNumber)
+  fnDivide = (C.prelude, (C./))
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator (m, op) f = everywhereOnJS convert
@@ -251,6 +254,9 @@ ringInt = (C.dataInt, C.ringInt)
 
 moduloSemiringNumber :: (String, String)
 moduloSemiringNumber = (C.prelude, C.moduloSemiringNumber)
+
+moduloSemiringInt :: (String, String)
+moduloSemiringInt = (C.dataInt, C.moduloSemiringInt)
 
 eqNumber :: (String, String)
 eqNumber = (C.prelude, C.eqNumber)
