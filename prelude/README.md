@@ -559,7 +559,7 @@ and subtraction operations.
 Instances must satisfy the following law in addition to the `Semiring`
 laws:
 
-- Additive inverse: `a + (−a) = (−a) + a = zero`
+- Additive inverse: `a + (-a) = (-a) + a = zero`
 
 #### `ringNumber`
 
@@ -723,6 +723,13 @@ instance eqArray :: (Eq a) => Eq [a]
 ```
 
 
+#### `eqOrdering`
+
+``` purescript
+instance eqOrdering :: Eq Ordering
+```
+
+
 #### `Ordering`
 
 ``` purescript
@@ -789,10 +796,10 @@ instance ordArray :: (Ord a) => Ord [a]
 ```
 
 
-#### `eqOrdering`
+#### `ordOrdering`
 
 ``` purescript
-instance eqOrdering :: Eq Ordering
+instance ordOrdering :: Ord Ordering
 ```
 
 
@@ -857,6 +864,13 @@ instance boundedUnit :: Bounded Unit
 ```
 
 
+#### `boundedOrdering`
+
+``` purescript
+instance boundedOrdering :: Bounded Ordering
+```
+
+
 #### `Lattice`
 
 ``` purescript
@@ -888,6 +902,13 @@ laws:
 
 ``` purescript
 instance latticeBoolean :: Lattice Boolean
+```
+
+
+#### `latticeUnit`
+
+``` purescript
+instance latticeUnit :: Lattice Unit
 ```
 
 
@@ -933,6 +954,13 @@ instance boundedLatticeBoolean :: BoundedLattice Boolean
 ```
 
 
+#### `boundedLatticeUnit`
+
+``` purescript
+instance boundedLatticeUnit :: BoundedLattice Unit
+```
+
+
 #### `ComplementedLattice`
 
 ``` purescript
@@ -959,6 +987,13 @@ instance complementedLatticeBoolean :: ComplementedLattice Boolean
 ```
 
 
+#### `complementedLatticeUnit`
+
+``` purescript
+instance complementedLatticeUnit :: ComplementedLattice Unit
+```
+
+
 #### `DistributiveLattice`
 
 ``` purescript
@@ -980,6 +1015,13 @@ instance distributiveLatticeBoolean :: DistributiveLattice Boolean
 ```
 
 
+#### `distributiveLatticeUnit`
+
+``` purescript
+instance distributiveLatticeUnit :: DistributiveLattice Unit
+```
+
+
 #### `BooleanAlgebra`
 
 ``` purescript
@@ -996,6 +1038,13 @@ Instances should satisfy the `ComplementedLattice` and
 
 ``` purescript
 instance booleanAlgebraBoolean :: BooleanAlgebra Boolean
+```
+
+
+#### `booleanAlgebraUnit`
+
+``` purescript
+instance booleanAlgebraUnit :: BooleanAlgebra Unit
 ```
 
 
