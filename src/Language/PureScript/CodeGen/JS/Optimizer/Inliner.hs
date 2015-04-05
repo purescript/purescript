@@ -92,14 +92,20 @@ inlineValues = everywhereOnJS convert
                             | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral True
   convert (JSApp fn [value]) | isFn fromNumber fn = JSBinary BitwiseOr value (JSNumericLiteral (Left 0))
   convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y])
+    | isDict semiringInt dict && isFn fnAdd fn = JSBinary BitwiseOr (JSBinary Add x y) (JSNumericLiteral (Left 0))
+    | isDict semiringInt dict && isFn fnMultiply fn = JSBinary BitwiseOr (JSBinary Multiply x y) (JSNumericLiteral (Left 0))
     | isDict moduloSemiringInt dict && isFn fnDivide fn = JSBinary BitwiseOr (JSBinary Divide x y) (JSNumericLiteral (Left 0))
+    | isDict ringInt dict && isFn fnSubtract fn = JSBinary BitwiseOr (JSBinary Subtract x y) (JSNumericLiteral (Left 0))
   convert other = other
   fnZero = (C.prelude, C.zero)
   fnOne = (C.prelude, C.one)
   fnBottom = (C.prelude, C.bottom)
   fnTop = (C.prelude, C.top)
   fromNumber = (C.dataInt, C.fromNumber)
+  fnAdd = (C.prelude, (C.+))
   fnDivide = (C.prelude, (C./))
+  fnMultiply = (C.prelude, (C.*))
+  fnSubtract = (C.prelude, (C.-))
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator (m, op) f = everywhereOnJS convert
@@ -115,8 +121,6 @@ inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll $
   [ binary semiringNumber (C.+) Add
   , binary semiringNumber (C.*) Multiply
-  , binary semiringInt (C.+) Add
-  , binary semiringInt (C.*) Multiply
 
   , binary ringNumber (C.-) Subtract
   , unary  ringNumber C.negate Negate
@@ -124,6 +128,7 @@ inlineCommonOperators = applyAll $
   , unary  ringInt C.negate Negate
 
   , binary moduloSemiringNumber (C./) Divide
+  , binary moduloSemiringInt C.mod Modulus
 
   , binary eqNumber (C.==) EqualTo
   , binary eqNumber (C./=) NotEqualTo
