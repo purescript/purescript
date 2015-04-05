@@ -593,6 +593,13 @@ module Prelude
     (==) = eqArrayImpl (==)
     (/=) xs ys = not (xs == ys)
 
+  instance eqOrdering :: Eq Ordering where
+    (==) LT LT = true
+    (==) GT GT = true
+    (==) EQ EQ = true
+    (==) _  _  = false
+    (/=) x y = not (x == y)
+
   foreign import refEq
     """
     function refEq(r1) {
@@ -667,12 +674,14 @@ module Prelude
       EQ -> compare xs ys
       other -> other
 
-  instance eqOrdering :: Eq Ordering where
-    (==) LT LT = true
-    (==) GT GT = true
-    (==) EQ EQ = true
-    (==) _  _  = false
-    (/=) x y = not (x == y)
+  instance ordOrdering :: Ord Ordering where
+    compare LT LT = EQ
+    compare EQ EQ = EQ
+    compare GT GT = EQ
+    compare LT _  = LT
+    compare EQ LT = GT
+    compare EQ GT = LT
+    compare GT _  = GT
 
   infixl 4 <
   infixl 4 >
@@ -739,6 +748,10 @@ module Prelude
     top = unit
     bottom = unit
 
+  instance boundedOrdering :: Bounded Ordering where
+    top = GT
+    bottom = LT
+
   -- | The `Lattice` type class represents types that are partially ordered
   -- | sets with a supremum (`sup` or `||`) and infimum (`inf` or `&&`).
   -- |
@@ -764,6 +777,10 @@ module Prelude
   instance latticeBoolean :: Lattice Boolean where
     sup = boolOr
     inf = boolAnd
+
+  instance latticeUnit :: Lattice Unit where
+    sup _ _ = unit
+    inf _ _ = unit
 
   infixr 2 ||
   infixr 3 &&
@@ -792,6 +809,8 @@ module Prelude
 
   instance boundedLatticeBoolean :: BoundedLattice Boolean
 
+  instance boundedLatticeUnit :: BoundedLattice Unit
+
   -- | The `ComplementedLattice` type class represents types that are lattices
   -- | where every member is also uniquely complemented.
   -- |
@@ -809,6 +828,9 @@ module Prelude
   instance complementedLatticeBoolean :: ComplementedLattice Boolean where
     not = boolNot
 
+  instance complementedLatticeUnit :: ComplementedLattice Unit where
+    not _ = unit
+
   -- | The `DistributiveLattice` type class represents types that are lattices
   -- | where the `&&` and `||` distribute over each other.
   -- |
@@ -820,6 +842,8 @@ module Prelude
 
   instance distributiveLatticeBoolean :: DistributiveLattice Boolean
 
+  instance distributiveLatticeUnit :: DistributiveLattice Unit
+
   -- | The `BooleanAlgebra` type class represents types that are Boolean
   -- | algebras, also known as Boolean lattices.
   -- |
@@ -828,6 +852,8 @@ module Prelude
   class (ComplementedLattice a, DistributiveLattice a) <= BooleanAlgebra a
 
   instance booleanAlgebraBoolean :: BooleanAlgebra Boolean
+
+  instance booleanAlgebraUnit :: BooleanAlgebra Unit
 
   foreign import boolOr
     """
