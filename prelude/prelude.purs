@@ -1377,7 +1377,7 @@ module Control.Monad.Eff
     """
     function untilE(f) {
       return function() {
-        while (!f());
+        while (!f()) {};
         return {};
       };
     }
