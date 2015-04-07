@@ -30,10 +30,12 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (Eq, D.Data, D.Typeable)
+  } deriving (Eq, Show, D.Data, D.Typeable)
 
-instance Show SourcePos where
-  show sp = "line " ++ show (sourcePosLine sp) ++ ", column " ++ show (sourcePosColumn sp)
+displaySourcePos :: SourcePos -> String
+displaySourcePos sp =
+  "line " ++ show (sourcePosLine sp) ++
+    ", column " ++ show (sourcePosColumn sp)
 
 data SourceSpan = SourceSpan
   { -- |
@@ -47,7 +49,10 @@ data SourceSpan = SourceSpan
     -- End of the span
     --
   , spanEnd :: SourcePos
-  } deriving (Eq, D.Data, D.Typeable)
+  } deriving (Eq, Show, D.Data, D.Typeable)
 
-instance Show SourceSpan where
-  show sp = spanName sp ++ " " ++ show (spanStart sp) ++ " - " ++ show (spanEnd sp)
+displaySourceSpan :: SourceSpan -> String
+displaySourceSpan sp =
+  spanName sp ++ " " ++
+    displaySourcePos (spanStart sp) ++ " - " ++
+    displaySourcePos (spanEnd sp)
