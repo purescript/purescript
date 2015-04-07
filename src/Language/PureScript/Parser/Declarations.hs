@@ -91,25 +91,38 @@ parseTypeSynonymDeclaration =
                          <*> (indented *> equals *> noWildcards parsePolyType)
 
 parseValueDeclaration :: TokenParser Declaration
-parseValueDeclaration = do
+parseValueDeclaration = P.try parseValueDeclarationWithIdentFirst <|> parseValueDeclarationWithInfixOperator
+
+parseValueDeclarationWithIdentFirst :: TokenParser Declaration
+parseValueDeclarationWithIdentFirst = do
   name <- parseIdent
   binders <- P.many parseBinderNoParens
-  value <- Left <$> (C.indented *>
-                       P.many1 ((,) <$> parseGuard
-                                    <*> (indented *> equals *> parseValueWithWhereClause)
-                               ))
-       <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
+  value <- parseValueDeclarationValue
   return $ ValueDeclaration name Value binders value
-  where
-  parseValueWithWhereClause :: TokenParser Expr
-  parseValueWithWhereClause = do
-    value <- parseValue
-    whereClause <- P.optionMaybe $ do
-      C.indented
-      reserved "where"
-      C.indented
-      C.mark $ P.many1 (C.same *> parseLocalDeclaration)
-    return $ maybe value (`Let` value) whereClause
+
+parseValueDeclarationWithInfixOperator :: TokenParser Declaration
+parseValueDeclarationWithInfixOperator = do
+  lhs <- parseBinderNoParens
+  binaryOp <- parseOp
+  rhs <- parseBinderNoParens
+  value <- parseValueDeclarationValue
+  return $ ValueDeclaration binaryOp Value [lhs,rhs] value
+
+parseValueDeclarationValue :: TokenParser (Either [(Guard, Expr)] Expr)
+parseValueDeclarationValue = 
+  Left <$> (C.indented *>
+              P.many1 ((,) <$> parseGuard
+                           <*> (indented *> equals *> parseValueWithWhereClause)
+                      )) <|>
+  Right <$> (indented *> equals *> parseValueWithWhereClause)
+  where parseValueWithWhereClause = do
+          value <- parseValue
+          whereClause <- P.optionMaybe $ do
+            C.indented
+            reserved "where"
+            C.indented
+            C.mark $ P.many1 (C.same *> parseLocalDeclaration)
+          return $ maybe value (`Let` value) whereClause
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
