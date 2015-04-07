@@ -60,6 +60,12 @@ parseIdent :: TokenParser Ident
 parseIdent = (Ident <$> identifier) <|> (Op <$> parens symbol)
 
 -- |
+-- Parse an operator without parameters
+--
+parseOp :: TokenParser Ident
+parseOp = Op <$> symbol
+
+-- |
 -- Run the first parser, then match the second if possible, applying the specified function on a successful match
 --
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
