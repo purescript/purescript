@@ -214,7 +214,7 @@ renameInModule imports exports (Module coms mn decls exps) =
   updateDecl :: (Maybe SourceSpan, [Ident]) -> Declaration -> m ((Maybe SourceSpan, [Ident]), Declaration)
   updateDecl (_, bound) d@(PositionedDeclaration pos _ _) = return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
-    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
+    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (sndM (updateTypesEverywhere pos)))) dctors)
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
     (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (TypeClassDeclaration className args implies ds) =

@@ -47,11 +47,6 @@ literals = mkPattern' match
   match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
   match (ObjectConstructor ps) = prettyPrintObject' ps
   match (ObjectGetter prop) = return $ "(." ++ prop ++ ")"
-  match (TypeClassDictionaryConstructorApp className ps) = concat <$> sequence
-    [ return (show className ++ "(\n")
-    , match ps
-    , return ")"
-    ]
   match (Constructor name) = return $ show name
   match (Case values binders) = concat <$> sequence
     [ return "case "
@@ -78,7 +73,7 @@ literals = mkPattern' match
   match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ prettyPrintValue op ++ ")"
   match (TypeClassDictionary _ (name, tys) _) = return $ "<<dict " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ">>"
   match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ show name ++ ">>"
-  match (TypedValue _ val _) = prettyPrintValue' val
+  match (TypedValue _ val ty) = return $ "(" ++ prettyPrintValue val ++ ") :: " ++ prettyPrintType ty
   match (PositionedValue _ _ val) = prettyPrintValue' val
   match _ = mzero
 

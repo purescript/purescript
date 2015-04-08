@@ -147,7 +147,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [Type])]
+  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [(Ident, Type)])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -393,11 +393,6 @@ data Expr
   --
   | Do [DoNotationElement]
   -- |
-  -- An application of a typeclass dictionary constructor. The value should be
-  -- an ObjectLiteral.
-  --
-  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr
-  -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
   -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
@@ -405,10 +400,6 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary Bool Constraint [TypeClassDictionaryInScope]
-  -- |
-  -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
-  --
-  | TypeClassDictionaryAccessor (Qualified ProperName) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --

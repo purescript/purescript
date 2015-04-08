@@ -61,6 +61,7 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Language.PureScript.Pretty
 import qualified Language.PureScript.Constants as C
 
 -- |
@@ -295,7 +296,7 @@ infer' (TypedValue checkType val ty) = do
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
 infer' (PositionedValue pos _ val) = rethrowWithPosition pos $ infer' val
-infer' _ = error "Invalid argument to infer"
+infer' v = error $ "Invalid argument to infer: " ++ prettyPrintValue v
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
@@ -509,7 +510,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   case val' of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
     Just _ -> do
-      val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
+      val''' <- if checkType then withScopedTypeVars moduleName args (check val ty1') else return val
       return $ TypedValue checkType val''' ty2'
 check' (Case vals binders) ret = do
   vals' <- mapM infer vals
@@ -525,9 +526,6 @@ check' (ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties ps row False
   return $ TypedValue True (ObjectLiteral ps') t
-check' (TypeClassDictionaryConstructorApp name ps) t = do
-  ps' <- check' ps t
-  return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
 check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.

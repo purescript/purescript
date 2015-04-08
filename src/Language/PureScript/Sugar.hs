@@ -68,4 +68,5 @@ desugar = map removeSignedLiterals
           >=> desugarImports
           >=> rebracket
           >=> desugarTypeClasses
+          >=> desugarCasesModule -- TODO: avoid duplicating this
           >=> createBindingGroupsModule

@@ -76,7 +76,11 @@ parseDataDeclaration = do
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
-    P.sepBy1 ((,) <$> properName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
+    flip P.sepBy1 pipe $ do
+      dname <- properName
+      tys <- P.many (indented *> noWildcards parseTypeAtom)
+      let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
+      return (dname, zip fields tys)
   return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration

@@ -50,7 +50,6 @@ everywhereOnValues f g h = (f', g', h')
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
   g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
   g' (ObjectConstructor vs) = g (ObjectConstructor (map (second (fmap g')) vs))
-  g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
   g' (ObjectUpdater obj vs) = g (ObjectUpdater (fmap g' obj) (map (second (fmap g')) vs))
@@ -108,7 +107,6 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (ArrayLiteral vs) = ArrayLiteral <$> mapM (g' <=< g) vs
   g' (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g' <=< g)) vs
   g' (ObjectConstructor vs) = ObjectConstructor <$> mapM (sndM $ maybeM (g' <=< g)) vs
-  g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> mapM (sndM (g' <=< g)) vs
   g' (ObjectUpdater obj vs) = ObjectUpdater <$> (maybeM g obj >>= maybeM g') <*> mapM (sndM $ maybeM (g' <=< g)) vs
@@ -161,7 +159,6 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (ArrayLiteral vs) = (ArrayLiteral <$> mapM g' vs) >>= g
   g' (ObjectLiteral vs) = (ObjectLiteral <$> mapM (sndM g') vs) >>= g
   g' (ObjectConstructor vs) = (ObjectConstructor <$> mapM (sndM $ maybeM g') vs) >>= g
-  g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> mapM (sndM g') vs) >>= g
   g' (ObjectUpdater obj vs) = (ObjectUpdater <$> maybeM g' obj <*> mapM (sndM $ maybeM g') vs) >>= g
@@ -217,7 +214,6 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
   g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
   g' v@(ObjectConstructor vs) = foldl (<>) (g v) (map g' (mapMaybe snd vs))
-  g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(ObjectUpdater obj vs) = foldl (<>) (maybe (g v) (\x -> g v <> g' x) obj) (map g' (mapMaybe snd vs))
@@ -284,7 +280,6 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
   g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
   g' s (ObjectConstructor vs) = foldl (<>) r0 (map (g'' s) (mapMaybe snd vs))
-  g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
   g' s (ObjectUpdater obj vs) = foldl (<>) (maybe r0 (g'' s) obj) (map (g'' s) (mapMaybe snd vs))
@@ -354,7 +349,6 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (ArrayLiteral vs) = ArrayLiteral <$> mapM (g'' s) vs
   g' s (ObjectLiteral vs) = ObjectLiteral <$> mapM (sndM (g'' s)) vs
   g' s (ObjectConstructor vs) = ObjectConstructor <$> mapM (sndM $ maybeM (g'' s)) vs
-  g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> mapM (sndM (g'' s)) vs
   g' s (ObjectUpdater obj vs) = ObjectUpdater <$> maybeM (g'' s) obj <*> mapM (sndM $ maybeM (g'' s)) vs
@@ -392,7 +386,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map (f . snd) . snd) dctors)
   forDecls (ExternDeclaration _ _ _ ty) = f ty
   forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)
