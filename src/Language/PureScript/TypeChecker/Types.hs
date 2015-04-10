@@ -439,9 +439,9 @@ check' val (ForAll ident ty _) = do
   val' <- check skVal sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
 check' val t@(ConstrainedType constraints ty) = do
-  dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
+  dictNames <- forM constraints $ \(Qualified mn' (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
-    return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
+    return $ Ident $ "__dict_" ++ (maybe "" ((++ ".") . runModuleName) mn') ++ className ++ "_" ++ show n
   val' <- makeBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
     TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular False) (map (Qualified Nothing) dictNames)
       constraints) $ check val ty
