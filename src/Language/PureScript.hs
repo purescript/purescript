@@ -45,6 +45,7 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.Writer
 
 import System.FilePath ((</>))
 
@@ -55,6 +56,7 @@ import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
 import Language.PureScript.Kinds as P
+import Language.PureScript.Linter as P
 import Language.PureScript.ModuleDependencies as P
 import Language.PureScript.Names as P
 import Language.PureScript.Options as P
@@ -89,26 +91,27 @@ import qualified Paths_purescript as Paths
 --
 --  * Pretty-print the generated Javascript
 --
-compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadReader (Options Compile) m)
+compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
         => [Module] -> [String] -> m (String, String, Environment)
 compile = compile' initEnvironment
 
-compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadReader (Options Compile) m)
+compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
          => Environment -> [Module] -> [String] -> m (String, String, Environment)
 compile' env ms prefix = do
   noPrelude <- asks optionsNoPrelude
   additional <- asks optionsAdditional
   mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
   (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
+  mapM_ lint sorted
   (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
   regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
   let corefn = map (CoreFn.moduleToCoreFn env') regrouped
-  let entryPoints = moduleNameFromString `map` entryPointModules additional
-  let elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
-  let renamed = renameInModules elim
-  let codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
-  let modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
+      entryPoints = moduleNameFromString `map` entryPointModules additional
+      elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
+      renamed = renameInModules elim
+      codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
+      modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
   js <- concat <$> (evalSupplyT nextVar $ T.traverse moduleToJs modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   js' <- generateMain env' js
@@ -129,7 +132,7 @@ generateMain env js = do
 -- |
 -- A type class which collects the IO actions we need to be able to run in "make" mode
 --
-class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m) => MonadMake m where
+class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => MonadMake m where
   -- |
   -- Get a file timestamp
   --
@@ -178,6 +181,8 @@ make outputDir ms prefix = do
 
   (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
 
+  mapM_ lint sorted
+
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
     let filePath = runModuleName moduleName'
 
@@ -219,8 +224,8 @@ make outputDir ms prefix = do
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
 
     let mod' = Module coms moduleName' regrouped exps
-    let corefn = CoreFn.moduleToCoreFn env' mod'
-    let [renamed] = renameInModules [corefn]
+        corefn = CoreFn.moduleToCoreFn env' mod'
+        [renamed] = renameInModules [corefn]
 
     pjs <- prettyPrintJS <$> moduleToJs renamed
     let js = unlines $ map ("// " ++) prefix ++ [pjs]

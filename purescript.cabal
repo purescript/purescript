@@ -71,6 +71,7 @@ library
                      Language.PureScript.Environment
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
+                     Language.PureScript.Linter
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names
                      Language.PureScript.Options

@@ -33,6 +33,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (ExceptT(..), MonadError, runExceptT)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
+import Control.Monad.Writer (MonadWriter, WriterT, runWriterT)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
@@ -182,11 +183,11 @@ newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Fu
 psciIO :: IO a -> PSCI a
 psciIO io = PSCI . lift $ lift io
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT P.MultipleErrors IO) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader (P.Options P.Make))
 
 runMake :: Make a -> IO (Either P.MultipleErrors a)
-runMake = runExceptT . flip runReaderT options . unMake
+runMake = runExceptT . fmap fst . runWriterT . flip runReaderT options . unMake
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
 makeIO f io = do
