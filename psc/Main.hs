@@ -51,8 +51,7 @@ data InputOptions = InputOptions
 readInput :: InputOptions -> IO [(Maybe FilePath, String)]
 readInput InputOptions{..}
   | ioUseStdIn = return . (Nothing ,) <$> getContents
-  | otherwise = do content <- forM ioInputFiles $ \inFile -> (Just inFile, ) <$> readFile inFile
-                   return (if ioNoPrelude then content else (Nothing, P.prelude) : content)
+  | otherwise = forM ioInputFiles $ \inFile -> (Just inFile, ) <$> readFile inFile
 
 type PSC = ReaderT (P.Options P.Compile) (WriterT P.MultipleErrors (Either P.MultipleErrors))
 
@@ -143,7 +142,7 @@ noTco = switch $
 noPrelude :: Parser Bool
 noPrelude = switch $
      long "no-prelude"
-  <> help "Omit the Prelude"
+  <> help "Omit the automatic Prelude import"
 
 comments :: Parser Bool
 comments = switch $

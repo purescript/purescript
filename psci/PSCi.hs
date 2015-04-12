@@ -101,7 +101,7 @@ loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- readFile filename
     return (Right filename, content)
-  return $ P.parseModulesFromFiles (either (const "") id) $ (Left P.RebuildNever, P.prelude) : filesAndContent
+  return $ P.parseModulesFromFiles (either (const "") id) filesAndContent
 
 -- |
 -- Load all modules, updating the application state

@@ -31,6 +31,10 @@ import System.FilePath (pathSeparator)
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
 
+-- TODO : embed a minimal prelude?
+prelude :: String
+prelude = "module Prelude where"
+
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
@@ -38,7 +42,7 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
 
 loadPrelude :: Either P.MultipleErrors (String, String, P.Environment)
 loadPrelude =
-  case P.parseModulesFromFiles id [("", P.prelude)] of
+  case P.parseModulesFromFiles id [("", prelude)] of
     Left parseError -> Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
 

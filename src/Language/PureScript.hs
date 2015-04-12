@@ -26,18 +26,15 @@ module Language.PureScript
   , RebuildPolicy(..)
   , MonadMake(..)
   , make
-  , prelude
   , version
   ) where
 
-import Data.FileEmbed (embedFile)
 import Data.Function (on)
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
 import Data.Version (Version)
 import qualified Data.Traversable as T (traverse)
-import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -273,9 +270,6 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
-
-prelude :: String
-prelude = BU.toString $(embedFile "prelude/prelude.purs")
 
 version :: Version
 version = Paths.version
