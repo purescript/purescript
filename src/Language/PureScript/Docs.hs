@@ -9,4 +9,4 @@ module Language.PureScript.Docs (
 import Language.PureScript.Docs.Types as Docs
 import Language.PureScript.Docs.RenderedCode.Types as Docs
 import Language.PureScript.Docs.RenderedCode.Render as Docs
-
+import Language.PureScript.Docs.Render as Docs

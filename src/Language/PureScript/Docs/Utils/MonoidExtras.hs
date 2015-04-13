@@ -1,4 +1,4 @@
-module Language.PureScript.Docs.MonoidExtras where
+module Language.PureScript.Docs.Utils.MonoidExtras where
 
 import Data.Monoid
 

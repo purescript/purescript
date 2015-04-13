@@ -6,30 +6,21 @@
 -- | Functions for rendering documentation generated from PureScript code.
 
 module Language.PureScript.Docs.Render (
-  renderPackage,
-  renderModule
+  renderModule,
+  collectBookmarks
 ) where
 
 import Control.Monad
 import Data.Either
-import Data.Version (Version)
 import Data.Monoid ((<>))
 import Data.Maybe (mapMaybe)
 import Data.List (nub)
 
 import qualified Language.PureScript as P
 
-import Language.PureScript.Docs.MonoidExtras
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
-
--- |
--- Render a Package, given its name, its current version, and a list of
--- contained modules.
---
-renderPackage :: String -> Version -> [P.Module] -> RenderedPackage
-renderPackage name vers mods =
-  RenderedPackage name vers (map renderModule mods)
+import Language.PureScript.Docs.Utils.MonoidExtras
 
 -- |
 -- Render a single Module.
@@ -235,3 +226,14 @@ renderComments cs = do
 toTypeVar :: (String, Maybe P.Kind) -> P.Type
 toTypeVar (s, Nothing) = P.TypeVar s
 toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
+
+collectBookmarks :: InPackage P.Module -> [Bookmark]
+collectBookmarks (Local m) = map Local (collectBookmarks' m)
+collectBookmarks (FromDep pkg m) = map (FromDep pkg) (collectBookmarks' m)
+
+collectBookmarks' :: P.Module -> [(P.ModuleName, String)]
+collectBookmarks' m =
+  map (P.getModuleName m, )
+      (mapMaybe getDeclarationTitle
+                (P.exportedDeclarations m))
+

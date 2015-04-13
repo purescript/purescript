@@ -9,3 +9,4 @@ cabal.sandbox.config
 *.lksh*
 .virthualenv
 .psci_modules/
+tmp/

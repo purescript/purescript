@@ -26,6 +26,7 @@ library
     build-depends: base >=4.6 && <5,
                    containers -any,
                    unordered-containers -any,
+                   dlist -any,
                    directory >= 1.2,
                    filepath -any,
                    mtl >= 2.1.0 && < 2.3.0,
@@ -35,7 +36,18 @@ library
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    time -any,
-                   boxes >= 0.1.4 && < 0.2.0
+                   boxes >= 0.1.4 && < 0.2.0,
+                   aeson >= 0.8 && < 0.9,
+                   vector -any,
+                   bower-json >= 0.7,
+                   aeson-better-errors >= 0.5,
+                   bytestring -any,
+                   text -any,
+                   split -any,
+                   lucid -any,
+                   blaze-html -any,
+                   data-default -any,
+                   cheapskate -any
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -118,8 +130,10 @@ library
                      Language.PureScript.Docs.RenderedCode
                      Language.PureScript.Docs.RenderedCode.Types
                      Language.PureScript.Docs.RenderedCode.Render
-                     Language.PureScript.Docs.MonoidExtras
                      Language.PureScript.Docs.AsMarkdown
+                     Language.PureScript.Docs.AsHtml
+                     Language.PureScript.Docs.Utils.HtmlHelpers
+                     Language.PureScript.Docs.Utils.MonoidExtras
 
                      Control.Monad.Unify
                      Control.Monad.Supply
@@ -169,14 +183,30 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any,
-                   pattern-arrows -any
+                   optparse-applicative >= 0.10.0, process -any, mtl -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules: Ctags
                    Etags
                    Tags
+    ghc-options: -Wall -O2
+
+executable psc-publish
+    build-depends: base >=4 && <5, purescript -any,
+                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   pattern-arrows -any, aeson -any, bytestring -any,
+                   directory -any, transformers -any, text -any, containers
+                   -any, boxes -any, split -any, Glob -any, aeson-better-errors
+                   -any, transformers-compat -any, bower-json -any, semigroups
+                   -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: psc-publish
+    other-modules: Output
+                   Utils
+                   ErrorsWarnings
+                   BoxesHelpers
     ghc-options: -Wall -O2
 
 executable psc-hierarchy

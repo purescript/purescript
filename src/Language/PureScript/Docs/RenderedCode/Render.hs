@@ -20,8 +20,8 @@ import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Environment
 
-import Language.PureScript.Docs.MonoidExtras
 import Language.PureScript.Docs.RenderedCode.Types
+import Language.PureScript.Docs.Utils.MonoidExtras
 
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
@@ -36,14 +36,8 @@ typeLiterals = mkPattern match
               , renderRow row
               , syntax "}"
               ]
-  match (PrettyPrintArray ty) =
-    Just $ mconcat
-              [ syntax "["
-              , renderType ty
-              , syntax "]"
-              ]
   match (TypeConstructor (Qualified mn name)) =
-    Just (ctor (show name) (toContainingModule mn))
+    Just (ctor (show name) (maybeToContainingModule mn))
   match (ConstrainedType deps ty) =
     Just $ mintersperse sp
             [ syntax "(" <> constraints <> syntax ")"
@@ -137,7 +131,6 @@ dePrim other = other
 
 convert :: Type -> Type
 convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
 convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
 convert other = other
 
