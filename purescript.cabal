@@ -36,7 +36,13 @@ library
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    time -any,
-                   boxes >= 0.1.4 && < 0.2.0
+                   boxes >= 0.1.4 && < 0.2.0,
+                   aeson >= 0.8 && < 0.9,
+                   vector -any,
+                   bower-json >= 0.5,
+                   aeson-better-errors >= 0.4.0.1,
+                   bytestring -any,
+                   text -any
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -170,14 +176,26 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any,
-                   pattern-arrows -any
+                   optparse-applicative >= 0.10.0, process -any, mtl -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules: Ctags
                    Etags
                    Tags
+    ghc-options: -Wall -O2
+
+executable psc-upload-package
+    build-depends: base >=4 && <5, purescript -any,
+                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   pattern-arrows -any, aeson -any, bytestring -any, wreq -any,
+                   directory -any, transformers -any, text -any, containers
+                   -any, boxes -any, split -any, mtl -any, Glob -any,
+                   http-client -any, http-types -any, aeson-better-errors -any,
+                   transformers-compat -any, bower-json -any, lens -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: psc-upload-package
     ghc-options: -Wall -O2
 
 executable psc-hierarchy

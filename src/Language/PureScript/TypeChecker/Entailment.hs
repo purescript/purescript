@@ -28,7 +28,6 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Arrow (Arrow(..))
 import Control.Monad.State
-import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.AST
