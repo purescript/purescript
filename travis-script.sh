@@ -9,3 +9,9 @@ fi
 
 cabal build
 cabal test
+
+# Check that a source distribution can be successfully generated, and that
+# the generated source distribution can be installed
+cabal sdist
+SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
+   (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
