@@ -439,7 +439,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     go (ErrorInForeignImport nm err)   = paras [ line $ "Error in foreign import " ++ show nm ++ ":"
                                                , go err
                                                ]
-    go (PositionedError span err)      = paras [ line $ "Error at " ++ displaySourceSpan span ++ ":"
+    go (PositionedError srcSpan err)   = paras [ line $ "Error at " ++ displaySourceSpan srcSpan ++ ":"
                                                , indent $ go err
                                                ]
 
