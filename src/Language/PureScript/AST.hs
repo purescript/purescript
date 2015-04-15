@@ -21,3 +21,4 @@ import Language.PureScript.AST.Declarations as AST
 import Language.PureScript.AST.Operators as AST
 import Language.PureScript.AST.SourcePos as AST
 import Language.PureScript.AST.Traversals as AST
+import Language.PureScript.AST.Exported as AST

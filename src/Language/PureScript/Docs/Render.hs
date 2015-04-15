@@ -35,14 +35,14 @@ renderPackage name vers mods =
 -- Render a single Module.
 --
 renderModule :: P.Module -> RenderedModule
-renderModule m@(P.Module coms moduleName  _ exps) =
+renderModule m@(P.Module coms moduleName  _ _) =
   RenderedModule (show moduleName) comments declarations
   where
   comments = renderComments coms
   declarations = groupChildren declarationsWithChildren
   declarationsWithChildren = mapMaybe go (P.exportedDeclarations m)
   go decl = getDeclarationTitle decl
-             >>= renderDeclaration exps decl
+             >>= renderDeclaration decl
 
 -- | An intermediate stage which we go through during rendering.
 --
@@ -95,39 +95,38 @@ getDeclarationTitle _                                        = Nothing
 basicDeclaration :: String -> RenderedCode -> Maybe IntermediateDeclaration
 basicDeclaration title code = Just (Right (RenderedDeclaration title Nothing code Nothing []))
 
-renderDeclaration :: Maybe [P.DeclarationRef] -> P.Declaration -> String -> Maybe IntermediateDeclaration
-renderDeclaration _ (P.TypeDeclaration ident' ty) title =
+renderDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
+renderDeclaration (P.TypeDeclaration ident' ty) title =
   basicDeclaration title code
   where
   code = ident (show ident')
           <> sp <> syntax "::" <> sp
           <> renderType ty
-renderDeclaration _ (P.ExternDeclaration _ ident' _ ty) title =
+renderDeclaration (P.ExternDeclaration _ ident' _ ty) title =
   basicDeclaration title code
   where
   code = ident (show ident')
           <> sp <> syntax "::" <> sp
           <> renderType ty
-renderDeclaration exps (P.DataDeclaration dtype name args ctors) title =
+renderDeclaration (P.DataDeclaration dtype name args ctors) title =
   Just (Right (RenderedDeclaration title Nothing code Nothing children))
   where
   typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
-  exported = filter (P.isDctorExported name exps . fst) ctors
   code = keyword (show dtype) <> sp <> renderType typeApp
-  children = map renderCtor exported
+  children = map renderCtor ctors
   -- TODO: Comments for data constructors?
   renderCtor (ctor', tys) =
           let typeApp' = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing ctor')) tys
               childCode = renderType typeApp'
           in  RenderedChildDeclaration (show ctor') Nothing childCode Nothing ChildDataConstructor
-renderDeclaration _ (P.ExternDataDeclaration name kind') title =
+renderDeclaration (P.ExternDataDeclaration name kind') title =
   basicDeclaration title code
   where
   code = keywordData <> sp
           <> renderType (P.TypeConstructor (P.Qualified Nothing name))
           <> sp <> syntax "::" <> sp
           <> renderKind kind'
-renderDeclaration _ (P.TypeSynonymDeclaration name args ty) title =
+renderDeclaration (P.TypeSynonymDeclaration name args ty) title =
   basicDeclaration title code
   where
   typeApp = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
@@ -137,7 +136,7 @@ renderDeclaration _ (P.TypeSynonymDeclaration name args ty) title =
           , syntax "="
           , renderType ty
           ]
-renderDeclaration _ (P.TypeClassDeclaration name args implies ds) title = do
+renderDeclaration (P.TypeClassDeclaration name args implies ds) title = do
   Just (Right (RenderedDeclaration title Nothing code Nothing children))
   where
   code = mintersperse sp $
@@ -172,7 +171,7 @@ renderDeclaration _ (P.TypeClassDeclaration name args implies ds) title = do
             ]
     in  RenderedChildDeclaration (show ident') Nothing childCode Nothing ChildTypeClassMember
   renderClassMember _ = error "Invalid argument to renderClassMember."
-renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _) title = do
+renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) title = do
   Just (Left (classNameString : typeNameStrings, childDecl))
   where
   classNameString = unQual className
@@ -204,15 +203,15 @@ renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _)
     in renderType supApp
 
   classApp = foldl P.TypeApp (P.TypeConstructor className) tys
-renderDeclaration exps (P.PositionedDeclaration srcSpan com d') title =
-  fmap (addComments . addSourceSpan) (renderDeclaration exps d' title)
+renderDeclaration (P.PositionedDeclaration srcSpan com d') title =
+  fmap (addComments . addSourceSpan) (renderDeclaration d' title)
   where
   addComments (Left (t, d)) = Left (t, d { rcdComments = renderComments com })
   addComments (Right d) = Right (d { rdComments = renderComments com })
 
   addSourceSpan (Left (t, d)) = Left (t, d { rcdSourceSpan = Just srcSpan })
   addSourceSpan (Right d) = Right (d { rdSourceSpan = Just srcSpan })
-renderDeclaration _ _ _ = Nothing
+renderDeclaration _ _ = Nothing
 
 renderComments :: [P.Comment] -> Maybe String
 renderComments cs = do
