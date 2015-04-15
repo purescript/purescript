@@ -33,7 +33,7 @@ import Language.PureScript.Names
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Data.Function (on)

@@ -21,7 +21,7 @@ import Data.Functor.Identity
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Writer
 

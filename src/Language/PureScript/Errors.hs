@@ -23,7 +23,8 @@ import Data.List (intercalate)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
 
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 import Control.Applicative ((<$>))
 

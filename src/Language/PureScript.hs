@@ -43,7 +43,8 @@ import qualified Data.Set as S
 
 import Control.Applicative
 import Control.Arrow ((&&&))
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 
 import System.FilePath ((</>))
