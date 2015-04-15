@@ -8,11 +8,12 @@ module ExportedInstanceDeclarations
   , foo
   ) where
 
-data NonexportedType = NonexportedType
 data Const a b = Const a
 
 class Foo a where
   foo :: a
+
+data NonexportedType = NonexportedType
 
 class NonexportedClass a where
   notExported :: a
@@ -26,6 +27,10 @@ class NonexportedClass a where
 -- Case 1: constraints
 instance nonExportedFoo :: (NonexportedClass a) => Foo a where
   foo = notExported
+
+-- Another instance of case 1:
+instance nonExportedFoo2 :: (Foo NonexportedType) => Foo (a -> a) where
+  foo = id
 
 -- Case 2: type class
 instance nonExportedNonexportedType :: NonexportedClass (Const Number a) where
