@@ -26,7 +26,7 @@ import Data.List (nub, (\\))
 import Data.Monoid
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
 import Language.PureScript.AST

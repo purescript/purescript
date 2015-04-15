@@ -17,7 +17,9 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.Except
 import Control.Monad.Reader
 import Control.Monad.Writer
 

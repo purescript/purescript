@@ -23,7 +23,8 @@ import Data.List (intercalate)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
 
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 import Control.Applicative ((<$>))
 
@@ -446,7 +447,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     go (ErrorInForeignImport nm err)   = paras [ line $ "Error in foreign import " ++ show nm ++ ":"
                                                , go err
                                                ]
-    go (PositionedError span err)      = paras [ line $ "Error at " ++ displaySourceSpan span ++ ":"
+    go (PositionedError srcSpan err)   = paras [ line $ "Error at " ++ displaySourceSpan srcSpan ++ ":"
                                                , indent $ go err
                                                ]
 

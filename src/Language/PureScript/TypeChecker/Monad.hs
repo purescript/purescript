@@ -22,7 +22,7 @@ import Data.Maybe
 import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Unify
 

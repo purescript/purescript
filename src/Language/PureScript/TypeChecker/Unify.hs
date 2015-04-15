@@ -29,7 +29,8 @@ import Data.List (nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Strict as H
 
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
 import Language.PureScript.Environment

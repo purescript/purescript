@@ -23,7 +23,8 @@ import Data.List (nub)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Map as M
 

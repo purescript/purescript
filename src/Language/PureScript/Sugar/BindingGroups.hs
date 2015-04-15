@@ -28,7 +28,7 @@ import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
 import Control.Applicative
 import Control.Monad ((<=<))
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Set as S
 
