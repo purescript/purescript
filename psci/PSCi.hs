@@ -30,8 +30,8 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Error.Class (throwError)
-import Control.Monad.Except (ExceptT(..), MonadError, runExceptT)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Control.Monad.Writer (MonadWriter, WriterT, runWriterT)
 import Control.Monad.Trans.Class

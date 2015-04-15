@@ -19,7 +19,7 @@ module Language.PureScript.ModuleDependencies (
   ModuleGraph
 ) where
 
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (nub)

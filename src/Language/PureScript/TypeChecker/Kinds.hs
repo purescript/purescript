@@ -30,7 +30,8 @@ import qualified Data.Map as M
 
 import Control.Arrow (second)
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Unify
 

@@ -21,7 +21,7 @@ module Language.PureScript.Sugar.ObjectWildcards (
 
 import Control.Applicative
 import Control.Arrow (second)
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Data.List (partition)
