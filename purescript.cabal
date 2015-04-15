@@ -43,6 +43,7 @@ library
                      Language.PureScript.AST.Operators
                      Language.PureScript.AST.SourcePos
                      Language.PureScript.AST.Traversals
+                     Language.PureScript.AST.Exported
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
