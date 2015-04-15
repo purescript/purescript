@@ -16,6 +16,8 @@
 
 module Language.PureScript.AST.Declarations where
 
+import Control.Category ((>>>))
+import Data.Maybe (mapMaybe)
 import qualified Data.Data as D
 
 import Language.PureScript.AST.Binders
@@ -41,7 +43,81 @@ getModuleName :: Module -> ModuleName
 getModuleName (Module _ name _ _) = name
 
 -- |
--- Test if a declaration is exported, given a module's export list.
+-- Return a list of all declarations which are exported from a module.
+-- This function descends into data declarations to filter out unexported
+-- data constructors, and also filters out type instance declarations if
+-- they refer to classes or types which are not themselves exported.
+--
+exportedDeclarations :: Module -> [Declaration]
+exportedDeclarations (Module _ _ decls exps) = go decls
+  where
+  go = flattenDecls
+        >>> filter (isExported exps)
+        >>> map (filterDataConstructors exps)
+        >>> filterInstances exps
+
+-- |
+-- Filter out all type constructors from a declaration which are not exported.
+-- If the supplied declaration is not a data declaration, this function returns
+-- it unchanged.
+--
+filterDataConstructors :: Maybe [DeclarationRef] -> Declaration -> Declaration
+filterDataConstructors exps (DataDeclaration dType tyName tyArgs dctors) =
+  DataDeclaration dType tyName tyArgs $
+    filter (isDctorExported tyName exps . fst) dctors
+filterDataConstructors exps (PositionedDeclaration _ _ d) =
+  filterDataConstructors exps d
+filterDataConstructors _ other = other
+
+-- |
+-- Filter out all the type instances from a list of declarations which
+-- reference a type or type class which is both local and not exported.
+--
+filterInstances :: Maybe [DeclarationRef] -> [Declaration] -> [Declaration]
+filterInstances Nothing = id
+filterInstances (Just exps) =
+  -- TODO: Does this require desugarImports to be called first?
+  let refs = mapMaybe typeName exps ++ mapMaybe typeClassName exps
+  in filter (all (visibleOutside refs) . typeInstanceConstituents)
+  where
+  -- Given a Qualified ProperName, and a list of all exported types and
+  -- type classes, returns whether the supplied Qualified ProperName is
+  -- visible outside this module; ie, whether it is in the export list.
+  visibleOutside _ (Qualified (Just _) _) = True
+  visibleOutside refs (Qualified Nothing n) = any (== n) refs
+
+  typeName (TypeRef n _) = Just n
+  typeName (PositionedDeclarationRef _ _ r) = typeName r
+  typeName _ = Nothing
+
+  typeClassName (TypeClassRef n) = Just n
+  typeClassName (PositionedDeclarationRef _ _ r) = typeClassName r
+  typeClassName _ = Nothing
+
+-- |
+-- Get all type and type class names referenced by a type instance declaration.
+--
+typeInstanceConstituents :: Declaration -> [Qualified ProperName]
+typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _) =
+  className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
+  where
+
+  fromConstraint (name, tys') = name : concatMap fromType tys'
+  fromType = everythingOnTypes (++) go
+
+  -- Note that type synonyms are disallowed in instance declarations, so
+  -- we don't need to handle them here.
+  go (TypeConstructor n) = [n]
+  go (ConstrainedType cs _) = concatMap fromConstraint cs
+  go _ = []
+
+typeInstanceConstituents (PositionedDeclaration _ _ d) = typeInstanceConstituents d
+typeInstanceConstituents _ = []
+
+
+-- |
+-- Test if a declaration is exported, given a module's export list. Prefer
+-- 'exportedDeclarations' to this function, where possible.
 --
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
@@ -60,11 +136,9 @@ isExported (Just exps) decl = any (matches decl) exps
   matches d (PositionedDeclarationRef _ _ r) = d `matches` r
   matches _ _ = False
 
-exportedDeclarations :: Module -> [Declaration]
-exportedDeclarations (Module _ _ decls exps) = filter (isExported exps) (flattenDecls decls)
-
 -- |
--- Test if a data constructor for a given type is exported, given a module's export list.
+-- Test if a data constructor for a given type is exported, given a module's
+-- export list. Prefer 'exportedDeclarations' to this function, where possible.
 --
 isDctorExported :: ProperName -> Maybe [DeclarationRef] -> ProperName -> Bool
 isDctorExported _ Nothing _ = True
@@ -76,7 +150,8 @@ isDctorExported ident (Just exps) ctor = test `any` exps
   test _ = False
 
 -- |
--- Return the exported data constructors for a given type.
+-- Return the exported data constructors for a given type. Prefer
+-- 'exportedDeclarations' to this function, where possible.
 --
 exportedDctors :: Module -> ProperName -> [(ProperName, [Type])]
 exportedDctors (Module _ _ decls exps) ident =
