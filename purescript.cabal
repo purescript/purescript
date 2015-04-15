@@ -112,9 +112,19 @@ library
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
 
+                     Language.PureScript.Docs
+                     Language.PureScript.Docs.Render
+                     Language.PureScript.Docs.Types
+                     Language.PureScript.Docs.RenderedCode
+                     Language.PureScript.Docs.RenderedCode.Types
+                     Language.PureScript.Docs.RenderedCode.Render
+                     Language.PureScript.Docs.MonoidExtras
+                     Language.PureScript.Docs.AsMarkdown
+
                      Control.Monad.Unify
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
+
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -159,7 +169,8 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any
+                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   pattern-arrows -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
