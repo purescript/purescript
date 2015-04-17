@@ -149,8 +149,8 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
-    let (_, tctor, _, _) = lookupConstructor env dctor
-    in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
+    let (_, tctor, ty, _) = lookupConstructor env dctor
+    in ConstructorBinder (ss, com, Just ty, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.ObjectBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
   binderToCoreFn ss com (A.ArrayBinder bs) =
