@@ -4,7 +4,13 @@ set -e
 
 npm install -g bower
 
-bower i purescript-profunctor \
+bower i purescript-prelude \
+        purescript-eff \
+        purescript-st \
+        purescript-integers \
+        purescript-functions \
+        purescript-console \
+        purescript-profunctor \
         purescript-contravariant \
         purescript-parallel \
         purescript-control \
