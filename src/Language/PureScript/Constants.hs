@@ -83,6 +83,9 @@ unsafeIndex = "unsafeIndex"
 (.^.) :: String
 (.^.) = ".^."
 
+(<<<) :: String
+(<<<) = "<<<"
+
 -- Functions
 
 negate :: String
