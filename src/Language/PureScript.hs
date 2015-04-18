@@ -97,6 +97,7 @@ compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter 
          => Environment -> [Module] -> [String] -> m (String, String, Environment)
 compile' env ms prefix = do
   noPrelude <- asks optionsNoPrelude
+  unless noPrelude (checkPreludeIsDefined ms)
   additional <- asks optionsAdditional
   mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
   (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
@@ -175,6 +176,7 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadMake m)
      => FilePath -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
 make outputDir ms prefix = do
   noPrelude <- asks optionsNoPrelude
+  unless noPrelude (checkPreludeIsDefined (map snd ms))
   let filePathMap = M.fromList (map (\(fp, Module _ mn _ _) -> (mn, fp)) ms)
 
   (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
@@ -248,6 +250,12 @@ make outputDir ms prefix = do
       [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
       _ -> throwError . errorMessage . InvalidExternsFile $ externsFile
 
+checkPreludeIsDefined :: (MonadWriter MultipleErrors m) => [Module] -> m ()
+checkPreludeIsDefined ms = do
+  let mns = map getModuleName ms
+  unless (preludeModuleName `elem` mns) $ 
+    tell (errorMessage PreludeNotPresent)
+
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
   where
@@ -269,8 +277,11 @@ addDefaultImport toImport m@(Module coms mn decls exps)  =
 importPrim :: Module -> Module
 importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 
+preludeModuleName :: ModuleName
+preludeModuleName = ModuleName [ProperName C.prelude]
+
 importPrelude :: Module -> Module
-importPrelude = addDefaultImport (ModuleName [ProperName C.prelude])
+importPrelude = addDefaultImport preludeModuleName
 
 version :: Version
 version = Paths.version

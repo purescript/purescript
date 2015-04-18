@@ -109,6 +109,7 @@ data ErrorMessage
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
+  | PreludeNotPresent
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
@@ -201,6 +202,7 @@ errorCode InvalidNewtype                = "InvalidNewtype"
 errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
 errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
 errorCode (ShadowedName _)              = "ShadowedName"
+errorCode PreludeNotPresent             = "PreludeNotPresent"
 errorCode (NotYetDefined _ e)           = errorCode e
 errorCode (ErrorUnifyingTypes _ _ e)    = errorCode e
 errorCode (ErrorInExpression _ e)       = errorCode e
@@ -382,6 +384,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     go (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
                                                  : map (line . prettyPrintExport) ys
     go (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
+    go PreludeNotPresent               = paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
+                                               , line $ "You probably need to install the Prelude and other dependencies using Bower." 
+                                               ]
     go (ErrorUnifyingTypes t1 t2 err)  = paras [ line "Error unifying type "
                                                , indent $ line $ prettyPrintType t1
                                                , line "with type"
