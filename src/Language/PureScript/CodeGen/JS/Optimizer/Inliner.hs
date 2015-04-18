@@ -18,6 +18,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineValues,
   inlineOperator,
   inlineCommonOperators,
+  inlineAppliedArrComposition,
   etaConvert,
   unThunk,
   evaluateIifes
@@ -31,6 +32,10 @@ import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer.Common
 import qualified Language.PureScript.Constants as C
 
+-- TODO: Potential bug:
+-- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
+-- Needs to be: { 0..toFixed(10); }
+-- Probably needs to be fixed in pretty-printer instead.
 shouldInline :: JS -> Bool
 shouldInline (JSVar _) = True
 shouldInline (JSNumericLiteral _) = True
@@ -233,6 +238,14 @@ inlineCommonOperators = applyAll $
     go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
+-- (f << g $ x) = f (g x)
+inlineAppliedArrComposition :: JS -> JS
+inlineAppliedArrComposition = everywhereOnJS convert
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn = JSApp x [JSApp y [z]]
+  convert other = other
+
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
 isDict _ _ = False
@@ -292,3 +305,6 @@ latticeBoolean = (C.prelude, C.latticeBoolean)
 
 complementedLatticeBoolean :: (String, String)
 complementedLatticeBoolean = (C.prelude, C.complementedLatticeBoolean)
+
+semigroupoidArr :: (String, String)
+semigroupoidArr = (C.prelude, C.semigroupoidArr)

@@ -77,7 +77,8 @@ optimize' js = do
     , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
     , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
     , inlineOperator (C.preludeUnsafe, C.unsafeIndex) $ flip JSIndexer
-    , inlineCommonOperators ]) js
+    , inlineCommonOperators
+    , inlineAppliedArrComposition ]) js
 
 untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
 untilFixedPoint f = go
