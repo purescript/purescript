@@ -27,22 +27,18 @@ import Control.Monad.Writer (runWriterT)
 import Control.Applicative
 import System.Exit
 import System.Process
-import System.FilePath (pathSeparator)
+import System.FilePath ((</>))
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
 import Text.Parsec (ParseError)
-
--- TODO : embed a minimal prelude?
-prelude :: String
-prelude = "module Prelude where"
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
   return (inputFile, text)
 
-loadPrelude :: Either P.MultipleErrors (String, String, P.Environment)
-loadPrelude =
-  case P.parseModulesFromFiles id [("", prelude)] of
+loadPrelude :: [(FilePath, String)] -> Either P.MultipleErrors (String, String, P.Environment)
+loadPrelude ms =
+  case P.parseModulesFromFiles id ms of
     Left parseError -> Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
 
@@ -87,26 +83,27 @@ assertDoesNotCompile preludeExterns inputFile = do
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-    where names = ["nodejs", "node"]
+  where 
+  names = ["nodejs", "node"]
 
 main :: IO ()
 main = do
+  cwd <- getCurrentDirectory
+  prelude <- readInput [cwd </> "tests" </> "prelude.purs"]
   putStrLn "Compiling Prelude"
-  case loadPrelude of
+  case loadPrelude prelude of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right (preludeJs, exts, _) -> do
       tmp <- getTemporaryDirectory
-      let preludeExterns = tmp ++ pathSeparator : "prelude.externs"
+      let preludeExterns = tmp </> "prelude.externs"
       writeFile preludeExterns exts
       putStrLn $ "Wrote " ++ preludeExterns
-      cd <- getCurrentDirectory
-      let examples = cd ++ pathSeparator : "examples"
-      let passing = examples ++ pathSeparator : "passing"
+      let passing = cwd </> "examples" </> "passing"
       passingTestCases <- getDirectoryContents passing
       forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-        assertCompiles preludeJs preludeExterns (passing ++ pathSeparator : inputFile)
-      let failing = examples ++ pathSeparator : "failing"
+        assertCompiles preludeJs preludeExterns (passing </> inputFile)
+      let failing = cwd </> "examples" </> "failing"
       failingTestCases <- getDirectoryContents failing
       forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-        assertDoesNotCompile preludeExterns (failing ++ pathSeparator : inputFile)
+        assertDoesNotCompile preludeExterns (failing </> inputFile)
       exitSuccess
