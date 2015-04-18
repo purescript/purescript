@@ -227,7 +227,7 @@ toTypeVar :: (String, Maybe P.Kind) -> P.Type
 toTypeVar (s, Nothing) = P.TypeVar s
 toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
 
-collectBookmarks :: InPackage P.Module -> Bookmarks
+collectBookmarks :: InPackage P.Module -> [Bookmark]
 collectBookmarks (Local m) = map Local (collectBookmarks' m)
 collectBookmarks (FromDep pkg m) = map (FromDep pkg) (collectBookmarks' m)
 

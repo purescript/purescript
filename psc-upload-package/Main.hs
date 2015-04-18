@@ -254,20 +254,19 @@ preparePackage' = do
 
   pkgMeta <- liftIO (decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntParseBowerJSON)
-  pkgVersion              <- getVersionFromGitTag
-  pkgGithub               <- getBowerInfo (bowerName pkgMeta)
-  pkgResolvedDependencies <- getBowerDepsVersions
-  pkgModuleSet            <- liftIO getRenderedModuleSet
+  pkgVersion                 <- getVersionFromGitTag
+  pkgGithub                  <- getBowerInfo (bowerName pkgMeta)
+  pkgResolvedDependencies    <- getResolvedDependencies
+  (pkgBookmarks, pkgModules) <- liftIO getModulesAndBookmarks
   let pkgUploader = Nothing
 
   return D.UploadedPackage{..}
 
-getRenderedModuleSet :: IO D.RenderedModuleSet
-getRenderedModuleSet = do
+getModulesAndBookmarks :: IO ([D.Bookmark], [D.RenderedModule])
+getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- getInputAndDepsFiles
-  (ms, depms, bs) <- parseAndDesugar inputFiles depsFiles $ \depms bookmarks ms ->
-                        return (ms, depms, bookmarks)
-  return (map D.renderModule ms, depms, bs)
+  parseAndDesugar inputFiles depsFiles $ \bookmarks modules ->
+    return (bookmarks, map D.renderModule modules)
 
 getVersionFromGitTag :: PrepareM Version
 getVersionFromGitTag = do
@@ -353,8 +352,8 @@ readProcess' prog args stdin = do
 -- probably for a reason. However, docs are only ever available for released
 -- versions. Therefore there will probably be no version of the docs which is
 -- appropriate to link to, and we should omit links.
-getBowerDepsVersions :: PrepareM [(PackageName, Version)]
-getBowerDepsVersions = do
+getResolvedDependencies :: PrepareM [(PackageName, Version)]
+getResolvedDependencies = do
   pathsBS <- fromString <$> readProcess' "bower" ["list", "--paths", "--json"] ""
 
   paths <- catchLeft (parse asBowerPathList pathsBS)
@@ -368,18 +367,15 @@ getBowerDepsVersions = do
 
   getVersion :: (PackageName, String) -> PrepareM (Maybe (PackageName, Version))
   getVersion (pkgName, path) = do
-    let jsonPath = path ++ "/.bower.json"
-
-    let malformedJSON = internalError . JSONError (FromFile jsonPath)
-
     isPs <- liftIO (isPureScript path)
     if not isPs
       then return Nothing
       else do
+        let jsonPath = path ++ "/.bower.json"
         jsonBS <- liftIO (B.readFile jsonPath)
 
         (typ, tag) <- catchLeft (getTypeAndTag jsonBS)
-                                malformedJSON
+                                (internalError . JSONError (FromFile jsonPath))
         case typ of
           "version" -> do
             let tag' = fromMaybe tag (stripPrefix "v" tag)

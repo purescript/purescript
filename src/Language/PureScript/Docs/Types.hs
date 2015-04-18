@@ -34,7 +34,8 @@ import Language.PureScript.Docs.RenderedCode as ReExports
 data UploadedPackage = UploadedPackage
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
-  , pkgModuleSet            :: RenderedModuleSet
+  , pkgModules              :: [RenderedModule]
+  , pkgBookmarks            :: [Bookmark]
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
   , pkgUploader             :: Maybe GithubUser
@@ -46,7 +47,8 @@ instance A.ToJSON UploadedPackage where
     A.object $
       [ "packageMeta"          .= pkgMeta
       , "version"              .= showVersion pkgVersion
-      , "moduleSet"            .= renderedModuleSetToJSON pkgModuleSet
+      , "modules"              .= pkgModules
+      , "bookmarks"            .= map (fmap (first P.runModuleName)) pkgBookmarks
       , "resolvedDependencies" .= assocListToJSON (T.pack . runPackageName)
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
@@ -63,21 +65,17 @@ data UploadedPackageError
   | InvalidVersion
   | InvalidDeclarationType
   | InvalidRenderedCode String
+  deriving (Show, Eq, Ord)
 
 asUploadedPackage :: Parse UploadedPackageError UploadedPackage
 asUploadedPackage =
   UploadedPackage <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
                   <*> key "version" asVersion
-                  <*> key "moduleSet" asRenderedModuleSet
+                  <*> key "modules" (eachInArray asRenderedModule)
+                  <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
                   <*> key "resolvedDependencies" asResolvedDependencies
                   <*> key "github" asGithub
                   <*> keyMay "uploader" (GithubUser <$> asString)
-
-asRenderedModuleSet :: Parse UploadedPackageError RenderedModuleSet
-asRenderedModuleSet =
-  (,,) <$> key "modules" (eachInArray asRenderedModule)
-       <*> key "depsModules" asDepsModules
-       <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
 
 asVersion :: Parse UploadedPackageError Version
 asVersion = withString (maybe (Left InvalidVersion) Right . parseVersion')
@@ -106,7 +104,7 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asBookmarks :: Parse BowerError Bookmarks
+asBookmarks :: Parse BowerError [Bookmark]
 asBookmarks = eachInArray asBookmark
 
 asBookmark :: Parse BowerError Bookmark
@@ -238,7 +236,6 @@ asRenderedChildDeclarationType =
                 flip lookup childDeclarationTypes)
 
 type Bookmark = InPackage (P.ModuleName, String)
-type Bookmarks = [Bookmark]
 
 data InPackage a
   = Local a
@@ -256,17 +253,6 @@ instance A.ToJSON a => A.ToJSON (InPackage a) where
       A.object [ "package" .= p
                , "item"    .= y
                ]
-
-type RenderedModuleSet = ([RenderedModule], M.Map P.ModuleName PackageName, Bookmarks)
-
-renderedModuleSetToJSON :: RenderedModuleSet -> A.Value
-renderedModuleSetToJSON (ms, pkgDeps, bookmarks) =
-  A.object [ "modules"     .= ms
-           , "depsModules" .= assocListToJSON (T.pack . P.runModuleName)
-                                              (T.pack . runPackageName)
-                                              (M.toList pkgDeps)
-           , "bookmarks"   .= map (fmap (first P.runModuleName)) bookmarks
-           ]
 
 takeLocal :: InPackage a -> Maybe a
 takeLocal (Local a) = Just a

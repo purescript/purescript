@@ -65,13 +65,11 @@ parseFile input' = (,) input' <$> readFile input'
 parseAndDesugar ::
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> (M.Map P.ModuleName PackageName -> Bookmarks -> [P.Module] -> IO a)
+  -> ([Bookmark] -> [P.Module] -> IO a)
   -> IO a
 parseAndDesugar inputFiles depsFiles callback = do
   inputFiles' <- mapM (parseAs Local) inputFiles
   depsFiles'  <- mapM (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
-  --let preludeInfo = FromDep (either (error "whoops") id (mkPackageName "purescript-prelude"))
-  --let allFiles = (preludeInfo "<prelude>", C.prelude) : (inputFiles' ++ depsFiles')
 
   case P.parseModulesFromFiles fileInfoToString (inputFiles' ++ depsFiles') of
     Left err -> do
@@ -94,7 +92,7 @@ parseAndDesugar inputFiles depsFiles callback = do
             Right modules ->
               let modules' = map (addPackage depsModules) modules
                   bookmarks = concatMap collectBookmarks modules'
-              in  callback depsModules bookmarks (takeLocals modules')
+              in  callback bookmarks (takeLocals modules')
 
   where
   parseAs :: (FilePath -> a) -> FilePath -> IO (a, String)
