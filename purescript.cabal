@@ -15,8 +15,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>
 
-extra-source-files: prelude/prelude.purs
-                  , examples/passing/*.purs
+extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
 
 source-repository head
