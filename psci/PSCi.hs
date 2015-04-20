@@ -214,8 +214,8 @@ createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    traceModule = P.ModuleName [P.ProperName "Debug", P.ProperName "Trace"]
-    trace = P.Var (P.Qualified (Just traceModule) (P.Ident "print"))
+    consoleModule = P.ModuleName [P.ProperName "Console"]
+    trace = P.Var (P.Qualified (Just consoleModule) (P.Ident "print"))
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
     itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right val
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
