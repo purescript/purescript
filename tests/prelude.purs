@@ -194,9 +194,9 @@ module Prelude
 
   instance semiringNumber :: Semiring Number where
     (+) = numAdd
-    zero = 0
+    zero = 0.0
     (*) = numMul
-    one = 1
+    one = 1.0
 
   instance semiringUnit :: Semiring Unit where
     (+) _ _ = unit
@@ -226,7 +226,7 @@ module Prelude
 
   instance moduloSemiringNumber :: ModuloSemiring Number where
     (/) = numDiv
-    mod _ _ = 0
+    mod _ _ = 0.0
 
   instance moduloSemiringUnit :: ModuloSemiring Unit where
     (/) _ _ = unit
