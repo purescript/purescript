@@ -18,7 +18,6 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineValues,
   inlineOperator,
   inlineCommonOperators,
-  inlineAppliedVars,
   inlineArrComposition,
   etaConvert,
   unThunk,
@@ -240,13 +239,6 @@ inlineCommonOperators = applyAll $
     go 0 acc (JSApp runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp fn acc)
     go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
-
-inlineAppliedVars :: JS -> JS
-inlineAppliedVars = everywhereOnJS convert
-  where
-  convert :: JS -> JS
-  convert (JSApp (JSFunction Nothing [a] (JSBlock [JSReturn b])) [JSVar x]) = replaceIdent a (JSVar x) b
-  convert other = other
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
