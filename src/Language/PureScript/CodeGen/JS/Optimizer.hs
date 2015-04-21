@@ -61,7 +61,7 @@ optimize js = do
 optimize' :: (Monad m, MonadReader (Options mode) m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  return $ untilFixedPoint (applyAll
+  untilFixedPoint (return . applyAll
     [ collapseNestedBlocks
     , collapseNestedIfs
     , tco opts
@@ -80,8 +80,9 @@ optimize' js = do
     , inlineCommonOperators
     , inlineAppliedArrComposition ]) js
 
-untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
+untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a
 untilFixedPoint f = go
   where
-  go a = let a' = f a in
-          if a' == a then a' else go a'
+  go a = do
+   a' <- f a
+   if a' == a then return a' else go a'
