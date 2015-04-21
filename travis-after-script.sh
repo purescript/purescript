@@ -1,10 +1,10 @@
 set -e
 
-# pushd core-tests/
+pushd core-tests/
 
-# ./test-everything.sh
+./test-everything.sh
 
-# popd
+popd
 
 if [ -z $( git describe --tags --exact-match 2>/dev/null ) ]
 then
