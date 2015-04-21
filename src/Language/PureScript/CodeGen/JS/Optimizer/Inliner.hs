@@ -25,6 +25,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   evaluateIifes
 ) where
 
+import Control.Applicative (Applicative)
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Data.Maybe (fromMaybe)
 
@@ -249,7 +250,7 @@ inlineAppliedVars = everywhereOnJS convert
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineArrComposition :: (MonadSupply m) => JS -> m JS
+inlineArrComposition :: (Applicative m, MonadSupply m) => JS -> m JS
 inlineArrComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS

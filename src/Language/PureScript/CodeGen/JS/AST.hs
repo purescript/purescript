@@ -17,9 +17,10 @@
 
 module Language.PureScript.CodeGen.JS.AST where
 
-import Control.Monad ((>=>))
+import Control.Applicative (Applicative, (<$>), (<*>))
 import Control.Monad.Identity
 import Data.Data
+import Data.Traversable (traverse)
 
 import Language.PureScript.Comments
 
@@ -285,7 +286,7 @@ everywhereOnJS f = go
 everywhereOnJSTopDown :: (JS -> JS) -> JS -> JS
 everywhereOnJSTopDown f = runIdentity . everywhereOnJSTopDownM (Identity . f)
 
-everywhereOnJSTopDownM :: (Monad m) => (JS -> m JS) -> JS -> m JS
+everywhereOnJSTopDownM :: (Applicative m, Monad m) => (JS -> m JS) -> JS -> m JS
 everywhereOnJSTopDownM f = f >=> go
   where
   f' = f >=> go
