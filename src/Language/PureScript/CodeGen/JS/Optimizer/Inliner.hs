@@ -18,7 +18,6 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineValues,
   inlineOperator,
   inlineCommonOperators,
-  inlineAppliedArrComposition,
   inlineAppliedVars,
   inlineArrComposition,
   etaConvert,
@@ -241,14 +240,6 @@ inlineCommonOperators = applyAll $
     go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
--- (f << g $ x) = f (g x)
-inlineAppliedArrComposition :: JS -> JS
-inlineAppliedArrComposition = everywhereOnJS convert
-  where
-  convert :: JS -> JS
-  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn = JSApp x [JSApp y [z]]
-  convert other = other
-
 inlineAppliedVars :: JS -> JS
 inlineAppliedVars = everywhereOnJS convert
   where
@@ -256,14 +247,20 @@ inlineAppliedVars = everywhereOnJS convert
   convert (JSApp (JSFunction Nothing [a] (JSBlock [JSReturn b])) [JSVar x]) = replaceIdent a (JSVar x) b
   convert other = other
 
+-- (f <<< g $ x) = f (g x)
+-- (f <<< g)     = \x -> f (g x)
 inlineArrComposition :: (MonadSupply m) => JS -> m JS
-inlineArrComposition js = everywhereOnJSTopDownM convert js
+inlineArrComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS
-  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn = do
+  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isArrCompose dict' fn =
+    return $ JSApp x [JSApp y [z]]
+  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isArrCompose dict' fn = do
     arg <- freshName
     return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp x [JSApp y [JSVar arg]]])
   convert other = return other
+  isArrCompose :: JS -> JS -> Bool
+  isArrCompose dict' fn = isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn
 
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
