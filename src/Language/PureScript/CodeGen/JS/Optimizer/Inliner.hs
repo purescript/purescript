@@ -19,6 +19,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineOperator,
   inlineCommonOperators,
   inlineAppliedArrComposition,
+  inlineAppliedVars,
   etaConvert,
   unThunk,
   evaluateIifes
@@ -244,6 +245,13 @@ inlineAppliedArrComposition = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn = JSApp x [JSApp y [z]]
+  convert other = other
+
+inlineAppliedVars :: JS -> JS
+inlineAppliedVars = everywhereOnJS convert
+  where
+  convert :: JS -> JS
+  convert (JSApp (JSFunction Nothing [a] (JSBlock [JSReturn b])) [JSVar x]) = replaceIdent a (JSVar x) b
   convert other = other
 
 isDict :: (String, String) -> JS -> Bool
