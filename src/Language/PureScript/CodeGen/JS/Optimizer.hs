@@ -38,6 +38,7 @@ module Language.PureScript.CodeGen.JS.Optimizer (
 ) where
 
 import Control.Monad.Reader (MonadReader, ask, asks)
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
@@ -53,15 +54,15 @@ import Language.PureScript.CodeGen.JS.Optimizer.Blocks
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (Monad m, MonadReader (Options mode) m) => JS -> m JS
+optimize :: (Monad m, MonadReader (Options mode) m, MonadSupply m) => JS -> m JS
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (Monad m, MonadReader (Options mode) m) => JS -> m JS
+optimize' :: (Monad m, MonadReader (Options mode) m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  untilFixedPoint (return . applyAll
+  untilFixedPoint (inlineArrComposition . applyAll
     [ collapseNestedBlocks
     , collapseNestedIfs
     , tco opts

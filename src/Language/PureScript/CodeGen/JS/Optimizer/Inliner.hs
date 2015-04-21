@@ -20,11 +20,13 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineCommonOperators,
   inlineAppliedArrComposition,
   inlineAppliedVars,
+  inlineArrComposition,
   etaConvert,
   unThunk,
   evaluateIifes
 ) where
 
+import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
@@ -253,6 +255,15 @@ inlineAppliedVars = everywhereOnJS convert
   convert :: JS -> JS
   convert (JSApp (JSFunction Nothing [a] (JSBlock [JSReturn b])) [JSVar x]) = replaceIdent a (JSVar x) b
   convert other = other
+
+inlineArrComposition :: (MonadSupply m) => JS -> m JS
+inlineArrComposition js = everywhereOnJSTopDownM convert js
+  where
+  convert :: (MonadSupply m) => JS -> m JS
+  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn = do
+    arg <- freshName
+    return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp x [JSApp y [JSVar arg]]])
+  convert other = return other
 
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
