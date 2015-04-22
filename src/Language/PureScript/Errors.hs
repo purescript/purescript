@@ -19,14 +19,16 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate)
+import Data.List (intercalate, elemIndex)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>), Applicative, pure)
+import Control.Monad.Trans.State.Lazy
+import Control.Arrow(first)
 
 import Language.PureScript.AST
 import Language.PureScript.Pretty
@@ -250,12 +252,55 @@ errorMessage err = MultipleErrors [err]
 onErrorMessages :: (ErrorMessage -> ErrorMessage) -> MultipleErrors -> MultipleErrors
 onErrorMessages f = MultipleErrors . map f . runMultipleErrors
 
+replaceUnknowns :: Type -> State [Unknown] Type
+replaceUnknowns = everywhereOnTypesM replaceUnknowns'
+  where
+    lookupTable :: Unknown -> [Unknown] -> (Unknown, [Unknown])
+    lookupTable x table = case (elemIndex x table) of
+                               Nothing -> (length table, table ++ [x])
+                               Just i  -> (i, table)
+
+    replaceUnknowns' :: Type -> State [Unknown] Type
+    replaceUnknowns' (TUnknown u) = state $ first TUnknown . lookupTable u
+    replaceUnknowns' other = return other
+
+
+onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
+onTypesInErrorMessageM f = g
+  where
+    g (InfiniteType t) = InfiniteType <$> (f t)
+    g (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> (f t1) <*> (f t2)
+    g (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> (f t1) <*> (f t2)
+    g (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> (f t)
+    g (PropertyIsMissing s t) = PropertyIsMissing s <$> (f t)
+    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> (f t1) <*> (f t2) <*> (g e)
+    g (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> (pure e)
+    g (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
+    g (ErrorInSubsumption t1 t2 em) = ErrorInSubsumption <$> (f t1) <*> (f t2) <*> (g em)
+    g (ErrorCheckingType e t em) = ErrorCheckingType e <$> (f t) <*> (g em)
+    g (ErrorCheckingKind t em) = ErrorCheckingKind <$> (f t) <*> g em
+    g (ErrorInApplication e1 t1 e2 em) = ErrorInApplication e1 <$> (f t1) <*> (pure e2) <*> (g em)
+    g (NotYetDefined x e) = NotYetDefined x <$> (g e)
+    g (ErrorInExpression x e) = ErrorInExpression x <$> (g e)
+    g (ErrorInModule x e) = ErrorInModule x <$> (g e)
+    g (ErrorInInstance x y e) = ErrorInInstance x y <$> (g e)
+    g (ErrorInferringType x e) = ErrorInferringType x <$> (g e)
+    g (ErrorInDataConstructor x e) = ErrorInDataConstructor x <$> (g e)
+    g (ErrorInTypeConstructor x e) = ErrorInTypeConstructor x <$> (g e)
+    g (ErrorInBindingGroup x e) = ErrorInBindingGroup x <$> (g e)
+    g (ErrorInDataBindingGroup e) = ErrorInDataBindingGroup <$> (g e)
+    g (ErrorInTypeSynonym x e) = ErrorInTypeSynonym x <$> (g e)
+    g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> (g e)
+    g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> (g e)
+    g (PositionedError x e) = PositionedError x <$> (g e)
+    g other = pure other
+
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> ErrorMessage -> Box.Box
-prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else simplifyErrorMessage e)
-  where
+prettyPrintSingleError :: Bool -> ErrorMessage -> State [Unknown] Box.Box
+prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+ where
   -- |
   -- Pretty print an ErrorMessage
   --
@@ -514,32 +559,37 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
     unwrap _   (PositionedError pos err) = unwrap (Just pos) err
     unwrap pos other = wrap pos other
-  
+
     wrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
     wrap Nothing    = id
     wrap (Just pos) = PositionedError pos
+
 
 -- |
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors = prettyPrintMultipleErrorsWith "Error:" "Multiple errors:"
-    
+prettyPrintMultipleErrors full = flip evalState [] . prettyPrintMultipleErrorsWith "Error:" "Multiple errors:" full
+
 -- |
 -- Pretty print multiple warnings
 --
-prettyPrintMultipleWarnings :: Bool -> MultipleErrors -> String
-prettyPrintMultipleWarnings = prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:"    
-    
-prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> String
-prettyPrintMultipleErrorsWith intro _ full  (MultipleErrors [e]) = renderBox $
-  Box.vcat Box.left [ Box.text intro
-                    , prettyPrintSingleError full e
-                    ]
-prettyPrintMultipleErrorsWith _ intro full  (MultipleErrors es) = renderBox $
-  Box.vcat Box.left [ Box.text intro
-                    , Box.vsep 1 Box.left $ map (Box.moveRight 2 . prettyPrintSingleError full) es
-                    ]
+prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
+prettyPrintMultipleWarnings full = flip evalState [] . prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:" full
+
+prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> State [Unknown] String
+prettyPrintMultipleErrorsWith intro _ full  (MultipleErrors [e]) = do
+  result <- prettyPrintSingleError full e
+  return $ renderBox $
+    Box.vcat Box.left [ Box.text intro
+                      , result
+                      ]
+prettyPrintMultipleErrorsWith _ intro full  (MultipleErrors es) = do
+  result <- forM es $ (liftM $ Box.moveRight 2) . prettyPrintSingleError full
+  return $ renderBox $
+    Box.vcat Box.left [ Box.text intro
+                      , Box.vsep 1 Box.left result
+                      ]
 
 renderBox :: Box.Box -> String
 renderBox = unlines . map trimEnd . lines . Box.render
