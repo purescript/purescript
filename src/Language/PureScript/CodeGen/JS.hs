@@ -256,7 +256,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
     jss <- forM binders $ \(CaseAlternative bs result) -> do
       ret <- guardsToJs result
       go valNames ret bs
-    return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow $ JSUnary JSNew $ JSApp (JSVar "Error") [JSStringLiteral "Failed pattern match"]])))
+    return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow $ failedPatternError valNames])))
                    []
     where
       go :: [String] -> [JS] -> [Binder Ann] -> m [JS]
@@ -265,6 +265,15 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
         done'' <- go vs done' bs
         binderToJs v done'' b
       go _ _ _ = error "Invalid arguments to bindersToJs"
+
+      failedPatternError :: [String] -> JS
+      failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral "Failed pattern match: ") (JSArrayLiteral $ zipWith valueError names vals)]
+
+      valueError :: String -> JS -> JS
+      valueError _ l@(JSNumericLiteral _) = l
+      valueError _ l@(JSStringLiteral _)  = l
+      valueError _ l@(JSBooleanLiteral _) = l
+      valueError s _                      = JSAccessor "name" . JSAccessor "constructor" $ JSVar s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
       guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
