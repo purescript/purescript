@@ -34,6 +34,7 @@ import Control.Monad (foldM, replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CoreFn
@@ -172,9 +173,9 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
     unApp other args = (other, args)
   valueToJs (Var _ ident) =
     return $ varToJs ident
-  valueToJs (Case _ values binders) = do
+  valueToJs (Case (maybeSpan, _, _, _) values binders) = do
     vals <- mapM valueToJs values
-    bindersToJs binders vals
+    bindersToJs maybeSpan binders vals
   valueToJs (Let _ ds val) = do
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
@@ -249,8 +250,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   -- Generate code in the simplified Javascript intermediate representation for pattern match binders
   -- and guards.
   --
-  bindersToJs :: [CaseAlternative Ann] -> [JS] -> m JS
-  bindersToJs binders vals = do
+  bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [JS] -> m JS
+  bindersToJs maybeSpan binders vals = do
     valNames <- replicateM (length vals) freshName
     let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
     jss <- forM binders $ \(CaseAlternative bs result) -> do
@@ -267,7 +268,10 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
       go _ _ _ = error "Invalid arguments to bindersToJs"
 
       failedPatternError :: [String] -> JS
-      failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral "Failed pattern match: ") (JSArrayLiteral $ zipWith valueError names vals)]
+      failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral errorMessage) (JSArrayLiteral $ zipWith valueError names vals)]
+
+      errorMessage :: String
+      errorMessage = "Failed pattern match" ++ maybe "" ((" at " ++) . displaySourceSpan) maybeSpan ++ ": "
 
       valueError :: String -> JS -> JS
       valueError _ l@(JSNumericLiteral _) = l
