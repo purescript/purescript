@@ -22,7 +22,7 @@
 module PSCi where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort)
+import Data.List (intercalate, nub, sort, isPrefixOf)
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -231,7 +231,7 @@ instance P.MonadMake Make where
   writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
     mkdirp path
     writeFile path text
-  progress s = unless (take 15 s == "Compiling $PSCI") $ liftIO . putStrLn $ s
+  progress s = unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
