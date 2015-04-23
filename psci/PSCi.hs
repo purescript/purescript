@@ -59,6 +59,35 @@ import Parser (parseCommand)
 import Completion (completion)
 import Types
 
+-- | The name of the PSCI support module
+supportModuleName :: P.ModuleName
+supportModuleName = P.ModuleName [P.ProperName "$PSCI", P.ProperName "Support"]
+
+-- | Support module, contains code to evaluate terms
+supportModule :: P.Module
+supportModule = 
+  case P.parseModulesFromFiles id [("", code)] of
+    Right [(_, P.Module cs _ ds exps)] -> P.Module cs supportModuleName ds exps
+    _ -> error "Support module could not be parsed"
+  where
+  code :: String
+  code = unlines
+    [ "module S where"
+    , ""
+    , "import Console"
+    , ""
+    , "import Control.Monad.Eff"
+    , "import Control.Monad.Eff.Unsafe"
+    , ""
+    , "class Eval a where"
+    , "  eval :: a -> Eff (console :: CONSOLE) Unit"
+    , ""
+    , "instance evalShow :: (Show a) => Eval a where"
+    , "  eval = print"
+    , ""
+    , "instance evalEff :: (Eval a) => Eval (Eff eff a) where"
+    , "  eval x = unsafeInterleaveEff x >>= eval"
+    ]
 
 -- File helpers
 -- |
@@ -202,7 +231,7 @@ instance P.MonadMake Make where
   writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
     mkdirp path
     writeFile path text
-  progress s = unless (s == "Compiling $PSCI") $ liftIO . putStrLn $ s
+  progress s = unless (take 15 s == "Compiling $PSCI") $ liftIO . putStrLn $ s
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -214,8 +243,7 @@ createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    consoleModule = P.ModuleName [P.ProperName "Console"]
-    trace = P.Var (P.Qualified (Just consoleModule) (P.Ident "print"))
+    trace = P.Var (P.Qualified (Just supportModuleName) (P.Ident "eval"))
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
     itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right val
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
@@ -262,7 +290,7 @@ handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
   let nodeArgs = psciNodeFlags st ++ [indexFile]
-  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, supportModule), (Left P.RebuildAlways, m)]) []
   case e of
     Left errs -> printErrors errs
     Right _ -> do
@@ -481,6 +509,10 @@ loadUserConfig = do
   else
     return Nothing
 
+-- | Checks if the Console module is defined
+consoleIsDefined :: [P.Module] -> Bool
+consoleIsDefined = any ((== P.ModuleName [P.ProperName "Console"]) . P.getModuleName)
+
 -- |
 -- The PSCI main loop.
 --
@@ -496,6 +528,10 @@ loop PSCiOptions{..} = do
       flip evalStateT (PSCiState psciInputFile defaultImports modules [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
         outputStrLn prologueMessage
         traverse_ (mapM_ (runPSCI . handleCommand)) config
+        unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines
+          [ "PSCi requires the purescript-console module to be installed."
+          , "For help getting started, visit http://wiki.purescript.org/PSCi"
+          ]
         go
       where
         go :: InputT (StateT PSCiState IO) ()
