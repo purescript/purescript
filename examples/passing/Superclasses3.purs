@@ -8,7 +8,7 @@ class (Monad m) <= MonadWriter w m where
   tell :: w -> m Unit
 
 testFunctor :: forall m. (Monad m) => m Number -> m Number
-testFunctor n = (+) 1 <$> n
+testFunctor n = (+) 1.0 <$> n
 
 test :: forall w m. (Monad m, MonadWriter w m) => w -> m Unit
 test w = do

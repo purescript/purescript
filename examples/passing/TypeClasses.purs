@@ -53,17 +53,17 @@ instance bindMaybe :: Bind Maybe where
 instance monadMaybe :: Monad Maybe
 
 test4 :: forall a m. (Monad m) => a -> m Number
-test4 = \_ -> return 1
+test4 = \_ -> return 1.0
 
-test5 = \_ -> Just 1 >>= \n -> return (n + 1)
+test5 = \_ -> Just 1.0 >>= \n -> return (n + 1.0)
 
 ask r = r
 
 runReader r f = f r
 
-test9 _ = runReader 0 $ do
+test9 _ = runReader 0.0 $ do
   n <- ask
-  return $ n + 1
+  return $ n + 1.0
 
 main = Debug.Trace.trace (test7 "Done")
 

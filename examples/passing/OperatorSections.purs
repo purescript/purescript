@@ -14,8 +14,8 @@ foreign import eqeqeq
 infixl 4 ===
 
 main = do
-  Debug.Trace.print $ (/ 2) 4 === 2
-  Debug.Trace.print $ (2 /) 4 === 0.5
-  Debug.Trace.print $ (`const` 1) 2 === 2
-  Debug.Trace.print $ (1 `const`) 2 === 1
+  Debug.Trace.print $ (/ 2.0) 4.0 === 2.0
+  Debug.Trace.print $ (2.0 /) 4.0 === 0.5
+  Debug.Trace.print $ (`const` 1.0) 2.0 === 2.0
+  Debug.Trace.print $ (1.0 `const`) 2.0 === 1.0
   Debug.Trace.trace "Done!"

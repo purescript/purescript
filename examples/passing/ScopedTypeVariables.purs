@@ -16,7 +16,7 @@ test2 = h
     g y = f (f y)
 
 test3 :: Number 
-test3 = ((\b -> b :: b) :: forall b. b -> b) 0
+test3 = ((\b -> b :: b) :: forall b. b -> b) 0.0
 
 test4 :: forall a. (a -> a) -> a -> a
 test4 = h

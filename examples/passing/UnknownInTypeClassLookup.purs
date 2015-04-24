@@ -9,4 +9,4 @@ test _ _ = "Done"
 
 runTest a = test a a
 
-main = Debug.Trace.trace $ runTest 0
+main = Debug.Trace.trace $ runTest 0.0

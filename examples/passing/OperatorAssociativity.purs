@@ -18,7 +18,7 @@ foreign import assert
   """ :: forall e. Boolean -> String -> Eff (assert :: Assert | e) Unit
 
 bug :: Number -> Number -> Number
-bug a b = 0 - (a - b)
+bug a b = 0.0 - (a - b)
 
 foreign import explode
   """
@@ -28,23 +28,23 @@ foreign import explode
   """ :: forall eff a. Eff eff a
 
 main = do
-    assert (bug 0 2 == 2)       "bug 0 2 == 2"
-    assert (0 - (0 - 2) == 2)   "0 - (0 - 2) == 2"
-    assert (0 - (0 + 2) == -2)  "0 - (0 + 2) == -2"
+    assert (bug 0.0 2.0 == 2.0)       "bug 0.0 2.0 == 2.0"
+    assert (0.0 - (0.0 - 2.0) == 2.0)   "0.0 - (0.0 - 2.0) == 2.0"
+    assert (0.0 - (0.0 + 2.0) == -2.0)  "0.0 - (0.0 + 2.0) == -2.0"
 
-    assert (6 / (3 * 2) == 1)   "6 / (3 * 2) == 1"
-    assert ((6 / 3) * 2 == 4)   "(6 / 3) * 2 == 4"
+    assert (6.0 / (3.0 * 2.0) == 1.0)   "6.0 / (3.0 * 2.0) == 1.0"
+    assert ((6.0 / 3.0) * 2.0 == 4.0)   "(6.0 / 3.0) * 2.0 == 4.0"
 
-    assert (not (1 < 0) == true) "not (1 < 0) == true"
-    assert (not ((negate 1) < 0) == false) "not ((negate 1) < 0) == false"
+    assert (not (1.0 < 0.0) == true) "not (1.0 < 0.0) == true"
+    assert (not ((negate 1.0) < 0.0) == false) "not ((negate 1.0) < 0.0) == false"
 
-    assert (negate (1 + 10) == -11) "negate (1 + 10) == -11"
+    assert (negate (1.0 + 10.0) == -11.0) "negate (1.0 + 10.0) == -11.0"
 
-    assert (2 * 3 / 4 == 1.5) "2 * 3 / 4 == 1.5"
-    assert (1 * 2 * 3 * 4 * 5 / 6 == 20) "1 * 2 * 3 * 4 * 5 / 6 == 20"
+    assert (2.0 * 3.0 / 4.0 == 1.5) "2.0 * 3.0 / 4.0 == 1.5"
+    assert (1.0 * 2.0 * 3.0 * 4.0 * 5.0 / 6.0 == 20.0) "1.0 * 2.0 * 3.0 * 4.0 * 5.0 / 6.0 == 20.0"
 
-    assert (1 + 10 - 5 == 6) "1 + 10 - 5 == 6"
-    assert (1 + 10 * 5 == 51) "1 + 10 * 5 == 51"
-    assert (10 * 5 - 1 == 49) "10 * 5 - 1 == 49"
+    assert (1.0 + 10.0 - 5.0 == 6.0) "1.0 + 10.0 - 5.0 == 6.0"
+    assert (1.0 + 10.0 * 5.0 == 51.0) "1.0 + 10.0 * 5.0 == 51.0"
+    assert (10.0 * 5.0 - 1.0 == 49.0) "10.0 * 5.0 - 1.0 == 49.0"
 
     trace "Success!"

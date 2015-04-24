@@ -10,7 +10,7 @@ module Main where
   data Nat = Nat forall r. r -> (r -> r) -> r
 
   runNat = \nat -> case nat of
-    Nat f -> f 0 (\n -> n + 1)
+    Nat f -> f 0.0 (\n -> n + 1.0)
 
   zero' = Nat (\zero' _ -> zero')
 

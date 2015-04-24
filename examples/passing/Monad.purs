@@ -21,7 +21,7 @@ module Main where
 	  }
 
   test :: forall m. Monad m -> m Number
-  test = \m -> m.bind (m.return 1) (\n1 ->
+  test = \m -> m.bind (m.return 1.0) (\n1 ->
 		 m.bind (m.return "Test") (\n2 ->
 		   m.return n1))
 

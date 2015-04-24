@@ -5,26 +5,26 @@ import Debug.Trace
 main = do
 
   -- semiringNumber
-  print (1 + 2)
-  print (1 * 2)
+  print (1.0 + 2.0)
+  print (1.0 * 2.0)
 
   -- ringNumber
-  print (1 - 2)
-  print (negate 1)
+  print (1.0 - 2.0)
+  print (negate 1.0)
 
   -- moduleSemiringNumber
-  print (1 / 2)
+  print (1.0 / 2.0)
 
   -- ordNumber
-  print (1 > 2)
-  print (1 < 2)
-  print (1 <= 2)
-  print (1 >= 2)
-  print (1 == 2)
+  print (1.0 > 2.0)
+  print (1.0 < 2.0)
+  print (1.0 <= 2.0)
+  print (1.0 >= 2.0)
+  print (1.0 == 2.0)
 
   -- eqNumber
-  print (1 == 2)
-  print (1 /= 2)
+  print (1.0 == 2.0)
+  print (1.0 /= 2.0)
 
   -- eqString
   print ("foo" == "bar")

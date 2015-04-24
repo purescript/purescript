@@ -17,6 +17,6 @@ instance exprId :: E Id where
 runId (Id a) = a
 
 three :: Expr Number
-three = add (num 1) (num 2)
+three = add (num 1.0) (num 2.0)
 
 main = Debug.Trace.print $ runId three

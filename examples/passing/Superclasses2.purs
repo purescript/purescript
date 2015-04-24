@@ -9,7 +9,7 @@ class (Su [a]) <= Cl a where
   cl :: a -> a -> a
 
 instance suNumber :: Su Number where
-  su n = n + 1
+  su n = n + 1.0
 
 instance suArray :: (Su a) => Su [a] where
   su (x : _) = [su x]
@@ -20,4 +20,4 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> [a]
 test x = su [cl x x]
 
-main = Debug.Trace.print $ test 10 `unsafeIndex` 0
+main = Debug.Trace.print $ test 10.0 `unsafeIndex` 0.0
