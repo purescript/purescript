@@ -39,6 +39,10 @@ data Binder
   --
   | StringBinder String
   -- |
+  -- A binder which matches a character literal
+  --
+  | CharBinder Char
+  -- |
   -- A binder which matches a numeric literal
   --
   | NumberBinder (Either Integer Double)

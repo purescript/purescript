@@ -205,6 +205,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   literalToValueJS :: Literal (Expr Ann) -> m JS
   literalToValueJS (NumericLiteral n) = return $ JSNumericLiteral n
   literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
+  literalToValueJS (CharLiteral c) = return $ JSStringLiteral [c]
   literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral b
   literalToValueJS (ArrayLiteral xs) = JSArrayLiteral <$> mapM valueToJs xs
   literalToValueJS (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM valueToJs) ps
@@ -327,6 +328,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   literalToBinderJS :: String -> [JS] -> Literal (Binder Ann) -> m [JS]
   literalToBinderJS varName done (NumericLiteral num) =
     return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSNumericLiteral num)) (JSBlock done) Nothing]
+  literalToBinderJS varName done (CharLiteral c) =
+    return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral [c])) (JSBlock done) Nothing]
   literalToBinderJS varName done (StringLiteral str) =
     return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral str)) (JSBlock done) Nothing]
   literalToBinderJS varName done (BooleanLiteral True) =

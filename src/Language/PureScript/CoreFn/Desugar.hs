@@ -83,6 +83,8 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     Literal (ss, com, ty, Nothing) (NumericLiteral v)
   exprToCoreFn ss com ty (A.StringLiteral v) =
     Literal (ss, com, ty, Nothing) (StringLiteral v)
+  exprToCoreFn ss com ty (A.CharLiteral v) =
+    Literal (ss, com, ty, Nothing) (CharLiteral v)
   exprToCoreFn ss com ty (A.BooleanLiteral v) =
     Literal (ss, com, ty, Nothing) (BooleanLiteral v)
   exprToCoreFn ss com ty (A.ArrayLiteral vs) =
@@ -147,6 +149,8 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     LiteralBinder (ss, com, Nothing, Nothing) (BooleanLiteral b)
   binderToCoreFn ss com (A.StringBinder s) =
     LiteralBinder (ss, com, Nothing, Nothing) (StringLiteral s)
+  binderToCoreFn ss com (A.CharBinder c) =
+    LiteralBinder (ss, com, Nothing, Nothing) (CharLiteral c)
   binderToCoreFn ss com (A.NumberBinder n) =
     LiteralBinder (ss, com, Nothing, Nothing) (NumericLiteral n)
   binderToCoreFn ss com (A.VarBinder name) =
