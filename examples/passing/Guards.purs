@@ -13,13 +13,13 @@ infixl 7 %
 (%) = jsMod
 
 collatz = \x -> case x of
-  y | y % 2 == 0 -> y / 2
-  y -> y * 3 + 1
+  y | y % 2.0 == 0.0 -> y / 2.0
+  y -> y * 3.0 + 1.0
 
 -- Guards have access to current scope
 collatz2 = \x y -> case x of
-  z | y > 0 -> z / 2
-  z -> z * 3 + 1
+  z | y > 0.0 -> z / 2.0
+  z -> z * 3.0 + 1.0
 
 min :: forall a. (Ord a) => a -> a -> a
 min n m | n < m     = n
@@ -31,7 +31,7 @@ max n m = case unit of
     | otherwise -> m
 
 testIndentation :: Number -> Number -> Number
-testIndentation x y | x > 0
+testIndentation x y | x > 0.0
   = x + y
                     | otherwise
   = y - x

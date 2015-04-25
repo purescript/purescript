@@ -10,13 +10,13 @@ test1 = do
   trace "Line 2"
 
 test2 = runPure (runST (do
-          ref <- newSTRef 0
-          modifySTRef ref $ \n -> n + 1
+          ref <- newSTRef 0.0
+          modifySTRef ref $ \n -> n + 1.0
           readSTRef ref))
 
 test3 = pureST (do
-          ref <- newSTRef 0
-          modifySTRef ref $ \n -> n + 1
+          ref <- newSTRef 0.0
+          modifySTRef ref $ \n -> n + 1.0
           readSTRef ref)
 
 main = do

@@ -1,6 +1,6 @@
 module Main where
 
-runNat f = f 0 (\n -> n + 1)
+runNat f = f 0.0 (\n -> n + 1.0)
 
 zero' z _ = z
 

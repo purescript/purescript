@@ -7,7 +7,7 @@ class (Su a) <= Cl a where
   cl :: a -> a -> a
 
 instance suNumber :: Su Number where
-  su n = n + 1
+  su n = n + 1.0
 
 instance clNumber :: Cl Number where
   cl n m = n + m
@@ -15,4 +15,4 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> a
 test a = su (cl a a)
 
-main = Debug.Trace.print $ test 10
+main = Debug.Trace.print $ test 10.0

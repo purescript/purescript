@@ -37,6 +37,7 @@ literals = mkPattern' match
   match :: Expr -> StateT PrinterState Maybe String
   match (NumericLiteral n) = return $ either show show n
   match (StringLiteral s) = return $ show s
+  match (CharLiteral c) = return $ show c
   match (BooleanLiteral True) = return "true"
   match (BooleanLiteral False) = return "false"
   match (ArrayLiteral xs) = concat <$> sequence
@@ -193,6 +194,7 @@ prettyPrintBinderAtom = mkPattern' match
   match :: Binder -> StateT PrinterState Maybe String
   match NullBinder = return "_"
   match (StringBinder str) = return $ show str
+  match (CharBinder c) = return $ show c
   match (NumberBinder num) = return $ either show show num
   match (BooleanBinder True) = return "true"
   match (BooleanBinder False) = return "false"

@@ -212,8 +212,10 @@ infer val = rethrow (onErrorMessages (ErrorInferringType val)) $ infer' val
 -- Infer a type for a value
 --
 infer' :: Expr -> UnifyT Type Check Expr
-infer' v@(NumericLiteral _) = return $ TypedValue True v tyNumber
+infer' v@(NumericLiteral (Left _)) = return $ TypedValue True v tyInt
+infer' v@(NumericLiteral (Right _)) = return $ TypedValue True v tyNumber
 infer' v@(StringLiteral _) = return $ TypedValue True v tyString
+infer' v@(CharLiteral _) = return $ TypedValue True v tyChar
 infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
 infer' (ArrayLiteral vals) = do
   ts <- mapM infer vals
@@ -350,7 +352,9 @@ inferProperty _ _ = return Nothing
 inferBinder :: Type -> Binder -> UnifyT Type Check (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
 inferBinder val (StringBinder _) = val =?= tyString >> return M.empty
-inferBinder val (NumberBinder _) = val =?= tyNumber >> return M.empty
+inferBinder val (CharBinder _) = val =?= tyChar >> return M.empty
+inferBinder val (NumberBinder (Left _)) = val =?= tyInt >> return M.empty
+inferBinder val (NumberBinder (Right _)) = val =?= tyNumber >> return M.empty
 inferBinder val (BooleanBinder _) = val =?= tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
@@ -458,9 +462,13 @@ check' val u@(TUnknown _) = do
   (val'', ty') <- instantiatePolyTypeWithUnknowns val' ty
   ty' =?= u
   return $ TypedValue True val'' ty'
-check' v@(NumericLiteral _) t | t == tyNumber =
+check' v@(NumericLiteral (Left _)) t | t == tyInt =
+  return $ TypedValue True v t
+check' v@(NumericLiteral (Right _)) t | t == tyNumber =
   return $ TypedValue True v t
 check' v@(StringLiteral _) t | t == tyString =
+  return $ TypedValue True v t
+check' v@(CharLiteral _) t | t == tyChar =
   return $ TypedValue True v t
 check' v@(BooleanLiteral _) t | t == tyBoolean =
   return $ TypedValue True v t
