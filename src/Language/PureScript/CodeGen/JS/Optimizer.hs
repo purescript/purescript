@@ -78,7 +78,7 @@ optimize' js = do
     , inlineValues
     , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
     , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
-    , inlineOperator (C.preludeUnsafe, C.unsafeIndex) $ flip JSIndexer
+    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip JSIndexer
     , inlineCommonOperators ]) js
 
 untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a
