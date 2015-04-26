@@ -19,9 +19,12 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate, elemIndex)
+import Data.List (intercalate)
+import Data.Function (on)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
+
+import qualified Data.Map as M
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -252,18 +255,24 @@ errorMessage err = MultipleErrors [err]
 onErrorMessages :: (ErrorMessage -> ErrorMessage) -> MultipleErrors -> MultipleErrors
 onErrorMessages f = MultipleErrors . map f . runMultipleErrors
 
-replaceUnknowns :: Type -> State [Unknown] Type
-replaceUnknowns = everywhereOnTypesM replaceUnknowns'
+-- | The various types of things which might need to be relabelled in errors messages.
+data LabelType = TypeLabel | SkolemLabel String deriving (Show, Eq, Ord)
+
+-- | A map from rigid type variable name/unknown variable pairs to new variables.
+type UnknownMap = M.Map (LabelType, Unknown) Unknown
+
+replaceUnknowns :: Type -> State UnknownMap Type
+replaceUnknowns = everywhereOnTypesM replaceTypes 
   where
-    lookupTable :: Unknown -> [Unknown] -> (Unknown, [Unknown])
-    lookupTable x table = case (elemIndex x table) of
-                               Nothing -> (length table, table ++ [x])
-                               Just i  -> (i, table)
+  lookupTable :: (LabelType, Unknown) -> UnknownMap -> (Unknown, UnknownMap)
+  lookupTable x m = case M.lookup x m of
+                      Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
+                      Just i  -> (i, m)
 
-    replaceUnknowns' :: Type -> State [Unknown] Type
-    replaceUnknowns' (TUnknown u) = state $ first TUnknown . lookupTable u
-    replaceUnknowns' other = return other
-
+  replaceTypes :: Type -> State UnknownMap Type
+  replaceTypes (TUnknown u) = state $ first TUnknown . lookupTable (TypeLabel, u)
+  replaceTypes (Skolem name s sko) = state $ first (flip (Skolem name) sko) . lookupTable (SkolemLabel name, s)
+  replaceTypes other = return other
 
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f = g
@@ -298,7 +307,7 @@ onTypesInErrorMessageM f = g
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> ErrorMessage -> State [Unknown] Box.Box
+prettyPrintSingleError :: Bool -> ErrorMessage -> State UnknownMap Box.Box
 prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
  where
   -- |
@@ -569,15 +578,15 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = flip evalState [] . prettyPrintMultipleErrorsWith "Error:" "Multiple errors:" full
+prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith "Error:" "Multiple errors:" full
 
 -- |
 -- Pretty print multiple warnings
 --
 prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = flip evalState [] . prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:" full
+prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:" full
 
-prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> State [Unknown] String
+prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> State UnknownMap String
 prettyPrintMultipleErrorsWith intro _ full  (MultipleErrors [e]) = do
   result <- prettyPrintSingleError full e
   return $ renderBox $

@@ -39,7 +39,7 @@ typeLiterals = mkPattern match
   match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
   match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
   match (TypeConstructor ctor) = Just $ show ctor
-  match (TUnknown u) = Just $ 'u' : show u
+  match (TUnknown u) = Just $ '_' : show u
   match (Skolem name s _) = Just $ name ++ show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
   match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
