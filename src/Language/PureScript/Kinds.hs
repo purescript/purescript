@@ -18,6 +18,7 @@ module Language.PureScript.Kinds where
 
 import Data.Data
 
+import Control.Applicative
 import Control.Monad.Unify (Unknown)
 
 -- |
@@ -50,6 +51,13 @@ everywhereOnKinds f = go
   where
   go (Row k1) = f (Row (go k1))
   go (FunKind k1 k2) = f (FunKind (go k1) (go k2))
+  go other = f other
+
+everywhereOnKindsM :: (Functor m, Applicative m, Monad m) => (Kind -> m Kind) -> Kind -> m Kind
+everywhereOnKindsM f = go
+  where
+  go (Row k1) = (Row <$> go k1) >>= f
+  go (FunKind k1 k2) = (FunKind <$> go k1 <*> go k2) >>= f
   go other = f other
 
 everythingOnKinds :: (r -> r -> r) -> (Kind -> r) -> Kind -> r

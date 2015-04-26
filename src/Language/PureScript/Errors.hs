@@ -255,21 +255,24 @@ errorMessage err = MultipleErrors [err]
 onErrorMessages :: (ErrorMessage -> ErrorMessage) -> MultipleErrors -> MultipleErrors
 onErrorMessages f = MultipleErrors . map f . runMultipleErrors
 
+-- | The various types of things which might need to be relabelled in errors messages.
+data LabelType = TypeLabel | SkolemLabel String deriving (Show, Eq, Ord)
+
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
-type UnknownMap = M.Map (Maybe String, Unknown) Unknown
+type UnknownMap = M.Map (LabelType, Unknown) Unknown
 
 replaceUnknowns :: Type -> State UnknownMap Type
-replaceUnknowns = everywhereOnTypesM replaceUnknowns'
+replaceUnknowns = everywhereOnTypesM replaceTypes 
   where
-    lookupTable :: (Maybe String, Unknown) -> UnknownMap -> (Unknown, UnknownMap)
-    lookupTable x m = case M.lookup x m of
-                        Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
-                        Just i  -> (i, m)
+  lookupTable :: (LabelType, Unknown) -> UnknownMap -> (Unknown, UnknownMap)
+  lookupTable x m = case M.lookup x m of
+                      Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
+                      Just i  -> (i, m)
 
-    replaceUnknowns' :: Type -> State UnknownMap Type
-    replaceUnknowns' (TUnknown u) = state $ first TUnknown . lookupTable (Nothing, u)
-    replaceUnknowns' (Skolem name s sko) = state $ first (flip (Skolem name) sko) . lookupTable (Just name, s)
-    replaceUnknowns' other = return other
+  replaceTypes :: Type -> State UnknownMap Type
+  replaceTypes (TUnknown u) = state $ first TUnknown . lookupTable (TypeLabel, u)
+  replaceTypes (Skolem name s sko) = state $ first (flip (Skolem name) sko) . lookupTable (SkolemLabel name, s)
+  replaceTypes other = return other
 
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f = g
