@@ -2,14 +2,14 @@ module Main where
 
   import Prelude
 
-  type Foo a = [a]
+  type Foo a = Array a
 
   foreign import length
     """
     function length(a) {
       return a.length;
     }
-    """ :: forall a. [a] -> Number
+    """ :: forall a. Array a -> Number
 
   foo _ = length ([] :: Foo Number)
 

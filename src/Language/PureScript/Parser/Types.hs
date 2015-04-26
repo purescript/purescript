@@ -32,11 +32,16 @@ import Language.PureScript.Environment
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
+-- TODO: remove these deprecation warnings in 0.8
 parseArray :: TokenParser Type
-parseArray = squares $ return tyArray
+parseArray = do
+  _ <- squares $ return tyArray
+  return $ error "Array notation is no longer supported. Use Array instead of []."
 
 parseArrayOf :: TokenParser Type
-parseArrayOf = squares $ TypeApp tyArray <$> parseType
+parseArrayOf = do
+  _ <- squares $ TypeApp tyArray <$> parseType
+  return $ error "Array notation is no longer supported. Use Array _ instead of [_]."
 
 parseFunction :: TokenParser Type
 parseFunction = parens $ rarrow >> return tyFunction

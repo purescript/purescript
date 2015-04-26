@@ -26,16 +26,6 @@ test5 = let
           g x = f (x - 1.0) + 1.0
         in f 10.0
 
-test6 = runPure (runST (do
-          r <- newSTRef 0.0
-          (let
-            go [] = readSTRef r
-            go (n : ns) = do
-              modifySTRef r ((+) n)
-              go ns
-           in go [1.0, 2.0, 3.0, 4.0, 5.0])
-        ))
-
 test7 = let
           f :: forall a. a -> a
           f x = x
@@ -59,6 +49,5 @@ main = do
   Debug.Trace.print test3
   Debug.Trace.print test4
   Debug.Trace.print test5
-  Debug.Trace.print test6
   Debug.Trace.print test7
   Debug.Trace.print (test8 100.0)

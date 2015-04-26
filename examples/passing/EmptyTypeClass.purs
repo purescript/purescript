@@ -4,8 +4,8 @@ import Prelude
 
 class Partial
 
-head :: forall a. (Partial) => [a] -> a
-head (x:xs) = x
+head :: forall a. (Partial) => Array a -> a
+head [x] = x
 
 instance allowPartials :: Partial
 

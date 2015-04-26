@@ -162,9 +162,6 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
   binderToCoreFn ss com (A.ArrayBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.ConsBinder b1 b2) =
-    let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-    in ConstructorBinder (ss, com, Nothing, Nothing) arrCtor arrCtor $ map (binderToCoreFn ss []) [b1, b2]
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =

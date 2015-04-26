@@ -18,7 +18,7 @@ gcd x 0.0 = x
 gcd x y | x > y = gcd (x % y) y
 gcd x y = gcd (y % x) x
 
-guardsTest (x:xs) | x > 0.0 = guardsTest xs
+guardsTest [x] | x > 0.0 = []
 guardsTest xs = xs
 
 data A = A

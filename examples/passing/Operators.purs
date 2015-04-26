@@ -46,7 +46,7 @@ module Main where
 
   test10 = "Hello" `Main.bar` "World"
 
-  (...) :: forall a. [a] -> [a] -> [a]
+  (...) :: forall a. Array a -> Array a -> Array a
   (...) = \as -> \bs -> as
 
   test11 = [1.0, 2.0, 0.0] ... [4.0, 5.0, 6.0]

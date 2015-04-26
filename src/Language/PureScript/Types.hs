@@ -94,10 +94,6 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintArray Type
-  -- |
-  -- A placeholder used in pretty printing
-  --
   | PrettyPrintObject Type
   -- |
   -- A placeholder used in pretty printing
@@ -248,7 +244,6 @@ everywhereOnTypes f = go
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
   go (KindedType ty k) = f (KindedType (go ty) k)
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
-  go (PrettyPrintArray t) = f (PrettyPrintArray (go t))
   go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
   go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
   go other = f other
@@ -263,7 +258,6 @@ everywhereOnTypesTopDown f = go . f
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
   go (KindedType ty k) = KindedType (go (f ty)) k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
-  go (PrettyPrintArray t) = PrettyPrintArray (go (f t))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
   go other = f other
@@ -278,7 +272,6 @@ everywhereOnTypesM f = go
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
-  go (PrettyPrintArray t) = (PrettyPrintArray <$> go t) >>= f
   go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
   go other = f other
@@ -293,7 +286,6 @@ everywhereOnTypesTopDownM f = go <=< f
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (PrettyPrintArray t) = PrettyPrintArray <$> (f t >>= go)
   go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
   go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
   go other = f other
@@ -308,7 +300,6 @@ everythingOnTypes (<>) f = go
   go t@(RCons _ ty rest) = f t <> go ty <> go rest
   go t@(KindedType ty _) = f t <> go ty
   go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
-  go t@(PrettyPrintArray t1) = f t <> go t1
   go t@(PrettyPrintObject t1) = f t <> go t1
   go t@(PrettyPrintForAll _ t1) = f t <> go t1
   go other = f other

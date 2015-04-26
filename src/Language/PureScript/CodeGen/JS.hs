@@ -30,7 +30,7 @@ import qualified Data.Traversable as T (traverse)
 
 import Control.Applicative
 import Control.Arrow ((&&&))
-import Control.Monad (foldM, replicateM, forM)
+import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
@@ -315,23 +315,6 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
       return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
-  binderToJs varName done binder@(ConstructorBinder _ _ ctor _) | isCons ctor = do
-    let (headBinders, tailBinder) = uncons [] binder
-        numberOfHeadBinders = fromIntegral $ length headBinders
-    js1 <- foldM (\done' (headBinder, index) -> do
-      headVar <- freshName
-      jss <- binderToJs headVar done' headBinder
-      return (JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : jss)) done (zip headBinders [0..])
-    tailVar <- freshName
-    js2 <- binderToJs tailVar js1 tailBinder
-    return [JSIfElse (JSBinary GreaterThanOrEqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left numberOfHeadBinders))) (JSBlock
-      ( JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left numberOfHeadBinders)])) :
-        js2
-      )) Nothing]
-    where
-    uncons :: [Binder Ann] -> Binder Ann -> ([Binder Ann], Binder Ann)
-    uncons acc (ConstructorBinder _ _ ctor' [h, t]) | isCons ctor' = uncons (h : acc) t
-    uncons acc tailBinder = (reverse acc, tailBinder)
   binderToJs _ _ b@(ConstructorBinder{}) =
     error $ "Invalid ConstructorBinder in binderToJs: " ++ show b
   binderToJs varName done (NamedBinder _ ident binder) = do
@@ -369,7 +352,3 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
       return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
-
-  isCons :: Qualified ProperName -> Bool
-  isCons (Qualified (Just mn') ctor) = mn' == ModuleName [ProperName C.prim] && ctor == ProperName "Array"
-  isCons name = error $ "Unexpected argument in isCons: " ++ show name

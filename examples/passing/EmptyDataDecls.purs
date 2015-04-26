@@ -5,7 +5,7 @@ import Prelude
 data Z
 data S n
 
-data ArrayBox n a = ArrayBox [a]
+data ArrayBox n a = ArrayBox (Array a)
 
 nil :: forall a. ArrayBox Z a
 nil = ArrayBox []
@@ -17,7 +17,7 @@ foreign import concat
       return l1.concat(l2);
     };
   }
-  """ :: forall a. [a] -> [a] -> [a]
+  """ :: forall a. Array a -> Array a -> Array a
 
 cons' :: forall a n. a -> ArrayBox n a -> ArrayBox (S n) a
 cons' x (ArrayBox xs) = ArrayBox $ concat [x] xs
