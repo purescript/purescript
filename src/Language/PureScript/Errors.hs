@@ -392,6 +392,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
                                                , indent $ line $ prettyPrintType t1
                                                , line "with type"
                                                , indent $ line $ prettyPrintType t2
+                                               , suggest "function composition (<<<)"
                                                ]
     go (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
                                                , indent $ line $ prettyPrintKind k1
@@ -512,6 +513,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
 
   line :: String -> Box.Box
   line = Box.text
+
+  suggest :: String -> Box.Box
+  suggest alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
