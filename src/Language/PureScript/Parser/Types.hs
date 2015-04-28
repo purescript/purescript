@@ -36,12 +36,12 @@ import qualified Text.Parsec.Expr as P
 parseArray :: TokenParser Type
 parseArray = do
   _ <- squares $ return tyArray
-  return $ error "Array notation is no longer supported. Use Array instead of []."
+  featureWasRemoved "Array notation is no longer supported. Use Array instead of []."
 
 parseArrayOf :: TokenParser Type
 parseArrayOf = do
   _ <- squares $ TypeApp tyArray <$> parseType
-  return $ error "Array notation is no longer supported. Use Array _ instead of [_]."
+  featureWasRemoved "Array notation is no longer supported. Use Array _ instead of [_]."
 
 parseFunction :: TokenParser Type
 parseFunction = parens $ rarrow >> return tyFunction
