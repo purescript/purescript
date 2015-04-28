@@ -86,7 +86,8 @@ unifyTypes t1 t2 = rethrow (onErrorMessages (ErrorUnifyingTypes t1 t2)) $
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
-    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+    guardWith (errorMessage (ErrorWithSuggestion fnCompSuggest (TypesDoNotUnify ty1 ty2))) (c1 == c2)
+    where fnCompSuggest = "Did you mean to use function composition (<<<) instead?"
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
