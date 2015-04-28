@@ -221,6 +221,14 @@ tyObject :: Type
 tyObject = primTy "Object"
 
 -- |
+-- Check whether a type is an object
+--
+isObject :: Type -> Bool
+isObject = (==) tyObject . extract
+  where extract (TypeApp t _) = t
+        extract t = t
+
+-- |
 -- Smart constructor for function types
 --
 function :: Type -> Type -> Type
