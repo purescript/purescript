@@ -316,10 +316,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
   --
   prettyPrintErrorMessage :: ErrorMessage -> Box.Box
   prettyPrintErrorMessage em =
-    paras
-      [ go em
-      , line ("See " ++ wikiUri ++ " for more information, or to contribute content related to this error.") 
-      ]
+    paras $
+      go em:suggestions em ++
+      [line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this error."]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
@@ -389,11 +388,11 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
                                                  <> foldMap (\expr -> [ line "Relevant expression: "
                                                                       , indent $ line $ prettyPrintValue expr 
                                                                       ]) binding
-    go err@(TypesDoNotUnify t1 t2)     = paras $ [ line "Cannot unify type"
+    go (TypesDoNotUnify t1 t2)         = paras [ line "Cannot unify type"
                                                , indent $ line $ prettyPrintType t1
                                                , line "with type"
                                                , indent $ line $ prettyPrintType t2
-                                               ] ++ suggestions err
+                                               ]
     go (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
                                                , indent $ line $ prettyPrintKind k1
                                                , line "with kind"
@@ -519,6 +518,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
     | otherwise                          = []
     where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
+  suggestions (PositionedError _ err) = suggestions err
   suggestions _ = []
 
   paras :: [Box.Box] -> Box.Box
