@@ -93,6 +93,7 @@ data ErrorMessage
   | EscapedSkolem (Maybe Expr)
   | UnspecifiedSkolemScope
   | TypesDoNotUnify Type Type
+  | ExpectedFunCompMisue Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified ProperName) [Type] [DictionaryValue]
@@ -131,7 +132,6 @@ data ErrorMessage
   | ErrorInValueDeclaration Ident ErrorMessage
   | ErrorInForeignImport Ident ErrorMessage
   | PositionedError SourceSpan ErrorMessage
-  | ErrorWithSuggestion String ErrorMessage
   deriving (Show)
   
 instance UnificationError Type ErrorMessage where
@@ -188,6 +188,7 @@ errorCode (PartiallyAppliedSynonym _)   = "PartiallyAppliedSynonym"
 errorCode (EscapedSkolem _)             = "EscapedSkolem"
 errorCode UnspecifiedSkolemScope        = "UnspecifiedSkolemScope"
 errorCode (TypesDoNotUnify _ _)         = "TypesDoNotUnify"
+errorCode (ExpectedFunCompMisue _ _)    = "ExpectedFunCompMisue"
 errorCode (KindsDoNotUnify _ _)         = "KindsDoNotUnify"
 errorCode (ConstrainedTypeUnified _ _)  = "ConstrainedTypeUnified"
 errorCode (OverlappingInstances _ _ _)  = "OverlappingInstances"
@@ -227,7 +228,6 @@ errorCode (ErrorInTypeSynonym _ e)      = errorCode e
 errorCode (ErrorInValueDeclaration _ e) = errorCode e
 errorCode (ErrorInForeignImport _ e)    = errorCode e
 errorCode (PositionedError _ e)         = errorCode e
-errorCode (ErrorWithSuggestion _ e)     = errorCode e
   
 -- |
 -- A stack trace for an error
@@ -395,6 +395,12 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
                                                , line "with type"
                                                , indent $ line $ prettyPrintType t2
                                                ]
+    go (ExpectedFunCompMisue t1 t2)    = paras [ line "Cannot unify type"
+                                               , indent $ line $ prettyPrintType t1
+                                               , line "with type"
+                                               , indent $ line $ prettyPrintType t2
+                                               , suggest "function composition (<<<)"
+                                               ]
     go (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
                                                , indent $ line $ prettyPrintKind k1
                                                , line "with kind"
@@ -511,12 +517,12 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     go (PositionedError srcSpan err)   = paras [ line $ "Error at " ++ displaySourceSpan srcSpan ++ ":"
                                                , indent $ go err
                                                ]
-    go (ErrorWithSuggestion sug err)   = paras [ go err
-                                               , line sug
-                                               ]
 
   line :: String -> Box.Box
   line = Box.text
+
+  suggest :: String -> Box.Box
+  suggest alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
