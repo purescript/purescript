@@ -518,7 +518,24 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
     | otherwise                          = []
     where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
-  suggestions (PositionedError _ err) = suggestions err
+  suggestions (ErrorCheckingKind _ err)       = suggestions err
+  suggestions (ErrorCheckingType _ _ err)     = suggestions err
+  suggestions (ErrorInApplication _ _ _ err)  = suggestions err
+  suggestions (ErrorInBindingGroup _ err)     = suggestions err
+  suggestions (ErrorInDataBindingGroup err)   = suggestions err
+  suggestions (ErrorInDataConstructor _ err)  = suggestions err
+  suggestions (ErrorInExpression _ err)       = suggestions err
+  suggestions (ErrorInForeignImport _ err)    = suggestions err
+  suggestions (ErrorInInstance _ _ err)       = suggestions err
+  suggestions (ErrorInModule _ err)           = suggestions err
+  suggestions (ErrorInSubsumption _ _ err)    = suggestions err
+  suggestions (ErrorInTypeConstructor _ err)  = suggestions err
+  suggestions (ErrorInTypeSynonym _ err)      = suggestions err
+  suggestions (ErrorInValueDeclaration _ err) = suggestions err
+  suggestions (ErrorInferringType _ err)      = suggestions err
+  suggestions (ErrorUnifyingTypes _ _ err)    = suggestions err
+  suggestions (NotYetDefined _ err)           = suggestions err
+  suggestions (PositionedError _ err)         = suggestions err
   suggestions _ = []
 
   paras :: [Box.Box] -> Box.Box
