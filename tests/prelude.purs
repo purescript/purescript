@@ -68,11 +68,11 @@ module Prelude
         return [e].concat(l);
       };
     }
-    """ :: forall a. a -> [a] -> [a]
+    """ :: forall a. a -> Array a -> Array a
 
   infixr 6 :
 
-  (:) :: forall a. a -> [a] -> [a]
+  (:) :: forall a. a -> Array a -> Array a
   (:) = cons
 
   infixr 9 >>>
@@ -303,7 +303,7 @@ module Prelude
     (==) _ _ = true
     (/=) _ _ = false
 
-  instance eqArray :: (Eq a) => Eq [a] where
+  instance eqArray :: (Eq a) => Eq (Array a) where
     (==) = eqArrayImpl (==)
     (/=) xs ys = not (xs == ys)
 
@@ -345,7 +345,7 @@ module Prelude
         };
       };
     }
-    """ :: forall a. (a -> a -> Boolean) -> [a] -> [a] -> Boolean
+    """ :: forall a. (a -> a -> Boolean) -> Array a -> Array a -> Boolean
 
   data Ordering = LT | GT | EQ
 
@@ -367,13 +367,36 @@ module Prelude
   instance ordUnit :: Ord Unit where
     compare _ _ = EQ
 
-  instance ordArray :: (Ord a) => Ord [a] where
-    compare [] [] = EQ
-    compare [] _ = LT
-    compare _ [] = GT
-    compare (x:xs) (y:ys) = case compare x y of
-      EQ -> compare xs ys
-      other -> other
+  instance ordArray :: (Ord a) => Ord (Array a) where
+    compare xs ys = compare 0.0 $ ordArrayImpl (\x y -> case compare x y of
+                                                EQ -> 0.0
+                                                LT -> -1.0
+                                                GT -> 1.0) xs ys
+
+  foreign import ordArrayImpl """
+    function ordArrayImpl(f) {
+      return function (ys) {
+        return function (ys) {
+          var i = 0;
+          while (i < xs.length && i < ys.length) {
+            var x = xs[i];
+            var y = ys[i];
+            var o = f(x)(y);
+            if (o !== 0) {
+              return o;
+            }
+          }
+          if (xs.length == ys.length) {
+            return 0;
+          } else if (xs.length > ys.length) {
+            return 1;
+          } else {
+            return -1;
+          }
+        };
+      };
+    }
+    """ :: forall a. (a -> a -> Number) -> Array a -> Array a -> Number
 
   instance ordOrdering :: Ord Ordering where
     compare LT LT = EQ
@@ -532,7 +555,7 @@ module Prelude
   instance showUnit :: Show Unit where
     show _ = "unit"
 
-  instance showArray :: (Show a) => Show [a] where
+  instance showArray :: (Show a) => Show (Array a) where
     show = showArrayImpl show
 
   instance showOrdering :: Show Ordering where
@@ -565,7 +588,7 @@ module Prelude
         return '[' + ss.join(',') + ']';
       };
     }
-    """ :: forall a. (a -> String) -> [a] -> String
+    """ :: forall a. (a -> String) -> Array a -> String
 
 module Data.Function where
 
@@ -889,7 +912,7 @@ module Prelude.Unsafe where
         return xs[n];
       };
     }
-    """ :: forall a. [a] -> Number -> a
+    """ :: forall a. Array a -> Number -> a
 
 module Control.Monad.Eff
   ( Eff()

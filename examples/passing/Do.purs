@@ -25,8 +25,8 @@ test1 = \_ -> do
   Just "abc"
 
 test2 = \_ -> do
-  (x : _) <- Just [1.0, 2.0, 3.0]
-  (y : _) <- Just [4.0, 5.0, 6.0]
+  x <- Just 1.0
+  y <- Just 2.0
   Just (x + y)
 
 test3 = \_ -> do

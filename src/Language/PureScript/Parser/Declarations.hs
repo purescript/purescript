@@ -493,9 +493,10 @@ parseIdentifierAndBinder = do
 -- Parse a binder
 --
 parseBinder :: TokenParser Binder
-parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators parseBinderAtom P.<?> "expression")
+parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators parseBinderAtom)
   where
-  operators = [ [ P.Infix (P.try $ C.indented *> colon *> return ConsBinder) P.AssocRight ] ]
+  -- TODO: remove this deprecation warning in 0.8
+  operators = [ [ P.Infix (P.try $ C.indented *> colon *> featureWasRemoved "Cons binders are no longer supported. Consider using purescript-lists or purescript-sequences instead.") P.AssocRight ] ]
   parseBinderAtom :: TokenParser Binder
   parseBinderAtom = P.choice (map P.try
                     [ parseNullBinder

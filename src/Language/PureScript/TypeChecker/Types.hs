@@ -391,12 +391,6 @@ inferBinder val (ArrayBinder binders) = do
   m1 <- M.unions <$> mapM (inferBinder el) binders
   val =?= TypeApp tyArray el
   return m1
-inferBinder val (ConsBinder headBinder tailBinder) = do
-  el <- fresh
-  m1 <- inferBinder el headBinder
-  m2 <- inferBinder val tailBinder
-  val =?= TypeApp tyArray el
-  return $ m1 `M.union` m2
 inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m

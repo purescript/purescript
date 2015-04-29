@@ -63,10 +63,6 @@ data Binder
   --
   | ArrayBinder [Binder]
   -- |
-  -- A binder which matches an array and binds its head and tail
-  --
-  | ConsBinder Binder Binder
-  -- |
   -- A binder which binds its input to an identifier
   --
   | NamedBinder Ident Binder
@@ -85,7 +81,6 @@ binderNames = go []
   go ns (ConstructorBinder _ bs) = foldl go ns bs
   go ns (ObjectBinder bs) = foldl go ns (map snd bs)
   go ns (ArrayBinder bs) = foldl go ns bs
-  go ns (ConsBinder b1 b2) = go (go ns b1) b2
   go ns (NamedBinder name b) = go (name : ns) b
   go ns (PositionedBinder _ _ b) = go ns b
   go ns _ = ns

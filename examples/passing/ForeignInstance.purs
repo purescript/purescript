@@ -3,7 +3,7 @@ module Main where
 class Foo a where
   foo :: a -> String
 
-foreign import instance fooArray :: (Foo a) => Foo [a]
+foreign import instance fooArray :: (Foo a) => Foo (Array a)
 
 foreign import instance fooNumber :: Foo Number
 
