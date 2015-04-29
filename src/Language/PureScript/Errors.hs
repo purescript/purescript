@@ -34,6 +34,7 @@ import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
 
 import Language.PureScript.AST
+import Language.PureScript.Environment (tyObject, tyFunction)
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -93,7 +94,6 @@ data ErrorMessage
   | EscapedSkolem (Maybe Expr)
   | UnspecifiedSkolemScope
   | TypesDoNotUnify Type Type
-  | ExpectedFunCompMisue Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified ProperName) [Type] [DictionaryValue]
@@ -188,7 +188,6 @@ errorCode (PartiallyAppliedSynonym _)   = "PartiallyAppliedSynonym"
 errorCode (EscapedSkolem _)             = "EscapedSkolem"
 errorCode UnspecifiedSkolemScope        = "UnspecifiedSkolemScope"
 errorCode (TypesDoNotUnify _ _)         = "TypesDoNotUnify"
-errorCode (ExpectedFunCompMisue _ _)    = "ExpectedFunCompMisue"
 errorCode (KindsDoNotUnify _ _)         = "KindsDoNotUnify"
 errorCode (ConstrainedTypeUnified _ _)  = "ConstrainedTypeUnified"
 errorCode (OverlappingInstances _ _ _)  = "OverlappingInstances"
@@ -390,17 +389,11 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
                                                  <> foldMap (\expr -> [ line "Relevant expression: "
                                                                       , indent $ line $ prettyPrintValue expr 
                                                                       ]) binding
-    go (TypesDoNotUnify t1 t2)         = paras [ line "Cannot unify type"
+    go err@(TypesDoNotUnify t1 t2)     = paras $ [ line "Cannot unify type"
                                                , indent $ line $ prettyPrintType t1
                                                , line "with type"
                                                , indent $ line $ prettyPrintType t2
-                                               ]
-    go (ExpectedFunCompMisue t1 t2)    = paras [ line "Cannot unify type"
-                                               , indent $ line $ prettyPrintType t1
-                                               , line "with type"
-                                               , indent $ line $ prettyPrintType t2
-                                               , suggest "function composition (<<<)"
-                                               ]
+                                               ] ++ suggestions err
     go (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
                                                , indent $ line $ prettyPrintKind k1
                                                , line "with kind"
@@ -521,8 +514,12 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
   line :: String -> Box.Box
   line = Box.text
 
-  suggest :: String -> Box.Box
-  suggest alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
+  suggestions :: ErrorMessage -> [Box.Box]
+  suggestions (TypesDoNotUnify t1 t2)
+    | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
+    | otherwise                          = []
+    where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
+  suggestions _ = []
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
