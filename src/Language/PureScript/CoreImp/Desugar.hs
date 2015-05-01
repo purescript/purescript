@@ -168,6 +168,8 @@ moduleToCoreImp (Module coms mn imps exps externs decls) =
   literalBinder :: Ident -> [Statement Ann] -> Literal (CF.Binder Ann) -> m [Statement Ann]
   literalBinder varName done (NumericLiteral n) =
     return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (Literal nullAnn $ NumericLiteral n)) done Nothing]
+  literalBinder varName done (CharLiteral c) =
+    return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (str [c])) done Nothing]
   literalBinder varName done (StringLiteral s) =
     return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (str s)) done Nothing]
   literalBinder varName done (BooleanLiteral True) =
