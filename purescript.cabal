@@ -132,6 +132,7 @@ library
                      Language.PureScript.Docs.RenderedCode.Render
                      Language.PureScript.Docs.AsMarkdown
                      Language.PureScript.Docs.AsHtml
+                     Language.PureScript.Docs.ParseAndDesugar
                      Language.PureScript.Docs.Utils.HtmlHelpers
                      Language.PureScript.Docs.Utils.MonoidExtras
 
@@ -203,8 +204,7 @@ executable psc-publish
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-publish
-    other-modules: Output
-                   Utils
+    other-modules: Utils
                    ErrorsWarnings
                    BoxesHelpers
     ghc-options: -Wall -O2

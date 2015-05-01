@@ -15,6 +15,9 @@ import Control.Exception (IOException)
 import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName)
 import qualified Web.Bower.PackageMeta as Bower
 
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Docs as D
+
 import BoxesHelpers
 
 -- | An error which meant that it was not possible to retrieve metadata for a
@@ -39,6 +42,7 @@ data UserError
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
   | MissingDependencies (NonEmpty PackageName)
+  | ParseAndDesugarError D.ParseDesugarError
   deriving (Show)
 
 data RepositoryFieldError
@@ -159,6 +163,21 @@ displayUserError e = case e of
       , para (concat
         [ "Please install ", them, " first, by running `bower install`."
         ])
+      ]
+  ParseAndDesugarError (D.ParseError err) ->
+    vcat
+      [ para "Parse error:"
+      , indented (para (show err))
+      ]
+  ParseAndDesugarError (D.SortModulesError err) ->
+    vcat
+      [ para "Error in sortModules:"
+      , indented (para (P.prettyPrintMultipleErrors False err))
+      ]
+  ParseAndDesugarError (D.DesugarError err) ->
+    vcat
+      [ para "Error while desugaring:"
+      , indented (para (P.prettyPrintMultipleErrors False err))
       ]
 
 displayRepositoryError :: RepositoryFieldError -> Box

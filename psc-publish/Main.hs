@@ -37,7 +37,6 @@ import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
 import qualified Web.Bower.PackageMeta as Bower
 
 import qualified Language.PureScript.Docs as D
-import Output (parseAndDesugar, getInputAndDepsFiles)
 import Utils
 import ErrorsWarnings
 
@@ -99,7 +98,7 @@ preparePackage' = do
                     >>= flip catchLeft (userError . CouldntParseBowerJSON)
   pkgVersion                 <- getVersionFromGitTag
   pkgGithub                  <- getBowerInfo pkgMeta
-  (pkgBookmarks, pkgModules) <- liftIO getModulesAndBookmarks
+  (pkgBookmarks, pkgModules) <- getModulesAndBookmarks
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++ bowerDevDependencies pkgMeta)
   pkgResolvedDependencies    <- getResolvedDependencies declaredDeps
@@ -108,10 +107,13 @@ preparePackage' = do
 
   return D.UploadedPackage{..}
 
-getModulesAndBookmarks :: IO ([D.Bookmark], [D.RenderedModule])
+getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.RenderedModule])
 getModulesAndBookmarks = do
-  (inputFiles, depsFiles) <- getInputAndDepsFiles
-  parseAndDesugar inputFiles depsFiles $ \bookmarks modules ->
+  (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
+  liftIO (D.parseAndDesugar inputFiles depsFiles renderModules)
+    >>= either (userError . ParseAndDesugarError) return
+  where
+  renderModules bookmarks modules =
     return (bookmarks, map D.renderModule modules)
 
 getVersionFromGitTag :: PrepareM Version
@@ -256,3 +258,21 @@ isPureScript :: FilePath -> IO Bool
 isPureScript dir = do
   files <- Glob.globDir1 purescriptSourceFiles dir
   return (not (null files))
+
+getInputAndDepsFiles :: IO ([FilePath], [(PackageName, FilePath)])
+getInputAndDepsFiles = do
+  inputFiles <- globRelative purescriptSourceFiles
+  depsFiles' <- globRelative purescriptDepsFiles
+  return (inputFiles, mapMaybe withPackageName depsFiles')
+
+withPackageName :: FilePath -> Maybe (PackageName, FilePath)
+withPackageName fp = (,fp) <$> getPackageName fp
+
+getPackageName :: FilePath -> Maybe PackageName
+getPackageName fp = do
+  let xs = splitOn "/" fp
+  ys <- stripPrefix ["bower_components"] xs
+  y <- headMay ys
+  case Bower.mkPackageName y of
+    Right name -> Just name
+    Left _ -> Nothing
