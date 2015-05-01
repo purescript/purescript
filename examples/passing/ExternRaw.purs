@@ -5,7 +5,7 @@ foreign import first
   function first(xs) {
     return xs[0];
   }
-  """ :: forall a. [a] -> a
+  """ :: forall a. Array a -> a
 
 foreign import loop
   """
@@ -21,6 +21,6 @@ foreign import concat
       return xs.concat(ys);
     };
   }
-  """ :: forall a. [a] -> [a] -> [a]
+  """ :: forall a. Array a -> Array a -> Array a
 
 main = Debug.Trace.trace "Done"

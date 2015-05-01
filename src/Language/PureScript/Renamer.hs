@@ -14,6 +14,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
+
 module Language.PureScript.Renamer (renameInModules) where
 
 import Control.Applicative
@@ -75,13 +77,12 @@ updateScope :: Ident -> Rename Ident
 updateScope i@(Ident name) | name == C.__unused = return i
 updateScope name = do
   scope <- get
-  let name' = case name `S.member` rsUsedNames scope of
-                True ->
-                  let
-                    newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
-                    Just newName = find (`S.notMember` rsUsedNames scope) newNames
-                  in newName
-                False -> name
+  name' <- case name `S.member` rsUsedNames scope of
+             True -> do
+               let newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
+                   Just newName = find (`S.notMember` rsUsedNames scope) newNames
+               return newName
+             False -> return name
   modify $ \s -> s { rsBoundNames = M.insert name name' (rsBoundNames s)
                    , rsUsedNames  = S.insert name' (rsUsedNames s)
                    }
@@ -114,7 +115,8 @@ renameInModules :: [Module (Bind Ann) a] -> [Module (Bind Ann) a]
 renameInModules = map go
   where
   go :: Module (Bind Ann) a -> Module (Bind Ann) a
-  go m@(Module _ _ _ _ _ decls) = m { moduleDecls = renameInDecl' (findDeclIdents decls) `map` decls }
+  go m@(Module _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
+  
   renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann
   renameInDecl' scope = runRename scope . renameInDecl True
 
@@ -176,7 +178,7 @@ renameInLiteral _ l = return l
 -- Renames within case alternatives.
 --
 renameInCaseAlternative :: CaseAlternative Ann -> Rename (CaseAlternative Ann)
-renameInCaseAlternative (CaseAlternative bs v) =
+renameInCaseAlternative (CaseAlternative bs v) = newScope $
   CaseAlternative <$> mapM renameInBinder bs
                   <*> eitherM (mapM (pairM renameInValue renameInValue)) renameInValue v
 

@@ -29,10 +29,11 @@ import qualified Data.Traversable as T (traverse)
 
 import Control.Applicative
 import Control.Arrow ((&&&))
+import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
-
-import Language.PureScript.AST.Declarations (ForeignCode(..))
+import Language.PureScript.AST.Declarations (ForeignCode, runForeignCode)
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CodeGen.JS.Optimizer
@@ -221,6 +222,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   literalToValueJS :: Literal (CI.Expr Ann) -> m JS
   literalToValueJS (NumericLiteral n) = return $ JSNumericLiteral n
   literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
+  literalToValueJS (CharLiteral c) = return $ JSStringLiteral [c]
   literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral b
   literalToValueJS (ArrayLiteral xs) = JSArrayLiteral <$> mapM exprToJS xs
   literalToValueJS (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM exprToJS) ps

@@ -28,7 +28,8 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
 import Language.PureScript.Environment

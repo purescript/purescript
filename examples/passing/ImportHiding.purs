@@ -7,7 +7,7 @@ import Prelude hiding (
   Unit(..)  -- a constructor
   )
 
-show = 1
+show = 1.0
 
 class Show a where
   noshow :: a -> a

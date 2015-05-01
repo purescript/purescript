@@ -283,6 +283,9 @@ booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> ret
 parseNumericLiteral :: TokenParser Expr
 parseNumericLiteral = NumericLiteral <$> number
 
+parseCharLiteral :: TokenParser Expr
+parseCharLiteral = CharLiteral <$> charLiteral
+
 parseStringLiteral :: TokenParser Expr
 parseStringLiteral = StringLiteral <$> stringLiteral
 
@@ -349,6 +352,7 @@ parseLet = do
 parseValueAtom :: TokenParser Expr
 parseValueAtom = P.choice
             [ P.try parseNumericLiteral
+            , P.try parseCharLiteral
             , P.try parseStringLiteral
             , P.try parseBooleanLiteral
             , parseArrayLiteral
@@ -441,6 +445,9 @@ parseObjectUpdaterWildcard = underscore *> C.indented *> parseUpdaterBody Nothin
 parseStringBinder :: TokenParser Binder
 parseStringBinder = StringBinder <$> stringLiteral
 
+parseCharBinder :: TokenParser Binder
+parseCharBinder = CharBinder <$> charLiteral
+
 parseBooleanBinder :: TokenParser Binder
 parseBooleanBinder = BooleanBinder <$> booleanLiteral
 
@@ -485,12 +492,14 @@ parseIdentifierAndBinder = do
 -- Parse a binder
 --
 parseBinder :: TokenParser Binder
-parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators parseBinderAtom P.<?> "expression")
+parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators parseBinderAtom)
   where
-  operators = [ [ P.Infix (P.try $ C.indented *> colon *> return ConsBinder) P.AssocRight ] ]
+  -- TODO: remove this deprecation warning in 0.8
+  operators = [ [ P.Infix (P.try $ C.indented *> colon *> featureWasRemoved "Cons binders are no longer supported. Consider using purescript-lists or purescript-sequences instead.") P.AssocRight ] ]
   parseBinderAtom :: TokenParser Binder
   parseBinderAtom = P.choice (map P.try
                     [ parseNullBinder
+                    , parseCharBinder
                     , parseStringBinder
                     , parseBooleanBinder
                     , parseNumberBinder
@@ -507,6 +516,7 @@ parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators
 parseBinderNoParens :: TokenParser Binder
 parseBinderNoParens = P.choice (map P.try
                   [ parseNullBinder
+                  , parseCharBinder
                   , parseStringBinder
                   , parseBooleanBinder
                   , parseNumberBinder

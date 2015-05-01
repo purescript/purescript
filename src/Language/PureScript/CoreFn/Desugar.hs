@@ -80,6 +80,8 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     Literal (ss, com, ty, Nothing) (NumericLiteral v)
   exprToCoreFn ss com ty (A.StringLiteral v) =
     Literal (ss, com, ty, Nothing) (StringLiteral v)
+  exprToCoreFn ss com ty (A.CharLiteral v) =
+    Literal (ss, com, ty, Nothing) (CharLiteral v)
   exprToCoreFn ss com ty (A.BooleanLiteral v) =
     Literal (ss, com, ty, Nothing) (BooleanLiteral v)
   exprToCoreFn ss com ty (A.ArrayLiteral vs) =
@@ -144,20 +146,19 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     LiteralBinder (ss, com, Nothing, Nothing) (BooleanLiteral b)
   binderToCoreFn ss com (A.StringBinder s) =
     LiteralBinder (ss, com, Nothing, Nothing) (StringLiteral s)
+  binderToCoreFn ss com (A.CharBinder c) =
+    LiteralBinder (ss, com, Nothing, Nothing) (CharLiteral c)
   binderToCoreFn ss com (A.NumberBinder n) =
     LiteralBinder (ss, com, Nothing, Nothing) (NumericLiteral n)
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
-    let (_, tctor, ty, _) = lookupConstructor env dctor
-    in ConstructorBinder (ss, com, Just ty, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
+    let (_, tctor, _, _) = lookupConstructor env dctor
+    in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.ObjectBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
   binderToCoreFn ss com (A.ArrayBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.ConsBinder b1 b2) =
-    let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-    in ConstructorBinder (ss, com, Nothing, Nothing) arrCtor arrCtor $ map (binderToCoreFn ss []) [b1, b2]
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =

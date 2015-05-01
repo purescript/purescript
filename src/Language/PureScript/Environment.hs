@@ -185,10 +185,22 @@ tyString :: Type
 tyString = primTy "String"
 
 -- |
+-- Type constructor for strings
+--
+tyChar :: Type
+tyChar = primTy "Char"
+
+-- |
 -- Type constructor for numbers
 --
 tyNumber :: Type
 tyNumber = primTy "Number"
+
+-- |
+-- Type constructor for integers
+--
+tyInt :: Type
+tyInt = primTy "Int"
 
 -- |
 -- Type constructor for booleans
@@ -222,7 +234,9 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
                        , (primName "Array"    , (FunKind Star Star, ExternData))
                        , (primName "Object"   , (FunKind (Row Star) Star, ExternData))
                        , (primName "String"   , (Star, ExternData))
+                       , (primName "Char"     , (Star, ExternData))
                        , (primName "Number"   , (Star, ExternData))
+                       , (primName "Int"      , (Star, ExternData))
                        , (primName "Boolean"  , (Star, ExternData)) ]
 
 -- |

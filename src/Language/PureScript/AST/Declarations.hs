@@ -303,6 +303,10 @@ data Expr
   --
   | StringLiteral String
   -- |
+  -- A character literal 
+  --
+  | CharLiteral Char
+  -- |
   -- A boolean literal
   --
   | BooleanLiteral Bool

@@ -11,17 +11,11 @@ module Main where
     { foo = "Foo" } -> o.bar
     _ -> 0
 
-  g = \o -> case o of
-    { arr = [x : xs], take = "car" } -> x
-    { arr = [_, x : xs], take = "cadr" } -> x
-    _ -> 0
-
-
   h = \o -> case o of
     a@[_,_,_] -> a
     _ -> []
 
-  isDesc :: [Number] -> Boolean
+  isDesc :: Array Number -> Boolean
   isDesc [x, y] | x > y = true
   isDesc _ = false
 

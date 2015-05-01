@@ -1,5 +1,5 @@
 name: purescript
-version: 0.6.9.3
+version: 0.7.0.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -15,8 +15,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>
 
-extra-source-files: prelude/prelude.purs
-                  , examples/passing/*.purs
+extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
 
 source-repository head
@@ -31,10 +30,10 @@ library
                    filepath -any,
                    mtl >= 2.1.0 && < 2.3.0,
                    parsec -any,
-                   transformers >= 0.4.0 && < 0.5,
+                   transformers >= 0.3.0 && < 0.5,
+                   transformers-compat >= 0.3.0,
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   file-embed >= 0.0.7 && < 0.0.8,
                    time -any,
                    boxes >= 0.1.4 && < 0.2.0
     exposed-modules: Language.PureScript
@@ -79,6 +78,7 @@ library
                      Language.PureScript.Environment
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
+                     Language.PureScript.Linter
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names
                      Language.PureScript.Options
@@ -141,7 +141,7 @@ executable psc
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any
+                   transformers -any, transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
@@ -152,7 +152,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   process -any
+                   transformers-compat -any, process -any
 
     main-is: Main.hs
     buildable: True
@@ -197,7 +197,7 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   process -any, HUnit -any
+                   transformers-compat -any, process -any, HUnit -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True

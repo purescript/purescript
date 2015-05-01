@@ -207,7 +207,7 @@ prettyPrintType' :: P.Type -> String
 prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
   where
   dePrim ty@(P.TypeConstructor (P.Qualified _ name))
-    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString =
+    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString || ty == P.tyChar || ty == P.tyInt =
       P.TypeConstructor $ P.Qualified Nothing name
   dePrim other = other
 

@@ -126,11 +126,11 @@ moduleToCoreImp (Module coms mn imps exps externs decls) =
     return $ Decl (VarDecl nullAnn ident (var varName)) : done
   binder varName done (CF.ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binder varName done b
-  binder varName done (CF.ConstructorBinder (_, _, ty, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+  binder varName done (CF.ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
     stmnts <- go (zip fields bs) done
     return $ case ctorType of
       ProductType -> stmnts
-      SumType -> [IfElse nullAnn (IsTagOf (Nothing, [], ty, Nothing) ctor (var varName)) stmnts Nothing]
+      SumType -> [IfElse nullAnn (IsTagOf nullAnn ctor (var varName)) stmnts Nothing]
     where
     go :: [(Ident, CF.Binder Ann)] -> [Statement Ann] -> m [Statement Ann]
     go [] done' = return done'

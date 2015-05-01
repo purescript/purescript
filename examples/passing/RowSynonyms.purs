@@ -35,7 +35,7 @@ withIt :: forall bindings eff a. Shadow (Object bindings) ->
                 ({addition :: Number | bindings} -> Eff eff a) -> Eff eff a
 withIt (Shadow str) success = do
   b <- withBindings
-  success (b{addition = 1})
+  success (b{addition = 1.0})
 
 foreign import withBindings
 """

@@ -37,6 +37,7 @@ literals = mkPattern' match
   match :: Expr -> StateT PrinterState Maybe String
   match (NumericLiteral n) = return $ either show show n
   match (StringLiteral s) = return $ show s
+  match (CharLiteral c) = return $ show c
   match (BooleanLiteral True) = return "true"
   match (BooleanLiteral False) = return "false"
   match (ArrayLiteral xs) = concat <$> sequence
@@ -193,6 +194,7 @@ prettyPrintBinderAtom = mkPattern' match
   match :: Binder -> StateT PrinterState Maybe String
   match NullBinder = return "_"
   match (StringBinder str) = return $ show str
+  match (CharBinder c) = return $ show c
   match (NumberBinder num) = return $ either show show num
   match (BooleanBinder True) = return "true"
   match (BooleanBinder False) = return "false"
@@ -214,7 +216,6 @@ prettyPrintBinderAtom = mkPattern' match
     ]
   match (NamedBinder ident binder) = ((show ident ++ "@") ++) <$> prettyPrintBinder' binder
   match (PositionedBinder _ _ binder) = prettyPrintBinder' binder
-  match _ = mzero
 
 -- |
 -- Generate a pretty-printed string representing a Binder
@@ -226,16 +227,7 @@ prettyPrintBinder' :: Binder -> StateT PrinterState Maybe String
 prettyPrintBinder' = runKleisli $ runPattern matchBinder
   where
   matchBinder :: Pattern PrinterState Binder String
-  matchBinder = buildPrettyPrinter operators (prettyPrintBinderAtom <+> fmap parens matchBinder)
-  operators :: OperatorTable PrinterState Binder String
-  operators =
-    OperatorTable [ [ AssocR matchConsBinder (\b1 b2 -> b1 ++ " : " ++ b2) ] ]
-
-matchConsBinder :: Pattern PrinterState Binder (Binder, Binder)
-matchConsBinder = mkPattern match'
-  where
-  match' (ConsBinder b1 b2) = Just (b1, b2)
-  match' _ = Nothing
+  matchBinder = prettyPrintBinderAtom <+> fmap parens matchBinder
 
 prettyPrintObjectPropertyBinder :: (String, Binder) -> StateT PrinterState Maybe String
 prettyPrintObjectPropertyBinder (key, binder) = concat <$> sequence

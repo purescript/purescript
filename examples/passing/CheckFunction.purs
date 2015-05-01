@@ -1,5 +1,5 @@
 module Main where
 
-test = ((\x -> x+1) >>> (\x -> x*2)) 4
+test = ((\x -> x+1.0) >>> (\x -> x*2.0)) 4.0
 
 main = Debug.Trace.trace "Done"

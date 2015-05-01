@@ -61,6 +61,7 @@ module Language.PureScript.Parser.Lexer
   , symbol
   , symbol'
   , identifier
+  , charLiteral
   , stringLiteral
   , number
   , natural
@@ -111,6 +112,7 @@ data Token
   | UName String
   | Qualifier String
   | Symbol String
+  | CharLiteral Char
   | StringLiteral String
   | Number (Either Integer Double)
   deriving (Show, Eq, Ord)
@@ -141,6 +143,7 @@ prettyPrintToken (LName s)         = show s
 prettyPrintToken (UName s)         = show s
 prettyPrintToken (Qualifier _)     = "qualifier"
 prettyPrintToken (Symbol s)        = s
+prettyPrintToken (CharLiteral c)   = show c
 prettyPrintToken (StringLiteral s) = show s
 prettyPrintToken (Number n)        = either show show n
 
@@ -204,6 +207,7 @@ parseToken = P.choice
   , do uName <- parseUName
        (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
   , Symbol        <$> parseSymbol
+  , CharLiteral   <$> parseCharLiteral
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
   ] <* whitespace
@@ -229,6 +233,9 @@ parseToken = P.choice
 
   symbolChar :: P.Parsec String u Char
   symbolChar = P.oneOf opChars
+
+  parseCharLiteral :: P.Parsec String u Char
+  parseCharLiteral = PT.charLiteral tokenParser
 
   parseStringLiteral :: P.Parsec String u String
   parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
@@ -431,6 +438,12 @@ symbol' s = token go P.<?> show s
   go (Symbol s') | s == s'   = Just ()
   go Colon       | s == ":"  = Just ()
   go LFatArrow   | s == "<=" = Just ()
+  go _ = Nothing
+
+charLiteral :: TokenParser Char
+charLiteral = token go P.<?> "char literal"
+  where
+  go (CharLiteral c) = Just c
   go _ = Nothing
 
 stringLiteral :: TokenParser String

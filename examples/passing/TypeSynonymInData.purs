@@ -1,6 +1,6 @@
 module Main where
 
-type A a = [a]
+type A a = Array a
 
 data Foo a = Foo (A a) | Bar
 

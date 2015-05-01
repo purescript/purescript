@@ -27,7 +27,7 @@ import Data.Monoid
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 
 import Data.HashMap.Strict as M
 

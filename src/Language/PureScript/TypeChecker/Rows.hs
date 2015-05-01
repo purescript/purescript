@@ -19,7 +19,8 @@ module Language.PureScript.TypeChecker.Rows (
 
 import Data.List
 
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Errors

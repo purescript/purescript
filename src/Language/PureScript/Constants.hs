@@ -15,7 +15,7 @@
 
 module Language.PureScript.Constants where
 
--- Prelude Operators
+-- Operators
 
 ($) :: String
 ($) = "$"
@@ -65,15 +65,6 @@ module Language.PureScript.Constants where
 (/=) :: String
 (/=) = "/="
 
-(.&.) :: String
-(.&.) = ".&."
-
-(.|.) :: String
-(.|.) = ".|."
-
-(.^.) :: String
-(.^.) = ".^."
-
 (&&) :: String
 (&&) = "&&"
 
@@ -83,10 +74,34 @@ module Language.PureScript.Constants where
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
--- Prelude Operator Functions
+(.|.) :: String
+(.|.) = ".|."
+
+(.&.) :: String
+(.&.) = ".&."
+
+(.^.) :: String
+(.^.) = ".^."
+
+(<<<) :: String
+(<<<) = "<<<"
+
+-- Functions
 
 negate :: String
 negate = "negate"
+
+not :: String
+not = "not"
+
+sup :: String
+sup = "sup"
+
+inf :: String
+inf = "inf"
+
+mod :: String
+mod = "mod"
 
 shl :: String
 shl = "shl"
@@ -100,8 +115,8 @@ zshr = "zshr"
 complement :: String
 complement = "complement"
 
-not :: String
-not = "not"
+fromNumber :: String
+fromNumber = "fromNumber"
 
 -- Prelude Values
 
@@ -110,6 +125,12 @@ zero = "zero"
 
 one :: String
 one = "one"
+
+bottom :: String
+bottom = "bottom"
+
+top :: String
+top = "top"
 
 return :: String
 return = "return"
@@ -172,20 +193,32 @@ bindEffDictionary = "bindEff"
 semiringNumber :: String
 semiringNumber = "semiringNumber"
 
+semiringInt :: String
+semiringInt = "semiringInt"
+
 ringNumber :: String
 ringNumber = "ringNumber"
+
+ringInt :: String
+ringInt = "ringInt"
 
 moduloSemiringNumber :: String
 moduloSemiringNumber = "moduloSemiringNumber"
 
-numNumber :: String
-numNumber = "numNumber"
+moduloSemiringInt :: String
+moduloSemiringInt = "moduloSemiringInt"
 
 ordNumber :: String
 ordNumber = "ordNumber"
 
+ordInt :: String
+ordInt = "ordInt"
+
 eqNumber :: String
 eqNumber = "eqNumber"
+
+eqInt :: String
+eqInt = "eqInt"
 
 eqString :: String
 eqString = "eqString"
@@ -193,11 +226,14 @@ eqString = "eqString"
 eqBoolean :: String
 eqBoolean = "eqBoolean"
 
-bitsNumber :: String
-bitsNumber = "bitsNumber"
+boundedBoolean :: String
+boundedBoolean = "boundedBoolean"
 
-boolLikeBoolean :: String
-boolLikeBoolean = "boolLikeBoolean"
+latticeBoolean :: String
+latticeBoolean = "latticeBoolean"
+
+complementedLatticeBoolean :: String
+complementedLatticeBoolean = "complementedLatticeBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
@@ -226,8 +262,8 @@ prim = "Prim"
 prelude :: String
 prelude = "Prelude"
 
-preludeUnsafe :: String
-preludeUnsafe = "Prelude_Unsafe"
+dataArrayUnsafe :: String
+dataArrayUnsafe = "Data_Array_Unsafe"
 
 eff :: String
 eff = "Control_Monad_Eff"
@@ -237,3 +273,9 @@ st = "Control_Monad_ST"
 
 dataFunction :: String
 dataFunction = "Data_Function"
+
+dataInt :: String
+dataInt = "Data_Int"
+
+dataIntBits :: String
+dataIntBits = "Data_Int_Bits"

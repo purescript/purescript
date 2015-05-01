@@ -17,8 +17,11 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.Except
 import Control.Monad.Reader
+import Control.Monad.Writer
 
 import Data.Version (showVersion)
 import Data.Traversable (traverse)
@@ -48,15 +51,13 @@ data InputOptions = InputOptions
   }
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
-readInput InputOptions{..} = do
-  content <- forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
-  return (if ioNoPrelude then content else (Left P.RebuildNever, P.prelude) : content)
+readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (ExceptT P.MultipleErrors IO) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader (P.Options P.Make))
 
-runMake :: P.Options P.Make -> Make a -> IO (Either P.MultipleErrors a)
-runMake opts = runExceptT . flip runReaderT opts . unMake
+runMake :: P.Options P.Make -> Make a -> IO (Either P.MultipleErrors (a, P.MultipleErrors))
+runMake opts = runExceptT . runWriterT . flip runReaderT opts . unMake
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
 makeIO f io = do
@@ -89,7 +90,9 @@ compile (PSCMakeOptions input outputDir opts usePrefix) = do
         Left errs -> do
           putStrLn (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
-        Right _ -> do
+        Right (_, warnings) -> do
+          when (P.nonEmpty warnings) $ 
+            putStrLn (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
           exitSuccess
   where
     prefix = if usePrefix
@@ -120,7 +123,7 @@ noTco = switch $
 noPrelude :: Parser Bool
 noPrelude = switch $
      long "no-prelude"
-  <> help "Omit the Prelude"
+  <> help "Omit the automatic Prelude import"
 
 noMagicDo :: Parser Bool
 noMagicDo = switch $
