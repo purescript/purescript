@@ -4,7 +4,7 @@ module Language.PureScript.Docs.AsMarkdown (
   renderModulesAsMarkdown
 ) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer hiding (First)
 import Data.Foldable (for_)
 import Data.List (partition)
 
@@ -23,10 +23,7 @@ renderModulesAsMarkdown =
   runDocs . modulesAsMarkdown . map Render.renderModule
 
 modulesAsMarkdown :: [RenderedModule] -> Docs
-modulesAsMarkdown ms = do
-  headerLevel 1 "Module Documentation"
-  spacer
-  mapM_ moduleAsMarkdown ms
+modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: RenderedModule -> Docs
 moduleAsMarkdown RenderedModule{..} = do
@@ -44,13 +41,13 @@ declAsMarkdown RenderedDeclaration{..} = do
   let (instances, children) = partition ((==) ChildInstance . rcdType) rdChildren
   fencedBlock $ do
     tell' (codeToString rdCode)
-    zipWithM_ (\f c -> tell' (childToString f c)) (True : repeat False) children
+    zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
   unless (null instances) $ do
     headerLevel 5 "Instances"
     fencedBlock $ do
-      mapM_ (tell' . childToString False) instances
+      mapM_ (tell' . childToString NotFirst) instances
     spacer
 
   for_ rdComments tell'
@@ -65,16 +62,21 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
-childToString :: Bool -> RenderedChildDeclaration -> String
-childToString isFirst RenderedChildDeclaration{..} =
+childToString :: First -> RenderedChildDeclaration -> String
+childToString f RenderedChildDeclaration{..} =
   case rcdType of
     ChildDataConstructor ->
-      let c = if isFirst then "=" else "|"
+      let c = if f == First then "=" else "|"
       in  "  " ++ c ++ " " ++ codeToString rcdCode
     ChildTypeClassMember ->
       "  " ++ codeToString rcdCode
     ChildInstance ->
       codeToString rcdCode
+
+data First
+  = First
+  | NotFirst
+  deriving (Show, Eq, Ord)
 
 type Docs = Writer [String] ()
 
