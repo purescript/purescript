@@ -65,13 +65,13 @@ makeIO f io = do
   either (throwError . P.errorMessage . f) return e
 
 instance P.MonadMake Make where
-  getTimestamp path = makeIO (const (P.CannotGetFileInfo path)) $ do
+  getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO (const (P.CannotReadFile path))$ do
+  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
     putStrLn $ "Reading " ++ path
     readFile path
-  writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
+  writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do
     mkdirp path
     putStrLn $ "Writing " ++ path
     writeFile path text

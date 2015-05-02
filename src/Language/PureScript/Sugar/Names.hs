@@ -100,7 +100,7 @@ updateExportedModule env mn update = do
 addEmptyModule :: (Applicative m, MonadError MultipleErrors m) => ExportEnvironment -> ModuleName -> m ExportEnvironment
 addEmptyModule env name =
   if name `M.member` env
-    then throwError . errorMessage $ RedefinedModule name
+    then throwError . errorMessage $ SimpleErrorWrapper $ RedefinedModule name
     else return $ M.insert name (Exports [] [] []) env
 
 -- |
@@ -142,7 +142,7 @@ addValue env mn name = updateExportedModule env mn $ \m -> do
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> ErrorMessage) -> [a] -> a -> m [a]
+addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> SimpleErrorMessage) -> [a] -> a -> m [a]
 addExport what exports name =
   if name `elem` exports
   then throwConflictError what name
@@ -237,7 +237,7 @@ renameInModule imports exports (Module coms mn decls exps) =
       let args = mapMaybe letBoundVariable ds
       unless (length (nub args) == length args) $
         maybe id rethrowWithPosition pos $
-          throwError . errorMessage $ OverlappingNamesInLet
+          throwError . errorMessage $ SimpleErrorWrapper $ OverlappingNamesInLet
       return ((pos, args ++ bound), Let ds val')
       where
   updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
@@ -279,7 +279,7 @@ renameInModule imports exports (Module coms mn decls exps) =
 
   -- Update names so unqualified references become qualified, and locally qualified references
   -- are replaced with their canoncial qualified names (e.g. M.Map -> Data.Map.Map)
-  update :: (Ord a, Show a) => (Qualified a -> ErrorMessage)
+  update :: (Ord a, Show a) => (Qualified a -> SimpleErrorMessage)
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
                             -> Qualified a
@@ -288,12 +288,12 @@ renameInModule imports exports (Module coms mn decls exps) =
   update unknown getI checkE qname@(Qualified mn' name) pos = positioned $ case (M.lookup qname imports', mn') of
     (Just qname', _) -> return qname'
     (Nothing, Just mn'') -> do
-      when (isExplicitQualModule mn'') . throwError . errorMessage $ unknown qname
+      when (isExplicitQualModule mn'') . throwError . errorMessage $ SimpleErrorWrapper $ unknown qname
       modExports <- getExports mn''
       if checkE modExports name
         then return qname
-        else throwError . errorMessage $ unknown qname
-    _ -> throwError . errorMessage $ unknown qname
+        else throwError . errorMessage $ SimpleErrorWrapper $ unknown qname
+    _ -> throwError . errorMessage $ SimpleErrorWrapper $ unknown qname
     where
     isExplicitQualModule :: ModuleName -> Bool
     isExplicitQualModule = flip elem $ mapMaybe (\(Qualified q _) -> q) (M.keys imports')
@@ -304,7 +304,7 @@ renameInModule imports exports (Module coms mn decls exps) =
 
   -- Gets the exports for a module, or an error message if the module doesn't exist
   getExports :: ModuleName -> m Exports
-  getExports mn' = maybe (throwError . errorMessage $ UnknownModule mn') return $ M.lookup mn' exports
+  getExports mn' = maybe (throwError . errorMessage $ SimpleErrorWrapper $ UnknownModule mn') return $ M.lookup mn' exports
 
 -- |
 -- Finds all exported declarations in a set of modules.
@@ -375,7 +375,7 @@ filterExports mn exps env = do
   filterDcons tcon exps' result name =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage $ UnknownDataConstructor (Qualified (Just mn) name) (Just (Qualified (Just mn) tcon))
+    else throwError . errorMessage $ SimpleErrorWrapper $ UnknownDataConstructor (Qualified (Just mn) name) (Just (Qualified (Just mn) tcon))
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
   filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> m [ProperName]
@@ -383,7 +383,7 @@ filterExports mn exps env = do
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage . UnknownTypeClass $ Qualified (Just mn) name
+    else throwError . errorMessage . SimpleErrorWrapper . UnknownTypeClass $ Qualified (Just mn) name
   filterClasses _ result _ = return result
 
   -- Ensure the exported values exist in the module and add them to the set of exports
@@ -392,7 +392,7 @@ filterExports mn exps env = do
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage . UnknownValue $ Qualified (Just mn) name
+    else throwError . errorMessage . SimpleErrorWrapper . UnknownValue $ Qualified (Just mn) name
   filterValues _ result _ = return result
 
 -- |
@@ -422,7 +422,7 @@ resolveImports env (Module _ currentModule decls _) =
 
   resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)) -> m ImportEnvironment
   resolveImport' imp (mn, (pos, typ, impQual)) = do
-    modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) return $ mn `M.lookup` env
+    modExports <- positioned $ maybe (throwError . errorMessage $ SimpleErrorWrapper $ UnknownModule mn) return $ mn `M.lookup` env
     positioned $ resolveImport currentModule mn modExports imp impQual typ
     where
     positioned err = case pos of
@@ -526,10 +526,10 @@ resolveImport currentModule importModule exps imps impQual =
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
   checkDctorExists :: [ProperName] -> ProperName -> m ProperName
-  checkDctorExists = checkImportExists $ \pn -> SimpleErrorWrapper $ UnknownDataConstructor pn Nothing
+  checkDctorExists = checkImportExists (flip UnknownDataConstructor Nothing)
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => (Qualified a -> ErrorMessage) -> [a] -> a -> m a
+  checkImportExists :: (Eq a, Show a) => (Qualified a -> SimpleErrorMessage) -> [a] -> a -> m a
   checkImportExists unknown exports item =
       if item `elem` exports
       then return item
@@ -538,5 +538,5 @@ resolveImport currentModule importModule exps imps impQual =
 -- |
 -- Raises an error for when there is more than one definition for something.
 --
-throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> ErrorMessage) -> a -> m b
-throwConflictError conflict = throwError . errorMessage . conflict
+throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> SimpleErrorMessage) -> a -> m b
+throwConflictError conflict = throwError . errorMessage . SimpleErrorWrapper . conflict

@@ -124,7 +124,7 @@ generateMain env js = do
   case moduleNameFromString <$> main of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
-        throwError . errorMessage $ NameIsUndefined (Ident C.main)
+        throwError . errorMessage $ SimpleErrorWrapper $ NameIsUndefined $ Ident C.main
       return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace additional)))) []]
     _ -> return js
 
@@ -245,16 +245,16 @@ make outputDir ms prefix = do
   rebuildIfNecessary graph toRebuild (Module _ moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- fmap (map snd) . either (throwError . errorMessage . ErrorParsingExterns) return $ P.parseModulesFromFiles id [(externsFile, externs)]
+    externsModules <- fmap (map snd) . either (throwError . errorMessage . SimpleErrorWrapper . ErrorParsingExterns) return $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
-      _ -> throwError . errorMessage . InvalidExternsFile $ externsFile
+      _ -> throwError . errorMessage . SimpleErrorWrapper . InvalidExternsFile $ externsFile
 
 checkPreludeIsDefined :: (MonadWriter MultipleErrors m) => [Module] -> m ()
 checkPreludeIsDefined ms = do
   let mns = map getModuleName ms
   unless (preludeModuleName `elem` mns) $ 
-    tell (errorMessage PreludeNotPresent)
+    tell (errorMessage $ SimpleErrorWrapper PreludeNotPresent)
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]

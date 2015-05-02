@@ -183,7 +183,7 @@ replaceTypeClassDictionaries mn =
 -- Check the kind of a type, failing if it is not of kind *.
 --
 checkTypeKind :: Kind -> UnifyT t Check ()
-checkTypeKind kind = guardWith (errorMessage (ExpectedType kind)) $ kind == Star
+checkTypeKind kind = guardWith (errorMessage $ SimpleErrorWrapper $ ExpectedType kind) $ kind == Star
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -270,7 +270,7 @@ infer' (Var var) = do
 infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
+    Nothing -> throwError . errorMessage $ SimpleErrorWrapper $ UnknownDataConstructor c Nothing
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
@@ -370,8 +370,8 @@ inferBinder val (ConstructorBinder ctor binders) = do
           return M.empty
         go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
           M.union <$> inferBinder obj binder <*> go binders' ret
-        go _ _ = throwError . errorMessage $ IncorrectConstructorArity ctor
-    _ -> throwError . errorMessage $ UnknownDataConstructor ctor Nothing
+        go _ _ = throwError . errorMessage $ SimpleErrorWrapper $ IncorrectConstructorArity ctor
+    _ -> throwError . errorMessage $ SimpleErrorWrapper $ UnknownDataConstructor ctor Nothing
 inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
@@ -409,7 +409,7 @@ inferBinder val (PositionedBinder pos _ binder) =
 checkBinders :: [Type] -> Type -> [CaseAlternative] -> UnifyT Type Check [CaseAlternative]
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders result : bs) = do
-  guardWith (errorMessage $ OverlappingArgNames Nothing) $
+  guardWith (errorMessage $ SimpleErrorWrapper $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (nub ns) == length ns
   Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
@@ -493,7 +493,7 @@ check' v@(Var var) ty = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> throwError . errorMessage $ SimpleErrorWrapper $ SubsumptionCheckFailed
     Just v'' -> return $ TypedValue True v'' ty'
 check' (SuperClassDictionary className tys) _ = do
   {-
@@ -516,7 +516,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> throwError . errorMessage $ SimpleErrorWrapper $ SubsumptionCheckFailed
     Just _ -> do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
       return $ TypedValue checkType val''' ty2'
@@ -554,7 +554,7 @@ check' (Accessor prop val) ty = do
 check' (Constructor c) ty = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
+    Nothing -> throwError . errorMessage $ SimpleErrorWrapper $ UnknownDataConstructor c Nothing
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
@@ -571,7 +571,7 @@ check' val kt@(KindedType ty kind) = do
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
   rethrowWithPosition pos $ check' val ty
-check' val ty = throwError . errorMessage $ ExprDoesNotHaveType val ty
+check' val ty = throwError . errorMessage $ SimpleErrorWrapper $ ExprDoesNotHaveType val ty
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everythingOnTypes (||) go where
@@ -592,8 +592,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError . errorMessage $ PropertyIsMissing p row
-  go ((p,_):_) [] REmpty = throwError . errorMessage $ PropertyIsMissing p row
+                      | otherwise = throwError . errorMessage $ SimpleErrorWrapper $ PropertyIsMissing p row
+  go ((p,_):_) [] REmpty = throwError . errorMessage $ SimpleErrorWrapper $ PropertyIsMissing p row
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
@@ -606,7 +606,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType (ObjectLiteral ps) (TypeApp tyObject row)
+  go _ _ _ = throwError . errorMessage $ SimpleErrorWrapper $ ExprDoesNotHaveType (ObjectLiteral ps) (TypeApp tyObject row)
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
@@ -650,7 +650,7 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
-checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
+checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ SimpleErrorWrapper $ CannotApplyFunction fnTy arg
 
 -- |
 -- Compute the meet of two types, i.e. the most general type which both types subsume.
@@ -674,5 +674,5 @@ ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(String, Expr)]
 ensureNoDuplicateProperties ps =
   let ls = map fst ps in
   case ls \\ nub ls of
-    l : _ -> throwError . errorMessage $ DuplicateLabel l Nothing
+    l : _ -> throwError . errorMessage $ SimpleErrorWrapper $ DuplicateLabel l Nothing
     _ -> return ()

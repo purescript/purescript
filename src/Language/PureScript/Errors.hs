@@ -71,7 +71,7 @@ data SimpleErrorMessage
   | UnknownDataConstructor (Qualified ProperName) (Maybe (Qualified ProperName))
   | UnknownTypeConstructor (Qualified ProperName)
   | ConflictingImport String ModuleName
-  | ConflictingImports String ModuleName ModuleName  
+  | ConflictingImports String ModuleName ModuleName
   | ConflictingTypeDecls ProperName
   | ConflictingCtorDecls ProperName
   | TypeConflictsWithClass ProperName
