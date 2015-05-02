@@ -69,5 +69,5 @@ lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ li
     stepB s _ = (s, mempty)
     
     bind :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
-    bind s name | name `S.member` s = (s, errorMessage (ShadowedName name))
+    bind s name | name `S.member` s = (s, errorMessage $ SimpleErrorWrapper $ ShadowedName name)
                 | otherwise = (S.insert name s, mempty)

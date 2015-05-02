@@ -74,4 +74,4 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 toModule :: (MonadError MultipleErrors m) => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)
+toModule (CyclicSCC ms) = throwError . errorMessage $ SimpleErrorWrapper $ CycleInModules (map getModuleName ms)

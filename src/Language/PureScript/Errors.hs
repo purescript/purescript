@@ -48,7 +48,7 @@ import qualified Text.Parsec as P
 -- |
 -- A type of error messages
 --
-data ErrorMessage 
+data SimpleErrorMessage
   = ErrorParsingExterns P.ParseError
   | ErrorParsingPrelude P.ParseError
   | InvalidExternsFile FilePath
@@ -90,7 +90,6 @@ data ErrorMessage
   | NameNotInScope Ident
   | UndefinedTypeVariable ProperName
   | PartiallyAppliedSynonym (Qualified ProperName)
-  | NotYetDefined [Ident] ErrorMessage
   | EscapedSkolem (Maybe Expr)
   | UnspecifiedSkolemScope
   | TypesDoNotUnify Type Type
@@ -108,7 +107,6 @@ data ErrorMessage
   | SubsumptionCheckFailed
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing String Type
-  | ErrorUnifyingTypes Type Type ErrorMessage
   | CannotApplyFunction Type Expr
   | TypeSynonymInstance
   | InvalidNewtype
@@ -116,6 +114,14 @@ data ErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | PreludeNotPresent
+  deriving (Show)
+
+-- |
+-- Wrapper of simpler errors
+--
+data ErrorMessage 
+  = NotYetDefined [Ident] ErrorMessage
+  | ErrorUnifyingTypes Type Type ErrorMessage
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
   | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
@@ -132,84 +138,85 @@ data ErrorMessage
   | ErrorInValueDeclaration Ident ErrorMessage
   | ErrorInForeignImport Ident ErrorMessage
   | PositionedError SourceSpan ErrorMessage
+  | SimpleErrorWrapper SimpleErrorMessage
   deriving (Show)
   
 instance UnificationError Type ErrorMessage where
-  occursCheckFailed = InfiniteType
+  occursCheckFailed t = SimpleErrorWrapper $ InfiniteType t
   
 instance UnificationError Kind ErrorMessage where
-  occursCheckFailed = InfiniteKind
+  occursCheckFailed k = SimpleErrorWrapper $ InfiniteKind k
 
 -- |
 -- Get the error code for a particular error type
 --
 errorCode :: ErrorMessage -> String
-errorCode (ErrorParsingExterns _)       = "ErrorParsingExterns"
-errorCode (ErrorParsingPrelude _)       = "ErrorParsingPrelude"
-errorCode (InvalidExternsFile _)        = "InvalidExternsFile"
-errorCode (CannotGetFileInfo _)         = "CannotGetFileInfo"
-errorCode (CannotReadFile _)            = "CannotReadFile"
-errorCode (CannotWriteFile _)           = "CannotWriteFile"
-errorCode (InfiniteType _)              = "InfiniteType"
-errorCode (InfiniteKind _)              = "InfiniteKind"
-errorCode CannotReorderOperators        = "CannotReorderOperators"
-errorCode (MultipleFixities _)          = "MultipleFixities"
-errorCode (OrphanTypeDeclaration _)     = "OrphanTypeDeclaration"
-errorCode (OrphanFixityDeclaration _)   = "OrphanFixityDeclaration"
-errorCode (RedefinedModule _)           = "RedefinedModule"
-errorCode (RedefinedIdent _)            = "RedefinedIdent"
-errorCode OverlappingNamesInLet         = "OverlappingNamesInLet"
-errorCode (UnknownModule _)             = "UnknownModule"
-errorCode (UnknownType _)               = "UnknownType"
-errorCode (UnknownTypeClass _)          = "UnknownTypeClass"
-errorCode (UnknownValue _)              = "UnknownValue"
-errorCode (UnknownDataConstructor _ _)  = "UnknownDataConstructor"
-errorCode (UnknownTypeConstructor _)    = "UnknownTypeConstructor"
-errorCode (ConflictingImport _ _)       = "ConflictingImport"
-errorCode (ConflictingImports _ _ _)    = "ConflictingImports"
-errorCode (ConflictingTypeDecls _)      = "ConflictingTypeDecls"
-errorCode (ConflictingCtorDecls _)      = "ConflictingCtorDecls"
-errorCode (TypeConflictsWithClass _)    = "TypeConflictsWithClass"
-errorCode (CtorConflictsWithClass _)    = "CtorConflictsWithClass"
-errorCode (ClassConflictsWithType _)    = "ClassConflictsWithType"
-errorCode (ClassConflictsWithCtor _)    = "ClassConflictsWithCtor"
-errorCode (DuplicateClassExport _)      = "DuplicateClassExport"
-errorCode (DuplicateValueExport _)      = "DuplicateValueExport"
-errorCode (DuplicateTypeArgument _)     = "DuplicateTypeArgument"
-errorCode InvalidDoBind                 = "InvalidDoBind"
-errorCode InvalidDoLet                  = "InvalidDoLet"
-errorCode (CycleInDeclaration _)        = "CycleInDeclaration"
-errorCode (CycleInTypeSynonym _)        = "CycleInTypeSynonym"
-errorCode (CycleInModules _)            = "CycleInModules"
-errorCode (NameIsUndefined _)           = "NameIsUndefined"
-errorCode (NameNotInScope _)            = "NameNotInScope"
-errorCode (UndefinedTypeVariable _)     = "UndefinedTypeVariable"
-errorCode (PartiallyAppliedSynonym _)   = "PartiallyAppliedSynonym"
-errorCode (EscapedSkolem _)             = "EscapedSkolem"
-errorCode UnspecifiedSkolemScope        = "UnspecifiedSkolemScope"
-errorCode (TypesDoNotUnify _ _)         = "TypesDoNotUnify"
-errorCode (KindsDoNotUnify _ _)         = "KindsDoNotUnify"
-errorCode (ConstrainedTypeUnified _ _)  = "ConstrainedTypeUnified"
-errorCode (OverlappingInstances _ _ _)  = "OverlappingInstances"
-errorCode (NoInstanceFound _ _)         = "NoInstanceFound"
-errorCode (DuplicateLabel _ _)          = "DuplicateLabel"
-errorCode (DuplicateValueDeclaration _) = "DuplicateValueDeclaration"
-errorCode (ArgListLengthsDiffer _)      = "ArgListLengthsDiffer"
-errorCode (OverlappingArgNames _)       = "OverlappingArgNames"
-errorCode (MissingClassMember _)        = "MissingClassMember"
-errorCode (ExpectedType _)              = "ExpectedType"
-errorCode (IncorrectConstructorArity _) = "IncorrectConstructorArity"
-errorCode SubsumptionCheckFailed        = "SubsumptionCheckFailed"
-errorCode (ExprDoesNotHaveType _ _)     = "ExprDoesNotHaveType"
-errorCode (PropertyIsMissing _ _)       = "PropertyIsMissing"
-errorCode (CannotApplyFunction _ _)     = "CannotApplyFunction"
-errorCode TypeSynonymInstance           = "TypeSynonymInstance"
-errorCode InvalidNewtype                = "InvalidNewtype"
-errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
-errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
-errorCode (ShadowedName _)              = "ShadowedName"
-errorCode PreludeNotPresent             = "PreludeNotPresent"
-errorCode wrappedError                  = errorCode $ unwrapErrorMessage wrappedError
+errorCode em = case unwrapErrorMessage em of
+  (ErrorParsingExterns _)       -> "ErrorParsingExterns"
+  (ErrorParsingPrelude _)       -> "ErrorParsingPrelude"
+  (InvalidExternsFile _)        -> "InvalidExternsFile"
+  (CannotGetFileInfo _)         -> "CannotGetFileInfo"
+  (CannotReadFile _)            -> "CannotReadFile"
+  (CannotWriteFile _)           -> "CannotWriteFile"
+  (InfiniteType _)              -> "InfiniteType"
+  (InfiniteKind _)              -> "InfiniteKind"
+  CannotReorderOperators        -> "CannotReorderOperators"
+  (MultipleFixities _)          -> "MultipleFixities"
+  (OrphanTypeDeclaration _)     -> "OrphanTypeDeclaration"
+  (OrphanFixityDeclaration _)   -> "OrphanFixityDeclaration"
+  (RedefinedModule _)           -> "RedefinedModule"
+  (RedefinedIdent _)            -> "RedefinedIdent"
+  OverlappingNamesInLet         -> "OverlappingNamesInLet"
+  (UnknownModule _)             -> "UnknownModule"
+  (UnknownType _)               -> "UnknownType"
+  (UnknownTypeClass _)          -> "UnknownTypeClass"
+  (UnknownValue _)              -> "UnknownValue"
+  (UnknownDataConstructor _ _)  -> "UnknownDataConstructor"
+  (UnknownTypeConstructor _)    -> "UnknownTypeConstructor"
+  (ConflictingImport _ _)       -> "ConflictingImport"
+  (ConflictingImports _ _ _)    -> "ConflictingImports"
+  (ConflictingTypeDecls _)      -> "ConflictingTypeDecls"
+  (ConflictingCtorDecls _)      -> "ConflictingCtorDecls"
+  (TypeConflictsWithClass _)    -> "TypeConflictsWithClass"
+  (CtorConflictsWithClass _)    -> "CtorConflictsWithClass"
+  (ClassConflictsWithType _)    -> "ClassConflictsWithType"
+  (ClassConflictsWithCtor _)    -> "ClassConflictsWithCtor"
+  (DuplicateClassExport _)      -> "DuplicateClassExport"
+  (DuplicateValueExport _)      -> "DuplicateValueExport"
+  (DuplicateTypeArgument _)     -> "DuplicateTypeArgument"
+  InvalidDoBind                 -> "InvalidDoBind"
+  InvalidDoLet                  -> "InvalidDoLet"
+  (CycleInDeclaration _)        -> "CycleInDeclaration"
+  (CycleInTypeSynonym _)        -> "CycleInTypeSynonym"
+  (CycleInModules _)            -> "CycleInModules"
+  (NameIsUndefined _)           -> "NameIsUndefined"
+  (NameNotInScope _)            -> "NameNotInScope"
+  (UndefinedTypeVariable _)     -> "UndefinedTypeVariable"
+  (PartiallyAppliedSynonym _)   -> "PartiallyAppliedSynonym"
+  (EscapedSkolem _)             -> "EscapedSkolem"
+  UnspecifiedSkolemScope        -> "UnspecifiedSkolemScope"
+  (TypesDoNotUnify _ _)         -> "TypesDoNotUnify"
+  (KindsDoNotUnify _ _)         -> "KindsDoNotUnify"
+  (ConstrainedTypeUnified _ _)  -> "ConstrainedTypeUnified"
+  (OverlappingInstances _ _ _)  -> "OverlappingInstances"
+  (NoInstanceFound _ _)         -> "NoInstanceFound"
+  (DuplicateLabel _ _)          -> "DuplicateLabel"
+  (DuplicateValueDeclaration _) -> "DuplicateValueDeclaration"
+  (ArgListLengthsDiffer _)      -> "ArgListLengthsDiffer"
+  (OverlappingArgNames _)       -> "OverlappingArgNames"
+  (MissingClassMember _)        -> "MissingClassMember"
+  (ExpectedType _)              -> "ExpectedType"
+  (IncorrectConstructorArity _) -> "IncorrectConstructorArity"
+  SubsumptionCheckFailed        -> "SubsumptionCheckFailed"
+  (ExprDoesNotHaveType _ _)     -> "ExprDoesNotHaveType"
+  (PropertyIsMissing _ _)       -> "PropertyIsMissing"
+  (CannotApplyFunction _ _)     -> "CannotApplyFunction"
+  TypeSynonymInstance           -> "TypeSynonymInstance"
+  InvalidNewtype                -> "InvalidNewtype"
+  (InvalidInstanceHead _)       -> "InvalidInstanceHead"
+  (TransitiveExportError _ _)   -> "TransitiveExportError"
+  (ShadowedName _)              -> "ShadowedName"
+  PreludeNotPresent             -> "PreludeNotPresent"
 
 -- |
 -- A stack trace for an error
@@ -248,7 +255,7 @@ type UnknownMap = M.Map (LabelType, Unknown) Unknown
 -- |
 -- Extract nested error messages from wrapper errors
 --
-unwrapErrorMessage :: ErrorMessage -> ErrorMessage
+unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage em = case em of
   (ErrorCheckingKind _ err)       -> unwrapErrorMessage err
   (ErrorCheckingType _ _ err)     -> unwrapErrorMessage err
@@ -268,7 +275,7 @@ unwrapErrorMessage em = case em of
   (ErrorUnifyingTypes _ _ err)    -> unwrapErrorMessage err
   (NotYetDefined _ err)           -> unwrapErrorMessage err
   (PositionedError _ err)         -> unwrapErrorMessage err
-  _                               -> em
+  (SimpleErrorWrapper sem)        -> sem
 
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes 
@@ -286,15 +293,16 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f = g
   where
-    g (InfiniteType t) = InfiniteType <$> (f t)
-    g (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> (f t1) <*> (f t2)
-    g (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> (f t1) <*> (f t2)
-    g (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> (f t)
-    g (PropertyIsMissing s t) = PropertyIsMissing s <$> (f t)
-    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> (f t1) <*> (f t2) <*> (g e)
-    g (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> (pure e)
-    g (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
+    gSimple (InfiniteType t) = InfiniteType <$> (f t)
+    gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> (f t1) <*> (f t2)
+    gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> (f t1) <*> (f t2)
+    gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> (f t)
+    gSimple (PropertyIsMissing s t) = PropertyIsMissing s <$> (f t)
+    gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> (pure e)
+    gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
+    gSimple other = pure other
     g (ErrorInSubsumption t1 t2 em) = ErrorInSubsumption <$> (f t1) <*> (f t2) <*> (g em)
+    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> (f t1) <*> (f t2) <*> (g e)
     g (ErrorCheckingType e t em) = ErrorCheckingType e <$> (f t) <*> (g em)
     g (ErrorCheckingKind t em) = ErrorCheckingKind <$> (f t) <*> g em
     g (ErrorInApplication e1 t1 e2 em) = ErrorInApplication e1 <$> (f t1) <*> (pure e2) <*> (g em)
@@ -311,7 +319,7 @@ onTypesInErrorMessageM f = g
     g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> (g e)
     g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> (g e)
     g (PositionedError x e) = PositionedError x <$> (g e)
-    g other = pure other
+    g (SimpleErrorWrapper sem) = SimpleErrorWrapper <$> gSimple sem
 
 -- |
 -- Pretty print a single error, simplifying if necessary
@@ -332,122 +340,122 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
       
     go :: ErrorMessage -> Box.Box
-    go (CannotGetFileInfo path)        = paras [ line "Unable to read file info: "
-                                               , indent . line $ path
-                                               ]
-    go (CannotReadFile path)           = paras [ line "Unable to read file: "
-                                               , indent . line $ path
-                                               ]
-    go (CannotWriteFile path)          = paras [ line "Unable to write file: "
-                                               , indent . line $ path
-                                               ]
-    go (ErrorParsingExterns err)       = paras [ line "Error parsing externs files: "
-                                               , indent . line . show $ err
-                                               ]
-    go (ErrorParsingPrelude err)       = paras [ line "Error parsing prelude: "
-                                               , indent . line . show $ err
-                                               ]
-    go (InvalidExternsFile path)       = paras [ line "Externs file is invalid: "
-                                               , indent . line $ path
-                                               ]
-    go InvalidDoBind                   = line "Bind statement cannot be the last statement in a do block"
-    go InvalidDoLet                    = line "Let statement cannot be the last statement in a do block"
-    go CannotReorderOperators          = line "Unable to reorder operators"
-    go UnspecifiedSkolemScope          = line "Skolem variable scope is unspecified"
-    go OverlappingNamesInLet           = line "Overlapping names in let binding."
-    go (InfiniteType ty)               = paras [ line "Infinite type detected: "
-                                               , indent $ line $ prettyPrintType ty
-                                               ]
-    go (InfiniteKind ki)               = paras [ line "Infinite kind detected: "
-                                               , indent $ line $ prettyPrintKind ki
-                                               ]
-    go (MultipleFixities name)         = line $ "Multiple fixity declarations for " ++ show name
-    go (OrphanTypeDeclaration nm)      = line $ "Orphan type declaration for " ++ show nm
-    go (OrphanFixityDeclaration op)    = line $ "Orphan fixity declaration for " ++ show op
-    go (RedefinedModule name)          = line $ "Module " ++ show name ++ " has been defined multiple times"
-    go (RedefinedIdent name)           = line $ "Name " ++ show name ++ " has been defined multiple times"
-    go (UnknownModule mn)              = line $ "Unknown module " ++ show mn
-    go (UnknownType name)              = line $ "Unknown type " ++ show name
-    go (UnknownTypeClass name)         = line $ "Unknown type class " ++ show name
-    go (UnknownValue name)             = line $ "Unknown value " ++ show name
-    go (UnknownTypeConstructor name)   = line $ "Unknown type constructor " ++ show name
-    go (UnknownDataConstructor dc tc)  = line $ "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
-    go (ConflictingImport nm mn)       = line $ "Declaration " ++ nm ++ " conflicts with import " ++ show mn 
-    go (ConflictingImports nm m1 m2)   = line $ "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
-    go (ConflictingTypeDecls nm)       = line $ "Conflicting type declarations for " ++ show nm
-    go (ConflictingCtorDecls nm)       = line $ "Conflicting data constructor declarations for " ++ show nm
-    go (TypeConflictsWithClass nm)     = line $ "Type " ++ show nm ++ " conflicts with type class declaration of the same name"
-    go (CtorConflictsWithClass nm)     = line $ "Data constructor " ++ show nm ++ " conflicts with type class declaration of the same name"
-    go (ClassConflictsWithType nm)     = line $ "Type class " ++ show nm ++ " conflicts with type declaration of the same name"
-    go (ClassConflictsWithCtor nm)     = line $ "Type class " ++ show nm ++ " conflicts with data constructor declaration of the same name"
-    go (DuplicateClassExport nm)       = line $ "Duplicate export declaration for type class " ++ show nm
-    go (DuplicateValueExport nm)       = line $ "Duplicate export declaration for value " ++ show nm
-    go (CycleInDeclaration nm)         = line $ "Cycle in declaration of " ++ show nm
-    go (CycleInModules mns)            = line $ "Cycle in module dependencies: " ++ intercalate ", " (map show mns)
+    goSimple (CannotGetFileInfo path)        = paras [ line "Unable to read file info: "
+                                                     , indent . line $ path
+                                                     ]
+    goSimple (CannotReadFile path)           = paras [ line "Unable to read file: "
+                                                     , indent . line $ path
+                                                     ]
+    goSimple (CannotWriteFile path)          = paras [ line "Unable to write file: "
+                                                     , indent . line $ path
+                                                     ]
+    goSimple (ErrorParsingExterns err)       = paras [ line "Error parsing externs files: "
+                                                     , indent . line . show $ err
+                                                     ]
+    goSimple (ErrorParsingPrelude err)       = paras [ line "Error parsing prelude: "
+                                                     , indent . line . show $ err
+                                                     ]
+    goSimple (InvalidExternsFile path)       = paras [ line "Externs file is invalid: "
+                                                     , indent . line $ path
+                                                     ]
+    goSimple InvalidDoBind                   = line "Bind statement cannot be the last statement in a do block"
+    goSimple InvalidDoLet                    = line "Let statement cannot be the last statement in a do block"
+    goSimple CannotReorderOperators          = line "Unable to reorder operators"
+    goSimple UnspecifiedSkolemScope          = line "Skolem variable scope is unspecified"
+    goSimple OverlappingNamesInLet           = line "Overlapping names in let binding."
+    goSimple (InfiniteType ty)               = paras [ line "Infinite type detected: "
+                                                     , indent $ line $ prettyPrintType ty
+                                                     ]
+    goSimple (InfiniteKind ki)               = paras [ line "Infinite kind detected: "
+                                                     , indent $ line $ prettyPrintKind ki
+                                                     ]
+    goSimple (MultipleFixities name)         = line $ "Multiple fixity declarations for " ++ show name
+    goSimple (OrphanTypeDeclaration nm)      = line $ "Orphan type declaration for " ++ show nm
+    goSimple (OrphanFixityDeclaration op)    = line $ "Orphan fixity declaration for " ++ show op
+    goSimple (RedefinedModule name)          = line $ "Module " ++ show name ++ " has been defined multiple times"
+    goSimple (RedefinedIdent name)           = line $ "Name " ++ show name ++ " has been defined multiple times"
+    goSimple (UnknownModule mn)              = line $ "Unknown module " ++ show mn
+    goSimple (UnknownType name)              = line $ "Unknown type " ++ show name
+    goSimple (UnknownTypeClass name)         = line $ "Unknown type class " ++ show name
+    goSimple (UnknownValue name)             = line $ "Unknown value " ++ show name
+    goSimple (UnknownTypeConstructor name)   = line $ "Unknown type constructor " ++ show name
+    goSimple (UnknownDataConstructor dc tc)  = line $ "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
+    goSimple (ConflictingImport nm mn)       = line $ "Declaration " ++ nm ++ " conflicts with import " ++ show mn 
+    goSimple (ConflictingImports nm m1 m2)   = line $ "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
+    goSimple (ConflictingTypeDecls nm)       = line $ "Conflicting type declarations for " ++ show nm
+    goSimple (ConflictingCtorDecls nm)       = line $ "Conflicting data constructor declarations for " ++ show nm
+    goSimple (TypeConflictsWithClass nm)     = line $ "Type " ++ show nm ++ " conflicts with type class declaration of the same name"
+    goSimple (CtorConflictsWithClass nm)     = line $ "Data constructor " ++ show nm ++ " conflicts with type class declaration of the same name"
+    goSimple (ClassConflictsWithType nm)     = line $ "Type class " ++ show nm ++ " conflicts with type declaration of the same name"
+    goSimple (ClassConflictsWithCtor nm)     = line $ "Type class " ++ show nm ++ " conflicts with data constructor declaration of the same name"
+    goSimple (DuplicateClassExport nm)       = line $ "Duplicate export declaration for type class " ++ show nm
+    goSimple (DuplicateValueExport nm)       = line $ "Duplicate export declaration for value " ++ show nm
+    goSimple (CycleInDeclaration nm)         = line $ "Cycle in declaration of " ++ show nm
+    goSimple (CycleInModules mns)            = line $ "Cycle in module dependencies: " ++ intercalate ", " (map show mns)
+    goSimple (CycleInTypeSynonym pn)         = line $ "Cycle in type synonym" ++ foldMap ((" " ++) . show) pn
+    goSimple (NameIsUndefined ident)         = line $ show ident ++ " is undefined"
+    goSimple (NameNotInScope ident)          = line $ show ident ++ " may not be defined in the current scope"
+    goSimple (UndefinedTypeVariable name)    = line $ "Type variable " ++ show name ++ " is undefined"
+    goSimple (PartiallyAppliedSynonym name)  = line $ "Partially applied type synonym " ++ show name
+    goSimple (EscapedSkolem binding)         = paras $ [ line "Rigid/skolem type variable has escaped." ]
+                                                       <> foldMap (\expr -> [ line "Relevant expression: "
+                                                                            , indent $ line $ prettyPrintValue expr 
+                                                                            ]) binding
+    goSimple (TypesDoNotUnify t1 t2)         = paras [ line "Cannot unify type"
+                                                     , indent $ line $ prettyPrintType t1
+                                                     , line "with type"
+                                                     , indent $ line $ prettyPrintType t2
+                                                     ]
+    goSimple (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
+                                                     , indent $ line $ prettyPrintKind k1
+                                                     , line "with kind"
+                                                     , indent $ line $ prettyPrintKind k2
+                                                     ]
+    goSimple (ConstrainedTypeUnified t1 t2)  = paras [ line "Cannot unify constrained type"
+                                                     , indent $ line $ prettyPrintType t1
+                                                     , line "with type"
+                                                     , indent $ line $ prettyPrintType t2
+                                                     ]
+    goSimple (OverlappingInstances nm ts ds) = paras [ line $ "Overlapping instances found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":"
+                                                     , paras $ map prettyPrintDictionaryValue ds
+                                                     ]
+    goSimple (NoInstanceFound nm ts)         = line $ "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
+    goSimple (DuplicateLabel l expr)         = paras $ [ line $ "Duplicate label " ++ show l ++ " in row." ]
+                                                       <> foldMap (\expr' -> [ line "Relevant expression: "
+                                                                             , indent $ line $ prettyPrintValue expr' 
+                                                                             ]) expr
+    goSimple (DuplicateTypeArgument name)    = line $ "Duplicate type argument " ++ show name
+    goSimple (DuplicateValueDeclaration nm)  = line $ "Duplicate value declaration for " ++ show nm
+    goSimple (ArgListLengthsDiffer ident)    = line $ "Argument list lengths differ in declaration " ++ show ident
+    goSimple (OverlappingArgNames ident)     = line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
+    goSimple (MissingClassMember ident)      = line $ "Member " ++ show ident ++ " has not been implemented"
+    goSimple (ExpectedType kind)             = line $ "Expected type of kind *, was " ++ prettyPrintKind kind
+    goSimple (IncorrectConstructorArity nm)  = line $ "Wrong number of arguments to constructor " ++ show nm
+    goSimple SubsumptionCheckFailed          = line $ "Unable to check type subsumption"
+    goSimple (ExprDoesNotHaveType expr ty)   = paras [ line "Expression"
+                                                     , indent $ line $ prettyPrintValue expr
+                                                     , line "does not have type"
+                                                     , indent $ line $ prettyPrintType ty
+                                                     ]
+    goSimple (PropertyIsMissing prop row)    = line $ "Row " ++ prettyPrintRow row ++ " lacks required property " ++ show prop
+    goSimple (CannotApplyFunction fn arg)    = paras [ line "Cannot apply function of type"
+                                                     , indent $ line $ prettyPrintType fn
+                                                     , line "to argument"
+                                                     , indent $ line $ prettyPrintValue arg
+                                                     ]
+    goSimple TypeSynonymInstance             = line "Type synonym instances are disallowed"
+    goSimple InvalidNewtype                  = line "Newtypes must define a single constructor with a single argument"
+    goSimple (InvalidInstanceHead ty)        = paras [ line "Invalid type in class instance head:"
+                                                     , indent $ line $ prettyPrintType ty
+                                                     ]
+    goSimple (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
+                                                       : map (line . prettyPrintExport) ys
+    goSimple (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
+    goSimple PreludeNotPresent               = paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
+                                                     , line $ "You probably need to install the Prelude and other dependencies using Bower." 
+                                                     ]
     go (NotYetDefined names err)       = paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
                                                , indent $ go err
-                                               ]
-    go (CycleInTypeSynonym pn)         = line $ "Cycle in type synonym" ++ foldMap ((" " ++) . show) pn
-    go (NameIsUndefined ident)         = line $ show ident ++ " is undefined"
-    go (NameNotInScope ident)          = line $ show ident ++ " may not be defined in the current scope"
-    go (UndefinedTypeVariable name)    = line $ "Type variable " ++ show name ++ " is undefined"
-    go (PartiallyAppliedSynonym name)  = line $ "Partially applied type synonym " ++ show name
-    go (EscapedSkolem binding)         = paras $ [ line "Rigid/skolem type variable has escaped." ]
-                                                 <> foldMap (\expr -> [ line "Relevant expression: "
-                                                                      , indent $ line $ prettyPrintValue expr 
-                                                                      ]) binding
-    go (TypesDoNotUnify t1 t2)         = paras [ line "Cannot unify type"
-                                               , indent $ line $ prettyPrintType t1
-                                               , line "with type"
-                                               , indent $ line $ prettyPrintType t2
-                                               ]
-    go (KindsDoNotUnify k1 k2)         = paras [ line "Cannot unify kind"
-                                               , indent $ line $ prettyPrintKind k1
-                                               , line "with kind"
-                                               , indent $ line $ prettyPrintKind k2
-                                               ]
-    go (ConstrainedTypeUnified t1 t2)  = paras [ line "Cannot unify constrained type"
-                                               , indent $ line $ prettyPrintType t1
-                                               , line "with type"
-                                               , indent $ line $ prettyPrintType t2
-                                               ]
-    go (OverlappingInstances nm ts ds) = paras [ line $ "Overlapping instances found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":"
-                                               , paras $ map prettyPrintDictionaryValue ds
-                                               ]
-    go (NoInstanceFound nm ts)         = line $ "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
-    go (DuplicateLabel l expr)         = paras $ [ line $ "Duplicate label " ++ show l ++ " in row." ]
-                                                 <> foldMap (\expr' -> [ line "Relevant expression: "
-                                                                       , indent $ line $ prettyPrintValue expr' 
-                                                                       ]) expr
-    go (DuplicateTypeArgument name)    = line $ "Duplicate type argument " ++ show name
-    go (DuplicateValueDeclaration nm)  = line $ "Duplicate value declaration for " ++ show nm
-    go (ArgListLengthsDiffer ident)    = line $ "Argument list lengths differ in declaration " ++ show ident
-    go (OverlappingArgNames ident)     = line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
-    go (MissingClassMember ident)      = line $ "Member " ++ show ident ++ " has not been implemented"
-    go (ExpectedType kind)             = line $ "Expected type of kind *, was " ++ prettyPrintKind kind
-    go (IncorrectConstructorArity nm)  = line $ "Wrong number of arguments to constructor " ++ show nm
-    go SubsumptionCheckFailed          = line $ "Unable to check type subsumption"
-    go (ExprDoesNotHaveType expr ty)   = paras [ line "Expression"
-                                               , indent $ line $ prettyPrintValue expr
-                                               , line "does not have type"
-                                               , indent $ line $ prettyPrintType ty
-                                               ]
-    go (PropertyIsMissing prop row)    = line $ "Row " ++ prettyPrintRow row ++ " lacks required property " ++ show prop
-    go (CannotApplyFunction fn arg)    = paras [ line "Cannot apply function of type"
-                                               , indent $ line $ prettyPrintType fn
-                                               , line "to argument"
-                                               , indent $ line $ prettyPrintValue arg
-                                               ]
-    go TypeSynonymInstance             = line "Type synonym instances are disallowed"
-    go InvalidNewtype                  = line "Newtypes must define a single constructor with a single argument"
-    go (InvalidInstanceHead ty)        = paras [ line "Invalid type in class instance head:"
-                                               , indent $ line $ prettyPrintType ty
-                                               ]
-    go (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
-                                                 : map (line . prettyPrintExport) ys
-    go (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
-    go PreludeNotPresent               = paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
-                                               , line $ "You probably need to install the Prelude and other dependencies using Bower." 
                                                ]
     go (ErrorUnifyingTypes t1 t2 err)  = paras [ line "Error unifying type "
                                                , indent $ line $ prettyPrintType t1
@@ -517,6 +525,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     go (PositionedError srcSpan err)   = paras [ line $ "Error at " ++ displaySourceSpan srcSpan ++ ":"
                                                , indent $ go err
                                                ]
+    go (SimpleErrorWrapper sem)        = goSimple sem
 
   line :: String -> Box.Box
   line = Box.text

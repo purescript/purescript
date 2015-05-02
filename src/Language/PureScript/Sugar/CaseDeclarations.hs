@@ -93,7 +93,7 @@ toDecls :: forall m. (Functor m, Applicative m, Monad m, MonadSupply m, MonadErr
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
-  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
+  guardWith (errorMessage $ SimpleErrorWrapper (OverlappingArgNames (Just ident))) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
   where
   isVarBinder :: Binder -> Bool
@@ -110,9 +110,9 @@ toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = 
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
-      throwError . errorMessage $ ArgListLengthsDiffer ident
+      throwError . errorMessage $ SimpleErrorWrapper $ ArgListLengthsDiffer ident
   unless (not (null bs) || isLeft result) $
-      throwError . errorMessage $ DuplicateValueDeclaration ident
+      throwError . errorMessage $ SimpleErrorWrapper $ DuplicateValueDeclaration ident
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
 toDecls (PositionedDeclaration pos com d : ds) = do

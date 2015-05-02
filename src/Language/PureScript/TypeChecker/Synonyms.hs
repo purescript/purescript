@@ -46,7 +46,7 @@ buildTypeSubstitution name n = go n []
   where
   go :: Int -> [Type] -> Type -> Either ErrorMessage (Maybe Type)
   go 0 args (TypeConstructor ctor) | name == ctor = return (Just $ SaturatedTypeSynonym ctor args)
-  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ PartiallyAppliedSynonym name
+  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ SimpleErrorWrapper $ PartiallyAppliedSynonym name
   go m args (TypeApp f arg) = go (m - 1) (arg:args) f
   go _ _ _ = return Nothing
 

@@ -365,7 +365,7 @@ filterExports mn exps env = do
   filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> m [(ProperName, [ProperName])]
   filterTypes expTys result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterTypes expTys result r
   filterTypes expTys result (TypeRef name expDcons) = do
-    dcons <- maybe (throwError . errorMessage . UnknownType $ Qualified (Just mn) name) return $ name `lookup` expTys
+    dcons <- maybe (throwError . errorMessage . SimpleErrorWrapper . UnknownType $ Qualified (Just mn) name) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
     return $ (name, dcons') : result
   filterTypes _ result _ = return result
@@ -512,7 +512,7 @@ resolveImport currentModule importModule exps imps impQual =
   updateImports m name = case M.lookup (Qualified impQual name) m of
     Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
-    Just (Qualified (Just mn) _) -> throwError . errorMessage $ err
+    Just (Qualified (Just mn) _) -> throwError . errorMessage $ SimpleErrorWrapper $ err
       where
       err = if mn == currentModule || importModule == currentModule
             then ConflictingImport (show name) mn
@@ -526,14 +526,14 @@ resolveImport currentModule importModule exps imps impQual =
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
   checkDctorExists :: [ProperName] -> ProperName -> m ProperName
-  checkDctorExists = checkImportExists (flip UnknownDataConstructor Nothing)
+  checkDctorExists = checkImportExists $ \pn -> SimpleErrorWrapper $ UnknownDataConstructor pn Nothing
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists :: (Eq a, Show a) => (Qualified a -> ErrorMessage) -> [a] -> a -> m a
   checkImportExists unknown exports item =
       if item `elem` exports
       then return item
-      else throwError . errorMessage . unknown $ Qualified (Just importModule) item
+      else throwError . errorMessage . SimpleErrorWrapper . unknown $ Qualified (Just importModule) item
 
 -- |
 -- Raises an error for when there is more than one definition for something.
