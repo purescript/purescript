@@ -211,7 +211,7 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (onErrorMessages (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
-      guardWith (errorMessage (ExpectedType kind)) $ kind == Star
+      guardWith (errorMessage $ ExpectedType kind) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
@@ -220,7 +220,7 @@ typeCheckAll mainModuleName moduleName exps = go
   go (d@(FixityDeclaration _ name) : rest) = do
     ds <- go rest
     env <- getEnv
-    guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
+    guardWith (errorMessage $ OrphanFixityDeclaration name) $ M.member (moduleName, Op name) $ names env
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
     tcds <- getTypeClassDictionaries

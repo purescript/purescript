@@ -183,7 +183,7 @@ replaceTypeClassDictionaries mn =
 -- Check the kind of a type, failing if it is not of kind *.
 --
 checkTypeKind :: Kind -> UnifyT t Check ()
-checkTypeKind kind = guardWith (errorMessage (ExpectedType kind)) $ kind == Star
+checkTypeKind kind = guardWith (errorMessage $ ExpectedType kind) $ kind == Star
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns

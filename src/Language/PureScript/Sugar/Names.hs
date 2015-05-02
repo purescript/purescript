@@ -142,7 +142,7 @@ addValue env mn name = updateExportedModule env mn $ \m -> do
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> ErrorMessage) -> [a] -> a -> m [a]
+addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> SimpleErrorMessage) -> [a] -> a -> m [a]
 addExport what exports name =
   if name `elem` exports
   then throwConflictError what name
@@ -279,7 +279,7 @@ renameInModule imports exports (Module coms mn decls exps) =
 
   -- Update names so unqualified references become qualified, and locally qualified references
   -- are replaced with their canoncial qualified names (e.g. M.Map -> Data.Map.Map)
-  update :: (Ord a, Show a) => (Qualified a -> ErrorMessage)
+  update :: (Ord a, Show a) => (Qualified a -> SimpleErrorMessage)
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
                             -> Qualified a
@@ -529,7 +529,7 @@ resolveImport currentModule importModule exps imps impQual =
   checkDctorExists = checkImportExists (flip UnknownDataConstructor Nothing)
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => (Qualified a -> ErrorMessage) -> [a] -> a -> m a
+  checkImportExists :: (Eq a, Show a) => (Qualified a -> SimpleErrorMessage) -> [a] -> a -> m a
   checkImportExists unknown exports item =
       if item `elem` exports
       then return item
@@ -538,5 +538,5 @@ resolveImport currentModule importModule exps imps impQual =
 -- |
 -- Raises an error for when there is more than one definition for something.
 --
-throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> ErrorMessage) -> a -> m b
+throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> SimpleErrorMessage) -> a -> m b
 throwConflictError conflict = throwError . errorMessage . conflict

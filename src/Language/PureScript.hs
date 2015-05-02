@@ -124,7 +124,7 @@ generateMain env js = do
   case moduleNameFromString <$> main of
     Just mmi -> do
       when ((mmi, Ident C.main) `M.notMember` names env) $
-        throwError . errorMessage $ NameIsUndefined (Ident C.main)
+        throwError . errorMessage $ NameIsUndefined $ Ident C.main
       return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace additional)))) []]
     _ -> return js
 

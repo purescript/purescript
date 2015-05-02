@@ -188,7 +188,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
 toDataBindingGroup :: (MonadError MultipleErrors m) => SCC Declaration -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage $ CycleInTypeSynonym (Just pn)
+  Just pn -> throwError . errorMessage $ CycleInTypeSynonym $ Just pn
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
   | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing

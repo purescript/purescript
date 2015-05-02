@@ -93,7 +93,7 @@ toDecls :: forall m. (Functor m, Applicative m, Monad m, MonadSupply m, MonadErr
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
-  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
+  guardWith (errorMessage $ OverlappingArgNames (Just ident)) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
   where
   isVarBinder :: Binder -> Bool
