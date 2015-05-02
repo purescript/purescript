@@ -209,25 +209,11 @@ errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
 errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
 errorCode (ShadowedName _)              = "ShadowedName"
 errorCode PreludeNotPresent             = "PreludeNotPresent"
-errorCode (NotYetDefined _ e)           = errorCode e
-errorCode (ErrorUnifyingTypes _ _ e)    = errorCode e
-errorCode (ErrorInExpression _ e)       = errorCode e
-errorCode (ErrorInModule _ e)           = errorCode e
-errorCode (ErrorInInstance _ _ e)       = errorCode e
-errorCode (ErrorInSubsumption _ _ e)    = errorCode e
-errorCode (ErrorCheckingType _ _ e)     = errorCode e
-errorCode (ErrorCheckingKind _ e)       = errorCode e
-errorCode (ErrorInferringType _ e)      = errorCode e
-errorCode (ErrorInApplication _ _ _ e)  = errorCode e
-errorCode (ErrorInDataConstructor _ e)  = errorCode e
-errorCode (ErrorInTypeConstructor _ e)  = errorCode e
-errorCode (ErrorInBindingGroup _ e)     = errorCode e
-errorCode (ErrorInDataBindingGroup e)   = errorCode e
-errorCode (ErrorInTypeSynonym _ e)      = errorCode e
-errorCode (ErrorInValueDeclaration _ e) = errorCode e
-errorCode (ErrorInForeignImport _ e)    = errorCode e
-errorCode (PositionedError _ e)         = errorCode e
-  
+errorCode wrappedErrorMessage =
+  case unwrapErrorMessage wrappedErrorMessage of
+    (Just err) -> errorCode err
+    _          -> error $ "Missing errorCode definition for " ++ show wrappedErrorMessage
+
 -- |
 -- A stack trace for an error
 --
@@ -261,6 +247,31 @@ data LabelType = TypeLabel | SkolemLabel String deriving (Show, Eq, Ord)
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 type UnknownMap = M.Map (LabelType, Unknown) Unknown
+
+-- |
+-- Extract nested error messages from wrapper errors
+--
+unwrapErrorMessage :: ErrorMessage -> Maybe ErrorMessage
+unwrapErrorMessage em = case em of
+  (ErrorCheckingKind _ err)       -> Just err
+  (ErrorCheckingType _ _ err)     -> Just err
+  (ErrorInApplication _ _ _ err)  -> Just err
+  (ErrorInBindingGroup _ err)     -> Just err
+  (ErrorInDataBindingGroup err)   -> Just err
+  (ErrorInDataConstructor _ err)  -> Just err
+  (ErrorInExpression _ err)       -> Just err
+  (ErrorInForeignImport _ err)    -> Just err
+  (ErrorInInstance _ _ err)       -> Just err
+  (ErrorInModule _ err)           -> Just err
+  (ErrorInSubsumption _ _ err)    -> Just err
+  (ErrorInTypeConstructor _ err)  -> Just err
+  (ErrorInTypeSynonym _ err)      -> Just err
+  (ErrorInValueDeclaration _ err) -> Just err
+  (ErrorInferringType _ err)      -> Just err
+  (ErrorUnifyingTypes _ _ err)    -> Just err
+  (NotYetDefined _ err)           -> Just err
+  (PositionedError _ err)         -> Just err
+  _                               -> Nothing
 
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes 
@@ -518,25 +529,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
     | otherwise                          = []
     where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
-  suggestions (ErrorCheckingKind _ err)       = suggestions err
-  suggestions (ErrorCheckingType _ _ err)     = suggestions err
-  suggestions (ErrorInApplication _ _ _ err)  = suggestions err
-  suggestions (ErrorInBindingGroup _ err)     = suggestions err
-  suggestions (ErrorInDataBindingGroup err)   = suggestions err
-  suggestions (ErrorInDataConstructor _ err)  = suggestions err
-  suggestions (ErrorInExpression _ err)       = suggestions err
-  suggestions (ErrorInForeignImport _ err)    = suggestions err
-  suggestions (ErrorInInstance _ _ err)       = suggestions err
-  suggestions (ErrorInModule _ err)           = suggestions err
-  suggestions (ErrorInSubsumption _ _ err)    = suggestions err
-  suggestions (ErrorInTypeConstructor _ err)  = suggestions err
-  suggestions (ErrorInTypeSynonym _ err)      = suggestions err
-  suggestions (ErrorInValueDeclaration _ err) = suggestions err
-  suggestions (ErrorInferringType _ err)      = suggestions err
-  suggestions (ErrorUnifyingTypes _ _ err)    = suggestions err
-  suggestions (NotYetDefined _ err)           = suggestions err
-  suggestions (PositionedError _ err)         = suggestions err
-  suggestions _ = []
+  suggestions err = case unwrapErrorMessage err of
+    (Just em) -> suggestions em
+    _         -> []
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
