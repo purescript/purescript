@@ -211,7 +211,7 @@ errorCode (ShadowedName _)              = "ShadowedName"
 errorCode PreludeNotPresent             = "PreludeNotPresent"
 errorCode wrappedErrorMessage =
   case unwrapErrorMessage wrappedErrorMessage of
-    (Just err) -> errorCode err
+    Just err -> errorCode err
     _          -> error $ "Missing errorCode definition for " ++ show wrappedErrorMessage
 
 -- |
@@ -530,7 +530,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     | otherwise                          = []
     where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
   suggestions err = case unwrapErrorMessage err of
-    (Just em) -> suggestions em
+    Just em -> suggestions em
     _         -> []
 
   paras :: [Box.Box] -> Box.Box
