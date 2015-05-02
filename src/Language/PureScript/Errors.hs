@@ -209,10 +209,7 @@ errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
 errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
 errorCode (ShadowedName _)              = "ShadowedName"
 errorCode PreludeNotPresent             = "PreludeNotPresent"
-errorCode wrappedErrorMessage =
-  case unwrapErrorMessage wrappedErrorMessage of
-    Just err -> errorCode err
-    _          -> error $ "Missing errorCode definition for " ++ show wrappedErrorMessage
+errorCode wrappedError                  = errorCode $ unwrapErrorMessage wrappedError
 
 -- |
 -- A stack trace for an error
@@ -251,27 +248,27 @@ type UnknownMap = M.Map (LabelType, Unknown) Unknown
 -- |
 -- Extract nested error messages from wrapper errors
 --
-unwrapErrorMessage :: ErrorMessage -> Maybe ErrorMessage
+unwrapErrorMessage :: ErrorMessage -> ErrorMessage
 unwrapErrorMessage em = case em of
-  (ErrorCheckingKind _ err)       -> Just err
-  (ErrorCheckingType _ _ err)     -> Just err
-  (ErrorInApplication _ _ _ err)  -> Just err
-  (ErrorInBindingGroup _ err)     -> Just err
-  (ErrorInDataBindingGroup err)   -> Just err
-  (ErrorInDataConstructor _ err)  -> Just err
-  (ErrorInExpression _ err)       -> Just err
-  (ErrorInForeignImport _ err)    -> Just err
-  (ErrorInInstance _ _ err)       -> Just err
-  (ErrorInModule _ err)           -> Just err
-  (ErrorInSubsumption _ _ err)    -> Just err
-  (ErrorInTypeConstructor _ err)  -> Just err
-  (ErrorInTypeSynonym _ err)      -> Just err
-  (ErrorInValueDeclaration _ err) -> Just err
-  (ErrorInferringType _ err)      -> Just err
-  (ErrorUnifyingTypes _ _ err)    -> Just err
-  (NotYetDefined _ err)           -> Just err
-  (PositionedError _ err)         -> Just err
-  _                               -> Nothing
+  (ErrorCheckingKind _ err)       -> unwrapErrorMessage err
+  (ErrorCheckingType _ _ err)     -> unwrapErrorMessage err
+  (ErrorInApplication _ _ _ err)  -> unwrapErrorMessage err
+  (ErrorInBindingGroup _ err)     -> unwrapErrorMessage err
+  (ErrorInDataBindingGroup err)   -> unwrapErrorMessage err
+  (ErrorInDataConstructor _ err)  -> unwrapErrorMessage err
+  (ErrorInExpression _ err)       -> unwrapErrorMessage err
+  (ErrorInForeignImport _ err)    -> unwrapErrorMessage err
+  (ErrorInInstance _ _ err)       -> unwrapErrorMessage err
+  (ErrorInModule _ err)           -> unwrapErrorMessage err
+  (ErrorInSubsumption _ _ err)    -> unwrapErrorMessage err
+  (ErrorInTypeConstructor _ err)  -> unwrapErrorMessage err
+  (ErrorInTypeSynonym _ err)      -> unwrapErrorMessage err
+  (ErrorInValueDeclaration _ err) -> unwrapErrorMessage err
+  (ErrorInferringType _ err)      -> unwrapErrorMessage err
+  (ErrorUnifyingTypes _ _ err)    -> unwrapErrorMessage err
+  (NotYetDefined _ err)           -> unwrapErrorMessage err
+  (PositionedError _ err)         -> unwrapErrorMessage err
+  _                               -> em
 
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes 
@@ -525,13 +522,13 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
   line = Box.text
 
   suggestions :: ErrorMessage -> [Box.Box]
-  suggestions (TypesDoNotUnify t1 t2)
-    | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
-    | otherwise                          = []
-    where suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
-  suggestions err = case unwrapErrorMessage err of
-    Just em -> suggestions em
-    _         -> []
+  suggestions = suggestions' . unwrapErrorMessage
+    where
+    suggestions' (TypesDoNotUnify t1 t2)
+      | [t1, t2] == [tyObject, tyFunction] = [suggestOp "function composition (<<<)"]
+      | otherwise                          = []
+    suggestions' _ = []
+    suggestOp alt = Box.text $ "Did you mean to use " ++ alt ++ " instead?"
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
