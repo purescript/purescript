@@ -14,8 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -34,7 +32,6 @@ import Data.List (sortBy, groupBy, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
 import Data.Version (Version)
-import qualified Data.Traversable as T (traverse)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -49,7 +46,7 @@ import System.FilePath ((</>))
 
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
-import Language.PureScript.CodeGen as P
+import Language.PureScript.CodeGen
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
@@ -90,12 +87,12 @@ import qualified Paths_purescript as Paths
 --  * Pretty-print the generated Javascript
 --
 compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-        => [Module] -> [String] -> m (String, String, Environment)
+        => [Module] -> m ([CoreFn.Module CoreFn.Ann], String, Environment, Integer)
 compile = compile' initEnvironment
 
 compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-         => Environment -> [Module] -> [String] -> m (String, String, Environment)
-compile' env ms prefix = do
+         => Environment -> [Module] -> m ([CoreFn.Module CoreFn.Ann], String, Environment, Integer)
+compile' env ms = do
   noPrelude <- asks optionsNoPrelude
   unless noPrelude (checkPreludeIsDefined ms)
   additional <- asks optionsAdditional
@@ -111,22 +108,8 @@ compile' env ms prefix = do
       renamed = renameInModules elim
       codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
       modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-  js <- concat <$> (evalSupplyT nextVar $ T.traverse moduleToJs modulesToCodeGen)
   let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
-  js' <- generateMain env' js
-  let pjs = unlines $ map ("// " ++) prefix ++ [prettyPrintJS js']
-  return (pjs, exts, env')
-
-generateMain :: (MonadError MultipleErrors m, MonadReader (Options Compile) m) => Environment -> [JS] -> m [JS]
-generateMain env js = do
-  main <- asks optionsMain
-  additional <- asks optionsAdditional
-  case moduleNameFromString <$> main of
-    Just mmi -> do
-      when ((mmi, Ident C.main) `M.notMember` names env) $
-        throwError . errorMessage $ NameIsUndefined (Ident C.main)
-      return $ js ++ [JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar (browserNamespace additional)))) []]
-    _ -> return js
+  return (modulesToCodeGen, exts, env', nextVar)
 
 -- |
 -- A type class which collects the IO actions we need to be able to run in "make" mode
@@ -253,7 +236,7 @@ make outputDir ms prefix = do
 checkPreludeIsDefined :: (MonadWriter MultipleErrors m) => [Module] -> m ()
 checkPreludeIsDefined ms = do
   let mns = map getModuleName ms
-  unless (preludeModuleName `elem` mns) $ 
+  unless (preludeModuleName `elem` mns) $
     tell (errorMessage PreludeNotPresent)
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]

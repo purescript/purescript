@@ -18,11 +18,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript.CodeGen.JS (
-    module AST,
-    module Common,
-    moduleToJs
-) where
+module Language.PureScript.CodeGen.JS
+  ( module AST
+  , module Common
+  , moduleToJs
+  , mainCall
+  ) where
 
 import Data.List ((\\), delete)
 import Data.Maybe (mapMaybe)
@@ -352,3 +353,6 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
       return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
+
+mainCall :: ModuleName -> String -> JS
+mainCall mmi ns = JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar ns))) []
