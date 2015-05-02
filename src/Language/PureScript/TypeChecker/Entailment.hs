@@ -133,9 +133,9 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
       checkOverlaps :: [DictionaryValue] -> Check Expr
       checkOverlaps dicts =
         case [ (d1, d2) | d1 <- dicts, d2 <- dicts, d1 `overlapping` d2 ] of
-          ds@(_ : _) -> throwError . errorMessage $ SimpleErrorWrapper $ OverlappingInstances className tys $ nub (map fst ds)
+          ds@(_ : _) -> throwError . errorMessage $ OverlappingInstances className tys $ nub (map fst ds)
           _ -> case chooseSimplestDictionaries dicts of
-                 [] -> throwError . errorMessage $ SimpleErrorWrapper $ NoInstanceFound className tys
+                 [] -> throwError . errorMessage $ NoInstanceFound className tys
                  d : _ -> return $ dictionaryValueToValue d
       -- Choose the simplest DictionaryValues from a list of candidates
       -- The reason for this function is as follows:

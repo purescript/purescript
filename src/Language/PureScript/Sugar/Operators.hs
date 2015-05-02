@@ -93,7 +93,7 @@ ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
   go ((x@(Qualified (Just mn) name), _) : (y, pos) : _) | x == y =
     rethrow (onErrorMessages (ErrorInModule mn)) $
       rethrowWithPosition pos $
-        throwError . errorMessage $ SimpleErrorWrapper $ MultipleFixities name
+        throwError . errorMessage $ MultipleFixities name
   go (_ : rest) = go rest
 
 customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]]
@@ -118,7 +118,7 @@ matchOperators ops = parseChains
   extendChain (BinaryNoParens op l r) = Left l : Right op : extendChain r
   extendChain other = [Left other]
   bracketChain :: Chain -> m Expr
-  bracketChain = either (const . throwError . errorMessage $ SimpleErrorWrapper $ CannotReorderOperators) return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
+  bracketChain = either (const . throwError . errorMessage $ CannotReorderOperators) return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]

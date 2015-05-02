@@ -88,7 +88,7 @@ skolemEscapeCheck root@TypedValue{} =
   let (_, f, _, _, _) = everythingWithContextOnValues [] [] (++) def go def def def
   in case f root of
        [] -> return ()
-       ((binding, val) : _) -> throwError . errorMessage $ ErrorInExpression val $ SimpleErrorWrapper $ EscapedSkolem binding
+       ((binding, val) : _) -> throwError . (MultipleErrors . (: [])) $ ErrorInExpression val $ SimpleErrorWrapper $ EscapedSkolem binding
   where
   def s _ = (s, [])
 

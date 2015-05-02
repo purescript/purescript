@@ -39,7 +39,7 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
 loadPrelude :: [(FilePath, String)] -> Either P.MultipleErrors (String, String, P.Environment)
 loadPrelude ms =
   case P.parseModulesFromFiles id ms of
-    Left parseError -> Left . P.errorMessage . P.SimpleErrorWrapper . P.ErrorParsingPrelude $ parseError
+    Left parseError -> Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
 
 compile :: P.Options P.Compile -> [FilePath] -> IO (Either P.MultipleErrors (String, String, P.Environment))
@@ -47,7 +47,7 @@ compile opts inputFiles = do
   modules <- P.parseModulesFromFiles id <$> readInput inputFiles
   case modules of
     Left parseError ->
-      return . Left . P.errorMessage . P.SimpleErrorWrapper . P.ErrorParsingPrelude $ parseError
+      return . Left . P.errorMessage . P.ErrorParsingPrelude $ parseError
     Right ms -> return $ fmap fst . runWriterT $ runReaderT (P.compile (map snd ms) []) opts
 
 assert :: FilePath -> P.Options P.Compile -> FilePath -> (Either P.MultipleErrors (String, String, P.Environment) -> IO (Maybe String)) -> IO ()

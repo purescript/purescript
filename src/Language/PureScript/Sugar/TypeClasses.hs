@@ -236,11 +236,11 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   (TypeClassDeclaration _ args implies tyDecls) <-
-    maybe (throwError . errorMessage $ SimpleErrorWrapper $ UnknownTypeClass className) return $
+    maybe (throwError . errorMessage $ UnknownTypeClass className) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
-    member : _ -> throwError . errorMessage $ SimpleErrorWrapper $ MissingClassMember member
+    member : _ -> throwError . errorMessage $ MissingClassMember member
     [] -> do
 
       let instanceTys = map memberToNameAndType tyDecls
@@ -277,7 +277,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- maybe (throwError . errorMessage $ SimpleErrorWrapper $ MissingClassMember ident) return $ lookup ident tys'
+    _ <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d

@@ -87,7 +87,7 @@ replaceAllTypeSynonyms' env d =
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  either (throwError . errorMessage) return $ replaceAllTypeSynonyms' env d
+  either (throwError . MultipleErrors . (: [])) return $ replaceAllTypeSynonyms' env d
 
 -- |
 -- Replace a type synonym and its arguments with the aliased type
@@ -103,7 +103,7 @@ expandTypeSynonym' env name args =
 expandTypeSynonym :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
-  either (throwError . errorMessage) return $ expandTypeSynonym' env name args
+  either (throwError . MultipleErrors . (: [])) return $ expandTypeSynonym' env name args
 
 expandAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 expandAllTypeSynonyms = everywhereOnTypesTopDownM go

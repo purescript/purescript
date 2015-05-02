@@ -58,7 +58,7 @@ desugarDo d =
   go (DoNotationValue val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
-  go [DoNotationBind _ _] = throwError . errorMessage $ SimpleErrorWrapper $ InvalidDoBind
+  go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
@@ -67,7 +67,7 @@ desugarDo d =
     rest' <- go rest
     ident <- Ident <$> freshName
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
-  go [DoNotationLet _] = throwError . errorMessage $ SimpleErrorWrapper $ InvalidDoLet
+  go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     rest' <- go rest
     return $ Let ds rest'

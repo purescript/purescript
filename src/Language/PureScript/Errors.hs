@@ -225,20 +225,20 @@ newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
   
 instance UnificationError Type MultipleErrors where
-  occursCheckFailed = errorMessage . occursCheckFailed
+  occursCheckFailed = occursCheckFailed
   
 instance UnificationError Kind MultipleErrors where
-  occursCheckFailed = errorMessage . occursCheckFailed
+  occursCheckFailed = occursCheckFailed
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
 nonEmpty = not . null . runMultipleErrors
 
 -- |
--- Create an error set from a single error message
+-- Create an error set from a single simple error message
 --
-errorMessage :: ErrorMessage -> MultipleErrors
-errorMessage err = MultipleErrors [err]
+errorMessage :: SimpleErrorMessage -> MultipleErrors
+errorMessage err = MultipleErrors [SimpleErrorWrapper err]
 
 -- |
 -- Lift a function on ErrorMessage to a function on MultipleErrors

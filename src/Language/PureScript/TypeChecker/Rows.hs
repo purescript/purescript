@@ -54,7 +54,7 @@ checkDuplicateLabels =
     checkDups r@RCons{} =
       let (ls, _) = rowToList r in
       case firstDup . sort . map fst $ ls of
-        Just l -> throwError . errorMessage $ SimpleErrorWrapper $ DuplicateLabel l (Just val)
+        Just l -> throwError . errorMessage $ DuplicateLabel l (Just val)
         Nothing -> return ()
     checkDups _ = return ()
 

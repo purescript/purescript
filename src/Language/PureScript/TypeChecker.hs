@@ -71,7 +71,7 @@ valueIsNotDefined :: ModuleName -> Ident -> Check ()
 valueIsNotDefined moduleName name = do
   env <- getEnv
   case M.lookup (moduleName, name) (names env) of
-    Just _ -> throwError . errorMessage $ SimpleErrorWrapper $ RedefinedIdent name
+    Just _ -> throwError . errorMessage $ RedefinedIdent name
     Nothing -> return ()
 
 addValue :: ModuleName -> Ident -> Type -> NameKind -> Check ()
@@ -95,7 +95,7 @@ addTypeClassDictionaries entries =
 
 checkDuplicateTypeArguments :: [String] -> Check ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
-  throwError . errorMessage $ SimpleErrorWrapper $ DuplicateTypeArgument dup
+  throwError . errorMessage $ DuplicateTypeArgument dup
   where
   firstDup :: Maybe String
   firstDup = listToMaybe $ args \\ nub args
@@ -104,10 +104,10 @@ checkTypeClassInstance :: ModuleName -> Type -> Check ()
 checkTypeClassInstance _ (TypeVar _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
-  when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ SimpleErrorWrapper $ TypeSynonymInstance
+  when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
   return ()
 checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError . errorMessage $ SimpleErrorWrapper $ InvalidInstanceHead ty
+checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
 -- Check that type synonyms are fully-applied in a type
@@ -145,8 +145,8 @@ typeCheckAll mainModuleName moduleName exps = go
     where
     checkNewtype :: [(ProperName, [Type])] -> Check ()
     checkNewtype [(_, [_])] = return ()
-    checkNewtype [(_, _)] = throwError . errorMessage $ SimpleErrorWrapper $ InvalidNewtype
-    checkNewtype _ = throwError . errorMessage $ SimpleErrorWrapper $ InvalidNewtype
+    checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype
+    checkNewtype _ = throwError . errorMessage $ InvalidNewtype
   go (d@(DataBindingGroupDeclaration tys) : rest) = do
     rethrow (onErrorMessages ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
@@ -211,16 +211,16 @@ typeCheckAll mainModuleName moduleName exps = go
     rethrow (onErrorMessages (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
-      guardWith (errorMessage $ SimpleErrorWrapper $ ExpectedType kind) $ kind == Star
+      guardWith (errorMessage $ ExpectedType kind) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
-        Just _ -> throwError . errorMessage $ SimpleErrorWrapper $ RedefinedIdent name
+        Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Extern importTy, Defined) (names env) })
     ds <- go rest
     return $ d : ds
   go (d@(FixityDeclaration _ name) : rest) = do
     ds <- go rest
     env <- getEnv
-    guardWith (errorMessage $ SimpleErrorWrapper $ OrphanFixityDeclaration name) $ M.member (moduleName, Op name) $ names env
+    guardWith (errorMessage $ OrphanFixityDeclaration name) $ M.member (moduleName, Op name) $ names env
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
     tcds <- getTypeClassDictionaries
@@ -293,7 +293,7 @@ typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onE
     ty <- lookupVariable mn (Qualified (Just mn) name)
     case filter (not . exported) (extract ty) of
       [] -> return ()
-      hidden -> throwError . errorMessage $ SimpleErrorWrapper $ TransitiveExportError dr hidden
+      hidden -> throwError . errorMessage $ TransitiveExportError dr hidden
       where
       exported e = any (exports e) exps
       exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
@@ -334,7 +334,7 @@ typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onE
   checkClassMembersAreExported dr@(TypeClassRef name) = do
     let members = ValueRef `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
-    unless (null missingMembers) $ throwError . errorMessage $ SimpleErrorWrapper $ TransitiveExportError dr members
+    unless (null missingMembers) $ throwError . errorMessage $ TransitiveExportError dr members
     where
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds

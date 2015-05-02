@@ -221,7 +221,7 @@ runMake = runExceptT . fmap fst . runWriterT . flip runReaderT options . unMake
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
 makeIO f io = do
   e <- liftIO $ tryIOError io
-  either (throwError . P.errorMessage . f) return e
+  either (throwError . (P.MultipleErrors . (: [])) . f) return e
 
 instance P.MonadMake Make where
   getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do

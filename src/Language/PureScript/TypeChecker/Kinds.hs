@@ -65,7 +65,7 @@ instance Unifiable Check Kind where
   FunKind k1 k2 =?= FunKind k3 k4 = do
     k1 =?= k3
     k2 =?= k4
-  k1 =?= k2 = UnifyT . lift . throwError . errorMessage $ SimpleErrorWrapper $ KindsDoNotUnify k1 k2
+  k1 =?= k2 = UnifyT . lift . throwError . errorMessage $ KindsDoNotUnify k1 k2
 
 -- |
 -- Infer the kind of a single type
@@ -192,7 +192,7 @@ infer' other = (, []) <$> go other
   go (TypeConstructor v) = do
     env <- liftCheck getEnv
     case M.lookup v (types env) of
-      Nothing -> UnifyT . lift . throwError . errorMessage $ SimpleErrorWrapper $ UnknownTypeConstructor v
+      Nothing -> UnifyT . lift . throwError . errorMessage $ UnknownTypeConstructor v
       Just (kind, _) -> return kind
   go (TypeApp t1 t2) = do
     k0 <- fresh
