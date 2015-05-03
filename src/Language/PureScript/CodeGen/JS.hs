@@ -49,8 +49,8 @@ import qualified Language.PureScript.Constants as C
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => Module Ann -> m [JS]
-moduleToJs (Module coms mn imps exps foreigns decls) = do
+           => Module Ann -> Maybe JS -> m [JS]
+moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
   jsDecls <- mapM bindToJs decls
@@ -59,7 +59,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   comments <- not <$> asks optionsNoComments
   let strict = JSStringLiteral "use strict"
   let header = if comments && not (null coms) then JSComment coms strict else strict
-  let moduleBody = header : jsImports ++ concat optimized
+  let foreign' = [JSVariableIntroduction "$foreign" foreign | not $ null foreigns || foreign == Nothing]
+  let moduleBody = header : foreign' ++ jsImports ++ concat optimized
   let foreignExps = exps `intersect` (fst `map` foreigns)
   let standardExps = exps \\ foreignExps
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps

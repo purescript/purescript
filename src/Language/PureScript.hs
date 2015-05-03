@@ -210,7 +210,7 @@ make outputDir ms prefix = do
         corefn = CoreFn.moduleToCoreFn env' mod'
         [renamed] = renameInModules [corefn]
 
-    pjs <- prettyPrintJS <$> moduleToJs renamed
+    pjs <- prettyPrintJS <$> moduleToJs renamed Nothing
     let js = unlines $ map ("// " ++) prefix ++ [pjs]
     let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
 

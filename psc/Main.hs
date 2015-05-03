@@ -42,7 +42,9 @@ import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
+
 
 import Foreign
 
@@ -82,7 +84,7 @@ compile (PSCOptions input inputForeign opts stdin output externs usePrefix) = do
       hPutStrLn stderr err
       exitFailure
     Right (ms, foreigns) ->
-      case runPSC opts (compileJS (map snd ms) M.empty prefix) of
+      case runPSC opts (compileJS (map snd ms) foreigns prefix) of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
@@ -106,12 +108,20 @@ compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m,
           => [P.Module] -> M.Map P.ModuleName String -> [String] -> m (String, String)
 compileJS ms foreigns prefix = do
   (modulesToCodeGen, exts, env, nextVar) <- P.compile ms
-  js <- concat <$> evalSupplyT nextVar (traverse J.moduleToJs modulesToCodeGen)
+  js <- concat <$> evalSupplyT nextVar (traverse codegenModule modulesToCodeGen)
   js' <- generateMain env js
   let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']
   return (pjs, exts)
 
   where
+
+  --codegenModule :: CF.Module CF.Ann -> m [J.JS]
+  codegenModule m =
+    J.moduleToJs m $ (\js -> J.JSApp (J.JSFunction Nothing [] (J.JSBlock
+          [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
+          , J.JSRaw js
+          , J.JSReturn (J.JSVar "exports")
+          ])) []) <$> CF.moduleName m `M.lookup` foreigns
 
   generateMain :: P.Environment -> [J.JS] -> m [J.JS]
   generateMain env js = do
