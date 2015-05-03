@@ -88,7 +88,11 @@ data NameKind
   -- |
   -- A public value for a module member or foreing import declaration
   --
-  | Public deriving (Show, Eq, Data, Typeable)
+  | Public
+  -- |
+  -- A name for member introduced by foreign import
+  --
+  | External deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The kinds of a type
@@ -234,3 +238,10 @@ isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
 isNewtypeConstructor e ctor = case lookupConstructor e ctor of
   (Newtype, _, _, _) -> True
   (Data, _, _, _) -> False
+
+-- |
+-- Finds information about values from the current environment.
+--
+lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
+lookupValue env (Qualified (Just mn) ident) = (mn, ident) `M.lookup` names env
+lookupValue _ _ = Nothing

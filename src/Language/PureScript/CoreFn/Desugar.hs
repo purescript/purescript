@@ -102,7 +102,7 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
   exprToCoreFn ss com ty (A.Var ident) =
-    Var (ss, com, ty, Nothing) ident
+    Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
     Case (ss, com, ty, Nothing) [exprToCoreFn ss [] Nothing v1]
       [ CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral True]
@@ -166,6 +166,15 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
     binderToCoreFn (Just ss) (com ++ com1) b
+
+  -- |
+  -- Gets metadata for values.
+  --
+  getValueMeta :: Qualified Ident -> Maybe Meta
+  getValueMeta name =
+    case lookupValue env name of
+      Just (_, External, _) -> Just IsForeign
+      _ -> Nothing
 
   -- |
   -- Gets metadata for data constructors.

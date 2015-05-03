@@ -214,7 +214,7 @@ typeCheckAll mainModuleName moduleName exps = go
       guardWith (errorMessage (ExpectedType kind)) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
-        Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, Public, Defined) (names env) })
+        Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })
     ds <- go rest
     return $ d : ds
   go (d@(FixityDeclaration _ name) : rest) = do
