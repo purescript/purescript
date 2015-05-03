@@ -226,8 +226,8 @@ renameInModule imports exports (Module coms mn decls exps) =
     (,) (pos, bound) <$> (ExternInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn Nothing <*> mapM (updateTypesEverywhere pos) ts)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
-  updateDecl (pos, bound) (ExternDeclaration fit name js ty) =
-    (,) (pos, name : bound) <$> (ExternDeclaration fit name js <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDeclaration name ty) =
+    (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
 
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)
@@ -337,7 +337,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
-  addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
+  addDecl mn env (ExternDeclaration name _) = addValue env mn name
   addDecl mn env (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ addDecl mn env d
   addDecl _  env _ = return env
 

@@ -30,22 +30,21 @@ module Language.PureScript.Parser.Declarations (
 
 import Prelude hiding (lex)
 
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Traversable (forM)
 
 import Control.Applicative
 import Control.Arrow ((+++))
 
-import Language.PureScript.Kinds
 import Language.PureScript.AST
 import Language.PureScript.Comments
+import Language.PureScript.Environment
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Parser.Common
-import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
-import Language.PureScript.Names
-import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.Environment
+import Language.PureScript.Parser.Types
 
 import qualified Language.PureScript.Parser.Common as C
 import qualified Text.Parsec as P
@@ -99,7 +98,7 @@ parseValueDeclaration = do
                                     <*> (indented *> equals *> parseValueWithWhereClause)
                                ))
        <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
-  return $ ValueDeclaration name Value binders value
+  return $ ValueDeclaration name Public binders value
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
@@ -126,9 +125,8 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
            tys <- P.many (indented *> noWildcards parseTypeAtom)
            return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
-           js <- P.optionMaybe (JSRaw <$> stringLiteral)
            ty <- indented *> doubleColon *> noWildcards parsePolyType
-           return $ ExternDeclaration (if isJust js then InlineJavascript else ForeignImport) ident js ty))
+           return $ ExternDeclaration ident ty))
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =

@@ -122,13 +122,13 @@ discardPositionInfo (P.PositionedDeclaration _ _ d) = d
 discardPositionInfo d = d
 
 acceptable :: P.Declaration -> Bool
-acceptable (P.DataDeclaration _ _ _ _) = True
-acceptable (P.TypeSynonymDeclaration _ _ _) = True
-acceptable (P.ExternDeclaration _ _ _ _) = True
-acceptable (P.ExternDataDeclaration _ _) = True
-acceptable (P.ExternInstanceDeclaration _ _ _ _) = True
-acceptable (P.TypeClassDeclaration _ _ _ _) = True
-acceptable (P.TypeInstanceDeclaration _ _ _ _ _) = True
+acceptable P.DataDeclaration{} = True
+acceptable P.TypeSynonymDeclaration{} = True
+acceptable P.ExternDeclaration{} = True
+acceptable P.ExternDataDeclaration{} = True
+acceptable P.ExternInstanceDeclaration{} = True
+acceptable P.TypeClassDeclaration{} = True
+acceptable P.TypeInstanceDeclaration{} = True
 acceptable _ = False
 
 parseReplQuery' :: String -> Either String ReplQuery

@@ -63,19 +63,6 @@ initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty M.empty
 
 -- |
--- The type of a foreign import
---
-data ForeignImportType
-  -- |
-  -- A regular foreign import
-  --
-  = ForeignImport
-  -- |
-  -- A foreign import which contains inline Javascript as a string literal
-  --
-  | InlineJavascript deriving (Show, Eq, Data, Typeable)
-
--- |
 -- The visibility of a name in scope
 --
 data NameVisibility
@@ -89,33 +76,19 @@ data NameVisibility
   | Defined deriving (Show, Eq)
 
 -- |
--- The kind of a name
+-- A flag for whether a name is for an private or public value - only public values will be
+-- included in a generated externs file.
 --
 data NameKind
   -- |
-  -- A value introduced as a binding in a module
+  -- A private value introduced as an artifact of code generation (class instances, class member
+  -- accessors, etc.)
   --
-  = Value
+  = Private
   -- |
-  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
+  -- A public value for a module member or foreing import declaration
   --
-  | TypeClassAccessorImport
-  -- |
-  -- A foreign import
-  --
-  | Extern ForeignImportType
-  -- |
-  -- A local name introduced using a lambda abstraction, variable introduction or binder
-  --
-  | LocalVariable
-  -- |
-  -- A data constructor
-  --
-  | DataConstructor
-  -- |
-  -- A type class dictionary, generated during desugaring of type class declarations
-  --
-  | TypeInstanceDictionaryValue deriving (Show, Eq, Data, Typeable)
+  | Public deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The kinds of a type

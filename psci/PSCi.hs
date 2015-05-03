@@ -65,7 +65,7 @@ supportModuleName = P.ModuleName [P.ProperName "$PSCI", P.ProperName "Support"]
 
 -- | Support module, contains code to evaluate terms
 supportModule :: P.Module
-supportModule = 
+supportModule =
   case P.parseModulesFromFiles id [("", code)] of
     Right [(_, P.Module cs _ ds exps)] -> P.Module cs supportModuleName ds exps
     _ -> error "Support module could not be parsed"
@@ -245,8 +245,8 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     trace = P.Var (P.Qualified (Just supportModuleName) (P.Ident "eval"))
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl = P.ValueDeclaration (P.Ident "it") P.Value [] $ Right val
-    mainDecl = P.ValueDeclaration (P.Ident "main") P.Value [] $ Right mainValue
+    itDecl = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
+    mainDecl = P.ValueDeclaration (P.Ident "main") P.Public [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
     P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing

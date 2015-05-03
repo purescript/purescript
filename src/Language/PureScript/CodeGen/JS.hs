@@ -26,7 +26,6 @@ module Language.PureScript.CodeGen.JS
   ) where
 
 import Data.List ((\\), delete)
-import Data.Maybe (mapMaybe)
 import qualified Data.Traversable as T (traverse)
 
 import Control.Applicative
@@ -54,7 +53,7 @@ moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode)
 moduleToJs (Module coms mn imps exps foreigns decls) = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
-  let foreigns' = mapMaybe (\(_, js, _) -> js) foreigns
+  let foreigns' = [] -- TODO: Update this. mapMaybe (\(_, js, _) -> js) foreigns
   jsDecls <- mapM bindToJs decls
   optimized <- T.traverse (T.traverse optimize) jsDecls
   let isModuleEmpty = null exps

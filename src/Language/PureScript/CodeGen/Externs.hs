@@ -90,7 +90,7 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
     exportToPs (ValueRef ident) =
       case (moduleName, ident) `M.lookup` names env of
         Nothing -> error $ show ident ++ " has no type in exportToPs"
-        Just (ty, nameKind, _) | nameKind == Value || nameKind == Extern ForeignImport || nameKind == Extern InlineJavascript ->
+        Just (ty, Public, _) ->
           tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
         _ -> return ()
     exportToPs (TypeClassRef className) =

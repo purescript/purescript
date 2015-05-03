@@ -198,7 +198,7 @@ findQualModules decls =
   fqValues (A.Var (Qualified (Just mn) _)) = [mn]
   fqValues (A.Constructor (Qualified (Just mn) _)) = [mn]
   fqValues _ = []
-  
+
   fqBinders :: A.Binder -> [ModuleName]
   fqBinders (A.ConstructorBinder (Qualified (Just mn) _) _) = [mn]
   fqBinders _ = []
@@ -215,8 +215,8 @@ importToCoreFn _ = Nothing
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
 externToCoreFn :: A.Declaration -> Maybe ForeignDecl
-externToCoreFn (A.ExternDeclaration _ name js ty) = Just (name, js, ty)
-externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
+externToCoreFn (A.ExternDeclaration name ty) = Just (name, ty)
+externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
 
