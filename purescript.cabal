@@ -44,6 +44,7 @@ library
                    bytestring -any,
                    text -any,
                    split -any
+
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -147,7 +148,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules:
+    other-modules: Foreign
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psc-make
