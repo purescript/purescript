@@ -115,13 +115,18 @@ compileJS ms foreigns prefix = do
 
   where
 
-  --codegenModule :: CF.Module CF.Ann -> m [J.JS]
   codegenModule m =
-    J.moduleToJs m $ (\js -> J.JSApp (J.JSFunction Nothing [] (J.JSBlock
-          [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
-          , J.JSRaw js
-          , J.JSReturn (J.JSVar "exports")
-          ])) []) <$> CF.moduleName m `M.lookup` foreigns
+    let requiresForeign = not $ null (CF.moduleForeign m)
+    in case CF.moduleName m `M.lookup` foreigns of
+      Just js | not requiresForeign -> error "Found unnecessary foreign module"
+              | otherwise -> J.moduleToJs m $ Just $
+              J.JSApp (J.JSFunction Nothing [] $
+                        J.JSBlock [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
+                                  , J.JSRaw js
+                                  , J.JSReturn (J.JSVar "exports")
+                                  ]) []
+      Nothing | requiresForeign -> error "Foreign module missing"
+              | otherwise -> J.moduleToJs m Nothing
 
   generateMain :: P.Environment -> [J.JS] -> m [J.JS]
   generateMain env js = do
