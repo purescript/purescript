@@ -40,14 +40,10 @@ library
                    aeson >= 0.8 && < 0.9,
                    vector -any,
                    bower-json >= 0.7,
-                   aeson-better-errors >= 0.5,
+                   aeson-better-errors >= 0.7,
                    bytestring -any,
                    text -any,
-                   split -any,
-                   lucid -any,
-                   blaze-html -any,
-                   data-default -any,
-                   cheapskate -any
+                   split -any
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -131,9 +127,7 @@ library
                      Language.PureScript.Docs.RenderedCode.Types
                      Language.PureScript.Docs.RenderedCode.Render
                      Language.PureScript.Docs.AsMarkdown
-                     Language.PureScript.Docs.AsHtml
                      Language.PureScript.Docs.ParseAndDesugar
-                     Language.PureScript.Docs.Utils.HtmlHelpers
                      Language.PureScript.Docs.Utils.MonoidExtras
 
                      Control.Monad.Unify

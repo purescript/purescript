@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
@@ -10,6 +11,7 @@ module Language.PureScript.Docs.Types
 
 import Control.Arrow (first, (***))
 import Control.Applicative ((<$>), (<*>))
+import Data.Functor ((<$))
 import Data.Char
 import Data.Maybe (mapMaybe)
 import Data.Version
@@ -18,6 +20,7 @@ import qualified Data.Aeson as A
 import Data.Aeson.BetterErrors
 import Text.ParserCombinators.ReadP (readP_to_S)
 import Data.Text (Text)
+import Data.ByteString.Lazy (ByteString)
 import qualified Data.Text as T
 
 import Web.Bower.PackageMeta hiding (Version)
@@ -32,16 +35,34 @@ import Language.PureScript.Docs.RenderedCode as ReExports
 --------------------
 -- Types
 
-data UploadedPackage = UploadedPackage
+data Package a = Package
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
   , pkgModules              :: [RenderedModule]
   , pkgBookmarks            :: [Bookmark]
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
-  , pkgUploader             :: Maybe GithubUser
+  , pkgUploader             :: a
   }
   deriving (Show, Eq, Ord)
+
+data NotYetKnown = NotYetKnown
+
+type UploadedPackage = Package NotYetKnown
+type VerifiedPackage = Package GithubUser
+
+verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
+verifyPackage verifiedUser Package{..} =
+  Package pkgMeta
+          pkgVersion
+          pkgModules
+          pkgBookmarks
+          pkgResolvedDependencies
+          pkgGithub
+          verifiedUser
+
+packageName :: Package a -> PackageName
+packageName = bowerName . pkgMeta
 
 data RenderedModule = RenderedModule
   { rmName         :: String
@@ -92,7 +113,7 @@ newtype GithubRepo
   = GithubRepo { runGithubRepo :: String }
   deriving (Show, Eq, Ord)
 
-data UploadedPackageError
+data PackageError
   = ErrorInPackageMeta BowerError
   | InvalidVersion
   | InvalidDeclarationType
@@ -124,17 +145,46 @@ ignorePackage (FromDep _ x) = x
 ----------------------
 -- Parsing
 
-asUploadedPackage :: Parse UploadedPackageError UploadedPackage
-asUploadedPackage =
-  UploadedPackage <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
-                  <*> key "version" asVersion
-                  <*> key "modules" (eachInArray asRenderedModule)
-                  <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
-                  <*> key "resolvedDependencies" asResolvedDependencies
-                  <*> key "github" asGithub
-                  <*> keyMay "uploader" (GithubUser <$> asString)
+parseUploadedPackage :: ByteString -> Either (ParseError PackageError) UploadedPackage
+parseUploadedPackage = parse asUploadedPackage
 
-asVersion :: Parse UploadedPackageError Version
+parseVerifiedPackage :: ByteString -> Either (ParseError PackageError) VerifiedPackage
+parseVerifiedPackage = parse asVerifiedPackage
+
+asPackage :: (forall e. Parse e a) -> Parse PackageError (Package a)
+asPackage uploader =
+  Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
+          <*> key "version" asVersion
+          <*> key "modules" (eachInArray asRenderedModule)
+          <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
+          <*> key "resolvedDependencies" asResolvedDependencies
+          <*> key "github" asGithub
+          <*> key "uploader" uploader
+
+asUploadedPackage :: Parse PackageError UploadedPackage
+asUploadedPackage = asPackage asNotYetKnown
+
+asNotYetKnown :: Parse e NotYetKnown
+asNotYetKnown = NotYetKnown <$ asNull
+
+instance A.FromJSON NotYetKnown where
+  parseJSON = toAesonParser' asNotYetKnown
+
+asVerifiedPackage :: Parse PackageError VerifiedPackage
+asVerifiedPackage = asPackage asGithubUser
+
+asGithubUser :: Parse e GithubUser
+asGithubUser = GithubUser <$> asString
+
+instance A.FromJSON GithubUser where
+  parseJSON = toAesonParser' asGithubUser
+
+instance A.FromJSON a => A.FromJSON (Package a) where
+  -- TODO: actual error display
+  parseJSON = toAesonParser (T.pack . show)
+                            (asPackage fromAesonParser)
+
+asVersion :: Parse PackageError Version
 asVersion = withString (maybe (Left InvalidVersion) Right . parseVersion')
 
 parseVersion' :: String -> Maybe Version
@@ -143,13 +193,13 @@ parseVersion' str =
     [(vers, "")] -> Just vers
     _            -> Nothing
 
-asRenderedModule :: Parse UploadedPackageError RenderedModule
+asRenderedModule :: Parse PackageError RenderedModule
 asRenderedModule =
   RenderedModule <$> key "name" asString
                  <*> key "comments" (perhaps asString)
                  <*> key "declarations" (eachInArray asDeclaration)
 
-asDeclaration :: Parse UploadedPackageError RenderedDeclaration
+asDeclaration :: Parse PackageError RenderedDeclaration
 asDeclaration =
   RenderedDeclaration <$> key "title" asString
                       <*> key "comments" (perhaps asString)
@@ -157,7 +207,7 @@ asDeclaration =
                       <*> key "sourceSpan" (perhaps asSourceSpan)
                       <*> key "children" (eachInArray asRenderedChildDeclaration)
 
-asRenderedChildDeclaration :: Parse UploadedPackageError RenderedChildDeclaration
+asRenderedChildDeclaration :: Parse PackageError RenderedChildDeclaration
 asRenderedChildDeclaration =
   RenderedChildDeclaration <$> key "title" asString
                            <*> key "comments" (perhaps asString)
@@ -167,7 +217,7 @@ asRenderedChildDeclaration =
   where
   p .!! err = p .! const err
 
-asRenderedChildDeclarationType :: Parse UploadedPackageError RenderedChildDeclarationType
+asRenderedChildDeclarationType :: Parse PackageError RenderedChildDeclarationType
 asRenderedChildDeclarationType =
   withString (maybe (Left InvalidDeclarationType) Right .
                 flip lookup childDeclarationTypes)
@@ -188,7 +238,7 @@ asBookmark =
   build Nothing = Local
   build (Just pn) = FromDep pn
 
-asResolvedDependencies :: Parse UploadedPackageError [(PackageName, Version)]
+asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
 asResolvedDependencies =
   eachInObjectWithKey (mapLeft ErrorInPackageMeta . parsePackageName . T.unpack) asVersion
   where
@@ -207,8 +257,8 @@ asSourceSpan = P.SourceSpan <$> key "name" asString
 ---------------------
 -- ToJSON instances
 
-instance A.ToJSON UploadedPackage where
-  toJSON UploadedPackage{..} =
+instance A.ToJSON a => A.ToJSON (Package a) where
+  toJSON Package{..} =
     A.object $
       [ "packageMeta"          .= pkgMeta
       , "version"              .= showVersion pkgVersion
@@ -218,9 +268,11 @@ instance A.ToJSON UploadedPackage where
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
-      ] ++ case pkgUploader of
-             Just u  -> [ "uploader" .= u ]
-             Nothing -> []
+      , "uploader"             .= pkgUploader
+      ]
+
+instance A.ToJSON NotYetKnown where
+  toJSON _ = A.Null
 
 instance A.ToJSON RenderedModule where
   toJSON RenderedModule{..} =

@@ -103,9 +103,9 @@ preparePackage' = do
   let declaredDeps = map fst (bowerDependencies pkgMeta ++ bowerDevDependencies pkgMeta)
   pkgResolvedDependencies    <- getResolvedDependencies declaredDeps
 
-  let pkgUploader = Nothing
+  let pkgUploader = D.NotYetKnown
 
-  return D.UploadedPackage{..}
+  return D.Package{..}
 
 getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.RenderedModule])
 getModulesAndBookmarks = do
