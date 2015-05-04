@@ -48,8 +48,6 @@ import System.FilePath (pathSeparator, takeDirectory, (</>), isPathSeparator)
 import System.IO.Error (tryIOError)
 import System.Process (readProcessWithExitCode)
 
-import qualified Text.Parsec as Par (ParseError)
-
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
@@ -125,7 +123,7 @@ loadModule filename = do
 -- |
 -- Load all modules, including the Prelude
 --
-loadAllModules :: [FilePath] -> IO (Either Par.ParseError [(Either P.RebuildPolicy FilePath, P.Module)])
+loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- readFile filename
@@ -140,7 +138,7 @@ loadAllImportedModules = do
   files <- PSCI . lift $ fmap psciImportedFilenames get
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
-    Left err -> psciIO $ print err
+    Left errs -> printErrors errs
     Right modules -> PSCI . lift . modify $ \st -> st { psciLoadedModules = modules }
 
 -- |

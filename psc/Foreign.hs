@@ -12,20 +12,23 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Foreign (parseForeignModulesFromFiles) where
 
 import Control.Applicative ((*>), (<*))
-import Control.Monad (forM, msum)
+import Control.Monad (msum)
+import Control.Monad.Error.Class (MonadError(..))
 import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Text.Parsec as PS
 
-parseForeignModulesFromFiles :: [(FilePath, String)] -> Either String (M.Map P.ModuleName String)
+parseForeignModulesFromFiles :: (MonadError P.MultipleErrors m, Functor m) => [(FilePath, String)] -> m (M.Map P.ModuleName String)
 parseForeignModulesFromFiles files = do
-  foreigns <- forM files $ \(path, file) -> do
+  foreigns <- P.parU files $ \(path, file) ->
     case findModuleName (lines file) of
-      Just name -> Right (name, file)
-      Nothing -> Left $ "Could not find a module definition comment in " ++ path
+      Just name -> return (name, file)
+      Nothing -> throwError (P.errorMessage $ P.ErrorParsingFFIModule path)
   return $ M.fromList foreigns
 
 findModuleName :: [String] -> Maybe P.ModuleName

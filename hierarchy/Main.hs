@@ -27,11 +27,8 @@ import System.FilePath ((</>))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStr, stderr)
 
-import Text.Parsec as Par (ParseError)
-
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-
 
 data HierarchyOptions = HierarchyOptions
   { hierachyInput   :: FilePath
@@ -53,16 +50,16 @@ instance Ord SuperMap where
 runModuleName :: P.ModuleName -> String
 runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
-readInput :: FilePath -> IO (Either Par.ParseError [P.Module])
+readInput :: FilePath -> IO (Either P.MultipleErrors [P.Module])
 readInput filename = do
   content <- readFile filename
-  return $ fmap (map snd) $ P.parseModulesFromFiles id [(filename, content)]
+  return $ map snd <$> P.parseModulesFromFiles id [(filename, content)]
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions input mOutput) = do
   modules <- readInput input
   case modules of
-    Left err -> hPutStr stderr (show err) >> exitFailure
+    Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right ms -> do
       for_ ms $ \(P.Module _ moduleName decls _) ->
         let name = runModuleName moduleName

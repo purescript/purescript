@@ -228,10 +228,15 @@ make outputDir ms prefix = do
   rebuildIfNecessary graph toRebuild (Module _ moduleName' _ _ : ms') = do
     let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
     externs <- readTextFile externsFile
-    externsModules <- fmap (map snd) . either (throwError . errorMessage . ErrorParsingExterns) return $ P.parseModulesFromFiles id [(externsFile, externs)]
+    externsModules <- fmap (map snd) . alterErrors $ P.parseModulesFromFiles id [(externsFile, externs)]
     case externsModules of
       [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
       _ -> throwError . errorMessage . InvalidExternsFile $ externsFile
+    where
+    alterErrors = flip catchError $ \(MultipleErrors errs) ->
+      throwError . MultipleErrors $ flip map errs $ \e -> case e of
+        SimpleErrorWrapper (ErrorParsingModule err) -> SimpleErrorWrapper (ErrorParsingExterns err)
+        _ -> e
 
 checkPreludeIsDefined :: (MonadWriter MultipleErrors m) => [Module] -> m ()
 checkPreludeIsDefined ms = do
