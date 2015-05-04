@@ -6,10 +6,6 @@ import Data.Maybe
 import System.Directory
 import qualified System.FilePath.Glob as Glob
 
-headMay :: [a] -> Maybe a
-headMay (x:_) = Just x
-headMay [] = Nothing
-
 -- | Glob relative to the current directory, and produce relative pathnames.
 globRelative :: Glob.Pattern -> IO [FilePath]
 globRelative pat = do

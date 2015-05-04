@@ -12,6 +12,7 @@ import Data.List (stripPrefix, isSuffixOf, (\\))
 import Data.List.Split (splitOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Version
+import Safe (headMay)
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text as T

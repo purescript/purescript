@@ -195,7 +195,7 @@ executable psc-publish
                    directory -any, transformers -any, text -any, containers
                    -any, boxes -any, split -any, Glob -any, aeson-better-errors
                    -any, transformers-compat -any, bower-json -any, semigroups
-                   -any
+                   -any, safe -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-publish
