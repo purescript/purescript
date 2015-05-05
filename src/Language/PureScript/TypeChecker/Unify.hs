@@ -22,7 +22,7 @@ module Language.PureScript.TypeChecker.Unify (
     unifiesWith,
     replaceVarWithUnknown,
     replaceTypeWildcards,
-    varIfUnknown
+    varIfUnknown,
 ) where
 
 import Data.List (nub, sort)
@@ -30,8 +30,9 @@ import Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Strict as H
 
 import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
+import Control.Monad.Writer
+import Control.Monad.Except
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -187,6 +188,7 @@ replaceTypeWildcards = everywhereOnTypesM replace
   where
   replace TypeWildcard = do
     u <- fresh'
+    liftCheck . tell $ errorMessage . WildcardInferredType $ TUnknown u
     return $ TUnknown u
   replace other = return other
 
@@ -202,3 +204,4 @@ varIfUnknown ty =
       typeToVar (TUnknown u) = TypeVar (toName u)
       typeToVar t = t
   in mkForAll (sort . map toName $ unks) ty'
+

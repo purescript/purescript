@@ -24,9 +24,10 @@ import Data.Monoid
 import Data.Foldable (fold, foldMap)
 
 import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 import Control.Applicative ((<$>))
+import Control.Monad.Writer
+import Control.Monad.Except
 
 import Language.PureScript.AST
 import Language.PureScript.Pretty
@@ -109,6 +110,7 @@ data ErrorMessage
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
+  | WildcardInferredType Type
   | PreludeNotPresent
   | ErrorInExpression Expr ErrorMessage
   | ErrorInModule ModuleName ErrorMessage
@@ -127,10 +129,10 @@ data ErrorMessage
   | ErrorInForeignImport Ident ErrorMessage
   | PositionedError SourceSpan ErrorMessage
   deriving (Show)
-  
+
 instance UnificationError Type ErrorMessage where
   occursCheckFailed = InfiniteType
-  
+
 instance UnificationError Kind ErrorMessage where
   occursCheckFailed = InfiniteKind
 
@@ -202,6 +204,7 @@ errorCode InvalidNewtype                = "InvalidNewtype"
 errorCode (InvalidInstanceHead _)       = "InvalidInstanceHead"
 errorCode (TransitiveExportError _ _)   = "TransitiveExportError"
 errorCode (ShadowedName _)              = "ShadowedName"
+errorCode (WildcardInferredType _)      = "WildcardInferredType"
 errorCode PreludeNotPresent             = "PreludeNotPresent"
 errorCode (NotYetDefined _ e)           = errorCode e
 errorCode (ErrorUnifyingTypes _ _ e)    = errorCode e
@@ -221,16 +224,16 @@ errorCode (ErrorInTypeSynonym _ e)      = errorCode e
 errorCode (ErrorInValueDeclaration _ e) = errorCode e
 errorCode (ErrorInForeignImport _ e)    = errorCode e
 errorCode (PositionedError _ e)         = errorCode e
-  
+
 -- |
 -- A stack trace for an error
 --
-newtype MultipleErrors = MultipleErrors 
+newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
-  
+
 instance UnificationError Type MultipleErrors where
   occursCheckFailed = errorMessage . occursCheckFailed
-  
+
 instance UnificationError Kind MultipleErrors where
   occursCheckFailed = errorMessage . occursCheckFailed
 
@@ -384,6 +387,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
     go (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
                                                  : map (line . prettyPrintExport) ys
     go (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
+    go (WildcardInferredType ty)       = line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     go PreludeNotPresent               = paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
                                                , line $ "You probably need to install the Prelude and other dependencies using Bower." 
                                                ]
@@ -477,7 +481,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage (if full then e else sim
   prettyPrintDictionaryValue (SubclassDictionaryValue sup nm _) = paras [ line $ (show nm) ++ " via superclass"
                                                                         , indent $ prettyPrintDictionaryValue sup
                                                                         ]
-  
+
   -- |
   -- Pretty print and export declaration
   --  
@@ -547,10 +551,12 @@ renderBox = unlines . map trimEnd . lines . Box.render
   trimEnd = reverse . dropWhile (== ' ') . reverse
 
 -- |
--- Interpret multiple errors in a monad supporting errors
+-- Interpret multiple errors and warnings in a monad supporting errors
 --
-interpretMultipleErrors :: (MonadError MultipleErrors m) => Either MultipleErrors a -> m a
-interpretMultipleErrors = either throwError return
+interpretMultipleErrorsAndWarnings :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => (Either MultipleErrors a, MultipleErrors) -> m a
+interpretMultipleErrorsAndWarnings (err, ws) = do
+  tell ws
+  either throwError return $ err
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
