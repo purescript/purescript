@@ -47,6 +47,7 @@ data Package a = Package
   deriving (Show, Eq, Ord)
 
 data NotYetKnown = NotYetKnown
+  deriving (Show, Eq, Ord)
 
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
