@@ -12,11 +12,13 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, RecordWildCards, OverloadedStrings #-}
 
 module Language.PureScript.AST.SourcePos where
 
 import qualified Data.Data as D
+import Data.Aeson ((.=))
+import qualified Data.Aeson as A
 
 -- |
 -- Source position information
@@ -30,12 +32,16 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (Eq, Show, D.Data, D.Typeable)
+  } deriving (Eq, Ord, Show, D.Data, D.Typeable)
 
 displaySourcePos :: SourcePos -> String
 displaySourcePos sp =
   "line " ++ show (sourcePosLine sp) ++
     ", column " ++ show (sourcePosColumn sp)
+
+instance A.ToJSON SourcePos where
+  toJSON SourcePos{..} =
+    A.toJSON [sourcePosLine, sourcePosColumn]
 
 data SourceSpan = SourceSpan
   { -- |
@@ -49,10 +55,17 @@ data SourceSpan = SourceSpan
     -- End of the span
     --
   , spanEnd :: SourcePos
-  } deriving (Eq, Show, D.Data, D.Typeable)
+  } deriving (Eq, Ord, Show, D.Data, D.Typeable)
 
 displaySourceSpan :: SourceSpan -> String
 displaySourceSpan sp =
   spanName sp ++ " " ++
     displaySourcePos (spanStart sp) ++ " - " ++
     displaySourcePos (spanEnd sp)
+
+instance A.ToJSON SourceSpan where
+  toJSON SourceSpan{..} =
+    A.object [ "name"  .= spanName
+             , "start" .= spanStart
+             , "end"   .= spanEnd
+             ]

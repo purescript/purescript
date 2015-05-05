@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 ----------------------------------------------------------------------------
 --
 -- Module      :  Main
@@ -15,223 +16,127 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Writer
-import Control.Arrow (first)
+import Control.Arrow (first, second)
+import Control.Category ((>>>))
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
-import Data.Foldable (traverse_)
 
 import Options.Applicative
+import qualified Text.PrettyPrint.ANSI.Leijen as PP
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import System.Exit (exitSuccess, exitFailure)
+import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
 import Etags
 import Ctags
+import qualified Language.PureScript.Docs as D
+import qualified Language.PureScript.Docs.AsMarkdown as D
 
 -- Available output formats
 data Format = Markdown -- Output documentation in Markdown format
                | Ctags -- Output ctags symbol index suitable for use with vi
                | Etags -- Output etags symbol index suitable for use with emacs
+               deriving (Show, Eq, Ord)
+
+-- | Available methods of outputting Markdown documentation
+data DocgenOutput
+  = EverythingToStdOut
+  | ToStdOut [P.ModuleName]
+  | ToFiles [(P.ModuleName, FilePath)]
+  deriving (Show)
 
 data PSCDocsOptions = PSCDocsOptions
   { pscdFormat :: Format
   , pscdInputFiles  :: [FilePath]
+  , pscdDocgen :: DocgenOutput
   }
+  deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt input) = do
+docgen (PSCDocsOptions fmt input output) =
+  case fmt of
+    Etags -> dumpTags input dumpEtags
+    Ctags -> dumpTags input dumpCtags
+    Markdown -> do
+      e <- D.parseAndDesugar input [] (\_ ms -> return ms)
+      case e of
+        Left (D.ParseError err) -> do
+          hPutStrLn stderr $ show err
+          exitFailure
+        Left (D.SortModulesError err) -> do
+          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
+          exitFailure
+        Left (D.DesugarError err) -> do
+          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
+          exitFailure
+        Right ms' -> do
+          case output of
+            EverythingToStdOut ->
+              putStrLn (D.renderModulesAsMarkdown ms')
+            ToStdOut names -> do
+              let (ms, missing) = takeModulesByName ms' names
+              guardMissing missing
+              putStrLn (D.renderModulesAsMarkdown ms)
+            ToFiles names -> do
+              let (ms, missing) = takeModulesByName' ms' names
+              guardMissing missing
+              forM_ ms $ \(m, fp) ->
+                writeFile fp (D.renderModulesAsMarkdown [m])
+
+  where
+  guardMissing [] = return ()
+  guardMissing [mn] = do
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ show mn ++ "\"")
+    exitFailure
+  guardMissing mns = do
+    hPutStrLn stderr "psc-docs: error: unknown modules:"
+    forM_ mns $ \mn ->
+      hPutStrLn stderr ("  * " ++ show mn)
+    exitFailure
+
+-- |
+-- Given a list of module names and a list of modules, return a list of modules
+-- whose names appeared in the given name list, together with a list of names
+-- for which no module could be found in the module list.
+--
+takeModulesByName :: [P.Module] -> [P.ModuleName] -> ([P.Module], [P.ModuleName])
+takeModulesByName modules names =
+  first (map fst) (takeModulesByName' modules (map (,()) names))
+
+-- |
+-- Like takeModulesByName but also keeps some extra data with the module.
+--
+takeModulesByName' :: [P.Module] -> [(P.ModuleName, a)] -> ([(P.Module, a)], [P.ModuleName])
+takeModulesByName' modules = foldl go ([], [])
+  where
+  go (ms, missing) (name, x) =
+    case find ((== name) . P.getModuleName) modules of
+      Just m  -> ((m, x) : ms, missing)
+      Nothing -> (ms, name : missing)
+
+dumpTags :: [FilePath] -> ([(String, P.Module)] -> [String]) -> IO ()
+dumpTags input renderTags = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
-      hPutStrLn stderr $ show err
+      hPutStrLn stderr (show err)
       exitFailure
-    Right ms -> do
-      case fmt of
-       Markdown -> putStrLn . runDocs $ renderModules (map snd ms)
-       Etags -> ldump $ dumpEtags $ pairs ms
-       Ctags -> ldump $ dumpCtags $ pairs ms
-      exitSuccess
-  where pairs :: [(Maybe String, m)] -> [(String, m)]
-        pairs = map (\(k,m) -> (fromMaybe "" k,m))
-        ldump :: [String] -> IO ()
-        ldump = mapM_ putStrLn
-    
+    Right ms ->
+      ldump (renderTags (pairs ms))
+
+  where
+  pairs :: [(Maybe String, m)] -> [(String, m)]
+  pairs = map (first (fromMaybe ""))
+
+  ldump :: [String] -> IO ()
+  ldump = mapM_ putStrLn
+
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input = (,) input <$> readFile input
-
-type Docs = Writer [String] ()
-
-runDocs :: Docs -> String
-runDocs = unlines . execWriter
-
-spacer :: Docs
-spacer = tell [""]
-
-headerLevel :: Int -> String -> Docs
-headerLevel level hdr = tell [replicate level '#' ++ ' ' : hdr]
-
-withIndent :: Int -> Docs -> Docs
-withIndent indent = censor (map (replicate indent ' ' ++ ))
-
-atIndent :: Int -> String -> Docs
-atIndent indent text =
-  let ls = lines text in
-  withIndent indent (tell ls)
-
-fenced :: String -> Docs
-fenced text = fencedBlock (tell $ lines text)
-
-fencedBlock :: Docs -> Docs
-fencedBlock inner = do
-  tell ["``` purescript"]
-  inner
-  tell ["```"]
-
-ticks :: String -> String
-ticks = ("`" ++) . (++ "`")
-
-renderModules :: [P.Module] -> Docs
-renderModules ms = do
-  headerLevel 1 "Module Documentation"
-  spacer
-  mapM_ renderModule ms
-
-renderModule :: P.Module -> Docs
-renderModule mdl@(P.Module coms moduleName _ exps) = do
-    headerLevel 2 $ "Module " ++ P.runModuleName moduleName
-    spacer
-    unless (null coms) $ do
-      renderComments coms
-      spacer
-    renderTopLevel exps (P.exportedDeclarations mdl)
-    spacer
-
-renderTopLevel :: Maybe [P.DeclarationRef] -> [P.Declaration] -> Docs
-renderTopLevel exps decls = forM_ decls $ \decl ->
-  when (canRenderDecl decl) $ do
-    traverse_ (headerLevel 4) (ticks `fmap` getDeclarationTitle decl)
-    spacer
-    renderDeclaration exps decl
-    spacer
-
-renderTypeclassImage :: P.ModuleName -> Docs
-renderTypeclassImage name =
-  let name' = P.runModuleName name
-  in tell ["![" ++ name' ++ "](images/" ++ name' ++ ".png)"]
-
-getDeclarationTitle :: P.Declaration -> Maybe String
-getDeclarationTitle (P.TypeDeclaration name _)                      = Just (show name)
-getDeclarationTitle (P.ExternDeclaration _ name _ _)                = Just (show name)
-getDeclarationTitle (P.DataDeclaration _ name _ _)                  = Just (show name)
-getDeclarationTitle (P.ExternDataDeclaration name _)                = Just (show name)
-getDeclarationTitle (P.TypeSynonymDeclaration name _ _)             = Just (show name)
-getDeclarationTitle (P.TypeClassDeclaration name _ _ _)   = Just (show name)
-getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _)        = Just (show name)
-getDeclarationTitle (P.PositionedDeclaration _ _ d)                 = getDeclarationTitle d
-getDeclarationTitle _                                               = Nothing
-
-renderDeclaration :: Maybe [P.DeclarationRef] -> P.Declaration -> Docs
-renderDeclaration _ (P.TypeDeclaration ident ty) =
-  fenced $ show ident ++ " :: " ++ prettyPrintType' ty
-renderDeclaration _ (P.ExternDeclaration _ ident _ ty) =
-  fenced $ show ident ++ " :: " ++ prettyPrintType' ty
-renderDeclaration exps (P.DataDeclaration dtype name args ctors) = do
-  let
-    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
-    typeName = prettyPrintType' typeApp
-    exported = filter (P.isDctorExported name exps . fst) ctors
-  fencedBlock $ do
-    tell [show dtype ++ " " ++ typeName]
-    zipWithM_ (\isFirst (ctor, tys) ->
-                atIndent 2 $ (if isFirst then "= " else "| ") ++ P.runProperName ctor ++ " " ++ unwords (map P.prettyPrintTypeAtom tys))
-              (True : repeat False) exported
-renderDeclaration _ (P.ExternDataDeclaration name kind) =
-  fenced $ "data " ++ P.runProperName name ++ " :: " ++ P.prettyPrintKind kind
-renderDeclaration _ (P.TypeSynonymDeclaration name args ty) = do
-  let
-    typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
-    typeName = prettyPrintType' typeApp
-  fenced $ "type " ++ typeName ++ " = " ++ prettyPrintType' ty
-renderDeclaration _ (P.TypeClassDeclaration name args implies ds) = do
-  let impliesText = case implies of
-                      [] -> ""
-                      is -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) is) ++ ") <= "
-      classApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
-      className = prettyPrintType' classApp
-  fencedBlock $ do
-    tell ["class " ++ impliesText ++ className ++ " where"]
-    mapM_ renderClassMember ds
-  where
-    renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
-    renderClassMember (P.TypeDeclaration ident ty) = atIndent 2 $ show ident ++ " :: " ++ prettyPrintType' ty
-    renderClassMember _ = error "Invalid argument to renderClassMember."
-renderDeclaration _ (P.TypeInstanceDeclaration name constraints className tys _) = do
-  let constraintsText = case constraints of
-                          [] -> ""
-                          cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map P.prettyPrintTypeAtom tys')) cs) ++ ") => "
-  fenced $ "instance " ++ show name ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map P.prettyPrintTypeAtom tys)
-renderDeclaration exps (P.PositionedDeclaration _ com d) = do
-  renderDeclaration exps d
-  renderComments com
-renderDeclaration _ _ = return ()
-
-renderComments :: [P.Comment] -> Docs
-renderComments cs = do
-  let raw = concatMap toLines cs
-  when (all hasPipe raw) $ do
-    spacer
-    atIndent 0 . unlines . map stripPipes $ raw
-  where
-
-  toLines (P.LineComment s) = [s]
-  toLines (P.BlockComment s) = lines s
-
-  hasPipe s = case dropWhile (== ' ') s of { ('|':_) -> True; _ -> False }
-
-  stripPipes = dropPipe . dropWhile (== ' ')
-
-  dropPipe ('|':' ':s) = s
-  dropPipe ('|':s) = s
-  dropPipe s = s
-
-toTypeVar :: (String, Maybe P.Kind) -> P.Type
-toTypeVar (s, Nothing) = P.TypeVar s
-toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
-
-prettyPrintType' :: P.Type -> String
-prettyPrintType' = P.prettyPrintType . P.everywhereOnTypes dePrim
-  where
-  dePrim ty@(P.TypeConstructor (P.Qualified _ name))
-    | ty == P.tyBoolean || ty == P.tyNumber || ty == P.tyString || ty == P.tyChar || ty == P.tyInt =
-      P.TypeConstructor $ P.Qualified Nothing name
-  dePrim other = other
-
-getName :: P.Declaration -> String
-getName (P.TypeDeclaration ident _) = show ident
-getName (P.ExternDeclaration _ ident _ _) = show ident
-getName (P.DataDeclaration _ name _ _) = P.runProperName name
-getName (P.ExternDataDeclaration name _) = P.runProperName name
-getName (P.TypeSynonymDeclaration name _ _) = P.runProperName name
-getName (P.TypeClassDeclaration name _ _ _) = P.runProperName name
-getName (P.TypeInstanceDeclaration name _ _ _ _) = show name
-getName (P.PositionedDeclaration _ _ d) = getName d
-getName _ = error "Invalid argument to getName"
-
-canRenderDecl :: P.Declaration -> Bool
-canRenderDecl P.TypeDeclaration{} = True
-canRenderDecl P.ExternDeclaration{} = True
-canRenderDecl P.DataDeclaration{} = True
-canRenderDecl P.ExternDataDeclaration{} = True
-canRenderDecl P.TypeSynonymDeclaration{} = True
-canRenderDecl P.TypeClassDeclaration{} = True
-canRenderDecl P.TypeInstanceDeclaration{} = True
-canRenderDecl (P.PositionedDeclaration _ _ d) = canRenderDecl d
-canRenderDecl _ = False
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
@@ -242,24 +147,97 @@ instance Read Format where
     readsPrec _ "etags" = [(Etags, "")]
     readsPrec _ "ctags" = [(Ctags, "")]
     readsPrec _ "markdown" = [(Markdown, "")]
-    readsPrec _ _ = []    
+    readsPrec _ _ = []
 
 format :: Parser Format
 format = option auto $ value Markdown
          <> long "format"
          <> metavar "FORMAT"
-         <> help "Set output FORMAT (markdown | etags | ctags)"  
+         <> help "Set output FORMAT (markdown | etags | ctags)"
 
-pscDocsOptions :: Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> many inputFile
+docgenModule :: Parser String
+docgenModule = strOption $
+                   long "docgen"
+                <> help "A list of module names which should appear in the output. This can optionally include file paths to write individual modules to, by separating with a colon ':'. For example, Prelude:docs/Prelude.md. This option may be specified multiple times."
+
+pscDocsOptions :: Parser (Format, [FilePath], [String])
+pscDocsOptions = (,,) <$> format <*> many inputFile <*> many docgenModule
+
+parseDocgen :: [String] -> Either String DocgenOutput
+parseDocgen [] = Right EverythingToStdOut
+parseDocgen xs = go xs
+  where
+  go = intersperse " "
+    >>> concat
+    >>> words
+    >>> map parseItem
+    >>> combine
+
+data DocgenOutputItem
+  = IToStdOut P.ModuleName
+  | IToFile (P.ModuleName, FilePath)
+
+parseItem :: String -> DocgenOutputItem
+parseItem s = case elemIndex ':' s of
+  Just i ->
+    s # splitAt i
+        >>> first P.moduleNameFromString
+        >>> second (drop 1)
+        >>> IToFile
+  Nothing ->
+    IToStdOut (P.moduleNameFromString s)
+
+  where
+  infixr 1 #
+  (#) = flip ($)
+
+combine :: [DocgenOutputItem] -> Either String DocgenOutput
+combine [] = Right EverythingToStdOut
+combine (x:xs) = foldM go (initial x) xs
+  where
+  initial (IToStdOut m) = ToStdOut [m]
+  initial (IToFile m)   = ToFiles [m]
+
+  go (ToStdOut ms) (IToStdOut m) = Right (ToStdOut (m:ms))
+  go (ToFiles ms) (IToFile m)    = Right (ToFiles (m:ms))
+  go _ _ = Left "Can't mix module names and module name/file path pairs in the same invocation."
+
+buildOptions :: (Format, [FilePath], [String]) -> IO PSCDocsOptions
+buildOptions (fmt, input, mapping) =
+  case parseDocgen mapping of
+    Right mapping' -> return (PSCDocsOptions fmt input mapping')
+    Left err -> do
+      hPutStrLn stderr "psc-docs: error in --docgen option:"
+      hPutStrLn stderr ("  " ++ err)
+      exitFailure
 
 main :: IO ()
-main = execParser opts >>= docgen
+main = execParser opts >>= buildOptions >>= docgen
   where
   opts        = info (version <*> helper <*> pscDocsOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header   "psc-docs - Generate Markdown documentation from PureScript extern files"
-  footerInfo  = footer $ "psc-docs " ++ showVersion Paths.version
+  headerInfo  = header "psc-docs - Generate Markdown documentation from PureScript source files"
+  footerInfo  = footerDoc $ Just $ PP.vcat
+                  [ examples, PP.empty, PP.text ("psc-docs " ++ showVersion Paths.version) ]
 
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
+
+examples :: PP.Doc
+examples =
+  PP.vcat $ map PP.text
+    [ "Examples:"
+    , "  print documentation for Data.List to stdout:"
+    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "      --docgen Data.List"
+    , ""
+    , "  write documentation for Data.List to docs/Data.List.md:"
+    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "      --docgen Data.List:docs/Data.List.md"
+    , ""
+    , "  write documentation for Data.List to docs/Data.List.md, and"
+    , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
+    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "      --docgen Data.List:docs/Data.List.md \\"
+    , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
+    ]
