@@ -42,9 +42,9 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Unify
+import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Environment
@@ -70,7 +70,7 @@ import qualified Language.PureScript.Constants as C
 --
 typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
 typesOf mainModuleName moduleName vals = do
-  tys <- fmap tidyUp . liftUnify $ do
+  tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> do
       triple@(_, (_, ty)) <- checkTypedBindingGroupElement moduleName e dict
@@ -97,6 +97,9 @@ typesOf mainModuleName moduleName vals = do
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
+  -- Replace all the wildcards types with their inferred types
+  replace sub (SimpleErrorWrapper (WildcardInferredType ty)) = SimpleErrorWrapper $ WildcardInferredType (sub $? ty)
+  replace _ em = em
   -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
   checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
     [eff, a] <- replicateM 2 fresh

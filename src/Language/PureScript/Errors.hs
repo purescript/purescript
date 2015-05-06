@@ -27,8 +27,9 @@ import Data.Foldable (fold, foldMap)
 import qualified Data.Map as M
 
 import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
+import Control.Monad.Writer
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Applicative ((<$>), (<*>), Applicative, pure)
 import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
@@ -113,6 +114,7 @@ data SimpleErrorMessage
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
+  | WildcardInferredType Type
   | PreludeNotPresent
   deriving (Show)
 
@@ -216,6 +218,7 @@ errorCode em = case unwrapErrorMessage em of
   (InvalidInstanceHead _)       -> "InvalidInstanceHead"
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
+  (WildcardInferredType _)      -> "WildcardInferredType"
   PreludeNotPresent             -> "PreludeNotPresent"
 
 -- |
@@ -458,6 +461,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     goSimple (TransitiveExportError x ys)    = paras $ (line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
                                                        : map (line . prettyPrintExport) ys
     goSimple (ShadowedName nm)               = line $ "Name '" ++ show nm ++ "' was shadowed."
+    goSimple (WildcardInferredType ty)       = line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     goSimple PreludeNotPresent               = paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
                                                      , line $ "You probably need to install the Prelude and other dependencies using Bower." 
                                                      ]
@@ -638,10 +642,12 @@ renderBox = unlines . map trimEnd . lines . Box.render
   trimEnd = reverse . dropWhile (== ' ') . reverse
 
 -- |
--- Interpret multiple errors in a monad supporting errors
+-- Interpret multiple errors and warnings in a monad supporting errors and warnings
 --
-interpretMultipleErrors :: (MonadError MultipleErrors m) => Either MultipleErrors a -> m a
-interpretMultipleErrors = either throwError return
+interpretMultipleErrorsAndWarnings :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => (Either MultipleErrors a, MultipleErrors) -> m a
+interpretMultipleErrorsAndWarnings (err, ws) = do
+  tell ws
+  either throwError return $ err
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
