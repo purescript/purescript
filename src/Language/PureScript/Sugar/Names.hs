@@ -514,8 +514,8 @@ resolveImport currentModule importModule exps imps impQual =
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
     Just (Qualified (Just mn) _) -> throwError . errorMessage $ err
       where
-      err = if mn == currentModule || importModule == currentModule
-            then ConflictingImport (show name) mn
+      err = if currentModule `elem` [mn, importModule]
+            then ConflictingImport (show name) importModule
             else ConflictingImports (show name) mn importModule
 
   -- The available values, types, and classes in the module being imported
