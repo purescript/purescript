@@ -38,6 +38,7 @@ import Language.PureScript.Docs.RenderedCode as ReExports
 data Package a = Package
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
+  , pkgVersionTag           :: String
   , pkgModules              :: [RenderedModule]
   , pkgBookmarks            :: [Bookmark]
   , pkgResolvedDependencies :: [(PackageName, Version)]
@@ -56,6 +57,7 @@ verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
 verifyPackage verifiedUser Package{..} =
   Package pkgMeta
           pkgVersion
+          pkgVersionTag
           pkgModules
           pkgBookmarks
           pkgResolvedDependencies
@@ -156,6 +158,7 @@ asPackage :: (forall e. Parse e a) -> Parse PackageError (Package a)
 asPackage uploader =
   Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
           <*> key "version" asVersion
+          <*> key "versionTag" asString
           <*> key "modules" (eachInArray asRenderedModule)
           <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
           <*> key "resolvedDependencies" asResolvedDependencies
@@ -263,6 +266,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
     A.object $
       [ "packageMeta"          .= pkgMeta
       , "version"              .= showVersion pkgVersion
+      , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
       , "bookmarks"            .= map (fmap (first P.runModuleName)) pkgBookmarks
       , "resolvedDependencies" .= assocListToJSON (T.pack . runPackageName)
