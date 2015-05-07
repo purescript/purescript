@@ -88,6 +88,7 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
+                     Language.PureScript.Parser.JS
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
@@ -148,7 +149,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules: Foreign
+    other-modules:
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psc-make

@@ -14,26 +14,30 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 
-module Foreign (parseForeignModulesFromFiles) where
+module Language.PureScript.Parser.JS (parseForeignModulesFromFiles) where
 
 import Control.Applicative ((*>), (<*))
 import Control.Monad (msum)
 import Control.Monad.Error.Class (MonadError(..))
+import Language.PureScript.Errors
+import Language.PureScript.Names
+import Language.PureScript.Parser.Common
+import Language.PureScript.Parser.Lexer
+import Prelude hiding (lex)
 import qualified Data.Map as M
-import qualified Language.PureScript as P
 import qualified Text.Parsec as PS
 
-parseForeignModulesFromFiles :: (MonadError P.MultipleErrors m, Functor m) => [(FilePath, String)] -> m (M.Map P.ModuleName String)
+parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, String)] -> m (M.Map ModuleName String)
 parseForeignModulesFromFiles files = do
-  foreigns <- P.parU files $ \(path, file) ->
+  foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
       Just name -> return (name, file)
-      Nothing -> throwError (P.errorMessage $ P.ErrorParsingFFIModule path)
+      Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path)
   return $ M.fromList foreigns
 
-findModuleName :: [String] -> Maybe P.ModuleName
+findModuleName :: [String] -> Maybe ModuleName
 findModuleName = msum . map parseComment
   where
-  parseComment :: String -> Maybe P.ModuleName
+  parseComment :: String -> Maybe ModuleName
   parseComment s = either (const Nothing) Just $
-    P.lex "" s >>= P.runTokenParser "" (P.symbol' "//" *> P.reserved "module" *> P.moduleName <* PS.eof)
+    lex "" s >>= runTokenParser "" (symbol' "//" *> reserved "module" *> moduleName <* PS.eof)

@@ -45,8 +45,6 @@ import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
 
-import Foreign
-
 data PSCOptions = PSCOptions
   { pscInput        :: [FilePath]
   , pscForeignInput :: [FilePath]
@@ -104,7 +102,7 @@ parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWr
             => [(Maybe FilePath, String)] -> [(FilePath, String)] -> m ([(Maybe FilePath, P.Module)], M.Map P.ModuleName String)
 parseInputs modules foreigns =
   (,) <$> P.parseModulesFromFiles (fromMaybe "") modules
-      <*> parseForeignModulesFromFiles foreigns
+      <*> P.parseForeignModulesFromFiles foreigns
 
 compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m, MonadReader (P.Options P.Compile) m)
           => [P.Module] -> M.Map P.ModuleName String -> [String] -> m (String, String)
