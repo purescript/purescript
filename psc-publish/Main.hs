@@ -97,12 +97,13 @@ preparePackage' = do
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntParseBowerJSON)
-  pkgVersion                 <- getVersionFromGitTag
-  pkgGithub                  <- getBowerInfo pkgMeta
-  (pkgBookmarks, pkgModules) <- getModulesAndBookmarks
+  (pkgVersionTag, pkgVersion) <- getVersionFromGitTag
+  pkgGithub                   <- getBowerInfo pkgMeta
+  (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
 
-  let declaredDeps = map fst (bowerDependencies pkgMeta ++ bowerDevDependencies pkgMeta)
-  pkgResolvedDependencies    <- getResolvedDependencies declaredDeps
+  let declaredDeps = map fst (bowerDependencies pkgMeta ++
+                              bowerDevDependencies pkgMeta)
+  pkgResolvedDependencies     <- getResolvedDependencies declaredDeps
 
   let pkgUploader = D.NotYetKnown
 
@@ -117,19 +118,19 @@ getModulesAndBookmarks = do
   renderModules bookmarks modules =
     return (bookmarks, map D.renderModule modules)
 
-getVersionFromGitTag :: PrepareM Version
+getVersionFromGitTag :: PrepareM (String, Version)
 getVersionFromGitTag = do
   out <- readProcess' "git" ["tag", "--list", "--points-at", "HEAD"] ""
-  let vs = map clean (lines out)
-  case mapMaybe D.parseVersion' vs of
+  let vs = map trimWhitespace (lines out)
+  case mapMaybe parseMay vs of
     []  -> userError TagMustBeCheckedOut
     [x] -> return x
-    xs  -> userError (AmbiguousVersions xs)
+    xs  -> userError (AmbiguousVersions (map snd xs))
   where
-  clean =
-    trimWhitespace >>> dropPrefix "v"
   trimWhitespace =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
+  parseMay str =
+    (str,) <$> D.parseVersion' (dropPrefix "v" str)
   dropPrefix prefix str =
     fromMaybe str (stripPrefix prefix str)
 
