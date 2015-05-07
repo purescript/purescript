@@ -16,7 +16,7 @@ if ! which cabal-dependency-licenses >/dev/null; then
 fi
 
 echo_header() {
-    cat license/header.txt
+    cat license-generator/header.txt
 }
 
 echo_deps_names() {
@@ -35,10 +35,10 @@ echo_deps_licenses() {
   done
 }
 
-echo_deps_names > license/tmp/deps.txt
+echo_deps_names > license-generator/tmp/deps.txt
 
 echo_header
 echo ""
-sed <license/tmp/deps.txt 's/^/  /'
+sed <license-generator/tmp/deps.txt 's/^/  /'
 echo ""
-echo_deps_licenses <license/tmp/deps.txt
+echo_deps_licenses <license-generator/tmp/deps.txt
