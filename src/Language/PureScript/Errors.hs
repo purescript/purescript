@@ -369,6 +369,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     goSimple (ErrorParsingFFIModule path)    = paras [ line "Unable to parse module from FFI file: "
                                                      , indent . line $ path
                                                      ]
+    goSimple (ErrorParsingModule err)        = paras [ line "Unable to parse module: "
+                                                     , indent . line . show $ err
+                                                     ]
     goSimple (ErrorParsingPrelude err)       = paras [ line "Error parsing prelude: "
                                                      , indent . line . show $ err
                                                      ]
