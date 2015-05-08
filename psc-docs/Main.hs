@@ -30,6 +30,8 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory)
 
 import Etags
 import Ctags
@@ -84,7 +86,8 @@ docgen (PSCDocsOptions fmt input output) =
             ToFiles names -> do
               let (ms, missing) = takeModulesByName' ms' names
               guardMissing missing
-              forM_ ms $ \(m, fp) ->
+              forM_ ms $ \(m, fp) -> do
+                createDirectoryIfMissing True (takeDirectory fp)
                 writeFile fp (D.renderModulesAsMarkdown [m])
 
   where
