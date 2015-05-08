@@ -41,8 +41,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Writer
-
-import System.FilePath ((</>))
+import Control.Monad.Supply.Class (fresh)
 
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
@@ -144,11 +143,6 @@ data RebuildPolicy
   -- | Always rebuild this module
   | RebuildAlways deriving (Show, Eq, Ord)
 
--- Traverse (Either e) instance (base 4.7)
-traverseEither :: Applicative f => (a -> f b) -> Either e a -> f (Either e b)
-traverseEither _ (Left x) = pure (Left x)
-traverseEither f (Right y) = Right <$> f y
-
 -- |
 -- Compiles in "make" mode, compiling each module separately to a js files and an externs file
 --
@@ -156,67 +150,46 @@ traverseEither f (Right y) = Right <$> f y
 -- having to typecheck the module again.
 --
 make :: forall m. (Functor m, Applicative m, Monad m, MonadMake m)
-     => FilePath -> [(Either RebuildPolicy FilePath, Module)] -> [String] -> m Environment
-make outputDir ms prefix = do
+     => (ModuleName -> m (Either RebuildPolicy (Maybe UTCTime)))
+     -> (ModuleName -> m (Maybe UTCTime))
+     -> (ModuleName -> m (FilePath, String))
+     -> (CoreFn.Module CoreFn.Ann -> String -> Environment -> Integer -> m ())
+     -> [(Either RebuildPolicy FilePath, Module)]
+     -> m Environment
+make getInputTimestamp getOutputTimestamp readExterns codegen ms = do
   noPrelude <- asks optionsNoPrelude
   unless noPrelude (checkPreludeIsDefined (map snd ms))
-  let filePathMap = M.fromList (map (\(fp, Module _ mn _ _) -> (mn, fp)) ms)
-
   (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
-
   mapM_ lint sorted
-
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
-    let filePath = runModuleName moduleName'
-
-        jsFile = outputDir </> filePath </> "index.js"
-        externsFile = outputDir </> filePath </> "externs.purs"
-        inputFile = fromMaybe (error "Module has no filename in 'make'") $ M.lookup moduleName' filePathMap
-
-    jsTimestamp <- getTimestamp jsFile
-    externsTimestamp <- getTimestamp externsFile
-    inputTimestamp <- traverseEither getTimestamp inputFile
-
-    return $ case (inputTimestamp, jsTimestamp, externsTimestamp) of
-      (Right (Just t1), Just t2, Just t3) | t1 < min t2 t3 -> s
-      (Left RebuildNever, Just _, Just _) -> s
+    inputTimestamp <- getInputTimestamp moduleName'
+    outputTimestamp <- getOutputTimestamp moduleName'
+    return $ case (inputTimestamp, outputTimestamp) of
+      (Right (Just t1), Just t2) | t1 < t2 -> s
+      (Left RebuildNever, Just _) -> s
       _ -> S.insert moduleName' s) S.empty sorted
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
-
   (desugared, nextVar) <- runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
-
   evalSupplyT nextVar $ go initEnvironment desugared
-
   where
+
   go :: Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
     (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
-
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
-    let filePath = runModuleName moduleName'
-        jsFile = outputDir </> filePath </> "index.js"
-        externsFile = outputDir </> filePath </> "externs.purs"
 
     lift . progress $ "Compiling " ++ runModuleName moduleName'
-
     (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
-
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
-
     let mod' = Module coms moduleName' regrouped exps
         corefn = CoreFn.moduleToCoreFn env' mod'
         [renamed] = renameInModules [corefn]
-
-    pjs <- prettyPrintJS <$> moduleToJs renamed Nothing
-    let js = unlines $ map ("// " ++) prefix ++ [pjs]
-    let exts = unlines $ map ("-- " ++) prefix ++ [moduleToPs mod' env']
-
-    lift $ writeTextFile jsFile js
-    lift $ writeTextFile externsFile exts
-
+    let exts = moduleToPs mod' env'
+    nextVar <- fresh
+    lift $ codegen renamed exts env' nextVar
     go env' ms'
 
   rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
@@ -226,12 +199,11 @@ make outputDir ms prefix = do
         toRebuild' = toRebuild `S.union` S.fromList deps
     (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms'
   rebuildIfNecessary graph toRebuild (Module _ moduleName' _ _ : ms') = do
-    let externsFile = outputDir </> runModuleName moduleName' </> "externs.purs"
-    externs <- readTextFile externsFile
-    externsModules <- fmap (map snd) . alterErrors $ P.parseModulesFromFiles id [(externsFile, externs)]
+    (path, externs) <- readExterns moduleName'
+    externsModules <- fmap (map snd) . alterErrors $ P.parseModulesFromFiles id [(path, externs)]
     case externsModules of
       [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
-      _ -> throwError . errorMessage . InvalidExternsFile $ externsFile
+      _ -> throwError . errorMessage . InvalidExternsFile $ path
     where
     alterErrors = flip catchError $ \(MultipleErrors errs) ->
       throwError . MultipleErrors $ flip map errs $ \e -> case e of
