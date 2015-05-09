@@ -64,7 +64,7 @@ traverseEither f (Right y) = Right <$> f y
 
 buildMakeActions :: FilePath
                  -> M.Map P.ModuleName (Either P.RebuildPolicy String)
-                 -> M.Map P.ModuleName String
+                 -> M.Map P.ModuleName P.ForeignJS
                  -> Bool
                  -> P.MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
@@ -88,8 +88,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> P.runModuleName mn </> "externs.purs"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> String -> P.Environment -> Integer -> Make ()
-  codegen m exts _ nextVar = do
+  codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
+  codegen m _ nextVar exts = do
     foreignInclude <- case CF.moduleName m `M.lookup` foreigns of
       Just _ | not $ requiresForeign m -> error "Found unnecessary foreign module"
              | otherwise -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]

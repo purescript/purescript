@@ -99,15 +99,15 @@ compile (PSCOptions input inputForeign opts stdin output externs usePrefix) = do
           exitSuccess
 
 parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
-            => [(Maybe FilePath, String)] -> [(FilePath, String)] -> m ([(Maybe FilePath, P.Module)], M.Map P.ModuleName String)
+            => [(Maybe FilePath, String)] -> [(FilePath, P.ForeignJS)] -> m ([(Maybe FilePath, P.Module)], M.Map P.ModuleName String)
 parseInputs modules foreigns =
   (,) <$> P.parseModulesFromFiles (fromMaybe "") modules
       <*> P.parseForeignModulesFromFiles foreigns
 
 compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m, MonadReader (P.Options P.Compile) m)
-          => [P.Module] -> M.Map P.ModuleName String -> [String] -> m (String, String)
+          => [P.Module] -> M.Map P.ModuleName P.ForeignJS -> [String] -> m (String, String)
 compileJS ms foreigns prefix = do
-  (modulesToCodeGen, exts, env, nextVar) <- P.compile ms
+  (modulesToCodeGen, env, nextVar, exts) <- P.compile ms
   js <- concat <$> evalSupplyT nextVar (traverse codegenModule modulesToCodeGen)
   js' <- generateMain env js
   let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']

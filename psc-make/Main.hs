@@ -78,8 +78,8 @@ readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$>
 
 parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
             => [(Either P.RebuildPolicy FilePath, String)]
-            -> [(FilePath, String)]
-            -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName String)
+            -> [(FilePath, P.ForeignJS)]
+            -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName P.ForeignJS)
 parseInputs modules foreigns =
   (,) <$> P.parseModulesFromFiles (either (const "") id) modules
       <*> P.parseForeignModulesFromFiles foreigns

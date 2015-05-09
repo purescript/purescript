@@ -24,6 +24,8 @@ module Language.PureScript
   , compile'
   , RebuildPolicy(..)
   , MakeActions(..)
+  , SupplyVar()
+  , Externs()
   , make
   , version
   ) where
@@ -46,7 +48,7 @@ import Control.Monad.Supply.Class (fresh)
 
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
-import Language.PureScript.CodeGen
+import Language.PureScript.CodeGen.Externs (moduleToPs)
 import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
@@ -87,11 +89,11 @@ import qualified Paths_purescript as Paths
 --  * Pretty-print the generated Javascript
 --
 compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-        => [Module] -> m ([CoreFn.Module CoreFn.Ann], String, Environment, Integer)
+        => [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
 compile = compile' initEnvironment
 
 compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-         => Environment -> [Module] -> m ([CoreFn.Module CoreFn.Ann], String, Environment, Integer)
+         => Environment -> [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
 compile' env ms = do
   noPrelude <- asks optionsNoPrelude
   unless noPrelude (checkPreludeIsDefined ms)
@@ -108,40 +110,48 @@ compile' env ms = do
       renamed = renameInModules elim
       codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
       modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-  let exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
-  return (modulesToCodeGen, exts, env', nextVar)
+      exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
+  return (modulesToCodeGen, env', nextVar, exts)
 
 -- |
--- A type class which collects the IO actions we need to be able to run in "make" mode
+-- Actions that require implementations when running in "make" mode.
 --
---class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => MonadMake m where
---  -- |
---  -- Get a file timestamp
---  --
---  getTimestamp :: FilePath -> m (Maybe UTCTime)
+data MakeActions m = MakeActions {
+  -- |
+  -- Get the timestamp for the input file(s) for a module. If there are multiple
+  -- files (.purs and foreign files, for example) the timestamp should be for
+  -- the most recently modified file.
+  --
+    getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
+  -- |
+  -- Get the timestamp for the output files for a module. This should be the
+  -- timestamp for the oldest modified file, or Nothing if any of the required
+  -- output files are missing.
+  --
+  , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
+  -- |
+  -- Read the externs file for a module as a string and also return the actual
+  -- path for the file.
+  , readExterns :: ModuleName -> m (FilePath, String)
+  -- |
+  -- Run the code generator for the module and write any required output files.
+  --
+  , codegen :: CoreFn.Module CoreFn.Ann -> Environment -> SupplyVar -> Externs -> m ()
+  -- |
+  -- Respond to a progress update.
+  --
+  , progress :: String -> m ()
+  }
 
---  -- |
---  -- Read a file as a string
---  --
---  readTextFile :: FilePath -> m String
+-- |
+-- Generated code for an externs file.
+--
+type Externs = String
 
---  -- |
---  -- Write a text file
---  --
---  writeTextFile :: FilePath -> String -> m ()
-
---  -- |
---  -- Respond to a progress update
---  --
---  progress :: String -> m ()
-
-data MakeActions m = MakeActions
-    { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
-    , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
-    , readExterns :: ModuleName -> m (FilePath, String)
-    , codegen :: CoreFn.Module CoreFn.Ann -> String -> Environment -> Integer -> m ()
-    , progress :: String -> m ()
-    }
+-- |
+-- A value to be used in the Supply monad.
+--
+type SupplyVar = Integer
 
 -- |
 -- Determines when to rebuild a module
@@ -186,16 +196,15 @@ make MakeActions{..} ms = do
     (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
-
     lift $ progress $ "Compiling " ++ runModuleName moduleName'
     (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
     let mod' = Module coms moduleName' regrouped exps
         corefn = CoreFn.moduleToCoreFn env' mod'
         [renamed] = renameInModules [corefn]
-    let exts = moduleToPs mod' env'
+        exts = moduleToPs mod' env'
     nextVar <- fresh
-    lift $ codegen renamed exts env' nextVar
+    lift $ codegen renamed env' nextVar exts
     go env' ms'
 
   rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]

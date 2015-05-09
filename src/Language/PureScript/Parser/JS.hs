@@ -14,7 +14,10 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 
-module Language.PureScript.Parser.JS (parseForeignModulesFromFiles) where
+module Language.PureScript.Parser.JS
+  ( ForeignJS()
+  , parseForeignModulesFromFiles
+  ) where
 
 import Control.Applicative ((*>), (<*))
 import Control.Monad (msum)
@@ -27,7 +30,9 @@ import Prelude hiding (lex)
 import qualified Data.Map as M
 import qualified Text.Parsec as PS
 
-parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, String)] -> m (M.Map ModuleName String)
+type ForeignJS = String
+
+parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, ForeignJS)] -> m (M.Map ModuleName ForeignJS)
 parseForeignModulesFromFiles files = do
   foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
