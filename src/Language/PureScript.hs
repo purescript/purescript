@@ -15,6 +15,7 @@
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript
@@ -22,7 +23,7 @@ module Language.PureScript
   , compile
   , compile'
   , RebuildPolicy(..)
-  , MonadMake(..)
+  , MakeActions(..)
   , make
   , version
   ) where
@@ -113,26 +114,34 @@ compile' env ms = do
 -- |
 -- A type class which collects the IO actions we need to be able to run in "make" mode
 --
-class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => MonadMake m where
-  -- |
-  -- Get a file timestamp
-  --
-  getTimestamp :: FilePath -> m (Maybe UTCTime)
+--class (MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => MonadMake m where
+--  -- |
+--  -- Get a file timestamp
+--  --
+--  getTimestamp :: FilePath -> m (Maybe UTCTime)
 
-  -- |
-  -- Read a file as a string
-  --
-  readTextFile :: FilePath -> m String
+--  -- |
+--  -- Read a file as a string
+--  --
+--  readTextFile :: FilePath -> m String
 
-  -- |
-  -- Write a text file
-  --
-  writeTextFile :: FilePath -> String -> m ()
+--  -- |
+--  -- Write a text file
+--  --
+--  writeTextFile :: FilePath -> String -> m ()
 
-  -- |
-  -- Respond to a progress update
-  --
-  progress :: String -> m ()
+--  -- |
+--  -- Respond to a progress update
+--  --
+--  progress :: String -> m ()
+
+data MakeActions m = MakeActions
+    { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
+    , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
+    , readExterns :: ModuleName -> m (FilePath, String)
+    , codegen :: CoreFn.Module CoreFn.Ann -> String -> Environment -> Integer -> m ()
+    , progress :: String -> m ()
+    }
 
 -- |
 -- Determines when to rebuild a module
@@ -149,14 +158,11 @@ data RebuildPolicy
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Functor m, Applicative m, Monad m, MonadMake m)
-     => (ModuleName -> m (Either RebuildPolicy (Maybe UTCTime)))
-     -> (ModuleName -> m (Maybe UTCTime))
-     -> (ModuleName -> m (FilePath, String))
-     -> (CoreFn.Module CoreFn.Ann -> String -> Environment -> Integer -> m ())
+make :: forall m. (Functor m, Applicative m, Monad m, MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+     => MakeActions m
      -> [(Either RebuildPolicy FilePath, Module)]
      -> m Environment
-make getInputTimestamp getOutputTimestamp readExterns codegen ms = do
+make MakeActions{..} ms = do
   noPrelude <- asks optionsNoPrelude
   unless noPrelude (checkPreludeIsDefined (map snd ms))
   (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
@@ -181,7 +187,7 @@ make getInputTimestamp getOutputTimestamp readExterns codegen ms = do
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
 
-    lift . progress $ "Compiling " ++ runModuleName moduleName'
+    lift $ progress $ "Compiling " ++ runModuleName moduleName'
     (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
     let mod' = Module coms moduleName' regrouped exps
