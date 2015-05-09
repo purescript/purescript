@@ -13,39 +13,35 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module PSCi where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort, isPrefixOf)
+import Data.List (intercalate, nub, sort)
 import Data.Traversable (traverse)
+import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
 import Control.Applicative
+import Control.Arrow (first)
 import Control.Monad
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
-import Control.Monad.Writer (MonadWriter, WriterT, runWriterT, runWriter)
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import Control.Monad.Writer (runWriter)
 import qualified Control.Monad.Trans.State.Lazy as L
 
 import Options.Applicative as Opts
 
 import System.Console.Haskeline
-import System.Directory (createDirectoryIfMissing, getModificationTime, doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
+import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
-import System.FilePath (pathSeparator, takeDirectory, (</>), isPathSeparator)
-import System.IO.Error (tryIOError)
+import System.FilePath (pathSeparator, (</>), isPathSeparator)
 import System.Process (readProcessWithExitCode)
 
 import qualified Language.PureScript as P
@@ -53,8 +49,10 @@ import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
 
 import qualified Directive as D
-import Parser (parseCommand)
 import Completion (completion)
+import IO (mkdirp)
+import Make
+import Parser (parseCommand)
 import Types
 
 -- | The name of the PSCI support module
@@ -88,6 +86,7 @@ supportModule =
     ]
 
 -- File helpers
+
 -- |
 -- Load the necessary modules.
 --
@@ -118,7 +117,7 @@ getHistoryFilename = do
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
   content <- readFile filename
-  return $ either (Left . show) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
+  return $ either (Left . P.prettyPrintMultipleErrors False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
 -- Load all modules, including the Prelude
@@ -147,6 +146,7 @@ loadAllImportedModules = do
 expandTilde :: FilePath -> IO FilePath
 expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
 expandTilde p = return p
+
 -- Messages
 
 -- |
@@ -160,13 +160,12 @@ helpMessage = "The following commands are available:\n\n    " ++
   line :: (Directive, String, String) -> String
   line (dir, arg, desc) =
     let cmd = ':' : D.stringFor dir
-    in intercalate " "
-        [ cmd
-        , replicate (11 - length cmd) ' '
-        , arg
-        , replicate (11 - length arg) ' '
-        , desc
-        ]
+    in unwords [ cmd
+               , replicate (11 - length cmd) ' '
+               , arg
+               , replicate (11 - length arg) ' '
+               , desc
+               ]
 
   extraHelp =
     "Further information is available on the PureScript wiki:\n" ++
@@ -194,14 +193,6 @@ prologueMessage = intercalate "\n"
 quitMessage :: String
 quitMessage = "See ya!"
 
-
--- Compilation
-
--- | Compilation options.
---
-options :: P.Options P.Make
-options = P.Options False False False Nothing False False False P.MakeOptions
-
 -- |
 -- PSCI monad
 --
@@ -209,30 +200,6 @@ newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Fu
 
 psciIO :: IO a -> PSCI a
 psciIO io = PSCI . lift $ lift io
-
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader (P.Options P.Make))
-
-runMake :: Make a -> IO (Either P.MultipleErrors a)
-runMake = runExceptT . fmap fst . runWriterT . flip runReaderT options . unMake
-
-makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
-makeIO f io = do
-  e <- liftIO $ tryIOError io
-  either (throwError . P.singleError . f) return e
-
-instance P.MonadMake Make where
-  getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do
-    exists <- doesFileExist path
-    traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ readFile path
-  writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do
-    mkdirp path
-    writeFile path text
-  progress s = unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s
-
-mkdirp :: FilePath -> IO ()
-mkdirp = createDirectoryIfMissing True . takeDirectory
 
 -- |
 -- Makes a volatile module to execute the current expression.
@@ -274,11 +241,13 @@ createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
 importDecl :: ImportedModule -> P.Declaration
 importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
 
-modulesDir :: FilePath
-modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
-
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
+
+make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> Make P.Environment
+make PSCiState{..} ms =
+  let filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
+  in P.make (buildMakeActions filePathMap M.empty) (psciLoadedModules ++ ms)
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
@@ -288,7 +257,7 @@ handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
   let nodeArgs = psciNodeFlags st ++ [indexFile]
-  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, supportModule), (Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, supportModule), (Left P.RebuildAlways, m)]
   case e of
     Left errs -> printErrors errs
     Right _ -> do
@@ -309,7 +278,7 @@ handleDecls ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
-  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st' ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ make st' [(Left P.RebuildAlways, m)]
   case e of
     Left err -> printErrors err
     Right _ -> PSCI $ lift (put st')
@@ -362,7 +331,7 @@ handleImport :: ImportedModule -> PSCI ()
 handleImport im = do
    st <- updateImportedModules im <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
-   e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+   e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
    case e of
      Left errs -> printErrors errs
      Right _  -> do
@@ -376,7 +345,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st val
-  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
   case e of
     Left errs -> printErrors errs
     Right env' ->
@@ -409,12 +378,11 @@ printModuleSignatures moduleName env =
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
   st <- PSCI $ lift get
-  let loadedModules = psciLoadedModules st
-  env <- psciIO . runMake $ P.make modulesDir loadedModules []
+  env <- psciIO . runMake $ make st []
   case env of
     Left errs -> printErrors errs
     Right env' ->
-      if moduleName `notElem` (nub . map ((\ (P.Module _ modName _ _ ) -> modName) . snd)) loadedModules
+      if moduleName `notElem` (nub . map ((\ (P.Module _ modName _ _ ) -> modName) . snd)) (psciLoadedModules st)
         then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
         else printModuleSignatures moduleName env'
 
@@ -430,7 +398,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ P.make modulesDir (psciLoadedModules st ++ [(Left P.RebuildAlways, m)]) []
+  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
   case e of
     Left errs -> printErrors errs
     Right env' ->
@@ -519,7 +487,7 @@ loop PSCiOptions{..} = do
   config <- loadUserConfig
   modulesOrFirstError <- loadAllModules psciInputFile
   case modulesOrFirstError of
-    Left err -> print err >> exitFailure
+    Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }

@@ -15,6 +15,7 @@
 
 module Types where
 
+import qualified Data.Map as M
 import qualified Language.PureScript as P
 
 data PSCiOptions = PSCiOptions
@@ -33,6 +34,7 @@ data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModules     :: [ImportedModule]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
+  --, psciForeignFiles        :: M.Map P.ModuleName P.ForeignJS
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }

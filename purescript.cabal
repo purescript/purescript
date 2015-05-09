@@ -166,7 +166,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any
+                   transformers-compat -any, process -any, time -any
 
     main-is: Main.hs
     buildable: True
