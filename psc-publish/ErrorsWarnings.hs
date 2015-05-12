@@ -256,10 +256,11 @@ renderWarnings =
   where
   collectWarnings patterns warns =
     let boxes = mapMaybe (collectWarnings' warns) patterns
-    in  vcat
-      [ para "Warnings:"
-      , indented (vcat (intersperse spacer boxes))
-      ]
+        result = vcat
+                    [ para "Warnings:"
+                    , indented (vcat (intersperse spacer boxes))
+                    ]
+    in if null boxes then nullBox else result
 
   getResolutionNotVersion (ResolutionNotVersion n) = Just n
   getResolutionNotVersion _ = Nothing
