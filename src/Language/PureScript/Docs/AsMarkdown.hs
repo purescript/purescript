@@ -44,6 +44,8 @@ declAsMarkdown RenderedDeclaration{..} = do
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
+  for_ rdFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
+
   for_ rdComments tell'
 
   unless (null instances) $ do
@@ -60,6 +62,20 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Kind x)    = x
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
+
+fixityAsMarkdown :: P.Fixity -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) =
+  tell' $ concat [ "_"
+                 , associativityStr
+                 , " / precedence "
+                 , show precedence
+                 , "_"
+                 ]
+  where
+  associativityStr = case associativity of
+    P.Infixl -> "left-associative"
+    P.Infixr -> "right-associative"
+    P.Infix  -> "non-associative"
 
 childToString :: First -> RenderedChildDeclaration -> String
 childToString f RenderedChildDeclaration{..} =
