@@ -128,6 +128,9 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
            tys <- P.many (indented *> noWildcards parseTypeAtom)
            return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
+           -- TODO: add a wiki page link with migration info
+           -- TODO: remove this deprecation warning in 0.8
+           _ <- P.optional $ stringLiteral *> featureWasRemoved "Inline foreign string literals are no longer supported."
            ty <- indented *> doubleColon *> noWildcards parsePolyType
            return $ ExternDeclaration ident ty))
 

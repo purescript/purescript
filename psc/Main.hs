@@ -25,10 +25,10 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Supply (evalSupplyT)
+import Control.Monad.Supply.Class (MonadSupply())
 import Control.Monad.Writer
 
 import Data.Maybe (fromMaybe)
-import Data.Traversable (traverse)
 import Data.Version (showVersion)
 
 import Options.Applicative as Opts
@@ -83,7 +83,7 @@ compile (PSCOptions input inputForeign opts stdin output externs usePrefix) = do
     Right ((ms, foreigns), warnings) -> do
       when (P.nonEmpty warnings) $
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
-      case runPSC opts (compileJS (map snd ms) foreigns prefix) of
+      case runPSC opts (compileJS ms foreigns prefix) of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
@@ -99,33 +99,39 @@ compile (PSCOptions input inputForeign opts stdin output externs usePrefix) = do
           exitSuccess
 
 parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
-            => [(Maybe FilePath, String)] -> [(FilePath, P.ForeignJS)] -> m ([(Maybe FilePath, P.Module)], M.Map P.ModuleName String)
+            => [(Maybe FilePath, String)] -> [(FilePath, P.ForeignJS)] -> m ([P.Module], M.Map P.ModuleName (FilePath, P.ForeignJS))
 parseInputs modules foreigns =
-  (,) <$> P.parseModulesFromFiles (fromMaybe "") modules
+  (,) <$> (map snd <$> P.parseModulesFromFiles (fromMaybe "") modules)
       <*> P.parseForeignModulesFromFiles foreigns
 
 compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m, MonadReader (P.Options P.Compile) m)
-          => [P.Module] -> M.Map P.ModuleName P.ForeignJS -> [String] -> m (String, String)
+          => [P.Module] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> [String] -> m (String, String)
 compileJS ms foreigns prefix = do
   (modulesToCodeGen, env, nextVar, exts) <- P.compile ms
-  js <- concat <$> evalSupplyT nextVar (traverse codegenModule modulesToCodeGen)
+  js <- concat <$> evalSupplyT nextVar (P.parU modulesToCodeGen codegenModule)
   js' <- generateMain env js
   let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']
   return (pjs, exts)
 
   where
 
+  codegenModule :: (Functor n, Applicative n, MonadError P.MultipleErrors n, MonadWriter P.MultipleErrors n, MonadReader (P.Options P.Compile) n, MonadSupply n)
+                => CF.Module CF.Ann -> n [J.JS]
   codegenModule m =
     let requiresForeign = not $ null (CF.moduleForeign m)
-    in case CF.moduleName m `M.lookup` foreigns of
-      Just js | not requiresForeign -> error "Found unnecessary foreign module"
-              | otherwise -> J.moduleToJs m $ Just $
-              J.JSApp (J.JSFunction Nothing [] $
-                        J.JSBlock [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
-                                  , J.JSRaw js
-                                  , J.JSReturn (J.JSVar "exports")
-                                  ]) []
-      Nothing | requiresForeign -> error "Foreign module missing"
+        mn = CF.moduleName m
+    in case mn `M.lookup` foreigns of
+      Just (path, js)
+        | not requiresForeign -> do
+            tell $ P.errorMessage $ P.UnnecessaryFFIModule mn path
+            J.moduleToJs m Nothing
+        | otherwise -> J.moduleToJs m $ Just $
+            J.JSApp (J.JSFunction Nothing [] $
+                      J.JSBlock [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
+                                , J.JSRaw js
+                                , J.JSReturn (J.JSVar "exports")
+                                ]) []
+      Nothing | requiresForeign -> throwError . P.errorMessage $ P.MissingFFIModule mn
               | otherwise -> J.moduleToJs m Nothing
 
   generateMain :: P.Environment -> [J.JS] -> m [J.JS]

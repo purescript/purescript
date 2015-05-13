@@ -32,11 +32,12 @@ import qualified Text.Parsec as PS
 
 type ForeignJS = String
 
-parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, ForeignJS)] -> m (M.Map ModuleName ForeignJS)
+parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, ForeignJS)] -> m (M.Map ModuleName (FilePath, ForeignJS))
 parseForeignModulesFromFiles files = do
+  -- TODO: emit MultipleFFIModules error when duplicates are found
   foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
-      Just name -> return (name, file)
+      Just name -> return (name, (path, file))
       Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path)
   return $ M.fromList foreigns
 
