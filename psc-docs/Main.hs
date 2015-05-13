@@ -16,11 +16,13 @@
 module Main where
 
 import Control.Applicative
-import Control.Monad.Writer
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
+import Control.Monad.Writer
+import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
+import Data.Tuple (swap)
 import Data.Version (showVersion)
 
 import Options.Applicative
@@ -75,7 +77,7 @@ docgen (PSCDocsOptions fmt input output) =
         Left (D.DesugarError err) -> do
           hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
           exitFailure
-        Right ms' -> do
+        Right ms' ->
           case output of
             EverythingToStdOut ->
               putStrLn (D.renderModulesAsMarkdown ms')
@@ -86,9 +88,11 @@ docgen (PSCDocsOptions fmt input output) =
             ToFiles names -> do
               let (ms, missing) = takeModulesByName' ms' names
               guardMissing missing
-              forM_ ms $ \(m, fp) -> do
+              let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms
+              forM_ ms'' $ \grp -> do
+                let fp = fst (head grp)
                 createDirectoryIfMissing True (takeDirectory fp)
-                writeFile fp (D.renderModulesAsMarkdown [m])
+                writeFile fp (D.renderModulesAsMarkdown $ snd `map` grp)
 
   where
   guardMissing [] = return ()
