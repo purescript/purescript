@@ -20,8 +20,11 @@ module Language.PureScript.Parser.JS
   ) where
 
 import Control.Applicative ((*>), (<*))
-import Control.Monad (msum)
+import Control.Monad (forM_, when, msum)
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
+import Data.Function (on)
+import Data.List (sortBy, groupBy)
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Parser.Common
@@ -32,13 +35,20 @@ import qualified Text.Parsec as PS
 
 type ForeignJS = String
 
-parseForeignModulesFromFiles :: (MonadError MultipleErrors m, Functor m) => [(FilePath, ForeignJS)] -> m (M.Map ModuleName (FilePath, ForeignJS))
+parseForeignModulesFromFiles :: (Functor m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+                             => [(FilePath, ForeignJS)]
+                             -> m (M.Map ModuleName (FilePath, ForeignJS))
 parseForeignModulesFromFiles files = do
-  -- TODO: emit MultipleFFIModules error when duplicates are found
   foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
       Just name -> return (name, (path, file))
       Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path)
+  let grouped = groupBy ((==) `on` fst) $ sortBy (compare `on` fst) foreigns
+  forM_ grouped $ \grp ->
+    when (length grp > 1) $ do
+      let mn = fst (head grp)
+          paths = map (fst . snd) grp
+      tell $ errorMessage $ MultipleFFIModules mn paths
   return $ M.fromList foreigns
 
 findModuleName :: [String] -> Maybe ModuleName
