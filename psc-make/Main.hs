@@ -68,9 +68,11 @@ instance P.MonadMake Make where
   getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
-    putStrLn $ "Reading " ++ path
-    readFile path
+  readTextFile path = do
+    verboseErrorsEnabled <- asks P.optionsVerboseErrors
+    makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
+      when verboseErrorsEnabled $ putStrLn $ "Reading " ++ path
+      readFile path
   writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do
     mkdirp path
     putStrLn $ "Writing " ++ path
