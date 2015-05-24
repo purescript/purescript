@@ -240,12 +240,19 @@ parseToken = P.choice
   parseStringLiteral :: P.Parsec String u String
   parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
     where
-    delimeter   = P.try (P.string "\"\"\"")
-    blockString = delimeter >> P.manyTill P.anyChar delimeter
+    delimiter   = P.try (P.string "\"\"\"")
+    blockString = delimiter >> P.manyTill P.anyChar delimiter
 
   parseNumber :: P.Parsec String u (Either Integer Double)
-  parseNumber = (Right <$> P.try (PT.float tokenParser) <|>
-                 Left <$> P.try (PT.natural tokenParser)) P.<?> "number"
+  parseNumber = (consumeLeadingZero >> P.parserZero) <|>
+                  (Right <$> P.try (PT.float tokenParser) <|>
+                  Left <$> P.try (PT.natural tokenParser))
+                P.<?> "number"
+    where
+    -- lookAhead doesn't consume any input if its parser succeeds
+    -- if notFollowedBy fails though, the consumed '0' will break the choice chain
+    consumeLeadingZero = P.lookAhead (P.char '0' >> 
+      (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
 
 -- |
 -- We use Text.Parsec.Token to implement the string and number lexemes
