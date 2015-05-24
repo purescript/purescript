@@ -204,21 +204,12 @@ identNames = nubOnFst . mapMaybe getDeclName . P.exportedDeclarations
   getDeclName _ = Nothing
 
 dctorNames :: P.Module -> [(N.ProperName, P.Declaration)]
-dctorNames m = nubOnFst $ concatMap dctors dnames
+dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   where
-  getDataDeclName :: P.Declaration -> Maybe (N.ProperName, P.Declaration)
-  getDataDeclName d@(P.DataDeclaration _ name _ _) = Just (name, d)
-  getDataDeclName (P.PositionedDeclaration _ _ d) = getDataDeclName d
-  getDataDeclName _ = Nothing
-
-  dnames :: [(N.ProperName, P.Declaration)]
-  dnames = (mapMaybe getDataDeclName onlyDataDecls)
-
-  onlyDataDecls :: [P.Declaration]
-  onlyDataDecls = (filter P.isDataDecl (P.exportedDeclarations m))
-
-  dctors :: (N.ProperName, P.Declaration) -> [(N.ProperName, P.Declaration)]
-  dctors (name, decl) = map (\n -> (n, decl)) (map fst (P.exportedDctors m name))
+  go :: P.Declaration -> [(N.ProperName, P.Declaration)]
+  go decl@(P.DataDeclaration _ _ _ ctors) = map (\n -> (n, decl)) (map fst ctors)
+  go (P.PositionedDeclaration _ _ d) = go d
+  go _ = []
 
 moduleNames :: [P.Module] -> [String]
 moduleNames ms = nub [show moduleName | P.Module _ moduleName _ _ <- ms]

@@ -33,7 +33,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
-import Control.Monad.Writer (MonadWriter, WriterT, runWriterT)
+import Control.Monad.Writer (MonadWriter, WriterT, runWriterT, runWriter)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
@@ -221,14 +221,14 @@ runMake = runExceptT . fmap fst . runWriterT . flip runReaderT options . unMake
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a
 makeIO f io = do
   e <- liftIO $ tryIOError io
-  either (throwError . P.errorMessage . f) return e
+  either (throwError . P.singleError . f) return e
 
 instance P.MonadMake Make where
-  getTimestamp path = makeIO (const (P.CannotGetFileInfo path)) $ do
+  getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
-  readTextFile path = makeIO (const (P.CannotReadFile path)) $ readFile path
-  writeTextFile path text = makeIO (const (P.CannotWriteFile path)) $ do
+  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ readFile path
+  writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do
     mkdirp path
     writeFile path text
   progress s = unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s
@@ -439,7 +439,7 @@ handleKindOf typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = P.CheckState env' 0 0 (Just mName)
-              k   = L.runStateT (P.unCheck (P.kindOf mName typ')) chk
+              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf mName typ')) chk
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
