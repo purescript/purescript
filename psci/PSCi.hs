@@ -16,6 +16,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module PSCi where
 
@@ -491,14 +492,20 @@ loop PSCiOptions{..} = do
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
-      flip evalStateT (PSCiState psciInputFile defaultImports modules [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
-        outputStrLn prologueMessage
-        traverse_ (mapM_ (runPSCI . handleCommand)) config
-        unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines
-          [ "PSCi requires the purescript-console module to be installed."
-          , "For help getting started, visit http://wiki.purescript.org/PSCi"
-          ]
-        go
+      foreignsOrError <- runMake $ do
+        foreignFiles <- forM psciForeignInputFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
+        P.parseForeignModulesFromFiles foreignFiles
+      case foreignsOrError of
+        Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
+        Right foreigns ->
+          flip evalStateT (PSCiState psciInputFile defaultImports modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+            outputStrLn prologueMessage
+            traverse_ (mapM_ (runPSCI . handleCommand)) config
+            unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines
+              [ "PSCi requires the purescript-console module to be installed."
+              , "For help getting started, visit http://wiki.purescript.org/PSCi"
+              ]
+            go
       where
         go :: InputT (StateT PSCiState IO) ()
         go = do
@@ -520,6 +527,12 @@ inputFile = strArgument $
      metavar "FILE"
   <> Opts.help "Optional .purs files to load on start"
 
+inputForeignFile :: Parser FilePath
+inputForeignFile = strOption $
+     short 'f'
+  <> long "ffi"
+  <> help "The input .js file(s) providing foreign import implementations"
+
 nodeFlagsFlag :: Parser [String]
 nodeFlagsFlag = option parser $
      long "node-opts"
@@ -532,6 +545,7 @@ nodeFlagsFlag = option parser $
 psciOptions :: Parser PSCiOptions
 psciOptions = PSCiOptions <$> multiLineMode
                           <*> many inputFile
+                          <*> many inputForeignFile
                           <*> nodeFlagsFlag
 
 runPSCi :: IO ()
