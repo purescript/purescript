@@ -175,6 +175,6 @@ makeCaseDeclaration ident alternatives = do
   resolveName (Just (Just a)) (Just (Just b))
     | a == b = Just (Just a)
     | otherwise = Nothing
-  resolveName (Just Nothing) a = a
-  resolveName a (Just Nothing) = a
+  resolveName a@(Just (Just _)) _ = a
+  resolveName _ b@(Just (Just _)) = b
   resolveName _ _ = Nothing
