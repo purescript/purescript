@@ -59,7 +59,7 @@ desugarModule (Module coms name decls (Just exps)) = do
   return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
   where
   classesFirst :: Declaration -> Declaration -> Ordering
-  classesFirst d1 d2 
+  classesFirst d1 d2
     | isTypeClassDeclaration d1 && not (isTypeClassDeclaration d2) = LT
     | not (isTypeClassDeclaration d1) && isTypeClassDeclaration d2 = GT
     | otherwise = EQ
@@ -219,7 +219,7 @@ typeClassDictionaryDeclaration name args implies members =
 typeClassMemberToDictionaryAccessor :: ModuleName -> ProperName -> [(String, Maybe Kind)] -> Declaration -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   let className = Qualified (Just mn) name
-  in ValueDeclaration ident TypeClassAccessorImport [] $ Right $
+  in ValueDeclaration ident Private [] $ Right $
       TypedValue False (TypeClassDictionaryAccessor className ident) $
       moveQuantifiersToFront (quantify (ConstrainedType [(className, map (TypeVar . fst) args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
@@ -264,7 +264,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor className) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDeclaration name TypeInstanceDictionaryValue [] (Right (TypedValue True dict constrainedTy))
+          result = ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))
       return result
 
   where

@@ -74,7 +74,7 @@ groupChildren (partitionEithers -> (children, toplevels)) =
 
 getDeclarationTitle :: P.Declaration -> Maybe String
 getDeclarationTitle (P.TypeDeclaration name _)               = Just (show name)
-getDeclarationTitle (P.ExternDeclaration _ name _ _)         = Just (show name)
+getDeclarationTitle (P.ExternDeclaration name _)             = Just (show name)
 getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (show name)
 getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (show name)
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (show name)
@@ -93,7 +93,7 @@ renderDeclaration (P.TypeDeclaration ident' ty) title =
   code = ident (show ident')
           <> sp <> syntax "::" <> sp
           <> renderType ty
-renderDeclaration (P.ExternDeclaration _ ident' _ ty) title =
+renderDeclaration (P.ExternDeclaration ident' ty) title =
   basicDeclaration title code
   where
   code = ident (show ident')

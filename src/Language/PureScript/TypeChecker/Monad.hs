@@ -86,7 +86,7 @@ getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
 --
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type, NameVisibility)] -> m a -> m a
 bindLocalVariables moduleName bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, LocalVariable, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, Private, visibility)))
 
 -- |
 -- Temporarily bind a collection of names to local type variables
@@ -98,7 +98,7 @@ bindLocalTypeVariables moduleName bindings =
 -- |
 -- Update the visibility of all names to Defined
 --
-makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m () 
+makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m ()
 makeBindingGroupVisible = modifyEnv $ \e -> e { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names e) }
 
 -- | Update the visibility of all names to Defined in the scope of the provided action

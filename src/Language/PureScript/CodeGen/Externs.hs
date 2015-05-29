@@ -24,13 +24,13 @@ import qualified Data.Map as M
 import Control.Monad.Writer
 
 import Language.PureScript.AST
+import Language.PureScript.Comments
 import Language.PureScript.Environment
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import Language.PureScript.Comments
 
 -- |
 -- Generate foreign imports for all declarations in a module
@@ -54,7 +54,7 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
       exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r
       exportsOp (ValueRef ident') = ident' == Op op
       exportsOp _ = False
-    declToPs (PositionedDeclaration _ com d) = mapM commentToPs com >> declToPs d
+    declToPs (PositionedDeclaration _ com d) = mapM_ commentToPs com >> declToPs d
     declToPs _ = return ()
 
     commentToPs :: Comment -> Writer [String] ()
@@ -63,7 +63,7 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
 
     exportToPs :: DeclarationRef -> Writer [String] ()
     exportToPs (PositionedDeclarationRef _ _ r) = exportToPs r
-    exportToPs (TypeRef pn dctors) = do
+    exportToPs (TypeRef pn dctors) =
       case Qualified (Just moduleName) pn `M.lookup` types env of
         Nothing -> error $ show pn ++ " has no kind in exportToPs"
         Just (kind, ExternData) ->
@@ -90,7 +90,7 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
     exportToPs (ValueRef ident) =
       case (moduleName, ident) `M.lookup` names env of
         Nothing -> error $ show ident ++ " has no type in exportToPs"
-        Just (ty, nameKind, _) | nameKind == Value || nameKind == Extern ForeignImport || nameKind == Extern InlineForeign ->
+        Just (ty, nk, _) | nk == Public || nk == External ->
           tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
         _ -> return ()
     exportToPs (TypeClassRef className) =

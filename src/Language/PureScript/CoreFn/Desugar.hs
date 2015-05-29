@@ -99,7 +99,7 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
   exprToCoreFn ss com ty (A.Var ident) =
-    Var (ss, com, ty, Nothing) ident
+    Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
     Case (ss, com, ty, Nothing) [exprToCoreFn ss [] Nothing v1]
       [ CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral True]
@@ -165,6 +165,15 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     binderToCoreFn (Just ss) (com ++ com1) b
 
   -- |
+  -- Gets metadata for values.
+  --
+  getValueMeta :: Qualified Ident -> Maybe Meta
+  getValueMeta name =
+    case lookupValue env name of
+      Just (_, External, _) -> Just IsForeign
+      _ -> Nothing
+
+  -- |
   -- Gets metadata for data constructors.
   --
   getConstructorMeta :: Qualified ProperName -> Meta
@@ -211,9 +220,9 @@ importToCoreFn _ = Nothing
 -- |
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
-externToCoreFn :: A.Declaration -> Maybe (ForeignDecl A.ForeignCode)
-externToCoreFn (A.ExternDeclaration _ name code ty) = Just (name, code, ty)
-externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
+externToCoreFn :: A.Declaration -> Maybe ForeignDecl
+externToCoreFn (A.ExternDeclaration name ty) = Just (name, ty)
+externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
 

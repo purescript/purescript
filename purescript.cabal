@@ -44,6 +44,7 @@ library
                    bytestring -any,
                    text -any,
                    split -any
+
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -95,6 +96,7 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
+                     Language.PureScript.Parser.JS
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
@@ -161,7 +163,7 @@ executable psc
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, transformers-compat -any
+                   time -any, transformers -any, transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
@@ -172,7 +174,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any
+                   transformers-compat -any, process -any, time -any
 
     main-is: Main.hs
     buildable: True

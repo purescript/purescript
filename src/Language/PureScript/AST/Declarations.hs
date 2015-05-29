@@ -121,9 +121,9 @@ data Declaration
   --
   | BindingGroupDeclaration [(Ident, NameKind, Expr)]
   -- |
-  -- A foreign import declaration (type, name, optional inline code, type)
+  -- A foreign import declaration (name, type)
   --
-  | ExternDeclaration ForeignImportType Ident (Maybe ForeignCode) Type
+  | ExternDeclaration Ident Type
   -- |
   -- A data type foreign import (name, kind)
   --
@@ -256,7 +256,7 @@ data Expr
   --
   | StringLiteral String
   -- |
-  -- A character literal 
+  -- A character literal
   --
   | CharLiteral Char
   -- |

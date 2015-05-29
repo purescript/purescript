@@ -35,7 +35,11 @@ data Meta
   -- |
   -- The contained value is a typeclass dictionary constructor
   --
-  | IsTypeClassConstructor deriving (Show, Eq, D.Data, D.Typeable)
+  | IsTypeClassConstructor
+  -- |
+  -- The contained reference is for a foreign member
+  --
+  | IsForeign deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- Data constructor metadata

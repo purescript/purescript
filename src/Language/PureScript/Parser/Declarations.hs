@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
 module Language.PureScript.Parser.Declarations (
@@ -30,21 +32,22 @@ module Language.PureScript.Parser.Declarations (
 
 import Prelude hiding (lex)
 
-import Data.Maybe (isJust, fromMaybe)
-import Data.Traversable (forM)
+import Data.Maybe (fromMaybe)
 
 import Control.Applicative
 import Control.Arrow ((+++))
+import Control.Monad.Error.Class (MonadError(..))
 
-import Language.PureScript.Kinds
 import Language.PureScript.AST
 import Language.PureScript.Comments
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Parser.Common
-import Language.PureScript.Parser.Types
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
-import Language.PureScript.Names
-import Language.PureScript.Environment
+import Language.PureScript.Parser.Types
 
 import qualified Language.PureScript.Parser.Common as C
 import qualified Text.Parsec as P
@@ -98,7 +101,7 @@ parseValueDeclaration = do
                                     <*> (indented *> equals *> parseValueWithWhereClause)
                                ))
        <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
-  return $ ValueDeclaration name Value binders value
+  return $ ValueDeclaration name Public binders value
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
@@ -117,17 +120,19 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
    <|> (do reserved "instance"
            name <- parseIdent <* indented <* doubleColon
            deps <- P.option [] $ do
-             deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
+             deps' <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
              indented
              rfatArrow
-             return deps
+             return deps'
            className <- indented *> parseQualified properName
            tys <- P.many (indented *> noWildcards parseTypeAtom)
            return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
-           raw <- P.optionMaybe stringLiteral
+           -- TODO: add a wiki page link with migration info
+           -- TODO: remove this deprecation warning in 0.8
+           _ <- P.optional $ stringLiteral *> featureWasRemoved "Inline foreign string literals are no longer supported."
            ty <- indented *> doubleColon *> noWildcards parsePolyType
-           return $ ExternDeclaration (if isJust raw then InlineForeign else ForeignImport) ident (ForeignCode <$> raw) ty))
+           return $ ExternDeclaration ident ty))
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =
@@ -150,7 +155,7 @@ parseImportDeclaration = do
   (mn, declType, asQ) <- parseImportDeclaration'
   return $ ImportDeclaration mn declType asQ
 
-parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, (Maybe ModuleName))
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
   reserved "import"
   indented
@@ -176,7 +181,7 @@ parseImportDeclaration' = do
     asQ <- moduleName
     return (moduleName', declType, Just asQ)
   importDeclarationType expectedType = do
-    idents <- P.optionMaybe $ indented *> (parens $ commaSep parseDeclarationRef)
+    idents <- P.optionMaybe $ indented *> parens (commaSep parseDeclarationRef)
     return $ fromMaybe Implicit (expectedType <$> idents)
 
 
@@ -212,14 +217,14 @@ parseTypeInstanceDeclaration = do
     rfatArrow
     return deps
   className <- indented *> parseQualified properName
-  ty <- P.many (indented *> (noWildcards parseTypeAtom))
+  ty <- P.many (indented *> noWildcards parseTypeAtom)
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))
   return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty members
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
-positioned d = withSourceSpan PositionedDeclaration d
+positioned = withSourceSpan PositionedDeclaration
 
 -- |
 -- Parse a single declaration
@@ -260,14 +265,18 @@ parseModule = do
 -- |
 -- Parse a collection of modules
 --
-parseModulesFromFiles :: (k -> String) -> [(k, String)] -> Either P.ParseError [(k, Module)]
-parseModulesFromFiles toFilePath input =
-  fmap collect . forM input $ \(k, content) -> do
+parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m, Functor m) =>
+                                     (k -> String) -> [(k, String)] -> m [(k, Module)]
+parseModulesFromFiles toFilePath input = do
+  modules <- parU input $ \(k, content) -> do
     let filename = toFilePath k
-    ts <- lex filename content
-    ms <- runTokenParser filename parseModules ts
+    ts <- wrapError $ lex filename content
+    ms <- wrapError $ runTokenParser filename parseModules ts
     return (k, ms)
+  return $ collect modules
   where
+  wrapError :: Either P.ParseError a -> m a
+  wrapError = either (throwError . errorMessage . ErrorParsingModule) return
   collect :: [(k, [v])] -> [(k, v)]
   collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
 
@@ -526,10 +535,9 @@ parseBinderNoParens = P.choice (map P.try
                   , parseObjectBinder
                   , parseArrayBinder
                   , parens parseBinder ]) P.<?> "binder"
+
 -- |
 -- Parse a guard
 --
 parseGuard :: TokenParser Guard
 parseGuard = pipe *> C.indented *> parseValue
-
-

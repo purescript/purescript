@@ -16,14 +16,13 @@ import Control.Monad.IO.Class (MonadIO(..))
 
 import Web.Bower.PackageMeta (PackageName)
 
-import qualified Text.Parsec as Parsec
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Render
 
 data ParseDesugarError
-  = ParseError Parsec.ParseError
+  = ParseError P.MultipleErrors
   | SortModulesError P.MultipleErrors
   | DesugarError P.MultipleErrors
   deriving (Show)

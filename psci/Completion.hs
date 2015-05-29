@@ -199,7 +199,7 @@ identNames = nubOnFst . mapMaybe getDeclName . P.exportedDeclarations
   where
   getDeclName :: P.Declaration -> Maybe (P.Ident, P.Declaration)
   getDeclName d@(P.ValueDeclaration ident _ _ _)  = Just (ident, d)
-  getDeclName d@(P.ExternDeclaration _ ident _ _) = Just (ident, d)
+  getDeclName d@(P.ExternDeclaration ident _) = Just (ident, d)
   getDeclName (P.PositionedDeclaration _ _ d) = getDeclName d
   getDeclName _ = Nothing
 
