@@ -30,7 +30,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Writer (MonadWriter, WriterT, runWriterT)
+import Control.Monad.Writer (MonadWriter, WriterT, runWriterT, tell)
 
 import System.Directory (getModificationTime, doesFileExist)
 import System.FilePath ((</>), pathSeparator)
@@ -90,10 +90,13 @@ buildMakeActions filePathMap foreigns =
 
   codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
   codegen m _ nextVar exts = do
+    let mn = CF.moduleName m
     foreignInclude <- case CF.moduleName m `M.lookup` foreigns of
-      Just _ | not $ requiresForeign m -> error "Found unnecessary foreign module"
-             | otherwise -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
-      Nothing | requiresForeign m -> error "Foreign module missing"
+      Just path 
+        | not $ requiresForeign m -> do tell $ P.errorMessage $ P.UnnecessaryFFIModule mn path
+                                        return Nothing
+        | otherwise -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
+      Nothing | requiresForeign m -> throwError . P.errorMessage $ P.MissingFFIModule mn
               | otherwise -> return Nothing
     pjs <- P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs m foreignInclude
     let filePath = P.runModuleName $ CF.moduleName m
