@@ -155,6 +155,8 @@ data Declaration
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, D.Data, D.Typeable)
 
+newtype ForeignCode = ForeignCode { runForeignCode :: String } deriving (Show, Eq, D.Data, D.Typeable)
+
 -- |
 -- Test if a declaration is a value declaration
 --

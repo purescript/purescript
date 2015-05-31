@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn.Module
+-- Module      :  Language.PureScript.Core.Module
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -8,24 +8,23 @@
 -- Stability   :  experimental
 -- Portability :
 --
--- | The CoreFn module representation
+-- | The Core module representation
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.CoreFn.Module where
+module Language.PureScript.Core.Module where
 
 import Language.PureScript.Comments
-import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
 import Language.PureScript.Types
 
-data Module a = Module
+data Module a f = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
   , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
-  , moduleDecls :: [Bind a]
+  , moduleDecls :: [a]
   } deriving (Show)
 
 type ForeignDecl = (Ident, Type)

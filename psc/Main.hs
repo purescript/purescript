@@ -39,10 +39,12 @@ import System.FilePath (takeDirectory)
 import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Map as M
+import qualified Data.Traversable as T (traverse)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.Constants as C
-import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.Core as CR
+import qualified Language.PureScript.CoreImp as CI
 import qualified Paths_purescript as Paths
 
 data PSCOptions = PSCOptions
@@ -108,7 +110,7 @@ compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m,
           => [P.Module] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> [String] -> m (String, String)
 compileJS ms foreigns prefix = do
   (modulesToCodeGen, env, nextVar, exts) <- P.compile ms
-  js <- concat <$> evalSupplyT nextVar (P.parU modulesToCodeGen codegenModule)
+  js <- concat <$> evalSupplyT nextVar (T.traverse (CI.moduleToCoreImp >=> codegenModule) modulesToCodeGen)
   js' <- generateMain env js
   let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']
   return (pjs, exts)
@@ -116,10 +118,10 @@ compileJS ms foreigns prefix = do
   where
 
   codegenModule :: (Functor n, Applicative n, MonadError P.MultipleErrors n, MonadWriter P.MultipleErrors n, MonadReader (P.Options P.Compile) n, MonadSupply n)
-                => CF.Module CF.Ann -> n [J.JS]
+                => CR.Module (CI.Decl CR.Ann) P.ForeignCode -> n [J.JS]
   codegenModule m =
-    let requiresForeign = not $ null (CF.moduleForeign m)
-        mn = CF.moduleName m
+    let requiresForeign = not $ null (CR.moduleForeign m)
+        mn = CR.moduleName m
     in case mn `M.lookup` foreigns of
       Just (path, js)
         | not requiresForeign -> do

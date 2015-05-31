@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.CoreFn.Meta
+-- Module      :  Language.PureScript.Core.Meta
 -- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
 -- License     :  MIT
 --
@@ -14,7 +14,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Language.PureScript.CoreFn.Meta where
+module Language.PureScript.Core.Meta where
 
 import qualified Data.Data as D
 
@@ -39,7 +39,7 @@ data Meta
   -- |
   -- The contained reference is for a foreign member
   --
-  | IsForeign deriving (Show, D.Data, D.Typeable)
+  | IsForeign deriving (Show, Eq, D.Data, D.Typeable)
 
 -- |
 -- Data constructor metadata
@@ -52,4 +52,4 @@ data ConstructorType
   -- |
   -- The constructor is for a type with multiple construcors
   --
-  | SumType deriving (Show, D.Data, D.Typeable)
+  | SumType deriving (Show, Eq, D.Data, D.Typeable)

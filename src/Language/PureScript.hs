@@ -64,6 +64,7 @@ import Language.PureScript.Sugar as P
 import Control.Monad.Supply as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
+import qualified Language.PureScript.Core as Core
 import qualified Language.PureScript.CoreFn as CoreFn
 import qualified Language.PureScript.Constants as C
 
@@ -89,11 +90,11 @@ import qualified Paths_purescript as Paths
 --  * Pretty-print the generated Javascript
 --
 compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-        => [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
+        => [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann) ForeignCode], Environment, SupplyVar, Externs)
 compile = compile' initEnvironment
 
 compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-         => Environment -> [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
+         => Environment -> [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann) ForeignCode], Environment, SupplyVar, Externs)
 compile' env ms = do
   noPrelude <- asks optionsNoPrelude
   unless noPrelude (checkPreludeIsDefined ms)
@@ -109,7 +110,7 @@ compile' env ms = do
       elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
       renamed = renameInModules elim
       codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
-      modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
+      modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(Core.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
       exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
   return (modulesToCodeGen, env', nextVar, exts)
 
@@ -136,7 +137,7 @@ data MakeActions m = MakeActions {
   -- |
   -- Run the code generator for the module and write any required output files.
   --
-  , codegen :: CoreFn.Module CoreFn.Ann -> Environment -> SupplyVar -> Externs -> m ()
+  , codegen :: Core.Module (CoreFn.Bind Core.Ann) ForeignCode -> Environment -> SupplyVar -> Externs -> m ()
   -- |
   -- Respond to a progress update.
   --

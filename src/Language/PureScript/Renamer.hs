@@ -26,6 +26,7 @@ import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import Language.PureScript.Core
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Traversals
@@ -110,10 +111,10 @@ findDeclIdents = concatMap go
 -- |
 -- Renames within each declaration in a module.
 --
-renameInModules :: [Module Ann] -> [Module Ann]
+renameInModules :: [Module (Bind Ann) a] -> [Module (Bind Ann) a]
 renameInModules = map go
   where
-  go :: Module Ann -> Module Ann
+  go :: Module (Bind Ann) a -> Module (Bind Ann) a
   go m@(Module _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
   
   renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann

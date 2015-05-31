@@ -46,11 +46,9 @@ import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
 
 import Language.PureScript.CodeGen.JS.Optimizer.Common
-import Language.PureScript.CodeGen.JS.Optimizer.TCO
-import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
 import Language.PureScript.CodeGen.JS.Optimizer.Inliner
-import Language.PureScript.CodeGen.JS.Optimizer.Unused
-import Language.PureScript.CodeGen.JS.Optimizer.Blocks
+import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
+import Language.PureScript.CodeGen.JS.Optimizer.TCO
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
@@ -64,13 +62,8 @@ optimize' :: (Monad m, MonadReader (Options mode) m, Applicative m, MonadSupply 
 optimize' js = do
   opts <- ask
   untilFixedPoint (inlineArrComposition . applyAll
-    [ collapseNestedBlocks
-    , collapseNestedIfs
-    , tco opts
+    [ tco opts
     , magicDo opts
-    , removeCodeAfterReturnStatements
-    , removeUnusedArg
-    , removeUndefinedApp
     , unThunk
     , etaConvert
     , evaluateIifes

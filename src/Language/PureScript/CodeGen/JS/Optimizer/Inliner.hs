@@ -30,8 +30,9 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.CoreImp.Operators
+import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:
@@ -130,30 +131,30 @@ inlineCommonOperators = applyAll $
   , binary semiringNumber (C.*) Multiply
 
   , binary ringNumber (C.-) Subtract
-  , unary  ringNumber C.negate Negate
+  , unary  ringNumber C.negate JSNegate
   , binary ringInt (C.-) Subtract
-  , unary  ringInt C.negate Negate
+  , unary  ringInt C.negate JSNegate
 
   , binary moduloSemiringNumber (C./) Divide
   , binary moduloSemiringInt C.mod Modulus
 
-  , binary eqNumber (C.==) EqualTo
-  , binary eqNumber (C./=) NotEqualTo
-  , binary eqInt (C.==) EqualTo
-  , binary eqInt (C./=) NotEqualTo
-  , binary eqString (C.==) EqualTo
-  , binary eqString (C./=) NotEqualTo
-  , binary eqBoolean (C.==) EqualTo
-  , binary eqBoolean (C./=) NotEqualTo
+  , binary eqNumber (C.==) Equal
+  , binary eqNumber (C./=) NotEqual
+  , binary eqInt (C.==) Equal
+  , binary eqInt (C./=) NotEqual
+  , binary eqString (C.==) Equal
+  , binary eqString (C./=) NotEqual
+  , binary eqBoolean (C.==) Equal
+  , binary eqBoolean (C./=) NotEqual
 
   , binary ordNumber (C.<) LessThan
   , binary ordNumber (C.>) GreaterThan
-  , binary ordNumber (C.<=) LessThanOrEqualTo
-  , binary ordNumber (C.>=) GreaterThanOrEqualTo
+  , binary ordNumber (C.<=) LessThanOrEqual
+  , binary ordNumber (C.>=) GreaterThanOrEqual
   , binary ordInt (C.<) LessThan
   , binary ordInt (C.>) GreaterThan
-  , binary ordInt (C.<=) LessThanOrEqualTo
-  , binary ordInt (C.>=) GreaterThanOrEqualTo
+  , binary ordInt (C.<=) LessThanOrEqual
+  , binary ordInt (C.>=) GreaterThanOrEqual
 
   , binary semigroupString (C.<>) Add
   , binary semigroupString (C.++) Add
@@ -162,7 +163,7 @@ inlineCommonOperators = applyAll $
   , binary latticeBoolean (C.||) Or
   , binaryFunction latticeBoolean C.inf And
   , binaryFunction latticeBoolean C.sup Or
-  , unary complementedLatticeBoolean C.not Not
+  , unary complementedLatticeBoolean C.not JSNot
 
   , binary' C.dataIntBits (C..|.) BitwiseOr
   , binary' C.dataIntBits (C..&.) BitwiseAnd
@@ -170,35 +171,35 @@ inlineCommonOperators = applyAll $
   , binary' C.dataIntBits C.shl ShiftLeft
   , binary' C.dataIntBits C.shr ShiftRight
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
-  , unary'  C.dataIntBits C.complement BitwiseNot
+  , unary'  C.dataIntBits C.complement JSBitwiseNot
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
-  binary :: (String, String) -> String -> BinaryOperator -> JS -> JS
+  binary :: (String, String) -> String -> BinaryOp -> JS -> JS
   binary dict opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isDict dict dict' && isPreludeFn opString fn = JSBinary op x y
     convert other = other
-  binary' :: String -> String -> BinaryOperator -> JS -> JS
+  binary' :: String -> String -> BinaryOp -> JS -> JS
   binary' moduleName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary op x y
     convert other = other
-  binaryFunction :: (String, String) -> String -> BinaryOperator -> JS -> JS
+  binaryFunction :: (String, String) -> String -> BinaryOp -> JS -> JS
   binaryFunction dict fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isPreludeFn fnName fn && isDict dict dict' = JSBinary op x y
     convert other = other
-  unary :: (String, String) -> String -> UnaryOperator -> JS -> JS
+  unary :: (String, String) -> String -> JSUnaryOp -> JS -> JS
   unary dict fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
     convert (JSApp (JSApp fn [dict']) [x]) | isPreludeFn fnName fn && isDict dict dict' = JSUnary op x
     convert other = other
-  unary' :: String -> String -> UnaryOperator -> JS -> JS
+  unary' :: String -> String -> JSUnaryOp -> JS -> JS
   unary' moduleName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS

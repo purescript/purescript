@@ -25,6 +25,7 @@ import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Names
 import Language.PureScript.Options
+import Language.PureScript.CoreImp.Operators
 import qualified Language.PureScript.Constants as C
 
 magicDo :: Options mode -> JS -> JS
@@ -66,7 +67,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
     JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : map applyReturns js)
   -- Desugar untilE
   convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
-    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn $ JSObjectLiteral []])) []
+    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary JSNot (JSApp arg [])) (JSBlock []), JSReturn $ JSObjectLiteral []])) []
   -- Desugar whileE
   convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn $ JSObjectLiteral []])) []

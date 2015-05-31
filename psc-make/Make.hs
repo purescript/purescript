@@ -44,6 +44,8 @@ import System.IO.Error (tryIOError)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.Core as CR
+import qualified Language.PureScript.CoreImp as CI
 import qualified Paths_purescript as Paths
 
 newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
@@ -88,9 +90,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> P.runModuleName mn </> "externs.purs"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
+  codegen :: CR.Module (CF.Bind CR.Ann) P.ForeignCode -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
   codegen m _ nextVar exts = do
-    let mn = CF.moduleName m
+    let mn = CR.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
       Just (path, _)
         | not $ requiresForeign m -> do
@@ -99,7 +101,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         | otherwise -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
       Nothing | requiresForeign m -> throwError . P.errorMessage $ P.MissingFFIModule mn
               | otherwise -> return Nothing
-    pjs <- P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs m foreignInclude
+    pjs <- P.evalSupplyT nextVar $  P.prettyPrintJS <$> (CI.moduleToCoreImp >=> (flip J.moduleToJs foreignInclude)) m
     let filePath = P.runModuleName mn
         jsFile = outputDir </> filePath </> "index.js"
         externsFile = outputDir </> filePath </> "externs.purs"
@@ -110,8 +112,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     maybe (return ()) (writeTextFile foreignFile . snd) $ mn `M.lookup` foreigns
     writeTextFile externsFile exts
 
-  requiresForeign :: CF.Module a -> Bool
-  requiresForeign = not . null . CF.moduleForeign
+  requiresForeign :: CR.Module a b -> Bool
+  requiresForeign = not . null . CR.moduleForeign
 
   getTimestamp :: FilePath -> Make (Maybe UTCTime)
   getTimestamp path = makeIO (const (P.SimpleErrorWrapper $ P.CannotGetFileInfo path)) $ do
