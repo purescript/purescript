@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 runNat f = f 0.0 (\n -> n + 1.0)
 
 zero' z _ = z

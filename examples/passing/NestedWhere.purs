@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 f x = g x
   where
   g x = go x

@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 comparing :: forall a b. (Ord b) => (a -> b) -> a -> a -> Ordering
 comparing f = compare `Data.Function.on` f
 

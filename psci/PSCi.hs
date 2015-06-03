@@ -89,12 +89,6 @@ supportModule =
 -- File helpers
 
 -- |
--- Load the necessary modules.
---
-defaultImports :: [ImportedModule]
-defaultImports = [(P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-
--- |
 -- Locates the node executable.
 -- Checks for either @nodejs@ or @node@.
 --
@@ -121,7 +115,7 @@ loadModule filename = do
   return $ either (Left . P.prettyPrintMultipleErrors False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
--- Load all modules, including the Prelude
+-- Load all modules.
 --
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
@@ -452,7 +446,7 @@ handleCommand ResetState = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st -> st
     { psciImportedFilenames   = files
-    , psciImportedModules     = defaultImports
+    , psciImportedModules     = []
     , psciLetBindings         = []
     }
   loadAllImportedModules
@@ -498,7 +492,7 @@ loop PSCiOptions{..} = do
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (PSCiState psciInputFile defaultImports modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (PSCiState psciInputFile [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (mapM_ (runPSCI . handleCommand)) config
             unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines

@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 type Inner = Number
 
 inner :: Inner

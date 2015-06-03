@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 type Reader = (->) String
 
 foo :: Reader String

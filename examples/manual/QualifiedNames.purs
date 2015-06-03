@@ -1,5 +1,7 @@
 module Data.Either where
 
+import Prelude
+
 data Either a b = Left a | Right b
 
 module Main where

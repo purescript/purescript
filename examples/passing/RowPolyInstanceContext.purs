@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class T s m where
   state :: (s -> s) -> m Unit
 

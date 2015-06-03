@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Prelude.Unsafe (unsafeIndex)
 
 class Su a where

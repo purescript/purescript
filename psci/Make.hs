@@ -43,7 +43,7 @@ import qualified Language.PureScript.CoreFn as CF
 import IO (mkdirp)
 
 options :: P.Options P.Make
-options = P.Options False False False Nothing False False False P.MakeOptions
+options = P.Options False False Nothing False False False P.MakeOptions
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
@@ -92,7 +92,7 @@ buildMakeActions filePathMap foreigns =
   codegen m _ nextVar exts = do
     let mn = CF.moduleName m
     foreignInclude <- case CF.moduleName m `M.lookup` foreigns of
-      Just path 
+      Just path
         | not $ requiresForeign m -> do tell $ P.errorMessage $ P.UnnecessaryFFIModule mn path
                                         return Nothing
         | otherwise -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]

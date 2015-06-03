@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Control.Monad.Eff
 import Assert
 
@@ -10,7 +11,7 @@ g 'a' = 'a'
 g _ = 'b'
 
 main = do
-  assert $ f 1 == 1 
+  assert $ f 1 == 1
   assert $ f 0 == 0
   assert $ g 'a' == 'a'
   assert $ g 'b' == 'b'

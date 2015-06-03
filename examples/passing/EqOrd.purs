@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data Pair a b = Pair a b
 
 instance ordPair :: (Ord a, Ord b) => Ord (Pair a b) where

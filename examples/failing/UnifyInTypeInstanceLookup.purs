@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data Z = Z
 data S n = S n
 

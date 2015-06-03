@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-
 import Assert
 
 snd = \[_, y] -> y

@@ -1,5 +1,5 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  test = \arr -> arr !! (0 !! 0)
+test = \arr -> arr !! (0 !! 0)

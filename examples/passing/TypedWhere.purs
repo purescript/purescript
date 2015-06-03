@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data E a b = L a | R b
 
 data L a = C a (L a) | N

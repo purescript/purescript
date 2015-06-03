@@ -1,6 +1,8 @@
 module Main where
 
-test = 
+import Prelude
+
+test =
   let f :: Number -> Boolean
       f 0.0 = false
       f n = g (n - 1.0)
