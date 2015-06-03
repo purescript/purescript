@@ -28,7 +28,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Writer (runWriterT)
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Applicative
 
 import System.Exit

@@ -6,7 +6,7 @@ import Control.Monad.Trans.State.Strict (runStateT)
 import Control.Monad (when, forM)
 import Control.Applicative
 import Control.Monad.Writer (runWriterT)
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Trans.Except (runExceptT)
 
 import Data.List (isSuffixOf, sort)
 
