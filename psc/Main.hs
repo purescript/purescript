@@ -24,8 +24,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
-import Control.Monad.Supply (evalSupplyT)
-import Control.Monad.Supply.Class (MonadSupply())
 import Control.Monad.Writer
 
 import Data.Maybe (fromMaybe)
@@ -40,9 +38,6 @@ import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Map as M
 import qualified Language.PureScript as P
-import qualified Language.PureScript.CodeGen.JS as J
-import qualified Language.PureScript.Constants as C
-import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
 
 data PSCOptions = PSCOptions
@@ -83,11 +78,11 @@ compile (PSCOptions input inputForeign opts stdin output externs usePrefix) = do
     Right ((ms, foreigns), warnings) -> do
       when (P.nonEmpty warnings) $
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
-      case runPSC opts (compileJS ms foreigns prefix) of
+      case runPSC opts (P.compileJS ms foreigns prefix) of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
-        Right ((js, exts), warnings') -> do
+        Right ((js, exts, _), warnings') -> do
           when (P.nonEmpty warnings') $
             hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
           case output of
@@ -103,47 +98,6 @@ parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWr
 parseInputs modules foreigns =
   (,) <$> (map snd <$> P.parseModulesFromFiles (fromMaybe "") modules)
       <*> P.parseForeignModulesFromFiles foreigns
-
-compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m, MonadReader (P.Options P.Compile) m)
-          => [P.Module] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> [String] -> m (String, String)
-compileJS ms foreigns prefix = do
-  (modulesToCodeGen, env, nextVar, exts) <- P.compile ms
-  js <- concat <$> evalSupplyT nextVar (P.parU modulesToCodeGen codegenModule)
-  js' <- generateMain env js
-  let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']
-  return (pjs, exts)
-
-  where
-
-  codegenModule :: (Functor n, Applicative n, MonadError P.MultipleErrors n, MonadWriter P.MultipleErrors n, MonadReader (P.Options P.Compile) n, MonadSupply n)
-                => CF.Module CF.Ann -> n [J.JS]
-  codegenModule m =
-    let requiresForeign = not $ null (CF.moduleForeign m)
-        mn = CF.moduleName m
-    in case mn `M.lookup` foreigns of
-      Just (path, js)
-        | not requiresForeign -> do
-            tell $ P.errorMessage $ P.UnnecessaryFFIModule mn path
-            J.moduleToJs m Nothing
-        | otherwise -> J.moduleToJs m $ Just $
-            J.JSApp (J.JSFunction Nothing [] $
-                      J.JSBlock [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
-                                , J.JSRaw js
-                                , J.JSReturn (J.JSVar "exports")
-                                ]) []
-      Nothing | requiresForeign -> throwError . P.errorMessage $ P.MissingFFIModule mn
-              | otherwise -> J.moduleToJs m Nothing
-
-  generateMain :: P.Environment -> [J.JS] -> m [J.JS]
-  generateMain env js = do
-    mainName <- asks P.optionsMain
-    additional <- asks P.optionsAdditional
-    case P.moduleNameFromString <$> mainName of
-      Just mmi -> do
-        when ((mmi, P.Ident C.main) `M.notMember` P.names env) $
-          throwError . P.errorMessage $ P.NameIsUndefined (P.Ident C.main)
-        return $ js ++ [J.mainCall mmi (P.browserNamespace additional)]
-      _ -> return js
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory

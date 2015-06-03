@@ -2,14 +2,9 @@ module Main where
 
 import Prelude
 
-snd = \[_, y] -> y
+import Assert
 
-foreign import error
-  """
-  function error(msg) {
-    throw msg;
-  }
-  """ :: forall a. String -> a
+snd = \[_, y] -> y
 
 main =
   let ts = snd [1.0, 2.0] in

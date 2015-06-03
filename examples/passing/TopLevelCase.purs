@@ -1,17 +1,5 @@
 module Main where
 
-foreign import jsMod
-  """
-  function jsMod(x) {
-    return function (y) {
-      return x % y;
-    };
-  }
-  """ :: Number -> Number -> Number
-
-infixl 7 %
-(%) = jsMod
-
 gcd :: Number -> Number -> Number
 gcd 0.0 x = x
 gcd x 0.0 = x
