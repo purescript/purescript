@@ -119,9 +119,11 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     traverse (const $ getModificationTime path) $ guard exists
 
   readTextFile :: FilePath -> Make String
-  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
-    putStrLn $ "Reading " ++ path
-    readFile path
+  readTextFile path = do
+    verboseErrorsEnabled <- asks P.optionsVerboseErrors
+    makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
+      when verboseErrorsEnabled $ putStrLn $ "Reading " ++ path
+      readFile path
 
   writeTextFile :: FilePath -> String -> Make ()
   writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do

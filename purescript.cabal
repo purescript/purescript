@@ -159,7 +159,7 @@ executable psc-make
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
-    other-modules:
+    other-modules: Make
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
@@ -176,6 +176,8 @@ executable psci
                    Directive
                    Completion
                    PSCi
+                   Make
+                   IO
     ghc-options: -Wall -O2
 
 executable psc-docs
@@ -229,7 +231,7 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, HUnit -any
+                   transformers-compat -any, process -any, HUnit -any, time -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True
