@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data Maybe a = Nothing | Just a
 
 test :: forall a. Maybe a -> Maybe a

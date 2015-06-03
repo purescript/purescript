@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 type Star2Star f = f :: * -> *
 
 type Star t = t :: *

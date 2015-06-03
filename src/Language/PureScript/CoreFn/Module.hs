@@ -14,7 +14,6 @@
 
 module Language.PureScript.CoreFn.Module where
 
-import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
@@ -29,4 +28,4 @@ data Module a = Module
   , moduleDecls :: [Bind a]
   } deriving (Show)
 
-type ForeignDecl = (Ident, Maybe JS, Type)
+type ForeignDecl = (Ident, Type)

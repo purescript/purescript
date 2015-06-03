@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class Foo a b
 
 class Bar a c

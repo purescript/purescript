@@ -1,7 +1,7 @@
 module Main where
 
+import Prelude
 import Debug.Trace
-
 import Control.Monad.Eff
 
 class (Monad m) <= MonadWriter w m where

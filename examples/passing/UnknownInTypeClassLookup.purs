@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class EQ a b
 
 instance eqAA :: EQ a a

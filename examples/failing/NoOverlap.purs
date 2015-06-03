@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data Foo = Foo
 
 instance showFoo1 :: Show Foo where
