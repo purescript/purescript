@@ -371,6 +371,9 @@ data Expr
   --
   | SuperClassDictionary (Qualified ProperName) [Type]
   -- |
+  -- A placeholder for a member function of a typeclass instance. To be elaborated during typechecking. (function name, class name, name of the type gaining the instance).
+  | TypeClassInstanceMemberFunction Ident (Qualified ProperName) (Qualified ProperName)
+  -- |
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr deriving (Show, D.Data, D.Typeable)
