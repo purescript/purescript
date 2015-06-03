@@ -1,5 +1,5 @@
 -- | This snapshot is provided for the purposes of running the test suite.
--- | It is not necessarily kept up to date with the official PureScript Prelude, 
+-- | It is not necessarily kept up to date with the official PureScript Prelude,
 -- | and should not be used in user code.
 -- | The official Prelude can be found at https://github.com/purescript/purescript-prelude
 
@@ -70,7 +70,7 @@ module Prelude
 
   (:) :: forall a. a -> Array a -> Array a
   (:) = cons
-  
+
   foreign import concat :: forall a. Array a -> Array a -> Array a
 
   infixr 9 >>>
@@ -222,11 +222,11 @@ module Prelude
   instance moduloSemiringUnit :: ModuloSemiring Unit where
     (/) _ _ = unit
     mod _ _ = unit
-    
+
   foreign import jsMod :: Number -> Number -> Number
 
   infixl 7 %
-  
+
   (%) = jsMod
 
   class (Ring a, ModuloSemiring a) <= DivisionRing a
@@ -466,6 +466,8 @@ module Prelude
 
 module Data.Function where
 
+  import Prelude
+
   on :: forall a b c. (b -> b -> c) -> (a -> b) -> a -> a -> c
   on f g x y = g x `f` g y
 
@@ -536,15 +538,16 @@ module Data.Function where
   foreign import runFn10 :: forall a b c d e f g h i j k. Fn10 a b c d e f g h i j k -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k
 
 module Assert where
-    
+
+  import Prelude
   import Control.Monad.Eff
-    
+
   foreign import data Assert :: !
-    
+
   foreign import error :: forall a. String -> a
-  
+
   foreign import assertPartial :: forall e a. (Unit -> a) -> Eff (assert :: Assert | e) Unit
-  
+
   assert :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
   assert true = return unit
   assert false = error "Assertion failed!"
@@ -559,6 +562,8 @@ module Control.Monad.Eff
   , runPure
   , untilE, whileE
   ) where
+
+  import Prelude
 
   foreign import data Eff :: # ! -> * -> *
 
@@ -583,13 +588,14 @@ module Control.Monad.Eff
     (>>=) = bindE
 
   instance monadEff :: Monad (Eff e)
-  
+
   foreign import untilE :: forall e. Eff e Boolean -> Eff e Unit
-  
+
   foreign import whileE :: forall e a. Eff e Boolean -> Eff e a -> Eff e Unit
 
 module Debug.Trace where
 
+  import Prelude
   import Control.Monad.Eff
 
   foreign import data Trace :: !
@@ -601,6 +607,7 @@ module Debug.Trace where
 
 module Control.Monad.ST where
 
+  import Prelude
   import Control.Monad.Eff
 
   foreign import data ST :: * -> !

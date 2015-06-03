@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Debug.Trace
 
 data Foo = Foo { id :: forall a. a -> a }

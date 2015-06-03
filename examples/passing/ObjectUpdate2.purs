@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 type X r = { | r }
 
 x :: X (baz :: String)

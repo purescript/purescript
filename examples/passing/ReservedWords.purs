@@ -1,13 +1,15 @@
 -- See https://github.com/purescript/purescript/issues/606
 module Main where
 
-  o :: { type :: String }
-  o = { type: "o" }
+import Prelude
 
-  p :: { type :: String }
-  p = o { type = "p" }
+o :: { type :: String }
+o = { type: "o" }
 
-  f :: forall r. { type :: String | r } -> String
-  f { type = "p" } = "Done"
+p :: { type :: String }
+p = o { type = "p" }
 
-  main = Debug.Trace.trace $ f { type: p.type, foo: "bar" }
+f :: forall r. { type :: String | r } -> String
+f { type = "p" } = "Done"
+
+main = Debug.Trace.trace $ f { type: p.type, foo: "bar" }

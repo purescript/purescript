@@ -52,7 +52,6 @@ import qualified Text.Parsec as P
 data SimpleErrorMessage
   = ErrorParsingExterns P.ParseError
   | ErrorParsingFFIModule FilePath
-  | ErrorParsingPrelude P.ParseError
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
@@ -120,7 +119,6 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | WildcardInferredType Type
-  | PreludeNotPresent
   deriving (Show)
 
 -- |
@@ -161,7 +159,6 @@ errorCode :: ErrorMessage -> String
 errorCode em = case unwrapErrorMessage em of
   (ErrorParsingExterns _)       -> "ErrorParsingExterns"
   (ErrorParsingFFIModule _)     -> "ErrorParsingFFIModule"
-  (ErrorParsingPrelude _)       -> "ErrorParsingPrelude"
   (ErrorParsingModule _)        -> "ErrorParsingModule"
   MissingFFIModule{}            -> "MissingFFIModule"
   MultipleFFIModules{}          -> "MultipleFFIModules"
@@ -229,7 +226,6 @@ errorCode em = case unwrapErrorMessage em of
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
-  PreludeNotPresent             -> "PreludeNotPresent"
 
 -- |
 -- A stack trace for an error
@@ -393,10 +389,6 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     goSimple (MultipleFFIModules mn paths) =
       paras $ [ line $ "Multiple FFI implementations have been provided for module " ++ show mn ++ ": " ]
             ++ map (indent . line) paths
-    goSimple (ErrorParsingPrelude err) =
-      paras [ line "Error parsing prelude: "
-            , indent . line . show $ err
-            ]
     goSimple (InvalidExternsFile path) =
       paras [ line "Externs file is invalid: "
             , indent . line $ path
@@ -553,10 +545,6 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
       line $ "Name '" ++ show nm ++ "' was shadowed."
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
-    goSimple PreludeNotPresent =
-      paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
-            , line $ "You probably need to install the Prelude and other dependencies using Bower."
-            ]
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
             , indent $ go err

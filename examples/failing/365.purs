@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class C a where
   f :: a -> a
   g :: a -> a

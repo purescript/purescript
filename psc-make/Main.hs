@@ -46,13 +46,12 @@ data PSCMakeOptions = PSCMakeOptions
   }
 
 data InputOptions = InputOptions
-  { ioNoPrelude   :: Bool
-  , ioInputFiles  :: [FilePath]
+  { ioInputFiles  :: [FilePath]
   }
 
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions input inputForeign outputDir opts usePrefix) = do
-  moduleFiles <- readInput (InputOptions (P.optionsNoPrelude opts) input)
+  moduleFiles <- readInput (InputOptions input)
   foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do
@@ -108,11 +107,6 @@ noTco = switch $
      long "no-tco"
   <> help "Disable tail call optimizations"
 
-noPrelude :: Parser Bool
-noPrelude = switch $
-     long "no-prelude"
-  <> help "Omit the automatic Prelude import"
-
 noMagicDo :: Parser Bool
 noMagicDo = switch $
      long "no-magic-do"
@@ -143,8 +137,7 @@ noPrefix = switch $
 
 
 options :: Parser (P.Options P.Make)
-options = P.Options <$> noPrelude
-                    <*> noTco
+options = P.Options <$> noTco
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts

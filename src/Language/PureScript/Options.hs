@@ -45,13 +45,9 @@ deriving instance Show (ModeOptions mode)
 --
 data Options mode = Options {
     -- |
-    -- Disable inclusion of the built in Prelude
-    --
-    optionsNoPrelude :: Bool
-    -- |
     -- Disable tail-call elimination
     --
-  , optionsNoTco :: Bool
+    optionsNoTco :: Bool
     -- |
     -- Disable inlining of calls to return and bind for the Eff monad
     --
@@ -83,10 +79,10 @@ data Options mode = Options {
 -- Default compiler options
 --
 defaultCompileOptions :: Options Compile
-defaultCompileOptions = Options False False False Nothing False False False (CompileOptions "PS" [] [])
+defaultCompileOptions = Options False False Nothing False False False (CompileOptions "PS" [] [])
 
 -- |
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False False Nothing False False False MakeOptions
+defaultMakeOptions = Options False False Nothing False False False MakeOptions

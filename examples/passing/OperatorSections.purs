@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Assert
 
 main = do

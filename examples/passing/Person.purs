@@ -1,9 +1,11 @@
 module Main where
 
-  data Person = Person { name :: String, age :: Number }
+import Prelude
 
-  showPerson :: Person -> String
-  showPerson = \p -> case p of
-    Person o -> o.name ++ ", aged " ++ show o.age
+data Person = Person { name :: String, age :: Number }
 
-  main = Debug.Trace.trace "Done"
+showPerson :: Person -> String
+showPerson = \p -> case p of
+  Person o -> o.name ++ ", aged " ++ show o.age
+
+main = Debug.Trace.trace "Done"

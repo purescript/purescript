@@ -1,5 +1,7 @@
 module OverlappingInstances where
 
+import Prelude
+
 class Foo a
 
 instance foo1 :: Foo Number

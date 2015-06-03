@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 collatz = \x -> case x of
   y | y % 2.0 == 0.0 -> y / 2.0
   y -> y * 3.0 + 1.0
