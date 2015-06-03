@@ -248,7 +248,7 @@ indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> Make P.Environment
 make PSCiState{..} ms =
   let filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-  in P.make (buildMakeActions filePathMap M.empty) (psciLoadedModules ++ ms)
+  in P.make (buildMakeActions filePathMap (M.map snd psciForeignFiles)) (psciLoadedModules ++ ms)
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
