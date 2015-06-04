@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import qualified Prelude as P
 import Debug.Trace
 

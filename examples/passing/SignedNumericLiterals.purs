@@ -1,15 +1,17 @@
 module Main where
 
-  p = 0.5
-  q = 1.0
-  x = -1.0
-  y = -0.5
-  z = 0.5
-  w = 1.0
+import Prelude
 
-  f :: Number -> Number
-  f x = -x
+p = 0.5
+q = 1.0
+x = -1.0
+y = -0.5
+z = 0.5
+w = 1.0
 
-  test1 = 2.0 - 1.0
+f :: Number -> Number
+f x = -x
 
-  main = Debug.Trace.trace "Done"
+test1 = 2.0 - 1.0
+
+main = Debug.Trace.trace "Done"

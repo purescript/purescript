@@ -9,4 +9,5 @@ cabal.sandbox.config
 *.lksh*
 .virthualenv
 .psci_modules/
+bower_components/
 tmp/

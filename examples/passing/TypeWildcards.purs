@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 testTopLevel :: _ -> _
 testTopLevel n = n + 1.0
 

@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 example1 :: String
 example1 = do
   "Do"

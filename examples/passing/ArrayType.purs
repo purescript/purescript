@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class Pointed p where
   point :: forall a. a -> p a
 

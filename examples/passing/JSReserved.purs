@@ -1,12 +1,12 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  yield = 0
-  member = 1
+yield = 0
+member = 1
 
-  public = \return -> return
+public = \return -> return
 
-  this catch = catch
+this catch = catch
 
-  main = Debug.Trace.trace "Done"
+main = Debug.Trace.trace "Done"

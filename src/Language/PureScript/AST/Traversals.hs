@@ -387,7 +387,7 @@ accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder 
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
-  forDecls (ExternDeclaration _ _ _ ty) = f ty
+  forDecls (ExternDeclaration _ ty) = f ty
   forDecls (ExternInstanceDeclaration _ cs _ tys) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)
   forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)

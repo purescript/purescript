@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 foo = a
   where
   a :: Number

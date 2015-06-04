@@ -15,6 +15,8 @@ author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>
 
+tested-with: GHC==7.8
+
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
 
@@ -44,6 +46,7 @@ library
                    bytestring -any,
                    text -any,
                    split -any
+
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -87,6 +90,7 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
+                     Language.PureScript.Parser.JS
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
@@ -153,18 +157,18 @@ executable psc
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, transformers-compat -any
+                   time -any, transformers -any, transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
-    other-modules:
+    other-modules: Make
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any
+                   transformers-compat -any, process -any, time -any
 
     main-is: Main.hs
     buildable: True
@@ -174,6 +178,8 @@ executable psci
                    Directive
                    Completion
                    PSCi
+                   Make
+                   IO
     ghc-options: -Wall -O2
 
 executable psc-docs
@@ -217,7 +223,7 @@ executable psc-hierarchy
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, process -any
+                   transformers -any, process -any, transformers-compat -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True
@@ -227,7 +233,7 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, HUnit -any
+                   transformers-compat -any, process -any, HUnit -any, time -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True

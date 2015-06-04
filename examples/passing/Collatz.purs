@@ -1,19 +1,8 @@
 module Main where
 
+import Prelude
 import Control.Monad.Eff
 import Control.Monad.ST
-
-foreign import jsMod
-  """
-  function jsMod(x) {
-    return function (y) {
-      return x % y;
-    };
-  }
-  """ :: Number -> Number -> Number
-
-infixl 7 %
-(%) = jsMod
 
 collatz :: Number -> Number
 collatz n = runPure (runST (do
