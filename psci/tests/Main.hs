@@ -133,7 +133,7 @@ getPSCiState = do
   cwd <- getCurrentDirectory
   let preludeDir = cwd </> "tests" </> "prelude"
       jsDir = preludeDir </> "js"
-  modulesOrFirstError <- loadAllModules [ preludeDir </> "prelude.purs" ]
+  modulesOrFirstError <- loadAllModules [ preludeDir </> "Prelude.purs" ]
   jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
   foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
