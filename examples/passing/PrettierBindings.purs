@@ -15,5 +15,5 @@ module Main where
   -- variable name taken from the purescript function binding: in this case "n"
   --
   main = do
-    assertEqual (fiblike 10) "n"
+    assert (fiblike 10 == "n")
     trace "Done"
