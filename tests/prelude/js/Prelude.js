@@ -80,7 +80,7 @@ exports.eqArrayImpl = function(f) {
 };
 
 exports.ordArrayImpl = function(f) {
-  return function (ys) {
+  return function (xs) {
     return function (ys) {
       var i = 0;
       while (i < xs.length && i < ys.length) {
