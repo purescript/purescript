@@ -51,10 +51,19 @@ lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ li
 
   lintDeclaration :: Declaration -> m ()
   lintDeclaration d =
-    let (f, _, _, _, _) = everythingWithContextOnValues moduleNames mempty mappend def stepE stepB def def
+    let (f, _, _, _, _) = everythingWithContextOnValues moduleNames mempty mappend stepD stepE stepB def def
     in tell (f d)
     where
     def s _ = (s, mempty)
+
+    stepD :: S.Set Ident -> Declaration -> (S.Set Ident, MultipleErrors)
+    stepD s (TypeClassDeclaration name _ _ decls) = (s, foldr go mempty decls)
+      where
+      go :: Declaration -> MultipleErrors -> MultipleErrors
+      go (PositionedDeclaration _ _ d') errs = go d' errs
+      go (TypeDeclaration op@(Op _) _) errs = errorMessage (ClassOperator name op) <> errs
+      go _ errs = errs
+    stepD s _ = (s, mempty)
 
     stepE :: S.Set Ident -> Expr -> (S.Set Ident, MultipleErrors)
     stepE s (Abs (Left name) _) = bind s name
