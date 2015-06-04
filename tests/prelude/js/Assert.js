@@ -17,3 +17,13 @@ exports.assertPartial = function(f) {
     }
   };
 };
+
+exports.assertEqual = function(a) {
+  return function(b) {
+    return function() {
+      if (a != b) {
+        throw new Error('Assertion failed - values do not match: ' + a + ' -vs- ' + b);
+      }
+    };
+  };
+}

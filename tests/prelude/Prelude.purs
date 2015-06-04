@@ -548,6 +548,8 @@ module Assert where
 
   foreign import assertPartial :: forall e a. (Unit -> a) -> Eff (assert :: Assert | e) Unit
 
+  foreign import assertEqual :: forall eff a. a -> a -> Eff eff Unit
+
   assert :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
   assert true = return unit
   assert false = error "Assertion failed!"
@@ -555,6 +557,8 @@ module Assert where
 module Prelude.Unsafe where
 
   foreign import unsafeIndex :: forall a. Array a -> Number -> a
+
+  foreign import reflectParameterName :: (Int -> String) -> String
 
 module Control.Monad.Eff
   ( Eff()
