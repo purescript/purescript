@@ -119,6 +119,7 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | WildcardInferredType Type
+  | ClassOperator ProperName Ident
   deriving (Show)
 
 -- |
@@ -226,6 +227,7 @@ errorCode em = case unwrapErrorMessage em of
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
+  (ClassOperator _ _)           -> "ClassOperator"
 
 -- |
 -- A stack trace for an error
@@ -543,6 +545,11 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
               : map (line . prettyPrintExport) ys
     goSimple (ShadowedName nm) =
       line $ "Name '" ++ show nm ++ "' was shadowed."
+    goSimple (ClassOperator className opName) =
+      paras [ line $ "Class '" ++ show className ++ "' declares operator " ++ show opName ++ "."
+            , indent $ line $ "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
+            , indent $ line $ show opName ++ " = someMember"
+            ]
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     go (NotYetDefined names err) =
