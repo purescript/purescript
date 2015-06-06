@@ -44,13 +44,12 @@ declAsMarkdown RenderedDeclaration{..} = do
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
+  for_ rdComments tell'
+
   unless (null instances) $ do
     headerLevel 5 "Instances"
-    fencedBlock $ do
-      mapM_ (tell' . childToString NotFirst) instances
+    fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
     spacer
-
-  for_ rdComments tell'
 
 codeToString :: RenderedCode -> String
 codeToString = outputWith elemAsMarkdown
