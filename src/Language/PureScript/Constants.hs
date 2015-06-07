@@ -115,9 +115,6 @@ zshr = "zshr"
 complement :: String
 complement = "complement"
 
-fromNumber :: String
-fromNumber = "fromNumber"
-
 -- Prelude Values
 
 zero :: String
