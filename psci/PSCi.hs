@@ -505,7 +505,8 @@ loop PSCiOptions{..} = do
           flip evalStateT (PSCiState psciInputFile [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (mapM_ (runPSCI . handleCommand)) config
-            unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines
+            modules' <- lift $ gets psciLoadedModules
+            unless (consoleIsDefined (map snd modules')) . outputStrLn $ unlines
               [ "PSCi requires the purescript-console module to be installed."
               , "For help getting started, visit http://wiki.purescript.org/PSCi"
               ]
