@@ -482,7 +482,7 @@ loadUserConfig = do
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.Module] -> Bool
-consoleIsDefined = any ((== P.ModuleName [P.ProperName "Console"]) . P.getModuleName)
+consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.getModuleName)
 
 -- |
 -- The PSCI main loop.
