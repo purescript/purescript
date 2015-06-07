@@ -71,9 +71,9 @@ supportModule =
   code = unlines
     [ "module S where"
     , ""
-    , "import Console"
-    , ""
+    , "import Prelude"
     , "import Control.Monad.Eff"
+    , "import Control.Monad.Eff.Console"
     , "import Control.Monad.Eff.Unsafe"
     , ""
     , "class Eval a where"
@@ -431,17 +431,19 @@ handleCommand (Expression val) = handleDeclaration val
 handleCommand ShowHelp = PSCI $ outputStrLn helpMessage
 handleCommand (Import im) = handleImport im
 handleCommand (Decls l) = handleDecls l
-handleCommand (LoadFile filePath) = do
-  absPath <- psciIO $ expandTilde filePath
-  exists <- psciIO $ doesFileExist absPath
-  if exists then do
-    PSCI . lift $ modify (updateImportedFiles absPath)
-    m <- psciIO $ loadModule absPath
-    case m of
-      Left err -> PSCI $ outputStrLn err
-      Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
-  else
-    PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
+handleCommand (LoadFile filePath) = whenFileExists filePath $ \absPath -> do
+  PSCI . lift $ modify (updateImportedFiles absPath)
+  m <- psciIO $ loadModule absPath
+  case m of
+    Left err -> PSCI $ outputStrLn err
+    Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
+handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
+  foreignsOrError <- psciIO . runMake $ do
+    foreignFile <- makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile absPath)) (readFile absPath)
+    P.parseForeignModulesFromFiles [(absPath, foreignFile)]
+  case foreignsOrError of
+    Left err -> PSCI $ outputStrLn $ P.prettyPrintMultipleErrors False err
+    Right foreigns -> PSCI . lift $ modify (updateForeignFiles foreigns)
 handleCommand ResetState = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st -> st
@@ -456,6 +458,14 @@ handleCommand (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand (ShowInfo QueryLoaded) = handleShowLoadedModules
 handleCommand (ShowInfo QueryImport) = handleShowImportedModules
 handleCommand QuitPSCi = error "`handleCommand QuitPSCi` was called. This is a bug."
+
+whenFileExists :: FilePath -> (FilePath -> PSCI ()) -> PSCI ()
+whenFileExists filePath f = do
+  absPath <- psciIO $ expandTilde filePath
+  exists <- psciIO $ doesFileExist absPath
+  if exists 
+    then f absPath
+    else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 
 loadUserConfig :: IO (Maybe [Command])
 loadUserConfig = do
