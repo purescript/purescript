@@ -44,7 +44,7 @@ elaborateInstance (TypeClassInstanceMemberFunction funName className t) =
                              ,((ProperName "Generic", Ident "toSignature"), mkSignatureFunction t)]
 elaborateInstance e = return e
 
-mkSpineFunction :: MonadState CheckState m => Qualified ProperName ->  m Expr
+mkSpineFunction :: (Functor m, MonadState CheckState m) => Qualified ProperName ->  m Expr
 mkSpineFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
   tcs <- M.toList . typeClasses <$> getEnv
@@ -64,7 +64,7 @@ mkSpineFunction t = do
 
   return . lamCase "x" . map mkCtorClause . constructorsForType t $ ctors
 
-mkSignatureFunction :: MonadState CheckState m => Qualified ProperName ->  m Expr
+mkSignatureFunction :: (Functor m, MonadState CheckState m) => Qualified ProperName ->  m Expr
 mkSignatureFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
   envtyps <- M.toList . types <$> getEnv
@@ -84,7 +84,7 @@ mkSignatureFunction t = do
 
   return . lam "x" . mkSigProd . map mkProdClause . constructorsForType t $ ctors
 
-mkFromSpineFunction :: MonadState CheckState m => Qualified ProperName ->  m Expr
+mkFromSpineFunction :: (Functor m, MonadState CheckState m) => Qualified ProperName ->  m Expr
 mkFromSpineFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
   tcs <- M.toList . typeClasses <$> getEnv

@@ -234,7 +234,7 @@ fillDerivingDecls className tys tyDecls decls = do
   let missingDecls = mapMaybe declName tyDecls \\ mapMaybe declName decls
   let mkMissingDecl cls fun =
           case tys of
-            [TypeConstructor t] | unQualify className == ProperName cls && Ident fun `elem` missingDecls -> return [ValueDeclaration (Ident fun) Value [] (Right $ TypeClassInstanceMemberFunction (Ident fun) className t)]
+            [TypeConstructor t] | unQualify className == ProperName cls && Ident fun `elem` missingDecls -> return [ValueDeclaration (Ident fun) Public [] (Right $ TypeClassInstanceMemberFunction (Ident fun) className t)]
             _ -> return []
   extraDecls <- concat <$> mapM (uncurry mkMissingDecl)
                   [("Generic","toSpine")
