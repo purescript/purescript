@@ -16,14 +16,16 @@ strip ../dist/build/psc/psc.exe
 strip ../dist/build/psci/psci.exe
 strip ../dist/build/psc-make/psc-make.exe
 strip ../dist/build/psc-docs/psc-docs.exe
+strip ../dist/build/psc-publish/psc-publish.exe
 
 # Copy files to staging directory
-cp ../dist/build/psc/psc.exe           build/purescript/
-cp ../dist/build/psci/psci.exe         build/purescript/
-cp ../dist/build/psc-make/psc-make.exe build/purescript/
-cp ../dist/build/psc-docs/psc-docs.exe build/purescript/
-cp README                              build/purescript/
-cp ../LICENSE                          build/purescript/
+cp ../dist/build/psc/psc.exe                 build/purescript/
+cp ../dist/build/psci/psci.exe               build/purescript/
+cp ../dist/build/psc-make/psc-make.exe       build/purescript/
+cp ../dist/build/psc-docs/psc-docs.exe       build/purescript/
+cp ../dist/build/psc-publish/psc-publish.exe build/purescript/
+cp README                                    build/purescript/
+cp ../LICENSE                                build/purescript/
 
 # Make the binary bundle
 pushd build
