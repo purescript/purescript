@@ -26,7 +26,7 @@ import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Environment
