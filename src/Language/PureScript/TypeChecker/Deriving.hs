@@ -35,7 +35,7 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
-elaborateInstance :: (MonadState CheckState m, MonadError MultipleErrors m) => Expr -> m Expr
+elaborateInstance :: (Functor m, MonadState CheckState m, MonadError MultipleErrors m) => Expr -> m Expr
 elaborateInstance (TypeClassInstanceMemberFunction funName className t) =
     fromMaybe noInstanceError $ lookup (unQualify className, funName) derivingList
         where noInstanceError = throwError $ MultipleErrors [ErrorInInstance className [TypeConstructor t] (SimpleErrorWrapper $ MissingClassMember funName)]
