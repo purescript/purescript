@@ -1,20 +1,19 @@
 module Main where
 
+import Prelude
 import Debug.Trace
 import Control.Monad.Eff
 
-foreign import doIt "function doIt() { global.flag = true; }" :: forall eff. Eff eff Unit
-
-foreign import get "function get() { return global.flag; }" :: forall eff. Eff eff Boolean
+doIt :: forall eff. Eff eff Boolean
+doIt = return true
 
 set = do
   trace "Testing..."
   case 0 of
     0 -> doIt
-    _ -> return unit
+    _ -> return false
 
 main = do
-  set
-  b <- get
+  b <- set
   case b of
     true -> trace "Done"

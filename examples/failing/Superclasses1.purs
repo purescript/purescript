@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class Su a where
   su :: a -> a
 

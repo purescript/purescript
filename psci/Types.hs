@@ -15,12 +15,14 @@
 
 module Types where
 
+import qualified Data.Map as M
 import qualified Language.PureScript as P
 
 data PSCiOptions = PSCiOptions
-  { psciMultiLineMode  :: Bool
-  , psciInputFile      :: [FilePath]
-  , psciInputNodeFlags :: [String]
+  { psciMultiLineMode     :: Bool
+  , psciInputFile         :: [FilePath]
+  , psciForeignInputFiles :: [FilePath]
+  , psciInputNodeFlags    :: [String]
   }
 
 -- |
@@ -33,6 +35,7 @@ data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModules     :: [ImportedModule]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
+  , psciForeignFiles        :: M.Map P.ModuleName (FilePath, P.ForeignJS)
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }
@@ -86,6 +89,12 @@ updateLets :: [P.Declaration] -> PSCiState -> PSCiState
 updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 
 -- |
+-- Updates the state to have more let bindings.
+--
+updateForeignFiles :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> PSCiState -> PSCiState
+updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `M.union` fs }
+
+-- |
 -- Valid Meta-commands for PSCI
 --
 data Command
@@ -109,6 +118,10 @@ data Command
   -- Load a file for use with importing
   --
   | LoadFile FilePath
+  -- |
+  -- Load a foreign module
+  --
+  | LoadForeign FilePath
   -- |
   -- Exit PSCI
   --
@@ -161,6 +174,7 @@ data Directive
   | Reset
   | Browse
   | Load
+  | Foreign
   | Type
   | Kind
   | Show

@@ -1,19 +1,19 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  f 0.0 = 0.0
-  f x = g x + 0.0
+f 0.0 = 0.0
+f x = g x + 0.0
 
-  g x = f (x / 0.0)
+g x = f (x / 0.0)
 
-  data Even = Zero | Even Odd
+data Even = Zero | Even Odd
 
-  data Odd = Odd Even
+data Odd = Odd Even
 
-  evenToNumber Zero = 0.0
-  evenToNumber (Even n) = oddToNumber n + 0.0
+evenToNumber Zero = 0.0
+evenToNumber (Even n) = oddToNumber n + 0.0
 
-  oddToNumber (Odd n) = evenToNumber n + 0.0
+oddToNumber (Odd n) = evenToNumber n + 0.0
 
-  main = Debug.Trace.trace "Done"
+main = Debug.Trace.trace "Done"

@@ -76,14 +76,15 @@ parseDirective cmd =
   (dstr, arg) = break isSpace cmd
 
   commandFor d = case d of
-    Help   -> return ShowHelp
-    Quit   -> return QuitPSCi
-    Reset  -> return ResetState
-    Browse -> BrowseModule <$> parseRest P.moduleName arg
-    Load   -> return $ LoadFile (trim arg)
-    Show   -> ShowInfo <$> parseReplQuery' (trim arg)
-    Type   -> TypeOf <$> parseRest P.parseValue arg
-    Kind   -> KindOf <$> parseRest P.parseType arg
+    Help    -> return ShowHelp
+    Quit    -> return QuitPSCi
+    Reset   -> return ResetState
+    Browse  -> BrowseModule <$> parseRest P.moduleName arg
+    Load    -> return $ LoadFile (trim arg)
+    Foreign -> return $ LoadForeign (trim arg)
+    Show    -> ShowInfo <$> parseReplQuery' (trim arg)
+    Type    -> TypeOf <$> parseRest P.parseValue arg
+    Kind    -> KindOf <$> parseRest P.parseType arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
@@ -122,13 +123,13 @@ discardPositionInfo (P.PositionedDeclaration _ _ d) = d
 discardPositionInfo d = d
 
 acceptable :: P.Declaration -> Bool
-acceptable (P.DataDeclaration _ _ _ _) = True
-acceptable (P.TypeSynonymDeclaration _ _ _) = True
-acceptable (P.ExternDeclaration _ _ _ _) = True
-acceptable (P.ExternDataDeclaration _ _) = True
-acceptable (P.ExternInstanceDeclaration _ _ _ _) = True
-acceptable (P.TypeClassDeclaration _ _ _ _) = True
-acceptable (P.TypeInstanceDeclaration _ _ _ _ _) = True
+acceptable P.DataDeclaration{} = True
+acceptable P.TypeSynonymDeclaration{} = True
+acceptable P.ExternDeclaration{} = True
+acceptable P.ExternDataDeclaration{} = True
+acceptable P.ExternInstanceDeclaration{} = True
+acceptable P.TypeClassDeclaration{} = True
+acceptable P.TypeInstanceDeclaration{} = True
 acceptable _ = False
 
 parseReplQuery' :: String -> Either String ReplQuery

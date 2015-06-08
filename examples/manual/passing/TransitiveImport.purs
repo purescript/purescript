@@ -1,5 +1,7 @@
 module Test where
 
+  import Prelude
+
   class TestCls a where
     test :: a -> a
 
@@ -12,6 +14,7 @@ module Middle where
 
 module Main where
 
+  import Prelude
   import Middle
   import Debug.Trace
 

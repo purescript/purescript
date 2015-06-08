@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Control.Monad.Eff
 import Debug.Trace
 

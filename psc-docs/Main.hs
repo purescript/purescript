@@ -93,7 +93,6 @@ docgen (PSCDocsOptions fmt input output) =
                 let fp = fst (head grp)
                 createDirectoryIfMissing True (takeDirectory fp)
                 writeFile fp (D.renderModulesAsMarkdown $ snd `map` grp)
-
   where
   guardMissing [] = return ()
   guardMissing [mn] = do

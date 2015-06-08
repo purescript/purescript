@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class Test a where
   fn :: a -> a -> a
   val :: a

@@ -8,6 +8,8 @@ module ExportedInstanceDeclarations
   , foo
   ) where
 
+import Prelude
+
 data Const a b = Const a
 
 class Foo a where

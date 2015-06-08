@@ -70,14 +70,15 @@ completeDirective ws w =
     _     -> []
 
 directiveArg :: String -> Directive -> [CompletionContext]
-directiveArg _ Browse = [CtxModule]
-directiveArg w Load   = [CtxFilePath w]
-directiveArg _ Quit   = []
-directiveArg _ Reset  = []
-directiveArg _ Help   = []
-directiveArg _ Show   = map CtxFixed replQueryStrings
-directiveArg _ Type   = [CtxIdentifier]
-directiveArg _ Kind   = [CtxType]
+directiveArg _ Browse      = [CtxModule]
+directiveArg w Load        = [CtxFilePath w]
+directiveArg w Foreign     = [CtxFilePath w]
+directiveArg _ Quit        = []
+directiveArg _ Reset       = []
+directiveArg _ Help        = []
+directiveArg _ Show        = map CtxFixed replQueryStrings
+directiveArg _ Type        = [CtxIdentifier]
+directiveArg _ Kind        = [CtxType]
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =
@@ -199,7 +200,7 @@ identNames = nubOnFst . mapMaybe getDeclName . P.exportedDeclarations
   where
   getDeclName :: P.Declaration -> Maybe (P.Ident, P.Declaration)
   getDeclName d@(P.ValueDeclaration ident _ _ _)  = Just (ident, d)
-  getDeclName d@(P.ExternDeclaration _ ident _ _) = Just (ident, d)
+  getDeclName d@(P.ExternDeclaration ident _) = Just (ident, d)
   getDeclName (P.PositionedDeclaration _ _ d) = getDeclName d
   getDeclName _ = Nothing
 

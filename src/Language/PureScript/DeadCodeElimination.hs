@@ -50,7 +50,7 @@ bindIdents (Rec names) = map fst names
 -- Extract the ident for a foreign declaration.
 --
 foreignIdent :: ForeignDecl -> Ident
-foreignIdent (name, _, _) = name
+foreignIdent = fst
 
 -- |
 -- Key type to use in graph
