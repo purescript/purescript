@@ -12,11 +12,14 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Language.PureScript.AST.Operators where
 
 import qualified Data.Data as D
+import Data.Aeson ((.=))
+import qualified Data.Aeson as A
 
 -- |
 -- A precedence level for an infix operator
@@ -26,14 +29,23 @@ type Precedence = Integer
 -- |
 -- Associativity for infix operators
 --
-data Associativity = Infixl | Infixr | Infix deriving (D.Data, D.Typeable)
+data Associativity = Infixl | Infixr | Infix deriving (Eq, Ord, D.Data, D.Typeable)
 
 instance Show Associativity where
   show Infixl = "infixl"
   show Infixr = "infixr"
   show Infix  = "infix"
 
+instance A.ToJSON Associativity where
+  toJSON = A.toJSON . show
+
 -- |
 -- Fixity data for infix operators
 --
-data Fixity = Fixity Associativity Precedence deriving (Show, D.Data, D.Typeable)
+data Fixity = Fixity Associativity Precedence deriving (Show, Eq, Ord, D.Data, D.Typeable)
+
+instance A.ToJSON Fixity where
+  toJSON (Fixity associativity precedence) =
+    A.object [ "associativity" .= associativity
+             , "precedence" .= precedence
+             ]

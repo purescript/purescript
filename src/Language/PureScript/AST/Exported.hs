@@ -98,8 +98,10 @@ typeInstanceConstituents _ = []
 
 
 -- |
--- Test if a declaration is exported, given a module's export list. Prefer
--- 'exportedDeclarations' to this function, where possible.
+-- Test if a declaration is exported, given a module's export list. Note that
+-- this function does not account for type instance declarations of
+-- non-exported types, or non-exported data constructors. Therefore, you should
+-- prefer 'exportedDeclarations' to this function, where possible.
 --
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
@@ -107,13 +109,15 @@ isExported _ TypeInstanceDeclaration{} = True
 isExported exps (PositionedDeclaration _ _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
-  matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
-  matches (ValueDeclaration ident _ _ _) (ValueRef ident') = ident == ident'
-  matches (ExternDeclaration ident _) (ValueRef ident') = ident == ident'
-  matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
-  matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
-  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
+  matches (TypeDeclaration ident _)          (ValueRef ident')     = ident == ident'
+  matches (ValueDeclaration ident _ _ _)     (ValueRef ident')     = ident == ident'
+  matches (ExternDeclaration ident _)        (ValueRef ident')     = ident == ident'
+  matches (FixityDeclaration _ name)         (ValueRef ident')     = name == runIdent ident'
+  matches (DataDeclaration _ ident _ _)      (TypeRef ident' _)    = ident == ident'
+  matches (ExternDataDeclaration ident _)    (TypeRef ident' _)    = ident == ident'
+  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _)    = ident == ident'
   matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
+
   matches (PositionedDeclaration _ _ d) r = d `matches` r
   matches d (PositionedDeclarationRef _ _ r) = d `matches` r
   matches _ _ = False

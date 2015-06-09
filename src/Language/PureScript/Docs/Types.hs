@@ -80,6 +80,7 @@ data RenderedDeclaration = RenderedDeclaration
   , rdCode       :: RenderedCode
   , rdSourceSpan :: Maybe P.SourceSpan
   , rdChildren   :: [RenderedChildDeclaration]
+  , rdFixity     :: Maybe P.Fixity
   }
   deriving (Show, Eq, Ord)
 
@@ -121,6 +122,7 @@ data PackageError
   | InvalidVersion
   | InvalidDeclarationType
   | InvalidRenderedCode String
+  | InvalidFixity
   deriving (Show, Eq, Ord)
 
 type Bookmark = InPackage (P.ModuleName, String)
@@ -210,6 +212,21 @@ asDeclaration =
                       <*> key "code" asRenderedCode .! InvalidRenderedCode
                       <*> key "sourceSpan" (perhaps asSourceSpan)
                       <*> key "children" (eachInArray asRenderedChildDeclaration)
+                      <*> key "fixity" (perhaps asFixity)
+
+asFixity :: Parse PackageError P.Fixity
+asFixity = P.Fixity <$> key "associativity" asAssociativity
+                    <*> key "precedence" asIntegral
+
+parseAssociativity :: String -> Maybe P.Associativity
+parseAssociativity str = case str of
+  "infix"  -> Just P.Infix
+  "infixl" -> Just P.Infixl
+  "infixr" -> Just P.Infixr
+  _        -> Nothing
+
+asAssociativity :: Parse PackageError P.Associativity
+asAssociativity = withString (maybe (Left InvalidFixity) Right . parseAssociativity)
 
 asRenderedChildDeclaration :: Parse PackageError RenderedChildDeclaration
 asRenderedChildDeclaration =
@@ -293,6 +310,7 @@ instance A.ToJSON RenderedDeclaration where
              , "code"       .= rdCode
              , "sourceSpan" .= rdSourceSpan
              , "children"   .= rdChildren
+             , "fixity"     .= rdFixity
              ]
 
 instance A.ToJSON RenderedChildDeclaration where
