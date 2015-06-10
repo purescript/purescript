@@ -101,6 +101,7 @@ addDefaultFixity rd@RenderedDeclaration{..}
   | isOp rdTitle && isNothing rdFixity = rd { rdFixity = Just defaultFixity }
   | otherwise                          = rd
   where
+  isOp :: String -> Bool
   isOp str = "(" `isPrefixOf` str && ")" `isSuffixOf` str
   defaultFixity = P.Fixity P.Infixl (-1)
 
