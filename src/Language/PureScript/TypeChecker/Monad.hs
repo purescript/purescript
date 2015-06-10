@@ -69,8 +69,8 @@ withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified 
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
+  let mentries = M.fromListWith (M.union) [ (mn, M.singleton (canonicalizeDictionary entry) entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
@@ -79,7 +79,13 @@ withTypeClassDictionaries entries action = do
 -- Get the currently available list of type class dictionaries
 --
 getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [TypeClassDictionaryInScope]
-getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries = (>>= M.elems) . M.elems . typeClassDictionaries . checkEnv <$> get
+
+-- |
+-- Lookup type class dictionaries in a module.
+--
+lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m [TypeClassDictionaryInScope]
+lookupTypeClassDictionaries mn = maybe [] M.elems . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Temporarily bind a collection of names to local variables
