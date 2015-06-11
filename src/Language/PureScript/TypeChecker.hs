@@ -90,8 +90,8 @@ addTypeClass moduleName pn args implies ds =
 
 addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
 addTypeClassDictionaries entries =
-  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ } <- entries ]
-  in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
+  let mentries = M.fromListWith (M.union) [ (mn, M.singleton (canonicalizeDictionary entry) entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ } <- entries ]
+  in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
 
 checkDuplicateTypeArguments :: [String] -> Check ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
@@ -223,8 +223,7 @@ typeCheckAll mainModuleName moduleName exps = go
     guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
-    tcds <- getTypeClassDictionaries
-    let instances = filter (\tcd -> let Qualified (Just mn) _ = tcdName tcd in importedModule == mn) tcds
+    instances <- lookupTypeClassDictionaries $ Just importedModule
     addTypeClassDictionaries [ tcd { tcdName = Qualified (Just moduleName) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
                              | tcd <- instances
                              , tcdExported tcd
