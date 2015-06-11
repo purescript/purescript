@@ -168,7 +168,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any
+                   transformers-compat -any, process -any, time -any, Glob -any
 
     main-is: Main.hs
     buildable: True
@@ -233,7 +233,8 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, HUnit -any, time -any
+                   transformers-compat -any, process -any, HUnit -any, time -any, 
+                   Glob -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True
