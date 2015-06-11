@@ -31,6 +31,7 @@ import Options.Applicative as Opts
 
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
+import System.FilePath.Glob (glob)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -50,8 +51,10 @@ data InputOptions = InputOptions
   }
 
 compile :: PSCMakeOptions -> IO ()
-compile (PSCMakeOptions input inputForeign outputDir opts usePrefix) = do
+compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
+  input <- concat <$> mapM glob inputGlob
   moduleFiles <- readInput (InputOptions input)
+  inputForeign <- concat <$> mapM glob inputForeignGlob
   foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do

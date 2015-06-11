@@ -43,6 +43,7 @@ import System.Console.Haskeline
 import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
 import System.FilePath (pathSeparator, (</>), isPathSeparator)
+import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 
 import qualified Language.PureScript as P
@@ -490,19 +491,21 @@ consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad",
 loop :: PSCiOptions -> IO ()
 loop PSCiOptions{..} = do
   config <- loadUserConfig
-  modulesOrFirstError <- loadAllModules psciInputFile
+  inputFiles <- concat <$> mapM glob psciInputFile
+  foreignFiles <- concat <$> mapM glob psciForeignInputFiles
+  modulesOrFirstError <- loadAllModules inputFiles
   case modulesOrFirstError of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFiles <- forM psciForeignInputFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
-        P.parseForeignModulesFromFiles foreignFiles
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
+        P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (PSCiState psciInputFile [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (PSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (mapM_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules
