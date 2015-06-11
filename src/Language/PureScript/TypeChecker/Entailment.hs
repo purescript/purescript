@@ -21,7 +21,7 @@ module Language.PureScript.TypeChecker.Entailment (
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
@@ -47,17 +47,17 @@ newtype Work = Work Integer deriving (Show, Eq, Ord, Num)
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
+entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
+entails env moduleName context = solve (sortedNubBy canonicalizeDictionary dictsInScope)
   where
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
     sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
 
-    -- Filter out type dictionaries which are in scope in the current module
-    filterModule :: TypeClassDictionaryInScope -> Bool
-    filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
-    filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
-    filterModule _ = False
+    dictsInScope :: [TypeClassDictionaryInScope]
+    dictsInScope = findDicts Nothing ++ findDicts (Just moduleName)
+
+    findDicts :: Maybe ModuleName -> [TypeClassDictionaryInScope]
+    findDicts = fromMaybe [] . flip M.lookup context
 
     solve :: [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
     solve context' (className, tys) trySuperclasses = do

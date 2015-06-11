@@ -76,10 +76,10 @@ withTypeClassDictionaries entries action = do
   return a
 
 -- |
--- Get the currently available list of type class dictionaries
+-- Get the currently available map of type class dictionaries
 --
-getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [TypeClassDictionaryInScope]
-getTypeClassDictionaries = (>>= M.elems) . M.elems . typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m (M.Map (Maybe ModuleName) [TypeClassDictionaryInScope])
+getTypeClassDictionaries = fmap M.elems . typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Lookup type class dictionaries in a module.
