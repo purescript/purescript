@@ -17,6 +17,6 @@ apply f x = f x
 
 main = do
   print $ Thing "hello"
-  print $ Box 42
-  print $ apply Box 9000
+  print $ Box 42.0
+  print $ apply Box 9000.0
   trace "Done"

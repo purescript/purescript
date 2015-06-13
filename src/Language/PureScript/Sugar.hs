@@ -20,7 +20,7 @@ module Language.PureScript.Sugar (desugar, module S) where
 import Control.Monad
 import Control.Category ((>>>))
 import Control.Applicative
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Language.PureScript.AST

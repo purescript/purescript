@@ -1,5 +1,5 @@
 name: purescript
-version: 0.6.9.3
+version: 0.7.0.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -15,8 +15,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>
 
-extra-source-files: prelude/prelude.purs
-                  , examples/passing/*.purs
+extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
 
 source-repository head
@@ -27,16 +26,25 @@ library
     build-depends: base >=4.6 && <5,
                    containers -any,
                    unordered-containers -any,
+                   dlist -any,
                    directory >= 1.2,
                    filepath -any,
                    mtl >= 2.1.0 && < 2.3.0,
                    parsec -any,
-                   transformers >= 0.4.0 && < 0.5,
+                   transformers >= 0.3.0 && < 0.5,
+                   transformers-compat >= 0.3.0,
                    utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   file-embed >= 0.0.7 && < 0.0.8,
                    time -any,
-                   boxes >= 0.1.4 && < 0.2.0
+                   boxes >= 0.1.4 && < 0.2.0,
+                   aeson >= 0.8 && < 0.9,
+                   vector -any,
+                   bower-json >= 0.7,
+                   aeson-better-errors >= 0.7,
+                   bytestring -any,
+                   text -any,
+                   split -any
+
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
                      Language.PureScript.AST.Binders
@@ -44,6 +52,7 @@ library
                      Language.PureScript.AST.Operators
                      Language.PureScript.AST.SourcePos
                      Language.PureScript.AST.Traversals
+                     Language.PureScript.AST.Exported
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
@@ -79,6 +88,7 @@ library
                      Language.PureScript.Environment
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
+                     Language.PureScript.Linter
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names
                      Language.PureScript.Options
@@ -86,6 +96,7 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
+                     Language.PureScript.Parser.JS
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
@@ -119,9 +130,20 @@ library
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
 
+                     Language.PureScript.Docs
+                     Language.PureScript.Docs.Render
+                     Language.PureScript.Docs.Types
+                     Language.PureScript.Docs.RenderedCode
+                     Language.PureScript.Docs.RenderedCode.Types
+                     Language.PureScript.Docs.RenderedCode.Render
+                     Language.PureScript.Docs.AsMarkdown
+                     Language.PureScript.Docs.ParseAndDesugar
+                     Language.PureScript.Docs.Utils.MonoidExtras
+
                      Control.Monad.Unify
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
+
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -141,7 +163,7 @@ executable psc
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any
+                   time -any, transformers -any, transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-make
@@ -152,7 +174,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   process -any
+                   transformers-compat -any, process -any, time -any
 
     main-is: Main.hs
     buildable: True
@@ -166,13 +188,31 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any
+                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   split -any, ansi-wl-pprint -any, directory -any, filepath
+                   -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
     other-modules: Ctags
                    Etags
                    Tags
+    ghc-options: -Wall -O2
+
+executable psc-publish
+    build-depends: base >=4 && <5, purescript -any,
+                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   pattern-arrows -any, aeson -any, bytestring -any,
+                   directory -any, transformers -any, text -any, containers
+                   -any, boxes -any, split -any, Glob -any, aeson-better-errors
+                   -any, transformers-compat -any, bower-json -any, semigroups
+                   -any, safe -any
+    main-is: Main.hs
+    buildable: True
+    hs-source-dirs: psc-publish
+    other-modules: Utils
+                   ErrorsWarnings
+                   BoxesHelpers
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
@@ -197,7 +237,7 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   process -any, HUnit -any
+                   transformers-compat -any, process -any, HUnit -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True

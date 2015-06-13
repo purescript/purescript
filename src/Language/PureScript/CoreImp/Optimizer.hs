@@ -17,7 +17,9 @@
 
 module Language.PureScript.CoreImp.Optimizer (optimize) where
 
+import Control.Applicative (Applicative)
 import Control.Monad.Reader (MonadReader, asks)
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.Core
 import Language.PureScript.CoreImp.AST
@@ -28,7 +30,8 @@ import Language.PureScript.Options
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: forall f m mode. (Monad m, MonadReader (Options mode) m) => Module (Decl Ann) f -> m (Module (Decl Ann) f)
+optimize :: forall f m mode. (Monad m, MonadReader (Options mode) m,  Applicative m, MonadSupply m) =>
+              Module (Decl Ann) f -> m (Module (Decl Ann) f)
 optimize m = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return m else optimize' m

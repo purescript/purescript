@@ -3,7 +3,7 @@ module Main where
 type Inner = Number
 
 inner :: Inner
-inner = 0
+inner = 0.0
 
 type Outer = { inner :: Inner }
 

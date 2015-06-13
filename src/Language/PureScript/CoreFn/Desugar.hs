@@ -80,6 +80,8 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     Literal (ss, com, ty, Nothing) (NumericLiteral v)
   exprToCoreFn ss com ty (A.StringLiteral v) =
     Literal (ss, com, ty, Nothing) (StringLiteral v)
+  exprToCoreFn ss com ty (A.CharLiteral v) =
+    Literal (ss, com, ty, Nothing) (CharLiteral v)
   exprToCoreFn ss com ty (A.BooleanLiteral v) =
     Literal (ss, com, ty, Nothing) (BooleanLiteral v)
   exprToCoreFn ss com ty (A.ArrayLiteral vs) =
@@ -97,7 +99,7 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
   exprToCoreFn ss com ty (A.Var ident) =
-    Var (ss, com, ty, Nothing) ident
+    Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
     Case (ss, com, ty, Nothing) [exprToCoreFn ss [] Nothing v1]
       [ CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral True]
@@ -144,24 +146,32 @@ moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
     LiteralBinder (ss, com, Nothing, Nothing) (BooleanLiteral b)
   binderToCoreFn ss com (A.StringBinder s) =
     LiteralBinder (ss, com, Nothing, Nothing) (StringLiteral s)
+  binderToCoreFn ss com (A.CharBinder c) =
+    LiteralBinder (ss, com, Nothing, Nothing) (CharLiteral c)
   binderToCoreFn ss com (A.NumberBinder n) =
     LiteralBinder (ss, com, Nothing, Nothing) (NumericLiteral n)
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
-    let (_, tctor, _, _) = lookupConstructor env dctor
-    in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
+    let (_, tctor, ty, _) = lookupConstructor env dctor
+    in ConstructorBinder (ss, com, Just ty, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.ObjectBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
   binderToCoreFn ss com (A.ArrayBinder bs) =
     LiteralBinder (ss, com, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.ConsBinder b1 b2) =
-    let arrCtor = Qualified (Just $ ModuleName [ProperName "Prim"]) (ProperName "Array")
-    in ConstructorBinder (ss, com, Nothing, Nothing) arrCtor arrCtor $ map (binderToCoreFn ss []) [b1, b2]
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
     binderToCoreFn (Just ss) (com ++ com1) b
+
+  -- |
+  -- Gets metadata for values.
+  --
+  getValueMeta :: Qualified Ident -> Maybe Meta
+  getValueMeta name =
+    case lookupValue env name of
+      Just (_, External, _) -> Just IsForeign
+      _ -> Nothing
 
   -- |
   -- Gets metadata for data constructors.
@@ -210,9 +220,9 @@ importToCoreFn _ = Nothing
 -- |
 -- Desugars foreign declarations from AST to CoreFn representation.
 --
-externToCoreFn :: A.Declaration -> Maybe (ForeignDecl A.ForeignCode)
-externToCoreFn (A.ExternDeclaration _ name code ty) = Just (name, code, ty)
-externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, Nothing, tyObject)
+externToCoreFn :: A.Declaration -> Maybe ForeignDecl
+externToCoreFn (A.ExternDeclaration name ty) = Just (name, ty)
+externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
 

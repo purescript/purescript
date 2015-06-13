@@ -16,9 +16,9 @@ foreign import assert
   """ :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
 
 main = do
-  assert (1 < 2)
-  assert (2 == 2)
-  assert (3 > 1)
+  assert (1.0 < 2.0)
+  assert (2.0 == 2.0)
+  assert (3.0 > 1.0)
   assert ("a" < "b")
   assert ("a" == "a")
   assert ("z" > "a")

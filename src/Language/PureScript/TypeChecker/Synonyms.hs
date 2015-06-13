@@ -28,7 +28,8 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
 import Language.PureScript.Environment
@@ -45,7 +46,7 @@ buildTypeSubstitution name n = go n []
   where
   go :: Int -> [Type] -> Type -> Either ErrorMessage (Maybe Type)
   go 0 args (TypeConstructor ctor) | name == ctor = return (Just $ SaturatedTypeSynonym ctor args)
-  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ PartiallyAppliedSynonym name
+  go m _ (TypeConstructor ctor) | m > 0 && name == ctor = throwError $ SimpleErrorWrapper $ PartiallyAppliedSynonym name
   go m args (TypeApp f arg) = go (m - 1) (arg:args) f
   go _ _ _ = return Nothing
 
@@ -86,7 +87,7 @@ replaceAllTypeSynonyms' env d =
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  either (throwError . errorMessage) return $ replaceAllTypeSynonyms' env d
+  either (throwError . singleError) return $ replaceAllTypeSynonyms' env d
 
 -- |
 -- Replace a type synonym and its arguments with the aliased type
@@ -102,7 +103,7 @@ expandTypeSynonym' env name args =
 expandTypeSynonym :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Qualified ProperName -> [Type] -> m Type
 expandTypeSynonym name args = do
   env <- getEnv
-  either (throwError . errorMessage) return $ expandTypeSynonym' env name args
+  either (throwError . singleError) return $ expandTypeSynonym' env name args
 
 expandAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Applicative m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
 expandAllTypeSynonyms = everywhereOnTypesTopDownM go

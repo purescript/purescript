@@ -23,8 +23,8 @@ data Module a f = Module
   , moduleName :: ModuleName
   , moduleImports :: [ModuleName]
   , moduleExports :: [Ident]
-  , moduleForeign :: [ForeignDecl f]
+  , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [a]
   } deriving (Show)
 
-type ForeignDecl f = (Ident, Maybe f, Type)
+type ForeignDecl = (Ident, Type)

@@ -1,7 +1,7 @@
 module Main where
 
 testTopLevel :: _ -> _
-testTopLevel n = n + 1
+testTopLevel n = n + 1.0
 
 test :: forall a. (Eq a) => (a -> a) -> a -> a
 test f a = go (f a) a

@@ -23,7 +23,8 @@ import Data.List (nub)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Map as M
 
@@ -141,7 +142,7 @@ addValue env mn name = updateExportedModule env mn $ \m -> do
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> ErrorMessage) -> [a] -> a -> m [a]
+addExport :: (Applicative m, MonadError MultipleErrors m, Eq a, Show a) => (a -> SimpleErrorMessage) -> [a] -> a -> m [a]
 addExport what exports name =
   if name `elem` exports
   then throwConflictError what name
@@ -225,8 +226,8 @@ renameInModule imports exports (Module coms mn decls exps) =
     (,) (pos, bound) <$> (ExternInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn Nothing <*> mapM (updateTypesEverywhere pos) ts)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
-  updateDecl (pos, bound) (ExternDeclaration fit name js ty) =
-    (,) (pos, name : bound) <$> (ExternDeclaration fit name js <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDeclaration name ty) =
+    (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
 
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)
@@ -278,7 +279,7 @@ renameInModule imports exports (Module coms mn decls exps) =
 
   -- Update names so unqualified references become qualified, and locally qualified references
   -- are replaced with their canoncial qualified names (e.g. M.Map -> Data.Map.Map)
-  update :: (Ord a, Show a) => (Qualified a -> ErrorMessage)
+  update :: (Ord a, Show a) => (Qualified a -> SimpleErrorMessage)
                             -> (ImportEnvironment -> M.Map (Qualified a) (Qualified a))
                             -> (Exports -> a -> Bool)
                             -> Qualified a
@@ -336,7 +337,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   addDecl mn env (TypeSynonymDeclaration tn _ _) = addType env mn tn []
   addDecl mn env (ExternDataDeclaration tn _) = addType env mn tn []
   addDecl mn env (ValueDeclaration name _ _ _) = addValue env mn name
-  addDecl mn env (ExternDeclaration _ name _ _) = addValue env mn name
+  addDecl mn env (ExternDeclaration name _) = addValue env mn name
   addDecl mn env (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ addDecl mn env d
   addDecl _  env _ = return env
 
@@ -513,8 +514,8 @@ resolveImport currentModule importModule exps imps impQual =
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
     Just (Qualified (Just mn) _) -> throwError . errorMessage $ err
       where
-      err = if mn == currentModule || importModule == currentModule
-            then ConflictingImport (show name) mn
+      err = if currentModule `elem` [mn, importModule]
+            then ConflictingImport (show name) importModule
             else ConflictingImports (show name) mn importModule
 
   -- The available values, types, and classes in the module being imported
@@ -528,7 +529,7 @@ resolveImport currentModule importModule exps imps impQual =
   checkDctorExists = checkImportExists (flip UnknownDataConstructor Nothing)
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => (Qualified a -> ErrorMessage) -> [a] -> a -> m a
+  checkImportExists :: (Eq a, Show a) => (Qualified a -> SimpleErrorMessage) -> [a] -> a -> m a
   checkImportExists unknown exports item =
       if item `elem` exports
       then return item
@@ -537,5 +538,5 @@ resolveImport currentModule importModule exps imps impQual =
 -- |
 -- Raises an error for when there is more than one definition for something.
 --
-throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> ErrorMessage) -> a -> m b
+throwConflictError :: (Applicative m, MonadError MultipleErrors m, Show a) => (a -> SimpleErrorMessage) -> a -> m b
 throwConflictError conflict = throwError . errorMessage . conflict

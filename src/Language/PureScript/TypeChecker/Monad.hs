@@ -22,9 +22,11 @@ import Data.Maybe
 import qualified Data.Map as M
 
 import Control.Applicative
-import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Unify
+import Control.Monad.Writer
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.Except
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -84,7 +86,7 @@ getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
 --
 bindLocalVariables :: (Functor m, MonadState CheckState m) => ModuleName -> [(Ident, Type, NameVisibility)] -> m a -> m a
 bindLocalVariables moduleName bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, LocalVariable, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, Private, visibility)))
 
 -- |
 -- Temporarily bind a collection of names to local type variables
@@ -96,12 +98,19 @@ bindLocalTypeVariables moduleName bindings =
 -- |
 -- Update the visibility of all names to Defined
 --
-makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
-makeBindingGroupVisible action = do
-  orig <- get
-  modify $ \st -> st { checkEnv = (checkEnv st) { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names . checkEnv $ st) } }
+makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m ()
+makeBindingGroupVisible = modifyEnv $ \e -> e { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names e) }
+
+-- | Update the visibility of all names to Defined in the scope of the provided action
+withBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
+withBindingGroupVisible action = preservingNames $ makeBindingGroupVisible >> action
+
+-- | Perform an action while preserving the names from the @Environment@.
+preservingNames :: (Functor m, MonadState CheckState m) => m a -> m a
+preservingNames action = do
+  orig <- gets (names . checkEnv)
   a <- action
-  modify $ \st -> st { checkEnv = (checkEnv st) { names = names . checkEnv $ orig } }
+  modifyEnv $ \e -> e { names = orig }
   return a
 
 -- |
@@ -169,8 +178,8 @@ data CheckState = CheckState {
 -- |
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
-newtype Check a = Check { unCheck :: StateT CheckState (Either MultipleErrors) a }
-  deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError MultipleErrors)
+newtype Check a = Check { unCheck :: StateT CheckState (ExceptT MultipleErrors (Writer MultipleErrors)) a }
+  deriving (Functor, Monad, Applicative, MonadState CheckState, MonadError MultipleErrors, MonadWriter MultipleErrors)
 
 -- |
 -- Get the current @Environment@
@@ -193,16 +202,26 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 -- |
 -- Run a computation in the Check monad, starting with an empty @Environment@
 --
-runCheck :: (MonadError MultipleErrors m) => Check a -> m (a, Environment)
+runCheck :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Check a -> m (a, Environment)
 runCheck = runCheck' initEnvironment
 
 -- |
 -- Run a computation in the Check monad, failing with an error, or succeeding with a return value and the final @Environment@.
 --
-runCheck' :: (MonadError MultipleErrors m) => Environment -> Check a -> m (a, Environment)
-runCheck' env c = interpretMultipleErrors $ do
-  (a, s) <- flip runStateT (CheckState env 0 0 Nothing) $ unCheck c
-  return (a, checkEnv s)
+runCheck' :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Environment -> Check a -> m (a, Environment)
+runCheck' env = interpretMultipleErrorsAndWarnings . unwrapCheckWithWarnings env
+  where
+  unwrapCheckWithWarnings :: Environment -> Check a -> (Either MultipleErrors (a, Environment), MultipleErrors)
+  unwrapCheckWithWarnings e =
+    (\(rc, w) -> (envCheck rc, w))
+    . runWriter
+    . runExceptT
+    . flip runStateT (CheckState e 0 0 Nothing)
+    . unCheck
+  envCheck :: Either MultipleErrors (a, CheckState) -> Either MultipleErrors (a, Environment)
+  envCheck rc = do
+    (a, s) <- rc
+    return (a, checkEnv s)
 
 -- |
 -- Make an assertion, failing with an error message
@@ -230,8 +249,18 @@ liftCheck = UnifyT . lift
 -- Run a computation in the substitution monad, generating a return value and the final substitution.
 --
 liftUnify :: (Partial t) => UnifyT t Check a -> Check (a, Substitution t)
-liftUnify unify = do
+liftUnify = liftUnifyWarnings (const id)
+
+-- |
+-- Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
+--
+liftUnifyWarnings :: (Partial t) => (Substitution t -> ErrorMessage -> ErrorMessage) -> UnifyT t Check a -> Check (a, Substitution t)
+liftUnifyWarnings replace unify = do
   st <- get
-  (a, ust) <- runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
+  let ru = runUnify (defaultUnifyState { unifyNextVar = checkNextVar st }) unify
+  ((a, ust), w) <- censor (const mempty) . listen $ ru
   modify $ \st' -> st' { checkNextVar = unifyNextVar ust }
-  return (a, unifyCurrentSubstitution ust)
+  let uust = unifyCurrentSubstitution ust
+  tell $ onErrorMessages (replace uust) w
+  return (a, uust)
+

@@ -126,11 +126,11 @@ moduleToCoreImp (Module coms mn imps exps externs decls) =
     return $ Decl (VarDecl nullAnn ident (var varName)) : done
   binder varName done (CF.ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binder varName done b
-  binder varName done (CF.ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+  binder varName done (CF.ConstructorBinder (_, _, ty, Just (IsConstructor ctorType fields)) _ ctor bs) = do
     stmnts <- go (zip fields bs) done
     return $ case ctorType of
       ProductType -> stmnts
-      SumType -> [IfElse nullAnn (IsTagOf nullAnn ctor (var varName)) stmnts Nothing]
+      SumType -> [IfElse nullAnn (IsTagOf (Nothing, [], ty, Nothing) ctor (var varName)) stmnts Nothing]
     where
     go :: [(Ident, CF.Binder Ann)] -> [Statement Ann] -> m [Statement Ann]
     go [] done' = return done'
@@ -168,6 +168,8 @@ moduleToCoreImp (Module coms mn imps exps externs decls) =
   literalBinder :: Ident -> [Statement Ann] -> Literal (CF.Binder Ann) -> m [Statement Ann]
   literalBinder varName done (NumericLiteral n) =
     return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (Literal nullAnn $ NumericLiteral n)) done Nothing]
+  literalBinder varName done (CharLiteral c) =
+    return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (str [c])) done Nothing]
   literalBinder varName done (StringLiteral s) =
     return [IfElse nullAnn (BinaryOp nullAnn Equal (var varName) (str s)) done Nothing]
   literalBinder varName done (BooleanLiteral True) =

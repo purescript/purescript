@@ -16,3 +16,17 @@ If you would like to contribute, please consider the issues in the current miles
 Finally, if you have made code changes and would like to be included in the copyright notice in the cabal file, please include that change in your pull request.
 
 To prevent core libraries from getting broken, every change must be reviewed. A pull request will be merged as long as one other team member has verified the changes.
+
+## Adding dependencies
+
+Because the PureScript compiler is distributed in binary form, we include
+the licenses of all dependencies, including transitive ones, in the LICENSE
+file. Therefore, whenever the dependencies change, the LICENSE file should be
+updated.
+
+You can automate this (if you have bash):
+
+- get a copy of [cabal-dependency-licenses][]
+- run at the command line: `./license/generate > LICENSE`
+
+[cabal-dependency-licenses]: https://github.com/jaspervdj/cabal-dependency-licenses

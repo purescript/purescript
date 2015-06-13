@@ -29,8 +29,10 @@ import Data.List (nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Strict as H
 
-import Control.Monad.Except
+import Control.Monad
 import Control.Monad.Unify
+import Control.Monad.Writer
+import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -186,6 +188,7 @@ replaceTypeWildcards = everywhereOnTypesM replace
   where
   replace TypeWildcard = do
     u <- fresh'
+    liftCheck . tell $ errorMessage . WildcardInferredType $ TUnknown u
     return $ TUnknown u
   replace other = return other
 

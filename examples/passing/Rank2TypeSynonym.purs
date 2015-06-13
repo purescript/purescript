@@ -8,7 +8,7 @@ foo :: forall a. a -> Foo a
 foo x = pure x
 
 bar :: Foo Number
-bar = foo 3
+bar = foo 3.0
 
 main = do
   x <- bar

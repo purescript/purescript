@@ -26,7 +26,7 @@ import Data.List (nub, (\\))
 import Data.Monoid
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
 import Language.PureScript.AST
@@ -88,7 +88,7 @@ skolemEscapeCheck root@TypedValue{} =
   let (_, f, _, _, _) = everythingWithContextOnValues [] [] (++) def go def def def
   in case f root of
        [] -> return ()
-       ((binding, val) : _) -> throwError . errorMessage . ErrorInExpression val $ EscapedSkolem binding
+       ((binding, val) : _) -> throwError . singleError $ ErrorInExpression val $ SimpleErrorWrapper $ EscapedSkolem binding
   where
   def s _ = (s, [])
 

@@ -2,33 +2,35 @@ module Main where
 
 import Control.Monad.Eff
 
+data List a = Cons a (List a) | Nil
+
 data Sequence t = Sequence (forall m a. (Monad m) => t (m a) -> m (t a))
 
 sequence :: forall t. Sequence t -> (forall m a. (Monad m) => t (m a) -> m (t a))
 sequence (Sequence s) = s
 
-sequenceArraySeq :: forall m a. (Monad m) => Array (m a) -> m (Array a)
-sequenceArraySeq [] = pure []
-sequenceArraySeq (x:xs) = (:) <$> x <*> sequenceArraySeq xs
+sequenceListSeq :: forall m a. (Monad m) => List (m a) -> m (List a)
+sequenceListSeq Nil = pure Nil
+sequenceListSeq (Cons x xs) = Cons <$> x <*> sequenceListSeq xs
 
-sequenceArray :: Sequence []
-sequenceArray = Sequence (sequenceArraySeq)
+sequenceList :: Sequence List
+sequenceList = Sequence (sequenceListSeq)
 
-sequenceArray' :: Sequence []
-sequenceArray' = Sequence ((\val -> case val of
-  [] -> pure []
-  (x:xs) -> (:) <$> x <*> sequence sequenceArray' xs))
+sequenceList' :: Sequence List
+sequenceList' = Sequence ((\val -> case val of
+  Nil -> pure Nil
+  Cons x xs -> Cons <$> x <*> sequence sequenceList' xs))
 
-sequenceArray'' :: Sequence []
-sequenceArray'' = Sequence (sequenceArraySeq :: forall m a. (Monad m) => Array (m a) -> m (Array a))
+sequenceList'' :: Sequence List
+sequenceList'' = Sequence (sequenceListSeq :: forall m a. (Monad m) => List (m a) -> m (List a))
 
-sequenceArray''' :: Sequence []
-sequenceArray''' = Sequence ((\val -> case val of
-  [] -> pure []
-  (x:xs) -> (:) <$> x <*> sequence sequenceArray''' xs) :: forall m a. (Monad m) => Array (m a) -> m (Array a))
+sequenceList''' :: Sequence List
+sequenceList''' = Sequence ((\val -> case val of
+  Nil -> pure Nil
+  Cons x xs -> Cons <$> x <*> sequence sequenceList''' xs) :: forall m a. (Monad m) => List (m a) -> m (List a))
 
 main = do
-  sequence sequenceArray $ [Debug.Trace.trace "Done"]
-  sequence sequenceArray' $ [Debug.Trace.trace "Done"]
-  sequence sequenceArray'' $ [Debug.Trace.trace "Done"]
-  sequence sequenceArray''' $ [Debug.Trace.trace "Done"]
+  sequence sequenceList $ Cons (Debug.Trace.trace "Done") Nil
+  sequence sequenceList' $ Cons (Debug.Trace.trace "Done") Nil
+  sequence sequenceList'' $ Cons (Debug.Trace.trace "Done") Nil
+  sequence sequenceList''' $ Cons (Debug.Trace.trace "Done") Nil

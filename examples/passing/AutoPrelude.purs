@@ -2,7 +2,7 @@ module Main where
 
 import Debug.Trace
 
-f x = x * 10
-g y = y - 10
+f x = x * 10.0
+g y = y - 10.0
 
-main = trace $ show $ (f <<< g) 100
+main = trace $ show $ (f <<< g) 100.0

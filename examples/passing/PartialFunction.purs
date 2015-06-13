@@ -13,7 +13,7 @@ foreign import testError
   """ :: (Unit -> Number) -> String
 
 fn :: Number -> Number
-fn 0 = 0
-fn 1 = 2
+fn 0.0 = 0.0
+fn 1.0 = 2.0
 
-main = Debug.Trace.trace (show $ testError $ \_ -> fn 2)
+main = Debug.Trace.trace (show $ testError $ \_ -> fn 2.0)

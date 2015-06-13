@@ -13,7 +13,7 @@ foreign import f
   """ :: forall e. Number -> Eff e Number
 
 main = do
-  let x = 0
+  let x = 0.0
   f x
-  let x = 1 + 1
+  let x = 1.0 + 1.0
   trace "Done"

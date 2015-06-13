@@ -17,7 +17,10 @@
 
 module Language.PureScript.CodeGen.JS.AST where
 
+import Control.Applicative (Applicative, (<$>), (<*>))
+import Control.Monad.Identity
 import Data.Data
+import Data.Traversable (traverse)
 
 import Language.PureScript.CoreImp.Operators
 import Language.PureScript.Comments
@@ -201,31 +204,34 @@ everywhereOnJS f = go
   go other = f other
 
 everywhereOnJSTopDown :: (JS -> JS) -> JS -> JS
-everywhereOnJSTopDown f = go . f
+everywhereOnJSTopDown f = runIdentity . everywhereOnJSTopDownM (Identity . f)
+
+everywhereOnJSTopDownM :: (Applicative m, Monad m) => (JS -> m JS) -> JS -> m JS
+everywhereOnJSTopDownM f = f >=> go
   where
-  go :: JS -> JS
-  go (JSUnary op j) = JSUnary op (go (f j))
-  go (JSBinary op j1 j2) = JSBinary op (go (f j1)) (go (f j2))
-  go (JSArrayLiteral js) = JSArrayLiteral (map (go . f) js)
-  go (JSIndexer j1 j2) = JSIndexer (go (f j1)) (go (f j2))
-  go (JSObjectLiteral js) = JSObjectLiteral (map (fmap (go . f)) js)
-  go (JSAccessor prop j) = JSAccessor prop (go (f j))
-  go (JSFunction name args j) = JSFunction name args (go (f j))
-  go (JSApp j js) = JSApp (go (f j)) (map (go . f) js)
-  go (JSConditional j1 j2 j3) = JSConditional (go (f j1)) (go (f j2)) (go (f j3))
-  go (JSBlock js) = JSBlock (map (go . f) js)
-  go (JSVariableIntroduction name j) = JSVariableIntroduction name (fmap (go . f) j)
-  go (JSAssignment j1 j2) = JSAssignment (go (f j1)) (go (f j2))
-  go (JSWhile j1 j2) = JSWhile (go (f j1)) (go (f j2))
-  go (JSFor name j1 j2 j3) = JSFor name (go (f j1)) (go (f j2)) (go (f j3))
-  go (JSForIn name j1 j2) = JSForIn name (go (f j1)) (go (f j2))
-  go (JSIfElse j1 j2 j3) = JSIfElse (go (f j1)) (go (f j2)) (fmap (go . f) j3)
-  go (JSReturn j) = JSReturn (go (f j))
-  go (JSThrow j) = JSThrow (go (f j))
-  go (JSTypeOf j) = JSTypeOf (go (f j))
-  go (JSLabel name j) = JSLabel name (go (f j))
-  go (JSInstanceOf j1 j2) = JSInstanceOf (go (f j1)) (go (f j2))
-  go (JSComment com j) = JSComment com (go (f j))
+  f' = f >=> go
+  go (JSUnary op j) = JSUnary op <$> f' j
+  go (JSBinary op j1 j2) = JSBinary op <$> f' j1 <*> f' j2
+  go (JSArrayLiteral js) = JSArrayLiteral <$> traverse f' js
+  go (JSIndexer j1 j2) = JSIndexer <$> f' j1 <*> f' j2
+  go (JSObjectLiteral js) = JSObjectLiteral <$> traverse (traverse f') js
+  go (JSAccessor prop j) = JSAccessor prop <$> f' j
+  go (JSFunction name args j) = JSFunction name args <$> f' j
+  go (JSApp j js) = JSApp <$> f' j <*> traverse f' js
+  go (JSConditional j1 j2 j3) = JSConditional <$> f' j1 <*> f' j2 <*> f' j3
+  go (JSBlock js) = JSBlock <$> traverse f' js
+  go (JSVariableIntroduction name j) = JSVariableIntroduction name <$> traverse f' j
+  go (JSAssignment j1 j2) = JSAssignment <$> f' j1 <*> f' j2
+  go (JSWhile j1 j2) = JSWhile <$> f' j1 <*> f' j2
+  go (JSFor name j1 j2 j3) = JSFor name <$> f' j1 <*> f' j2 <*> f' j3
+  go (JSForIn name j1 j2) = JSForIn name <$> f' j1 <*> f' j2
+  go (JSIfElse j1 j2 j3) = JSIfElse <$> f' j1 <*> f' j2 <*> traverse f' j3
+  go (JSReturn j) = JSReturn <$> f' j
+  go (JSThrow j) = JSThrow <$> f' j
+  go (JSTypeOf j) = JSTypeOf <$> f' j
+  go (JSLabel name j) = JSLabel name <$> f' j
+  go (JSInstanceOf j1 j2) = JSInstanceOf <$> f' j1 <*> f' j2
+  go (JSComment com j) = JSComment com <$> f' j
   go other = f other
 
 everythingOnJS :: (r -> r -> r) -> (JS -> r) -> JS -> r

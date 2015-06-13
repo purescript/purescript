@@ -14,19 +14,19 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.CaseDeclarations (
     desugarCases,
     desugarCasesModule
 ) where
 
+import Data.Maybe (catMaybes)
 import Data.List (nub, groupBy)
 
 import Control.Applicative
-import Control.Monad ((<=<), forM, join, unless)
-import Control.Monad.Except (throwError)
-import Control.Monad.Error.Class (MonadError)
+import Control.Monad ((<=<), forM, replicateM, join, unless)
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Language.PureScript.Names
@@ -89,12 +89,24 @@ inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+toDecls :: forall m. (Functor m, Applicative m, Monad m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
-  let args = map (\(VarBinder arg) -> arg) bs
-      body = foldr (Abs . Left) val args
+  args <- mapM fromVarBinder bs
+  let body = foldr (Abs . Left) val args
   guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] (Right body)]
+  where
+  isVarBinder :: Binder -> Bool
+  isVarBinder NullBinder = True
+  isVarBinder (VarBinder _) = True
+  isVarBinder (PositionedBinder _ _ b) = isVarBinder b
+  isVarBinder _ = False
+
+  fromVarBinder :: Binder -> m Ident
+  fromVarBinder NullBinder = Ident <$> freshName
+  fromVarBinder (VarBinder name) = return name
+  fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
+  fromVarBinder _ = error "fromVarBinder: Invalid argument"
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
@@ -108,43 +120,61 @@ toDecls (PositionedDeclaration pos com d : ds) = do
   return (PositionedDeclaration pos com d' : ds')
 toDecls ds = return ds
 
-isVarBinder :: Binder -> Bool
-isVarBinder (VarBinder _) = True
-isVarBinder _ = False
-
 toTuple :: Declaration -> ([Binder], Either [(Guard, Expr)] Expr)
 toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = error "Not a value declaration"
 
-makeCaseDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
-  args <- mapM argName $ foldl1 resolveNames namedArgs
-  let
-    vars = map (Var . Qualified Nothing) args
-    binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
-    value = foldr (Abs . Left) (Case vars binders) args
-  return $ ValueDeclaration ident Value [] (Right value)
+      argNames = map join $ foldl1 resolveNames namedArgs
+  args <- if allUnique (catMaybes argNames)
+            then mapM argName argNames
+            else replicateM (length argNames) (Ident <$> freshName)
+  let vars = map (Var . Qualified Nothing) args
+      binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
+      value = foldr (Abs . Left) (Case vars binders) args
+  return $ ValueDeclaration ident Public [] (Right value)
   where
-  findName :: Binder -> Maybe Ident
-  findName (VarBinder name) = Just name
+  -- We will construct a table of potential names.
+  -- VarBinders will become Just (Just _) which is a potential name.
+  -- NullBinder will become Just Nothing, which indicates that we may
+  -- have to generate a name.
+  -- Everything else becomes Nothing, which indicates that we definitely
+  -- have to generate a name.
+  findName :: Binder -> Maybe (Maybe Ident)
+  findName NullBinder = Just Nothing
+  findName (VarBinder name) = Just (Just name)
   findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 
-  argName :: (MonadSupply m) => Maybe Ident -> m Ident
+  -- We still have to make sure the generated names are unique, or else
+  -- we will end up constructing an invalid function.
+  allUnique :: (Eq a) => [a] -> Bool
+  allUnique xs = length xs == length (nub xs)
+
+  argName :: Maybe Ident -> m Ident
   argName (Just name) = return name
-  argName Nothing = do
+  argName _ = do
     name <- freshName
     return (Ident name)
 
-  resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
+  -- Combine two lists of potential names from two case alternatives
+  -- by zipping correspoding columns.
+  resolveNames :: [Maybe (Maybe Ident)] ->
+                  [Maybe (Maybe Ident)] ->
+                  [Maybe (Maybe Ident)]
   resolveNames = zipWith resolveName
 
-  resolveName :: Maybe Ident -> Maybe Ident -> Maybe Ident
-  resolveName (Just a) (Just b)
-    | a == b = Just a
+  -- Resolve a pair of names. VarBinder beats NullBinder, and everything
+  -- else results in Nothing.
+  resolveName :: Maybe (Maybe Ident) ->
+                 Maybe (Maybe Ident) ->
+                 Maybe (Maybe Ident)
+  resolveName (Just (Just a)) (Just (Just b))
+    | a == b = Just (Just a)
     | otherwise = Nothing
-  resolveName Nothing Nothing = Nothing
-  resolveName (Just a) Nothing = Just a
-  resolveName Nothing (Just b) = Just b
+  resolveName (Just Nothing) a = a
+  resolveName a (Just Nothing) = a
+  resolveName _ _ = Nothing

@@ -24,12 +24,12 @@ main = do
   record' <- record { value = _ } <$> getValue
   print $ record'.value === true
 
-  let point = { x: 1, y: 1 }
-      x = 10
-      point' = (point { x = _, y = x }) 100
+  let point = { x: 1.0, y: 1.0 }
+      x = 10.0
+      point' = (point { x = _, y = x }) 100.0
 
-  print $ point'.x === 100
-  print $ point'.y === 10
+  print $ point'.x === 100.0
+  print $ point'.y === 10.0
 
-  let record2 = (_ { x = _ }) { x: 0 } 10
-  print $ record2.x === 10
+  let record2 = (_ { x = _ }) { x: 0.0 } 10.0
+  print $ record2.x === 10.0

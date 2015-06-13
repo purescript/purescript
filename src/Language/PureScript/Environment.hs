@@ -63,19 +63,6 @@ initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty M.empty
 
 -- |
--- The type of a foreign import
---
-data ForeignImportType
-  -- |
-  -- A regular foreign import
-  --
-  = ForeignImport
-  -- |
-  -- A foreign import which contains inline foreign code as a string literal
-  --
-  | InlineForeign deriving (Show, Eq, Data, Typeable)
-
--- |
 -- The visibility of a name in scope
 --
 data NameVisibility
@@ -89,33 +76,23 @@ data NameVisibility
   | Defined deriving (Show, Eq)
 
 -- |
--- The kind of a name
+-- A flag for whether a name is for an private or public value - only public values will be
+-- included in a generated externs file.
 --
 data NameKind
   -- |
-  -- A value introduced as a binding in a module
+  -- A private value introduced as an artifact of code generation (class instances, class member
+  -- accessors, etc.)
   --
-  = Value
+  = Private
   -- |
-  -- A type class dictionary member accessor import, generated during desugaring of type class declarations
+  -- A public value for a module member or foreing import declaration
   --
-  | TypeClassAccessorImport
+  | Public
   -- |
-  -- A foreign import
+  -- A name for member introduced by foreign import
   --
-  | Extern ForeignImportType
-  -- |
-  -- A local name introduced using a lambda abstraction, variable introduction or binder
-  --
-  | LocalVariable
-  -- |
-  -- A data constructor
-  --
-  | DataConstructor
-  -- |
-  -- A type class dictionary, generated during desugaring of type class declarations
-  --
-  | TypeInstanceDictionaryValue deriving (Show, Eq, Data, Typeable)
+  | External deriving (Show, Eq, Data, Typeable)
 
 -- |
 -- The kinds of a type
@@ -185,10 +162,22 @@ tyString :: Type
 tyString = primTy "String"
 
 -- |
+-- Type constructor for strings
+--
+tyChar :: Type
+tyChar = primTy "Char"
+
+-- |
 -- Type constructor for numbers
 --
 tyNumber :: Type
 tyNumber = primTy "Number"
+
+-- |
+-- Type constructor for integers
+--
+tyInt :: Type
+tyInt = primTy "Int"
 
 -- |
 -- Type constructor for booleans
@@ -209,6 +198,14 @@ tyObject :: Type
 tyObject = primTy "Object"
 
 -- |
+-- Check whether a type is an object
+--
+isObject :: Type -> Bool
+isObject = (==) tyObject . extract
+  where extract (TypeApp t _) = t
+        extract t = t
+
+-- |
 -- Smart constructor for function types
 --
 function :: Type -> Type -> Type
@@ -222,7 +219,9 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
                        , (primName "Array"    , (FunKind Star Star, ExternData))
                        , (primName "Object"   , (FunKind (Row Star) Star, ExternData))
                        , (primName "String"   , (Star, ExternData))
+                       , (primName "Char"     , (Star, ExternData))
                        , (primName "Number"   , (Star, ExternData))
+                       , (primName "Int"      , (Star, ExternData))
                        , (primName "Boolean"  , (Star, ExternData)) ]
 
 -- |
@@ -239,3 +238,10 @@ isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
 isNewtypeConstructor e ctor = case lookupConstructor e ctor of
   (Newtype, _, _, _) -> True
   (Data, _, _, _) -> False
+
+-- |
+-- Finds information about values from the current environment.
+--
+lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
+lookupValue env (Qualified (Just mn) ident) = (mn, ident) `M.lookup` names env
+lookupValue _ _ = Nothing

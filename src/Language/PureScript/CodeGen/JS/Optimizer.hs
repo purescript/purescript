@@ -37,7 +37,9 @@ module Language.PureScript.CodeGen.JS.Optimizer (
     optimize
 ) where
 
+import Control.Applicative (Applicative)
 import Control.Monad.Reader (MonadReader, ask, asks)
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.Options
@@ -51,15 +53,15 @@ import Language.PureScript.CodeGen.JS.Optimizer.TCO
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (Monad m, MonadReader (Options mode) m) => JS -> m JS
+optimize :: (Monad m, MonadReader (Options mode) m, Applicative m, MonadSupply m) => JS -> m JS
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (Monad m, MonadReader (Options mode) m) => JS -> m JS
+optimize' :: (Monad m, MonadReader (Options mode) m, Applicative m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  return $ untilFixedPoint (applyAll
+  untilFixedPoint (inlineArrComposition . applyAll
     [ tco opts
     , magicDo opts
     , unThunk
@@ -69,11 +71,12 @@ optimize' js = do
     , inlineValues
     , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
     , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
-    , inlineOperator (C.preludeUnsafe, C.unsafeIndex) $ flip JSIndexer
+    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip JSIndexer
     , inlineCommonOperators ]) js
 
-untilFixedPoint :: (Eq a) => (a -> a) -> a -> a
+untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a
 untilFixedPoint f = go
   where
-  go a = let a' = f a in
-          if a' == a then a' else go a'
+  go a = do
+   a' <- f a
+   if a' == a then return a' else go a'

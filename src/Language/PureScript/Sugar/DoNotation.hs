@@ -28,7 +28,7 @@ import Language.PureScript.Errors
 import qualified Language.PureScript.Constants as C
 
 import Control.Applicative
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 -- |

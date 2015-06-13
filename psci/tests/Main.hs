@@ -5,8 +5,12 @@ module Main where
 import Control.Monad.Trans.State.Strict (runStateT)
 import Control.Monad (when)
 
+import Data.List (sort)
+
 import System.Exit (exitFailure)
 import System.Console.Haskeline
+import System.FilePath ((</>))
+import System.Directory (getCurrentDirectory)
 
 import Test.HUnit
 
@@ -76,7 +80,7 @@ completionTestData =
   , ("import Control.Monad.S", ["import Control.Monad.ST"])
   , ("import qualified Control.Monad.S", ["import qualified Control.Monad.ST"])
   , ("import Control.Monad.", map ("import Control.Monad." ++)
-                                  ["Eff", "Eff.Unsafe", "ST"])
+                                  ["Eff", "ST"])
 
   -- a few other import tests
   , ("impor", ["import"])
@@ -101,7 +105,6 @@ completionTestData =
   ]
   where
   allModuleNames = [ "Control.Monad.Eff"
-                   , "Control.Monad.Eff.Unsafe"
                    , "Control.Monad.ST"
                    , "Data.Function"
                    , "Debug.Trace"
@@ -114,7 +117,7 @@ assertCompletedOk (line, expecteds) = do
   (unusedR, completions) <- runCM (completion' (reverse line, ""))
   let unused = reverse unusedR
   let actuals = map ((unused ++) . replacement) completions
-  expecteds @=? actuals
+  sort expecteds @=? sort actuals
 
 runCM :: CompletionM a -> IO a
 runCM act = do
@@ -123,7 +126,8 @@ runCM act = do
 
 getPSCiState :: IO PSCiState
 getPSCiState = do
-  modulesOrFirstError <- loadAllModules []
+  cwd <- getCurrentDirectory
+  modulesOrFirstError <- loadAllModules [ cwd </> "tests" </> "prelude.purs" ]
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure

@@ -17,22 +17,25 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript.CodeGen.JS (
-    module AST,
-    module Common,
-    moduleToJs
-) where
+module Language.PureScript.CodeGen.JS
+  ( module AST
+  , module Common
+  , moduleToJs
+  , mainCall
+  ) where
 
 import Data.List ((\\), delete)
 import Data.Maybe (mapMaybe, fromMaybe)
+import Data.List ((\\), delete, intersect)
 import qualified Data.Traversable as T (traverse)
 
 import Control.Applicative
 import Control.Arrow ((&&&))
+import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
-
-import Language.PureScript.AST.Declarations (ForeignCode(..))
+import Language.PureScript.AST.Declarations (ForeignCode, runForeignCode)
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CodeGen.JS.Optimizer
@@ -49,19 +52,22 @@ import qualified Language.PureScript.CoreImp.AST as CI
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => Module (CI.Decl Ann) ForeignCode -> m [JS]
-moduleToJs (Module coms mn imps exps foreigns decls) = do
+           => Module (CI.Decl Ann) ForeignCode -> Maybe JS -> m [JS]
+moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
-  let foreigns' = mapMaybe (\(_, js, _) -> JSRaw . runForeignCode <$> js) foreigns
   jsDecls <- mapM declToJS decls
   optimized <- T.traverse optimize jsDecls
   let isModuleEmpty = null exps
   comments <- not <$> asks optionsNoComments
   let strict = JSStringLiteral "use strict"
   let header = if comments && not (null coms) then JSComment coms strict else strict
-  let moduleBody = header : jsImports ++ foreigns' ++ optimized
-  let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) exps
+  let foreign' = [JSVariableIntroduction "$foreign" foreign | not $ null foreigns || foreign == Nothing]
+  let moduleBody = header : foreign' ++ jsImports ++ optimized
+  let foreignExps = exps `intersect` (fst `map` foreigns)
+  let standardExps = exps \\ foreignExps
+  let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps
+                             ++ map (runIdent &&& foreignIdent) foreignExps
   return $ case additional of
     MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
     CompileOptions ns _ _ | not isModuleEmpty ->
@@ -194,6 +200,12 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
     return $ JSAccessor "value" $ qualifiedToJS id ident
   exprToJS (CI.Var (_, _, _, Just (IsConstructor _ _)) ident) =
     return $ JSAccessor "create" $ qualifiedToJS id ident
+  exprToJS (CI.Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
+    return $ if mn' == mn
+             then foreignIdent ident
+             else varToJs qi
+  exprToJS (CI.Var (_, _, _, Just IsForeign) ident) =
+    error $ "Encountered an unqualified reference to a foreign ident " ++ show ident
   exprToJS (CI.Var _ ident) =
     return $ varToJs ident
   exprToJS (CI.ObjectUpdate _ obj ps) = do
@@ -221,6 +233,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   literalToValueJS :: Literal (CI.Expr Ann) -> m JS
   literalToValueJS (NumericLiteral n) = return $ JSNumericLiteral n
   literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
+  literalToValueJS (CharLiteral c) = return $ JSStringLiteral [c]
   literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral b
   literalToValueJS (ArrayLiteral xs) = JSArrayLiteral <$> mapM exprToJS xs
   literalToValueJS (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM exprToJS) ps
@@ -260,3 +273,9 @@ moduleToJs (Module coms mn imps exps foreigns decls) = do
   qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = JSVar . runIdent $ f a
   qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (JSVar (moduleNameToJs mn'))
   qualifiedToJS f (Qualified _ a) = JSVar $ identToJs (f a)
+
+  foreignIdent :: Ident -> JS
+  foreignIdent ident = accessorString (runIdent ident) (JSVar "$foreign")
+
+mainCall :: ModuleName -> String -> JS
+mainCall mmi ns = JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar ns))) []
