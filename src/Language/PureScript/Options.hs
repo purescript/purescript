@@ -27,7 +27,7 @@ data Mode = Compile | Make
 --
 data ModeOptions mode where
   CompileOptions :: String -> [String] -> [String] -> ModeOptions Compile
-  MakeOptions :: ModeOptions Make
+  MakeOptions :: Maybe FilePath -> ModeOptions Make
 
 browserNamespace :: ModeOptions Compile -> String
 browserNamespace (CompileOptions ns _ _) = ns
@@ -37,6 +37,9 @@ entryPointModules (CompileOptions _ ms _) = ms
 
 codeGenModules :: ModeOptions Compile -> [String]
 codeGenModules (CompileOptions _ _ ms) = ms
+
+requirePath :: ModeOptions Make -> Maybe FilePath
+requirePath (MakeOptions mp) = mp
 
 deriving instance Show (ModeOptions mode)
 
@@ -85,4 +88,4 @@ defaultCompileOptions = Options False False Nothing False False False (CompileOp
 -- Default make options
 --
 defaultMakeOptions :: Options Make
-defaultMakeOptions = Options False False Nothing False False False MakeOptions
+defaultMakeOptions = Options False False Nothing False False False (MakeOptions Nothing)

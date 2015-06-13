@@ -44,6 +44,8 @@ import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
+import System.FilePath.Posix ((</>))
+
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
@@ -66,7 +68,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps
                              ++ map (runIdent &&& foreignIdent) foreignExps
   return $ case additional of
-    MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
+    MakeOptions _ -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
     CompileOptions ns _ _ | not isModuleEmpty ->
       [ JSVariableIntroduction ns
                                (Just (JSBinary Or (JSVar ns) (JSObjectLiteral [])) )
@@ -84,7 +86,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   importToJs mn' = do
     additional <- asks optionsAdditional
     let moduleBody = case additional of
-          MakeOptions -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn')]
+          MakeOptions path -> JSApp (JSVar "require") [JSStringLiteral (maybe id (</>) path $ runModuleName mn')]
           CompileOptions ns _ _ -> JSAccessor (moduleNameToJs mn') (JSVar ns)
     return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
 
