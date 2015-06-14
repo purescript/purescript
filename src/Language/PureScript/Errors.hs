@@ -107,6 +107,7 @@ data SimpleErrorMessage
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
+  | ExtraneousClassMember Ident
   | ExpectedType Kind
   | IncorrectConstructorArity (Qualified ProperName)
   | SubsumptionCheckFailed
@@ -215,6 +216,7 @@ errorCode em = case unwrapErrorMessage em of
   (ArgListLengthsDiffer _)      -> "ArgListLengthsDiffer"
   (OverlappingArgNames _)       -> "OverlappingArgNames"
   (MissingClassMember _)        -> "MissingClassMember"
+  (ExtraneousClassMember _)     -> "ExtraneousClassMember"
   (ExpectedType _)              -> "ExpectedType"
   (IncorrectConstructorArity _) -> "IncorrectConstructorArity"
   SubsumptionCheckFailed        -> "SubsumptionCheckFailed"
@@ -513,6 +515,8 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
       line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
     goSimple (MissingClassMember ident) =
       line $ "Member " ++ show ident ++ " has not been implemented"
+    goSimple (ExtraneousClassMember ident) =
+      line $ "Member " ++ show ident ++ " is not a member of the class being instantiated"
     goSimple (ExpectedType kind) =
       line $ "Expected type of kind *, was " ++ prettyPrintKind kind
     goSimple (IncorrectConstructorArity nm) =
