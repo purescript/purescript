@@ -105,6 +105,12 @@ outputDirectory = strOption $
   <> showDefault
   <> help "The output directory"
 
+requirePath :: Parser (Maybe FilePath)
+requirePath = optional $ strOption $
+     short 'r'
+  <> long "require-path"
+  <> help "The path prefix to use for require() calls in the generated JavaScript"
+
 noTco :: Parser Bool
 noTco = switch $
      long "no-tco"
@@ -113,18 +119,18 @@ noTco = switch $
 noMagicDo :: Parser Bool
 noMagicDo = switch $
      long "no-magic-do"
-  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
+  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad"
 
 noOpts :: Parser Bool
 noOpts = switch $
      long "no-opts"
-  <> help "Skip the optimization phase."
+  <> help "Skip the optimization phase"
 
 comments :: Parser Bool
 comments = switch $
      short 'c'
   <> long "comments"
-  <> help "Include comments in the generated code."
+  <> help "Include comments in the generated code"
 
 verboseErrors :: Parser Bool
 verboseErrors = switch $
@@ -146,7 +152,10 @@ options = P.Options <$> noTco
                     <*> noOpts
                     <*> verboseErrors
                     <*> (not <$> comments)
-                    <*> pure P.MakeOptions
+                    <*> additionalOptions
+  where
+  additionalOptions =
+    P.MakeOptions <$> requirePath
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

@@ -43,7 +43,7 @@ import qualified Language.PureScript.CoreFn as CF
 import IO (mkdirp)
 
 options :: P.Options P.Make
-options = P.Options False False Nothing False False False P.MakeOptions
+options = P.Options False False Nothing False False False (P.MakeOptions Nothing)
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
