@@ -152,9 +152,14 @@ renderDeclaration (P.DataDeclaration dtype name args ctors) title =
   children = map renderCtor ctors
   -- TODO: Comments for data constructors?
   renderCtor (ctor', tys) =
-          let typeApp' = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing ctor')) tys
-              childCode = renderType typeApp'
-          in  RenderedChildDeclaration (show ctor') Nothing childCode Nothing ChildDataConstructor
+    RenderedChildDeclaration (show ctor') Nothing Nothing (ChildDataConstructor ctorSignature ctorCode)
+    where
+    ctor'' = P.TypeConstructor (P.Qualified Nothing ctor')
+    typeApp' = foldl P.TypeApp ctor'' tys
+    ctorSignature = renderType typeApp'
+    -- TODO: add forall for all free type variables
+    ctorCode = ident (show ctor') <> sp <> syntax "::" <> sp <> renderType ctorType
+    ctorType = P.quantify $ foldr (\a b -> P.TypeApp (P.TypeApp P.tyFunction a) b) typeApp tys
 renderDeclaration (P.ExternDataDeclaration name kind') title =
   basicDeclaration title code
   where
@@ -196,16 +201,16 @@ renderDeclaration (P.TypeClassDeclaration name args implies ds) title = do
 
   children = map renderClassMember ds
 
-  -- TODO: Comments for type class members
+  -- TODO: Comments for type class members?
   renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
   renderClassMember (P.TypeDeclaration ident' ty) =
-    let childCode =
-          mintersperse sp
-            [ ident (show ident')
-            , syntax "::"
-            , renderType ty
-            ]
-    in  RenderedChildDeclaration (show ident') Nothing childCode Nothing ChildTypeClassMember
+    RenderedChildDeclaration (show ident') Nothing Nothing (ChildTypeClassMember contextualType actualType)
+    where
+    begin               = ident (show ident') <> sp <> syntax "::" <> sp
+    contextualType      = begin <> renderType ty
+    actualType          = begin <> renderType (addConstraint classConstraint ty)
+    classConstraint     = (P.Qualified Nothing name, map toTypeVar args)
+    addConstraint c ty' = P.moveQuantifiersToFront (P.quantify (P.ConstrainedType [c] ty'))
   renderClassMember _ = error "Invalid argument to renderClassMember."
 renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) title = do
   Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
@@ -218,7 +223,7 @@ renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) t
   extractProperNames (P.SaturatedTypeSynonym n _) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = RenderedChildDeclaration title Nothing code Nothing ChildInstance
+  childDecl = RenderedChildDeclaration title Nothing Nothing (ChildInstance code)
 
   code =
     mintersperse sp $

@@ -12,7 +12,6 @@ module Language.PureScript.Docs.Types
 import Control.Arrow (first, (***))
 import Control.Applicative ((<$>), (<*>))
 import Data.Functor ((<$))
-import Data.Char
 import Data.Maybe (mapMaybe)
 import Data.Version
 import Data.Aeson ((.=))
@@ -87,27 +86,32 @@ data RenderedDeclaration = RenderedDeclaration
 data RenderedChildDeclaration = RenderedChildDeclaration
   { rcdTitle      :: String
   , rcdComments   :: Maybe String
-  , rcdCode       :: RenderedCode
   , rcdSourceSpan :: Maybe P.SourceSpan
-  , rcdType       :: RenderedChildDeclarationType
+  , rcdInfo       :: RenderedChildDeclarationInfo
   }
   deriving (Show, Eq, Ord)
 
-data RenderedChildDeclarationType
-  = ChildInstance
-  | ChildDataConstructor
-  | ChildTypeClassMember
-  deriving (Show, Eq, Ord, Bounded, Enum)
+data RenderedChildDeclarationInfo
+  = ChildInstance RenderedCode
+    -- ^ A type instance declaration. The rendered code value looks like
+    -- `instance showUnit :: Show Unit`
+  | ChildDataConstructor RenderedCode RenderedCode
+    -- ^ A data constructor, with rendered code for both how it appears in the
+    -- data declaration, and the constructor with its actual type. For example,
+    -- the constructor `Just` from the type `Maybe` might have the rendered
+    -- code values being `Just a` and `Just :: forall a. a -> Maybe a`.
+  | ChildTypeClassMember RenderedCode RenderedCode
+    -- ^ A type class member, with rendered code for its type in the context of
+    -- the parent type class declaration (that is, without a constraint), and
+    -- also for its actual type.  For example, `add` from `Semiring` might have
+    -- the rendered code values as `add :: a -> a -> a` and
+    -- `add :: forall a. (Semiring a) => a -> a -> a` respectively.
+  deriving (Show, Eq, Ord)
 
-childDeclTypeToString :: RenderedChildDeclarationType -> String
-childDeclTypeToString = withHead toLower . drop 5 . show
-  where
-  withHead f (x:xs) = f x : xs
-  withHead _ [] = []
-
-childDeclarationTypes :: [(String, RenderedChildDeclarationType)]
-childDeclarationTypes =
-  map (\t -> (childDeclTypeToString t, t)) [minBound .. maxBound]
+childDeclTypeToString :: RenderedChildDeclarationInfo -> String
+childDeclTypeToString (ChildInstance _)          = "instance"
+childDeclTypeToString (ChildDataConstructor _ _) = "dataConstructor"
+childDeclTypeToString (ChildTypeClassMember _ _) = "typeClassMember"
 
 newtype GithubUser
   = GithubUser { runGithubUser :: String }
@@ -120,7 +124,7 @@ newtype GithubRepo
 data PackageError
   = ErrorInPackageMeta BowerError
   | InvalidVersion
-  | InvalidDeclarationType
+  | InvalidChildDeclarationType String
   | InvalidRenderedCode String
   | InvalidFixity
   deriving (Show, Eq, Ord)
@@ -232,16 +236,23 @@ asRenderedChildDeclaration :: Parse PackageError RenderedChildDeclaration
 asRenderedChildDeclaration =
   RenderedChildDeclaration <$> key "title" asString
                            <*> key "comments" (perhaps asString)
-                           <*> key "code" asRenderedCode .! InvalidRenderedCode
                            <*> key "sourceSpan" (perhaps asSourceSpan)
-                           <*> key "type" asRenderedChildDeclarationType .!! InvalidDeclarationType
-  where
-  p .!! err = p .! const err
+                           <*> key "info" asRenderedChildDeclarationInfo
 
-asRenderedChildDeclarationType :: Parse PackageError RenderedChildDeclarationType
-asRenderedChildDeclarationType =
-  withString (maybe (Left InvalidDeclarationType) Right .
-                flip lookup childDeclarationTypes)
+asRenderedChildDeclarationInfo :: Parse PackageError RenderedChildDeclarationInfo
+asRenderedChildDeclarationInfo = do
+  ty <- key "declType" asString
+  case ty of
+    "instance" ->
+      ChildInstance <$> codeKey "code"
+    "dataConstructor" ->
+      ChildDataConstructor <$> codeKey "signature" <*> codeKey "type"
+    "typeClassMember" ->
+      ChildTypeClassMember <$> codeKey "contextualType" <*> codeKey "type"
+    other ->
+      throwCustomError $ InvalidChildDeclarationType other
+  where
+  codeKey k = key k asRenderedCode .! InvalidRenderedCode
 
 asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
@@ -317,13 +328,17 @@ instance A.ToJSON RenderedChildDeclaration where
   toJSON RenderedChildDeclaration{..} =
     A.object [ "title"      .= rcdTitle
              , "comments"   .= rcdComments
-             , "code"       .= rcdCode
              , "sourceSpan" .= rcdSourceSpan
-             , "type"       .= rcdType
+             , "info"       .= rcdInfo
              ]
 
-instance A.ToJSON RenderedChildDeclarationType where
-  toJSON = A.toJSON . childDeclTypeToString
+instance A.ToJSON RenderedChildDeclarationInfo where
+  toJSON info = A.object $ "declType" .= childDeclTypeToString info : props
+    where
+    props = case info of
+      ChildInstance code -> ["code" .= code]
+      ChildDataConstructor sig ty -> ["signature" .= sig, "type" .= ty]
+      ChildTypeClassMember cTy ty -> ["contextualType" .= cTy, "type" .= ty]
 
 instance A.ToJSON GithubUser where
   toJSON = A.toJSON . runGithubUser
