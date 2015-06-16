@@ -48,8 +48,11 @@ newtype Work = Work Integer deriving (Show, Eq, Ord, Num)
 -- return a type class dictionary reference.
 --
 entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary dictsInScope)
+entails env moduleName context = solve
   where
+    byClassName :: M.Map (Qualified ProperName) [TypeClassDictionaryInScope]
+    byClassName = M.fromListWith (++) $ (\tcd -> (tcdClassName tcd, [tcd])) <$> sortedNubBy canonicalizeDictionary dictsInScope
+
     sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
     sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
 
@@ -59,8 +62,8 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary dicts
     findDicts :: Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts = fromMaybe [] . flip M.lookup context
 
-    solve :: [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-    solve context' (className, tys) trySuperclasses = do
+    solve :: Constraint -> Bool -> Check Expr
+    solve (className, tys) trySuperclasses = do
       let dicts = flip evalStateT (Work 0) $ go trySuperclasses className tys
       checkOverlaps dicts
       where
@@ -73,9 +76,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary dicts
         where
         directInstances :: StateT Work [] DictionaryValue
         directInstances = do
-          tcd <- lift context'
-          -- Make sure the type class name matches the one we are trying to satisfy
-          guard $ className' == tcdClassName tcd
+          tcd <- lift . fromMaybe [] $ M.lookup className' byClassName
           -- Make sure the type unifies with the type in the type instance definition
           subst <- lift . maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
           -- Solve any necessary subgoals
