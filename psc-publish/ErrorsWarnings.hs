@@ -1,10 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module ErrorsWarnings where
 
+import Control.Applicative ((<$>))
 import Data.Aeson.BetterErrors
 import Data.Version
 import Data.Maybe
+import Data.Monoid
+import Data.Foldable (foldMap)
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -31,6 +35,7 @@ data PackageError
 data PackageWarning
   = ResolutionNotVersion PackageName
   | UndeclaredDependency PackageName
+  | UnacceptableVersion (PackageName, String)
   deriving (Show)
 
 -- | An error that should be fixed by the user.
@@ -247,32 +252,39 @@ displayOtherError e = case e of
     successivelyIndented
       [ "An IO exception occurred:", show exc ]
 
-renderWarnings :: [PackageWarning] -> Box
-renderWarnings =
-  collectWarnings
-    [ (getResolutionNotVersion, warnResolutionNotVersions)
-    , (getUndeclaredDependency, warnUndeclaredDependencies)
-    ]
+data CollectedWarnings = CollectedWarnings
+  { resolutionNotVersions  :: [PackageName]
+  , undeclaredDependencies :: [PackageName]
+  , unacceptableVersions   :: [(PackageName, String)]
+  }
+  deriving (Show, Eq, Ord)
+
+instance Monoid CollectedWarnings where
+  mempty = CollectedWarnings mempty mempty mempty
+  mappend (CollectedWarnings as bs cs) (CollectedWarnings as' bs' cs') =
+    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs')
+
+collectWarnings :: [PackageWarning] -> CollectedWarnings
+collectWarnings = foldMap singular
   where
-  collectWarnings patterns warns =
-    let boxes = mapMaybe (collectWarnings' warns) patterns
-        result = vcat
-                    [ para "Warnings:"
-                    , indented (vcat (intersperse spacer boxes))
-                    ]
-    in if null boxes then nullBox else result
+  singular w = case w of
+    ResolutionNotVersion pn -> CollectedWarnings [pn] [] []
+    UndeclaredDependency pn -> CollectedWarnings [] [pn] []
+    UnacceptableVersion t   -> CollectedWarnings [] [] [t]
 
-  getResolutionNotVersion (ResolutionNotVersion n) = Just n
-  getResolutionNotVersion _ = Nothing
-
-  getUndeclaredDependency (UndeclaredDependency n) = Just n
-  getUndeclaredDependency _ = Nothing
-
-collectWarnings' :: [PackageWarning] -> ((PackageWarning -> Maybe a), (NonEmpty a -> Box)) -> Maybe Box
-collectWarnings' warns (pattern, render) =
-  case mapMaybe pattern warns of
-    []     -> Nothing
-    (x:xs) -> Just (render (x :| xs))
+renderWarnings :: [PackageWarning] -> Box
+renderWarnings warns =
+  let CollectedWarnings{..} = collectWarnings warns
+      go toBox warns' = toBox <$> NonEmpty.nonEmpty warns'
+      mboxes = [ go warnResolutionNotVersions  resolutionNotVersions
+               , go warnUndeclaredDependencies undeclaredDependencies
+               , go warnUnacceptableVersions   unacceptableVersions
+               ]
+  in case catMaybes mboxes of
+       []    -> nullBox
+       boxes -> vcat [ para "Warnings:"
+                     , indented (vcat (intersperse spacer boxes))
+                     ]
 
 warnResolutionNotVersions :: NonEmpty PackageName -> Box
 warnResolutionNotVersions pkgNames =
@@ -313,6 +325,35 @@ warnUndeclaredDependencies pkgNames =
       ])
     ] ++
       bulletedList runPackageName (NonEmpty.toList pkgNames)
+
+warnUnacceptableVersions :: NonEmpty (PackageName, String) -> Box
+warnUnacceptableVersions pkgs =
+  let singular = NonEmpty.length pkgs == 1
+      pl a b = if singular then b else a
+
+      packages'  = pl "packages'" "package's"
+      packages   = pl "packages" "package"
+      anyOfThese = pl "any of these" "this"
+      these      = pl "these" "this"
+      versions   = pl "versions" "version"
+  in vcat $
+    [ para (concat
+      [ "The following installed Bower ", packages', " ", versions, " could "
+      , "not be parsed:"
+      ])
+    ] ++
+      bulletedList showTuple (NonEmpty.toList pkgs)
+      ++
+    [ spacer
+    , para (concat
+      ["Links to types in ", anyOfThese, " ", packages, " will not work. In "
+      , "order to make links work, edit your bower.json to specify an "
+      , "acceptable version or version range for ", these, " ", packages, ", "
+      , "and rerun `bower install`."
+      ])
+    ]
+  where
+  showTuple (pkgName, tag) = runPackageName pkgName ++ "#" ++ tag
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

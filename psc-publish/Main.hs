@@ -236,7 +236,7 @@ handleDeps deps = do
       userError (MissingDependencies (x :| xs))
     [] -> do
       mapM_ (warn . ResolutionNotVersion . fst) notVersion
-      let withVersions = mapMaybe tryExtractVersion installed
+      withVersions <- catMaybes <$> mapM tryExtractVersion' installed
       filterM (liftIO . isPureScript . bowerDir . fst) withVersions
 
   where
@@ -248,6 +248,12 @@ handleDeps deps = do
       ResolvedVersion v -> (ms, os, (pkgName, v) : is)
 
   bowerDir pkgName = "bower_components/" ++ runPackageName pkgName
+
+  -- Try to extract a version, and warn if unsuccessful.
+  tryExtractVersion' pair =
+    maybe (warn (UnacceptableVersion pair) >> return Nothing)
+          (return . Just)
+          (tryExtractVersion pair)
 
 tryExtractVersion :: (PackageName, String) -> Maybe (PackageName, Version)
 tryExtractVersion (pkgName, tag) =
