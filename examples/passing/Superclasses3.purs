@@ -31,7 +31,7 @@ instance applicativeMTrace :: Applicative MTrace where
   pure = MTrace <<< return
 
 instance bindMTrace :: Bind MTrace where
-  (>>=) m f = MTrace (runMTrace m >>= (runMTrace <<< f))
+  bind m f = MTrace (runMTrace m >>= (runMTrace <<< f))
 
 instance monadMTrace :: Monad MTrace
 

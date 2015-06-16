@@ -17,7 +17,7 @@ module Prelude
   , Functor, (<$>), (<#>), void
   , Apply, (<*>)
   , Applicative, pure, liftA1
-  , Bind, (>>=)
+  , Bind, bind, (>>=)
   , Monad, return, liftM1, ap
   , Semigroup, (<>), (++)
   , Semiring, (+), zero, (*), one
@@ -127,12 +127,15 @@ module Prelude
   liftA1 f a = pure f <*> a
 
   infixl 1 >>=
+ 
+  (>>=) :: forall m a b. (Bind m) => m a -> (a -> m b) -> m b
+  (>>=) = bind
 
   class (Apply m) <= Bind m where
-    (>>=) :: forall a b. m a -> (a -> m b) -> m b
+    bind :: forall a b. m a -> (a -> m b) -> m b
 
   instance bindArr :: Bind ((->) r) where
-    (>>=) m f x = f (m x) x
+    bind m f x = f (m x) x
 
   class (Applicative m, Bind m) <= Monad m
 
@@ -585,7 +588,7 @@ module Control.Monad.Eff
     pure = returnE
 
   instance bindEff :: Bind (Eff e) where
-    (>>=) = bindE
+    bind = bindE
 
   instance monadEff :: Monad (Eff e)
 
