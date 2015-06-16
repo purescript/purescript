@@ -71,6 +71,9 @@ module Language.PureScript.Constants where
 (||) :: String
 (||) = "||"
 
+bind :: String
+bind = "bind"
+
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
