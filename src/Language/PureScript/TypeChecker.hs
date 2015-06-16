@@ -88,10 +88,9 @@ addTypeClass moduleName pn args implies ds =
   toPair (PositionedDeclaration _ _ d) = toPair d
   toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
-addTypeClassDictionaries :: [TypeClassDictionaryInScope] -> Check ()
-addTypeClassDictionaries entries =
-  let mentries = M.fromListWith (M.union) [ (mn, M.singleton (canonicalizeDictionary entry) entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ } <- entries ]
-  in modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
+addTypeClassDictionaries :: Maybe ModuleName -> M.Map (Qualified Ident) TypeClassDictionaryInScope -> Check ()
+addTypeClassDictionaries mn entries =
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.insertWith M.union mn entries (typeClassDictionaries . checkEnv $ st) } }
 
 checkDuplicateTypeArguments :: [String] -> Check ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
@@ -224,11 +223,7 @@ typeCheckAll mainModuleName moduleName exps = go
     return $ d : ds
   go (d@(ImportDeclaration importedModule _ _) : rest) = do
     instances <- lookupTypeClassDictionaries $ Just importedModule
-    addTypeClassDictionaries [ tcd { tcdName = Qualified (Just moduleName) ident, tcdType = TCDAlias (canonicalizeDictionary tcd) }
-                             | tcd <- instances
-                             , tcdExported tcd
-                             , let (Qualified _ ident) = tcdName tcd
-                             ]
+    addTypeClassDictionaries (Just moduleName) instances
     ds <- go rest
     return $ d : ds
   go (d@(TypeClassDeclaration pn args implies tys) : rest) = do
@@ -247,7 +242,8 @@ typeCheckAll mainModuleName moduleName exps = go
   goInstance d dictName deps className tys rest = do
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
-    addTypeClassDictionaries [TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported]
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported
+    addTypeClassDictionaries (Just moduleName) $ M.singleton (canonicalizeDictionary dict) dict
     ds <- go rest
     return $ d : ds
 

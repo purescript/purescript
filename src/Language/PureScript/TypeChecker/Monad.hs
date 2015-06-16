@@ -84,8 +84,8 @@ getTypeClassDictionaries = fmap M.elems . typeClassDictionaries . checkEnv <$> g
 -- |
 -- Lookup type class dictionaries in a module.
 --
-lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m [TypeClassDictionaryInScope]
-lookupTypeClassDictionaries mn = maybe [] M.elems . M.lookup mn . typeClassDictionaries . checkEnv <$> get
+lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Temporarily bind a collection of names to local variables
