@@ -157,7 +157,6 @@ renderDeclaration (P.DataDeclaration dtype name args ctors) title =
     ctor'' = P.TypeConstructor (P.Qualified Nothing ctor')
     typeApp' = foldl P.TypeApp ctor'' tys
     ctorSignature = renderType typeApp'
-    -- TODO: add forall for all free type variables
     ctorCode = ident (show ctor') <> sp <> syntax "::" <> sp <> renderType ctorType
     ctorType = P.quantify $ foldr (\a b -> P.TypeApp (P.TypeApp P.tyFunction a) b) typeApp tys
 renderDeclaration (P.ExternDataDeclaration name kind') title =
