@@ -49,7 +49,7 @@ data Environment = Environment {
   -- |
   -- Available type class dictionaries
   --
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -- |
   -- Type classes
   --
