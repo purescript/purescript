@@ -150,7 +150,6 @@ renderDeclaration (P.DataDeclaration dtype name args ctors) title =
   typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
   code = keyword (show dtype) <> sp <> renderType typeApp
   children = map renderCtor ctors
-  -- TODO: Comments for data constructors?
   renderCtor (ctor', tys) =
     RenderedChildDeclaration (show ctor') Nothing Nothing (ChildDataConstructor ctorSignature ctorCode)
     where
@@ -200,7 +199,6 @@ renderDeclaration (P.TypeClassDeclaration name args implies ds) title = do
 
   children = map renderClassMember ds
 
-  -- TODO: Comments for type class members?
   renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
   renderClassMember (P.TypeDeclaration ident' ty) =
     RenderedChildDeclaration (show ident') Nothing Nothing (ChildTypeClassMember contextualType actualType)
