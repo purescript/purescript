@@ -42,7 +42,7 @@ library
                    aeson >= 0.8 && < 0.9,
                    vector -any,
                    bower-json >= 0.7,
-                   aeson-better-errors >= 0.7,
+                   aeson-better-errors >= 0.8,
                    bytestring -any,
                    text -any,
                    split -any

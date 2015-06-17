@@ -38,7 +38,7 @@ declAsMarkdown RenderedDeclaration{..} = do
   headerLevel 4 (ticks rdTitle)
   spacer
 
-  let (instances, children) = partition ((==) ChildInstance . rcdType) rdChildren
+  let (instances, children) = partition (isChildInstance . rcdInfo) rdChildren
   fencedBlock $ do
     tell' (codeToString rdCode)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
@@ -52,6 +52,10 @@ declAsMarkdown RenderedDeclaration{..} = do
     headerLevel 5 "Instances"
     fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
     spacer
+
+  where
+  isChildInstance (ChildInstance _) = True
+  isChildInstance _ = False
 
 codeToString :: RenderedCode -> String
 codeToString = outputWith elemAsMarkdown
@@ -79,14 +83,14 @@ fixityAsMarkdown (P.Fixity associativity precedence) =
 
 childToString :: First -> RenderedChildDeclaration -> String
 childToString f RenderedChildDeclaration{..} =
-  case rcdType of
-    ChildDataConstructor ->
+  case rcdInfo of
+    ChildDataConstructor sig _ ->
       let c = if f == First then "=" else "|"
-      in  "  " ++ c ++ " " ++ codeToString rcdCode
-    ChildTypeClassMember ->
-      "  " ++ codeToString rcdCode
-    ChildInstance ->
-      codeToString rcdCode
+      in  "  " ++ c ++ " " ++ codeToString sig
+    ChildTypeClassMember ty _ ->
+      "  " ++ codeToString ty
+    ChildInstance code ->
+      codeToString code
 
 data First
   = First
