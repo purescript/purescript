@@ -69,8 +69,8 @@ withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified 
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromListWith (M.union) [ (mn, M.singleton (canonicalizeDictionary entry) entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
+  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (canonicalizeDictionary entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
@@ -78,13 +78,13 @@ withTypeClassDictionaries entries action = do
 -- |
 -- Get the currently available map of type class dictionaries
 --
-getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m (M.Map (Maybe ModuleName) [TypeClassDictionaryInScope])
-getTypeClassDictionaries = fmap M.elems . typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Lookup type class dictionaries in a module.
 --
-lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- |

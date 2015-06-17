@@ -88,9 +88,10 @@ addTypeClass moduleName pn args implies ds =
   toPair (PositionedDeclaration _ _ d) = toPair d
   toPair _ = error "Invalid declaration in TypeClassDeclaration"
 
-addTypeClassDictionaries :: Maybe ModuleName -> M.Map (Qualified Ident) TypeClassDictionaryInScope -> Check ()
+addTypeClassDictionaries :: Maybe ModuleName -> M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope) -> Check ()
 addTypeClassDictionaries mn entries =
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.insertWith M.union mn entries (typeClassDictionaries . checkEnv $ st) } }
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
+  where insertState st = M.insertWith (M.unionWith M.union) mn entries (typeClassDictionaries . checkEnv $ st)
 
 checkDuplicateTypeArguments :: [String] -> Check ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
@@ -243,7 +244,7 @@ typeCheckAll mainModuleName moduleName exps = go
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported
-    addTypeClassDictionaries (Just moduleName) $ M.singleton (canonicalizeDictionary dict) dict
+    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (canonicalizeDictionary dict) dict
     ds <- go rest
     return $ d : ds
 

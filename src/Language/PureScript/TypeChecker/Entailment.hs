@@ -47,20 +47,14 @@ newtype Work = Work Integer deriving (Show, Eq, Ord, Num)
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
+entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Bool -> Check Expr
 entails env moduleName context = solve
   where
-    byClassName :: M.Map (Qualified ProperName) [TypeClassDictionaryInScope]
-    byClassName = M.fromListWith (++) $ (\tcd -> (tcdClassName tcd, [tcd])) <$> sortedNubBy canonicalizeDictionary dictsInScope
+    forClassName :: Qualified ProperName -> [TypeClassDictionaryInScope]
+    forClassName cn = findDicts cn Nothing ++ findDicts cn (Just moduleName)
 
-    sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
-    sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
-
-    dictsInScope :: [TypeClassDictionaryInScope]
-    dictsInScope = findDicts Nothing ++ findDicts (Just moduleName)
-
-    findDicts :: Maybe ModuleName -> [TypeClassDictionaryInScope]
-    findDicts = fromMaybe [] . flip M.lookup context
+    findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
+    findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
     solve :: Constraint -> Bool -> Check Expr
     solve (className, tys) trySuperclasses = do
@@ -76,7 +70,7 @@ entails env moduleName context = solve
         where
         directInstances :: StateT Work [] DictionaryValue
         directInstances = do
-          tcd <- lift . fromMaybe [] $ M.lookup className' byClassName
+          tcd <- lift $ forClassName className'
           -- Make sure the type unifies with the type in the type instance definition
           subst <- lift . maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
           -- Solve any necessary subgoals
