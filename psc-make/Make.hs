@@ -74,7 +74,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp :: P.ModuleName -> Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
     let path = fromMaybe (error "Module has no filename in 'make'") $ M.lookup mn filePathMap
-    traverseEither getTimestamp path
+    e1 <- traverseEither getTimestamp path
+    fPath <- maybe (return Nothing) (getTimestamp . fst) $ M.lookup mn foreigns
+    return $ fmap (max fPath) e1
 
   getOutputTimestamp :: P.ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
