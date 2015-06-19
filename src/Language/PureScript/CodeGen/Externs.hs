@@ -38,10 +38,21 @@ import Language.PureScript.Types
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
 moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
-  tell [ "module " ++ runModuleName moduleName ++ " where"]
+  tell [ "module " ++ runModuleName moduleName ++ " (" ++ listExports exts ++ ") where"]
   mapM_ declToPs ds
   mapM_ exportToPs exts
   where
+
+    listExports :: [DeclarationRef] -> String
+    listExports = intercalate ", " . mapMaybe listExport
+
+    listExport :: DeclarationRef -> Maybe String
+    listExport (PositionedDeclarationRef _ _ d) = listExport d
+    listExport (TypeRef name Nothing) = Just $ show name ++ "()"
+    listExport (TypeRef name (Just dctors)) = Just $ show name ++ "(" ++ intercalate ", " (map show dctors) ++ ")"
+    listExport (ValueRef name) = Just $ show name
+    listExport (TypeClassRef name) = Just $ show name
+    listExport _ = Nothing
 
     declToPs :: Declaration -> Writer [String] ()
     declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
