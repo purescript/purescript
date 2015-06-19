@@ -22,7 +22,7 @@ instance applicativeState :: Applicative (State s) where
   pure a = State $ \s -> Tuple s a
 
 instance bindState :: Bind (State s) where
-  (>>=) f g = State $ \s -> case runState s f of
+  bind f g = State $ \s -> case runState s f of
                               Tuple s1 a -> runState s1 (g a)
 
 instance monadState :: Monad (State s)

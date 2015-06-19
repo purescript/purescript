@@ -31,7 +31,7 @@ instance applicativeData :: Applicative Data where
   pure = Data
 
 instance bindData :: Bind Data where
-  (>>=) (Data a) f = f a
+  bind (Data a) f = f a
 
 instance monadData :: Monad Data
 
@@ -47,8 +47,8 @@ instance applicativeMaybe :: Applicative Maybe where
   pure = Just
 
 instance bindMaybe :: Bind Maybe where
-  (>>=) Nothing _ = Nothing
-  (>>=) (Just a) f = f a
+  bind Nothing _ = Nothing
+  bind (Just a) f = f a
 
 instance monadMaybe :: Monad Maybe
 

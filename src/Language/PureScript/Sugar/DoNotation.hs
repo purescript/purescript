@@ -10,7 +10,7 @@
 --
 -- |
 -- This module implements the desugaring pass which replaces do-notation statements with
--- appropriate calls to (>>=) from the Prelude.Monad type class.
+-- appropriate calls to bind from the Prelude.Monad type class.
 --
 -----------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 -- |
--- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.(>>=) function,
+-- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.bind function,
 -- and all @DoNotationLet@ constructors with let expressions.
 --
 desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
@@ -45,7 +45,7 @@ desugarDo d =
   in f d
   where
   bind :: Expr
-  bind = Var (Qualified Nothing (Op (C.>>=)))
+  bind = Var (Qualified Nothing (Ident (C.bind)))
 
   replace :: Expr -> m Expr
   replace (Do els) = go els
