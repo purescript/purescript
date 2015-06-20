@@ -61,6 +61,10 @@ data DeclarationRef
   --
   | TypeInstanceRef Ident
   -- |
+  -- A module, in its entirety
+  --
+  | ModuleRef ModuleName
+  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
@@ -71,6 +75,7 @@ instance Eq DeclarationRef where
   (ValueRef name)        == (ValueRef name')        = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
+  (ModuleRef name) == (ModuleRef name') = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False

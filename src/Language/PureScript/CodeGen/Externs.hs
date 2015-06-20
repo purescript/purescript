@@ -38,7 +38,8 @@ import Language.PureScript.Types
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
 moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
-  tell [ "module " ++ runModuleName moduleName ++ " (" ++ listExports exts ++ ") where"]
+  let exps = listExports exts
+  tell ["module " ++ runModuleName moduleName ++ (if null exps then "" else " (" ++ exps ++ ")") ++ " where"]
   mapM_ declToPs ds
   mapM_ exportToPs exts
   where
@@ -52,6 +53,7 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
     listExport (TypeRef name (Just dctors)) = Just $ show name ++ "(" ++ intercalate ", " (map show dctors) ++ ")"
     listExport (ValueRef name) = Just $ show name
     listExport (TypeClassRef name) = Just $ show name
+    listExport (ModuleRef name) = Just $ "module " ++ show name
     listExport _ = Nothing
 
     declToPs :: Declaration -> Writer [String] ()
@@ -123,6 +125,8 @@ moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWri
                               [] -> ""
                               cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "
       tell ["foreign import instance " ++ show ident ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)]
+
+    exportToPs (ModuleRef _) = return ()
 
     toTypeVar :: (String, Maybe Kind) -> Type
     toTypeVar (s, Nothing) = TypeVar s
