@@ -71,7 +71,7 @@ literals = mkPattern' match
     ]
   match (Var ident) = return $ show ident
   match (Do els) = concat <$> sequence
-    [ return "do "
+    [ return "do\n"
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
@@ -99,7 +99,10 @@ prettyPrintCaseAlternative (CaseAlternative binders result) =
     , prettyPrintResult result
     ]
   where
-  prettyPrintResult (Left gs) = concat <$> mapM prettyPrintGuardedValue gs
+  prettyPrintResult (Left gs) = concat <$> sequence
+      [ return "\n"
+      , withIndent $ prettyPrintMany prettyPrintGuardedValue gs
+      ]
   prettyPrintResult (Right v) = (" -> " ++) <$> prettyPrintValue' v
 
   prettyPrintGuardedValue (grd, val) =
@@ -108,7 +111,6 @@ prettyPrintCaseAlternative (CaseAlternative binders result) =
       , prettyPrintValue' grd
       , return " -> "
       , prettyPrintValue' val
-      , return "\n"
       ]
 
 prettyPrintDoNotationElement :: DoNotationElement -> StateT PrinterState Maybe String
