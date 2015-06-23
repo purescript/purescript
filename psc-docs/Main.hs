@@ -34,6 +34,7 @@ import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
+import System.FilePath.Glob (glob)
 
 import Etags
 import Ctags
@@ -61,7 +62,8 @@ data PSCDocsOptions = PSCDocsOptions
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt input output) =
+docgen (PSCDocsOptions fmt inputGlob output) = do
+  input <- concat <$> mapM glob inputGlob
   case fmt of
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags

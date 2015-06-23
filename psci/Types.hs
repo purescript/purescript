@@ -89,6 +89,12 @@ updateLets :: [P.Declaration] -> PSCiState -> PSCiState
 updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 
 -- |
+-- Updates the state to have more let bindings.
+--
+updateForeignFiles :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> PSCiState -> PSCiState
+updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `M.union` fs }
+
+-- |
 -- Valid Meta-commands for PSCI
 --
 data Command
@@ -112,6 +118,10 @@ data Command
   -- Load a file for use with importing
   --
   | LoadFile FilePath
+  -- |
+  -- Load a foreign module
+  --
+  | LoadForeign FilePath
   -- |
   -- Exit PSCI
   --
@@ -164,6 +174,7 @@ data Directive
   | Reset
   | Browse
   | Load
+  | Foreign
   | Type
   | Kind
   | Show

@@ -111,10 +111,10 @@ findDeclIdents = concatMap go
 -- |
 -- Renames within each declaration in a module.
 --
-renameInModules :: [Module (Bind Ann) a] -> [Module (Bind Ann) a]
+renameInModules :: [Module (Bind Ann)] -> [Module (Bind Ann)]
 renameInModules = map go
   where
-  go :: Module (Bind Ann) a -> Module (Bind Ann) a
+  go :: Module (Bind Ann) -> Module (Bind Ann)
   go m@(Module _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
   
   renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann

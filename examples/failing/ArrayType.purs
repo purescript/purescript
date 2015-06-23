@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Debug.Trace
 
 bar :: Number -> Number -> Number

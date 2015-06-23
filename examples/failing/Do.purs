@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 test1 = do let x = 1
 
 test2 y = do x <- y

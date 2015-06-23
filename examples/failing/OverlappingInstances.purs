@@ -1,5 +1,7 @@
 module OverlappingInstances where
 
+import Prelude
+
 data A = A
 
 instance showA1 :: Show A where

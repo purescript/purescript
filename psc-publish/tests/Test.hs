@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | To run these tests:
 --
@@ -11,6 +12,7 @@ module Test where
 
 import Control.Monad
 import Control.Applicative
+import Control.Exception
 import System.Process
 import System.Directory
 import qualified Data.ByteString.Lazy as BL
@@ -21,17 +23,17 @@ import Data.Aeson.BetterErrors
 import Main
 import Language.PureScript.Docs
 
-packageName = "purescript-integers"
-packageUrl = "https://github.com/purescript/" ++ packageName
-packageDir = "tmp/" ++ packageName
+pkgName = "purescript-prelude"
+packageUrl = "https://github.com/purescript/" ++ pkgName
+packageDir = "tmp/" ++ pkgName
 
-pushd :: FilePath -> IO a -> IO a
+pushd :: forall a. FilePath -> IO a -> IO a
 pushd dir act = do
   original <- getCurrentDirectory
   setCurrentDirectory dir
-  result <- act
+  result <- try act :: IO (Either IOException a)
   setCurrentDirectory original
-  return result
+  either throwIO return result
 
 clonePackage :: IO ()
 clonePackage = do
@@ -39,8 +41,9 @@ clonePackage = do
   pushd packageDir $ do
     exists <- doesDirectoryExist ".git"
     unless exists $ do
-      putStrLn ("Cloning " ++ packageName ++ " into " ++ packageDir ++ "...")
+      putStrLn ("Cloning " ++ pkgName ++ " into " ++ packageDir ++ "...")
       readProcess "git" ["clone", packageUrl, "."] "" >>= putStr
+      readProcess "git" ["tag", "v999.0.0"] "" >>= putStr
 
 bowerInstall :: IO ()
 bowerInstall = do
@@ -54,7 +57,7 @@ getPackage = do
   pushd packageDir preparePackage
 
 data TestResult
-  = ParseFailed (ParseError UploadedPackageError)
+  = ParseFailed (ParseError PackageError)
   | Mismatch ByteString ByteString -- ^ encoding before, encoding after
   | Pass ByteString
   deriving (Show)

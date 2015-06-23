@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data A = A B
 
 data B = B A

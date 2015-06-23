@@ -1,4 +1,6 @@
 module ArgLengthMismatch where
 
-  f x y = true
-  f = false
+import Prelude
+
+f x y = true
+f = false

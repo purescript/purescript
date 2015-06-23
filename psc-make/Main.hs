@@ -31,6 +31,7 @@ import Options.Applicative as Opts
 
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
+import System.FilePath.Glob (glob)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -46,13 +47,14 @@ data PSCMakeOptions = PSCMakeOptions
   }
 
 data InputOptions = InputOptions
-  { ioNoPrelude   :: Bool
-  , ioInputFiles  :: [FilePath]
+  { ioInputFiles  :: [FilePath]
   }
 
 compile :: PSCMakeOptions -> IO ()
-compile (PSCMakeOptions input inputForeign outputDir opts usePrefix) = do
-  moduleFiles <- readInput (InputOptions (P.optionsNoPrelude opts) input)
+compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
+  input <- concat <$> mapM glob inputGlob
+  moduleFiles <- readInput (InputOptions input)
+  inputForeign <- concat <$> mapM glob inputForeignGlob
   foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do
@@ -103,31 +105,32 @@ outputDirectory = strOption $
   <> showDefault
   <> help "The output directory"
 
+requirePath :: Parser (Maybe FilePath)
+requirePath = optional $ strOption $
+     short 'r'
+  <> long "require-path"
+  <> help "The path prefix to use for require() calls in the generated JavaScript"
+
 noTco :: Parser Bool
 noTco = switch $
      long "no-tco"
   <> help "Disable tail call optimizations"
 
-noPrelude :: Parser Bool
-noPrelude = switch $
-     long "no-prelude"
-  <> help "Omit the automatic Prelude import"
-
 noMagicDo :: Parser Bool
 noMagicDo = switch $
      long "no-magic-do"
-  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad."
+  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad"
 
 noOpts :: Parser Bool
 noOpts = switch $
      long "no-opts"
-  <> help "Skip the optimization phase."
+  <> help "Skip the optimization phase"
 
 comments :: Parser Bool
 comments = switch $
      short 'c'
   <> long "comments"
-  <> help "Include comments in the generated code."
+  <> help "Include comments in the generated code"
 
 verboseErrors :: Parser Bool
 verboseErrors = switch $
@@ -143,14 +146,16 @@ noPrefix = switch $
 
 
 options :: Parser (P.Options P.Make)
-options = P.Options <$> noPrelude
-                    <*> noTco
+options = P.Options <$> noTco
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts
                     <*> verboseErrors
                     <*> (not <$> comments)
-                    <*> pure P.MakeOptions
+                    <*> additionalOptions
+  where
+  additionalOptions =
+    P.MakeOptions <$> requirePath
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

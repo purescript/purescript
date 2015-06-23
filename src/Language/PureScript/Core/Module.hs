@@ -18,7 +18,7 @@ import Language.PureScript.Comments
 import Language.PureScript.Names
 import Language.PureScript.Types
 
-data Module a f = Module
+data Module a = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
   , moduleImports :: [ModuleName]

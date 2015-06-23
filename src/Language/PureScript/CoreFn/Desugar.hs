@@ -36,7 +36,7 @@ import qualified Language.PureScript.AST as A
 -- |
 -- Desugars a module from AST to CoreFn representation.
 --
-moduleToCoreFn :: Environment -> A.Module -> Module (Bind Ann) A.ForeignCode
+moduleToCoreFn :: Environment -> A.Module -> Module (Bind Ann)
 moduleToCoreFn _ (A.Module _ _ _ Nothing) =
   error "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module coms mn decls (Just exps)) =

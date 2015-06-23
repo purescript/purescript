@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 type Foo = (x :: Number | (y :: Number | (z :: Number)))
 type Bar = (x :: Number, y :: Number, z :: Number)
 type Baz = { w :: Number | Bar }

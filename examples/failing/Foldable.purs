@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class Foldable f where
   fold :: forall a b. (a -> b -> b) -> b -> f a -> b
   size :: forall a. f a -> Number

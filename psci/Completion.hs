@@ -70,14 +70,15 @@ completeDirective ws w =
     _     -> []
 
 directiveArg :: String -> Directive -> [CompletionContext]
-directiveArg _ Browse = [CtxModule]
-directiveArg w Load   = [CtxFilePath w]
-directiveArg _ Quit   = []
-directiveArg _ Reset  = []
-directiveArg _ Help   = []
-directiveArg _ Show   = map CtxFixed replQueryStrings
-directiveArg _ Type   = [CtxIdentifier]
-directiveArg _ Kind   = [CtxType]
+directiveArg _ Browse      = [CtxModule]
+directiveArg w Load        = [CtxFilePath w]
+directiveArg w Foreign     = [CtxFilePath w]
+directiveArg _ Quit        = []
+directiveArg _ Reset       = []
+directiveArg _ Help        = []
+directiveArg _ Show        = map CtxFixed replQueryStrings
+directiveArg _ Type        = [CtxIdentifier]
+directiveArg _ Kind        = [CtxType]
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =

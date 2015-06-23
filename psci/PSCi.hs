@@ -43,6 +43,7 @@ import System.Console.Haskeline
 import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
 import System.FilePath (pathSeparator, (</>), isPathSeparator)
+import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 
 import qualified Language.PureScript as P
@@ -71,9 +72,9 @@ supportModule =
   code = unlines
     [ "module S where"
     , ""
-    , "import Console"
-    , ""
+    , "import Prelude"
     , "import Control.Monad.Eff"
+    , "import Control.Monad.Eff.Console"
     , "import Control.Monad.Eff.Unsafe"
     , ""
     , "class Eval a where"
@@ -87,12 +88,6 @@ supportModule =
     ]
 
 -- File helpers
-
--- |
--- Load the necessary modules.
---
-defaultImports :: [ImportedModule]
-defaultImports = [(P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
 
 -- |
 -- Locates the node executable.
@@ -121,7 +116,7 @@ loadModule filename = do
   return $ either (Left . P.prettyPrintMultipleErrors False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
--- Load all modules, including the Prelude
+-- Load all modules.
 --
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(Either P.RebuildPolicy FilePath, P.Module)])
 loadAllModules files = do
@@ -248,7 +243,7 @@ indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> Make P.Environment
 make PSCiState{..} ms =
   let filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-  in P.make (buildMakeActions filePathMap M.empty) (psciLoadedModules ++ ms)
+  in P.make (buildMakeActions filePathMap (M.map snd psciForeignFiles)) (psciLoadedModules ++ ms)
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
@@ -437,22 +432,24 @@ handleCommand (Expression val) = handleDeclaration val
 handleCommand ShowHelp = PSCI $ outputStrLn helpMessage
 handleCommand (Import im) = handleImport im
 handleCommand (Decls l) = handleDecls l
-handleCommand (LoadFile filePath) = do
-  absPath <- psciIO $ expandTilde filePath
-  exists <- psciIO $ doesFileExist absPath
-  if exists then do
-    PSCI . lift $ modify (updateImportedFiles absPath)
-    m <- psciIO $ loadModule absPath
-    case m of
-      Left err -> PSCI $ outputStrLn err
-      Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
-  else
-    PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
+handleCommand (LoadFile filePath) = whenFileExists filePath $ \absPath -> do
+  PSCI . lift $ modify (updateImportedFiles absPath)
+  m <- psciIO $ loadModule absPath
+  case m of
+    Left err -> PSCI $ outputStrLn err
+    Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
+handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
+  foreignsOrError <- psciIO . runMake $ do
+    foreignFile <- makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile absPath)) (readFile absPath)
+    P.parseForeignModulesFromFiles [(absPath, foreignFile)]
+  case foreignsOrError of
+    Left err -> PSCI $ outputStrLn $ P.prettyPrintMultipleErrors False err
+    Right foreigns -> PSCI . lift $ modify (updateForeignFiles foreigns)
 handleCommand ResetState = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st -> st
     { psciImportedFilenames   = files
-    , psciImportedModules     = defaultImports
+    , psciImportedModules     = []
     , psciLetBindings         = []
     }
   loadAllImportedModules
@@ -462,6 +459,14 @@ handleCommand (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand (ShowInfo QueryLoaded) = handleShowLoadedModules
 handleCommand (ShowInfo QueryImport) = handleShowImportedModules
 handleCommand QuitPSCi = error "`handleCommand QuitPSCi` was called. This is a bug."
+
+whenFileExists :: FilePath -> (FilePath -> PSCI ()) -> PSCI ()
+whenFileExists filePath f = do
+  absPath <- psciIO $ expandTilde filePath
+  exists <- psciIO $ doesFileExist absPath
+  if exists 
+    then f absPath
+    else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 
 loadUserConfig :: IO (Maybe [Command])
 loadUserConfig = do
@@ -478,7 +483,7 @@ loadUserConfig = do
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.Module] -> Bool
-consoleIsDefined = any ((== P.ModuleName [P.ProperName "Console"]) . P.getModuleName)
+consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.getModuleName)
 
 -- |
 -- The PSCI main loop.
@@ -486,22 +491,25 @@ consoleIsDefined = any ((== P.ModuleName [P.ProperName "Console"]) . P.getModule
 loop :: PSCiOptions -> IO ()
 loop PSCiOptions{..} = do
   config <- loadUserConfig
-  modulesOrFirstError <- loadAllModules psciInputFile
+  inputFiles <- concat <$> mapM glob psciInputFile
+  foreignFiles <- concat <$> mapM glob psciForeignInputFiles
+  modulesOrFirstError <- loadAllModules inputFiles
   case modulesOrFirstError of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFiles <- forM psciForeignInputFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
-        P.parseForeignModulesFromFiles foreignFiles
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
+        P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (PSCiState psciInputFile defaultImports modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (PSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (mapM_ (runPSCI . handleCommand)) config
-            unless (consoleIsDefined (map snd modules)) . outputStrLn $ unlines
+            modules' <- lift $ gets psciLoadedModules
+            unless (consoleIsDefined (map snd modules')) . outputStrLn $ unlines
               [ "PSCi requires the purescript-console module to be installed."
               , "For help getting started, visit http://wiki.purescript.org/PSCi"
               ]

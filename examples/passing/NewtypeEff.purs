@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Debug.Trace
 import Control.Monad.Eff
 
@@ -18,7 +19,7 @@ instance applicativeT :: Applicative T where
   pure t = T (pure t)
 
 instance bindT :: Bind T where
-  (>>=) (T t) f = T (t >>= \x -> runT (f x))
+  bind (T t) f = T (t >>= \x -> runT (f x))
 
 instance monadT :: Monad T
 

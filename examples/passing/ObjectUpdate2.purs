@@ -1,8 +1,11 @@
 module Main where
 
+import Prelude
+
 type X r = { | r }
 
-foreign import x "var x = {};" :: forall r. X r
+x :: X (baz :: String)
+x = { baz: "baz" }
 
 blah :: forall r. X r -> X r
 blah x = x

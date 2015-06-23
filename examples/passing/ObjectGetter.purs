@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 getX = _.x
 
 point = { x: 1.0, y: 0.0 }

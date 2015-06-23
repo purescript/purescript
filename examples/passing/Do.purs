@@ -16,8 +16,8 @@ instance applicativeMaybe :: Applicative Maybe where
   pure = Just
 
 instance bindMaybe :: Bind Maybe where
-  (>>=) Nothing _ = Nothing
-  (>>=) (Just a) f = f a
+  bind Nothing _ = Nothing
+  bind (Just a) f = f a
 
 instance monadMaybe :: Prelude.Monad Maybe
 

@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 instance fooNumber :: Foo Number where
   foo = 0.0
 

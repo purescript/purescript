@@ -21,7 +21,7 @@ module Language.PureScript.TypeChecker.Entailment (
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
@@ -47,20 +47,17 @@ newtype Work = Work Integer deriving (Show, Eq, Ord, Num)
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filter filterModule context))
+entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Bool -> Check Expr
+entails env moduleName context = solve
   where
-    sortedNubBy :: (Ord k) => (v -> k) -> [v] -> [v]
-    sortedNubBy f vs = M.elems (M.fromList (map (f &&& id) vs))
+    forClassName :: Qualified ProperName -> [TypeClassDictionaryInScope]
+    forClassName cn = findDicts cn Nothing ++ findDicts cn (Just moduleName)
 
-    -- Filter out type dictionaries which are in scope in the current module
-    filterModule :: TypeClassDictionaryInScope -> Bool
-    filterModule (TypeClassDictionaryInScope { tcdName = Qualified (Just mn) _ }) | mn == moduleName = True
-    filterModule (TypeClassDictionaryInScope { tcdName = Qualified Nothing _ }) = True
-    filterModule _ = False
+    findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
+    findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
-    solve :: [TypeClassDictionaryInScope] -> Constraint -> Bool -> Check Expr
-    solve context' (className, tys) trySuperclasses = do
+    solve :: Constraint -> Bool -> Check Expr
+    solve (className, tys) trySuperclasses = do
       let dicts = flip evalStateT (Work 0) $ go trySuperclasses className tys
       checkOverlaps dicts
       where
@@ -73,9 +70,7 @@ entails env moduleName context = solve (sortedNubBy canonicalizeDictionary (filt
         where
         directInstances :: StateT Work [] DictionaryValue
         directInstances = do
-          tcd <- lift context'
-          -- Make sure the type class name matches the one we are trying to satisfy
-          guard $ className' == tcdClassName tcd
+          tcd <- lift $ forClassName className'
           -- Make sure the type unifies with the type in the type instance definition
           subst <- lift . maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
           -- Solve any necessary subgoals

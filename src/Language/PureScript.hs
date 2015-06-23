@@ -44,7 +44,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Control.Monad.Supply.Class (fresh)
+import Control.Monad.Supply.Class (MonadSupply, fresh)
 
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
@@ -90,17 +90,15 @@ import qualified Paths_purescript as Paths
 --  * Pretty-print the generated Javascript
 --
 compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-        => [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann) ForeignCode], Environment, SupplyVar, Externs)
+        => [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann)], Environment, SupplyVar, Externs)
 compile = compile' initEnvironment
 
 compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-         => Environment -> [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann) ForeignCode], Environment, SupplyVar, Externs)
+         => Environment -> [Module] -> m ([Core.Module (CoreFn.Bind Core.Ann)], Environment, SupplyVar, Externs)
 compile' env ms = do
-  noPrelude <- asks optionsNoPrelude
-  unless noPrelude (checkPreludeIsDefined ms)
   additional <- asks optionsAdditional
   mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
-  (sorted, _) <- sortModules $ map importPrim $ if noPrelude then ms else map importPrelude ms
+  (sorted, _) <- sortModules $ map importPrim ms
   mapM_ lint sorted
   (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
   (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
@@ -137,7 +135,7 @@ data MakeActions m = MakeActions {
   -- |
   -- Run the code generator for the module and write any required output files.
   --
-  , codegen :: Core.Module (CoreFn.Bind Core.Ann) ForeignCode -> Environment -> SupplyVar -> Externs -> m ()
+  , codegen :: Core.Module (CoreFn.Bind Core.Ann) -> Environment -> SupplyVar -> Externs -> m ()
   -- |
   -- Respond to a progress update.
   --
@@ -174,9 +172,7 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadReader (P.Options P.M
      -> [(Either RebuildPolicy FilePath, Module)]
      -> m Environment
 make MakeActions{..} ms = do
-  noPrelude <- asks optionsNoPrelude
-  unless noPrelude (checkPreludeIsDefined (map snd ms))
-  (sorted, graph) <- sortModules $ map importPrim $ if noPrelude then map snd ms else map (importPrelude . snd) ms
+  (sorted, graph) <- sortModules $ map (importPrim . snd) ms
   mapM_ lint sorted
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
     inputTimestamp <- getInputTimestamp moduleName'
@@ -226,12 +222,6 @@ make MakeActions{..} ms = do
         SimpleErrorWrapper (ErrorParsingModule err) -> SimpleErrorWrapper (ErrorParsingExterns err)
         _ -> e
 
-checkPreludeIsDefined :: (MonadWriter MultipleErrors m) => [Module] -> m ()
-checkPreludeIsDefined ms = do
-  let mns = map getModuleName ms
-  unless (preludeModuleName `elem` mns) $
-    tell (errorMessage PreludeNotPresent)
-
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
   where
@@ -252,12 +242,6 @@ addDefaultImport toImport m@(Module coms mn decls exps)  =
 
 importPrim :: Module -> Module
 importPrim = addDefaultImport (ModuleName [ProperName C.prim])
-
-preludeModuleName :: ModuleName
-preludeModuleName = ModuleName [ProperName C.prelude]
-
-importPrelude :: Module -> Module
-importPrelude = addDefaultImport preludeModuleName
 
 version :: Version
 version = Paths.version

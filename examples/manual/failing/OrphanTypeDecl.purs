@@ -1,3 +1,3 @@
 module OrphanTypeDecl where
 
-  fn :: Number -> Boolean
+fn :: Number -> Boolean

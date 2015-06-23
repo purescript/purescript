@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude
 import Control.Monad.Eff
 
 type Foo a = forall f. (Monad f) => f a
