@@ -17,7 +17,7 @@
 module Main (main) where
 
 import qualified Language.PureScript as P
-
+import qualified Language.PureScript.CodeGen.JS.Compile as JS
 import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
 
@@ -43,18 +43,18 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
   return (inputFile, text)
 
-loadPrelude :: [(FilePath, String)] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> Either P.MultipleErrors (String, String, P.Environment)
+loadPrelude :: [(FilePath, String)] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> Either P.MultipleErrors (String, String)
 loadPrelude fs foreigns = do
   ms <- P.parseModulesFromFiles id fs
-  fmap fst . runWriterT $ runReaderT (P.compileJS (map snd ms) foreigns []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
+  fmap fst . runWriterT $ runReaderT (JS.compileJS (map snd ms) foreigns []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
 
-compile :: P.Options P.Compile -> [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors (String, String, P.Environment))
+compile :: P.Options P.Compile -> [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors (String, String))
 compile opts inputFiles foreigns = runExceptT . fmap fst . runWriterT . flip runReaderT opts $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
-  P.compileJS (map snd ms) foreigns []
+  JS.compileJS (map snd ms) foreigns []
 
-assert :: FilePath -> P.Options P.Compile -> FilePath -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> (Either P.MultipleErrors (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
+assert :: FilePath -> P.Options P.Compile -> FilePath -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> (Either P.MultipleErrors (String, String) -> IO (Maybe String)) -> IO ()
 assert preludeExterns opts inputFile foreigns f = do
   e <- compile opts [preludeExterns, inputFile] foreigns
   maybeErr <- f e
@@ -69,7 +69,7 @@ assertCompiles preludeJs preludeExterns inputFile foreigns = do
                               { P.optionsMain = Just "Main"
                               , P.optionsAdditional = P.CompileOptions "Tests" ["Main"] ["Main"]
                               }
-  assert preludeExterns options inputFile foreigns $ either (return . Just . P.prettyPrintMultipleErrors False) $ \(js, _, _) -> do
+  assert preludeExterns options inputFile foreigns $ either (return . Just . P.prettyPrintMultipleErrors False) $ \(js, _) -> do
     process <- findNodeProcess
     result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
     case result of
@@ -102,7 +102,7 @@ main = do
   putStrLn "Compiling Prelude"
   case loadPrelude prelude foreigns of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
-    Right (preludeJs, exts, _) -> do
+    Right (preludeJs, exts) -> do
       tmp <- getTemporaryDirectory
       let preludeExterns = tmp </> "prelude.externs"
       writeFile preludeExterns exts

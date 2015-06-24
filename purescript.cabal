@@ -60,6 +60,7 @@ library
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.JS.Common
+                     Language.PureScript.CodeGen.JS.Compile
                      Language.PureScript.CodeGen.JS.Optimizer
                      Language.PureScript.CodeGen.JS.Optimizer.Common
                      Language.PureScript.CodeGen.JS.Optimizer.Inliner
