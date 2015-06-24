@@ -48,8 +48,6 @@ import qualified Language.PureScript.CoreImp.AST as CI
 
 import System.FilePath.Posix ((</>))
 
-import System.FilePath.Posix ((</>))
-
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
