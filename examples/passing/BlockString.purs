@@ -1,12 +1,8 @@
 module Main where
 
-foreign import foo """
-  function foo(s) {
-    return s;
-  }
-""" :: String -> String
+import Prelude
 
-bar :: String -> String
-bar _ = foo "test"
+foo :: String
+foo = """foo"""
 
 main = Debug.Trace.trace "Done"

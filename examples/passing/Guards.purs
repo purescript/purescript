@@ -1,16 +1,6 @@
 module Main where
 
-foreign import jsMod
-  """
-  function jsMod(x) {
-    return function (y) {
-      return x % y;
-    };
-  }
-  """ :: Number -> Number -> Number
-
-infixl 7 %
-(%) = jsMod
+import Prelude
 
 collatz = \x -> case x of
   y | y % 2.0 == 0.0 -> y / 2.0

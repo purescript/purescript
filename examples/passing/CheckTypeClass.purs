@@ -1,16 +1,18 @@
 module Main where
 
-  data Bar a = Bar
-  data Baz
+import Prelude
 
-  class Foo a where
-    foo :: Bar a -> Baz
+data Bar a = Bar
+data Baz
 
-  foo_ :: forall a. (Foo a) => a -> Baz
-  foo_ x = foo ((mkBar :: forall a. (Foo a) => a -> Bar a) x)
+class Foo a where
+  foo :: Bar a -> Baz
 
-  mkBar :: forall a. a -> Bar a
-  mkBar _ = Bar
+foo_ :: forall a. (Foo a) => a -> Baz
+foo_ x = foo ((mkBar :: forall a. (Foo a) => a -> Bar a) x)
 
-  main = Debug.Trace.trace "Done"
+mkBar :: forall a. a -> Bar a
+mkBar _ = Bar
+
+main = Debug.Trace.trace "Done"
 

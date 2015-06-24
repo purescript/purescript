@@ -33,8 +33,8 @@ import qualified Language.PureScript.CoreFn as CF
 -- |
 -- Desugars a module from CoreFn to CoreImp representation.
 --
-moduleToCoreImp :: forall m a. (Applicative m, Monad m, MonadSupply m)
-                => Module (CF.Bind Ann) a -> m (Module (Decl Ann) a)
+moduleToCoreImp :: forall m. (Applicative m, Monad m, MonadSupply m)
+                => Module (CF.Bind Ann) -> m (Module (Decl Ann))
 moduleToCoreImp (Module coms mn imps exps externs decls) =
   Module coms mn imps exps externs . concat <$> mapM bind decls
 

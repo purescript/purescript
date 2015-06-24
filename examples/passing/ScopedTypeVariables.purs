@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 test1 :: forall a. (a -> a) -> a -> a
 test1 f x = g (g x)
   where
@@ -15,7 +17,7 @@ test2 = h
     g :: b -> b
     g y = f (f y)
 
-test3 :: Number 
+test3 :: Number
 test3 = ((\b -> b :: b) :: forall b. b -> b) 0.0
 
 test4 :: forall a. (a -> a) -> a -> a

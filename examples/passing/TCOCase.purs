@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 data Data = One | More Data
 
 main = Debug.Trace.trace (from (to 10000.0 One))

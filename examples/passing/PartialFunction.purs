@@ -1,19 +1,10 @@
 module Main where
 
-foreign import testError
-  """
-  function testError(f) {
-    try {
-      return f();
-    } catch (e) {
-      if (e instanceof Error) return 'success';
-      throw new Error('Pattern match failure is not Error');
-    }
-  }
-  """ :: (Unit -> Number) -> String
+import Prelude
+import Assert
 
 fn :: Number -> Number
 fn 0.0 = 0.0
 fn 1.0 = 2.0
 
-main = Debug.Trace.trace (show $ testError $ \_ -> fn 2.0)
+main = assertPartial $ \_ -> fn 2.0

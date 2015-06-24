@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TupleSections #-}
+
 module Main where
 
 import Control.Monad (unless)
@@ -24,6 +26,7 @@ import Data.Version (showVersion)
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStr, stderr)
 
@@ -50,13 +53,14 @@ instance Ord SuperMap where
 runModuleName :: P.ModuleName -> String
 runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
-readInput :: FilePath -> IO (Either P.MultipleErrors [P.Module])
-readInput filename = do
-  content <- readFile filename
-  return $ map snd <$> P.parseModulesFromFiles id [(filename, content)]
+readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
+readInput paths = do
+  content <- mapM (\path -> (path, ) <$> readFile path) paths
+  return $ map snd <$> P.parseModulesFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
-compile (HierarchyOptions input mOutput) = do
+compile (HierarchyOptions inputGlob mOutput) = do
+  input <- glob inputGlob
   modules <- readInput input
   case modules of
     Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors False errs) >> exitFailure

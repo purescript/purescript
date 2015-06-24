@@ -27,7 +27,7 @@ import Language.PureScript.Names
 -- |
 -- Eliminate all declarations which are not a transitive dependency of the entry point module
 --
-eliminateDeadCode :: [ModuleName] -> [Module (Bind a) b] -> [Module (Bind a) b]
+eliminateDeadCode :: [ModuleName] -> [Module (Bind a)] -> [Module (Bind a)]
 eliminateDeadCode entryPoints ms = map go ms
   where
   go (Module coms mn imps exps foreigns ds) = Module coms mn imps exps' foreigns' ds'
@@ -61,7 +61,7 @@ type Key = (ModuleName, Ident)
 -- |
 -- Find dependencies for each member in a module.
 --
-declarationsByModule :: Module (Bind a) b -> [(Key, [Key])]
+declarationsByModule :: Module (Bind a) -> [(Key, [Key])]
 declarationsByModule (Module _ mn _ _ fs ds) =
   let fs' = map ((\name -> ((mn, name), [])) . foreignIdent) fs
   in fs' ++ concatMap go ds

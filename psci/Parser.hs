@@ -76,14 +76,15 @@ parseDirective cmd =
   (dstr, arg) = break isSpace cmd
 
   commandFor d = case d of
-    Help   -> return ShowHelp
-    Quit   -> return QuitPSCi
-    Reset  -> return ResetState
-    Browse -> BrowseModule <$> parseRest P.moduleName arg
-    Load   -> return $ LoadFile (trim arg)
-    Show   -> ShowInfo <$> parseReplQuery' (trim arg)
-    Type   -> TypeOf <$> parseRest P.parseValue arg
-    Kind   -> KindOf <$> parseRest P.parseType arg
+    Help    -> return ShowHelp
+    Quit    -> return QuitPSCi
+    Reset   -> return ResetState
+    Browse  -> BrowseModule <$> parseRest P.moduleName arg
+    Load    -> return $ LoadFile (trim arg)
+    Foreign -> return $ LoadForeign (trim arg)
+    Show    -> ShowInfo <$> parseReplQuery' (trim arg)
+    Type    -> TypeOf <$> parseRest P.parseValue arg
+    Kind    -> KindOf <$> parseRest P.parseType arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.

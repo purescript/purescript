@@ -76,7 +76,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp :: P.ModuleName -> Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
     let path = fromMaybe (error "Module has no filename in 'make'") $ M.lookup mn filePathMap
-    traverseEither getTimestamp path
+    e1 <- traverseEither getTimestamp path
+    fPath <- maybe (return Nothing) (getTimestamp . fst) $ M.lookup mn foreigns
+    return $ fmap (max fPath) e1
 
   getOutputTimestamp :: P.ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -90,7 +92,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> P.runModuleName mn </> "externs.purs"
     (path, ) <$> readTextFile path
 
-  codegen :: CR.Module (CF.Bind CR.Ann) P.ForeignCode -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
+  codegen :: CR.Module (CF.Bind CR.Ann) -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
   codegen m _ nextVar exts = do
     let mn = CR.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
@@ -112,7 +114,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     maybe (return ()) (writeTextFile foreignFile . snd) $ mn `M.lookup` foreigns
     writeTextFile externsFile exts
 
-  requiresForeign :: CR.Module a b -> Bool
+  requiresForeign :: CR.Module a -> Bool
   requiresForeign = not . null . CR.moduleForeign
 
   getTimestamp :: FilePath -> Make (Maybe UTCTime)
@@ -121,9 +123,11 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     traverse (const $ getModificationTime path) $ guard exists
 
   readTextFile :: FilePath -> Make String
-  readTextFile path = makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
-    putStrLn $ "Reading " ++ path
-    readFile path
+  readTextFile path = do
+    verboseErrorsEnabled <- asks P.optionsVerboseErrors
+    makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile path)) $ do
+      when verboseErrorsEnabled $ putStrLn $ "Reading " ++ path
+      readFile path
 
   writeTextFile :: FilePath -> String -> Make ()
   writeTextFile path text = makeIO (const (P.SimpleErrorWrapper $ P.CannotWriteFile path)) $ do

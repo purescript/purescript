@@ -98,7 +98,6 @@ inlineValues = everywhereOnJS convert
                             | isDict semiringInt dict && isFn fnOne fn = JSNumericLiteral (Left 1)
                             | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral False
                             | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral True
-  convert (JSApp fn [value]) | isFn fromNumber fn = JSBinary BitwiseOr value (JSNumericLiteral (Left 0))
   convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y])
     | isDict semiringInt dict && isFn fnAdd fn = JSBinary BitwiseOr (JSBinary Add x y) (JSNumericLiteral (Left 0))
     | isDict semiringInt dict && isFn fnMultiply fn = JSBinary BitwiseOr (JSBinary Multiply x y) (JSNumericLiteral (Left 0))
@@ -109,7 +108,6 @@ inlineValues = everywhereOnJS convert
   fnOne = (C.prelude, C.one)
   fnBottom = (C.prelude, C.bottom)
   fnTop = (C.prelude, C.top)
-  fromNumber = (C.dataInt, C.fromNumber)
   fnAdd = (C.prelude, (C.+))
   fnDivide = (C.prelude, (C./))
   fnMultiply = (C.prelude, (C.*))

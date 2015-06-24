@@ -30,13 +30,13 @@ import Language.PureScript.Options
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: forall f m mode. (Monad m, MonadReader (Options mode) m,  Applicative m, MonadSupply m) =>
-              Module (Decl Ann) f -> m (Module (Decl Ann) f)
+optimize :: forall m mode. (Monad m, MonadReader (Options mode) m,  Applicative m, MonadSupply m) =>
+              Module (Decl Ann) -> m (Module (Decl Ann))
 optimize m = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return m else optimize' m
   where
-  optimize' :: Module (Decl Ann) f -> m (Module (Decl Ann) f)
+  optimize' :: Module (Decl Ann) -> m (Module (Decl Ann))
   optimize' (Module coms mn imps exps externs decls) =
     return $ Module coms mn imps exps externs $ untilFixedPoint (applyAll
       [ collapseNestedIfs

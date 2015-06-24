@@ -1,5 +1,7 @@
 module OverlappingInstances where
 
+import Prelude
+
 data A = A | B
 
 instance eqA1 :: Eq A where

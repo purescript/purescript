@@ -57,7 +57,7 @@ parseAndDesugar inputFiles depsFiles callback = do
     ms <- throwLeft ParseError eParsed
 
     let depsModules = getDepsModuleNames (map (\(fp, m) -> (,m) <$> fp) ms)
-    let eSorted = P.sortModules . map (importPrim . importPrelude . snd) $ ms
+    let eSorted = P.sortModules . map (importPrim . snd) $ ms
     (ms', _) <- throwLeft SortModulesError eSorted
 
     modules <- throwLeft DesugarError (desugar ms')
@@ -92,9 +92,6 @@ addDefaultImport toImport m@(P.Module coms mn decls exps)  =
 
 importPrim :: P.Module -> P.Module
 importPrim = addDefaultImport (P.ModuleName [P.ProperName C.prim])
-
-importPrelude :: P.Module -> P.Module
-importPrelude = addDefaultImport (P.ModuleName [P.ProperName C.prelude])
 
 desugar :: [P.Module] -> Either P.MultipleErrors [P.Module]
 desugar = P.evalSupplyT 0 . desugar'

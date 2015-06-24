@@ -277,7 +277,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   memberToValue :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
-    _ <- maybe (throwError . errorMessage $ MissingClassMember ident) return $ lookup ident tys'
+    _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
     val <- memberToValue tys' d

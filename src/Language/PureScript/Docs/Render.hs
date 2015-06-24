@@ -5,16 +5,17 @@
 
 -- | Functions for rendering documentation generated from PureScript code.
 
-module Language.PureScript.Docs.Render (
-  renderModule,
-  collectBookmarks
-) where
+module Language.PureScript.Docs.Render
+  ( renderModule
+  , collectBookmarks
+  ) where
 
 import Control.Monad
+import Control.Category ((>>>))
 import Data.Either
 import Data.Monoid ((<>))
-import Data.Maybe (mapMaybe)
-import Data.List (nub)
+import Data.Maybe (mapMaybe, isNothing)
+import Data.List (nub, isPrefixOf, isSuffixOf)
 
 import qualified Language.PureScript as P
 
@@ -27,50 +28,82 @@ import Language.PureScript.Docs.Utils.MonoidExtras
 --
 renderModule :: P.Module -> RenderedModule
 renderModule m@(P.Module coms moduleName  _ _) =
-  RenderedModule (show moduleName) comments declarations
+  RenderedModule (show moduleName) comments (declarations m)
   where
   comments = renderComments coms
-  declarations = groupChildren declarationsWithChildren
-  declarationsWithChildren = mapMaybe go (P.exportedDeclarations m)
-  go decl = getDeclarationTitle decl
-             >>= renderDeclaration decl
+  declarations =
+    P.exportedDeclarations
+    >>> mapMaybe (\d -> getDeclarationTitle d >>= renderDeclaration d)
+    >>> augmentDeclarations
+    >>> map addDefaultFixity
 
--- | An intermediate stage which we go through during rendering.
+-- | The data type for an intermediate stage which we go through during
+-- rendering.
 --
 -- In the first pass, we take all top level declarations in the module, and
--- render those which should appear at the top level in the output, as well as
--- those which should appear as children of other declarations in the output.
+-- collect other information which will later be used to augment the top level
+-- declarations. These two situation correspond to the Right and Left
+-- constructors, respectively.
 --
--- In the second pass, we move all children under their respective parents,
--- or discard them if none are found.
+-- In the second pass, we go over all of the Left values and augment the
+-- relevant declarations, leaving only the augmented Right values.
 --
--- This two-pass system is only necessary for type instance declarations, since
--- they appear at the top level in the AST, and since they might need to appear
--- as children in two places (for example, if a data type defined in a module
--- is an instance of a type class also defined in that module).
---
--- This data type is used as an intermediate type between the two stages. The
--- Left case is a child declaration, together with a list of parent declaration
--- titles which this may appear as a child of.
---
--- The Right case is a top level declaration which should pass straight through
--- the second stage; the only way it might change is if child declarations are
--- added to it.
+-- Note that in the Left case, we provide a [String] as well as augment
+-- information. The [String] value should be a list of titles of declarations
+-- that the augmentation should apply to. For example, for a type instance
+-- declaration, that would be any types or type classes mentioned in the
+-- instance. For a fixity declaration, it would be just the relevant operator's
+-- name.
 type IntermediateDeclaration
-  = Either ([String], RenderedChildDeclaration) RenderedDeclaration
+  = Either ([String], DeclarationAugment) RenderedDeclaration
 
--- | Move child declarations into their respective parents; the second pass.
--- See the comments under the type synonym IntermediateDeclaration for more
--- information.
-groupChildren :: [IntermediateDeclaration] -> [RenderedDeclaration]
-groupChildren (partitionEithers -> (children, toplevels)) =
-  foldl go toplevels children
+-- | Some data which will be used to augment a RenderedDeclaration in the
+-- output.
+--
+-- The AugmentChild constructor allows us to move all children under their
+-- respective parents. It is only necessary for type instance declarations,
+-- since they appear at the top level in the AST, and since they might need to
+-- appear as children in two places (for example, if a data type defined in a
+-- module is an instance of a type class also defined in that module).
+--
+-- The AugmentFixity constructor allows us to augment operator definitions
+-- with their associativity and precedence.
+data DeclarationAugment
+  = AugmentChild RenderedChildDeclaration
+  | AugmentFixity P.Fixity
+
+-- | Augment top-level declarations; the second pass. See the comments under
+-- the type synonym IntermediateDeclaration for more information.
+augmentDeclarations :: [IntermediateDeclaration] -> [RenderedDeclaration]
+augmentDeclarations (partitionEithers -> (augments, toplevels)) =
+  foldl go toplevels augments
   where
-  go ds (parentTitles, child) =
+  go ds (parentTitles, a) =
     map (\d ->
       if rdTitle d `elem` parentTitles
-        then d { rdChildren = rdChildren d ++ [child] }
+        then augmentWith a d
         else d) ds
+
+  augmentWith a d =
+    case a of
+      AugmentChild child ->
+        d { rdChildren = rdChildren d ++ [child] }
+      AugmentFixity fixity ->
+        d { rdFixity = Just fixity }
+
+-- | Add the default operator fixity for operators which do not have associated
+-- fixity declarations.
+--
+-- TODO: This may no longer be necessary after issue 806 is resolved, hopefully
+-- in 0.8.
+addDefaultFixity :: RenderedDeclaration -> RenderedDeclaration
+addDefaultFixity rd@RenderedDeclaration{..}
+  | isOp rdTitle && isNothing rdFixity = rd { rdFixity = Just defaultFixity }
+  | otherwise                          = rd
+  where
+  isOp :: String -> Bool
+  isOp str = "(" `isPrefixOf` str && ")" `isSuffixOf` str
+  defaultFixity = P.Fixity P.Infixl (-1)
 
 getDeclarationTitle :: P.Declaration -> Maybe String
 getDeclarationTitle (P.TypeDeclaration name _)               = Just (show name)
@@ -80,11 +113,23 @@ getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (show name)
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (show name)
 getDeclarationTitle (P.TypeClassDeclaration name _ _ _)      = Just (show name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (show name)
+getDeclarationTitle (P.FixityDeclaration _ name)             = Just ("(" ++ name ++ ")")
 getDeclarationTitle (P.PositionedDeclaration _ _ d)          = getDeclarationTitle d
 getDeclarationTitle _                                        = Nothing
 
+-- | Create a basic RenderedDeclaration value.
+mkDeclaration :: String -> RenderedCode -> RenderedDeclaration
+mkDeclaration title code =
+  RenderedDeclaration { rdTitle      = title
+                      , rdComments   = Nothing
+                      , rdCode       = code
+                      , rdSourceSpan = Nothing
+                      , rdChildren   = []
+                      , rdFixity     = Nothing
+                      }
+
 basicDeclaration :: String -> RenderedCode -> Maybe IntermediateDeclaration
-basicDeclaration title code = Just (Right (RenderedDeclaration title Nothing code Nothing []))
+basicDeclaration title code = Just $ Right $ mkDeclaration title code
 
 renderDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
 renderDeclaration (P.TypeDeclaration ident' ty) title =
@@ -100,16 +145,19 @@ renderDeclaration (P.ExternDeclaration ident' ty) title =
           <> sp <> syntax "::" <> sp
           <> renderType ty
 renderDeclaration (P.DataDeclaration dtype name args ctors) title =
-  Just (Right (RenderedDeclaration title Nothing code Nothing children))
+  Just (Right (mkDeclaration title code) { rdChildren = children })
   where
   typeApp  = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing name)) (map toTypeVar args)
   code = keyword (show dtype) <> sp <> renderType typeApp
   children = map renderCtor ctors
-  -- TODO: Comments for data constructors?
   renderCtor (ctor', tys) =
-          let typeApp' = foldl P.TypeApp (P.TypeConstructor (P.Qualified Nothing ctor')) tys
-              childCode = renderType typeApp'
-          in  RenderedChildDeclaration (show ctor') Nothing childCode Nothing ChildDataConstructor
+    RenderedChildDeclaration (show ctor') Nothing Nothing (ChildDataConstructor ctorSignature ctorCode)
+    where
+    ctor'' = P.TypeConstructor (P.Qualified Nothing ctor')
+    typeApp' = foldl P.TypeApp ctor'' tys
+    ctorSignature = renderType typeApp'
+    ctorCode = ident (show ctor') <> sp <> syntax "::" <> sp <> renderType ctorType
+    ctorType = P.quantify $ foldr (\a b -> P.TypeApp (P.TypeApp P.tyFunction a) b) typeApp tys
 renderDeclaration (P.ExternDataDeclaration name kind') title =
   basicDeclaration title code
   where
@@ -128,7 +176,7 @@ renderDeclaration (P.TypeSynonymDeclaration name args ty) title =
           , renderType ty
           ]
 renderDeclaration (P.TypeClassDeclaration name args implies ds) title = do
-  Just (Right (RenderedDeclaration title Nothing code Nothing children))
+  Just (Right (mkDeclaration title code) { rdChildren = children })
   where
   code = mintersperse sp $
            [keywordClass]
@@ -151,19 +199,18 @@ renderDeclaration (P.TypeClassDeclaration name args implies ds) title = do
 
   children = map renderClassMember ds
 
-  -- TODO: Comments for type class members
   renderClassMember (P.PositionedDeclaration _ _ d) = renderClassMember d
   renderClassMember (P.TypeDeclaration ident' ty) =
-    let childCode =
-          mintersperse sp
-            [ ident (show ident')
-            , syntax "::"
-            , renderType ty
-            ]
-    in  RenderedChildDeclaration (show ident') Nothing childCode Nothing ChildTypeClassMember
+    RenderedChildDeclaration (show ident') Nothing Nothing (ChildTypeClassMember contextualType actualType)
+    where
+    begin               = ident (show ident') <> sp <> syntax "::" <> sp
+    contextualType      = begin <> renderType ty
+    actualType          = begin <> renderType (addConstraint classConstraint ty)
+    classConstraint     = (P.Qualified Nothing name, map toTypeVar args)
+    addConstraint c ty' = P.moveQuantifiersToFront (P.quantify (P.ConstrainedType [c] ty'))
   renderClassMember _ = error "Invalid argument to renderClassMember."
 renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) title = do
-  Just (Left (classNameString : typeNameStrings, childDecl))
+  Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
   typeNameStrings = nub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
@@ -173,7 +220,7 @@ renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) t
   extractProperNames (P.SaturatedTypeSynonym n _) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = RenderedChildDeclaration title Nothing code Nothing ChildInstance
+  childDecl = RenderedChildDeclaration title Nothing Nothing (ChildInstance code)
 
   code =
     mintersperse sp $
@@ -194,14 +241,27 @@ renderDeclaration (P.TypeInstanceDeclaration name constraints className tys _) t
     in renderType supApp
 
   classApp = foldl P.TypeApp (P.TypeConstructor className) tys
+renderDeclaration (P.FixityDeclaration fixity _) title =
+  Just (Left ([title], AugmentFixity fixity))
 renderDeclaration (P.PositionedDeclaration srcSpan com d') title =
   fmap (addComments . addSourceSpan) (renderDeclaration d' title)
   where
-  addComments (Left (t, d)) = Left (t, d { rcdComments = renderComments com })
-  addComments (Right d) = Right (d { rdComments = renderComments com })
+  addComments (Right d) =
+    Right (d { rdComments = renderComments com })
+  addComments (Left augment) =
+    Left (withAugmentChild (\d -> d { rcdComments = renderComments com })
+                           augment)
 
-  addSourceSpan (Left (t, d)) = Left (t, d { rcdSourceSpan = Just srcSpan })
-  addSourceSpan (Right d) = Right (d { rdSourceSpan = Just srcSpan })
+  addSourceSpan (Right d) =
+    Right (d { rdSourceSpan = Just srcSpan })
+  addSourceSpan (Left augment) =
+    Left (withAugmentChild (\d -> d { rcdSourceSpan = Just srcSpan })
+                           augment)
+
+  withAugmentChild f (t, a) =
+    case a of
+      AugmentChild d -> (t, AugmentChild (f d))
+      _              -> (t, a)
 renderDeclaration _ _ = Nothing
 
 renderComments :: [P.Comment] -> Maybe String

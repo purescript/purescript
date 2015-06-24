@@ -34,7 +34,6 @@ import Control.Arrow ((&&&))
 import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
-import Language.PureScript.AST.Declarations (ForeignCode, runForeignCode)
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
@@ -47,12 +46,14 @@ import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreImp.AST as CI
 
+import System.FilePath.Posix ((</>))
+
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
 moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
-           => Module (CI.Decl Ann) ForeignCode -> Maybe JS -> m [JS]
+           => Module (CI.Decl Ann) -> Maybe JS -> m [JS]
 moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
@@ -69,7 +70,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps
                              ++ map (runIdent &&& foreignIdent) foreignExps
   return $ case additional of
-    MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
+    MakeOptions _ -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
     CompileOptions ns _ _ | not isModuleEmpty ->
       [ JSVariableIntroduction ns
                                (Just (JSBinary Or (JSVar ns) (JSObjectLiteral [])) )
@@ -87,7 +88,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   importToJs mn' = do
     additional <- asks optionsAdditional
     let moduleBody = case additional of
-          MakeOptions -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn')]
+          MakeOptions path -> JSApp (JSVar "require") [JSStringLiteral (maybe id (</>) path $ runModuleName mn')]
           CompileOptions ns _ _ -> JSAccessor (moduleNameToJs mn') (JSVar ns)
     return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
 

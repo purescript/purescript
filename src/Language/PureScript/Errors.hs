@@ -52,7 +52,6 @@ import qualified Text.Parsec as P
 data SimpleErrorMessage
   = ErrorParsingExterns P.ParseError
   | ErrorParsingFFIModule FilePath
-  | ErrorParsingPrelude P.ParseError
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
@@ -108,6 +107,7 @@ data SimpleErrorMessage
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
+  | ExtraneousClassMember Ident
   | ExpectedType Kind
   | IncorrectConstructorArity (Qualified ProperName)
   | SubsumptionCheckFailed
@@ -120,7 +120,7 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | WildcardInferredType Type
-  | PreludeNotPresent
+  | ClassOperator ProperName Ident
   deriving (Show)
 
 -- |
@@ -161,7 +161,6 @@ errorCode :: ErrorMessage -> String
 errorCode em = case unwrapErrorMessage em of
   (ErrorParsingExterns _)       -> "ErrorParsingExterns"
   (ErrorParsingFFIModule _)     -> "ErrorParsingFFIModule"
-  (ErrorParsingPrelude _)       -> "ErrorParsingPrelude"
   (ErrorParsingModule _)        -> "ErrorParsingModule"
   MissingFFIModule{}            -> "MissingFFIModule"
   MultipleFFIModules{}          -> "MultipleFFIModules"
@@ -217,6 +216,7 @@ errorCode em = case unwrapErrorMessage em of
   (ArgListLengthsDiffer _)      -> "ArgListLengthsDiffer"
   (OverlappingArgNames _)       -> "OverlappingArgNames"
   (MissingClassMember _)        -> "MissingClassMember"
+  (ExtraneousClassMember _)     -> "ExtraneousClassMember"
   (ExpectedType _)              -> "ExpectedType"
   (IncorrectConstructorArity _) -> "IncorrectConstructorArity"
   SubsumptionCheckFailed        -> "SubsumptionCheckFailed"
@@ -229,7 +229,7 @@ errorCode em = case unwrapErrorMessage em of
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
-  PreludeNotPresent             -> "PreludeNotPresent"
+  (ClassOperator _ _)           -> "ClassOperator"
 
 -- |
 -- A stack trace for an error
@@ -393,10 +393,6 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     goSimple (MultipleFFIModules mn paths) =
       paras $ [ line $ "Multiple FFI implementations have been provided for module " ++ show mn ++ ": " ]
             ++ map (indent . line) paths
-    goSimple (ErrorParsingPrelude err) =
-      paras [ line "Error parsing prelude: "
-            , indent . line . show $ err
-            ]
     goSimple (InvalidExternsFile path) =
       paras [ line "Externs file is invalid: "
             , indent . line $ path
@@ -519,6 +515,8 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
       line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . show) ident
     goSimple (MissingClassMember ident) =
       line $ "Member " ++ show ident ++ " has not been implemented"
+    goSimple (ExtraneousClassMember ident) =
+      line $ "Member " ++ show ident ++ " is not a member of the class being instantiated"
     goSimple (ExpectedType kind) =
       line $ "Expected type of kind *, was " ++ prettyPrintKind kind
     goSimple (IncorrectConstructorArity nm) =
@@ -551,12 +549,13 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
               : map (line . prettyPrintExport) ys
     goSimple (ShadowedName nm) =
       line $ "Name '" ++ show nm ++ "' was shadowed."
+    goSimple (ClassOperator className opName) =
+      paras [ line $ "Class '" ++ show className ++ "' declares operator " ++ show opName ++ "."
+            , indent $ line $ "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
+            , indent $ line $ show opName ++ " = someMember"
+            ]
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
-    goSimple PreludeNotPresent =
-      paras [ line $ "There is no Prelude module loaded, and the --no-prelude option was not specified."
-            , line $ "You probably need to install the Prelude and other dependencies using Bower."
-            ]
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
             , indent $ go err

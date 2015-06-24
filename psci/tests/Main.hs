@@ -1,16 +1,19 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, TupleSections #-}
 
 module Main where
 
 import Control.Monad.Trans.State.Strict (runStateT)
-import Control.Monad (when)
+import Control.Monad (when, forM)
+import Control.Applicative
+import Control.Monad.Writer (runWriterT)
+import Control.Monad.Trans.Except (runExceptT)
 
-import Data.List (sort)
+import Data.List (isSuffixOf, sort)
 
 import System.Exit (exitFailure)
 import System.Console.Haskeline
 import System.FilePath ((</>))
-import System.Directory (getCurrentDirectory)
+import System.Directory (getCurrentDirectory, getDirectoryContents)
 
 import Test.HUnit
 
@@ -104,7 +107,8 @@ completionTestData =
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
   where
-  allModuleNames = [ "Control.Monad.Eff"
+  allModuleNames = [ "Assert"
+                   , "Control.Monad.Eff"
                    , "Control.Monad.ST"
                    , "Data.Function"
                    , "Debug.Trace"
@@ -127,13 +131,18 @@ runCM act = do
 getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
-  modulesOrFirstError <- loadAllModules [ cwd </> "tests" </> "prelude.purs" ]
+  let preludeDir = cwd </> "tests" </> "prelude"
+      jsDir = preludeDir </> "js"
+  modulesOrFirstError <- loadAllModules [ preludeDir </> "Prelude.purs" ]
+  jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
+  foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
+  Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure
     Right modules ->
-      let imports = controlMonadSTasST : defaultImports
-      in  return (PSCiState [] imports modules [] [])
+      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
+      in  return (PSCiState [] imports modules foreigns [] [])
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))

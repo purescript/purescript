@@ -45,7 +45,7 @@ import qualified Language.PureScript.CoreImp as CI
 import IO (mkdirp)
 
 options :: P.Options P.Make
-options = P.Options False False False Nothing False False False P.MakeOptions
+options = P.Options False False Nothing False False False (P.MakeOptions Nothing)
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
@@ -90,7 +90,7 @@ buildMakeActions filePathMap foreigns =
     let path = modulesDir </> P.runModuleName mn </> "externs.purs"
     (path, ) <$> readTextFile path
 
-  codegen :: CR.Module (CF.Bind CR.Ann) P.ForeignCode -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
+  codegen :: CR.Module (CF.Bind CR.Ann) -> P.Environment -> P.SupplyVar -> P.Externs -> Make ()
   codegen m _ nextVar exts = do
     let mn = CR.moduleName m
     foreignInclude <- case CR.moduleName m `M.lookup` foreigns of
@@ -109,7 +109,7 @@ buildMakeActions filePathMap foreigns =
     maybe (return ()) (writeTextFile foreignFile) $ CR.moduleName m `M.lookup` foreigns
     writeTextFile externsFile exts
 
-  requiresForeign :: CR.Module a b -> Bool
+  requiresForeign :: CR.Module a -> Bool
   requiresForeign = not . null . CR.moduleForeign
 
   getTimestamp :: FilePath -> Make (Maybe UTCTime)

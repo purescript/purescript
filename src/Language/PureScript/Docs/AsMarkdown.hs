@@ -38,19 +38,24 @@ declAsMarkdown RenderedDeclaration{..} = do
   headerLevel 4 (ticks rdTitle)
   spacer
 
-  let (instances, children) = partition ((==) ChildInstance . rcdType) rdChildren
+  let (instances, children) = partition (isChildInstance . rcdInfo) rdChildren
   fencedBlock $ do
     tell' (codeToString rdCode)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
-  unless (null instances) $ do
-    headerLevel 5 "Instances"
-    fencedBlock $ do
-      mapM_ (tell' . childToString NotFirst) instances
-    spacer
+  for_ rdFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
 
   for_ rdComments tell'
+
+  unless (null instances) $ do
+    headerLevel 5 "Instances"
+    fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
+    spacer
+
+  where
+  isChildInstance (ChildInstance _) = True
+  isChildInstance _ = False
 
 codeToString :: RenderedCode -> String
 codeToString = outputWith elemAsMarkdown
@@ -62,16 +67,30 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
+fixityAsMarkdown :: P.Fixity -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) =
+  tell' $ concat [ "_"
+                 , associativityStr
+                 , " / precedence "
+                 , show precedence
+                 , "_"
+                 ]
+  where
+  associativityStr = case associativity of
+    P.Infixl -> "left-associative"
+    P.Infixr -> "right-associative"
+    P.Infix  -> "non-associative"
+
 childToString :: First -> RenderedChildDeclaration -> String
 childToString f RenderedChildDeclaration{..} =
-  case rcdType of
-    ChildDataConstructor ->
+  case rcdInfo of
+    ChildDataConstructor sig _ ->
       let c = if f == First then "=" else "|"
-      in  "  " ++ c ++ " " ++ codeToString rcdCode
-    ChildTypeClassMember ->
-      "  " ++ codeToString rcdCode
-    ChildInstance ->
-      codeToString rcdCode
+      in  "  " ++ c ++ " " ++ codeToString sig
+    ChildTypeClassMember ty _ ->
+      "  " ++ codeToString ty
+    ChildInstance code ->
+      codeToString code
 
 data First
   = First

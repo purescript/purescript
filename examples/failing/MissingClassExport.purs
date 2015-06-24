@@ -1,4 +1,6 @@
 module Test (bar) where
 
-  class Foo a where
-    bar :: a -> a
+import Prelude
+
+class Foo a where
+  bar :: a -> a

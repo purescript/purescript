@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 example1 :: String
 example1 = do
   "Do"
@@ -7,7 +9,7 @@ example1 = do
   " for"
   " Semigroup"
   where
-  (>>=) x f = x <> f unit
+  bind x f = x <> f unit
 
 (*>) :: forall f a b. (Apply f) => f a -> f b -> f b
 (*>) fa fb = const id <$> fa <*> fb
@@ -30,7 +32,7 @@ example2 = do
   Const " for"
   Const " Apply"
   where
-  (>>=) x f = x *> f unit
+  bind x f = x *> f unit
 
 main = do
   Debug.Trace.trace example1

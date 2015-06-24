@@ -71,6 +71,9 @@ module Language.PureScript.Constants where
 (||) :: String
 (||) = "||"
 
+bind :: String
+bind = "bind"
+
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
@@ -114,9 +117,6 @@ zshr = "zshr"
 
 complement :: String
 complement = "complement"
-
-fromNumber :: String
-fromNumber = "fromNumber"
 
 -- Prelude Values
 
