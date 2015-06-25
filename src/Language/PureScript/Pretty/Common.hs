@@ -55,10 +55,17 @@ currentIndent = do
 -- Print many lines
 --
 prettyPrintMany :: (a -> StateT PrinterState Maybe String) -> [a] -> StateT PrinterState Maybe String
-prettyPrintMany f xs = do
+prettyPrintMany = prettyPrintMany' ""
+
+-- |
+-- Print many lines, intercalating a string at the end of every line except the final line.
+-- This is primarily useful to add a comma to the end of each line except the final line.
+--
+prettyPrintMany' :: String -> (a -> StateT PrinterState Maybe String) -> [a] -> StateT PrinterState Maybe String
+prettyPrintMany' postfix f xs = do
   ss <- mapM f xs
   indentString <- currentIndent
-  return $ intercalate "\n" $ map (indentString ++) ss
+  return $ intercalate (postfix ++ "\n") $ map (indentString ++) ss
 
 -- |
 -- Prints an object key, escaping reserved names.

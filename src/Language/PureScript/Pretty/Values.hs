@@ -124,7 +124,7 @@ prettyPrintDoNotationElement (DoNotationBind binder val) =
     ]
 prettyPrintDoNotationElement (DoNotationLet ds) =
   concat <$> sequence
-    [ return "let "
+    [ return "let\n"
     , withIndent $ prettyPrintMany prettyPrintDeclaration ds
     ]
 prettyPrintDoNotationElement (PositionedDoNotationElement _ _ el) = prettyPrintDoNotationElement el
@@ -133,7 +133,7 @@ prettyPrintObject' :: [(String, Maybe Expr)] -> StateT PrinterState Maybe String
 prettyPrintObject' [] = return "{}"
 prettyPrintObject' ps = concat <$> sequence
   [ return "{\n"
-  , withIndent $ prettyPrintMany prettyPrintObjectProperty ps
+  , withIndent $ prettyPrintMany' "," prettyPrintObjectProperty ps
   , return "\n"
   , currentIndent
   , return "}"
