@@ -125,6 +125,7 @@ library
                      Language.PureScript.Types
 
                      Language.PureScript.Docs
+                     Language.PureScript.Docs.Convert
                      Language.PureScript.Docs.Render
                      Language.PureScript.Docs.Types
                      Language.PureScript.Docs.RenderedCode

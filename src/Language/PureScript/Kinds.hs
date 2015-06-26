@@ -13,10 +13,12 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Kinds where
 
 import Data.Data
+import qualified Data.Aeson.TH as A
 
 import Control.Applicative
 import Control.Monad.Unify (Unknown)
@@ -44,7 +46,9 @@ data Kind
   -- |
   -- Function kinds
   --
-  | FunKind Kind Kind deriving (Show, Eq, Data, Typeable)
+  | FunKind Kind Kind deriving (Show, Eq, Ord, Data, Typeable)
+
+$(A.deriveJSON A.defaultOptions ''Kind)
 
 everywhereOnKinds :: (Kind -> Kind) -> Kind -> Kind
 everywhereOnKinds f = go

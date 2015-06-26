@@ -38,7 +38,7 @@ data Package a = Package
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
   , pkgVersionTag           :: String
-  , pkgModules              :: [RenderedModule]
+  , pkgModules              :: [Module]
   , pkgBookmarks            :: [Bookmark]
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
@@ -66,52 +66,100 @@ verifyPackage verifiedUser Package{..} =
 packageName :: Package a -> PackageName
 packageName = bowerName . pkgMeta
 
-data RenderedModule = RenderedModule
-  { rmName         :: String
-  , rmComments     :: Maybe String
-  , rmDeclarations :: [RenderedDeclaration]
+data Module = Module
+  { modName         :: String
+  , modComments     :: Maybe String
+  , modDeclarations :: [Declaration]
   }
   deriving (Show, Eq, Ord)
 
-data RenderedDeclaration = RenderedDeclaration
-  { rdTitle      :: String
-  , rdComments   :: Maybe String
-  , rdCode       :: RenderedCode
-  , rdSourceSpan :: Maybe P.SourceSpan
-  , rdChildren   :: [RenderedChildDeclaration]
-  , rdFixity     :: Maybe P.Fixity
+data Declaration = Declaration
+  { declTitle      :: String
+  , declComments   :: Maybe String
+  , declSourceSpan :: Maybe P.SourceSpan
+  , declChildren   :: [ChildDeclaration]
+  , declFixity     :: Maybe P.Fixity
+  , declInfo       :: DeclarationInfo
   }
   deriving (Show, Eq, Ord)
 
-data RenderedChildDeclaration = RenderedChildDeclaration
-  { rcdTitle      :: String
-  , rcdComments   :: Maybe String
-  , rcdSourceSpan :: Maybe P.SourceSpan
-  , rcdInfo       :: RenderedChildDeclarationInfo
+-- |
+-- A value of this type contains information that is specific to a particular
+-- kind of declaration (as opposed to information which exists in all kinds of
+-- declarations, which goes into the 'Declaration' type directly).
+--
+-- Many of the constructors are very similar to their equivalents in the real
+-- PureScript AST, except that they have their name elided, since this is
+-- already available via the rdTitle field of 'Declaration'.
+--
+data DeclarationInfo
+  -- |
+  -- A value declaration, with its type.
+  --
+  = ValueDeclaration P.Type
+
+  -- |
+  -- A data/newtype declaration, with the kind of declaration (data or
+  -- newtype) and its type arguments. Constructors are represented as child
+  -- declarations.
+  --
+  | DataDeclaration P.DataDeclType [(String, Maybe P.Kind)]
+
+  -- |
+  -- A data type foreign import, with its kind.
+  --
+  | ExternDataDeclaration P.Kind
+
+  -- |
+  -- A type synonym, with its type arguments and its type.
+  --
+  | TypeSynonymDeclaration [(String, Maybe P.Kind)] P.Type
+
+  -- |
+  -- A type class, with its type arguments and its superclasses. Instances and
+  -- members are represented as child declarations.
+  --
+  | TypeClassDeclaration [(String, Maybe P.Kind)] [P.Constraint]
+  deriving (Show, Eq, Ord)
+
+declInfoToString :: DeclarationInfo -> String
+declInfoToString (ValueDeclaration _) = "value"
+declInfoToString (DataDeclaration _ _) = "data"
+declInfoToString (ExternDataDeclaration _) = "externData"
+declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
+declInfoToString (TypeClassDeclaration _ _) = "typeClass"
+
+data ChildDeclaration = ChildDeclaration
+  { cdeclTitle      :: String
+  , cdeclComments   :: Maybe String
+  , cdeclSourceSpan :: Maybe P.SourceSpan
+  , cdeclInfo       :: ChildDeclarationInfo
   }
   deriving (Show, Eq, Ord)
 
-data RenderedChildDeclarationInfo
-  = ChildInstance RenderedCode
-    -- ^ A type instance declaration. The rendered code value looks like
-    -- `instance showUnit :: Show Unit`
-  | ChildDataConstructor RenderedCode RenderedCode
-    -- ^ A data constructor, with rendered code for both how it appears in the
-    -- data declaration, and the constructor with its actual type. For example,
-    -- the constructor `Just` from the type `Maybe` might have the rendered
-    -- code values being `Just a` and `Just :: forall a. a -> Maybe a`.
-  | ChildTypeClassMember RenderedCode RenderedCode
-    -- ^ A type class member, with rendered code for its type in the context of
-    -- the parent type class declaration (that is, without a constraint), and
-    -- also for its actual type.  For example, `add` from `Semiring` might have
-    -- the rendered code values as `add :: a -> a -> a` and
-    -- `add :: forall a. (Semiring a) => a -> a -> a` respectively.
+data ChildDeclarationInfo
+  -- |
+  -- A type instance declaration, with its dependencies and its type.
+  --
+  = ChildInstance [P.Constraint] P.Type
+
+  -- |
+  -- A data constructor, with its type arguments.
+  --
+  | ChildDataConstructor [P.Type]
+
+  -- |
+  -- A type class member, with its type. Note that the type does not include
+  -- the type class constraint; this may be added manually if desired. For
+  -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
+  --
+  | ChildTypeClassMember P.Type
   deriving (Show, Eq, Ord)
 
-childDeclTypeToString :: RenderedChildDeclarationInfo -> String
-childDeclTypeToString (ChildInstance _)          = "instance"
-childDeclTypeToString (ChildDataConstructor _ _) = "dataConstructor"
-childDeclTypeToString (ChildTypeClassMember _ _) = "typeClassMember"
+childDeclInfoToString :: ChildDeclarationInfo -> String
+childDeclInfoToString (ChildInstance _ _)      = "instance"
+childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
+childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
 
 newtype GithubUser
   = GithubUser { runGithubUser :: String }
@@ -124,9 +172,11 @@ newtype GithubRepo
 data PackageError
   = ErrorInPackageMeta BowerError
   | InvalidVersion
+  | InvalidDeclarationType String
   | InvalidChildDeclarationType String
-  | InvalidRenderedCode String
   | InvalidFixity
+  | InvalidKind String
+  | InvalidDataDeclType String
   deriving (Show, Eq, Ord)
 
 type Bookmark = InPackage (P.ModuleName, String)
@@ -165,7 +215,7 @@ asPackage uploader =
   Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
           <*> key "version" asVersion
           <*> key "versionTag" asString
-          <*> key "modules" (eachInArray asRenderedModule)
+          <*> key "modules" (eachInArray asModule)
           <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
           <*> key "resolvedDependencies" asResolvedDependencies
           <*> key "github" asGithub
@@ -203,20 +253,20 @@ parseVersion' str =
     [(vers, "")] -> Just vers
     _            -> Nothing
 
-asRenderedModule :: Parse PackageError RenderedModule
-asRenderedModule =
-  RenderedModule <$> key "name" asString
-                 <*> key "comments" (perhaps asString)
-                 <*> key "declarations" (eachInArray asDeclaration)
+asModule :: Parse PackageError Module
+asModule =
+  Module <$> key "name" asString
+         <*> key "comments" (perhaps asString)
+         <*> key "declarations" (eachInArray asDeclaration)
 
-asDeclaration :: Parse PackageError RenderedDeclaration
+asDeclaration :: Parse PackageError Declaration
 asDeclaration =
-  RenderedDeclaration <$> key "title" asString
-                      <*> key "comments" (perhaps asString)
-                      <*> key "code" asRenderedCode .! InvalidRenderedCode
-                      <*> key "sourceSpan" (perhaps asSourceSpan)
-                      <*> key "children" (eachInArray asRenderedChildDeclaration)
-                      <*> key "fixity" (perhaps asFixity)
+  Declaration <$> key "title" asString
+              <*> key "comments" (perhaps asString)
+              <*> key "sourceSpan" (perhaps asSourceSpan)
+              <*> key "children" (eachInArray asChildDeclaration)
+              <*> key "fixity" (perhaps asFixity)
+              <*> key "info" asDeclarationInfo
 
 asFixity :: Parse PackageError P.Fixity
 asFixity = P.Fixity <$> key "associativity" asAssociativity
@@ -232,31 +282,75 @@ parseAssociativity str = case str of
 asAssociativity :: Parse PackageError P.Associativity
 asAssociativity = withString (maybe (Left InvalidFixity) Right . parseAssociativity)
 
-asRenderedChildDeclaration :: Parse PackageError RenderedChildDeclaration
-asRenderedChildDeclaration =
-  RenderedChildDeclaration <$> key "title" asString
+asDeclarationInfo :: Parse PackageError DeclarationInfo
+asDeclarationInfo = do
+  ty <- key "declType" asString
+  case ty of
+    "value" ->
+      ValueDeclaration <$> key "type" asType
+    "data" ->
+      DataDeclaration <$> key "dataDeclType" asDataDeclType
+                      <*> key "typeArguments" asTypeArguments
+    "externData" ->
+      ExternDataDeclaration <$> key "kind" asKind
+    "typeSynonym" ->
+      TypeSynonymDeclaration <$> key "arguments" asTypeArguments
+                             <*> key "type" asType
+    "typeClass" ->
+      TypeClassDeclaration <$> key "arguments" asTypeArguments
+                           <*> key "superclasses" (eachInArray asConstraint)
+    other ->
+      throwCustomError (InvalidDeclarationType other)
+
+asTypeArguments :: Parse PackageError [(String, Maybe P.Kind)]
+asTypeArguments = eachInArray asTypeArgument
+  where
+  asTypeArgument = (,) <$> nth 0 asString <*> nth 1 (perhaps asKind)
+
+asKind :: Parse e P.Kind
+asKind = fromAesonParser
+
+asType :: Parse e P.Type
+asType = fromAesonParser
+
+asDataDeclType :: Parse PackageError P.DataDeclType
+asDataDeclType =
+  withString $ \s -> case s of
+    "data"    -> Right P.Data
+    "newtype" -> Right P.Newtype
+    other     -> Left (InvalidDataDeclType other)
+
+asChildDeclaration :: Parse PackageError ChildDeclaration
+asChildDeclaration =
+  ChildDeclaration <$> key "title" asString
                            <*> key "comments" (perhaps asString)
                            <*> key "sourceSpan" (perhaps asSourceSpan)
-                           <*> key "info" asRenderedChildDeclarationInfo
+                           <*> key "info" asChildDeclarationInfo
 
-asRenderedChildDeclarationInfo :: Parse PackageError RenderedChildDeclarationInfo
-asRenderedChildDeclarationInfo = do
+asChildDeclarationInfo :: Parse PackageError ChildDeclarationInfo
+asChildDeclarationInfo = do
   ty <- key "declType" asString
   case ty of
     "instance" ->
-      ChildInstance <$> codeKey "code"
+      ChildInstance <$> key "dependencies" (eachInArray asConstraint)
+                    <*> key "type" asType
     "dataConstructor" ->
-      ChildDataConstructor <$> codeKey "signature" <*> codeKey "type"
+      ChildDataConstructor <$> key "arguments" (eachInArray asType)
     "typeClassMember" ->
-      ChildTypeClassMember <$> codeKey "contextualType" <*> codeKey "type"
+      ChildTypeClassMember <$> key "type" asType
     other ->
       throwCustomError $ InvalidChildDeclarationType other
-  where
-  codeKey k = key k asRenderedCode .! InvalidRenderedCode
 
 asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
+
+asConstraint :: Parse PackageError P.Constraint
+asConstraint = (,) <$> nth 0 asQualifiedProperName
+                   <*> nth 1 (eachInArray asType)
+
+asQualifiedProperName :: Parse e (P.Qualified P.ProperName)
+asQualifiedProperName = fromAesonParser
 
 asBookmarks :: Parse BowerError [Bookmark]
 asBookmarks = eachInArray asBookmark
@@ -307,38 +401,48 @@ instance A.ToJSON a => A.ToJSON (Package a) where
 instance A.ToJSON NotYetKnown where
   toJSON _ = A.Null
 
-instance A.ToJSON RenderedModule where
-  toJSON RenderedModule{..} =
-    A.object [ "name"         .= rmName
-             , "comments"     .= rmComments
-             , "declarations" .= rmDeclarations
+instance A.ToJSON Module where
+  toJSON Module{..} =
+    A.object [ "name"         .= modName
+             , "comments"     .= modComments
+             , "declarations" .= modDeclarations
              ]
 
-instance A.ToJSON RenderedDeclaration where
-  toJSON RenderedDeclaration{..} =
-    A.object [ "title"      .= rdTitle
-             , "comments"   .= rdComments
-             , "code"       .= rdCode
-             , "sourceSpan" .= rdSourceSpan
-             , "children"   .= rdChildren
-             , "fixity"     .= rdFixity
+instance A.ToJSON Declaration where
+  toJSON Declaration{..} =
+    A.object [ "title"      .= declTitle
+             , "comments"   .= declComments
+             , "sourceSpan" .= declSourceSpan
+             , "children"   .= declChildren
+             , "fixity"     .= declFixity
+             , "info"       .= declInfo
              ]
 
-instance A.ToJSON RenderedChildDeclaration where
-  toJSON RenderedChildDeclaration{..} =
-    A.object [ "title"      .= rcdTitle
-             , "comments"   .= rcdComments
-             , "sourceSpan" .= rcdSourceSpan
-             , "info"       .= rcdInfo
+instance A.ToJSON ChildDeclaration where
+  toJSON ChildDeclaration{..} =
+    A.object [ "title"      .= cdeclTitle
+             , "comments"   .= cdeclComments
+             , "sourceSpan" .= cdeclSourceSpan
+             , "info"       .= cdeclInfo
              ]
 
-instance A.ToJSON RenderedChildDeclarationInfo where
-  toJSON info = A.object $ "declType" .= childDeclTypeToString info : props
+instance A.ToJSON DeclarationInfo where
+  toJSON info = A.object $ "declType" .= declInfoToString info : props
     where
     props = case info of
-      ChildInstance code -> ["code" .= code]
-      ChildDataConstructor sig ty -> ["signature" .= sig, "type" .= ty]
-      ChildTypeClassMember cTy ty -> ["contextualType" .= cTy, "type" .= ty]
+      ValueDeclaration ty -> ["type" .= ty]
+      DataDeclaration ty args -> ["dataDeclType" .= ty, "typeArguments" .= args]
+      ExternDataDeclaration kind -> ["kind" .= kind]
+      TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
+      TypeClassDeclaration args super -> ["arguments" .= args, "superclasses" .= super]
+
+instance A.ToJSON ChildDeclarationInfo where
+  toJSON info = A.object $ "declType" .= childDeclInfoToString info : props
+    where
+    props = case info of
+      ChildInstance deps ty     -> ["dependencies" .= deps, "type" .= ty]
+      ChildDataConstructor args -> ["arguments" .= args]
+      ChildTypeClassMember ty   -> ["type" .= ty]
 
 instance A.ToJSON GithubUser where
   toJSON = A.toJSON . runGithubUser
