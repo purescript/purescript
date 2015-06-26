@@ -11,3 +11,4 @@ cabal.sandbox.config
 .psci_modules/
 bower_components/
 tmp/
+.stack-work/
