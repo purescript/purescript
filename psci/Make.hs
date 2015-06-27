@@ -42,14 +42,14 @@ import qualified Language.PureScript.CoreFn as CF
 
 import IO (mkdirp)
 
-options :: P.Options P.Make
-options = P.Options False False Nothing False False False (P.MakeOptions Nothing)
+options :: P.Options
+options = P.Options False False Nothing False False False Nothing
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT P.Options (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader P.Options)
 
 runMake :: Make a -> IO (Either P.MultipleErrors a)
 runMake = runExceptT . fmap fst . runWriterT . flip runReaderT options . unMake

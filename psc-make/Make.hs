@@ -46,10 +46,10 @@ import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
 
-newtype Make a = Make { unMake :: ReaderT (P.Options P.Make) (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader (P.Options P.Make))
+newtype Make a = Make { unMake :: ReaderT P.Options (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader P.Options)
 
-runMake :: P.Options P.Make -> Make a -> IO (Either P.MultipleErrors (a, P.MultipleErrors))
+runMake :: P.Options -> Make a -> IO (Either P.MultipleErrors (a, P.MultipleErrors))
 runMake opts = runExceptT . runWriterT . flip runReaderT opts . unMake
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> Make a

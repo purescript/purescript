@@ -55,12 +55,12 @@ import Language.PureScript.CodeGen.JS.Optimizer.Blocks
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (Monad m, MonadReader (Options mode) m, Applicative m, MonadSupply m) => JS -> m JS
+optimize :: (Monad m, MonadReader Options m, Applicative m, MonadSupply m) => JS -> m JS
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (Monad m, MonadReader (Options mode) m, Applicative m, MonadSupply m) => JS -> m JS
+optimize' :: (Monad m, MonadReader Options m, Applicative m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
   untilFixedPoint (inlineArrComposition . applyAll

@@ -20,9 +20,6 @@
 
 module Language.PureScript
   ( module P
-  , compile
-  , compile'
-  , compileJS
   , RebuildPolicy(..)
   , MakeActions(..)
   , SupplyVar()
@@ -32,7 +29,7 @@ module Language.PureScript
   ) where
 
 import Data.Function (on)
-import Data.List (sortBy, groupBy, intercalate)
+import Data.List (sortBy, groupBy)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
 import Data.Version (Version)
@@ -45,12 +42,11 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Control.Monad.Supply.Class (MonadSupply, fresh)
+import Control.Monad.Supply.Class (fresh)
 
 import Language.PureScript.AST as P
 import Language.PureScript.Comments as P
 import Language.PureScript.CodeGen.Externs (moduleToPs)
-import Language.PureScript.DeadCodeElimination as P
 import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P
 import Language.PureScript.Kinds as P
@@ -67,95 +63,8 @@ import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
 import qualified Language.PureScript.CoreFn as CoreFn
 import qualified Language.PureScript.Constants as C
-import qualified Language.PureScript.CodeGen.JS as J
 
 import qualified Paths_purescript as Paths
-
--- |
--- Compile a collection of modules
---
--- The compilation pipeline proceeds as follows:
---
---  * Sort the modules based on module dependencies, checking for cyclic dependencies.
---
---  * Perform a set of desugaring passes.
---
---  * Type check, and elaborate values to include type annotations and type class dictionaries.
---
---  * Regroup values to take into account new value dependencies introduced by elaboration.
---
---  * Eliminate dead code.
---
---  * Generate Javascript, and perform optimization passes.
---
---  * Pretty-print the generated Javascript
---
-compile :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-        => [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
-compile = compile' initEnvironment
-
-compile' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader (Options Compile) m)
-         => Environment -> [Module] -> m ([CoreFn.Module CoreFn.Ann], Environment, SupplyVar, Externs)
-compile' env ms = do
-  additional <- asks optionsAdditional
-  mainModuleIdent <- asks (fmap moduleNameFromString . optionsMain)
-  (sorted, _) <- sortModules $ map importPrim ms
-  mapM_ lint sorted
-  (desugared, nextVar) <- runSupplyT 0 $ desugar sorted
-  (elaborated, env') <- runCheck' env $ forM desugared $ typeCheckModule mainModuleIdent
-  regrouped <- createBindingGroupsModule . collapseBindingGroupsModule $ elaborated
-  let corefn = map (CoreFn.moduleToCoreFn env') regrouped
-      entryPoints = moduleNameFromString `map` entryPointModules additional
-      elim = if null entryPoints then corefn else eliminateDeadCode entryPoints corefn
-      renamed = renameInModules elim
-      codeGenModuleNames = moduleNameFromString `map` codeGenModules additional
-      modulesToCodeGen = if null codeGenModuleNames then renamed else filter (\(CoreFn.Module _ mn _ _ _ _) -> mn `elem` codeGenModuleNames) renamed
-      exts = intercalate "\n" . map (`moduleToPs` env') $ regrouped
-  return (modulesToCodeGen, env', nextVar, exts)
-
--- |
--- Compile a collection of modules to JavaScript and externs files
---
-compileJS :: forall m. (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m, MonadReader (P.Options P.Compile) m)
-          => [P.Module] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> [String] -> m (String, String, Environment)
-compileJS ms foreigns prefix = do
-  (modulesToCodeGen, env, nextVar, exts) <- compile ms
-  js <- concat <$> evalSupplyT nextVar (P.parU modulesToCodeGen codegenModule)
-  js' <- generateMain env js
-  let pjs = unlines $ map ("// " ++) prefix ++ [P.prettyPrintJS js']
-  return (pjs, exts, env)
-
-  where
-
-  codegenModule :: (Functor n, Applicative n, MonadError P.MultipleErrors n, MonadWriter P.MultipleErrors n, MonadReader (P.Options P.Compile) n, MonadSupply n)
-                => CoreFn.Module CoreFn.Ann -> n [J.JS]
-  codegenModule m =
-    let requiresForeign = not $ null (CoreFn.moduleForeign m)
-        mn = CoreFn.moduleName m
-    in case mn `M.lookup` foreigns of
-      Just (path, js)
-        | not requiresForeign -> do
-            tell $ P.errorMessage $ P.UnnecessaryFFIModule mn path
-            J.moduleToJs m Nothing
-        | otherwise -> J.moduleToJs m $ Just $
-            J.JSApp (J.JSFunction Nothing [] $
-                      J.JSBlock [ J.JSVariableIntroduction "exports" (Just $ J.JSObjectLiteral [])
-                                , J.JSRaw js
-                                , J.JSReturn (J.JSVar "exports")
-                                ]) []
-      Nothing | requiresForeign -> throwError . P.errorMessage $ P.MissingFFIModule mn
-              | otherwise -> J.moduleToJs m Nothing
-
-  generateMain :: P.Environment -> [J.JS] -> m [J.JS]
-  generateMain env js = do
-    mainName <- asks P.optionsMain
-    additional <- asks P.optionsAdditional
-    case P.moduleNameFromString <$> mainName of
-      Just mmi -> do
-        when ((mmi, P.Ident C.main) `M.notMember` P.names env) $
-          throwError . P.errorMessage $ P.NameIsUndefined (P.Ident C.main)
-        return $ js ++ [J.mainCall mmi (P.browserNamespace additional)]
-      _ -> return js
 
 -- |
 -- Actions that require implementations when running in "make" mode.
@@ -212,7 +121,7 @@ data RebuildPolicy
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Functor m, Applicative m, Monad m, MonadReader (P.Options P.Make) m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Functor m, Applicative m, Monad m, MonadReader P.Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [(Either RebuildPolicy FilePath, Module)]
      -> m Environment

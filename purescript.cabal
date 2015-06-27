@@ -78,7 +78,6 @@ library
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
                      Language.PureScript.Comments
-                     Language.PureScript.DeadCodeElimination
                      Language.PureScript.Environment
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
@@ -144,16 +143,6 @@ library
     hs-source-dirs: src
     other-modules: Paths_purescript
     ghc-options: -Wall -O2
-
-executable psc
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   transformers -any, Glob >= 0.7 && < 0.8
-    main-is: Main.hs
-    buildable: True
-    hs-source-dirs: psc
-    other-modules:
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psc-make
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
