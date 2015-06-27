@@ -45,7 +45,9 @@ renderDeclaration Declaration{..} =
       [ keywordClass ]
       ++ maybe [] (:[]) superclasses
       ++ [renderType (typeApp declTitle args)]
-      ++ if (not (null declChildren)) then [keywordWhere] else []
+      ++ if any (isTypeClassMember . cdeclInfo) declChildren
+            then [keywordWhere]
+            else []
 
       where
       superclasses
@@ -54,6 +56,9 @@ renderDeclaration Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
+
+      isTypeClassMember (ChildTypeClassMember _) = True
+      isTypeClassMember _ = False
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration ChildDeclaration{..} =
