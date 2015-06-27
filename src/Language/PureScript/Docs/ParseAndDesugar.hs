@@ -19,7 +19,7 @@ import Web.Bower.PackageMeta (PackageName)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Render
+import Language.PureScript.Docs.Convert (collectBookmarks)
 
 data ParseDesugarError
   = ParseError P.MultipleErrors

@@ -13,12 +13,15 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, GADTs #-}
 
 module Language.PureScript.Names where
 
 import Data.List
 import Data.Data
+import Data.List.Split (splitOn)
+import qualified Data.Aeson as A
+import qualified Data.Text as T
 
 -- |
 -- Names for value identifiers
@@ -76,6 +79,20 @@ data Qualified a = Qualified (Maybe ModuleName) a deriving (Eq, Ord, Data, Typea
 instance (Show a) => Show (Qualified a) where
   show (Qualified Nothing a) = show a
   show (Qualified (Just name) a) = show name ++ "." ++ show a
+
+instance (a ~ ProperName) => A.ToJSON (Qualified a) where
+  toJSON = A.toJSON . show
+
+instance (a ~ ProperName) => A.FromJSON (Qualified a) where
+  parseJSON =
+    A.withText "Qualified ProperName" $ \str ->
+      return $ case reverse (splitOn "." (T.unpack str)) of
+        [name]      -> Qualified Nothing (ProperName name)
+        (name:rest) -> Qualified (Just (reconstructModuleName rest)) (ProperName name)
+        _           -> Qualified Nothing (ProperName "")
+    where
+    reconstructModuleName = moduleNameFromString . intercalate "." . reverse
+
 
 -- |
 -- Provide a default module name, if a name is unqualified

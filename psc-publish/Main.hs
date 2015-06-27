@@ -109,14 +109,14 @@ preparePackage' = do
 
   return D.Package{..}
 
-getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.RenderedModule])
+getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
   liftIO (D.parseAndDesugar inputFiles depsFiles renderModules)
     >>= either (userError . ParseAndDesugarError) return
   where
   renderModules bookmarks modules =
-    return (bookmarks, map D.renderModule modules)
+    return (bookmarks, map D.convertModule modules)
 
 getVersionFromGitTag :: PrepareM (String, Version)
 getVersionFromGitTag = do

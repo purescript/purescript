@@ -13,12 +13,15 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Environment where
 
 import Data.Data
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Aeson as A
 
 import Language.PureScript.Kinds
 import Language.PureScript.Names
@@ -136,6 +139,16 @@ data DataDeclType
 instance Show DataDeclType where
   show Data = "data"
   show Newtype = "newtype"
+
+instance A.ToJSON DataDeclType where
+  toJSON = A.toJSON . show
+
+instance A.FromJSON DataDeclType where
+  parseJSON = A.withText "DataDeclType" $ \str ->
+    case str of
+      "data" -> return Data
+      "newtype" -> return Newtype
+      other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
 
 -- |
 -- Construct a ProperName in the Prim module
