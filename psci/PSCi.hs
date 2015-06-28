@@ -315,6 +315,7 @@ handleShowImportedModules = do
   showRef (P.ValueRef ident) = show ident
   showRef (P.TypeClassRef pn) = show pn
   showRef (P.TypeInstanceRef ident) = show ident
+  showRef (P.ModuleRef name) = "module " ++ show name
   showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref
 
   commaList :: [String] -> String

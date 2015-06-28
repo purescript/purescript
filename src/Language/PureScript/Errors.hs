@@ -688,6 +688,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
   prettyPrintExport (ValueRef ident) = show ident
   prettyPrintExport (TypeClassRef pn) = show pn
   prettyPrintExport (TypeInstanceRef ident) = show ident
+  prettyPrintExport (ModuleRef name) = "module " ++ show name
   prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 
   -- |

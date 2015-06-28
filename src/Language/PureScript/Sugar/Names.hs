@@ -14,13 +14,14 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternGuards #-}
 
 module Language.PureScript.Sugar.Names (
   desugarImports
 ) where
 
-import Data.List (nub)
-import Data.Maybe (fromMaybe, isJust, mapMaybe)
+import Data.List (find, nub, (\\))
+import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad
@@ -59,6 +60,10 @@ data Exports = Exports
   -- The values exported from each module
   --
   , exportedValues :: [Ident]
+  -- |
+  -- The modules exported from each module
+  --
+  , exportedModules :: [ModuleName]
   } deriving (Show)
 
 -- |
@@ -101,7 +106,7 @@ addEmptyModule :: (Applicative m, MonadError MultipleErrors m) => ExportEnvironm
 addEmptyModule env name =
   if name `M.member` env
     then throwError . errorMessage $ RedefinedModule name
-    else return $ M.insert name (Exports [] [] []) env
+    else return $ M.insert name (Exports [] [] [] []) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
@@ -155,13 +160,65 @@ desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m) => [Mod
 desugarImports modules = do
   unfilteredExports <- findExports modules
   exports <- foldM filterModuleExports unfilteredExports modules
-  mapM (renameInModule' unfilteredExports exports) modules
+  let modules' = moduleReexports <$> modules
+  mapM (renameInModule' unfilteredExports exports) modules'
   where
+  moduleReexports :: Module -> Module
+  moduleReexports (Module coms mn decls exps) =
+    let importedMods = catMaybes findImports'
+    in (Module coms mn (decls ++ (concatMap reexports importedMods)) exps)
+    where
+    imports :: [Declaration]
+    imports = filter isImportDecl decls
+    findImports' :: [Maybe (Declaration, Module)]
+    findImports' = go <$> modules
+      where
+      go :: Module -> Maybe (Declaration, Module)
+      go m@(Module _ mn' _ (Just exps'))
+        | any isModExport exps', Just d <- find ((== mn') . importedModName) imports = Just (d, m)
+        where
+        importedModName :: Declaration -> ModuleName
+        importedModName (ImportDeclaration imn _ _) = imn
+        importedModName (PositionedDeclaration _ _ d) = importedModName d
+        importedModName _ = error "Not an import decl"
+      go _ = Nothing
+    reexports :: (Declaration, Module) -> [Declaration]
+    reexports (ImportDeclaration _ (Hiding refs) _, (Module coms' mn' ds' (Just exps'))) =
+      case nonHiddenRefs of
+        [] -> []
+        _ -> reexports (ImportDeclaration mn' Implicit Nothing, Module coms' mn' ds' (Just nonHiddenRefs))
+      where
+      nonHiddenRefs :: [DeclarationRef]
+      nonHiddenRefs = filter isModExport exps' \\ filter isModExport refs
+    reexports (ImportDeclaration _ ty qual, Module _ _ _ (Just exps')) =
+      let ty' = case ty of
+                  Explicit _ -> Explicit []
+                  _ -> ty
+      in (\m -> ImportDeclaration m ty' qual) <$> (catMaybes $ go <$> exps')
+      where
+      go :: DeclarationRef -> Maybe ModuleName
+      go (ModuleRef mn') = Just mn'
+      go _ = Nothing
+    reexports (PositionedDeclaration _ _ d, m@(Module _ _ _ (Just _))) = reexports (d, m)
+    reexports _ = []
+
+  isModExport :: DeclarationRef -> Bool
+  isModExport (ModuleRef _) = True
+  isModExport _ = False
 
   -- Filters the exports for a module in the global exports environment so that only explicitly
   -- exported members remain. If the module does not explicitly export anything, everything is
   -- exported.
   filterModuleExports :: ExportEnvironment -> Module -> m ExportEnvironment
+  filterModuleExports env (Module _ mn _ (Just exps))
+    | any isSelfModuleExport exps, Just exps' <- M.lookup mn env =
+        let moduleNames = filter (/= mn) $ (\(ModuleRef mn') -> mn') <$> filter isModExport exps
+        in return $ M.insert mn (exps' {exportedModules = moduleNames}) env
+    where
+    isSelfModuleExport :: DeclarationRef -> Bool
+    isSelfModuleExport (ModuleRef mn') | mn' == mn = True
+    isSelfModuleExport (PositionedDeclarationRef _ _ ref) = isSelfModuleExport ref
+    isSelfModuleExport _ = False
   filterModuleExports env (Module _ mn _ (Just exps)) = filterExports mn exps env
   filterModuleExports env _ = return env
 
@@ -183,7 +240,8 @@ elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module coms mn decls _) = Module coms mn decls (Just $
   map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (exportedTypes exps) ++
   map TypeClassRef (exportedTypeClasses exps) ++
-  map ValueRef (exportedValues exps))
+  map ValueRef (exportedValues exps) ++
+  map ModuleRef (exportedModules exps))
 
 -- |
 -- Add `import X ()` for any modules where there are only fully qualified references to members.
@@ -314,7 +372,7 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   where
 
   -- The exported types from the Prim module
-  primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] []
+  primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] [] []
     where
     mkTypeEntry (Qualified _ name) = (name, [])
 
@@ -358,7 +416,8 @@ filterExports mn exps env = do
     types' <- foldM (filterTypes $ exportedTypes exported) [] exps
     values <- foldM (filterValues $ exportedValues exported) [] exps
     classes <- foldM (filterClasses $ exportedTypeClasses exported) [] exps
-    return exported { exportedTypes = types', exportedTypeClasses = classes, exportedValues = values }
+    modules <- foldM (filterModules $ exportedModules exported) [] exps
+    return exported { exportedTypes = types', exportedTypeClasses = classes, exportedValues = values, exportedModules = modules }
 
   -- Ensure the exported types and data constructors exist in the module and add them to the set of
   -- exports
@@ -394,6 +453,12 @@ filterExports mn exps env = do
     then return $ name : result
     else throwError . errorMessage . UnknownValue $ Qualified (Just mn) name
   filterValues _ result _ = return result
+
+  -- Add the exported modules to the set of exports
+  filterModules :: [ModuleName] -> [ModuleName] -> DeclarationRef -> m [ModuleName]
+  filterModules exps' result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterModules exps' result r
+  filterModules _ result (ModuleRef name) = return $ name : result
+  filterModules _ result _ = return result
 
 -- |
 -- Finds the imports within a module, mapping the imported module name to an optional set of
@@ -501,6 +566,8 @@ resolveImport currentModule importModule exps imps impQual =
       return ref
     check ref@(TypeClassRef name) =
       checkImportExists UnknownTypeClass classes name >> return ref
+    check ref@(ModuleRef name) =
+      checkImportExists (UnknownModule . (\(Qualified _ m) -> m)) (exportedModules exps) name >> return ref
     check _ = error "Invalid argument to checkRefIsValid"
 
   -- Find all exported data constructors for a given type
