@@ -54,7 +54,7 @@ compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
-    hPutStrLn stderr "psc-make: No input files."
+    hPutStrLn stderr "psc: No input files."
     exitFailure
   moduleFiles <- readInput (InputOptions input)
   inputForeign <- concat <$> mapM glob inputForeignGlob
@@ -169,8 +169,8 @@ main = execParser opts >>= compile
   where
   opts        = info (version <*> helper <*> pscMakeOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header   "psc-make - Compiles PureScript to Javascript"
-  footerInfo  = footer $ "psc-make " ++ showVersion Paths.version
+  headerInfo  = header   "psc - Compiles PureScript to Javascript"
+  footerInfo  = footer $ "psc " ++ showVersion Paths.version
 
   version :: Parser (a -> a)
   version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden

@@ -144,13 +144,13 @@ library
     other-modules: Paths_purescript
     ghc-options: -Wall -O2
 
-executable psc-make
+executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
                    time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psc-make
+    hs-source-dirs: psc
     other-modules: Make
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
