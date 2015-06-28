@@ -27,7 +27,7 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
 
-magicDo :: Options mode -> JS -> JS
+magicDo :: Options -> JS -> JS
 magicDo opts | optionsNoMagicDo opts = id
              | otherwise = inlineST . magicDo'
 

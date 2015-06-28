@@ -42,7 +42,7 @@ data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
   , pscmForeignInput :: [FilePath]
   , pscmOutputDir    :: FilePath
-  , pscmOpts         :: P.Options P.Make
+  , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
   }
 
@@ -53,6 +53,9 @@ data InputOptions = InputOptions
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
   input <- concat <$> mapM glob inputGlob
+  when (null input) $ do
+    hPutStrLn stderr "psc-make: No input files."
+    exitFailure
   moduleFiles <- readInput (InputOptions input)
   inputForeign <- concat <$> mapM glob inputForeignGlob
   foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
@@ -68,7 +71,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
       e <- runMake opts $ P.make makeActions ms
       case e of
         Left errs -> do
-          putStrLn (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
+          hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
         Right (_, warnings') -> do
           when (P.nonEmpty warnings') $
@@ -145,18 +148,15 @@ noPrefix = switch $
   <> help "Do not include comment header"
 
 
-options :: Parser (P.Options P.Make)
+options :: Parser P.Options
 options = P.Options <$> noTco
                     <*> noMagicDo
                     <*> pure Nothing
                     <*> noOpts
                     <*> verboseErrors
                     <*> (not <$> comments)
-                    <*> additionalOptions
-  where
-  additionalOptions =
-    P.MakeOptions <$> requirePath
-
+                    <*> requirePath
+                    
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> many inputForeignFile

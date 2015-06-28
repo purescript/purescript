@@ -12,75 +12,149 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds, DoAndIfThenElse, TupleSections #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DoAndIfThenElse #-} 
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Main (main) where
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CodeGen.JS as J
+import qualified Language.PureScript.CoreFn as CF
 
 import Data.List (isSuffixOf)
 import Data.Traversable (traverse)
+import Data.Time.Clock (UTCTime())
 
 import qualified Data.Map as M
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Control.Monad.Reader (runReaderT)
-import Control.Monad.Writer (runWriterT)
-import Control.Monad.Trans.Except (runExceptT)
 import Control.Applicative
+
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
+import Control.Monad.Error.Class
 
 import System.Exit
 import System.Process
-import System.FilePath ((</>))
-import System.Directory (getCurrentDirectory, getTemporaryDirectory, getDirectoryContents, findExecutable)
+import System.FilePath
+import System.Directory
 
 import Text.Parsec (ParseError)
+
+modulesDir :: FilePath
+modulesDir = ".test_modules" </> "node_modules"
+
+newtype Test a = Test { unTest :: ReaderT P.Options (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader P.Options)
+
+runTest :: Test a -> IO (Either P.MultipleErrors a)
+runTest = runExceptT . fmap fst . runWriterT . flip runReaderT P.defaultOptions . unTest
+
+makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions Test
+makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+  where
+  getInputTimestamp :: P.ModuleName -> Test (Either P.RebuildPolicy (Maybe UTCTime))
+  getInputTimestamp mn 
+    | isPreludeModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | otherwise = return (Left P.RebuildAlways)
+    where
+    isPreludeModule = flip elem
+      [ "Prelude.Unsafe"
+      , "Prelude"
+      , "Data.Function"
+      , "Control.Monad.Eff"
+      , "Control.Monad.ST"
+      , "Debug.Trace"
+      , "Assert"
+      ]
+  
+  getOutputTimestamp :: P.ModuleName -> Test (Maybe UTCTime)
+  getOutputTimestamp mn = do
+    let filePath = modulesDir </> P.runModuleName mn
+    exists <- liftIO $ doesDirectoryExist filePath
+    return (if exists then Just (error "getOutputTimestamp: read timestamp") else Nothing)
+  
+  readExterns :: P.ModuleName -> Test (FilePath, String)
+  readExterns mn = do
+    let filePath = modulesDir </> P.runModuleName mn </> "externs.purs"
+    (filePath, ) <$> readTextFile filePath
+  
+  codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Test ()
+  codegen m _ nextVar exts = do
+    let mn = CF.moduleName m
+    foreignInclude <- case (CF.moduleName m `M.lookup` foreigns, CF.moduleForeign m) of
+      (Just _, [])   -> error "Unnecessary foreign module"
+      (Just path, _) -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
+      (Nothing, [])  -> return Nothing
+      (Nothing, _)   -> error "Missing foreign module"
+    pjs <- P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs m foreignInclude
+    let filePath    = P.runModuleName $ CF.moduleName m
+        jsFile      = modulesDir </> filePath </> "index.js"
+        externsFile = modulesDir </> filePath </> "externs.purs"
+        foreignFile = modulesDir </> filePath </> "foreign.js"
+    writeTextFile jsFile pjs
+    maybe (return ()) (writeTextFile foreignFile . snd) $ CF.moduleName m `M.lookup` foreigns
+    writeTextFile externsFile exts
+    
+  readTextFile :: FilePath -> Test String
+  readTextFile path = liftIO $ readFile path
+  
+  writeTextFile :: FilePath -> String -> Test ()
+  writeTextFile path text = liftIO $ do
+    createDirectoryIfMissing True (takeDirectory path)
+    writeFile path text
+  
+  progress :: String -> Test ()
+  progress = liftIO . putStrLn
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
   return (inputFile, text)
 
-loadPrelude :: [(FilePath, String)] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> Either P.MultipleErrors (String, String, P.Environment)
-loadPrelude fs foreigns = do
-  ms <- P.parseModulesFromFiles id fs
-  fmap fst . runWriterT $ runReaderT (P.compileJS (map snd ms) foreigns []) (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] })
-
-compile :: P.Options P.Compile -> [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors (String, String, P.Environment))
-compile opts inputFiles foreigns = runExceptT . fmap fst . runWriterT . flip runReaderT opts $ do
+compile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors P.Environment)
+compile inputFiles foreigns = runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
-  P.compileJS (map snd ms) foreigns []
+  P.make (makeActions foreigns) (map (\(k, v) -> (Right k, v)) ms)
 
-assert :: FilePath -> P.Options P.Compile -> FilePath -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> (Either P.MultipleErrors (String, String, P.Environment) -> IO (Maybe String)) -> IO ()
-assert preludeExterns opts inputFile foreigns f = do
-  e <- compile opts [preludeExterns, inputFile] foreigns
+assert :: [FilePath] -> 
+          M.Map P.ModuleName (FilePath, P.ForeignJS) -> 
+          (Either P.MultipleErrors P.Environment -> IO (Maybe String)) -> 
+          IO ()
+assert inputFiles foreigns f = do
+  e <- compile inputFiles foreigns
   maybeErr <- f e
   case maybeErr of
     Just err -> putStrLn err >> exitFailure
     Nothing -> return ()
 
-assertCompiles :: String -> FilePath -> FilePath -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
-assertCompiles preludeJs preludeExterns inputFile foreigns = do
-  putStrLn $ "Assert " ++ inputFile ++ " compiles successfully"
-  let options = P.defaultCompileOptions
-                              { P.optionsMain = Just "Main"
-                              , P.optionsAdditional = P.CompileOptions "Tests" ["Main"] ["Main"]
-                              }
-  assert preludeExterns options inputFile foreigns $ either (return . Just . P.prettyPrintMultipleErrors False) $ \(js, _, _) -> do
-    process <- findNodeProcess
-    result <- traverse (\node -> readProcessWithExitCode node [] (preludeJs ++ js)) process
-    case result of
-      Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
-      Just (ExitFailure _, _, err) -> return $ Just err
-      Nothing -> return $ Just "Couldn't find node.js executable"
+assertCompiles :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
+assertCompiles inputFiles foreigns = do
+  putStrLn $ "Assert " ++ last inputFiles ++ " compiles successfully"
+  assert inputFiles foreigns $ \e ->
+    case e of 
+      Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
+      Right _ -> do
+        process <- findNodeProcess
+        let entryPoint = modulesDir </> "index.js"
+        writeFile entryPoint "require('Main').main()"
+        result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+        case result of
+          Just (ExitSuccess, out, _) -> putStrLn out >> return Nothing
+          Just (ExitFailure _, _, err) -> return $ Just err
+          Nothing -> return $ Just "Couldn't find node.js executable"
 
-assertDoesNotCompile :: FilePath -> FilePath -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
-assertDoesNotCompile preludeExterns inputFile foreigns = do
-  putStrLn $ "Assert " ++ inputFile ++ " does not compile"
-  assert preludeExterns (P.defaultCompileOptions { P.optionsAdditional = P.CompileOptions "Tests" [] [] }) inputFile foreigns $ \e ->
+assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
+assertDoesNotCompile inputFiles foreigns = do
+  putStrLn $ "Assert " ++ last inputFiles ++ " does not compile"
+  assert inputFiles foreigns $ \e ->
     case e of
       Left errs -> putStrLn  (P.prettyPrintMultipleErrors False errs) >> return Nothing
       Right _ -> return $ Just "Should not have compiled"
@@ -93,26 +167,20 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 main :: IO ()
 main = do
   cwd <- getCurrentDirectory
-  let preludeDir = cwd </> "tests" </> "prelude"
-      jsDir = preludeDir </> "js"
-  prelude <- readInput [preludeDir </> "Prelude.purs"]
+  
+  let preludeDir  = cwd </> "tests" </> "prelude"
+      preludePurs = preludeDir </> "Prelude.purs"
+      jsDir       = preludeDir </> "js"
   jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
   foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
-  putStrLn "Compiling Prelude"
-  case loadPrelude prelude foreigns of
-    Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
-    Right (preludeJs, exts, _) -> do
-      tmp <- getTemporaryDirectory
-      let preludeExterns = tmp </> "prelude.externs"
-      writeFile preludeExterns exts
-      putStrLn $ "Wrote " ++ preludeExterns
-      let passing = cwd </> "examples" </> "passing"
-      passingTestCases <- getDirectoryContents passing
-      forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-        assertCompiles preludeJs preludeExterns (passing </> inputFile) foreigns
-      let failing = cwd </> "examples" </> "failing"
-      failingTestCases <- getDirectoryContents failing
-      forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-        assertDoesNotCompile preludeExterns (failing </> inputFile) foreigns
-      exitSuccess
+  
+  let passing = cwd </> "examples" </> "passing"
+  passingTestCases <- getDirectoryContents passing
+  forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
+    assertCompiles [preludePurs, passing </> inputFile] foreigns
+  let failing = cwd </> "examples" </> "failing"
+  failingTestCases <- getDirectoryContents failing
+  forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
+    assertDoesNotCompile [preludePurs, failing </> inputFile] foreigns
+  exitSuccess

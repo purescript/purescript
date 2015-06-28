@@ -21,7 +21,7 @@ module Language.PureScript.TypeChecker.Entailment (
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (maybeToList)
 import Data.Foldable (foldMap)
 import qualified Data.Map as M
 
