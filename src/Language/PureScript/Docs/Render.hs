@@ -75,18 +75,8 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
       [ keywordInstance
       , ident cdeclTitle
       , syntax "::"
-      ] ++ maybe [] (:[]) constraints'
+      ] ++ maybe [] (:[]) (renderConstraints constraints)
         ++ [ renderType' ty ]
-      where
-      constraints'
-        | null constraints = Nothing
-        | otherwise = Just $
-              syntax "("
-              <> renderedConstraints
-              <> syntax ")" <> sp <> syntax "=>"
-
-      renderedConstraints = mintersperse (syntax "," <> sp)
-                                         (map renderConstraint constraints)
     ChildDataConstructor args ->
       [ renderType' typeApp' ]
       where
@@ -102,8 +92,26 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   renderType' = renderTypeWithOptions opts
 
 renderConstraint :: (P.Qualified P.ProperName, [P.Type]) -> RenderedCode
-renderConstraint (pn, tys) =
-  renderType $ foldl P.TypeApp (P.TypeConstructor pn) tys
+renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
+
+renderConstraintWithOptions :: RenderTypeOptions -> (P.Qualified P.ProperName, [P.Type]) -> RenderedCode
+renderConstraintWithOptions opts (pn, tys) =
+  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor pn) tys
+
+renderConstraints :: [P.Constraint] -> Maybe RenderedCode
+renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
+
+renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint] -> Maybe RenderedCode
+renderConstraintsWithOptions opts constraints
+  | null constraints = Nothing
+  | otherwise = Just $
+        syntax "("
+        <> renderedConstraints
+        <> syntax ")" <> sp <> syntax "=>"
+  where
+  renderedConstraints =
+    mintersperse (syntax "," <> sp)
+                 (map (renderConstraintWithOptions opts) constraints)
 
 notQualified :: String -> P.Qualified P.ProperName
 notQualified = P.Qualified Nothing . P.ProperName
