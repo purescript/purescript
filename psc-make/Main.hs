@@ -54,7 +54,7 @@ compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
-    putStrLn "psc-make: No input files."
+    hPutStrLn stderr "psc-make: No input files."
     exitFailure
   moduleFiles <- readInput (InputOptions input)
   inputForeign <- concat <$> mapM glob inputForeignGlob
@@ -71,7 +71,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
       e <- runMake opts $ P.make makeActions ms
       case e of
         Left errs -> do
-          putStrLn (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
+          hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
           exitFailure
         Right (_, warnings') -> do
           when (P.nonEmpty warnings') $
