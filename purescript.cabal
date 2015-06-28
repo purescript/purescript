@@ -214,7 +214,7 @@ executable psc-hierarchy
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, process -any, transformers-compat -any
+                   transformers -any, process -any, transformers-compat -any, time -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
     buildable: True
