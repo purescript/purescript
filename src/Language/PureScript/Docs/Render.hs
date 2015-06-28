@@ -18,33 +18,36 @@ import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Utils.MonoidExtras
 
 renderDeclaration :: Declaration -> RenderedCode
-renderDeclaration Declaration{..} =
+renderDeclaration = renderDeclarationWithOptions defaultRenderTypeOptions
+
+renderDeclarationWithOptions :: RenderTypeOptions -> Declaration -> RenderedCode
+renderDeclarationWithOptions opts Declaration{..} =
   mintersperse sp $ case declInfo of
     ValueDeclaration ty ->
       [ ident declTitle
       , syntax "::"
-      , renderType ty
+      , renderType' ty
       ]
     DataDeclaration dtype args ->
       [ keyword (show dtype)
-      , renderType (typeApp declTitle args)
+      , renderType' (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->
       [ keywordData
-      , renderType (P.TypeConstructor (notQualified declTitle))
+      , renderType' (P.TypeConstructor (notQualified declTitle))
       , syntax "::"
       , renderKind kind'
       ]
     TypeSynonymDeclaration args ty ->
       [ keywordType
-      , renderType (typeApp declTitle args)
+      , renderType' (typeApp declTitle args)
       , syntax "="
-      , renderType ty
+      , renderType' ty
       ]
     TypeClassDeclaration args implies ->
       [ keywordClass ]
       ++ maybe [] (:[]) superclasses
-      ++ [renderType (typeApp declTitle args)]
+      ++ [renderType' (typeApp declTitle args)]
       ++ if any (isTypeClassMember . cdeclInfo) declChildren
             then [keywordWhere]
             else []
@@ -59,16 +62,21 @@ renderDeclaration Declaration{..} =
 
       isTypeClassMember (ChildTypeClassMember _) = True
       isTypeClassMember _ = False
+  where
+  renderType' = renderTypeWithOptions opts
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
-renderChildDeclaration ChildDeclaration{..} =
+renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
+
+renderChildDeclarationWithOptions :: RenderTypeOptions -> ChildDeclaration -> RenderedCode
+renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of
     ChildInstance constraints ty ->
       [ keywordInstance
       , ident cdeclTitle
       , syntax "::"
       ] ++ maybe [] (:[]) constraints'
-        ++ [ renderType ty ]
+        ++ [ renderType' ty ]
       where
       constraints'
         | null constraints = Nothing
@@ -80,7 +88,7 @@ renderChildDeclaration ChildDeclaration{..} =
       renderedConstraints = mintersperse (syntax "," <> sp)
                                          (map renderConstraint constraints)
     ChildDataConstructor args ->
-      [ renderType typeApp' ]
+      [ renderType' typeApp' ]
       where
       typeApp' = foldl P.TypeApp ctor' args
       ctor' = P.TypeConstructor (notQualified cdeclTitle)
@@ -88,8 +96,10 @@ renderChildDeclaration ChildDeclaration{..} =
     ChildTypeClassMember ty ->
       [ ident cdeclTitle
       , syntax "::"
-      , renderType ty
+      , renderType' ty
       ]
+  where
+  renderType' = renderTypeWithOptions opts
 
 renderConstraint :: (P.Qualified P.ProperName, [P.Type]) -> RenderedCode
 renderConstraint (pn, tys) =
