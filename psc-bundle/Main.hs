@@ -30,7 +30,10 @@ import Data.Version (showVersion)
 import qualified Data.Set as S
 
 import Control.Applicative
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Error.Class
+import Control.Monad.Trans.Except
+import Control.Monad.IO.Class
 
 import System.FilePath (takeFileName, takeDirectory)
 import System.Exit (exitFailure)
