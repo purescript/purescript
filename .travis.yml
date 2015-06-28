@@ -10,6 +10,7 @@ install:
   - cabal --version
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
+  - cabal install alex happy
   - cabal install --only-dependencies --enable-tests --enable-benchmarks
 script:
   - ./travis-script.sh

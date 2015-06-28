@@ -211,6 +211,24 @@ executable psc-hierarchy
     other-modules:
     ghc-options: -Wall -O2
 
+executable psc-bundle
+  main-is:             Main.hs
+  other-modules:
+  other-extensions:
+  build-depends:       base >=4 && <5,
+                       language-javascript == 0.5.*,
+                       syb -any,
+                       containers -any,
+                       filepath -any,
+                       directory -any,
+                       mtl -any,
+                       transformers -any,
+                       transformers-compat -any, 
+                       optparse-applicative >= 0.10.0
+  ghc-options:         -Wall -O2
+  hs-source-dirs:      psc-bundle
+  default-language:    Haskell2010
+
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,

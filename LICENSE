@@ -22,6 +22,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 PureScript uses the following Haskell library packages. Their license files follow.
 
+  Glob
+  HUnit
   aeson
   aeson-better-errors
   ansi-terminal
@@ -29,6 +31,7 @@ PureScript uses the following Haskell library packages. Their license files foll
   array
   attoparsec
   base
+  blaze-builder
   bower-json
   boxes
   bytestring
@@ -38,10 +41,10 @@ PureScript uses the following Haskell library packages. Their license files foll
   dlist
   filepath
   ghc-prim
-  Glob
   hashable
   haskeline
   integer-gmp
+  language-javascript
   mtl
   nats
   old-locale
@@ -68,6 +71,69 @@ PureScript uses the following Haskell library packages. Their license files foll
   utf8-string
   vector
   void
+
+Glob LICENSE file:
+
+  The code in Glob is released under the license below. Copyrights to parts of
+  the code are held by whoever wrote the code in question: see CREDITS.txt for a
+  list of authors.
+
+  Copyright (c) 2008-2012 <authors>
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+      * Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in the
+        documentation and/or other materials provided with the distribution.
+      * Neither the name of the project nor the names of its contributors may be
+        used to endorse or promote products derived from this software without
+        specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR IMPLIED
+  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+  EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+HUnit LICENSE file:
+
+  HUnit is Copyright (c) Dean Herington, 2002, all rights reserved,
+  and is distributed as free software under the following license.
+  
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  
+  - Redistributions of source code must retain the above copyright
+  notice, this list of conditions, and the following disclaimer.
+  
+  - Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions, and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+  
+  - The names of the copyright holders may not be used to endorse or
+  promote products derived from this software without specific prior
+  written permission.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
+  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 aeson LICENSE file:
 
@@ -149,6 +215,7 @@ ansi-terminal LICENSE file:
   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
   IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 ansi-wl-pprint LICENSE file:
 
   Copyright 2008, Daan Leijen and Max Bolingbroke. All rights reserved.
@@ -381,6 +448,39 @@ base LICENSE file:
     be a definition of the Haskell 98 Foreign Function Interface.
   
   -----------------------------------------------------------------------------
+
+blaze-builder LICENSE file:
+
+  Copyright Jasper Van der Jeugt 2010, Simon Meier 2010 & 2011
+  
+  All rights reserved.
+  
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+  
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+  
+      * Redistributions in binary form must reproduce the above
+        copyright notice, this list of conditions and the following
+        disclaimer in the documentation and/or other materials provided
+        with the distribution.
+  
+      * Neither the name of Jasper Van der Jeugt nor the names of other
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 bower-json LICENSE file:
 
@@ -742,10 +842,6 @@ ghc-prim LICENSE file:
     be a definition of the Haskell 98 Language.
   
 
-Glob LICENSE file:
-
-  Page not found: Sorry, it's just not here.
-
 hashable LICENSE file:
 
   Copyright Milan Straka 2010
@@ -823,6 +919,39 @@ integer-gmp LICENSE file:
         with the distribution.
   
       * Neither the name of Herbert Valerio Riedel nor the names of other
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+language-javascript LICENSE file:
+
+  Copyright (c)2010, Alan Zimmerman
+  
+  All rights reserved.
+  
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+  
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+  
+      * Redistributions in binary form must reproduce the above
+        copyright notice, this list of conditions and the following
+        disclaimer in the documentation and/or other materials provided
+        with the distribution.
+  
+      * Neither the name of Alan Zimmerman nor the names of other
         contributors may be used to endorse or promote products derived
         from this software without specific prior written permission.
   
@@ -1198,7 +1327,7 @@ rts LICENSE file:
 
 safe LICENSE file:
 
-  Copyright Neil Mitchell 2007-2014.
+  Copyright Neil Mitchell 2007-2015.
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without
