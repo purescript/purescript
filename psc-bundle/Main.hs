@@ -50,9 +50,9 @@ import qualified Paths_purescript as Paths
 -- type, in case we need to match on error types later.
 data ErrorMessage
   = UnsupportedModulePath String
-  | InvalidTopLevel
-  | UnableToParseModule
-  | UnsupportedExport
+  | InvalidTopLevel String
+  | UnableToParseModule String
+  | UnsupportedExport String
   | ErrorInFile FilePath ErrorMessage
   deriving Show
 
@@ -117,12 +117,12 @@ printErrorMessage (UnsupportedModulePath s) =
   , "  1) index.js (psc-make native modules)"
   , "  2) foreign.js (psc-make foreign modules)"
   ]
-printErrorMessage InvalidTopLevel =
-  [ "Expected a list of source elements at the top level." ] 
-printErrorMessage UnableToParseModule =
-  [ "The module could not be parsed." ]
-printErrorMessage UnsupportedExport =
-  [ "An export was unsupported. Exports can be defined in one of two ways: "
+printErrorMessage (InvalidTopLevel filename) =
+  [ "Expected a list of source elements at the top level of "++ filename ++"." ] 
+printErrorMessage (UnableToParseModule filename) =
+  [ "The module ("++ filename ++")could not be parsed." ]
+printErrorMessage (UnsupportedExport filename) =
+  [ "An export was found in "++ filename ++" that is unsupported. Exports can be defined in one of two ways: "
   , "  1) exports.name = ..."
   , "  2) exports = { ... }"
   ]
@@ -218,11 +218,11 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 -- Other constructor.
 toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSNode -> m Module
 toModule mids mid top 
-  | JSSourceElementsTop ns <- node top = Module mid <$> mapM toModuleElement ns
-  | otherwise = throwError InvalidTopLevel
+  | JSSourceElementsTop ns <- node top = Module mid <$> mapM (toModuleElement mid) ns
+  | otherwise = throwError $ InvalidTopLevel (moduleName mid)
   where      
-  toModuleElement :: JSNode -> m ModuleElement
-  toModuleElement n
+  toModuleElement :: ModuleIdentifier -> JSNode -> m ModuleElement
+  toModuleElement mid n
     | JSVariables var [ varIntro ] _ <- node n
     , JSLiteral "var" <- node var 
     , JSVarDecl impN [ eq, req, impP ] <- node varIntro
@@ -233,14 +233,14 @@ toModule mids mid top
     , JSStringLiteral _ importPath <- node impS
     , Just importPath' <- checkImportPath importPath mid mids
     = pure (Require n importName importPath')
-  toModuleElement n
+  toModuleElement mid n
     | JSVariables var [ varIntro ] _ <- node n
     , JSLiteral "var" <- node var 
     , JSVarDecl declN (eq : decl) <- node varIntro
     , JSIdentifier name <- node declN
     , JSLiteral "=" <- node eq
     = pure (Member n False name decl [])
-  toModuleElement n
+  toModuleElement mid n
     | JSExpression (e : op : decl) <- node n
     , JSMemberDot [ exports ] _ nm <- node e
     , JSIdentifier "exports" <- node exports
@@ -248,7 +248,7 @@ toModule mids mid top
     , JSLiteral "=" <- node eq
     , JSIdentifier name <- node nm
     = pure (Member n True name decl [])
-  toModuleElement n
+  toModuleElement mid n
     | JSExpression (mnExp : op : obj: _) <- node n
     , JSMemberDot [ mn ] _ e <- node mnExp
     , JSIdentifier "module" <- node mn
@@ -256,33 +256,33 @@ toModule mids mid top
     , JSOperator eq <- node op
     , JSLiteral "=" <- node eq
     , JSObjectLiteral _ props _ <- node obj
-    = ExportsList <$> mapM toExport (filter (not . isSeparator) (map node props))
+    = ExportsList <$> mapM (toExport (moduleName mid)) (filter (not . isSeparator) (map node props))
     where
-    toExport :: Node -> m (ExportType, String, JSNode, [Key])
-    toExport (JSPropertyNameandValue name _ [val] ) = 
-      (,,val,[]) <$> exportType (node val) 
-                 <*> extractLabel (node name)
-    toExport _ = throwError UnsupportedExport
+    toExport :: String -> Node -> m (ExportType, String, JSNode, [Key])
+    toExport moduleName (JSPropertyNameandValue name _ [val] ) = 
+      (,,val,[]) <$> exportType moduleName (node val) 
+                 <*> extractLabel moduleName (node name)
+    toExport modulename _ = throwError $ UnsupportedExport modulename
   
-    exportType :: Node -> m ExportType
-    exportType (JSMemberDot [f] _ _)
+    exportType :: String -> Node -> m ExportType
+    exportType _ (JSMemberDot [f] _ _)
       | JSIdentifier "$foreign" <- node f
       = pure ForeignReexport
-    exportType (JSMemberSquare [f] _ _ _)
+    exportType _ (JSMemberSquare [f] _ _ _)
       | JSIdentifier "$foreign" <- node f
       = pure ForeignReexport
-    exportType (JSIdentifier s) = pure (RegularExport s)
-    exportType _ = throwError UnsupportedExport
+    exportType _ (JSIdentifier s) = pure (RegularExport s)
+    exportType modulename _ = throwError $ UnsupportedExport modulename
   
-    extractLabel :: Node -> m String
-    extractLabel (JSStringLiteral _ nm) = pure nm
-    extractLabel (JSIdentifier nm) = pure nm
-    extractLabel _ = throwError UnsupportedExport
+    extractLabel :: String -> Node -> m String
+    extractLabel _ (JSStringLiteral _ nm) = pure nm
+    extractLabel _ (JSIdentifier nm) = pure nm
+    extractLabel modulename _ = throwError $ UnsupportedExport modulename
     
     isSeparator :: Node -> Bool
     isSeparator (JSLiteral ",") = True
     isSeparator _ = False
-  toModuleElement other = pure (Other other)
+  toModuleElement _ other = pure (Other other)
 
 -- | Eliminate unused code based on the specified entry point set.
 compile :: [Module] -> [ModuleIdentifier] -> [Module]
@@ -525,7 +525,7 @@ app :: forall m. (Applicative m, MonadError ErrorMessage m, MonadIO m) => Option
 app opts@Options{..} = do
   input <- for optionsInputFiles $ \filename -> do
     js <- liftIO (readFile filename)
-    ast <- fromRight (parse js filename)
+    ast <- fromRight filename (parse js filename)
     mid <- guessModuleIdentifier filename
     return (mid, ast)
     
@@ -539,9 +539,9 @@ app opts@Options{..} = do
   return (codeGen opts sorted)
   
   where
-  fromRight :: Either a b -> m b
-  fromRight (Right b) = pure b
-  fromRight (Left _) = throwError UnableToParseModule
+  fromRight :: FilePath -> Either a b -> m b
+  fromRight fp (Right b) = pure b
+  fromRight fp (Left _) = throwError $ UnableToParseModule fp
     
 -- | Command line options parser.
 options :: Parser Options
