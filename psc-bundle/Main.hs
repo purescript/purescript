@@ -242,12 +242,22 @@ toModule mids mid top
     = pure (Member n False name decl [])
   toModuleElement n
     | JSExpression (e : op : decl) <- node n
-    , JSMemberDot [ exports ] _ nm <- node e
-    , JSIdentifier "exports" <- node exports
+    , Just name <- accessor (node e)
     , JSOperator eq <- node op
     , JSLiteral "=" <- node eq
-    , JSIdentifier name <- node nm
     = pure (Member n True name decl [])
+    where
+    accessor :: Node -> Maybe String
+    accessor (JSMemberDot [ exports ] _ nm)
+      | JSIdentifier "exports" <- node exports
+      , JSIdentifier name <- node nm
+      = Just name
+    accessor (JSMemberSquare [ exports ] _ nm _)
+      | JSIdentifier "exports" <- node exports
+      , JSExpression [e] <- node nm
+      , JSStringLiteral _ name <- node e
+      = Just name
+    accessor _ = Nothing
   toModuleElement n
     | JSExpression (mnExp : op : obj: _) <- node n
     , JSMemberDot [ mn ] _ e <- node mnExp
