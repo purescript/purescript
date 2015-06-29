@@ -4,7 +4,7 @@ cabal-version: >=1.8
 build-type: Simple
 license: MIT
 license-file: LICENSE
-copyright: (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
+copyright: (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
 maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
@@ -13,7 +13,8 @@ category: Language
 Homepage: http://www.purescript.org/
 author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
-        Hardy Jones <jones3.hardy@gmail.com>
+        Hardy Jones <jones3.hardy@gmail.com>,
+        Harry Garrood <harry@garrood.me>
 
 tested-with: GHC==7.8
 
