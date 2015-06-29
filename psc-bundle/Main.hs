@@ -536,7 +536,7 @@ app :: forall m. (Applicative m, MonadError ErrorMessage m, MonadIO m) => Option
 app opts@Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
-    hPutStrLn stderr "psc: No input files."
+    hPutStrLn stderr "psc-bundle: No input files."
     exitFailure
   input <- for inputFiles $ \filename -> do
     js <- liftIO (readFile filename)
