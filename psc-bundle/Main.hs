@@ -36,6 +36,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
 
 import System.FilePath (takeFileName, takeDirectory)
+import System.FilePath.Glob (glob)
 import System.Exit (exitFailure)
 import System.IO (stderr, hPutStrLn)
 import System.Directory (createDirectoryIfMissing)
@@ -533,7 +534,11 @@ codeGen Options{..} ms = renderToString (NN (JSSourceElementsTop (prelude ++ con
 -- and generates and prints the final Javascript bundle.
 app :: forall m. (Applicative m, MonadError ErrorMessage m, MonadIO m) => Options -> m String
 app opts@Options{..} = do
-  input <- for optionsInputFiles $ \filename -> do
+  inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
+  when (null inputFiles) . liftIO $ do
+    hPutStrLn stderr "psc: No input files."
+    exitFailure
+  input <- for inputFiles $ \filename -> do
     js <- liftIO (readFile filename)
     ast <- fromRight (parse js filename)
     mid <- guessModuleIdentifier filename

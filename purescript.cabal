@@ -224,7 +224,8 @@ executable psc-bundle
                        mtl -any,
                        transformers -any,
                        transformers-compat -any, 
-                       optparse-applicative >= 0.10.0
+                       optparse-applicative >= 0.10.0,
+                       Glob -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
   default-language:    Haskell2010
