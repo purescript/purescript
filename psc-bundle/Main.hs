@@ -297,6 +297,7 @@ toModule mids mid top
 
 -- | Eliminate unused code based on the specified entry point set.
 compile :: [Module] -> [ModuleIdentifier] -> [Module]
+compile modules [] = modules
 compile modules entryPoints = filteredModules
   where    
   (graph, _, vertexFor) = graphFromEdges verts
@@ -562,7 +563,7 @@ app opts@Options{..} = do
 options :: Parser Options
 options = Options <$> some inputFile
                   <*> optional outputFile
-                  <*> some entryPoint
+                  <*> many entryPoint
                   <*> optional mainModule
                   <*> namespace
   where                  
