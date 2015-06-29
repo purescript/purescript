@@ -438,9 +438,9 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
     goSimple (UnknownDataConstructor dc tc) =
       line $ "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
     goSimple (ConflictingImport nm mn) =
-      line $ "Cannot declare `" ++ nm ++ "` since another declaration of that name was imported from `" ++ show mn ++ "`"
+      line $ "Cannot declare " ++ show nm ++ " since another declaration of that name was imported from " ++ show mn
     goSimple (ConflictingImports nm m1 m2) =
-      line $ "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
+      line $ "Conflicting imports for " ++ show nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
     goSimple (ConflictingTypeDecls nm) =
       line $ "Conflicting type declarations for " ++ show nm
     goSimple (ConflictingCtorDecls nm) =
@@ -653,11 +653,11 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
   suggestions :: ErrorMessage -> [Box.Box]
   suggestions = suggestions' . unwrapErrorMessage
     where
-    suggestions' (ConflictingImport nm im) = [ line $ "Possible fix: hide `" ++ nm ++ "` when importing `" ++ show im ++ "`:"
+    suggestions' (ConflictingImport nm im) = [ line $ "Possible fix: hide " ++ show nm ++ " when importing " ++ show im ++ ":"
                                              , indent . line $ "import " ++ show im ++ " hiding (" ++ nm ++ ")"
                                              ]
     suggestions' (TypesDoNotUnify t1 t2)
-      | any isObject [t1, t2] = [line "Note that function composition in PureScript is defined using `(<<<)`"]
+      | any isObject [t1, t2] = [line "Note that function composition in PureScript is defined using (<<<)"]
       | otherwise             = []
     suggestions' _ = []
 
