@@ -18,7 +18,6 @@ bower i purescript-prelude \
         purescript-maps \
         purescript-free \
         purescript-transformers \
-        purescript-monad-eff \
         purescript-exists \
         purescript-monoid \
         purescript-either \
@@ -45,6 +44,10 @@ bower i purescript-prelude \
         purescript-globals \
         purescript-exceptions \
         purescript-validation \
+        purescript-parallel \
+        purescript-proxy \
+        purescript-semirings \
         purescript-math
-  
-find bower_components/**/src -name '*.purs' | xargs ../dist/build/psc-make/psc-make
+
+../dist/build/psc/psc 'bower_components/purescript-*/src/**/*.purs' \
+                --ffi 'bower_components/purescript-*/src/**/*.js'
