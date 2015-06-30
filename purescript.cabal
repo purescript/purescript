@@ -229,7 +229,6 @@ executable psc-bundle
                        Glob -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
-  default-language:    Haskell2010
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
