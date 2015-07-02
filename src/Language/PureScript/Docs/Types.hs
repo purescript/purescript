@@ -233,6 +233,18 @@ instance A.FromJSON NotYetKnown where
 asVerifiedPackage :: Parse PackageError VerifiedPackage
 asVerifiedPackage = asPackage asGithubUser
 
+displayPackageError :: PackageError -> Text
+displayPackageError e = case e of
+  ErrorInPackageMeta err -> "Error in package metadata: " <> showBowerError err
+  InvalidVersion -> "Invalid version"
+  InvalidDeclarationType str -> "Invalid declaration type: \"" <> T.pack str <> "\""
+  InvalidChildDeclarationType str -> "Invalid child declaration type: \"" <> T.pack str <> "\""
+  InvalidFixity -> "Invalid fixity"
+  InvalidKind str -> "Invalid kind: \"" <> T.pack str <> "\""
+  InvalidDataDeclType str -> "Invalid data declaration type: \"" <> T.pack str <> "\""
+  where
+  (<>) = T.append
+
 asGithubUser :: Parse e GithubUser
 asGithubUser = GithubUser <$> asString
 
