@@ -13,6 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TupleSections #-}
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
     prettyPrintBinder
@@ -41,9 +42,11 @@ literals = mkPattern' match
   match (BooleanLiteral True) = return "true"
   match (BooleanLiteral False) = return "false"
   match (ArrayLiteral xs) = concat <$> sequence
-    [ return "[ "
-    , withIndent $ prettyPrintMany prettyPrintValue' xs
-    , return " ]"
+    [ return "[\n"
+    , withIndent $ prettyPrintMany' "," prettyPrintValue' xs
+    , return "\n"
+    , currentIndent
+    , return "]"
     ]
   match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
   match (ObjectConstructor ps) = prettyPrintObject' ps
@@ -60,6 +63,14 @@ literals = mkPattern' match
     , return " of\n"
     , withIndent $ prettyPrintMany prettyPrintCaseAlternative binders
     , currentIndent
+    ]
+  match (Let [d] val) = concat <$> sequence
+    [ return "let "
+    , withIndent $ prettyPrintDeclaration d
+    , return "\n"
+    , currentIndent
+    , return "in "
+    , withIndent $ prettyPrintValue' val
     ]
   match (Let ds val) = concat <$> sequence
     [ return "let\n"
@@ -159,10 +170,10 @@ objectUpdate = mkPattern match
   match _ = Nothing
 
 app :: Pattern PrinterState Expr (String, Expr)
-app = mkPattern match
+app = mkPattern' match
   where
-  match (App val arg) = Just (prettyPrintValue arg, val)
-  match _ = Nothing
+  match (App val arg) = (,val) <$> prettyPrintValue' arg
+  match _ = mzero
 
 lam :: Pattern PrinterState Expr (String, Expr)
 lam = mkPattern match
