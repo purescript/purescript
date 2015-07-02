@@ -14,8 +14,6 @@ install:
   - cabal install --only-dependencies --enable-tests --enable-benchmarks
 script:
   - ./travis-script.sh
-after_script:
-  - ./travis-after-script.sh
 notifications:
   email: true
 before_deploy: "./bundle/build.sh linux64"
