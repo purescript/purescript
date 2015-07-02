@@ -23,6 +23,7 @@ import Data.Data
 import Data.Traversable (traverse)
 
 import Language.PureScript.Comments
+import Language.PureScript.Traversals
 
 -- |
 -- Built-in unary operators
@@ -294,7 +295,7 @@ everywhereOnJSTopDownM f = f >=> go
   go (JSBinary op j1 j2) = JSBinary op <$> f' j1 <*> f' j2
   go (JSArrayLiteral js) = JSArrayLiteral <$> traverse f' js
   go (JSIndexer j1 j2) = JSIndexer <$> f' j1 <*> f' j2
-  go (JSObjectLiteral js) = JSObjectLiteral <$> traverse (traverse f') js
+  go (JSObjectLiteral js) = JSObjectLiteral <$> traverse (sndM f') js
   go (JSAccessor prop j) = JSAccessor prop <$> f' j
   go (JSFunction name args j) = JSFunction name args <$> f' j
   go (JSApp j js) = JSApp <$> f' j <*> traverse f' js

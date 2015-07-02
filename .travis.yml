@@ -1,6 +1,6 @@
 env:
-  - CABALVER=1.22 GHCVER=7.8.3 SUITE=tests
-  - CABALVER=1.22 GHCVER=7.8.3 SUITE=psci-tests
+  - CABALVER=1.20 GHCVER=7.6.3 SUITE=tests
+  - CABALVER=1.20 GHCVER=7.6.3 SUITE=psci-tests
 before_install:
   - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
   - travis_retry sudo apt-get update
@@ -14,8 +14,6 @@ install:
   - cabal install --only-dependencies --enable-tests --enable-benchmarks
 script:
   - ./travis-script.sh
-after_script:
-  - ./travis-after-script.sh
 notifications:
   email: true
 before_deploy: "./bundle/build.sh linux64"
