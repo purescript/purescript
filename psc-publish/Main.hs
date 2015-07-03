@@ -8,10 +8,11 @@ import Prelude hiding (userError)
 import Data.Maybe
 import Data.Char (isSpace)
 import Data.String (fromString)
-import Data.List (stripPrefix, isSuffixOf, (\\))
+import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
 import Data.List.Split (splitOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Version
+import Data.Function (on)
 import Safe (headMay)
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -196,18 +197,35 @@ getResolvedDependencies :: [PackageName] -> PrepareM [(PackageName, Version)]
 getResolvedDependencies declaredDeps = do
   depsBS <- fromString <$> readProcess' "bower" ["list", "--json", "--offline"] ""
 
-  deps <- catchLeft (parse asBowerResolvedDependencies depsBS)
-                    (internalError . JSONError FromBowerList)
+  -- Check for undeclared dependencies
+  toplevels <- catchJSON (parse asToplevelDependencies depsBS)
+  warnUndeclared declaredDeps toplevels
 
-  warnUndeclared declaredDeps (map fst deps)
+  deps <- catchJSON (parse asResolvedDependencies depsBS)
   handleDeps deps
 
   where
-  asBowerResolvedDependencies ::
-    Parse BowerError [(PackageName, DependencyStatus)]
-  asBowerResolvedDependencies =
-    key "dependencies"
-      (eachInObjectWithKey (parsePackageName . T.unpack) asDependencyStatus)
+  catchJSON = flip catchLeft (internalError . JSONError FromBowerList)
+
+-- | Extracts all dependencies and their versions from
+--   `bower list --json --offline`
+asResolvedDependencies :: Parse BowerError [(PackageName, DependencyStatus)]
+asResolvedDependencies = nubBy ((==) `on` fst) <$> go
+  where
+  go =
+    fmap (fromMaybe []) $
+      keyMay "dependencies" $
+        (++) <$> eachInObjectWithKey (parsePackageName . T.unpack)
+                                     asDependencyStatus
+             <*> (concatMap snd <$> eachInObject asResolvedDependencies)
+
+-- | Extracts only the top level dependency names from the output of
+--   `bower list --json --offline`
+asToplevelDependencies :: Parse BowerError [PackageName]
+asToplevelDependencies =
+  fmap (map fst) $
+    key "dependencies" $
+      eachInObjectWithKey (parsePackageName . T.unpack) (return ())
 
 asDependencyStatus :: Parse e DependencyStatus
 asDependencyStatus = do
