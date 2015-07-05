@@ -6,7 +6,7 @@ pushd core-tests/
 
 popd
 
-if [ -z $( git describe --tags --exact-match 2>/dev/null ) ]
+if [ -z $( git describe --tags --exact-match 2>/dev/null ) && -n "$COVERAGE_SUITE" ]
 then
   cabal install hpc-coveralls
   case "$COVERAGE_SUITE" in
