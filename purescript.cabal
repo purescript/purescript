@@ -26,7 +26,7 @@ source-repository head
     location: https://github.com/purescript/purescript.git
 
 library
-    build-depends: base >=4.6 && <5,
+    build-depends: base >=4.7 && <5,
                    containers -any,
                    unordered-containers -any,
                    dlist -any,
