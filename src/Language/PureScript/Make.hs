@@ -161,7 +161,8 @@ make MakeActions{..} ms = do
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
     lift $ progress $ "Compiling " ++ runModuleName moduleName'
-    (Module _ _ elaborated _, env') <- lift . runCheck' env $ typeCheckModule Nothing m
+    (checked@(Module _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
+    checkExhaustiveModule env' checked
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
     let mod' = Module coms moduleName' regrouped exps
         corefn = CF.moduleToCoreFn env' mod'

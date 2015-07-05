@@ -86,6 +86,7 @@ library
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
+                     Language.PureScript.Linter.Exhaustive
                      Language.PureScript.Make
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names

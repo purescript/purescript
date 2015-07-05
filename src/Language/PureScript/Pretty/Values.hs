@@ -15,7 +15,8 @@
 
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
-    prettyPrintBinder
+    prettyPrintBinder,
+    prettyPrintBinderAtom
 ) where
 
 import Data.Maybe (fromMaybe)
