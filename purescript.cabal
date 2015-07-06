@@ -83,6 +83,7 @@ library
                      Language.PureScript.Errors
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
+                     Language.PureScript.Make
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names
                      Language.PureScript.Options
@@ -152,7 +153,6 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules: Make
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
