@@ -173,6 +173,12 @@ readProcess' prog args stdin = do
 
 data DependencyStatus
   = Missing
+    -- ^ Listed in bower.json, but not installed.
+  | NoResolution
+    -- ^ In the output of `bower list --json --offline`, there was no
+    -- _resolution key. This can be caused by adding the dependency using
+    -- `bower link`, or simply copying it into bower_components instead of
+    -- installing it normally.
   | ResolvedOther String
     -- ^ Resolved, but to something other than a version. The String argument
     -- is the resolution type. The values it can take that I'm aware of are
@@ -237,7 +243,7 @@ asDependencyStatus = do
       return Missing
     else
       key "pkgMeta" $
-        key "_resolution" $ do
+        keyOrDefault "_resolution" NoResolution $ do
           type_ <- key "type" asString
           case type_ of
             "version" -> ResolvedVersion <$> key "tag" asString
@@ -250,12 +256,12 @@ warnUndeclared declared actual =
 handleDeps ::
   [(PackageName, DependencyStatus)] -> PrepareM [(PackageName, Version)]
 handleDeps deps = do
-  let (missing, notVersion, installed) = partitionDeps deps
+  let (missing, noVersion, installed) = partitionDeps deps
   case missing of
     (x:xs) ->
       userError (MissingDependencies (x :| xs))
     [] -> do
-      mapM_ (warn . ResolutionNotVersion . fst) notVersion
+      mapM_ (warn . NoResolvedVersion) noVersion
       withVersions <- catMaybes <$> mapM tryExtractVersion' installed
       filterM (liftIO . isPureScript . bowerDir . fst) withVersions
 
@@ -264,7 +270,8 @@ handleDeps deps = do
   go (pkgName, d) (ms, os, is) =
     case d of
       Missing           -> (pkgName : ms, os, is)
-      ResolvedOther o   -> (ms, (pkgName, o) : os, is)
+      NoResolution      -> (ms, pkgName : os, is)
+      ResolvedOther _   -> (ms, pkgName : os, is)
       ResolvedVersion v -> (ms, os, (pkgName, v) : is)
 
   bowerDir pkgName = "bower_components/" ++ runPackageName pkgName

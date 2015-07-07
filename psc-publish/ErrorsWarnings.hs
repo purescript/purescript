@@ -33,7 +33,7 @@ data PackageError
   deriving (Show)
 
 data PackageWarning
-  = ResolutionNotVersion PackageName
+  = NoResolvedVersion PackageName
   | UndeclaredDependency PackageName
   | UnacceptableVersion (PackageName, String)
   deriving (Show)
@@ -253,7 +253,7 @@ displayOtherError e = case e of
       [ "An IO exception occurred:", show exc ]
 
 data CollectedWarnings = CollectedWarnings
-  { resolutionNotVersions  :: [PackageName]
+  { noResolvedVersions     :: [PackageName]
   , undeclaredDependencies :: [PackageName]
   , unacceptableVersions   :: [(PackageName, String)]
   }
@@ -268,7 +268,7 @@ collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular
   where
   singular w = case w of
-    ResolutionNotVersion pn -> CollectedWarnings [pn] [] []
+    NoResolvedVersion    pn -> CollectedWarnings [pn] [] []
     UndeclaredDependency pn -> CollectedWarnings [] [pn] []
     UnacceptableVersion t   -> CollectedWarnings [] [] [t]
 
@@ -276,7 +276,7 @@ renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
   let CollectedWarnings{..} = collectWarnings warns
       go toBox warns' = toBox <$> NonEmpty.nonEmpty warns'
-      mboxes = [ go warnResolutionNotVersions  resolutionNotVersions
+      mboxes = [ go warnNoResolvedVersions     noResolvedVersions
                , go warnUndeclaredDependencies undeclaredDependencies
                , go warnUnacceptableVersions   unacceptableVersions
                ]
@@ -286,18 +286,18 @@ renderWarnings warns =
                      , indented (vcat (intersperse spacer boxes))
                      ]
 
-warnResolutionNotVersions :: NonEmpty PackageName -> Box
-warnResolutionNotVersions pkgNames =
+warnNoResolvedVersions :: NonEmpty PackageName -> Box
+warnNoResolvedVersions pkgNames =
   let singular = NonEmpty.length pkgNames == 1
       pl a b = if singular then b else a
 
       packages   = pl "packages" "package"
-      were       = pl "were" "was"
       anyOfThese = pl "any of these" "this"
       these      = pl "these" "this"
   in vcat $
     [ para (concat
-      ["The following ", packages, " ", were, " not resolved to a version:"])
+      ["The following ", packages, " did not appear to have a resolved "
+      , "version:"])
     ] ++
       bulletedList runPackageName (NonEmpty.toList pkgNames)
       ++
