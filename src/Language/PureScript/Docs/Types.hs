@@ -10,7 +10,8 @@ module Language.PureScript.Docs.Types
   where
 
 import Control.Arrow (first, (***))
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>), (<*>), pure)
+import Control.Monad (when)
 import Data.Functor ((<$))
 import Data.Maybe (mapMaybe)
 import Data.Version
@@ -22,7 +23,7 @@ import Data.Text (Text)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Text as T
 
-import Web.Bower.PackageMeta hiding (Version)
+import Web.Bower.PackageMeta hiding (Version, displayError)
 
 import qualified Language.PureScript as P
 
@@ -43,6 +44,9 @@ data Package a = Package
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
   , pkgUploader             :: a
+  , pkgCompilerVersion      :: Version
+    -- ^ The version of the PureScript compiler which was used to generate
+    -- this data. We store this in order to reject packages which are too old.
   }
   deriving (Show, Eq, Ord)
 
@@ -62,6 +66,7 @@ verifyPackage verifiedUser Package{..} =
           pkgResolvedDependencies
           pkgGithub
           verifiedUser
+          pkgCompilerVersion
 
 packageName :: Package a -> PackageName
 packageName = bowerName . pkgMeta
@@ -170,7 +175,10 @@ newtype GithubRepo
   deriving (Show, Eq, Ord)
 
 data PackageError
-  = ErrorInPackageMeta BowerError
+  = CompilerTooOld Version Version
+      -- ^ Minimum allowable version for generating data with the current
+      -- parser, and actual version used.
+  | ErrorInPackageMeta BowerError
   | InvalidVersion
   | InvalidDeclarationType String
   | InvalidChildDeclarationType String
@@ -204,14 +212,21 @@ ignorePackage (FromDep _ x) = x
 ----------------------
 -- Parsing
 
-parseUploadedPackage :: ByteString -> Either (ParseError PackageError) UploadedPackage
-parseUploadedPackage = parse asUploadedPackage
+parseUploadedPackage :: Version -> ByteString -> Either (ParseError PackageError) UploadedPackage
+parseUploadedPackage minVersion = parse $ asUploadedPackage minVersion
 
-parseVerifiedPackage :: ByteString -> Either (ParseError PackageError) VerifiedPackage
-parseVerifiedPackage = parse asVerifiedPackage
+parseVerifiedPackage :: Version -> ByteString -> Either (ParseError PackageError) VerifiedPackage
+parseVerifiedPackage minVersion = parse $ asVerifiedPackage minVersion
 
-asPackage :: (forall e. Parse e a) -> Parse PackageError (Package a)
-asPackage uploader =
+asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
+asPackage minimumVersion uploader = do
+  -- If the compilerVersion key is missing, we can be sure that it was produced
+  -- with 0.7.0.0, since that is the only released version that included the
+  -- psc-publish tool before this key was added.
+  compilerVersion <- keyOrDefault "compilerVersion" (Version [0,7,0,0] []) asVersion
+  when (compilerVersion < minimumVersion)
+    (throwCustomError $ CompilerTooOld minimumVersion compilerVersion)
+
   Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
           <*> key "version" asVersion
           <*> key "versionTag" asString
@@ -220,9 +235,10 @@ asPackage uploader =
           <*> key "resolvedDependencies" asResolvedDependencies
           <*> key "github" asGithub
           <*> key "uploader" uploader
+          <*> pure compilerVersion
 
-asUploadedPackage :: Parse PackageError UploadedPackage
-asUploadedPackage = asPackage asNotYetKnown
+asUploadedPackage :: Version -> Parse PackageError UploadedPackage
+asUploadedPackage minVersion = asPackage minVersion asNotYetKnown
 
 asNotYetKnown :: Parse e NotYetKnown
 asNotYetKnown = NotYetKnown <$ asNull
@@ -230,31 +246,41 @@ asNotYetKnown = NotYetKnown <$ asNull
 instance A.FromJSON NotYetKnown where
   parseJSON = toAesonParser' asNotYetKnown
 
-asVerifiedPackage :: Parse PackageError VerifiedPackage
-asVerifiedPackage = asPackage asGithubUser
+asVerifiedPackage :: Version -> Parse PackageError VerifiedPackage
+asVerifiedPackage minVersion = asPackage minVersion asGithubUser
 
 displayPackageError :: PackageError -> Text
 displayPackageError e = case e of
-  ErrorInPackageMeta err -> "Error in package metadata: " <> showBowerError err
-  InvalidVersion -> "Invalid version"
-  InvalidDeclarationType str -> "Invalid declaration type: \"" <> T.pack str <> "\""
-  InvalidChildDeclarationType str -> "Invalid child declaration type: \"" <> T.pack str <> "\""
-  InvalidFixity -> "Invalid fixity"
-  InvalidKind str -> "Invalid kind: \"" <> T.pack str <> "\""
-  InvalidDataDeclType str -> "Invalid data declaration type: \"" <> T.pack str <> "\""
+  CompilerTooOld minV usedV ->
+    "Expecting data produced by at least version " <> T.pack (showVersion minV)
+    <> " of the compiler, but it appears that " <> T.pack (showVersion usedV)
+    <> " was used."
+  ErrorInPackageMeta err ->
+    "Error in package metadata: " <> showBowerError err
+  InvalidVersion ->
+    "Invalid version"
+  InvalidDeclarationType str ->
+    "Invalid declaration type: \"" <> T.pack str <> "\""
+  InvalidChildDeclarationType str ->
+    "Invalid child declaration type: \"" <> T.pack str <> "\""
+  InvalidFixity ->
+    "Invalid fixity"
+  InvalidKind str ->
+    "Invalid kind: \"" <> T.pack str <> "\""
+  InvalidDataDeclType str ->
+    "Invalid data declaration type: \"" <> T.pack str <> "\""
   where
   (<>) = T.append
+
+instance A.FromJSON a => A.FromJSON (Package a) where
+  parseJSON = toAesonParser displayPackageError
+                            (asPackage (Version [0,0,0,0] []) fromAesonParser)
 
 asGithubUser :: Parse e GithubUser
 asGithubUser = GithubUser <$> asString
 
 instance A.FromJSON GithubUser where
   parseJSON = toAesonParser' asGithubUser
-
-instance A.FromJSON a => A.FromJSON (Package a) where
-  -- TODO: actual error display
-  parseJSON = toAesonParser (T.pack . show)
-                            (asPackage fromAesonParser)
 
 asVersion :: Parse PackageError Version
 asVersion = withString (maybe (Left InvalidVersion) Right . parseVersion')
@@ -408,6 +434,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
       , "uploader"             .= pkgUploader
+      , "compilerVersion"      .= showVersion P.version
       ]
 
 instance A.ToJSON NotYetKnown where
