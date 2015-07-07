@@ -38,6 +38,7 @@ import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
                               runPackageName, parsePackageName, Repository(..))
 import qualified Web.Bower.PackageMeta as Bower
 
+import qualified Language.PureScript as P (version)
 import qualified Language.PureScript.Docs as D
 import Utils
 import ErrorsWarnings
@@ -107,6 +108,7 @@ preparePackage' = do
   pkgResolvedDependencies     <- getResolvedDependencies declaredDeps
 
   let pkgUploader = D.NotYetKnown
+  let pkgCompilerVersion = P.version
 
   return D.Package{..}
 
