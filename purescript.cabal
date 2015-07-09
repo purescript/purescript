@@ -46,7 +46,9 @@ library
                    aeson-better-errors >= 0.8,
                    bytestring -any,
                    text -any,
-                   split -any
+                   split -any,
+                   language-javascript == 0.5.*,
+                   syb -any
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -56,6 +58,7 @@ library
                      Language.PureScript.AST.SourcePos
                      Language.PureScript.AST.Traversals
                      Language.PureScript.AST.Exported
+                     Language.PureScript.Bundle
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
@@ -217,9 +220,7 @@ executable psc-bundle
   other-modules:
   other-extensions:
   build-depends:       base >=4 && <5,
-                       language-javascript == 0.5.*,
-                       syb -any,
-                       containers -any,
+                       purescript -any,
                        filepath -any,
                        directory -any,
                        mtl -any,
