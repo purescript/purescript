@@ -172,7 +172,6 @@ executable psci
                    Directive
                    Completion
                    PSCi
-                   Make
                    IO
     ghc-options: -Wall -O2
 

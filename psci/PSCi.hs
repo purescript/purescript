@@ -21,7 +21,7 @@
 module PSCi where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort)
+import Data.List (intercalate, nub, sort, isPrefixOf)
 import Data.Traversable (traverse)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
@@ -30,10 +30,12 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Writer (runWriter)
 import qualified Control.Monad.Trans.State.Lazy as L
 
@@ -45,6 +47,7 @@ import System.Exit
 import System.FilePath (pathSeparator, (</>), isPathSeparator)
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
+import System.IO.Error (tryIOError)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -53,7 +56,6 @@ import qualified Paths_purescript as Paths
 import qualified Directive as D
 import Completion (completion)
 import IO (mkdirp)
-import Make
 import Parser (parseCommand)
 import Types
 
@@ -240,10 +242,25 @@ importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
-make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> Make P.Environment
-make PSCiState{..} ms =
-  let filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-  in P.make (buildMakeActions filePathMap (M.map snd psciForeignFiles)) (psciLoadedModules ++ ms)
+modulesDir :: FilePath
+modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
+
+-- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
+-- options and ignores the warning messages.
+runMake :: P.Make a -> IO (Either P.MultipleErrors a)
+runMake mk = fmap (fmap fst) $ P.runMake (P.Options False False Nothing False False False Nothing) mk
+
+makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
+makeIO f io = do
+  e <- liftIO $ tryIOError io
+  either (throwError . P.singleError . f) return e
+
+make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
+make PSCiState{..} ms = P.make actions' (psciLoadedModules ++ ms)
+    where
+    filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
+    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+    actions' = actions { P.progress = \s -> unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s }
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
