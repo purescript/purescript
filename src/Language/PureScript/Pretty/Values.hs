@@ -40,11 +40,7 @@ literals = mkPattern' match
   match (CharLiteral c) = return $ show c
   match (BooleanLiteral True) = return "true"
   match (BooleanLiteral False) = return "false"
-  match (ArrayLiteral xs) = concat <$> sequence
-    [ return "[ "
-    , withIndent $ prettyPrintMany prettyPrintValue' xs
-    , return " ]"
-    ]
+  match (ArrayLiteral xs) = return $ "[" ++ intercalate ", " (map prettyPrintValue xs) ++ "]"
   match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
   match (ObjectConstructor ps) = prettyPrintObject' ps
   match (ObjectGetter prop) = return $ "(." ++ prop ++ ")"
