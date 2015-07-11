@@ -272,6 +272,9 @@ data LabelType = TypeLabel | SkolemLabel String deriving (Show, Eq, Ord)
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 type UnknownMap = M.Map (LabelType, Unknown) Unknown
 
+-- | How critical the issue is
+data Level = Error | Warning deriving Show
+
 -- |
 -- Extract nested error messages from wrapper errors
 --
@@ -344,8 +347,8 @@ onTypesInErrorMessageM f = g
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> ErrorMessage -> State UnknownMap Box.Box
-prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State UnknownMap Box.Box
+prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
  where
   -- |
   -- Pretty print an ErrorMessage
@@ -373,7 +376,7 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
             , indent . line $ path
             ]
     goSimple (ErrorParsingExterns err) =
-      paras [ line "Error parsing externs files: "
+      paras [ lineWithLevel "parsing externs files: "
             , indent . line . show $ err
             ]
     goSimple (ErrorParsingFFIModule path) =
@@ -561,51 +564,51 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
             , indent $ go err
             ]
     go (ErrorUnifyingTypes t1 t2 err) =
-      paras [ line "Error unifying type "
+      paras [ lineWithLevel "unifying type "
             , indent $ line $ prettyPrintType t1
             , line "with type"
             , indent $ line $ prettyPrintType t2
             , go err
             ]
     go (ErrorInExpression expr err) =
-      paras [ line "Error in expression:"
+      paras [ lineWithLevel "in expression:"
             , indent $ line $ prettyPrintValue expr
             , go err
             ]
     go (ErrorInModule mn err) =
-      paras [ line $ "Error in module " ++ show mn ++ ":"
+      paras [ lineWithLevel $ "in module " ++ show mn ++ ":"
             , go err
             ]
     go (ErrorInSubsumption t1 t2 err) =
-      paras [ line "Error checking that type "
+      paras [ lineWithLevel "checking that type "
             , indent $ line $ prettyPrintType t1
             , line "subsumes type"
             , indent $ line $ prettyPrintType t2
             , go err
             ]
     go (ErrorInInstance name ts err) =
-      paras [ line $ "Error in type class instance " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":"
+      paras [ lineWithLevel $ "in type class instance " ++ show name ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":"
             , go err
             ]
     go (ErrorCheckingKind ty err) =
-      paras [ line "Error checking kind of type "
+      paras [ lineWithLevel "checking kind of type "
             , indent $ line $ prettyPrintType ty
             , go err
             ]
     go (ErrorInferringType expr err) =
-      paras [ line "Error inferring type of value "
+      paras [ lineWithLevel "inferring type of value "
             , indent $ line $ prettyPrintValue expr
             , go err
             ]
     go (ErrorCheckingType expr ty err) =
-      paras [ line "Error checking that value "
+      paras [ lineWithLevel "checking that value "
             , indent $ line $ prettyPrintValue expr
             , line "has type"
             , indent $ line $ prettyPrintType ty
             , go err
             ]
     go (ErrorInApplication f t a err) =
-      paras [ line "Error applying function"
+      paras [ lineWithLevel "applying function"
             , indent $ line $ prettyPrintValue f
             , line "of type"
             , indent $ line $ prettyPrintType t
@@ -614,41 +617,44 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
             , go err
             ]
     go (ErrorInDataConstructor nm err) =
-      paras [ line $ "Error in data constructor " ++ show nm ++ ":"
+      paras [ lineWithLevel $ "in data constructor " ++ show nm ++ ":"
             , go err
             ]
     go (ErrorInTypeConstructor nm err) =
-      paras [ line $ "Error in type constructor " ++ show nm ++ ":"
+      paras [ lineWithLevel $ "in type constructor " ++ show nm ++ ":"
             , go err
             ]
     go (ErrorInBindingGroup nms err) =
-      paras [ line $ "Error in binding group " ++ intercalate ", " (map show nms) ++ ":"
+      paras [ lineWithLevel $ "in binding group " ++ intercalate ", " (map show nms) ++ ":"
             , go err
             ]
     go (ErrorInDataBindingGroup err) =
-      paras [ line $ "Error in data binding group:"
+      paras [ lineWithLevel $ "in data binding group:"
             , go err
             ]
     go (ErrorInTypeSynonym name err) =
-      paras [ line $ "Error in type synonym " ++ show name ++ ":"
+      paras [ lineWithLevel $ "in type synonym " ++ show name ++ ":"
             , go err
             ]
     go (ErrorInValueDeclaration n err) =
-      paras [ line $ "Error in value declaration " ++ show n ++ ":"
+      paras [ lineWithLevel $ "in value declaration " ++ show n ++ ":"
             , go err
             ]
     go (ErrorInForeignImport nm err) =
-      paras [ line $ "Error in foreign import " ++ show nm ++ ":"
+      paras [ lineWithLevel $ "in foreign import " ++ show nm ++ ":"
             , go err
             ]
     go (PositionedError srcSpan err) =
-      paras [ line $ "Error at " ++ displaySourceSpan srcSpan ++ ":"
+      paras [ lineWithLevel $ "at " ++ displaySourceSpan srcSpan ++ ":"
             , indent $ go err
             ]
     go (SimpleErrorWrapper sem) = goSimple sem
 
   line :: String -> Box.Box
   line = Box.text
+
+  lineWithLevel :: String -> Box.Box
+  lineWithLevel text = line $ show level ++ " " ++ text
 
   suggestions :: ErrorMessage -> [Box.Box]
   suggestions = suggestions' . unwrapErrorMessage
@@ -727,23 +733,23 @@ prettyPrintSingleError full e = prettyPrintErrorMessage <$> onTypesInErrorMessag
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith "Error:" "Multiple errors:" full
+prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error:" "Multiple errors:" full
 
 -- |
 -- Pretty print multiple warnings
 --
 prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith "Warning:" "Multiple warnings:" full
+prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning:" "Multiple warnings:" full
 
-prettyPrintMultipleErrorsWith :: String -> String -> Bool -> MultipleErrors -> State UnknownMap String
-prettyPrintMultipleErrorsWith intro _ full  (MultipleErrors [e]) = do
-  result <- prettyPrintSingleError full e
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State UnknownMap String
+prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
+  result <- prettyPrintSingleError full level e
   return $ renderBox $
     Box.vcat Box.left [ Box.text intro
                       , result
                       ]
-prettyPrintMultipleErrorsWith _ intro full  (MultipleErrors es) = do
-  result <- forM es $ (liftM $ Box.moveRight 2) . prettyPrintSingleError full
+prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
+  result <- forM es $ (liftM $ Box.moveRight 2) . prettyPrintSingleError full level
   return $ renderBox $
     Box.vcat Box.left [ Box.text intro
                       , Box.vsep 1 Box.left result
