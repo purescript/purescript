@@ -36,7 +36,7 @@ import System.FilePath.Glob (glob)
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 
-import Make
+import Language.PureScript.Make
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
