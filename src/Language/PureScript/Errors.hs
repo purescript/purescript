@@ -19,7 +19,7 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate)
+import Data.List (intercalate, transpose)
 import Data.Function (on)
 import Data.Monoid
 import Data.Foldable (fold, foldMap)
@@ -120,6 +120,7 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | WildcardInferredType Type
+  | NotExhaustivePattern [[Binder]]
   | ClassOperator ProperName Ident
   deriving (Show)
 
@@ -229,6 +230,7 @@ errorCode em = case unwrapErrorMessage em of
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
+  (NotExhaustivePattern _)      -> "NotExhaustivePattern"
   (ClassOperator _ _)           -> "ClassOperator"
 
 -- |
@@ -559,6 +561,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
+    goSimple (NotExhaustivePattern bs) =
+      paras $ [ line "Pattern could not be determined to cover all cases."
+              , line $ "The definition has the following uncovered cases:\n"
+              , indent $ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
+              ]
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
             , indent $ go err

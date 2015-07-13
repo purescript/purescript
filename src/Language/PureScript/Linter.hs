@@ -16,7 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript.Linter (lint) where
+module Language.PureScript.Linter (lint, module L) where
 
 import Data.List (mapAccumL, nub)
 import Data.Maybe (mapMaybe)
@@ -30,6 +30,7 @@ import Control.Monad.Writer.Class
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
+import Language.PureScript.Linter.Exhaustive as L
 
 -- | Lint the PureScript AST.
 -- |
