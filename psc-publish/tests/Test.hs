@@ -57,7 +57,7 @@ getPackage = do
   pushd packageDir preparePackage
 
 data TestResult
-  = ParseFailed (ParseError PackageError)
+  = ParseFailed String
   | Mismatch ByteString ByteString -- ^ encoding before, encoding after
   | Pass ByteString
   deriving (Show)
@@ -70,10 +70,10 @@ test = roundTrip <$> getPackage
 roundTrip :: UploadedPackage -> TestResult
 roundTrip pkg =
   let before = A.encode pkg
-  in case parse asUploadedPackage before of
+  in case A.eitherDecode before of
        Left err -> ParseFailed err
        Right parsed -> do
-         let after = A.encode parsed
+         let after = A.encode (parsed :: UploadedPackage)
          if before == after
            then Pass before
            else Mismatch before after
