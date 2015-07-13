@@ -3,6 +3,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+module Main where
+
 import Prelude hiding (userError)
 
 import Data.Maybe
