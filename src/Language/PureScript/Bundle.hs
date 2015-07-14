@@ -10,6 +10,9 @@
 --
 -- | Bundles compiled PureScript modules for the browser.
 --
+-- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
+-- performs dead code elimination, filters empty modules,
+-- and generates the final Javascript bundle.
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE PatternGuards #-}
@@ -18,11 +21,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- | Bundle javascript for use in the browser.
---
--- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
--- performs dead code elimination, filters empty modules,
--- and generates the final Javascript bundle.
 module Language.PureScript.Bundle (
      bundle
    , ModuleIdentifier(..)
