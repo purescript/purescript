@@ -1,5 +1,10 @@
 set -e
 
+if [ -n "$STACKAGE" ]
+then
+  curl -O https://www.stackage.org/$STACKAGE/cabal.config
+fi
+
 if [ -z $( git describe --tags --exact-match 2>/dev/null ) && -n "$COVERAGE_SUITE" ]
 then
   cabal configure --enable-tests --enable-coverage -v2
