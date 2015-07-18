@@ -31,6 +31,7 @@ import Data.Function (on)
 
 import Control.Monad (unless)
 import Control.Applicative
+import Control.Arrow (second)
 import Control.Monad.Writer.Class
 
 import Language.PureScript.AST.Binders
@@ -241,7 +242,7 @@ checkExhaustive env mn cas = makeResult . nub $ foldl' step [initial] cas
   makeResult :: [[Binder]] -> m ()
   makeResult bss = unless (null bss) tellWarning 
     where
-    tellWarning = tell . errorMessage $ NotExhaustivePattern bss
+    tellWarning = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
 
 -- |
 -- Exhaustivity checking over a list of declarations

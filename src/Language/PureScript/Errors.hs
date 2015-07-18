@@ -120,7 +120,7 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | WildcardInferredType Type
-  | NotExhaustivePattern [[Binder]]
+  | NotExhaustivePattern [[Binder]] Bool
   | ClassOperator ProperName Ident
   deriving (Show)
 
@@ -230,7 +230,7 @@ errorCode em = case unwrapErrorMessage em of
   (TransitiveExportError _ _)   -> "TransitiveExportError"
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
-  (NotExhaustivePattern _)      -> "NotExhaustivePattern"
+  (NotExhaustivePattern _ _)    -> "NotExhaustivePattern"
   (ClassOperator _ _)           -> "ClassOperator"
 
 -- |
@@ -561,11 +561,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
-    goSimple (NotExhaustivePattern bs) =
-      paras $ [ line "Pattern could not be determined to cover all cases."
+    goSimple (NotExhaustivePattern bs b) =
+      indent $ paras $ [ line "Pattern could not be determined to cover all cases."
               , line $ "The definition has the following uncovered cases:\n"
-              , indent $ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
-              ]
+              , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
+              ] ++ if not b then [line "..."] else []
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
             , indent $ go err
