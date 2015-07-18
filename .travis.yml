@@ -1,23 +1,29 @@
+sudo: false
 env:
-  - CABALVER=1.22 GHCVER=7.8.3 COVERAGE_SUITE=tests
-  - CABALVER=1.22 GHCVER=7.8.3 COVERAGE_SUITE=psci-tests
-  - CABALVER=1.22 GHCVER=7.6.3
-  - CABALVER=1.22 GHCVER=7.10.1
+  - GHCVER=7.8.3 COVERAGE_SUITE=tests
+  - GHCVER=7.8.3 COVERAGE_SUITE=psci-tests
+  - GHCVER=7.6.3
+  - GHCVER=7.10.1
 before_install:
-  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
-  - travis_retry sudo apt-get update
-  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
-  - export PATH="/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.cabal/bin:$PATH"
+  - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
+  - export PATH="/opt/cabal/1.22/bin:$PATH"
+  - export PATH="$HOME/.cabal/bin:$PATH"
+  - export PATH="/opt/happy/1.19.5/bin:/$PATH"
+  - export PATH="/opt/alex/3.1.4/bin:/$PATH"
 install:
   - cabal --version
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
-  - cabal install alex happy
-  - cabal install --only-dependencies --enable-tests --enable-benchmarks
+  - cabal sandbox init
+  - cabal install --only-dependencies --enable-tests
+  - cabal install hpc-coveralls
 script:
-  - ./travis-script.sh
+  - ./travis/configure.sh
+  - cabal build
+  - cabal test
+  - ./travis/test-install.sh
 after_script:
-  - ./travis-after-script.sh
+  - ./travis/after.sh
 notifications:
   email: true
 before_deploy: "./bundle/build.sh linux64"
@@ -31,3 +37,18 @@ deploy:
   on:
     all_branches: true
     tags: true
+addons:
+  apt:
+    sources:
+      - hvr-ghc
+    packages:
+      - cabal-install-1.22
+      - ghc-7.6.3
+      - ghc-7.8.3
+      - ghc-7.10.1
+      - happy-1.19.5
+      - alex-3.1.4
+cache:
+  directories:
+    - .cabal-sandbox
+    - ../install-test/.cabal-sandbox
