@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module ErrorsWarnings where
+module Language.PureScript.Publish.ErrorsWarnings where
 
 import Control.Applicative ((<$>))
 import Data.Aeson.BetterErrors
@@ -22,7 +22,7 @@ import qualified Web.Bower.PackageMeta as Bower
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 
-import BoxesHelpers
+import Language.PureScript.Publish.BoxesHelpers
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.
