@@ -35,7 +35,7 @@ import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
 
 import Language.PureScript.AST
-import Language.PureScript.Environment (isObject)
+import Language.PureScript.Environment (isObject, isFunction)
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -670,7 +670,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
                                              , indent . line $ "import " ++ show im ++ " hiding (" ++ nm ++ ")"
                                              ]
     suggestions' (TypesDoNotUnify t1 t2)
-      | any isObject [t1, t2] = [line "Note that function composition in PureScript is defined using (<<<)"]
+      | isObject t1 && isFunction t2 = [line "Note that function composition in PureScript is defined using (<<<)"]
       | otherwise             = []
     suggestions' _ = []
 
