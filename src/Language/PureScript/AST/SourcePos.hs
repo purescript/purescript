@@ -36,8 +36,7 @@ data SourcePos = SourcePos
 
 displaySourcePos :: SourcePos -> String
 displaySourcePos sp =
-  "line " ++ show (sourcePosLine sp) ++
-    ", column " ++ show (sourcePosColumn sp)
+  show (sourcePosLine sp) ++ ":" ++ show (sourcePosColumn sp)
 
 instance A.ToJSON SourcePos where
   toJSON SourcePos{..} =
@@ -62,6 +61,10 @@ displaySourceSpan sp =
   spanName sp ++ " " ++
     displaySourcePos (spanStart sp) ++ " - " ++
     displaySourcePos (spanEnd sp)
+
+displaySourceSpanStart :: SourceSpan -> String
+displaySourceSpanStart sp =
+  spanName sp ++ ":" ++ displaySourcePos (spanStart sp)
 
 instance A.ToJSON SourceSpan where
   toJSON SourceSpan{..} =
