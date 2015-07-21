@@ -91,12 +91,15 @@ supportModule =
 
 -- File helpers
 
+onFirstFileMatching :: Monad m => (b -> m (Maybe a)) -> [b] -> m (Maybe a)
+onFirstFileMatching f pathVariants = runMaybeT . msum $ map (MaybeT . f) pathVariants
+
 -- |
 -- Locates the node executable.
 -- Checks for either @nodejs@ or @node@.
 --
 findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+findNodeProcess = onFirstFileMatching findExecutable names
   where names = ["nodejs", "node"]
 
 -- |
@@ -486,18 +489,27 @@ whenFileExists filePath f = do
     then f absPath
     else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 
+-- |
+-- Attempts to read initial commands from '.psci' in the present working
+-- directory then the user's home
+--
 loadUserConfig :: IO (Maybe [Command])
-loadUserConfig = do
-  configFile <- (</> ".psci") <$> getCurrentDirectory
-  exists <- doesFileExist configFile
-  if exists
-  then do
-    ls <- lines <$> readFile configFile
-    case mapM parseCommand ls of
-      Left err -> print err >> exitFailure
-      Right cs -> return $ Just cs
-  else
-    return Nothing
+loadUserConfig = onFirstFileMatching readCommands pathGetters
+  where
+  pathGetters = [getCurrentDirectory, getHomeDirectory]
+  readCommands :: IO FilePath -> IO (Maybe [Command])
+  readCommands path = do
+    configFile <- (</> ".psci") <$> path
+    exists <- doesFileExist configFile
+    if exists
+    then do
+      ls <- lines <$> readFile configFile
+      case mapM parseCommand ls of
+        Left err -> print err >> exitFailure
+        Right cs -> return $ Just cs
+    else
+      return Nothing
+
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.Module] -> Bool
