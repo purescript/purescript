@@ -486,18 +486,29 @@ whenFileExists filePath f = do
     then f absPath
     else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 
+-- |
+-- Attempts to read initial commands from '.psci' in the user's home then
+-- current directory
+--
 loadUserConfig :: IO (Maybe [Command])
 loadUserConfig = do
-  configFile <- (</> ".psci") <$> getCurrentDirectory
-  exists <- doesFileExist configFile
-  if exists
-  then do
-    ls <- lines <$> readFile configFile
+  homeConfigPath <- configFileAt getHomeDirectory
+  homeExists <- doesFileExist homeConfigPath
+
+  localConfigPath <- configFileAt getCurrentDirectory
+  localExists <- doesFileExist localConfigPath
+  case (homeExists, localExists) of
+    (True, _) -> parseCommands homeConfigPath
+    (_, True) -> parseCommands localConfigPath
+    _ -> return Nothing
+  where
+  parseCommands file = do
+    ls <- lines <$> readFile file
     case mapM parseCommand ls of
       Left err -> print err >> exitFailure
       Right cs -> return $ Just cs
-  else
-    return Nothing
+  configFileAt = (<$>) (</> ".psci")
+
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.Module] -> Bool
