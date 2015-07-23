@@ -57,11 +57,15 @@ data SourceSpan = SourceSpan
   , spanEnd :: SourcePos
   } deriving (Eq, Ord, Show, D.Data, D.Typeable)
 
+displayStartEndPos :: SourceSpan -> String
+displayStartEndPos sp =
+  displaySourcePos (spanStart sp) ++ " - " ++
+  displaySourcePos (spanEnd sp)
+
 displaySourceSpan :: SourceSpan -> String
 displaySourceSpan sp =
   spanName sp ++ " " ++
-    displaySourcePos (spanStart sp) ++ " - " ++
-    displaySourcePos (spanEnd sp)
+    displayStartEndPos sp 
 
 instance A.ToJSON SourceSpan where
   toJSON SourceSpan{..} =

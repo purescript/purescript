@@ -274,7 +274,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
       failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral errorMessage) (JSArrayLiteral $ zipWith valueError names vals)]
 
       errorMessage :: String
-      errorMessage = "Failed pattern match" ++ maybe "" ((" at " ++) . displaySourceSpan) maybeSpan ++ ": "
+      errorMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan ++ ": "
 
       valueError :: String -> JS -> JS
       valueError _ l@(JSNumericLiteral _) = l
