@@ -25,6 +25,7 @@ module Language.PureScript.Make
   -- * Make API
     RebuildPolicy(..)
   , MakeActions(..)
+  , OutputFormatters(..)
   , SupplyVar()
   , Externs()
   , make
@@ -47,7 +48,7 @@ import Control.Monad.Supply.Class (fresh)
 
 import Data.Function (on)
 import Data.List (sortBy, groupBy)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust, fromJust)
 import Data.Time.Clock
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
@@ -107,7 +108,24 @@ data MakeActions m = MakeActions {
   -- Respond to a progress update.
   --
   , progress :: String -> m ()
+  -- |
+  -- Formatters for output messages
+  --
+  , formatters :: OutputFormatters
   }
+
+data OutputFormatters = OutputFormatters {
+  -- |
+  -- Accepts the name of a module and formats the log message. If `Nothing`
+  -- doesn't output a message
+  --
+    formatCompilingMessage :: Maybe (String -> String)
+  -- |
+  -- Accepts the name of a file path and formats the log message. If `Nothing`
+  -- doesn't output a message
+  --
+  , formatWritingMessage :: Maybe (String -> String)
+}
 
 -- |
 -- Generated code for an externs file.
@@ -160,7 +178,7 @@ make MakeActions{..} ms = do
     (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
-    lift $ progress $ "Compiling " ++ runModuleName moduleName'
+    when (isJust formatter) $ lift $ progress $ fromJust formatter $ runModuleName moduleName'
     (checked@(Module _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
     checkExhaustiveModule env' checked
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
@@ -171,6 +189,8 @@ make MakeActions{..} ms = do
     nextVar <- fresh
     lift $ codegen renamed env' nextVar exts
     go env' ms'
+    where
+    formatter = formatCompilingMessage formatters
 
   rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
   rebuildIfNecessary _ _ [] = return []
@@ -240,9 +260,10 @@ buildMakeActions :: FilePath -- ^ the output directory
                  -> M.Map ModuleName (Either RebuildPolicy String) -- ^ a map between module names and paths to the file containing the PureScript module
                  -> M.Map ModuleName (FilePath, ForeignJS) -- ^ a map between module name and the file containing the foreign javascript for the module
                  -> Bool -- ^ Generate a prefix comment?
+                 -> OutputFormatters -- ^ Format various messages during compilation
                  -> MakeActions Make
-buildMakeActions outputDir filePathMap foreigns usePrefix =
-  MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+buildMakeActions outputDir filePathMap foreigns usePrefix formatters =
+  MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress formatters
   where
 
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
@@ -304,11 +325,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   writeTextFile :: FilePath -> String -> Make ()
   writeTextFile path text = makeIO (const (SimpleErrorWrapper $ CannotWriteFile path)) $ do
     mkdirp path
-    putStrLn $ "Writing " ++ path
+    when (isJust formatter) $ putStrLn $ fromJust formatter $ path
     writeFile path text
     where
     mkdirp :: FilePath -> IO ()
     mkdirp = createDirectoryIfMissing True . takeDirectory
+    formatter = formatWritingMessage formatters
 
   progress :: String -> Make ()
   progress = liftIO . putStrLn

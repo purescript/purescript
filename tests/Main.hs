@@ -57,8 +57,12 @@ runTest :: Test a -> IO (Either P.MultipleErrors a)
 runTest = runExceptT . fmap fst . runWriterT . flip runReaderT P.defaultOptions . unTest
 
 makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions Test
-makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress formatters
   where
+  formatters = P.OutputFormatters {
+    P.formatCompilingMessage = Nothing
+    ,P.formatWritingMessage = Nothing
+  }
   getInputTimestamp :: P.ModuleName -> Test (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn 
     | isPreludeModule (P.runModuleName mn) = return (Left P.RebuildNever)

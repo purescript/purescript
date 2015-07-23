@@ -67,7 +67,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
       when (P.nonEmpty warnings) $
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
       let filePathMap = M.fromList $ map (\(fp, P.Module _ mn _ _) -> (mn, fp)) ms
-          makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
+          makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix formatters
       e <- runMake opts $ P.make makeActions ms
       case e of
         Left errs -> do
@@ -77,6 +77,11 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
           when (P.nonEmpty warnings') $
             putStrLn (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
           exitSuccess
+  where
+  formatters = P.OutputFormatters {
+    formatCompilingMessage = Just $ \mn -> "Compiling " ++ mn
+    , formatWritingMessage = Just $ \path -> "Writing " ++ path
+  }
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile

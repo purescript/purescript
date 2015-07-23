@@ -262,8 +262,12 @@ make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.E
 make PSCiState{..} ms = P.make actions' (psciLoadedModules ++ ms)
     where
     filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False formatters
     actions' = actions { P.progress = \s -> unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s }
+    formatters = P.OutputFormatters {
+      formatCompilingMessage = Nothing
+      ,formatWritingMessage = Nothing
+    }
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
