@@ -3,7 +3,15 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Language.PureScript.Publish where
+module Language.PureScript.Publish
+  ( preparePackage
+  , PrepareM()
+  , runPrepareM
+  , getVersionFromGitTag
+  , getBowerInfo
+  , getModulesAndBookmarks
+  , getResolvedDependencies
+  ) where
 
 import Prelude hiding (userError)
 

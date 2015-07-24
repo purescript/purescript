@@ -1,7 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Language.PureScript.Publish.ErrorsWarnings where
+module Language.PureScript.Publish.ErrorsWarnings
+  ( PackageError(..)
+  , PackageWarning(..)
+  , UserError(..)
+  , InternalError(..)
+  , OtherError(..)
+  , RepositoryFieldError(..)
+  , JSONSource(..)
+  , printError
+  , renderError
+  , printWarnings
+  , renderWarnings
+  ) where
 
 import Control.Applicative ((<$>))
 import Data.Aeson.BetterErrors
