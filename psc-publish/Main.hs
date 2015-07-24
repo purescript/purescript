@@ -31,6 +31,8 @@ import Control.Monad.Trans.Except
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer
 
+import Options.Applicative hiding (str)
+
 import System.Directory (doesFileExist)
 import System.Process (readProcess)
 import System.Exit (exitFailure)
@@ -42,11 +44,24 @@ import qualified Web.Bower.PackageMeta as Bower
 
 import qualified Language.PureScript as P (version)
 import qualified Language.PureScript.Docs as D
+import qualified Paths_purescript as Paths
+
 import Utils
 import ErrorsWarnings
 
 main :: IO ()
-main = do
+main = execParser opts >> publish
+  where
+  opts        = info (version <*> helper) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header "psc-publish - Generates documentation packages for upload to http://pursuit.purescript.org"
+  footerInfo  = footer $ "psc-publish " ++ showVersion Paths.version
+
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
+
+publish :: IO ()
+publish = do
   pkg <- preparePackage
   BL.putStrLn (A.encode pkg)
 
