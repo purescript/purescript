@@ -31,7 +31,7 @@ import Data.Function (on)
 
 import Control.Monad (unless)
 import Control.Applicative
-import Control.Arrow (second)
+import Control.Arrow (first, second)
 import Control.Monad.Writer.Class
 
 import Language.PureScript.AST.Binders
@@ -108,31 +108,30 @@ genericMerge f bsl@((s, b):bs) bsr@((s', b'):bs')
 
 -- |
 -- Find the uncovered set between two binders:
--- the first binder is the case we are trying to cover the second one is the matching binder
+-- the first binder is the case we are trying to cover, the second one is the matching binder
 --
-missingCasesSingle :: Environment -> ModuleName -> Binder -> Binder -> [Binder]
-missingCasesSingle _ _ _ NullBinder = []
-missingCasesSingle _ _ _ (VarBinder _) = []
+missingCasesSingle :: Environment -> ModuleName -> Binder -> Binder -> ([Binder], Maybe Bool)
+missingCasesSingle _ _ _ NullBinder = ([], Just True)
+missingCasesSingle _ _ _ (VarBinder _) = ([], Just True)
 missingCasesSingle env mn (VarBinder _) b = missingCasesSingle env mn NullBinder b
 missingCasesSingle env mn br (NamedBinder _ bl) = missingCasesSingle env mn br bl
 missingCasesSingle env mn NullBinder cb@(ConstructorBinder con _) =
-  concatMap (\cp -> missingCasesSingle env mn cp cb) allPatterns
+  (concatMap (\cp -> fst $ missingCasesSingle env mn cp cb) allPatterns, Just True)
   where
   allPatterns = map (\(p, t) -> ConstructorBinder (qualifyName p mn con) (initialize $ length t))
                   $ getConstructors env mn con
 missingCasesSingle env mn cb@(ConstructorBinder con bs) (ConstructorBinder con' bs')
-  | con == con' = map (ConstructorBinder con) (missingCasesMultiple env mn bs bs')
-  | otherwise = [cb]
-missingCasesSingle _ _ NullBinder (ArrayBinder bs)
-  | null bs = [] 
-  | otherwise = []
+  | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder con) bs'', pr)
+  | otherwise = ([cb], Just False)
 missingCasesSingle env mn NullBinder (ObjectBinder bs) =
-  map (ObjectBinder . zip (map fst bs)) allMisses
+  (map (ObjectBinder . zip (map fst bs)) allMisses, pr)
   where
-  allMisses = missingCasesMultiple env mn (initialize $ length bs) (map snd bs)
+  (allMisses, pr) = missingCasesMultiple env mn (initialize $ length bs) (map snd bs)
 missingCasesSingle env mn (ObjectBinder bs) (ObjectBinder bs') =
-  map (ObjectBinder . zip sortedNames) $ uncurry (missingCasesMultiple env mn) (unzip binders)
+  (map (ObjectBinder . zip sortedNames) allMisses, pr)
   where
+  (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
+
   sortNames = sortBy (compare `on` fst)
 
   (sbs, sbs') = (sortNames bs, sortNames bs')
@@ -146,12 +145,12 @@ missingCasesSingle env mn (ObjectBinder bs) (ObjectBinder bs') =
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder (BooleanBinder b) = [BooleanBinder $ not b]
+missingCasesSingle _ _ NullBinder (BooleanBinder b) = ([BooleanBinder $ not b], Just True)
 missingCasesSingle _ _ (BooleanBinder bl) (BooleanBinder br)
-  | bl == br = []
-  | otherwise = [BooleanBinder bl]
+  | bl == br = ([], Just True)
+  | otherwise = ([BooleanBinder bl], Just False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
-missingCasesSingle _ _ b _ = [b]
+missingCasesSingle _ _ b _ = ([b], Nothing)
 
 -- |
 -- Returns the uncovered set of binders
@@ -179,15 +178,14 @@ missingCasesSingle _ _ b _ = [b]
 --       redundant or not, but uncovered at least. If we use `y` instead, we'll need to have a redundancy checker
 --       (which ought to be available soon), or increase the complexity of the algorithm.
 --
-missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> [[Binder]]
+missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Maybe Bool)
 missingCasesMultiple env mn = go
   where
-  go [] _ = []
-  go (x:xs) (y:ys)
-    | null miss = map (x :) (go xs ys)
-    | otherwise = map (: xs) miss ++ map (x :) (go xs ys)
+  go [] [] = ([], pure True)
+  go (x:xs) (y:ys) = (map (: xs) miss1 ++ map (x :) miss2, liftA2 (&&) pr1 pr2)
     where
-    miss = missingCasesSingle env mn x y
+    (miss1, pr1) = missingCasesSingle env mn x y
+    (miss2, pr2) = go xs ys
   go _ _ = error "Argument lengths did not match in missingCasesMultiple."
 
 -- |
@@ -214,13 +212,15 @@ isExhaustiveGuard (Right _) = True
 -- |
 -- Returns the uncovered set of case alternatives
 --
-missingCases :: Environment -> ModuleName -> [Binder] -> CaseAlternative -> [[Binder]]
+missingCases :: Environment -> ModuleName -> [Binder] -> CaseAlternative -> ([[Binder]], Maybe Bool)
 missingCases env mn uncovered ca = missingCasesMultiple env mn uncovered (caseAlternativeBinders ca)
 
-missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> [[Binder]]
+missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> ([[Binder]], Maybe Bool)
 missingAlternative env mn ca uncovered
-  | isExhaustiveGuard (caseAlternativeResult ca) = missingCases env mn uncovered ca
-  | otherwise = [uncovered]
+  | isExhaustiveGuard (caseAlternativeResult ca) = mcases 
+  | otherwise = ([uncovered], snd mcases)
+  where
+  mcases = missingCases env mn uncovered ca
 
 -- |
 -- Main exhaustivity checking function
@@ -229,20 +229,29 @@ missingAlternative env mn ca uncovered
 -- Then, returns the uncovered set of case alternatives.
 -- 
 checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> [CaseAlternative] -> m ()
-checkExhaustive env mn cas = makeResult . nub $ foldl' step [initial] cas
+checkExhaustive env mn cas = makeResult . first nub $ foldl' step ([initial], (pure True, [])) cas
   where
-  step :: [[Binder]] -> CaseAlternative -> [[Binder]]
-  step uncovered ca = concatMap (missingAlternative env mn ca) uncovered
+  step :: ([[Binder]], (Maybe Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]]))
+  step (uncovered, (nec, redundant)) ca =
+    let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
+        cond = or <$> sequenceA pr
+    in (concat missed, (liftA2 (&&) cond nec,
+                         if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
+    where
+    sequenceA = foldr (liftA2 (:)) (pure [])
 
   initial :: [Binder]
   initial = initialize numArgs
     where
     numArgs = length . caseAlternativeBinders . head $ cas 
 
-  makeResult :: [[Binder]] -> m ()
-  makeResult bss = unless (null bss) tellWarning 
+  makeResult :: ([[Binder]], (Maybe Bool, [[Binder]])) -> m ()
+  makeResult (bss, (_, bss')) =
+    do unless (null bss) tellExhaustive
+       unless (null bss') tellRedundant
     where
-    tellWarning = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
+    tellExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
+    tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
 
 -- |
 -- Exhaustivity checking over a list of declarations

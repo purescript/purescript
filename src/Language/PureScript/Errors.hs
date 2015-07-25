@@ -121,6 +121,7 @@ data SimpleErrorMessage
   | ShadowedName Ident
   | WildcardInferredType Type
   | NotExhaustivePattern [[Binder]] Bool
+  | OverlappingPattern [[Binder]] Bool
   | ClassOperator ProperName Ident
   deriving (Show)
 
@@ -231,6 +232,7 @@ errorCode em = case unwrapErrorMessage em of
   (ShadowedName _)              -> "ShadowedName"
   (WildcardInferredType _)      -> "WildcardInferredType"
   (NotExhaustivePattern _ _)    -> "NotExhaustivePattern"
+  (OverlappingPattern _ _)      -> "OverlappingPattern"
   (ClassOperator _ _)           -> "ClassOperator"
 
 -- |
@@ -564,6 +566,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple (NotExhaustivePattern bs b) =
       indent $ paras $ [ line "Pattern could not be determined to cover all cases."
               , line $ "The definition has the following uncovered cases:\n"
+              , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
+              ] ++ if not b then [line "..."] else []
+    goSimple (OverlappingPattern bs b) =
+      indent $ paras $ [ line "Redundant cases have been detected."
+              , line $ "The definition has the following redundant cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
               ] ++ if not b then [line "..."] else []
     go (NotYetDefined names err) =
