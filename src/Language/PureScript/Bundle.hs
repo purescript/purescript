@@ -50,7 +50,7 @@ import qualified Paths_purescript as Paths
 data ErrorMessage
   = UnsupportedModulePath String
   | InvalidTopLevel
-  | UnableToParseModule
+  | UnableToParseModule String
   | UnsupportedExport
   | ErrorInModule ModuleIdentifier ErrorMessage
   deriving Show
@@ -109,8 +109,10 @@ printErrorMessage (UnsupportedModulePath s) =
   ]
 printErrorMessage InvalidTopLevel =
   [ "Expected a list of source elements at the top level." ]
-printErrorMessage UnableToParseModule =
-  [ "The module could not be parsed." ]
+printErrorMessage (UnableToParseModule err) =
+  [ "The module could not be parsed:"
+  , err
+  ]
 printErrorMessage UnsupportedExport =
   [ "An export was unsupported. Exports can be defined in one of two ways: "
   , "  1) exports.name = ..."
@@ -530,7 +532,7 @@ bundle :: forall m. (Applicative m, MonadError ErrorMessage m)
        -> m String
 bundle inputStrs entryPoints mainModule namespace = do
   input <- forM inputStrs $ \(ident, js) -> do
-                ast <- either (const $ throwError $ ErrorInModule ident UnableToParseModule) pure $ parse js (moduleName ident)
+                ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
 
   let mids = S.fromList (map (moduleName . fst) input)
