@@ -1,5 +1,5 @@
 
-module Utils where
+module Language.PureScript.Publish.Utils where
 
 import Data.List
 import Data.Maybe

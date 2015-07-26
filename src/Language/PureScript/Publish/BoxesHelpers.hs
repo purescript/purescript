@@ -1,7 +1,7 @@
-module BoxesHelpers
+module Language.PureScript.Publish.BoxesHelpers
   ( Boxes.Box
   , Boxes.nullBox
-  , module BoxesHelpers
+  , module Language.PureScript.Publish.BoxesHelpers
   ) where
 
 import System.IO (hPutStr, stderr)

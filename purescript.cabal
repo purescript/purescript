@@ -48,7 +48,11 @@ library
                    text -any,
                    split -any,
                    language-javascript == 0.5.*,
-                   syb -any
+                   syb -any,
+                   Glob >= 0.7 && < 0.8,
+                   process >= 1.2.0 && < 1.3,
+                   safe >= 0.3.9 && < 0.4,
+                   semigroups >= 0.16.2 && < 0.17
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -140,6 +144,11 @@ library
                      Language.PureScript.Docs.ParseAndDesugar
                      Language.PureScript.Docs.Utils.MonoidExtras
 
+                     Language.PureScript.Publish
+                     Language.PureScript.Publish.Utils
+                     Language.PureScript.Publish.ErrorsWarnings
+                     Language.PureScript.Publish.BoxesHelpers
+
                      Control.Monad.Unify
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
@@ -190,19 +199,10 @@ executable psc-docs
     ghc-options: -Wall -O2
 
 executable psc-publish
-    build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any,
-                   pattern-arrows -any, aeson -any, bytestring -any,
-                   directory -any, transformers -any, text -any, containers
-                   -any, boxes -any, split -any, Glob -any, aeson-better-errors
-                   -any, transformers-compat -any, bower-json -any, semigroups
-                   -any, safe -any
+    build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-publish
-    other-modules: Utils
-                   ErrorsWarnings
-                   BoxesHelpers
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
