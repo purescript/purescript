@@ -20,6 +20,8 @@ tested-with: GHC==7.8
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
+                  , tests/prelude/*.purs
+                  , tests/prelude/js/*.js
 
 source-repository head
     type: git
@@ -188,7 +190,7 @@ executable psci
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any,
-                   split -any, ansi-wl-pprint -any, directory -any, 
+                   split -any, ansi-wl-pprint -any, directory -any,
                    filepath -any, Glob -any
     main-is: Main.hs
     buildable: True
@@ -207,7 +209,7 @@ executable psc-publish
 
 executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
-                   process -any, mtl -any, parsec -any, filepath -any, directory -any, 
+                   process -any, mtl -any, parsec -any, filepath -any, directory -any,
                    Glob -any
     main-is: Main.hs
     buildable: True
@@ -225,7 +227,7 @@ executable psc-bundle
                        directory -any,
                        mtl -any,
                        transformers -any,
-                       transformers-compat -any, 
+                       transformers-compat -any,
                        optparse-applicative >= 0.10.0,
                        Glob -any
   ghc-options:         -Wall -O2
@@ -244,7 +246,7 @@ test-suite psci-tests
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, HUnit -any, time -any, 
+                   transformers-compat -any, process -any, HUnit -any, time -any,
                    Glob -any
     type: exitcode-stdio-1.0
     main-is: Main.hs
