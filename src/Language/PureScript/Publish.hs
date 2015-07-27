@@ -5,8 +5,11 @@
 
 module Language.PureScript.Publish
   ( preparePackage
+  , preparePackage'
   , PrepareM()
   , runPrepareM
+  , PublishOptions(..)
+  , defaultPublishOptions
   , getVersionFromGitTag
   , getBowerInfo
   , getModulesAndBookmarks
@@ -49,11 +52,22 @@ import qualified Language.PureScript.Docs as D
 import Language.PureScript.Publish.Utils
 import Language.PureScript.Publish.ErrorsWarnings
 
+data PublishOptions = PublishOptions
+  { -- | How to obtain the version tag and version that the data being
+    -- generated will refer to.
+    publishGetVersion :: PrepareM (String, Version)
+  }
+
+defaultPublishOptions :: PublishOptions
+defaultPublishOptions = PublishOptions
+  { publishGetVersion = getVersionFromGitTag
+  }
+
 -- | Attempt to retrieve package metadata from the current directory.
 -- Calls exitFailure if no package metadata could be retrieved.
-preparePackage :: IO D.UploadedPackage
-preparePackage =
-  runPrepareM preparePackage'
+preparePackage :: PublishOptions -> IO D.UploadedPackage
+preparePackage opts =
+  runPrepareM (preparePackage' opts)
     >>= either (\e -> printError e >> exitFailure)
                handleWarnings
   where
@@ -93,14 +107,14 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
-preparePackage' :: PrepareM D.UploadedPackage
-preparePackage' = do
+preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
+preparePackage' opts = do
   exists <- liftIO (doesFileExist "bower.json")
   unless exists (userError BowerJSONNotFound)
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntParseBowerJSON)
-  (pkgVersionTag, pkgVersion) <- getVersionFromGitTag
+  (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgGithub                   <- getBowerInfo pkgMeta
   (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
 
