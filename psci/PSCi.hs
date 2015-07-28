@@ -222,12 +222,12 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModules = imports} typ =
+createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
-    P.Module [] moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
+    P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
