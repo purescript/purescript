@@ -6,6 +6,7 @@ import Data.Char (isUpper)
 import Data.Function (on)
 import Data.Traversable (traverse)
 
+import Control.Arrow (second)
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
 import Control.Monad.Trans.State.Strict
@@ -196,13 +197,15 @@ typeDecls = mapMaybe getTypeName . filter P.isDataDecl . P.exportedDeclarations
   getTypeName _ = Nothing
 
 identNames :: P.Module -> [(N.Ident, P.Declaration)]
-identNames = nubOnFst . mapMaybe getDeclName . P.exportedDeclarations
+identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
   where
-  getDeclName :: P.Declaration -> Maybe (P.Ident, P.Declaration)
-  getDeclName d@(P.ValueDeclaration ident _ _ _)  = Just (ident, d)
-  getDeclName d@(P.ExternDeclaration ident _) = Just (ident, d)
-  getDeclName (P.PositionedDeclaration _ _ d) = getDeclName d
-  getDeclName _ = Nothing
+  getDeclNames :: P.Declaration -> [(P.Ident, P.Declaration)]
+  getDeclNames d@(P.ValueDeclaration ident _ _ _)  = [(ident, d)]
+  getDeclNames d@(P.TypeDeclaration ident _ ) = [(ident, d)]
+  getDeclNames d@(P.ExternDeclaration ident _) = [(ident, d)]
+  getDeclNames d@(P.TypeClassDeclaration _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
+  getDeclNames (P.PositionedDeclaration _ _ d) = getDeclNames d
+  getDeclNames _ = []
 
 dctorNames :: P.Module -> [(N.ProperName, P.Declaration)]
 dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
