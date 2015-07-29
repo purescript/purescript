@@ -8,12 +8,13 @@ import Control.Applicative
 import Control.Monad.Writer (runWriterT)
 import Control.Monad.Trans.Except (runExceptT)
 
-import Data.List (isSuffixOf, sort)
+import Data.List (sort)
 
 import System.Exit (exitFailure)
 import System.Console.Haskeline
 import System.FilePath ((</>))
-import System.Directory (getCurrentDirectory, getDirectoryContents)
+import System.Directory (getCurrentDirectory)
+import qualified System.FilePath.Glob as Glob
 
 import Test.HUnit
 
@@ -48,9 +49,14 @@ completionTestData =
   , (":mo", [":module"])
   , (":b", [":browse"])
 
-  -- :browse should complete modules
-  , (":b Prel", [":b Prelude", ":b Prelude.Unsafe"])
-  , (":b Prelude.", [":b Prelude.Unsafe"])
+  -- :browse should complete module names
+  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
+  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
+
+  -- import should complete module names
+  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
+  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
+  , ("import qualified Control.Monad.Eff.", map ("import qualified Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
   -- :load, :module should complete file paths
   , (":l psci/tests/data/", [":l psci/tests/data/Sample.purs"])
@@ -66,8 +72,8 @@ completionTestData =
   , (":show a", [])
 
   -- :type should complete values and data constructors in scope
-  , (":type Prelude.Unsafe.un", [":type Prelude.Unsafe.unsafeIndex"])
-  , (":type un", [":type unit"])
+  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log"])
+  , (":type uni", [":type unit"])
   , (":type E", [":type EQ"])
 
   -- :kind should complete types in scope
@@ -79,25 +85,19 @@ completionTestData =
   , (":type EQ ", [])
   , (":kind Ordering ", [])
 
-  -- import should complete module names
-  , ("import Control.Monad.S", ["import Control.Monad.ST"])
-  , ("import qualified Control.Monad.S", ["import qualified Control.Monad.ST"])
-  , ("import Control.Monad.", map ("import Control.Monad." ++)
-                                  ["Eff", "ST"])
-
   -- a few other import tests
   , ("impor", ["import"])
   , ("import q", ["import qualified"])
-  , ("import ", map ("import " ++) allModuleNames ++ ["import qualified"])
-  , ("import Prelude.Unsafe ", [])
+  , ("import ", map ("import " ++) supportModules ++ ["import qualified"])
+  , ("import Prelude ", [])
 
   -- String and number literals should not be completed
   , ("\"hi", [])
   , ("34", [])
 
   -- Identifiers and data constructors should be completed
-  , ("un", ["unit"])
-  , ("Debug.Trace.", map ("Debug.Trace." ++) ["print", "trace"])
+  , ("uni", ["unit"])
+  , ("Control.Monad.Eff.Class.", ["Control.Monad.Eff.Class.liftEff"])
   , ("G", ["GT"])
   , ("Prelude.L", ["Prelude.LT"])
 
@@ -107,14 +107,6 @@ completionTestData =
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
   where
-  allModuleNames = [ "Assert"
-                   , "Control.Monad.Eff"
-                   , "Control.Monad.ST"
-                   , "Data.Function"
-                   , "Debug.Trace"
-                   , "Prelude"
-                   , "Prelude.Unsafe"
-                   ]
 
 assertCompletedOk :: (String, [String]) -> Assertion
 assertCompletedOk (line, expecteds) = do
@@ -131,10 +123,12 @@ runCM act = do
 getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
-  let preludeDir = cwd </> "tests" </> "prelude"
-      jsDir = preludeDir </> "js"
-  modulesOrFirstError <- loadAllModules [ preludeDir </> "Prelude.purs" ]
-  jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
+  let supportDir = cwd </> "tests" </> "support" </> "flattened"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+  pursFiles <- supportFiles "purs"
+  jsFiles   <- supportFiles "js"
+
+  modulesOrFirstError <- loadAllModules pursFiles
   foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   case modulesOrFirstError of
@@ -148,3 +142,15 @@ controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
   s = P.moduleNameFromString
+
+supportModules :: [String]
+supportModules =
+  [ "Control.Monad.Eff.Class"
+  , "Control.Monad.Eff.Console"
+  , "Control.Monad.Eff"
+  , "Control.Monad.Eff.Unsafe"
+  , "Control.Monad.ST"
+  , "Data.Function"
+  , "Prelude"
+  , "Test.Assert"
+  ]
