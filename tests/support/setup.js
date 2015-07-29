@@ -1,6 +1,15 @@
 var glob = require("glob");
 var fs = require("fs");
 
+try {
+  fs.mkdirSync("./flattened");
+} catch(e) {
+  // ignore the error if it already exists
+  if (e.code !== "EEXIST") {
+    throw(e);
+  }
+}
+
 glob("bower_components/*/src/**/*.{js,purs}", function(err, files) {
   if (err) throw err;
   files.forEach(function(file) {
