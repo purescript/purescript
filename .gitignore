@@ -13,3 +13,4 @@ cabal.sandbox.config
 bower_components/
 tmp/
 .stack-work/
+tests/support/flattened/
