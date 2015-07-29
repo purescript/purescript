@@ -1,3 +1,4 @@
+-- @shouldFailWith PropertyIsMissing
 module Main where
 
 import Prelude

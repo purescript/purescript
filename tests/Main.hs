@@ -18,13 +18,30 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 
+-- Failing tests can specify the kind of error that should be thrown with a
+-- @shouldFailWith declaration. For example:
+--
+--   "-- @shouldFailWith TypesDoNotUnify"
+--
+-- will cause the test to fail unless that module fails to compile with exactly
+-- one TypesDoNotUnify error.
+--
+-- If a module is expected to produce multiple type errors, then use multiple
+-- @shouldFailWith lines; for example:
+--
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TransitiveExportError
+
 module Main (main) where
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
 
-import Data.List (isSuffixOf)
+import Data.Char (isSpace)
+import Data.Maybe (mapMaybe)
+import Data.List (isSuffixOf, sort, stripPrefix)
 import Data.Traversable (traverse)
 import Data.Time.Clock (UTCTime())
 
@@ -33,6 +50,7 @@ import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative
+import Control.Arrow ((>>>))
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -146,11 +164,35 @@ assertCompiles inputFiles foreigns = do
 
 assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
 assertDoesNotCompile inputFiles foreigns = do
-  putStrLn $ "Assert " ++ last inputFiles ++ " does not compile"
+  let testFile = last inputFiles
+  putStrLn $ "Assert " ++ testFile ++ " does not compile"
+  shouldFailWith <- getShouldFailWith testFile
   assert inputFiles foreigns $ \e ->
     case e of
-      Left errs -> putStrLn  (P.prettyPrintMultipleErrors False errs) >> return Nothing
-      Right _ -> return $ Just "Should not have compiled"
+      Left errs -> do
+        putStrLn (P.prettyPrintMultipleErrors False errs)
+        if null shouldFailWith
+          then return Nothing
+          else return $ checkShouldFailWith shouldFailWith errs
+      Right _ ->
+        return $ Just "Should not have compiled"
+
+  where
+  getShouldFailWith =
+    readFile
+    >>> fmap (   lines
+             >>> mapMaybe (stripPrefix "-- @shouldFailWith ")
+             >>> map trim
+             )
+
+  checkShouldFailWith expected errs =
+    let actual = map P.errorCode $ P.runMultipleErrors errs
+    in if sort expected == sort actual
+      then Nothing
+      else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
+
+  trim =
+    dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
