@@ -16,4 +16,4 @@ module M2 where
 
 module Main where
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

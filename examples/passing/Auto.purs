@@ -12,4 +12,4 @@ exists = \state step f -> f (Auto { state: state, step: step })
 run :: forall i o. SomeAuto i o -> i -> o
 run = \s i -> s (\a -> case a of Auto a -> a.step a.state i)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

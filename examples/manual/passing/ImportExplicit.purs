@@ -11,4 +11,4 @@ module Main where
   testX = X
   testY = Y
 
-  main = Debug.Trace.trace "Done"
+  main = Control.Monad.Eff.Console.log "Done"

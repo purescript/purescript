@@ -39,4 +39,4 @@ wildcard { w: w } = { x: w, y: w, z: w, w: w }
 wildcard' :: { | Quux _ } -> Number
 wildcard' { q: q } = q
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

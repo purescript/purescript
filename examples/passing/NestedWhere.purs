@@ -9,4 +9,4 @@ f x = g x
     go x = go1 (x - 1.0)
     go1 x = go x
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

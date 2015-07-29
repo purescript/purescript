@@ -9,4 +9,4 @@ iterate :: forall a. Number -> (a -> a) -> a -> a
 iterate 0.0 f a = a
 iterate n f a = iterate (n - 1.0) f (f a)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

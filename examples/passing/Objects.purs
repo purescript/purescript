@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude
+import Prelude hiding (append)
 
 test = \x -> x.foo + x.bar + 1.0
 
@@ -32,4 +32,4 @@ test6 = case { "***": 1.0 } of
 
 test7 {a:    snoog , b     : blah } = blah
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

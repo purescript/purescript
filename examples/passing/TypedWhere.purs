@@ -14,4 +14,4 @@ lefts = go N
   go ls (C (L a) rest) = go (C a ls) rest
   go ls (C _ rest) = go ls rest
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

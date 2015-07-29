@@ -14,4 +14,4 @@ test = blah x
   { baz = "blah"
   }
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

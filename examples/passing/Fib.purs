@@ -12,4 +12,4 @@ main = runST (do
     n2' <- readSTRef n2
     writeSTRef n2 $ n1' + n2'
     writeSTRef n1 n2'
-    Debug.Trace.print n2')
+    Control.Monad.Eff.Console.print n2')

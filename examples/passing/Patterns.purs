@@ -19,4 +19,4 @@ isDesc :: Array Number -> Boolean
 isDesc [x, y] | x > y = true
 isDesc _ = false
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

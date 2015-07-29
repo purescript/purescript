@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Debug.Trace
+import Control.Monad.Eff.Console
 import Control.Monad.Eff
 import Control.Monad.ST
 

@@ -29,4 +29,4 @@ test1 = test id
 
 test2 = test maybe
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

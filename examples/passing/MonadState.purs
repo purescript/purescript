@@ -13,10 +13,10 @@ data State s a = State (s -> Tuple s a)
 runState s (State f) = f s
 
 instance functorState :: Functor (State s) where
-  (<$>) = liftM1
+  map = liftM1
 
 instance applyState :: Apply (State s) where
-  (<*>) = ap
+  apply = ap
 
 instance applicativeState :: Applicative (State s) where
   pure a = State $ \s -> Tuple s a
@@ -44,5 +44,5 @@ test = runState "" $ do
 
 main = do
   let t1 = test
-  Debug.Trace.trace "Done"
+  Control.Monad.Eff.Console.log "Done"
 

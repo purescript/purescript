@@ -1,6 +1,6 @@
 module Main where
 
-import Debug.Trace
+import Control.Monad.Eff.Console
 import Prelude hiding (
   show, -- a value
   Show, -- a type class

@@ -44,6 +44,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.Directory
+import qualified System.FilePath.Glob as Glob
 
 import Text.Parsec (ParseError)
 
@@ -61,18 +62,10 @@ makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readEx
   where
   getInputTimestamp :: P.ModuleName -> Test (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn 
-    | isPreludeModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
-    isPreludeModule = flip elem
-      [ "Prelude.Unsafe"
-      , "Prelude"
-      , "Data.Function"
-      , "Control.Monad.Eff"
-      , "Control.Monad.ST"
-      , "Debug.Trace"
-      , "Assert"
-      ]
+    isSupportModule = flip elem supportModules
   
   getOutputTimestamp :: P.ModuleName -> Test (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -168,19 +161,74 @@ main :: IO ()
 main = do
   cwd <- getCurrentDirectory
   
-  let preludeDir  = cwd </> "tests" </> "prelude"
-      preludePurs = preludeDir </> "Prelude.purs"
-      jsDir       = preludeDir </> "js"
-  jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
-  foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
+  let supportDir  = cwd </> "tests" </> "support" </> "flattened"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+
+  supportPurs <- supportFiles "purs"
+  supportJS   <- supportFiles "js"
+
+  foreignFiles <- forM supportJS (\f -> (f,) <$> readFile f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   
   let passing = cwd </> "examples" </> "passing"
   passingTestCases <- getDirectoryContents passing
   forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertCompiles [preludePurs, passing </> inputFile] foreigns
+    assertCompiles (supportPurs ++ [passing </> inputFile]) foreigns
   let failing = cwd </> "examples" </> "failing"
   failingTestCases <- getDirectoryContents failing
   forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertDoesNotCompile [preludePurs, failing </> inputFile] foreigns
+    assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
   exitSuccess
+
+supportModules :: [String]
+supportModules =
+  [ "Control.Alternative"
+  , "Control.Alt"
+  , "Control.Apply"
+  , "Control.Biapplicative"
+  , "Control.Biapply"
+  , "Control.Bind"
+  , "Control.Comonad"
+  , "Control.Extend"
+  , "Control.Lazy"
+  , "Control.Monad.Eff.Class"
+  , "Control.Monad.Eff.Console"
+  , "Control.Monad.Eff"
+  , "Control.Monad.Eff.Unsafe"
+  , "Control.MonadPlus"
+  , "Control.Monad"
+  , "Control.Monad.ST"
+  , "Control.Plus"
+  , "Data.Array"
+  , "Data.Array.ST"
+  , "Data.Array.Unsafe"
+  , "Data.Bifoldable"
+  , "Data.Bifunctor.Clown"
+  , "Data.Bifunctor.Flip"
+  , "Data.Bifunctor.Join"
+  , "Data.Bifunctor.Joker"
+  , "Data.Bifunctor.Product"
+  , "Data.Bifunctor"
+  , "Data.Bifunctor.Wrap"
+  , "Data.Bitraversable"
+  , "Data.Foldable"
+  , "Data.Function"
+  , "Data.Functor.Invariant"
+  , "Data.Functor"
+  , "Data.Maybe.First"
+  , "Data.Maybe.Last"
+  , "Data.Maybe"
+  , "Data.Maybe.Unsafe"
+  , "Data.Monoid.Additive"
+  , "Data.Monoid.Conj"
+  , "Data.Monoid.Disj"
+  , "Data.Monoid.Dual"
+  , "Data.Monoid.Endo"
+  , "Data.Monoid.Multiplicative"
+  , "Data.Monoid"
+  , "Data.Traversable"
+  , "Data.Tuple.Nested"
+  , "Data.Tuple"
+  , "Prelude"
+  , "Test.Assert"
+  ]

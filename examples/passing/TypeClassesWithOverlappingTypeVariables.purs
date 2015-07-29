@@ -5,7 +5,7 @@ import Prelude
 data Either a b = Left a | Right b
 
 instance functorEither :: Prelude.Functor (Either a) where
-  (<$>) _ (Left x) = Left x
-  (<$>) f (Right y) = Right (f y)
+  map _ (Left x) = Left x
+  map f (Right y) = Right (f y)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

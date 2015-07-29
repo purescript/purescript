@@ -18,4 +18,4 @@ f :: (forall r. F r) -> String
 f g = case g { x: "Hello" } of
         { x = x } -> x
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

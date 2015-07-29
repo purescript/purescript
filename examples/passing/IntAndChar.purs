@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
-import Assert
+import Test.Assert
 
 f 1 = 1
 f _ = 0
@@ -15,4 +15,4 @@ main = do
   assert $ f 0 == 0
   assert $ g 'a' == 'a'
   assert $ g 'b' == 'b'
-  Debug.Trace.trace "Done"
+  Control.Monad.Eff.Console.log "Done"

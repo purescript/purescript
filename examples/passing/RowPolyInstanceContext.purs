@@ -19,4 +19,4 @@ test2 = state $ \o -> o { foo = o.foo ++ "!" }
 main = do
   let t1 = test1
   let t2 = test2
-  Debug.Trace.trace "Done"
+  Control.Monad.Eff.Console.log "Done"

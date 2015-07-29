@@ -7,4 +7,4 @@ fib = \n -> case n of
   1.0 -> 1.0
   n -> fib (n - 1.0) + fib (n - 2.0)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
-import Debug.Trace
-import Assert
+import Control.Monad.Eff.Console
+import Test.Assert
 
 mkRecord = { foo: _, bar: _, baz: "baz" }
 
@@ -17,4 +17,4 @@ main = do
   point <- { x: _, y: x } <$> return 2.0
   assert $ point.x == 2.0
   assert $ point.y == 1.0
-  trace (mkRecord 1.0 "Done!").bar
+  log (mkRecord 1.0 "Done!").bar

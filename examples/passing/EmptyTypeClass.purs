@@ -9,4 +9,4 @@ head [x] = x
 
 instance allowPartials :: Partial
 
-main = Debug.Trace.trace $ head ["Done"]
+main = Control.Monad.Eff.Console.log $ head ["Done"]

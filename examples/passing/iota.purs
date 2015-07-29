@@ -6,4 +6,4 @@ k = \x -> \y -> x
 
 iota = \x -> x s k
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

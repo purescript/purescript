@@ -12,4 +12,4 @@ instance sequenceList :: Sequence List where
   sequence Nil = pure Nil
   sequence (Cons x xs) = Cons <$> x <*> sequence xs
 
-main = sequence $ Cons (Debug.Trace.trace "Done") Nil
+main = sequence $ Cons (Control.Monad.Eff.Console.log "Done") Nil

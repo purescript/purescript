@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
-import Debug.Trace
-import Assert
+import Control.Monad.Eff.Console
+import Test.Assert
 
 getValue :: forall e. Eff (| e) Boolean
 getValue = return true

@@ -22,10 +22,10 @@ instance showData :: (Prelude.Show a) => Prelude.Show (Data a) where
 test3 = \_ -> show (Data "testing")
 
 instance functorData :: Functor Data where
-  (<$>) = liftM1
+  map = liftM1
 
 instance applyData :: Apply Data where
-  (<*>) = ap
+  apply = ap
 
 instance applicativeData :: Applicative Data where
   pure = Data
@@ -38,10 +38,10 @@ instance monadData :: Monad Data
 data Maybe a = Nothing | Just a
 
 instance functorMaybe :: Functor Maybe where
-  (<$>) = liftM1
+  map = liftM1
 
 instance applyMaybe :: Apply Maybe where
-  (<*>) = ap
+  apply = ap
 
 instance applicativeMaybe :: Applicative Maybe where
   pure = Just
@@ -65,5 +65,5 @@ test9 _ = runReader 0.0 $ do
   n <- ask
   return $ n + 1.0
 
-main = Debug.Trace.trace (test7 "Done")
+main = Control.Monad.Eff.Console.log (test7 "Done")
 

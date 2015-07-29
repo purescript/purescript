@@ -1,13 +1,12 @@
 module Main where
 
 import Prelude
-import Assert
+import Test.Assert
 
 mkValue :: Number -> Number
 mkValue id = id
 
 main = do
   let value = mkValue 1.0
-  if value == 1.0
-    then Debug.Trace.trace "Done"
-    else error "Not done"
+  assert $ value == 1.0
+  Control.Monad.Eff.Console.log "Done"

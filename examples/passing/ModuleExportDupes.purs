@@ -9,7 +9,7 @@ module C (module Prelude, module A) where
   import A
 
 module Main where
-  import Debug.Trace
+  import Control.Monad.Eff.Console
   import A
   import B
   import C

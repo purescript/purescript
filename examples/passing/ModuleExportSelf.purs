@@ -4,7 +4,7 @@ module A (module A, module Prelude) where
   type Foo = Boolean
 
 module Main where
-  import Debug.Trace
+  import Control.Monad.Eff.Console
   import A
 
   bar :: Foo

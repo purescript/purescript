@@ -14,4 +14,4 @@ loop x = loop (x + 1.0)
 notATailCall = \x ->
   (\notATailCall -> notATailCall x) (\x -> x)
 
-main = Debug.Trace.print (test 0.0 (1.0 `C` (2.0 `C` (3.0 `C` N))))
+main = Control.Monad.Eff.Console.print (test 0.0 (1.0 `C` (2.0 `C` (3.0 `C` N))))

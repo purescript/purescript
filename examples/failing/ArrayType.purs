@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 bar :: Number -> Number -> Number
 bar n m = n + m

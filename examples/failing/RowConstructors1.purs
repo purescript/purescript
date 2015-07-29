@@ -5,4 +5,4 @@ import Prelude
 data Foo = Bar
 type Baz = { | Foo }
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

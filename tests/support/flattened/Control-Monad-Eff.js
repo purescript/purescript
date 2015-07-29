@@ -38,3 +38,25 @@ exports.whileE = function (f) {
     };
   };
 };
+
+exports.forE = function (lo) {
+  return function (hi) {
+    return function (f) {
+      return function () {
+        for (var i = lo; i < hi; i++) {
+          f(i)();
+        }
+      };
+    };
+  };
+};
+
+exports.foreachE = function (as) {
+  return function (f) {
+    return function () {
+      for (var i = 0, l = as.length; i < l; i++) {
+        f(as[i])();
+      }
+    };
+  };
+};

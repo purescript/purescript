@@ -16,4 +16,4 @@ instance bNumber :: B Number where
   b 0.0 = false
   b n = a (n - 1.0)
 
-main = Debug.Trace.print $ a 10.0
+main = Control.Monad.Eff.Console.print $ a 10.0

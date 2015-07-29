@@ -8,4 +8,4 @@ test1 = \f -> f 0.0
 forever :: forall m a b. (forall a b. m a -> (a -> m b) -> m b) -> m a -> m b
 forever = \bind action -> bind action $ \_ -> forever bind action
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

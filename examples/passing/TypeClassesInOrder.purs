@@ -8,4 +8,4 @@ class Foo a where
 instance fooString :: Foo String where
   foo s = s
 
-main = Debug.Trace.trace $ foo "Done"
+main = Control.Monad.Eff.Console.log $ foo "Done"
