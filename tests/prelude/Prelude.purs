@@ -559,6 +559,8 @@ module Prelude.Unsafe where
 
   foreign import unsafeIndex :: forall a. Array a -> Number -> a
 
+  foreign import reflectParameterName :: forall a b. (a -> b) -> String
+
 module Control.Monad.Eff
   ( Eff()
   , Pure()
