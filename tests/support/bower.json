@@ -3,7 +3,7 @@
   "dependencies": {
     "purescript-eff": "0.1.0",
     "purescript-prelude": "0.1.1",
-    "purescript-assert": "https://github.com/hdgarrood/purescript-assert.git#2f166394176548e19e0ddc72d4ff620036aec931",
+    "purescript-assert": "0.1.1",
     "purescript-st": "0.1.0",
     "purescript-console": "0.1.0",
     "purescript-functions": "0.1.0"
