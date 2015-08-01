@@ -10,6 +10,8 @@ module Language.PureScript.Publish
   , runPrepareM
   , PublishOptions(..)
   , defaultPublishOptions
+  , getGitWorkingTreeStatus
+  , requireCleanWorkingTree
   , getVersionFromGitTag
   , getBowerInfo
   , getModulesAndBookmarks
@@ -112,6 +114,8 @@ preparePackage' opts = do
   exists <- liftIO (doesFileExist "bower.json")
   unless exists (userError BowerJSONNotFound)
 
+  requireCleanWorkingTree
+
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntParseBowerJSON)
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
@@ -135,6 +139,22 @@ getModulesAndBookmarks = do
   where
   renderModules bookmarks modules =
     return (bookmarks, map D.convertModule modules)
+
+data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
+
+getGitWorkingTreeStatus :: PrepareM TreeStatus
+getGitWorkingTreeStatus = do
+  out <- readProcess' "git" ["status", "--porcelain"] ""
+  return $
+    if null . filter (not . null) . lines $ out
+      then Clean
+      else Dirty
+
+requireCleanWorkingTree :: PrepareM ()
+requireCleanWorkingTree = do
+  status <- getGitWorkingTreeStatus
+  unless (status == Clean) $
+    userError DirtyWorkingTree
 
 getVersionFromGitTag :: PrepareM (String, Version)
 getVersionFromGitTag = do
