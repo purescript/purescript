@@ -53,6 +53,7 @@ data PackageWarning
 -- | An error that should be fixed by the user.
 data UserError
   = BowerJSONNotFound
+  | BowerExecutableNotFound
   | CouldntParseBowerJSON (ParseError BowerError)
   | BowerJSONNameMissing
   | TagMustBeCheckedOut
@@ -120,6 +121,11 @@ displayUserError e = case e of
     para (concat
       [ "The bower.json file was not found. Please create one, or run "
       , "`pulp init`."
+      ])
+  BowerExecutableNotFound ->
+    para (concat
+      [ "The \"bower\" executable was not found (nor \"bower.cmd\"). Please"
+      , " ensure that bower is installed and on your PATH."
       ])
   CouldntParseBowerJSON err ->
     vcat
