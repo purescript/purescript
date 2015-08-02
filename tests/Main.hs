@@ -174,7 +174,9 @@ assertDoesNotCompile inputFiles foreigns = do
       Left errs -> do
         putStrLn (P.prettyPrintMultipleErrors False errs)
         return $ if null shouldFailWith
-          then Just $ "shouldFailWith declaration is missing"
+          then Just $ "shouldFailWith declaration is missing (errors were: "
+                      ++ show (map P.errorCode (P.runMultipleErrors errs))
+                      ++ ")"
           else checkShouldFailWith shouldFailWith errs
       Right _ ->
         return $ Just "Should not have compiled"
