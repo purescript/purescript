@@ -1,4 +1,4 @@
--- @shouldFailWith ExprsDoesNotHaveType
+-- @shouldFailWith ExprDoesNotHaveType
 module Main where
 
 import Prelude
