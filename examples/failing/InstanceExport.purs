@@ -1,3 +1,4 @@
+-- @shouldFailWith TransitiveExportError
 module InstanceExport (S(..), f) where
 
 import Prelude

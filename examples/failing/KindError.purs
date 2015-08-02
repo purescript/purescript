@@ -1,3 +1,4 @@
+-- @shouldFailWith InvalidKind
 module Main where
 
 import Prelude

@@ -1,3 +1,4 @@
+-- @shouldFailWith ?
 module TypeWildcards where
 
 import Prelude

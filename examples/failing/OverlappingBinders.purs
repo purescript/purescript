@@ -1,3 +1,4 @@
+-- @shouldFailWith OverlappingArgNames
 module OverlappingBinders where
 
 import Prelude

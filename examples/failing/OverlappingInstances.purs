@@ -1,3 +1,4 @@
+-- @shouldFailWith OverlappingInstances
 module OverlappingInstances where
 
 import Prelude

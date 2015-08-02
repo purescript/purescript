@@ -1,3 +1,5 @@
+-- @shouldFailWith ExpressionDoesNotHaveType
+-- @shouldFailWith ExpressionDoesNotHaveType
 module MultipleErrors where
 
 import Prelude

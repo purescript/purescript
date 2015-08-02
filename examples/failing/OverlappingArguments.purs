@@ -1,3 +1,4 @@
+-- @shouldFailWith ??
 module OverlappingArguments where
 
 import Prelude

@@ -1,3 +1,4 @@
+-- @shouldFailWith DuplicateTypeArgument
 module Main where
 
 import Prelude
