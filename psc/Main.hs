@@ -75,7 +75,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
           exitFailure
         Right (_, warnings') -> do
           when (P.nonEmpty warnings') $
-            putStrLn (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
+            hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
           exitSuccess
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
