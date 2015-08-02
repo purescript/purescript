@@ -60,6 +60,7 @@ data UserError
   | BadRepositoryField RepositoryFieldError
   | MissingDependencies (NonEmpty PackageName)
   | ParseAndDesugarError D.ParseDesugarError
+  | DirtyWorkingTree
   deriving (Show)
 
 data RepositoryFieldError
@@ -196,6 +197,11 @@ displayUserError e = case e of
       [ para "Error while desugaring:"
       , indented (para (P.prettyPrintMultipleErrors False err))
       ]
+  DirtyWorkingTree ->
+    para (concat
+        [ "Your git working tree is dirty. Please commit, discard, or stash "
+        , "your changes first."
+        ])
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
