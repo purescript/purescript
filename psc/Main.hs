@@ -68,7 +68,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
       let filePathMap = M.fromList $ map (\(fp, P.Module _ mn _ _) -> (mn, fp)) ms
           makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
-      e <- runMake opts $ P.make makeActions ms
+      e <- runMake opts $ P.make makeActions (map snd ms)
       case e of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
