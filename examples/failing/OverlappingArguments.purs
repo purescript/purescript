@@ -1,4 +1,4 @@
--- @shouldFailWith ??
+-- @shouldFailWith OverlappingArgNames
 module OverlappingArguments where
 
 import Prelude

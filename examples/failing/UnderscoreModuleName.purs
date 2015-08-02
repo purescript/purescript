@@ -1,3 +1,4 @@
+-- @shouldFailWith ErrorParsingModule
 module Bad_Module where
 
 import Prelude

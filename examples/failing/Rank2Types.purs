@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith ExprDoesNotHaveType
 module Main where
 
 import Prelude

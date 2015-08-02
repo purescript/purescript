@@ -1,4 +1,4 @@
--- @shouldFailWith ?
+-- @shouldFailWith ErrorParsingModule
 module TypeWildcards where
 
 import Prelude

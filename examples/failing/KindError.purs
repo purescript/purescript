@@ -1,4 +1,4 @@
--- @shouldFailWith InvalidKind
+-- @shouldFailWith KindsDoNotUnify
 module Main where
 
 import Prelude

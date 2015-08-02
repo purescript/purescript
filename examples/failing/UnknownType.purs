@@ -1,3 +1,4 @@
+-- @shouldFailWith UnknownType
 module Main where
 
 import Prelude
