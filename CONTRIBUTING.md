@@ -9,8 +9,8 @@ Please follow the following guidelines:
 - Add at least a test to `examples/passing/` and possibly to `examples/failing`.
 - Build the binaries and libs with `cabal build`
 - Install the binaries and libs with `cabal install`.
-- Run `cabal configure --enable-tests && cabal build && cabal test` to build the test suite.
-- Build the core libraries by running the script in `core-tests`
+- Run `cabal configure --enable-tests && cabal build && cabal test` to build the test suite. You will need `npm`, `node`, and `bower` on your PATH to run the tests.
+- Build the core libraries by running the script in `core-tests`.
 
 If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) to get started.
 

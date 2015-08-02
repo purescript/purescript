@@ -5,7 +5,7 @@ module A (module Prelude, foo) where
   foo _ = 0.0
 
 module Main where
-  import Debug.Trace
+  import Control.Monad.Eff.Console
   import A (foo)
 
   otherwise = false

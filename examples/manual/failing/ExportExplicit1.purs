@@ -11,4 +11,4 @@ module Main where
   -- should fail as Y constructor is not exported from M1
   testY = Y
 
-  main = Debug.Trace.trace "Done"
+  main = Control.Monad.Eff.Console.log "Done"

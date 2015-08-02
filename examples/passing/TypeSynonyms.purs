@@ -24,4 +24,4 @@ fst =
 test1 :: forall a b c. Lens (Pair (Pair a b) c) a
 test1 = composeLenses fst fst
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

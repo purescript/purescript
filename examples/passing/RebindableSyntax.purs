@@ -20,10 +20,10 @@ runConst :: forall a b. Const a b -> a
 runConst (Const a) = a
 
 instance functorConst :: Functor (Const a) where
-  (<$>) _ (Const a) = Const a
+  map _ (Const a) = Const a
 
 instance applyConst :: (Semigroup a) => Apply (Const a) where
-  (<*>) (Const a1) (Const a2) = Const (a1 <> a2)
+  apply (Const a1) (Const a2) = Const (a1 <> a2)
 
 example2 :: Const String Unit
 example2 = do
@@ -35,5 +35,5 @@ example2 = do
   bind x f = x *> f unit
 
 main = do
-  Debug.Trace.trace example1
-  Debug.Trace.trace $ runConst example2
+  Control.Monad.Eff.Console.log example1
+  Control.Monad.Eff.Console.log $ runConst example2

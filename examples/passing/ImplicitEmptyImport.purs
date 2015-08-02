@@ -3,6 +3,6 @@ module Main where
 import Prelude
 
 main = do
-  Debug.Trace.trace "Hello"
-  Debug.Trace.trace "Goodbye"
-  Debug.Trace.trace "Done"
+  Control.Monad.Eff.Console.log "Hello"
+  Control.Monad.Eff.Console.log "Goodbye"
+  Control.Monad.Eff.Console.log "Done"

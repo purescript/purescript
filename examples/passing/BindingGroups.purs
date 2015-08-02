@@ -7,4 +7,4 @@ foo = bar
 
 r = foo 2.0
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

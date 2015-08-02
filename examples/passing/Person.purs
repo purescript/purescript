@@ -8,4 +8,4 @@ showPerson :: Person -> String
 showPerson = \p -> case p of
   Person o -> o.name ++ ", aged " ++ show o.age
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

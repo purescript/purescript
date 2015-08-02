@@ -5,4 +5,4 @@ import Prelude
 foo :: String
 foo = """foo"""
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

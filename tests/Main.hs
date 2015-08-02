@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DoAndIfThenElse #-} 
+{-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -44,6 +44,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.Directory
+import qualified System.FilePath.Glob as Glob
 
 import Text.Parsec (ParseError)
 
@@ -60,31 +61,23 @@ makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions Test
 makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
   where
   getInputTimestamp :: P.ModuleName -> Test (Either P.RebuildPolicy (Maybe UTCTime))
-  getInputTimestamp mn 
-    | isPreludeModule (P.runModuleName mn) = return (Left P.RebuildNever)
+  getInputTimestamp mn
+    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
-    isPreludeModule = flip elem
-      [ "Prelude.Unsafe"
-      , "Prelude"
-      , "Data.Function"
-      , "Control.Monad.Eff"
-      , "Control.Monad.ST"
-      , "Debug.Trace"
-      , "Assert"
-      ]
-  
+    isSupportModule = flip elem supportModules
+
   getOutputTimestamp :: P.ModuleName -> Test (Maybe UTCTime)
   getOutputTimestamp mn = do
     let filePath = modulesDir </> P.runModuleName mn
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (error "getOutputTimestamp: read timestamp") else Nothing)
-  
+
   readExterns :: P.ModuleName -> Test (FilePath, String)
   readExterns mn = do
     let filePath = modulesDir </> P.runModuleName mn </> "externs.purs"
     (filePath, ) <$> readTextFile filePath
-  
+
   codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Test ()
   codegen m _ nextVar exts = do
     let mn = CF.moduleName m
@@ -101,15 +94,15 @@ makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readEx
     writeTextFile jsFile pjs
     maybe (return ()) (writeTextFile foreignFile . snd) $ CF.moduleName m `M.lookup` foreigns
     writeTextFile externsFile exts
-    
+
   readTextFile :: FilePath -> Test String
   readTextFile path = liftIO $ readFile path
-  
+
   writeTextFile :: FilePath -> String -> Test ()
   writeTextFile path text = liftIO $ do
     createDirectoryIfMissing True (takeDirectory path)
     writeFile path text
-  
+
   progress :: String -> Test ()
   progress = liftIO . putStrLn
 
@@ -124,9 +117,9 @@ compile inputFiles foreigns = runTest $ do
   ms <- P.parseModulesFromFiles id fs
   P.make (makeActions foreigns) (map (\(k, v) -> (Right k, v)) ms)
 
-assert :: [FilePath] -> 
-          M.Map P.ModuleName (FilePath, P.ForeignJS) -> 
-          (Either P.MultipleErrors P.Environment -> IO (Maybe String)) -> 
+assert :: [FilePath] ->
+          M.Map P.ModuleName (FilePath, P.ForeignJS) ->
+          (Either P.MultipleErrors P.Environment -> IO (Maybe String)) ->
           IO ()
 assert inputFiles foreigns f = do
   e <- compile inputFiles foreigns
@@ -139,7 +132,7 @@ assertCompiles :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO
 assertCompiles inputFiles foreigns = do
   putStrLn $ "Assert " ++ last inputFiles ++ " compiles successfully"
   assert inputFiles foreigns $ \e ->
-    case e of 
+    case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
       Right _ -> do
         process <- findNodeProcess
@@ -161,26 +154,49 @@ assertDoesNotCompile inputFiles foreigns = do
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-  where 
+  where
   names = ["nodejs", "node"]
 
 main :: IO ()
 main = do
+  fetchSupportCode
   cwd <- getCurrentDirectory
-  
-  let preludeDir  = cwd </> "tests" </> "prelude"
-      preludePurs = preludeDir </> "Prelude.purs"
-      jsDir       = preludeDir </> "js"
-  jsFiles <- map (jsDir </>) . filter (".js" `isSuffixOf`) <$> getDirectoryContents jsDir
-  foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
+
+  let supportDir  = cwd </> "tests" </> "support" </> "flattened"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+
+  supportPurs <- supportFiles "purs"
+  supportJS   <- supportFiles "js"
+
+  foreignFiles <- forM supportJS (\f -> (f,) <$> readFile f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
-  
+
   let passing = cwd </> "examples" </> "passing"
   passingTestCases <- getDirectoryContents passing
   forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertCompiles [preludePurs, passing </> inputFile] foreigns
+    assertCompiles (supportPurs ++ [passing </> inputFile]) foreigns
   let failing = cwd </> "examples" </> "failing"
   failingTestCases <- getDirectoryContents failing
   forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertDoesNotCompile [preludePurs, failing </> inputFile] foreigns
+    assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
   exitSuccess
+
+fetchSupportCode :: IO ()
+fetchSupportCode = do
+  setCurrentDirectory "tests/support"
+  callProcess "npm" ["install"]
+  callProcess "bower" ["install"]
+  callProcess "node" ["setup.js"]
+  setCurrentDirectory "../.."
+
+supportModules :: [String]
+supportModules =
+  [ "Control.Monad.Eff.Class"
+  , "Control.Monad.Eff.Console"
+  , "Control.Monad.Eff"
+  , "Control.Monad.Eff.Unsafe"
+  , "Control.Monad.ST"
+  , "Data.Function"
+  , "Prelude"
+  , "Test.Assert"
+  ]

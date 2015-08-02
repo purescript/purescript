@@ -6,4 +6,4 @@ test :: Number -> Boolean
 test -1.0 = false
 test _  = true
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

@@ -1,13 +1,12 @@
 module Main where
 
 import Prelude
-import Assert
+import Test.Assert
 
 test :: forall a b. a -> b -> a
 test = \const _ -> const
 
 main = do
   let value = test "Done" {}
-  if value == "Done"
-    then Debug.Trace.trace "Done"
-    else error "Not done"
+  assert' "Not done" $ value == "Done"
+  Control.Monad.Eff.Console.log "Done"

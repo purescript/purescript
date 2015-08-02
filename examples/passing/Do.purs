@@ -5,12 +5,12 @@ import Prelude
 data Maybe a = Nothing | Just a
 
 instance functorMaybe :: Functor Maybe where
-  (<$>) f Nothing = Nothing
-  (<$>) f (Just x) = Just (f x)
+  map f Nothing = Nothing
+  map f (Just x) = Just (f x)
 
 instance applyMaybe :: Apply Maybe where
-  (<*>) (Just f) (Just x) = Just (f x)
-  (<*>) _ _ = Nothing
+  apply (Just f) (Just x) = Just (f x)
+  apply _ _ = Nothing
 
 instance applicativeMaybe :: Applicative Maybe where
   pure = Just
@@ -64,4 +64,4 @@ test10 _ = do
     g x = f x / 2.0
   Just (f 10.0)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

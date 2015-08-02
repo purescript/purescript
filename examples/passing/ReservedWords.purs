@@ -12,4 +12,4 @@ p = o { type = "p" }
 f :: forall r. { type :: String | r } -> String
 f { type = "p" } = "Done"
 
-main = Debug.Trace.trace $ f { type: p.type, foo: "bar" }
+main = Control.Monad.Eff.Console.log $ f { type: p.type, foo: "bar" }

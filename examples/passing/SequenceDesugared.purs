@@ -31,7 +31,7 @@ sequenceList''' = Sequence ((\val -> case val of
   Cons x xs -> Cons <$> x <*> sequence sequenceList''' xs) :: forall m a. (Monad m) => List (m a) -> m (List a))
 
 main = do
-  sequence sequenceList $ Cons (Debug.Trace.trace "Done") Nil
-  sequence sequenceList' $ Cons (Debug.Trace.trace "Done") Nil
-  sequence sequenceList'' $ Cons (Debug.Trace.trace "Done") Nil
-  sequence sequenceList''' $ Cons (Debug.Trace.trace "Done") Nil
+  sequence sequenceList $ Cons (Control.Monad.Eff.Console.log "Done") Nil
+  sequence sequenceList' $ Cons (Control.Monad.Eff.Console.log "Done") Nil
+  sequence sequenceList'' $ Cons (Control.Monad.Eff.Console.log "Done") Nil
+  sequence sequenceList''' $ Cons (Control.Monad.Eff.Console.log "Done") Nil

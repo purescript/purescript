@@ -1,6 +1,6 @@
 module Main where
 
 import Prelude
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 main = print (const unit $ "Hello world")

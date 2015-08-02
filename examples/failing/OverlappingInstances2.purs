@@ -22,4 +22,4 @@ instance ordA :: Ord A where
 test :: forall a. (Ord a) => a -> a -> String
 test x y = show $ x == y
 
-main = Debug.Trace.trace $ test A B
+main = Control.Monad.Eff.Console.log $ test A B

@@ -10,4 +10,4 @@ test m = o.x
     o = case m of Nothing -> { x : Nothing }
                   Just a  -> { x : Just a }
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

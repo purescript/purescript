@@ -16,7 +16,7 @@ module Main where
 
   import Prelude
   import Middle
-  import Debug.Trace
+  import Control.Monad.Eff.Console
 
   main = do
     print (middle unit)

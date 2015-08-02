@@ -6,4 +6,4 @@ foo = \x -> case x of
   y@{ foo = "Foo" } -> y
   y -> y
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"
