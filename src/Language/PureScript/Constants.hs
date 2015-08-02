@@ -97,11 +97,11 @@ negate = "negate"
 not :: String
 not = "not"
 
-sup :: String
-sup = "sup"
+conj :: String
+conj = "conj"
 
-inf :: String
-inf = "inf"
+disj :: String
+disj = "disj"
 
 mod :: String
 mod = "mod"
@@ -229,11 +229,8 @@ eqBoolean = "eqBoolean"
 boundedBoolean :: String
 boundedBoolean = "boundedBoolean"
 
-latticeBoolean :: String
-latticeBoolean = "latticeBoolean"
-
-complementedLatticeBoolean :: String
-complementedLatticeBoolean = "complementedLatticeBoolean"
+booleanAlgebraBoolean :: String
+booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
