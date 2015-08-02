@@ -115,7 +115,7 @@ compile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Eithe
 compile inputFiles foreigns = runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
-  P.make (makeActions foreigns) (map (\(k, v) -> (Right k, v)) ms)
+  P.make (makeActions foreigns) (map snd ms)
 
 assert :: [FilePath] ->
           M.Map P.ModuleName (FilePath, P.ForeignJS) ->

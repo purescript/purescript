@@ -21,7 +21,7 @@
 module PSCi where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort, isPrefixOf)
+import Data.List (intercalate, nub, sort)
 import Data.Traversable (traverse)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
@@ -259,11 +259,11 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
-make PSCiState{..} ms = P.make actions' (psciLoadedModules ++ ms)
+make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms))
     where
     filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
     actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
-    actions' = actions { P.progress = \s -> unless ("Compiling $PSCI" `isPrefixOf` s) $ liftIO . putStrLn $ s }
+    actions' = actions { P.progress = const (return ()) }
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
