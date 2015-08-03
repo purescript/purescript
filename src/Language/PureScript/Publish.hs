@@ -45,6 +45,7 @@ import System.Directory (doesFileExist, findExecutable)
 import System.Process (readProcess)
 import System.Exit (exitFailure)
 import qualified System.FilePath.Glob as Glob
+import qualified System.Info
 
 import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
                               runPackageName, parsePackageName, Repository(..))
@@ -255,9 +256,11 @@ getResolvedDependencies declaredDeps = do
 findBowerExecutable :: PrepareM String
 findBowerExecutable = do
   mname <- liftIO . runMaybeT . msum . map (MaybeT . findExecutable) $ names
-  maybe (userError BowerExecutableNotFound) return mname
+  maybe (userError (BowerExecutableNotFound names)) return mname
   where
-  names = ["bower", "bower.cmd"]
+  names = case System.Info.os of
+    "mingw32" -> ["bower", "bower.cmd"]
+    _         -> ["bower"]
 
 -- | Extracts all dependencies and their versions from
 --   `bower list --json --offline`
