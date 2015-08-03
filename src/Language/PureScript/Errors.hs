@@ -747,13 +747,13 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error:" "Multiple errors:" full
+prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error found:" "Multiple errors found:" full
 
 -- |
 -- Pretty print multiple warnings
 --
 prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning:" "Multiple warnings:" full
+prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Multiple warnings found:" full
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State UnknownMap String
 prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
