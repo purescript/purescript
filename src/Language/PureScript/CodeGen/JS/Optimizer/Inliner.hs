@@ -269,25 +269,25 @@ semiringNumber :: (String, String)
 semiringNumber = (C.prelude, C.semiringNumber)
 
 semiringInt :: (String, String)
-semiringInt = (C.dataInt, C.semiringInt)
+semiringInt = (C.prelude, C.semiringInt)
 
 ringNumber :: (String, String)
 ringNumber = (C.prelude, C.ringNumber)
 
 ringInt :: (String, String)
-ringInt = (C.dataInt, C.ringInt)
+ringInt = (C.prelude, C.ringInt)
 
 moduloSemiringNumber :: (String, String)
 moduloSemiringNumber = (C.prelude, C.moduloSemiringNumber)
 
 moduloSemiringInt :: (String, String)
-moduloSemiringInt = (C.dataInt, C.moduloSemiringInt)
+moduloSemiringInt = (C.prelude, C.moduloSemiringInt)
 
 eqNumber :: (String, String)
 eqNumber = (C.prelude, C.eqNumber)
 
 eqInt :: (String, String)
-eqInt = (C.dataInt, C.eqInt)
+eqInt = (C.prelude, C.eqInt)
 
 eqString :: (String, String)
 eqString = (C.prelude, C.eqNumber)
@@ -299,7 +299,7 @@ ordNumber :: (String, String)
 ordNumber = (C.prelude, C.ordNumber)
 
 ordInt :: (String, String)
-ordInt = (C.dataInt, C.ordInt)
+ordInt = (C.prelude, C.ordInt)
 
 semigroupString :: (String, String)
 semigroupString = (C.prelude, C.semigroupString)

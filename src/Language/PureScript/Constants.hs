@@ -271,8 +271,5 @@ st = "Control_Monad_ST"
 dataFunction :: String
 dataFunction = "Data_Function"
 
-dataInt :: String
-dataInt = "Data_Int"
-
 dataIntBits :: String
 dataIntBits = "Data_Int_Bits"
