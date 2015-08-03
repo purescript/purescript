@@ -21,7 +21,7 @@ import Data.Version
 import Data.Maybe
 import Data.Monoid
 import Data.Foldable (foldMap)
-import Data.List (intersperse)
+import Data.List (intersperse, intercalate)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -53,6 +53,7 @@ data PackageWarning
 -- | An error that should be fixed by the user.
 data UserError
   = BowerJSONNotFound
+  | BowerExecutableNotFound [String] -- list of executable names tried
   | CouldntParseBowerJSON (ParseError BowerError)
   | BowerJSONNameMissing
   | TagMustBeCheckedOut
@@ -121,6 +122,13 @@ displayUserError e = case e of
       [ "The bower.json file was not found. Please create one, or run "
       , "`pulp init`."
       ])
+  BowerExecutableNotFound names ->
+    para (concat
+      [ "The Bower executable was not found (tried: ", format names, "). Please"
+      , " ensure that bower is installed and on your PATH."
+      ])
+    where
+    format = intercalate ", " . map show
   CouldntParseBowerJSON err ->
     vcat
       [ successivelyIndented

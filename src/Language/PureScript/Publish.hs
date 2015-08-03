@@ -36,14 +36,16 @@ import Control.Applicative
 import Control.Category ((>>>))
 import Control.Arrow ((***))
 import Control.Exception (catch, try)
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.Except
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer
 
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, findExecutable)
 import System.Process (readProcess)
 import System.Exit (exitFailure)
 import qualified System.FilePath.Glob as Glob
+import qualified System.Info
 
 import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
                               runPackageName, parsePackageName, Repository(..))
@@ -238,7 +240,8 @@ data DependencyStatus
 -- appropriate to link to, and we should omit links.
 getResolvedDependencies :: [PackageName] -> PrepareM [(PackageName, Version)]
 getResolvedDependencies declaredDeps = do
-  depsBS <- fromString <$> readProcess' "bower" ["list", "--json", "--offline"] ""
+  bower <- findBowerExecutable
+  depsBS <- fromString <$> readProcess' bower ["list", "--json", "--offline"] ""
 
   -- Check for undeclared dependencies
   toplevels <- catchJSON (parse asToplevelDependencies depsBS)
@@ -249,6 +252,15 @@ getResolvedDependencies declaredDeps = do
 
   where
   catchJSON = flip catchLeft (internalError . JSONError FromBowerList)
+
+findBowerExecutable :: PrepareM String
+findBowerExecutable = do
+  mname <- liftIO . runMaybeT . msum . map (MaybeT . findExecutable) $ names
+  maybe (userError (BowerExecutableNotFound names)) return mname
+  where
+  names = case System.Info.os of
+    "mingw32" -> ["bower", "bower.cmd"]
+    _         -> ["bower"]
 
 -- | Extracts all dependencies and their versions from
 --   `bower list --json --offline`
