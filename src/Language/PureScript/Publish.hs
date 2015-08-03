@@ -43,6 +43,7 @@ import Control.Monad.Writer
 import System.Directory (doesFileExist)
 import System.Process (readProcess)
 import System.Exit (exitFailure)
+import System.FilePath (pathSeparator)
 import qualified System.FilePath.Glob as Glob
 
 import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
@@ -340,7 +341,7 @@ withPackageName fp = (,fp) <$> getPackageName fp
 
 getPackageName :: FilePath -> Maybe PackageName
 getPackageName fp = do
-  let xs = splitOn "/" fp
+  let xs = splitOn [pathSeparator] fp
   ys <- stripPrefix ["bower_components"] xs
   y <- headMay ys
   case Bower.mkPackageName y of
