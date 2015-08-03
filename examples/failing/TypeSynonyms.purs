@@ -1,3 +1,4 @@
+-- @shouldFailWith CycleInTypeSynonym
 module Main where
 
 import Prelude

@@ -1,3 +1,4 @@
+-- @shouldFailWith TypeSynonymInstance
 module Main where
 
 import Prelude

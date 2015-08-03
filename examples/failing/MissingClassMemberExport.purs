@@ -1,3 +1,4 @@
+-- @shouldFailWith TransitiveExportError
 module Test (Foo) where
 
 import Prelude

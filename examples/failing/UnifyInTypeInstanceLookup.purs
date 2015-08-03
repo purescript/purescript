@@ -1,3 +1,6 @@
+-- @shouldFailWith NoInstanceFound
+-- See issue #390.
+-- TODO: Improve this error.
 module Main where
 
 import Prelude

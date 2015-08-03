@@ -1,3 +1,4 @@
+-- @shouldFailWith DuplicateLabel
 module DuplicateProperties where
 
 import Prelude

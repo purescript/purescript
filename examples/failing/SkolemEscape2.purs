@@ -1,3 +1,4 @@
+-- @shouldFailWith EscapedSkolem
 module Main where
 
 import Prelude

@@ -1,3 +1,4 @@
+-- @shouldFailWith IncorrectConstructorArity
 module Main where
 
 import Prelude

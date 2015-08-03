@@ -18,13 +18,30 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 
+-- Failing tests can specify the kind of error that should be thrown with a
+-- @shouldFailWith declaration. For example:
+--
+--   "-- @shouldFailWith TypesDoNotUnify"
+--
+-- will cause the test to fail unless that module fails to compile with exactly
+-- one TypesDoNotUnify error.
+--
+-- If a module is expected to produce multiple type errors, then use multiple
+-- @shouldFailWith lines; for example:
+--
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TransitiveExportError
+
 module Main (main) where
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
 
-import Data.List (isSuffixOf)
+import Data.Char (isSpace)
+import Data.Maybe (mapMaybe, fromMaybe)
+import Data.List (isSuffixOf, sort, stripPrefix)
 import Data.Traversable (traverse)
 import Data.Time.Clock (UTCTime())
 
@@ -33,6 +50,7 @@ import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative
+import Control.Arrow ((>>>))
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -111,6 +129,8 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readFile inputFile
   return (inputFile, text)
 
+type TestM = WriterT [(FilePath, String)] IO
+
 compile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors P.Environment)
 compile inputFiles foreigns = runTest $ do
   fs <- liftIO $ readInput inputFiles
@@ -120,17 +140,17 @@ compile inputFiles foreigns = runTest $ do
 assert :: [FilePath] ->
           M.Map P.ModuleName (FilePath, P.ForeignJS) ->
           (Either P.MultipleErrors P.Environment -> IO (Maybe String)) ->
-          IO ()
+          TestM ()
 assert inputFiles foreigns f = do
-  e <- compile inputFiles foreigns
-  maybeErr <- f e
+  e <- liftIO $ compile inputFiles foreigns
+  maybeErr <- liftIO $ f e
   case maybeErr of
-    Just err -> putStrLn err >> exitFailure
+    Just err -> tell [(last inputFiles, err)]
     Nothing -> return ()
 
-assertCompiles :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
+assertCompiles :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> TestM ()
 assertCompiles inputFiles foreigns = do
-  putStrLn $ "Assert " ++ last inputFiles ++ " compiles successfully"
+  liftIO . putStrLn $ "Assert " ++ last inputFiles ++ " compiles successfully"
   assert inputFiles foreigns $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
@@ -144,13 +164,40 @@ assertCompiles inputFiles foreigns = do
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
 
-assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO ()
+assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> TestM ()
 assertDoesNotCompile inputFiles foreigns = do
-  putStrLn $ "Assert " ++ last inputFiles ++ " does not compile"
+  let testFile = last inputFiles
+  liftIO . putStrLn $ "Assert " ++ testFile ++ " does not compile"
+  shouldFailWith <- getShouldFailWith testFile
   assert inputFiles foreigns $ \e ->
     case e of
-      Left errs -> putStrLn  (P.prettyPrintMultipleErrors False errs) >> return Nothing
-      Right _ -> return $ Just "Should not have compiled"
+      Left errs -> do
+        putStrLn (P.prettyPrintMultipleErrors False errs)
+        return $ if null shouldFailWith
+          then Just $ "shouldFailWith declaration is missing (errors were: "
+                      ++ show (map P.errorCode (P.runMultipleErrors errs))
+                      ++ ")"
+          else checkShouldFailWith shouldFailWith errs
+      Right _ ->
+        return $ Just "Should not have compiled"
+
+  where
+  getShouldFailWith =
+    readFile
+    >>> liftIO
+    >>> fmap (   lines
+             >>> mapMaybe (stripPrefix "-- @shouldFailWith ")
+             >>> map trim
+             )
+
+  checkShouldFailWith expected errs =
+    let actual = map P.errorCode $ P.runMultipleErrors errs
+    in if sort expected == sort actual
+      then Nothing
+      else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
+
+  trim =
+    dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -172,14 +219,24 @@ main = do
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
 
   let passing = cwd </> "examples" </> "passing"
-  passingTestCases <- getDirectoryContents passing
-  forM_ passingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertCompiles (supportPurs ++ [passing </> inputFile]) foreigns
+  passingTestCases <- sort . filter (".purs" `isSuffixOf`) <$> getDirectoryContents passing
   let failing = cwd </> "examples" </> "failing"
-  failingTestCases <- getDirectoryContents failing
-  forM_ failingTestCases $ \inputFile -> when (".purs" `isSuffixOf` inputFile) $
-    assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
-  exitSuccess
+  failingTestCases <- sort . filter (".purs" `isSuffixOf`) <$> getDirectoryContents failing
+
+  failures <- execWriterT $ do
+    forM_ passingTestCases $ \inputFile ->
+      assertCompiles (supportPurs ++ [passing </> inputFile]) foreigns
+    forM_ failingTestCases $ \inputFile ->
+      assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
+
+  if null failures
+    then exitSuccess
+    else do
+      putStrLn "Failures:"
+      forM_ failures $ \(fp, err) ->
+        let fp' = fromMaybe fp $ stripPrefix (failing ++ [pathSeparator]) fp
+        in putStrLn $ fp' ++ ": " ++ err
+      exitFailure
 
 fetchSupportCode :: IO ()
 fetchSupportCode = do

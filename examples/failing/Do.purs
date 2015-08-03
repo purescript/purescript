@@ -1,3 +1,5 @@
+-- @shouldFailWith InvalidDoBind
+-- @shouldFailWith InvalidDoLet
 module Main where
 
 import Prelude

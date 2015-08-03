@@ -1,3 +1,4 @@
+-- @shouldFailWith DuplicateValueDeclaration
 module Main where
 
 import Prelude
