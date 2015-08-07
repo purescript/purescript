@@ -15,11 +15,11 @@ install:
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
   - cabal sandbox init
-  - cabal install --only-dependencies --enable-tests
-  - cabal install hpc-coveralls
+  - cabal install --only-dependencies --enable-tests -j2 --ghc-options='+RTS -A32m -RTS'
+  - cabal install hpc-coveralls -j2
 script:
   - ./travis/configure.sh
-  - cabal build
+  - cabal build -j2 --ghc-options='+RTS -A32m -RTS'
   - cabal test
   - ./travis/test-install.sh
 after_script:
