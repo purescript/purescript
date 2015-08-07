@@ -242,10 +242,10 @@ newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
 
 instance UnificationError Type MultipleErrors where
-  occursCheckFailed = occursCheckFailed
+  occursCheckFailed t = MultipleErrors [occursCheckFailed t]
 
 instance UnificationError Kind MultipleErrors where
-  occursCheckFailed = occursCheckFailed
+  occursCheckFailed k = MultipleErrors [occursCheckFailed k]
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
