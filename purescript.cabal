@@ -20,8 +20,10 @@ tested-with: GHC==7.8
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
-                  , tests/support/flattened/*.purs
-                  , tests/support/flattened/*.js
+                  , tests/support/setup.js
+                  , tests/support/package.json
+                  , tests/support/bower.json
+                  , psci/tests/data/Sample.purs
 
 source-repository head
     type: git

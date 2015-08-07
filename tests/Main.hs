@@ -242,7 +242,9 @@ fetchSupportCode :: IO ()
 fetchSupportCode = do
   setCurrentDirectory "tests/support"
   callProcess "npm" ["install"]
-  callProcess "bower" ["install"]
+  -- Sometimes we run as a root (e.g. in simple docker containers)
+  -- And we are non-interactive: https://github.com/bower/bower/issues/1162
+  callProcess "node_modules/.bin/bower" ["--allow-root", "install", "--config.interactive=false"]
   callProcess "node" ["setup.js"]
   setCurrentDirectory "../.."
 
