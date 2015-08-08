@@ -8,5 +8,5 @@ then
   mkdir -p ../install-test
   cd ../install-test
   cabal sandbox init
-  cabal install "$SRC_TGZ"
+  cabal install -j2 --ghc-options='+RTS -A32m -RTS' "$SRC_TGZ"
 fi
