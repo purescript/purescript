@@ -2,6 +2,22 @@
 
 set -e
 
+force_recompile='false'
+force_reinstall='false'
+
+while getopts 'ci' flag; do
+  case "${flag}" in
+    c) force_recompile='true' ;;
+    i) force_reinstall='true' ;;
+    *) error "Unexpected option ${flag}" ;;
+  esac
+done
+
+if [ "$force_reinstall" = "true" ] && [ -d "bower_components" ]; then
+  echo "Reinstalling core packages..."
+  rm -r bower_components
+fi
+
 if ! type bower ; then
   npm install -g bower
 fi
@@ -51,6 +67,11 @@ bower i purescript-prelude \
         purescript-semirings \
         purescript-math \
         purescript-generics
+
+if [ "$force_recompile" = "true" ] && [ -d "output" ]; then
+  echo "Recompiling..."
+  rm -r output
+fi
 
 ../dist/build/psc/psc tests/*/*.purs \
                       'bower_components/purescript-*/src/**/*.purs' \
