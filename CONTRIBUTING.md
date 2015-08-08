@@ -2,6 +2,10 @@ An introductory overview of the compiler is available [here](https://www.youtube
 
 Pull requests are encouraged.
 
+## Finding Issues to Work On
+
+If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) to get started.
+
 ## Pull Requests
 
 Please follow the following guidelines:
@@ -9,12 +13,10 @@ Please follow the following guidelines:
 - Add at least a test to `examples/passing/` and possibly to `examples/failing`.
 - Build the binaries and libs with `cabal build`
 - Install the binaries and libs with `cabal install`.
-- Run `cabal configure --enable-tests && cabal build && cabal test` to build the test suite. You will need `npm`, `node`, and `bower` on your PATH to run the tests.
+- Run `cabal configure --enable-tests && cabal build && cabal test` to build the test suite. You will need `npm` and `node` on your PATH to run the tests.
 - Build the core libraries by running the script in `core-tests`.
 
-If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) to get started.
-
-Finally, if you have made code changes and would like to be included in the copyright notice in the cabal file, please include that change in your pull request.
+## Code Review
 
 To prevent core libraries from getting broken, every change must be reviewed. A pull request will be merged as long as one other team member has verified the changes.
 
