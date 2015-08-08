@@ -2,7 +2,9 @@
 
 set -e
 
-npm install -g bower
+if ! type bower ; then
+  npm install -g bower
+fi
 
 bower i purescript-prelude \
         purescript-eff \
