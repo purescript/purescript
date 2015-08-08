@@ -15,6 +15,14 @@ install:
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
   - cabal sandbox init
+  # Run with limited concurrency
+  # Travis container infrastructure seems to expose all host CPUs (16?), thus
+  # cabal and ghc tries to use them all. Which is bad idea on a shared box.
+  # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
+  #
+  # We probably want to be running with larger heap sizes when there are lots
+  # of cores, to counteract the synchronization overhead of stop-the-world GC
+  # across many cores. e.g. +RTS -A32m at least.
   - cabal install --only-dependencies --enable-tests -j2 --ghc-options='+RTS -A32m -RTS'
   - cabal install hpc-coveralls -j2
 script:
