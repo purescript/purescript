@@ -30,6 +30,7 @@ cp ../dist/build/psc-publish/psc-publish build/purescript/
 cp ../dist/build/psc-bundle/psc-bundle   build/purescript/
 cp README                                build/purescript/
 cp ../LICENSE                            build/purescript/
+cp ../INSTALL.md                         build/purescript/
 
 # Make the binary bundle
 pushd build > /dev/null
