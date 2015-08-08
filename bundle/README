@@ -10,11 +10,12 @@ Installation Instructions
 
 This bundle contains the following executables:
 
-- psc           The PureScript compiler (generates JavaScript for use
-                in the browser)
-- psc-make      The PureScript compiler (generates CommonJS modules)
-- psci          The PureScript interactive module (requires NodeJS)
-- psc-docs      A documentation generator
+- psc           The PureScript compiler
+- psci          The PureScript interactive REPL (requires NodeJS)
+- psc-docs      A Markdown documentation generator for PureScript code
+- psc-bundle    Bundles together CommonJS modules produced by `psc` into a
+                single JavaScript file; useful for running in the browser.
+- psc-publish   Generates documentation packages for uploading to Pursuit
 
 Copy these files anywhere on your PATH.
 
