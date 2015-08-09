@@ -753,7 +753,11 @@ prettyPrintMultipleErrors full = renderBox . prettyPrintMultipleErrorsBox full
 -- Pretty print multiple warnings
 --
 prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = renderBox . flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Multiple warnings found:" full
+prettyPrintMultipleWarnings full = renderBox . prettyPrintMultipleWarningsBox full
+
+-- | Pretty print warnings as a Box
+prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleWarningsBox full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Multiple warnings found:" full
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
