@@ -19,7 +19,6 @@
 module Language.PureScript.Linter (lint, module L) where
 
 import Data.List (mapAccumL, nub)
-import Data.Maybe (mapMaybe)
 import Data.Monoid
 
 import qualified Data.Set as S
@@ -39,16 +38,16 @@ lint :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Module -> m (
 lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
   moduleNames :: S.Set Ident
-  moduleNames = S.fromList (nub (mapMaybe getDeclIdent ds))
+  moduleNames = S.fromList (nub (concatMap getDeclIdent ds))
 
-  getDeclIdent :: Declaration -> Maybe Ident
+  getDeclIdent :: Declaration -> [Ident]
   getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
-  getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
-  getDeclIdent (ExternDeclaration ident _) = Just ident
-  getDeclIdent (ExternInstanceDeclaration ident _ _ _) = Just ident
-  getDeclIdent (TypeInstanceDeclaration ident _ _ _ _) = Just ident
-  getDeclIdent (BindingGroupDeclaration _) = error "lint: binding groups should not be desugared yet."
-  getDeclIdent _ = Nothing
+  getDeclIdent (ValueDeclaration ident _ _ _) = [ident]
+  getDeclIdent (ExternDeclaration ident _) = [ident]
+  getDeclIdent (ExternInstanceDeclaration ident _ _ _) = [ident]
+  getDeclIdent (TypeInstanceDeclaration ident _ _ _ _) = [ident]
+  getDeclIdent (BindingGroupDeclaration bs) = map (\(ident, _, _) -> ident) bs
+  getDeclIdent _ = []
 
   lintDeclaration :: Declaration -> m ()
   lintDeclaration d =
@@ -74,7 +73,7 @@ lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ li
     stepE :: S.Set Ident -> Expr -> (S.Set Ident, MultipleErrors)
     stepE s (Abs (Left name) _) = bind s name
     stepE s (Let ds' _) =
-      case mapAccumL bind s (nub (mapMaybe getDeclIdent ds')) of
+      case mapAccumL bind s (nub (concatMap getDeclIdent ds')) of
         (s', es) -> (s', mconcat es)
     stepE s _ = (s, mempty)
 
