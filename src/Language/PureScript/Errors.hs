@@ -55,7 +55,7 @@ data SimpleErrorMessage
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
-  | UnnecessaryFFIModule ModuleName FilePath
+  | UnnecessaryFFIModule ModuleName
   | InvalidExternsFile FilePath
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
@@ -393,9 +393,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (MissingFFIModule mn) =
       line $ "Missing FFI implementations for module " ++ show mn
-    goSimple (UnnecessaryFFIModule mn path) =
-      paras [ line $ "Unnecessary FFI implementations have been provided for module " ++ show mn ++ ": "
-            , indent . line $ path
+    goSimple (UnnecessaryFFIModule mn) =
+      paras [ line $ "Unnecessary FFI implementations have been provided for module " ++ show mn ++ "."
             ]
     goSimple (MultipleFFIModules mn paths) =
       paras $ [ line $ "Multiple FFI implementations have been provided for module " ++ show mn ++ ": " ]

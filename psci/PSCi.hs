@@ -20,6 +20,7 @@
 
 module PSCi where
 
+import Data.Maybe (fromMaybe)
 import Data.Foldable (traverse_)
 import Data.List (intercalate, nub, sort)
 import Data.Traversable (traverse)
@@ -259,10 +260,11 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
-make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms))
+make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms)) False
     where
     filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+    getFilePaths mn = (fromMaybe (error "make: module did not exist in filePathMap") (M.lookup mn filePathMap), M.lookup mn psciForeignFiles)
+    actions = P.buildMakeActions modulesDir getFilePaths
     actions' = actions { P.progress = const (return ()) }
 
 -- |
