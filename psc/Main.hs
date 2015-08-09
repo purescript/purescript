@@ -24,6 +24,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer
 
+import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
@@ -67,8 +68,9 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
       when (P.nonEmpty warnings) $
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
       let filePathMap = M.fromList $ map (\(fp, P.Module _ mn _ _) -> (mn, fp)) ms
-          makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
-      e <- runMake opts $ P.make makeActions (map snd ms)
+          getFilePaths mn = (fromMaybe (error "compile: module did not exist in filePathMap") (M.lookup mn filePathMap), M.lookup mn foreigns)
+          makeActions = buildMakeActions outputDir getFilePaths
+      e <- runMake opts $ P.make makeActions (map snd ms) usePrefix
       case e of
         Left errs -> do
           hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
@@ -146,7 +148,6 @@ noPrefix = switch $
      short 'p'
   <> long "no-prefix"
   <> help "Do not include comment header"
-
 
 options :: Parser P.Options
 options = P.Options <$> noTco
