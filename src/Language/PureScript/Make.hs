@@ -77,8 +77,13 @@ import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
 
--- |
--- Actions that require implementations when running in "make" mode.
+-- | Actions that require implementations when running in "make" mode.
+--
+-- This type exists to make two things abstract:
+--
+-- * The particular backend being used (Javascript, C++11, etc.)
+-- 
+-- * The details of how files are read/written etc.
 --
 data MakeActions m = MakeActions {
   -- |
