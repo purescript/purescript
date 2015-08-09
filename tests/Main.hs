@@ -96,22 +96,23 @@ makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readEx
     let filePath = modulesDir </> P.runModuleName mn </> "externs.purs"
     (filePath, ) <$> readTextFile filePath
 
-  codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Test ()
-  codegen m _ nextVar exts = do
+  codegen :: CF.Module CF.Ann -> P.Environment -> P.Externs -> P.SupplyT Test ()
+  codegen m _ exts = do
     let mn = CF.moduleName m
     foreignInclude <- case (CF.moduleName m `M.lookup` foreigns, CF.moduleForeign m) of
       (Just _, [])   -> error "Unnecessary foreign module"
       (Just path, _) -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
       (Nothing, [])  -> return Nothing
       (Nothing, _)   -> error "Missing foreign module"
-    pjs <- P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs m foreignInclude
+    pjs <- P.prettyPrintJS <$> J.moduleToJs m foreignInclude
     let filePath    = P.runModuleName $ CF.moduleName m
         jsFile      = modulesDir </> filePath </> "index.js"
         externsFile = modulesDir </> filePath </> "externs.purs"
         foreignFile = modulesDir </> filePath </> "foreign.js"
-    writeTextFile jsFile pjs
-    maybe (return ()) (writeTextFile foreignFile . snd) $ CF.moduleName m `M.lookup` foreigns
-    writeTextFile externsFile exts
+    lift $ do
+      writeTextFile jsFile pjs
+      maybe (return ()) (writeTextFile foreignFile . snd) $ CF.moduleName m `M.lookup` foreigns
+      writeTextFile externsFile exts
 
   readTextFile :: FilePath -> Test String
   readTextFile path = liftIO $ readFile path
@@ -121,8 +122,8 @@ makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readEx
     createDirectoryIfMissing True (takeDirectory path)
     writeFile path text
 
-  progress :: String -> Test ()
-  progress = liftIO . putStrLn
+  progress :: P.ProgressMessage -> Test ()
+  progress = liftIO . putStrLn . P.renderProgressMessage
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
