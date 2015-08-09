@@ -140,7 +140,6 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadReader Options m, Mon
      -> m Environment
 make MakeActions{..} ms = do
   (sorted, graph) <- sortModules $ map importPrim ms
-  mapM_ lint sorted
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
     inputTimestamp <- getInputTimestamp moduleName'
     outputTimestamp <- getOutputTimestamp moduleName'
@@ -161,6 +160,7 @@ make MakeActions{..} ms = do
     go env' ms'
   go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
     lift $ progress $ "Compiling " ++ runModuleName moduleName'
+    lint m
     (checked@(Module _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
     checkExhaustiveModule env' checked
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
