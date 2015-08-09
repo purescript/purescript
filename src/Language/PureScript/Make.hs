@@ -49,6 +49,7 @@ import Data.Function (on)
 import Data.List (sortBy, groupBy)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
+import Data.Foldable (for_)
 import Data.Traversable (traverse)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -140,7 +141,6 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadReader Options m, Mon
      -> m Environment
 make MakeActions{..} ms = do
   (sorted, graph) <- sortModules $ map importPrim ms
-  mapM_ lint sorted
   toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
     inputTimestamp <- getInputTimestamp moduleName'
     outputTimestamp <- getOutputTimestamp moduleName'
@@ -150,6 +150,7 @@ make MakeActions{..} ms = do
       _ -> S.insert moduleName' s) S.empty sorted
 
   marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
+  for_ marked $ \(willRebuild, m) -> when willRebuild (lint m)
   (desugared, nextVar) <- runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
   evalSupplyT nextVar $ go initEnvironment desugared
   where
