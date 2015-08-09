@@ -18,11 +18,10 @@ if [ "$force_reinstall" = "true" ] && [ -d "bower_components" ]; then
   rm -r bower_components
 fi
 
-if ! type bower ; then
-  npm install -g bower
-fi
+npm install bower
 
-bower i purescript-prelude \
+node_modules/.bin/bower i \
+        purescript-prelude \
         purescript-eff \
         purescript-st \
         purescript-integers \
