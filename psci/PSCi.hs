@@ -251,7 +251,7 @@ modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
 runMake :: P.Make a -> IO (Either P.MultipleErrors a)
-runMake mk = fmap (fmap fst) $ P.runMake (P.Options False False Nothing False False False Nothing) mk
+runMake mk = fmap (fmap fst) $ P.runMake P.defaultOptions mk
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
 makeIO f io = do
