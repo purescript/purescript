@@ -187,6 +187,20 @@ executable psci
                    IO
     ghc-options: -Wall -O2
 
+executable psc-mod
+    build-depends: base >=4 && <5
+                 , containers
+                 , mtl
+                 , purescript
+                 , transformers
+                 , filepath
+                 , parsec
+
+    main-is:        Main.hs
+    buildable:      True
+    hs-source-dirs: psc-mod
+    ghc-options:    -Wall
+
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any,

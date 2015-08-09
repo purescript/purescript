@@ -14,3 +14,5 @@ bower_components/
 tmp/
 .stack-work/
 tests/support/flattened/
+tags
+.session
