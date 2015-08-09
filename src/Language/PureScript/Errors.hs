@@ -658,8 +658,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ lineWithLevel $ "in foreign import " ++ show nm ++ ":"
             , go err
             ]
+
+    -- Format follows gcc: "/path/to/file.purs:line:col:level:"
     go (PositionedError srcSpan err) =
-      paras [ lineWithLevel $ "at " ++ displaySourceSpan srcSpan ++ ":"
+      paras [ lineWithLevelSuffix $ displaySourceSpanStart srcSpan ++ ":"
             , indent $ go err
             ]
     go (SimpleErrorWrapper sem) = goSimple sem
@@ -669,6 +671,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
 
   lineWithLevel :: String -> Box.Box
   lineWithLevel text = line $ show level ++ " " ++ text
+
+  lineWithLevelSuffix :: String -> Box.Box
+  lineWithLevelSuffix text = line $ text ++ show level ++ ":"
 
   suggestions :: ErrorMessage -> [Box.Box]
   suggestions = suggestions' . unwrapErrorMessage
