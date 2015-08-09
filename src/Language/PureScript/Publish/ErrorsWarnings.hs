@@ -198,12 +198,12 @@ displayUserError e = case e of
   ParseAndDesugarError (D.SortModulesError err) ->
     vcat
       [ para "Error in sortModules:"
-      , indented (para (P.prettyPrintMultipleErrors False err))
+      , indented (P.prettyPrintMultipleErrorsBox False err)
       ]
   ParseAndDesugarError (D.DesugarError err) ->
     vcat
       [ para "Error while desugaring:"
-      , indented (para (P.prettyPrintMultipleErrors False err))
+      , indented (P.prettyPrintMultipleErrorsBox False err)
       ]
   DirtyWorkingTree ->
     para (concat

@@ -747,24 +747,28 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error found:" "Multiple errors found:" full
+prettyPrintMultipleErrors full = renderBox . prettyPrintMultipleErrorsBox full
 
 -- |
 -- Pretty print multiple warnings
 --
 prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Multiple warnings found:" full
+prettyPrintMultipleWarnings full = renderBox . flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Multiple warnings found:" full
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State UnknownMap String
+-- | Pretty print errors as a Box
+prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleErrorsBox full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error found:" "Multiple errors found:" full
+
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State UnknownMap Box.Box
 prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
   result <- prettyPrintSingleError full level e
-  return $ renderBox $
+  return $
     Box.vcat Box.left [ Box.text intro
                       , result
                       ]
 prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
   result <- forM es $ (liftM $ Box.moveRight 2) . prettyPrintSingleError full level
-  return $ renderBox $
+  return $
     Box.vcat Box.left [ Box.text intro
                       , Box.vsep 1 Box.left result
                       ]
