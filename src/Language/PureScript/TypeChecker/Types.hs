@@ -68,8 +68,8 @@ import qualified Language.PureScript.Constants as C
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
-typesOf mainModuleName moduleName vals = do
+typesOf :: ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
+typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> do
@@ -101,7 +101,7 @@ typesOf mainModuleName moduleName vals = do
   replace sub (SimpleErrorWrapper (WildcardInferredType ty)) = SimpleErrorWrapper $ WildcardInferredType (sub $? ty)
   replace _ em = em
   -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
-  checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
+  checkMain nm ty = when (nm == Ident C.main) $ do
     [eff, a] <- replicateM 2 fresh
     ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
 

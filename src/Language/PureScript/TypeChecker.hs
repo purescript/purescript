@@ -129,8 +129,8 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 --  * Process module imports
 --
-typeCheckAll :: Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
-typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphanFixities ds
+typeCheckAll :: ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
+typeCheckAll moduleName exps ds = mapM go ds <* mapM_ checkOrphanFixities ds
   where
   go :: Declaration -> Check Declaration
   go (DataDeclaration dtype name args dctors) = do
@@ -178,7 +178,7 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
   go (ValueDeclaration name nameKind [] (Right val)) =
     rethrow (onErrorMessages (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
-      [(_, (val', ty))] <- typesOf mainModuleName moduleName [(name, val)]
+      [(_, (val', ty))] <- typesOf moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
   go (ValueDeclaration{}) = error "Binders were not desugared"
@@ -186,7 +186,7 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
     rethrow (onErrorMessages (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
-      tys <- typesOf mainModuleName moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
+      tys <- typesOf moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
       vals' <- forM [ (name, val, nameKind, ty)
                     | (name, nameKind, _) <- vals
                     , (name', (val, ty)) <- tys
@@ -263,11 +263,11 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
 -- Type check an entire module and ensure all types and classes defined within the module that are
 -- required by exported members are also exported.
 --
-typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
+typeCheckModule :: Module -> Check Module
+typeCheckModule (Module _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
-  decls' <- typeCheckAll mainModuleName mn exps decls
+  decls' <- typeCheckAll mn exps decls
   forM_ exps $ \e -> do
     checkTypesAreExported e
     checkClassMembersAreExported e
