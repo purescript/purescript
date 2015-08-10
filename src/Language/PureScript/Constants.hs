@@ -238,6 +238,12 @@ semigroupString = "semigroupString"
 semigroupoidArr :: String
 semigroupoidArr = "semigroupoidArr"
 
+-- Generic Deriving
+generic = "Generic"
+toSpine = "toSpine"
+fromSpine = "fromSpine"
+toSignature = "toSignature"
+
 -- Main module
 
 main :: String
