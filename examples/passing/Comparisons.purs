@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
-import Debug.Trace
-import Assert
+import Control.Monad.Eff.Console
+import Test.Assert
 
 main = do
   assert (1.0 < 2.0)
@@ -12,4 +12,4 @@ main = do
   assert ("a" < "b")
   assert ("a" == "a")
   assert ("z" > "a")
-  trace "Done!"
+  log "Done!"

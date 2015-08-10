@@ -8,4 +8,4 @@ data Foo a = Foo (A a) | Bar
 
 foo (Foo []) = Bar
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

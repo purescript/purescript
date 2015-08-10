@@ -1,3 +1,4 @@
+-- @shouldFailWith KindsDoNotUnify
 module Main where
 
 import Prelude

@@ -1,3 +1,4 @@
+-- @shouldFailWith MissingClassMember
 module Main where
 
 import Prelude

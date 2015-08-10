@@ -1,3 +1,4 @@
+-- @shouldFailWith TypesDoNotUnify
 module DuplicateProperties where
 
 import Prelude

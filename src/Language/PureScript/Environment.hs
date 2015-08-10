@@ -13,12 +13,15 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Environment where
 
 import Data.Data
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Aeson as A
 
 import Language.PureScript.Kinds
 import Language.PureScript.Names
@@ -49,7 +52,7 @@ data Environment = Environment {
   -- |
   -- Available type class dictionaries
   --
-  , typeClassDictionaries :: M.Map (Qualified Ident, Maybe ModuleName) TypeClassDictionaryInScope
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -- |
   -- Type classes
   --
@@ -137,6 +140,16 @@ instance Show DataDeclType where
   show Data = "data"
   show Newtype = "newtype"
 
+instance A.ToJSON DataDeclType where
+  toJSON = A.toJSON . show
+
+instance A.FromJSON DataDeclType where
+  parseJSON = A.withText "DataDeclType" $ \str ->
+    case str of
+      "data" -> return Data
+      "newtype" -> return Newtype
+      other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
+
 -- |
 -- Construct a ProperName in the Prim module
 --
@@ -201,9 +214,17 @@ tyObject = primTy "Object"
 -- Check whether a type is an object
 --
 isObject :: Type -> Bool
-isObject = (==) tyObject . extract
-  where extract (TypeApp t _) = t
-        extract t = t
+isObject = isTypeOrApplied tyObject
+
+-- |
+-- Check whether a type is a function
+--
+isFunction :: Type -> Bool
+isFunction = isTypeOrApplied tyFunction
+
+isTypeOrApplied :: Type -> Type -> Bool
+isTypeOrApplied t1 (TypeApp t2 _) = t1 == t2
+isTypeOrApplied t1 t2 = t1 == t2
 
 -- |
 -- Smart constructor for function types

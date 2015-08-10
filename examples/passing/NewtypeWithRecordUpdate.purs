@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 newtype NewType a = NewType (Object a)
 
@@ -13,4 +13,4 @@ rec1 = { a: 0.0, b: 0.0, c: 0.0 }
 rec2 :: NewType (a :: Number, b :: Number, c :: Number)
 rec2 = NewType (rec1 { a = 1.0 })
 
-main = trace "Done"
+main = log "Done"

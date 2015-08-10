@@ -8,4 +8,4 @@ class Pointed p where
 instance pointedArray :: Pointed Array where
   point a = [a]
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

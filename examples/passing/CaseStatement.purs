@@ -18,4 +18,4 @@ h f N a = a
 h f a N = a
 h f (J a) (J b) = J (f a b)
 
-main = Debug.Trace.trace $ f "Done" "Failed" A
+main = Control.Monad.Eff.Console.log $ f "Done" "Failed" A

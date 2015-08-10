@@ -14,11 +14,15 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Types where
 
 import Data.Data
 import Data.List (nub)
+import qualified Data.Aeson as A
+import qualified Data.Aeson.TH as A
 
 import Control.Monad.Unify
 import Control.Arrow (second)
@@ -32,7 +36,7 @@ import Language.PureScript.Traversals
 -- |
 -- An identifier for the scope of a skolem variable
 --
-newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord, Data, Typeable)
+newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord, Data, Typeable, A.ToJSON, A.FromJSON)
 
 -- |
 -- The type of types
@@ -98,12 +102,14 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintForAll [String] Type deriving (Show, Eq, Data, Typeable)
+  | PrettyPrintForAll [String] Type deriving (Show, Eq, Ord, Data, Typeable)
 
 -- |
 -- A typeclass constraint
 --
 type Constraint = (Qualified ProperName, [Type])
+
+$(A.deriveJSON A.defaultOptions ''Type)
 
 -- |
 -- Convert a row to a list of pairs of labels and types

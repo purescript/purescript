@@ -14,4 +14,4 @@ f x = -x
 
 test1 = 2.0 - 1.0
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

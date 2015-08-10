@@ -27,7 +27,7 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
 
-magicDo :: Options mode -> JS -> JS
+magicDo :: Options -> JS -> JS
 magicDo opts | optionsNoMagicDo opts = id
              | otherwise = inlineST . magicDo'
 
@@ -81,8 +81,8 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isPure (JSApp purePoly [effDict]) | isPurePoly purePoly && isEffDict C.applicativeEffDictionary effDict = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && prop == identToJs (Op (C.>>=))
-  isBindPoly (JSIndexer (JSStringLiteral bind) (JSVar prelude)) = prelude == C.prelude && bind == (C.>>=)
+  isBindPoly (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && (prop `elem` map identToJs [Ident C.bind, Op (C.>>=)])
+  isBindPoly (JSIndexer (JSStringLiteral bind) (JSVar prelude)) = prelude == C.prelude && (bind `elem` [C.bind, (C.>>=)])
   isBindPoly _ = False
   -- Check if an expression represents the polymorphic return function
   isRetPoly (JSAccessor returnEscaped (JSVar prelude)) = prelude == C.prelude && returnEscaped == C.returnEscaped

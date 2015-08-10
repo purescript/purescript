@@ -44,10 +44,10 @@ test10 _ =
   in f 10.0
 
 main = do
-  Debug.Trace.print (test1 1.0)
-  Debug.Trace.print (test2 1.0 2.0)
-  Debug.Trace.print test3
-  Debug.Trace.print test4
-  Debug.Trace.print test5
-  Debug.Trace.print test7
-  Debug.Trace.print (test8 100.0)
+  Control.Monad.Eff.Console.print (test1 1.0)
+  Control.Monad.Eff.Console.print (test2 1.0 2.0)
+  Control.Monad.Eff.Console.print test3
+  Control.Monad.Eff.Console.print test4
+  Control.Monad.Eff.Console.print test5
+  Control.Monad.Eff.Console.print test7
+  Control.Monad.Eff.Console.print (test8 100.0)

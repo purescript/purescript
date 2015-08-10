@@ -1,3 +1,4 @@
+-- @shouldFailWith OverlappingNamesInLet
 module Main where
 
 import Prelude

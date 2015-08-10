@@ -14,4 +14,4 @@ instance bar :: Bar (a -> b) b
 
 instance baz :: (Eq a) => Baz (a -> b) a b
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

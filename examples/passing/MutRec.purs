@@ -16,4 +16,4 @@ evenToNumber (Even n) = oddToNumber n + 0.0
 
 oddToNumber (Odd n) = evenToNumber n + 0.0
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

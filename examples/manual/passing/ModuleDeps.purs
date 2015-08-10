@@ -14,4 +14,4 @@ baz = 1
 
 module Main where
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

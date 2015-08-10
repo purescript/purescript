@@ -69,17 +69,23 @@ withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified 
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromList [ ((canonicalizeDictionary entry, mn), entry) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _ }  <- entries ]
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = (typeClassDictionaries . checkEnv $ st) `M.union` mentries } }
+  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (canonicalizeDictionary entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
 
 -- |
--- Get the currently available list of type class dictionaries
+-- Get the currently available map of type class dictionaries
 --
-getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m [TypeClassDictionaryInScope]
-getTypeClassDictionaries = M.elems . typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries :: (Functor m, MonadState CheckState m) => m (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
+
+-- |
+-- Lookup type class dictionaries in a module.
+--
+lookupTypeClassDictionaries :: (Functor m, MonadState CheckState m) => Maybe ModuleName -> m (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- |
 -- Temporarily bind a collection of names to local variables

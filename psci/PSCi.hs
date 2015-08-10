@@ -30,10 +30,12 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Writer (runWriter)
 import qualified Control.Monad.Trans.State.Lazy as L
 
@@ -43,7 +45,9 @@ import System.Console.Haskeline
 import System.Directory (doesFileExist, findExecutable, getHomeDirectory, getCurrentDirectory)
 import System.Exit
 import System.FilePath (pathSeparator, (</>), isPathSeparator)
+import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
+import System.IO.Error (tryIOError)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -52,7 +56,6 @@ import qualified Paths_purescript as Paths
 import qualified Directive as D
 import Completion (completion)
 import IO (mkdirp)
-import Make
 import Parser (parseCommand)
 import Types
 
@@ -88,12 +91,15 @@ supportModule =
 
 -- File helpers
 
+onFirstFileMatching :: Monad m => (b -> m (Maybe a)) -> [b] -> m (Maybe a)
+onFirstFileMatching f pathVariants = runMaybeT . msum $ map (MaybeT . f) pathVariants
+
 -- |
 -- Locates the node executable.
 -- Checks for either @nodejs@ or @node@.
 --
 findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+findNodeProcess = onFirstFileMatching findExecutable names
   where names = ["nodejs", "node"]
 
 -- |
@@ -216,12 +222,12 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModules = imports} typ =
+createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
-    P.Module [] moduleName ((importDecl `map` imports) ++ [itDecl]) Nothing
+    P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
@@ -239,10 +245,25 @@ importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
-make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> Make P.Environment
-make PSCiState{..} ms =
-  let filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-  in P.make (buildMakeActions filePathMap (M.map snd psciForeignFiles)) (psciLoadedModules ++ ms)
+modulesDir :: FilePath
+modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
+
+-- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
+-- options and ignores the warning messages.
+runMake :: P.Make a -> IO (Either P.MultipleErrors a)
+runMake mk = fmap (fmap fst) $ P.runMake P.defaultOptions mk
+
+makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
+makeIO f io = do
+  e <- liftIO $ tryIOError io
+  either (throwError . P.singleError . f) return e
+
+make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
+make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms))
+    where
+    filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
+    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+    actions' = actions { P.progress = const (return ()) }
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
@@ -314,6 +335,7 @@ handleShowImportedModules = do
   showRef (P.ValueRef ident) = show ident
   showRef (P.TypeClassRef pn) = show pn
   showRef (P.TypeInstanceRef ident) = show ident
+  showRef (P.ModuleRef name) = "module " ++ show name
   showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref
 
   commaList :: [String] -> String
@@ -467,18 +489,27 @@ whenFileExists filePath f = do
     then f absPath
     else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 
+-- |
+-- Attempts to read initial commands from '.psci' in the present working
+-- directory then the user's home
+--
 loadUserConfig :: IO (Maybe [Command])
-loadUserConfig = do
-  configFile <- (</> ".psci") <$> getCurrentDirectory
-  exists <- doesFileExist configFile
-  if exists
-  then do
-    ls <- lines <$> readFile configFile
-    case mapM parseCommand ls of
-      Left err -> print err >> exitFailure
-      Right cs -> return $ Just cs
-  else
-    return Nothing
+loadUserConfig = onFirstFileMatching readCommands pathGetters
+  where
+  pathGetters = [getCurrentDirectory, getHomeDirectory]
+  readCommands :: IO FilePath -> IO (Maybe [Command])
+  readCommands path = do
+    configFile <- (</> ".psci") <$> path
+    exists <- doesFileExist configFile
+    if exists
+    then do
+      ls <- lines <$> readFile configFile
+      case mapM parseCommand ls of
+        Left err -> print err >> exitFailure
+        Right cs -> return $ Just cs
+    else
+      return Nothing
+
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.Module] -> Bool
@@ -490,19 +521,21 @@ consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad",
 loop :: PSCiOptions -> IO ()
 loop PSCiOptions{..} = do
   config <- loadUserConfig
-  modulesOrFirstError <- loadAllModules psciInputFile
+  inputFiles <- concat <$> mapM glob psciInputFile
+  foreignFiles <- concat <$> mapM glob psciForeignInputFiles
+  modulesOrFirstError <- loadAllModules inputFiles
   case modulesOrFirstError of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right modules -> do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFiles <- forM psciForeignInputFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
-        P.parseForeignModulesFromFiles foreignFiles
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
+        P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (PSCiState psciInputFile [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (PSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (mapM_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules

@@ -186,11 +186,19 @@ parseImportDeclaration' = do
 
 
 parseDeclarationRef :: TokenParser DeclarationRef
-parseDeclarationRef = withSourceSpan PositionedDeclarationRef $
+parseDeclarationRef =
+  parseModuleRef <|> (
+  withSourceSpan PositionedDeclarationRef $
   ValueRef <$> parseIdent
     <|> do name <- properName
            dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
            return $ maybe (TypeClassRef name) (TypeRef name) dctors
+  )
+  where
+  parseModuleRef :: TokenParser DeclarationRef
+  parseModuleRef = do
+    name <- indented *> reserved "module" *> moduleName
+    return $ ModuleRef name
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do

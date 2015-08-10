@@ -44,18 +44,18 @@ import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
+import System.FilePath.Posix ((</>))
+
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: forall m mode. (Applicative m, Monad m, MonadReader (Options mode) m, MonadSupply m)
+moduleToJs :: forall m. (Applicative m, Monad m, MonadReader Options m, MonadSupply m)
            => Module Ann -> Maybe JS -> m [JS]
 moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
-  additional <- asks optionsAdditional
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
   jsDecls <- mapM bindToJs decls
   optimized <- T.traverse (T.traverse optimize) jsDecls
-  let isModuleEmpty = null exps
   comments <- not <$> asks optionsNoComments
   let strict = JSStringLiteral "use strict"
   let header = if comments && not (null coms) then JSComment coms strict else strict
@@ -65,15 +65,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   let standardExps = exps \\ foreignExps
   let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps
                              ++ map (runIdent &&& foreignIdent) foreignExps
-  return $ case additional of
-    MakeOptions -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
-    CompileOptions ns _ _ | not isModuleEmpty ->
-      [ JSVariableIntroduction ns
-                               (Just (JSBinary Or (JSVar ns) (JSObjectLiteral [])) )
-      , JSAssignment (JSAccessor (moduleNameToJs mn) (JSVar ns))
-                     (JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn exps']))) [])
-      ]
-    _ -> []
+  return $ moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
 
   where
 
@@ -82,10 +74,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
   --
   importToJs :: ModuleName -> m JS
   importToJs mn' = do
-    additional <- asks optionsAdditional
-    let moduleBody = case additional of
-          MakeOptions -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn')]
-          CompileOptions ns _ _ -> JSAccessor (moduleNameToJs mn') (JSVar ns)
+    path <- asks optionsRequirePath
+    let moduleBody = JSApp (JSVar "require") [JSStringLiteral (maybe id (</>) path $ runModuleName mn')]
     return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
 
   -- |
@@ -284,7 +274,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
       failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral errorMessage) (JSArrayLiteral $ zipWith valueError names vals)]
 
       errorMessage :: String
-      errorMessage = "Failed pattern match" ++ maybe "" ((" at " ++) . displaySourceSpan) maybeSpan ++ ": "
+      errorMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan ++ ": "
 
       valueError :: String -> JS -> JS
       valueError _ l@(JSNumericLiteral _) = l

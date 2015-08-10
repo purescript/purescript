@@ -17,4 +17,4 @@ polyUpdate = \o -> o { foo = "Foo" }
 
 inferPolyUpdate = \o -> o { foo = "Foo" }
 
-main = Debug.Trace.trace ((update1 {foo: ""}).foo)
+main = Control.Monad.Eff.Console.log ((update1 {foo: ""}).foo)

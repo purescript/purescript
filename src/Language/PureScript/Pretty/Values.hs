@@ -15,7 +15,8 @@
 
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
-    prettyPrintBinder
+    prettyPrintBinder,
+    prettyPrintBinderAtom
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -40,11 +41,7 @@ literals = mkPattern' match
   match (CharLiteral c) = return $ show c
   match (BooleanLiteral True) = return "true"
   match (BooleanLiteral False) = return "false"
-  match (ArrayLiteral xs) = concat <$> sequence
-    [ return "[ "
-    , withIndent $ prettyPrintMany prettyPrintValue' xs
-    , return " ]"
-    ]
+  match (ArrayLiteral xs) = return $ "[" ++ intercalate ", " (map prettyPrintValue xs) ++ "]"
   match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
   match (ObjectConstructor ps) = prettyPrintObject' ps
   match (ObjectGetter prop) = return $ "(." ++ prop ++ ")"
@@ -71,7 +68,7 @@ literals = mkPattern' match
     ]
   match (Var ident) = return $ show ident
   match (Do els) = concat <$> sequence
-    [ return "do "
+    [ return "do\n"
     , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
     , currentIndent
     ]
@@ -95,11 +92,14 @@ prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
 prettyPrintCaseAlternative (CaseAlternative binders result) =
   concat <$> sequence
-    [ intercalate ", " <$> forM binders prettyPrintBinder'
+    [ return (unwords (map prettyPrintBinderAtom binders))
     , prettyPrintResult result
     ]
   where
-  prettyPrintResult (Left gs) = concat <$> mapM prettyPrintGuardedValue gs
+  prettyPrintResult (Left gs) = concat <$> sequence
+      [ return "\n"
+      , withIndent $ prettyPrintMany prettyPrintGuardedValue gs
+      ]
   prettyPrintResult (Right v) = (" -> " ++) <$> prettyPrintValue' v
 
   prettyPrintGuardedValue (grd, val) =
@@ -108,7 +108,6 @@ prettyPrintCaseAlternative (CaseAlternative binders result) =
       , prettyPrintValue' grd
       , return " -> "
       , prettyPrintValue' val
-      , return "\n"
       ]
 
 prettyPrintDoNotationElement :: DoNotationElement -> StateT PrinterState Maybe String
@@ -116,7 +115,7 @@ prettyPrintDoNotationElement (DoNotationValue val) =
   prettyPrintValue' val
 prettyPrintDoNotationElement (DoNotationBind binder val) =
   concat <$> sequence
-    [ prettyPrintBinder' binder
+    [ return (prettyPrintBinder binder)
     , return " <- "
     , prettyPrintValue' val
     ]
@@ -129,13 +128,10 @@ prettyPrintDoNotationElement (PositionedDoNotationElement _ _ el) = prettyPrintD
 
 prettyPrintObject' :: [(String, Maybe Expr)] -> StateT PrinterState Maybe String
 prettyPrintObject' [] = return "{}"
-prettyPrintObject' ps = concat <$> sequence
-  [ return "{\n"
-  , withIndent $ prettyPrintMany prettyPrintObjectProperty ps
-  , return "\n"
-  , currentIndent
-  , return "}"
-  ]
+prettyPrintObject' ps = return $ "{ " ++ intercalate ", " (map prettyPrintObjectProperty ps) ++ "}"
+  where
+  prettyPrintObjectProperty :: (String, Maybe Expr) -> String
+  prettyPrintObjectProperty (key, value) = prettyPrintObjectKey key ++ ": " ++ maybe "_" prettyPrintValue value
 
 ifThenElse :: Pattern PrinterState Expr ((Expr, Expr), Expr)
 ifThenElse = mkPattern match
@@ -188,55 +184,35 @@ prettyPrintValue' = runKleisli $ runPattern matchValue
                   , [ Wrap ifThenElse $ \(th, el) cond -> "if " ++ cond ++ " then " ++ prettyPrintValue th ++ " else " ++ prettyPrintValue el ]
                   ]
 
-prettyPrintBinderAtom :: Pattern PrinterState Binder String
-prettyPrintBinderAtom = mkPattern' match
+prettyPrintBinderAtom :: Binder -> String
+prettyPrintBinderAtom NullBinder = "_"
+prettyPrintBinderAtom (StringBinder str) = show str
+prettyPrintBinderAtom (CharBinder c) = show c
+prettyPrintBinderAtom (NumberBinder num) = either show show num
+prettyPrintBinderAtom (BooleanBinder True) = "true"
+prettyPrintBinderAtom (BooleanBinder False) = "false"
+prettyPrintBinderAtom (VarBinder ident) = show ident
+prettyPrintBinderAtom (ConstructorBinder ctor []) = show ctor
+prettyPrintBinderAtom (ObjectBinder bs) = 
+  "{ " 
+  ++ intercalate ", " (map prettyPrintObjectPropertyBinder bs)
+  ++ " }"
   where
-  match :: Binder -> StateT PrinterState Maybe String
-  match NullBinder = return "_"
-  match (StringBinder str) = return $ show str
-  match (CharBinder c) = return $ show c
-  match (NumberBinder num) = return $ either show show num
-  match (BooleanBinder True) = return "true"
-  match (BooleanBinder False) = return "false"
-  match (VarBinder ident) = return $ show ident
-  match (ConstructorBinder ctor args) = concat <$> sequence
-    [ return $ show ctor ++ " "
-    , unwords <$> forM args match
-    ]
-  match (ObjectBinder bs) = concat <$> sequence
-    [ return "{\n"
-    , withIndent $ prettyPrintMany prettyPrintObjectPropertyBinder bs
-    , currentIndent
-    , return "}"
-    ]
-  match (ArrayBinder bs) = concat <$> sequence
-    [ return "["
-    , unwords <$> mapM prettyPrintBinder' bs
-    , return "]"
-    ]
-  match (NamedBinder ident binder) = ((show ident ++ "@") ++) <$> prettyPrintBinder' binder
-  match (PositionedBinder _ _ binder) = prettyPrintBinder' binder
+  prettyPrintObjectPropertyBinder :: (String, Binder) -> String
+  prettyPrintObjectPropertyBinder (key, binder) = prettyPrintObjectKey key ++ ": " ++ prettyPrintBinder binder
+prettyPrintBinderAtom (ArrayBinder bs) =
+  "[ " 
+  ++ intercalate ", " (map prettyPrintBinder bs)
+  ++ " ]"
+prettyPrintBinderAtom (NamedBinder ident binder) = show ident ++ "@" ++ prettyPrintBinder binder
+prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
+prettyPrintBinderAtom b = parens (prettyPrintBinder b)
 
 -- |
 -- Generate a pretty-printed string representing a Binder
 --
 prettyPrintBinder :: Binder -> String
-prettyPrintBinder = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintBinder'
-
-prettyPrintBinder' :: Binder -> StateT PrinterState Maybe String
-prettyPrintBinder' = runKleisli $ runPattern matchBinder
-  where
-  matchBinder :: Pattern PrinterState Binder String
-  matchBinder = prettyPrintBinderAtom <+> fmap parens matchBinder
-
-prettyPrintObjectPropertyBinder :: (String, Binder) -> StateT PrinterState Maybe String
-prettyPrintObjectPropertyBinder (key, binder) = concat <$> sequence
-    [ return $ prettyPrintObjectKey key ++ ": "
-    , prettyPrintBinder' binder
-    ]
-
-prettyPrintObjectProperty :: (String, Maybe Expr) -> StateT PrinterState Maybe String
-prettyPrintObjectProperty (key, value) = concat <$> sequence
-    [ return $ prettyPrintObjectKey key ++ ": "
-    , maybe (pure "_") prettyPrintValue' value
-    ]
+prettyPrintBinder (ConstructorBinder ctor []) = show ctor
+prettyPrintBinder (ConstructorBinder ctor args) = show ctor ++ " " ++ unwords (map prettyPrintBinderAtom args)
+prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
+prettyPrintBinder b = prettyPrintBinderAtom b

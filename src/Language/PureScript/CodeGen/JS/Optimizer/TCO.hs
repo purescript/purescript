@@ -23,7 +23,7 @@ import Language.PureScript.CodeGen.JS.AST
 -- |
 -- Eliminate tail calls
 --
-tco :: Options mode -> JS -> JS
+tco :: Options -> JS -> JS
 tco opts | optionsNoTco opts = id
          | otherwise = tco'
 

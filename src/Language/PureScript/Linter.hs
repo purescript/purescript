@@ -16,7 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript.Linter (lint) where
+module Language.PureScript.Linter (lint, module L) where
 
 import Data.List (mapAccumL, nub)
 import Data.Maybe (mapMaybe)
@@ -30,6 +30,7 @@ import Control.Monad.Writer.Class
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
+import Language.PureScript.Linter.Exhaustive as L
 
 -- | Lint the PureScript AST.
 -- |
@@ -52,7 +53,12 @@ lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ li
   lintDeclaration :: Declaration -> m ()
   lintDeclaration d =
     let (f, _, _, _, _) = everythingWithContextOnValues moduleNames mempty mappend stepD stepE stepB def def
-    in tell (f d)
+
+        f' :: Declaration -> MultipleErrors
+        f' (PositionedDeclaration pos _ dec) = onErrorMessages (PositionedError pos) (f' dec)
+        f' dec = f dec
+
+    in tell (f' d)
     where
     def s _ = (s, mempty)
 

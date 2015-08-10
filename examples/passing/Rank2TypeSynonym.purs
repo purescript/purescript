@@ -13,4 +13,4 @@ bar = foo 3.0
 
 main = do
   x <- bar
-  Debug.Trace.print x
+  Control.Monad.Eff.Console.print x

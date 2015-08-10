@@ -17,4 +17,4 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> a
 test a = su (cl a a)
 
-main = Debug.Trace.print $ test 10.0
+main = Control.Monad.Eff.Console.print $ test 10.0

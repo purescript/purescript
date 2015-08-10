@@ -369,12 +369,15 @@ inferBinder val (ConstructorBinder ctor binders) = do
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       go binders fn'
         where
-        go [] ty' = do
-          _ <- subsumes Nothing val ty'
-          return M.empty
+        go [] ty' = case (val, ty') of
+          (TypeConstructor _, TypeApp _ _) -> throwIncorrectArity
+          _ -> do
+            _ <- subsumes Nothing val ty'
+            return M.empty
         go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
           M.union <$> inferBinder obj binder <*> go binders' ret
-        go _ _ = throwError . errorMessage $ IncorrectConstructorArity ctor
+        go _ _ = throwIncorrectArity
+        throwIncorrectArity = throwError . errorMessage $ IncorrectConstructorArity ctor
     _ -> throwError . errorMessage $ UnknownDataConstructor ctor Nothing
 inferBinder val (ObjectBinder props) = do
   row <- fresh

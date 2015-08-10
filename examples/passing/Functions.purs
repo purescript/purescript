@@ -12,4 +12,4 @@ test4 = \(%%) -> 1.0 %% 2.0
 
 test5 = \(+++) (***) -> 1.0 +++ 2.0 *** 3.0
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

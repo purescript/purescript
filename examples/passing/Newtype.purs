@@ -1,8 +1,8 @@
 module Main where
 
-import Prelude
+import Prelude hiding (apply)
 import Control.Monad.Eff
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 newtype Thing = Thing String
 
@@ -20,4 +20,4 @@ main = do
   print $ Thing "hello"
   print $ Box 42.0
   print $ apply Box 9000.0
-  trace "Done"
+  log "Done"

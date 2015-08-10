@@ -156,11 +156,11 @@ inlineCommonOperators = applyAll $
   , binary semigroupString (C.<>) Add
   , binary semigroupString (C.++) Add
 
-  , binary latticeBoolean (C.&&) And
-  , binary latticeBoolean (C.||) Or
-  , binaryFunction latticeBoolean C.inf And
-  , binaryFunction latticeBoolean C.sup Or
-  , unary complementedLatticeBoolean C.not Not
+  , binary booleanAlgebraBoolean (C.&&) And
+  , binary booleanAlgebraBoolean (C.||) Or
+  , binaryFunction booleanAlgebraBoolean C.conj And
+  , binaryFunction booleanAlgebraBoolean C.disj Or
+  , unary booleanAlgebraBoolean C.not Not
 
   , binary' C.dataIntBits (C..|.) BitwiseOr
   , binary' C.dataIntBits (C..&.) BitwiseAnd
@@ -269,25 +269,25 @@ semiringNumber :: (String, String)
 semiringNumber = (C.prelude, C.semiringNumber)
 
 semiringInt :: (String, String)
-semiringInt = (C.dataInt, C.semiringInt)
+semiringInt = (C.prelude, C.semiringInt)
 
 ringNumber :: (String, String)
 ringNumber = (C.prelude, C.ringNumber)
 
 ringInt :: (String, String)
-ringInt = (C.dataInt, C.ringInt)
+ringInt = (C.prelude, C.ringInt)
 
 moduloSemiringNumber :: (String, String)
 moduloSemiringNumber = (C.prelude, C.moduloSemiringNumber)
 
 moduloSemiringInt :: (String, String)
-moduloSemiringInt = (C.dataInt, C.moduloSemiringInt)
+moduloSemiringInt = (C.prelude, C.moduloSemiringInt)
 
 eqNumber :: (String, String)
 eqNumber = (C.prelude, C.eqNumber)
 
 eqInt :: (String, String)
-eqInt = (C.dataInt, C.eqInt)
+eqInt = (C.prelude, C.eqInt)
 
 eqString :: (String, String)
 eqString = (C.prelude, C.eqNumber)
@@ -299,7 +299,7 @@ ordNumber :: (String, String)
 ordNumber = (C.prelude, C.ordNumber)
 
 ordInt :: (String, String)
-ordInt = (C.dataInt, C.ordInt)
+ordInt = (C.prelude, C.ordInt)
 
 semigroupString :: (String, String)
 semigroupString = (C.prelude, C.semigroupString)
@@ -307,11 +307,8 @@ semigroupString = (C.prelude, C.semigroupString)
 boundedBoolean :: (String, String)
 boundedBoolean = (C.prelude, C.boundedBoolean)
 
-latticeBoolean :: (String, String)
-latticeBoolean = (C.prelude, C.latticeBoolean)
-
-complementedLatticeBoolean :: (String, String)
-complementedLatticeBoolean = (C.prelude, C.complementedLatticeBoolean)
+booleanAlgebraBoolean :: (String, String)
+booleanAlgebraBoolean = (C.prelude, C.booleanAlgebraBoolean)
 
 semigroupoidArr :: (String, String)
 semigroupoidArr = (C.prelude, C.semigroupoidArr)

@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 (?!) :: forall a. a -> a -> a
 (?!) x _ = x
@@ -96,4 +96,4 @@ main = do
   let t18 = test18
   let t19 = test19
   let t20 = test20
-  trace "Done"
+  log "Done"

@@ -1,3 +1,4 @@
+-- @shouldFailWith UndefinedTypeVariable
 module UnknownSuperclassTypeVar where
 
 import Prelude

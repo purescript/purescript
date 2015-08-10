@@ -17,6 +17,7 @@
 module Language.PureScript.AST.Declarations where
 
 import qualified Data.Data as D
+import qualified Data.Map as M
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Operators
@@ -60,6 +61,10 @@ data DeclarationRef
   --
   | TypeInstanceRef Ident
   -- |
+  -- A module, in its entirety
+  --
+  | ModuleRef ModuleName
+  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
@@ -70,6 +75,7 @@ instance Eq DeclarationRef where
   (ValueRef name)        == (ValueRef name')        = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
+  (ModuleRef name) == (ModuleRef name') = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
@@ -360,7 +366,7 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Bool Constraint [TypeClassDictionaryInScope]
+  | TypeClassDictionary Bool Constraint (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --

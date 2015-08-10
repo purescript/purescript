@@ -16,4 +16,4 @@ g b = case b of B a -> f a
 showN :: A -> S
 showN a = f a
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

@@ -12,6 +12,7 @@ import qualified Language.PureScript as P
 
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode
+import qualified Language.PureScript.Docs.Convert as Convert
 import qualified Language.PureScript.Docs.Render as Render
 
 -- |
@@ -20,36 +21,42 @@ import qualified Language.PureScript.Docs.Render as Render
 --
 renderModulesAsMarkdown :: [P.Module] -> String
 renderModulesAsMarkdown =
-  runDocs . modulesAsMarkdown . map Render.renderModule
+  runDocs . modulesAsMarkdown . map Convert.convertModule
 
-modulesAsMarkdown :: [RenderedModule] -> Docs
+modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
 
-moduleAsMarkdown :: RenderedModule -> Docs
-moduleAsMarkdown RenderedModule{..} = do
-  headerLevel 2 $ "Module " ++ rmName
+moduleAsMarkdown :: Module -> Docs
+moduleAsMarkdown Module{..} = do
+  headerLevel 2 $ "Module " ++ modName
   spacer
-  for_ rmComments tell'
-  mapM_ declAsMarkdown rmDeclarations
-  spacer
-
-declAsMarkdown :: RenderedDeclaration -> Docs
-declAsMarkdown RenderedDeclaration{..} = do
-  headerLevel 4 (ticks rdTitle)
+  for_ modComments tell'
+  mapM_ declAsMarkdown modDeclarations
   spacer
 
-  let (instances, children) = partition ((==) ChildInstance . rcdType) rdChildren
+declAsMarkdown :: Declaration -> Docs
+declAsMarkdown decl@Declaration{..} = do
+  headerLevel 4 (ticks declTitle)
+  spacer
+
+  let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
-    tell' (codeToString rdCode)
+    tell' (codeToString $ Render.renderDeclaration decl)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
-  for_ rdComments tell'
+  for_ declFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
+
+  for_ declComments tell'
 
   unless (null instances) $ do
     headerLevel 5 "Instances"
     fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
     spacer
+
+  where
+  isChildInstance (ChildInstance _ _) = True
+  isChildInstance _ = False
 
 codeToString :: RenderedCode -> String
 codeToString = outputWith elemAsMarkdown
@@ -61,16 +68,32 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
-childToString :: First -> RenderedChildDeclaration -> String
-childToString f RenderedChildDeclaration{..} =
-  case rcdType of
-    ChildDataConstructor ->
+fixityAsMarkdown :: P.Fixity -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) =
+  tell' $ concat [ "_"
+                 , associativityStr
+                 , " / precedence "
+                 , show precedence
+                 , "_"
+                 ]
+  where
+  associativityStr = case associativity of
+    P.Infixl -> "left-associative"
+    P.Infixr -> "right-associative"
+    P.Infix  -> "non-associative"
+
+childToString :: First -> ChildDeclaration -> String
+childToString f decl@ChildDeclaration{..} =
+  case cdeclInfo of
+    ChildDataConstructor _ ->
       let c = if f == First then "=" else "|"
-      in  "  " ++ c ++ " " ++ codeToString rcdCode
-    ChildTypeClassMember ->
-      "  " ++ codeToString rcdCode
-    ChildInstance ->
-      codeToString rcdCode
+      in  "  " ++ c ++ " " ++ str
+    ChildTypeClassMember _ ->
+      "  " ++ str
+    ChildInstance _ _ ->
+      str
+  where
+  str = codeToString $ Render.renderChildDeclaration decl
 
 data First
   = First

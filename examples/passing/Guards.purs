@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 collatz = \x -> case x of
-  y | y % 2.0 == 0.0 -> y / 2.0
+  y | y `mod` 2.0 == 0.0 -> y / 2.0
   y -> y * 3.0 + 1.0
 
 -- Guards have access to current scope
@@ -26,4 +26,4 @@ testIndentation x y | x > 0.0
                     | otherwise
   = y - x
 
-main = Debug.Trace.trace $ min "Done" "ZZZZ"
+main = Control.Monad.Eff.Console.log $ min "Done" "ZZZZ"

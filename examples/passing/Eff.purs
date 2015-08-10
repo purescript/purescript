@@ -3,11 +3,11 @@ module Main where
 import Prelude
 import Control.Monad.Eff
 import Control.Monad.ST
-import Debug.Trace
+import Control.Monad.Eff.Console
 
 test1 = do
-  trace "Line 1"
-  trace "Line 2"
+  log "Line 1"
+  log "Line 2"
 
 test2 = runPure (runST (do
           ref <- newSTRef 0.0
@@ -21,5 +21,5 @@ test3 = pureST (do
 
 main = do
   test1
-  Debug.Trace.print test2
-  Debug.Trace.print test3
+  Control.Monad.Eff.Console.print test2
+  Control.Monad.Eff.Console.print test3

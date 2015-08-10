@@ -6,4 +6,4 @@ data A = A B
 
 type B = A
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

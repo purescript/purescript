@@ -5,7 +5,10 @@ module Language.PureScript.Docs.RenderedCode.Render (
     renderType,
     renderTypeAtom,
     renderRow,
-    renderKind
+    renderKind,
+    RenderTypeOptions(..),
+    defaultRenderTypeOptions,
+    renderTypeWithOptions
 ) where
 
 import Data.Monoid ((<>), mconcat, mempty)
@@ -119,9 +122,9 @@ forall_ = mkPattern match
   match (PrettyPrintForAll idents ty) = Just (idents, ty)
   match _ = Nothing
 
-insertPlaceholders :: Type -> Type
-insertPlaceholders =
-  everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
+insertPlaceholders :: RenderTypeOptions -> Type -> Type
+insertPlaceholders opts =
+  everywhereOnTypesTopDown convertForAlls . everywhereOnTypes (convert opts)
 
 dePrim :: Type -> Type
 dePrim ty@(TypeConstructor (Qualified _ name))
@@ -129,10 +132,10 @@ dePrim ty@(TypeConstructor (Qualified _ name))
     TypeConstructor $ Qualified Nothing name
 dePrim other = other
 
-convert :: Type -> Type
-convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
-convert other = other
+convert :: RenderTypeOptions -> Type -> Type
+convert _ (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
+convert opts (TypeApp o r) | o == tyObject && prettyPrintObjects opts = PrettyPrintObject r
+convert _ other = other
 
 convertForAlls :: Type -> Type
 convertForAlls (ForAll i ty _) = go [i] ty
@@ -141,8 +144,8 @@ convertForAlls (ForAll i ty _) = go [i] ty
   go idents other = PrettyPrintForAll idents other
 convertForAlls other = other
 
-preprocessType :: Type -> Type
-preprocessType = dePrim . insertPlaceholders
+preprocessType :: RenderTypeOptions -> Type -> Type
+preprocessType opts = dePrim . insertPlaceholders opts
 
 -- |
 -- Render code representing a Kind
@@ -154,12 +157,23 @@ renderKind = kind . prettyPrintKind
 -- Render code representing a Type, as it should appear inside parentheses
 --
 renderTypeAtom :: Type -> RenderedCode
-renderTypeAtom = fromMaybe (error "Incomplete pattern") . pattern matchTypeAtom () . preprocessType
+renderTypeAtom =
+  fromMaybe (error "Incomplete pattern") . pattern matchTypeAtom () . preprocessType defaultRenderTypeOptions
 
 
 -- |
 -- Render code representing a Type
 --
 renderType :: Type -> RenderedCode
-renderType = fromMaybe (error "Incomplete pattern") . pattern matchType () . preprocessType
+renderType = renderTypeWithOptions defaultRenderTypeOptions
 
+data RenderTypeOptions = RenderTypeOptions
+  { prettyPrintObjects :: Bool
+  }
+
+defaultRenderTypeOptions :: RenderTypeOptions
+defaultRenderTypeOptions = RenderTypeOptions { prettyPrintObjects = True }
+
+renderTypeWithOptions :: RenderTypeOptions -> Type -> RenderedCode
+renderTypeWithOptions opts =
+  fromMaybe (error "Incomplete pattern") . pattern matchType () . preprocessType opts

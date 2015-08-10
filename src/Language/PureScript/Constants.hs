@@ -71,6 +71,9 @@ module Language.PureScript.Constants where
 (||) :: String
 (||) = "||"
 
+bind :: String
+bind = "bind"
+
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
@@ -94,11 +97,11 @@ negate = "negate"
 not :: String
 not = "not"
 
-sup :: String
-sup = "sup"
+conj :: String
+conj = "conj"
 
-inf :: String
-inf = "inf"
+disj :: String
+disj = "disj"
 
 mod :: String
 mod = "mod"
@@ -226,11 +229,8 @@ eqBoolean = "eqBoolean"
 boundedBoolean :: String
 boundedBoolean = "boundedBoolean"
 
-latticeBoolean :: String
-latticeBoolean = "latticeBoolean"
-
-complementedLatticeBoolean :: String
-complementedLatticeBoolean = "complementedLatticeBoolean"
+booleanAlgebraBoolean :: String
+booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
@@ -270,9 +270,6 @@ st = "Control_Monad_ST"
 
 dataFunction :: String
 dataFunction = "Data_Function"
-
-dataInt :: String
-dataInt = "Data_Int"
 
 dataIntBits :: String
 dataIntBits = "Data_Int_Bits"

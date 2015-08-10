@@ -21,7 +21,7 @@ echo_header() {
 
 echo_deps_names() {
     cabal-dependency-licenses \
-        | grep '^- ' | sed 's/^..//' | sort -h
+        | grep '^- ' | sed 's/^..//' | gsort -h
 }
 
 echo_deps_licenses() {

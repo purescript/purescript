@@ -1,3 +1,4 @@
+-- @shouldFailWith PartiallyAppliedSynonym
 module TypeSynonyms4 where
 
 import Prelude

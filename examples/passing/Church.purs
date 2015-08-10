@@ -15,4 +15,4 @@ append = \l1 l2 r f -> l2 (l1 r f) f
 
 test = append (cons 1 empty) (cons 2 empty)
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

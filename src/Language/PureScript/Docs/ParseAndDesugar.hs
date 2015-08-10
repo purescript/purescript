@@ -19,7 +19,7 @@ import Web.Bower.PackageMeta (PackageName)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Render
+import Language.PureScript.Docs.Convert (collectBookmarks)
 
 data ParseDesugarError
   = ParseError P.MultipleErrors
@@ -53,20 +53,41 @@ parseAndDesugar inputFiles depsFiles callback = do
   depsFiles'  <- mapM (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
 
   runExceptT $ do
-    let eParsed = P.parseModulesFromFiles fileInfoToString (inputFiles' ++ depsFiles')
-    ms <- throwLeft ParseError eParsed
+    ms         <- parseFiles (inputFiles' ++ depsFiles')
+    ms'        <- sortModules (map snd ms)
+    (bs, ms'') <- desugarWithBookmarks ms ms'
+    liftIO $ callback bs ms''
 
-    let depsModules = getDepsModuleNames (map (\(fp, m) -> (,m) <$> fp) ms)
-    let eSorted = P.sortModules . map (importPrim . snd) $ ms
-    (ms', _) <- throwLeft SortModulesError eSorted
+parseFiles ::
+  [(FileInfo, FilePath)]
+  -> ExceptT ParseDesugarError IO [(FileInfo, P.Module)]
+parseFiles =
+  throwLeft ParseError . P.parseModulesFromFiles fileInfoToString
 
-    modules <- throwLeft DesugarError (desugar ms')
-    let modules' = map (addPackage depsModules) modules
-        bookmarks = concatMap collectBookmarks modules'
-    liftIO (callback bookmarks (takeLocals modules'))
-
+sortModules ::
+  [P.Module]
+  -> ExceptT ParseDesugarError IO [P.Module]
+sortModules =
+  fmap fst . throwLeft SortModulesError . sortModules' . map importPrim
   where
-  throwLeft f = either (throwError . f) return
+  sortModules' :: [P.Module] -> Either P.MultipleErrors ([P.Module], P.ModuleGraph)
+  sortModules' = P.sortModules
+
+desugarWithBookmarks ::
+  [(FileInfo, P.Module)]
+  -> [P.Module]
+  -> ExceptT ParseDesugarError IO ([Bookmark], [P.Module])
+desugarWithBookmarks msInfo msSorted =  do
+  msDesugared <- throwLeft DesugarError (desugar msSorted)
+
+  let msDeps = getDepsModuleNames (map (\(fp, m) -> (,m) <$> fp) msInfo)
+      msPackages = map (addPackage msDeps) msDesugared
+      bookmarks = concatMap collectBookmarks msPackages
+
+  return (bookmarks, takeLocals msPackages)
+
+throwLeft :: (MonadError e m) => (l -> e) -> Either l r -> m r
+throwLeft f = either (throwError . f) return
 
 -- | Specifies whether a PureScript source file is considered as:
 --

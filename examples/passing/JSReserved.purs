@@ -9,4 +9,4 @@ public = \return -> return
 
 this catch = catch
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"
