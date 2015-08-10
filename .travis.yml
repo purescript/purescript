@@ -1,9 +1,12 @@
 sudo: false
 env:
-  - GHCVER=7.8.3 COVERAGE_SUITE=tests
-  - GHCVER=7.8.3 COVERAGE_SUITE=psci-tests
+  - GHCVER=7.8.4 COVERAGE_SUITE=tests
+  - GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
   - GHCVER=7.6.3
   - GHCVER=7.10.1
+  - GHCVER=7.8.4 STACKAGE=lts-2.22
+  # 7.10.2 Pending https://github.com/travis-ci/apt-package-whitelist/pull/686
+  - GHCVER=7.10.1 STACKAGE-nightly-2015-08-09
 before_install:
   - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
   - export PATH="/opt/cabal/1.22/bin:$PATH"
@@ -15,6 +18,9 @@ install:
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
   - cabal sandbox init
+  # Download stackage cabal.config
+  # Not sure whether filtering out purescript is necessary
+  - if [ -n "$STACKAGE" ]; then curl http://www.stackage.org/$STACKAGE/cabal.config | grep -v purescript > cabal.config; fi
   # Run with limited concurrency
   # Travis container infrastructure seems to expose all host CPUs (16?), thus
   # cabal and ghc tries to use them all. Which is bad idea on a shared box.
@@ -52,7 +58,7 @@ addons:
     packages:
       - cabal-install-1.22
       - ghc-7.6.3
-      - ghc-7.8.3
+      - ghc-7.8.4
       - ghc-7.10.1
       - happy-1.19.5
       - alex-3.1.4
