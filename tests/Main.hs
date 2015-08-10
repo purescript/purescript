@@ -69,60 +69,24 @@ import Text.Parsec (ParseError)
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
-newtype Test a = Test { unTest :: ReaderT P.Options (WriterT P.MultipleErrors (ExceptT P.MultipleErrors IO)) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError P.MultipleErrors, MonadWriter P.MultipleErrors, MonadReader P.Options)
-
-runTest :: Test a -> IO (Either P.MultipleErrors a)
-runTest = runExceptT . fmap fst . runWriterT . flip runReaderT P.defaultOptions . unTest
-
-makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions Test
-makeActions foreigns = P.MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions P.Make
+makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input file map was read.") foreigns False)
+                         { P.getInputTimestamp = getInputTimestamp
+                         , P.getOutputTimestamp = getOutputTimestamp
+                         }
   where
-  getInputTimestamp :: P.ModuleName -> Test (Either P.RebuildPolicy (Maybe UTCTime))
+  getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
     | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
     isSupportModule = flip elem supportModules
 
-  getOutputTimestamp :: P.ModuleName -> Test (Maybe UTCTime)
+  getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     let filePath = modulesDir </> P.runModuleName mn
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (error "getOutputTimestamp: read timestamp") else Nothing)
-
-  readExterns :: P.ModuleName -> Test (FilePath, String)
-  readExterns mn = do
-    let filePath = modulesDir </> P.runModuleName mn </> "externs.purs"
-    (filePath, ) <$> readTextFile filePath
-
-  codegen :: CF.Module CF.Ann -> P.Environment -> P.SupplyVar -> P.Externs -> Test ()
-  codegen m _ nextVar exts = do
-    let mn = CF.moduleName m
-    foreignInclude <- case (CF.moduleName m `M.lookup` foreigns, CF.moduleForeign m) of
-      (Just _, [])   -> error "Unnecessary foreign module"
-      (Just path, _) -> return $ Just $ J.JSApp (J.JSVar "require") [J.JSStringLiteral "./foreign"]
-      (Nothing, [])  -> return Nothing
-      (Nothing, _)   -> error "Missing foreign module"
-    pjs <- P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs m foreignInclude
-    let filePath    = P.runModuleName $ CF.moduleName m
-        jsFile      = modulesDir </> filePath </> "index.js"
-        externsFile = modulesDir </> filePath </> "externs.purs"
-        foreignFile = modulesDir </> filePath </> "foreign.js"
-    writeTextFile jsFile pjs
-    maybe (return ()) (writeTextFile foreignFile . snd) $ CF.moduleName m `M.lookup` foreigns
-    writeTextFile externsFile exts
-
-  readTextFile :: FilePath -> Test String
-  readTextFile path = liftIO $ readFile path
-
-  writeTextFile :: FilePath -> String -> Test ()
-  writeTextFile path text = liftIO $ do
-    createDirectoryIfMissing True (takeDirectory path)
-    writeFile path text
-
-  progress :: String -> Test ()
-  progress = liftIO . putStrLn
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
@@ -130,6 +94,9 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
   return (inputFile, text)
 
 type TestM = WriterT [(FilePath, String)] IO
+
+runTest :: P.Make a -> IO (Either P.MultipleErrors a)
+runTest = fmap (fmap fst) . P.runMake P.defaultOptions
 
 compile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors P.Environment)
 compile inputFiles foreigns = runTest $ do
