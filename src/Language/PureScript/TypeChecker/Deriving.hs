@@ -49,12 +49,8 @@ elaborateInstance e = return e
 mkSpineFunction :: (Functor m, MonadState CheckState m) => Qualified ProperName ->  m Expr
 mkSpineFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
-  tcs <- M.toList . typeClasses <$> getEnv
   let prodConstructor = App (Constructor $ findName "SProd" ctors)
       recordConstructor = App (Constructor $ findName "SRecord" ctors)
-
-      --TODO always set this
-      genericModule = case findName C.generic tcs of (Qualified mn _) -> mn
 
       mkCtorClause (ctorName, (_,_,typ,idents)) = CaseAlternative [ConstructorBinder ctorName (map VarBinder idents)] (Right caseResult)
           where caseResult = App (prodConstructor (StringLiteral . runProperName . unQualify $ ctorName)) . ArrayLiteral $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) (argTypes typ)
@@ -64,7 +60,7 @@ mkSpineFunction t = do
           lamNull . recordConstructor . ArrayLiteral .
               map (\(str,typ) -> ObjectLiteral [("recLabel", StringLiteral str), ("recValue", toSpineFun (Accessor str i) typ)])
               $ decomposeRec rec
-      toSpineFun i _ = lamNull $ App (mkVarMn genericModule C.toSpine) i
+      toSpineFun i _ = lamNull $ App (mkGenVar C.toSpine) i
 
   return . lamCase "$x" . map mkCtorClause . constructorsForType t $ ctors
 
@@ -72,12 +68,8 @@ mkSignatureFunction :: (Functor m, MonadState CheckState m) => Qualified ProperN
 mkSignatureFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
   envtyps <- M.toList . types <$> getEnv
-  tcs <- M.toList . typeClasses <$> getEnv
   let mkSigProd = App (Constructor $ findName "SigProd" ctors) . ArrayLiteral
       mkSigRec =  App (Constructor $ findName "SigRecord" ctors) . ArrayLiteral
-
-      -- TODO always fix this
-      genericModule = case findName "Generic" tcs of (Qualified mn _) -> mn
 
       mkProdClause (ctorName, (_,_,typ,_)) = ObjectLiteral [("sigConstructor",StringLiteral (runProperName . unQualify $ ctorName)),("sigValues", ArrayLiteral . map mkProductSignature . argTypes $ typ)]
 
@@ -85,20 +77,17 @@ mkSignatureFunction t = do
           lamNull . mkSigRec .
               map (\(str,typ) -> ObjectLiteral [("recLabel", StringLiteral str), ("recValue", mkProductSignature typ)])
               $ decomposeRec rec
-      mkProductSignature typ = lamNull $ App (mkVarMn genericModule "toSignature")
-                               (TypedValue False (mkVarMn genericModule "anyProxy") (TypeApp (TypeConstructor $ findName "Proxy" envtyps) typ))
+      mkProductSignature typ = lamNull $ App (mkGenVar C.toSignature)
+                               (TypedValue False (mkGenVar "anyProxy") (TypeApp (TypeConstructor $ findName "Proxy" envtyps) typ))
 
   return . lamNull . mkSigProd . map mkProdClause . constructorsForType t $ ctors
 
 mkFromSpineFunction :: (Functor m, MonadState CheckState m) => Qualified ProperName ->  m Expr
 mkFromSpineFunction t = do
   ctors <- M.toList . dataConstructors <$> getEnv
-  tcs <- M.toList . typeClasses <$> getEnv
   let
       mkJust    = App (Constructor $ findName "Just" ctors)
       mkNothing = Constructor $ findName "Nothing" ctors
-      --TODO hardwire this
-      genericModule = case findName "Generic" tcs of (Qualified mn _) -> mn
 
       mkAlternative (ctor@(Qualified _ (ProperName ctorName)), (_,_,typ,idents)) =
           CaseAlternative [ConstructorBinder (findName "SProd" ctors) [StringBinder ctorName, ArrayBinder (map VarBinder idents)]]
@@ -106,7 +95,7 @@ mkFromSpineFunction t = do
 
       fromSpineFun e (ObjectType rec) = App (lamCase "r" [mkRecCase (decomposeRec rec), CaseAlternative [NullBinder] (Right mkNothing)]) (App e (mkPrelVar "unit"))
 
-      fromSpineFun e _ = App (mkVarMn genericModule C.fromSpine) (App e (mkPrelVar "unit"))
+      fromSpineFun e _ = App (mkGenVar C.fromSpine) (App e (mkPrelVar "unit"))
 
       mkRecCase rs = CaseAlternative [ConstructorBinder (findName "SRecord" ctors) [ArrayBinder (map (VarBinder . Ident . fst) rs)]] . Right $ liftApplicative (mkRecFun rs) (map (\(x,y) -> fromSpineFun (Accessor "recValue" (mkVar x)) y) rs)
 
@@ -124,7 +113,7 @@ lam :: String -> Expr -> Expr
 lam s = Abs (Left (Ident s))
 
 lamNull :: Expr -> Expr
-lamNull = Abs (Right NullBinder)
+lamNull = lam "$q"
 
 lamCase :: String -> [CaseAlternative] -> Expr
 lamCase s = lam s . Case [mkVar s]
@@ -140,6 +129,9 @@ mkVar s = mkVarMn Nothing s
 
 mkPrelVar :: String -> Expr
 mkPrelVar s = mkVarMn (Just (ModuleName [ProperName C.prelude])) s
+
+mkGenVar :: String -> Expr
+mkGenVar s = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic])) s
 
 decomposeRec :: Type -> [(String, Type)]
 decomposeRec = sortBy (comparing fst) . go
