@@ -2,7 +2,7 @@
 --
 -- Module      :  Language.PureScript.TypeChecker.Deriving
 -- Copyright   :  (c) Gershom Bazerman 2015
--- License     :  MIT
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
