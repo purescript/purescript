@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, OverloadedStrings, PatternSynonyms #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, OverloadedStrings, PatternGuards #-}
 
 module Language.PureScript.TypeChecker.Deriving (
     elaborateInstance
@@ -56,7 +56,7 @@ mkSpineFunction t = do
           where caseResult = App (prodConstructor (StringLiteral . runProperName . unQualify $ ctorName)) . ArrayLiteral $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) (argTypes typ)
 
       toSpineFun :: Expr -> Type -> Expr
-      toSpineFun i (ObjectType rec) =
+      toSpineFun i r | Just rec <- objectType r =
           lamNull . recordConstructor . ArrayLiteral .
               map (\(str,typ) -> ObjectLiteral [("recLabel", StringLiteral str), ("recValue", toSpineFun (Accessor str i) typ)])
               $ decomposeRec rec
@@ -73,7 +73,7 @@ mkSignatureFunction t = do
 
       mkProdClause (ctorName, (_,_,typ,_)) = ObjectLiteral [("sigConstructor",StringLiteral (runProperName . unQualify $ ctorName)),("sigValues", ArrayLiteral . map mkProductSignature . argTypes $ typ)]
 
-      mkProductSignature (ObjectType rec) =
+      mkProductSignature r | Just rec <- objectType r =
           lamNull . mkSigRec .
               map (\(str,typ) -> ObjectLiteral [("recLabel", StringLiteral str), ("recValue", mkProductSignature typ)])
               $ decomposeRec rec
@@ -93,7 +93,7 @@ mkFromSpineFunction t = do
           CaseAlternative [ConstructorBinder (findName "SProd" ctors) [StringBinder ctorName, ArrayBinder (map VarBinder idents)]]
                           . Right $ liftApplicative (mkJust $ Constructor ctor) (zipWith fromSpineFun (map (Var . (Qualified Nothing))idents) (argTypes typ))
 
-      fromSpineFun e (ObjectType rec) = App (lamCase "r" [mkRecCase (decomposeRec rec), CaseAlternative [NullBinder] (Right mkNothing)]) (App e (mkPrelVar "unit"))
+      fromSpineFun e r | Just rec <- objectType r = App (lamCase "r" [mkRecCase (decomposeRec rec), CaseAlternative [NullBinder] (Right mkNothing)]) (App e (mkPrelVar "unit"))
 
       fromSpineFun e _ = App (mkGenVar C.fromSpine) (App e (mkPrelVar "unit"))
 
@@ -107,7 +107,9 @@ mkFromSpineFunction t = do
 
 -- Helpers
 
-pattern ObjectType rec = TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Object"))) rec
+objectType :: Type -> Maybe Type
+objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Object"))) rec) = Just rec
+objectType _ = Nothing
 
 lam :: String -> Expr -> Expr
 lam s = Abs (Left (Ident s))

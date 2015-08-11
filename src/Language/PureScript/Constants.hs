@@ -239,9 +239,17 @@ semigroupoidArr :: String
 semigroupoidArr = "semigroupoidArr"
 
 -- Generic Deriving
+
+generic :: String
 generic = "Generic"
+
+toSpine :: String
 toSpine = "toSpine"
+
+fromSpine :: String
 fromSpine = "fromSpine"
+
+toSignature :: String
 toSignature = "toSignature"
 
 -- Main module
