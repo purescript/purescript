@@ -59,7 +59,6 @@ import System.Directory
 import System.FilePath ((</>), takeDirectory)
 import System.IO.Error (tryIOError)
 
-
 import Language.PureScript.AST
 import Language.PureScript.CodeGen.Externs (moduleToPs)
 import Language.PureScript.Environment
@@ -245,8 +244,8 @@ traverseEither f (Right y) = Right <$> f y
 -- A set of make actions that read and write modules from the given directory.
 --
 buildMakeActions :: FilePath -- ^ the output directory
-                 -> M.Map ModuleName (Either RebuildPolicy String) -- ^ a map between module names and paths to the file containing the PureScript module
-                 -> M.Map ModuleName (FilePath, ForeignJS) -- ^ a map between module name and the file containing the foreign javascript for the module
+                 -> M.Map ModuleName (Either RebuildPolicy FilePath) -- ^ a map between module names and paths to the file containing the PureScript module
+                 -> M.Map ModuleName FilePath -- ^ a map between module name and the file containing the foreign javascript for the module
                  -> Bool -- ^ Generate a prefix comment?
                  -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
@@ -257,7 +256,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp mn = do
     let path = fromMaybe (error "Module has no filename in 'make'") $ M.lookup mn filePathMap
     e1 <- traverseEither getTimestamp path
-    fPath <- maybe (return Nothing) (getTimestamp . fst) $ M.lookup mn foreigns
+    fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
     return $ fmap (max fPath) e1
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
@@ -276,7 +275,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   codegen m _ exts = do
     let mn = CF.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
-      Just (path, _)
+      Just path
         | not $ requiresForeign m -> do
             tell $ errorMessage $ UnnecessaryFFIModule mn path
             return Nothing
@@ -292,7 +291,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         js = unlines $ map ("// " ++) prefix ++ [pjs]
     lift $ do
       writeTextFile jsFile js
-      maybe (return ()) (writeTextFile foreignFile . snd) $ mn `M.lookup` foreigns
+      for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
 
   requiresForeign :: CF.Module a -> Bool

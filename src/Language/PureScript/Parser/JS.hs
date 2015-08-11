@@ -37,17 +37,17 @@ type ForeignJS = String
 
 parseForeignModulesFromFiles :: (Functor m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
                              => [(FilePath, ForeignJS)]
-                             -> m (M.Map ModuleName (FilePath, ForeignJS))
+                             -> m (M.Map ModuleName FilePath)
 parseForeignModulesFromFiles files = do
   foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
-      Just name -> return (name, (path, file))
+      Just name -> return (name, path)
       Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path)
   let grouped = groupBy ((==) `on` fst) $ sortBy (compare `on` fst) foreigns
   forM_ grouped $ \grp ->
     when (length grp > 1) $ do
       let mn = fst (head grp)
-          paths = map (fst . snd) grp
+          paths = map snd grp
       tell $ errorMessage $ MultipleFFIModules mn paths
   return $ M.fromList foreigns
 
