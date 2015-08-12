@@ -44,7 +44,7 @@ library
                    pattern-arrows >= 0.0.2 && < 0.1,
                    time -any,
                    boxes >= 0.1.4 && < 0.2.0,
-                   aeson >= 0.8 && < 0.9,
+                   aeson >= 0.8 && < 0.10,
                    vector -any,
                    bower-json >= 0.7,
                    aeson-better-errors >= 0.8,
