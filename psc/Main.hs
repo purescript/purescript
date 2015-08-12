@@ -52,12 +52,12 @@ data InputOptions = InputOptions
 
 compile :: PSCMakeOptions -> IO ()
 compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
-  input <- concat <$> mapM glob inputGlob
+  input <- globWarningOnMisses warnFileTypeNotFound inputGlob
   when (null input) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
   moduleFiles <- readInput (InputOptions input)
-  inputForeign <- concat <$> mapM glob inputForeignGlob
+  inputForeign <- globWarningOnMisses warnFileTypeNotFound inputForeignGlob
   foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do
@@ -77,6 +77,18 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
           when (P.nonEmpty warnings') $
             hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
           exitSuccess
+
+warnFileTypeNotFound :: String -> IO ()
+warnFileTypeNotFound = hPutStrLn stderr . ((++) "psc: No files found using pattern: ")
+
+globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
+globWarningOnMisses warn = concatMapM globWithWarning
+  where
+  globWithWarning pattern = do
+    paths <- glob pattern
+    when (null paths) $ warn pattern
+    return paths
+  concatMapM f = liftM concat . mapM f
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
