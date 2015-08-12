@@ -69,7 +69,7 @@ import Text.Parsec (ParseError)
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
-makeActions :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> P.MakeActions P.Make
+makeActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input file map was read.") foreigns False)
                          { P.getInputTimestamp = getInputTimestamp
                          , P.getOutputTimestamp = getOutputTimestamp
@@ -98,14 +98,14 @@ type TestM = WriterT [(FilePath, String)] IO
 runTest :: P.Make a -> IO (Either P.MultipleErrors a)
 runTest = fmap (fmap fst) . P.runMake P.defaultOptions
 
-compile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> IO (Either P.MultipleErrors P.Environment)
+compile :: [FilePath] -> M.Map P.ModuleName FilePath -> IO (Either P.MultipleErrors P.Environment)
 compile inputFiles foreigns = runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
   P.make (makeActions foreigns) (map snd ms)
 
 assert :: [FilePath] ->
-          M.Map P.ModuleName (FilePath, P.ForeignJS) ->
+          M.Map P.ModuleName FilePath ->
           (Either P.MultipleErrors P.Environment -> IO (Maybe String)) ->
           TestM ()
 assert inputFiles foreigns f = do
@@ -115,7 +115,7 @@ assert inputFiles foreigns f = do
     Just err -> tell [(last inputFiles, err)]
     Nothing -> return ()
 
-assertCompiles :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> TestM ()
+assertCompiles :: [FilePath] -> M.Map P.ModuleName FilePath -> TestM ()
 assertCompiles inputFiles foreigns = do
   liftIO . putStrLn $ "Assert " ++ last inputFiles ++ " compiles successfully"
   assert inputFiles foreigns $ \e ->
@@ -131,7 +131,7 @@ assertCompiles inputFiles foreigns = do
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
 
-assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName (FilePath, P.ForeignJS) -> TestM ()
+assertDoesNotCompile :: [FilePath] -> M.Map P.ModuleName FilePath -> TestM ()
 assertDoesNotCompile inputFiles foreigns = do
   let testFile = last inputFiles
   liftIO . putStrLn $ "Assert " ++ testFile ++ " does not compile"

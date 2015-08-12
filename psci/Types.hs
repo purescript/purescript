@@ -35,7 +35,7 @@ data PSCiState = PSCiState
   { psciImportedFilenames   :: [FilePath]
   , psciImportedModules     :: [ImportedModule]
   , psciLoadedModules       :: [(Either P.RebuildPolicy FilePath, P.Module)]
-  , psciForeignFiles        :: M.Map P.ModuleName (FilePath, P.ForeignJS)
+  , psciForeignFiles        :: M.Map P.ModuleName FilePath
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }
@@ -91,7 +91,7 @@ updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
 -- |
 -- Updates the state to have more let bindings.
 --
-updateForeignFiles :: M.Map P.ModuleName (FilePath, P.ForeignJS) -> PSCiState -> PSCiState
+updateForeignFiles :: M.Map P.ModuleName FilePath -> PSCiState -> PSCiState
 updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `M.union` fs }
 
 -- |
