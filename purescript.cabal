@@ -125,6 +125,7 @@ library
                      Language.PureScript.Sugar.TypeDeclarations
                      Language.PureScript.Traversals
                      Language.PureScript.TypeChecker
+                     Language.PureScript.TypeChecker.Deriving
                      Language.PureScript.TypeChecker.Entailment
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad

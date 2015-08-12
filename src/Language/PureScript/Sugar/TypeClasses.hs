@@ -229,8 +229,29 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = error "Invalid declaration in type
 unit :: Type
 unit = TypeApp tyObject REmpty
 
+fillDerivingDecls :: (MonadError MultipleErrors m, Applicative m) => Qualified ProperName -> [Type] -> [Declaration] -> [Declaration] -> Desugar m [Declaration]
+fillDerivingDecls className tys tyDecls decls = do
+  let missingDecls = mapMaybe declName tyDecls \\ mapMaybe declName decls
+  let mkMissingDecl cls fun =
+          case tys of
+            [TypeConstructor t] | unQualify className == ProperName cls && Ident fun `elem` missingDecls -> return [ValueDeclaration (Ident fun) Public [] (Right $ TypeClassInstanceMemberFunction (Ident fun) className t)]
+            _ -> return []
+  extraDecls <- concat <$> mapM (uncurry mkMissingDecl)
+                  [(C.generic,C.toSpine)
+                  ,(C.generic,C.fromSpine)
+                  ,(C.generic,C.toSignature)]
+  return $ extraDecls ++ decls
+ where
+    declName :: Declaration -> Maybe Ident
+    declName (PositionedDeclaration _ _ d) = declName d
+    declName (ValueDeclaration ident _ _ _) = Just ident
+    declName (TypeDeclaration ident _) = Just ident
+    declName _ = Nothing
+
+    unQualify (Qualified _ a) = a
+
 typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
-typeInstanceDictionaryDeclaration name mn deps className tys decls =
+typeInstanceDictionaryDeclaration name mn deps className tys decls1 =
   rethrow (onErrorMessages (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -238,6 +259,8 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   (TypeClassDeclaration _ args implies tyDecls) <-
     maybe (throwError . errorMessage $ UnknownTypeClass className) return $
       M.lookup (qualify mn className) m
+
+  decls <- fillDerivingDecls className tys tyDecls decls1
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
     member : _ -> throwError . errorMessage $ MissingClassMember member
