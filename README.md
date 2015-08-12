@@ -15,8 +15,7 @@ A small strongly typed programming language with expressive types that compiles 
 - [PureScript book](https://leanpub.com/purescript/read)
 - [Wiki](http://wiki.purescript.org)
 - [Try PureScript](http://try.purescript.org)
-- [Pursuit package search engine](http://pursuit.purescript.org/)
-- [Core library documentation index](http://functorial.com/psc-pages/docs)
+- [Pursuit Package Index](http://pursuit.purescript.org/)
 
 ## Help!
 
