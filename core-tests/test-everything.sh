@@ -47,7 +47,8 @@ bower i purescript-prelude \
         purescript-parallel \
         purescript-proxy \
         purescript-semirings \
-        purescript-math
+        purescript-math \
+        purescript-generics
 
 ../dist/build/psc/psc 'bower_components/purescript-*/src/**/*.purs' \
                 --ffi 'bower_components/purescript-*/src/**/*.js'

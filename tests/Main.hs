@@ -77,10 +77,12 @@ makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
-    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | isSupportModule mn = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
-    isSupportModule = flip elem supportModules
+    isSupportModule (P.ModuleName (P.ProperName "Data" : _)) = True
+    isSupportModule (P.ModuleName (P.ProperName "Control" : _)) = True
+    isSupportModule other = P.runModuleName other `elem` supportModules
 
   getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -217,12 +219,7 @@ fetchSupportCode = do
 
 supportModules :: [String]
 supportModules =
-  [ "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.ST"
-  , "Data.Function"
-  , "Prelude"
+  [ "Prelude"
   , "Test.Assert"
+  , "Math"
   ]
