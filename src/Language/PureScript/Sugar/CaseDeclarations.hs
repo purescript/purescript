@@ -23,7 +23,6 @@ module Language.PureScript.Sugar.CaseDeclarations (
 
 import Data.Maybe (catMaybes)
 import Data.List (nub, groupBy)
-import Data.Traversable (traverse)
 
 import Control.Applicative
 import Control.Monad ((<=<), forM, replicateM, join, unless)
