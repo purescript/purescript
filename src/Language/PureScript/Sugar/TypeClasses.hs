@@ -166,8 +166,8 @@ desugarDecl mn exps = go
     modify (M.insert (mn, name) d)
     return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
-  go (TypeInstanceDeclaration _ _ _ _ Nothing) = error "Derived instanced should have been desugared"
-  go d@(TypeInstanceDeclaration name deps className tys (Just members)) = do
+  go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = error "Derived instanced should have been desugared"
+  go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])

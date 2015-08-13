@@ -47,12 +47,12 @@ deriveInstances (Module coms mn ds exts) = Module coms mn <$> mapM (deriveInstan
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration, 
 -- elaborates that into an instance declaration via code generation.
 deriveInstance :: (Functor m, MonadError MultipleErrors m, MonadSupply m) => ModuleName -> [Declaration] -> Declaration -> m Declaration
-deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Nothing) 
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] DerivedInstance) 
   | className == Qualified (Just dataGeneric) (ProperName C.generic)
   , Just (Qualified mn' tyCon) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
-  = TypeInstanceDeclaration nm deps className tys . Just <$> deriveGeneric mn ds tyCon
-deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys Nothing) 
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn ds tyCon
+deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance) 
   = throwError . errorMessage $ CannotDerive className tys
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
 deriveInstance _  _  e = return e

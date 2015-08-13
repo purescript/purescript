@@ -69,7 +69,7 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
   where
     desugarRest :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
-      (:) <$> (TypeInstanceDeclaration name constraints className tys <$> traverse desugarCases ds) <*> desugarRest rest
+      (:) <$> (TypeInstanceDeclaration name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
           f' (Left gs) = Left <$> mapM (pairM return f) gs

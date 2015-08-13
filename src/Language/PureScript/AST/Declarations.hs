@@ -19,6 +19,10 @@ module Language.PureScript.AST.Declarations where
 import qualified Data.Data as D
 import qualified Data.Map as M
 
+import Control.Monad.Identity
+
+import Control.Applicative
+
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Operators
 import Language.PureScript.AST.SourcePos
@@ -154,12 +158,28 @@ data Declaration
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] (Maybe [Declaration])
+  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] TypeInstanceBody
   -- |
   -- A declaration with source position information
   --
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, D.Data, D.Typeable)
+
+-- | The members of a type class instance declaration
+data TypeInstanceBody
+  -- | This is a derived instance
+  = DerivedInstance
+  -- | This is a regular (explicit) instance
+  | ExplicitInstance [Declaration]
+  deriving (Show, D.Data, D.Typeable)
+ 
+mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
+mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
+ 
+-- | A traversal for TypeInstanceBody
+traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]) -> TypeInstanceBody -> f TypeInstanceBody
+traverseTypeInstanceBody _ DerivedInstance = pure DerivedInstance
+traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
 
 -- |
 -- Test if a declaration is a value declaration
