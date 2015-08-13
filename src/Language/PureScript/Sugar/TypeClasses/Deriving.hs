@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.TypeChecker.Deriving
+-- Module      :  Language.PureScript.Sugar.TypeClasses.Deriving
 -- Copyright   :  (c) Gershom Bazerman 2015
 -- License     :  MIT (http://opensource.org/licenses/MIT)
 --
