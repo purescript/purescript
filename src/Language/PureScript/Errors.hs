@@ -102,6 +102,8 @@ data SimpleErrorMessage
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified ProperName) [Type] [DictionaryValue]
   | NoInstanceFound (Qualified ProperName) [Type]
+  | CannotDerive (Qualified ProperName) [Type]
+  | CannotFindDerivingType ProperName
   | DuplicateLabel String (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
@@ -214,6 +216,8 @@ errorCode em = case unwrapErrorMessage em of
   (ConstrainedTypeUnified _ _)  -> "ConstrainedTypeUnified"
   (OverlappingInstances _ _ _)  -> "OverlappingInstances"
   (NoInstanceFound _ _)         -> "NoInstanceFound"
+  (CannotDerive _ _)            -> "CannotDerive"
+  (CannotFindDerivingType _)    -> "CannotFindDerivingType"
   (DuplicateLabel _ _)          -> "DuplicateLabel"
   (DuplicateValueDeclaration _) -> "DuplicateValueDeclaration"
   (ArgListLengthsDiffer _)      -> "ArgListLengthsDiffer"
@@ -509,6 +513,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (NoInstanceFound nm ts) =
       line $ "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
+    goSimple (CannotDerive nm ts) =
+      line $ "Cannot derive " ++ show nm ++ " instance for " ++ unwords (map prettyPrintTypeAtom ts)
+    goSimple (CannotFindDerivingType nm) =
+      line $ "Cannot derive instance, because the type declaration for " ++ show nm ++ " could not be found."
     goSimple (DuplicateLabel l expr) =
       paras $ [ line $ "Duplicate label " ++ show l ++ " in row." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "

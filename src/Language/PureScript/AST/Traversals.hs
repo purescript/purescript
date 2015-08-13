@@ -16,6 +16,7 @@ module Language.PureScript.AST.Traversals where
 
 import Data.Monoid (Monoid(..), mconcat)
 import Data.Maybe (mapMaybe)
+import Data.Traversable (traverse)
 
 import Control.Applicative
 import Control.Monad
@@ -37,7 +38,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (ValueDeclaration name nameKind bs val) = f (ValueDeclaration name nameKind (map h' bs) ((map (g' *** g') +++ g') val))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration name args implies ds) = f (TypeClassDeclaration name args implies (map f' ds))
-  f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (map f' ds))
+  f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (mapTypeInstanceBody (map f') ds))
   f' (PositionedDeclaration pos com d) = f (PositionedDeclaration pos com (f' d))
   f' other = f other
 
@@ -95,7 +96,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> mapM (h' <=< h) bs <*> eitherM (mapM (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f' <=< f) ds
-  f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f' <=< f) ds
+  f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
   f' (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (f d >>= f')
   f' other = f other
 
@@ -147,7 +148,7 @@ everywhereOnValuesM f g h = (f', g', h')
   f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> mapM h' bs <*> eitherM (mapM (pairM g' g')) g' val) >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> mapM (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
   f' (TypeClassDeclaration name args implies ds) = (TypeClassDeclaration name args implies <$> mapM f' ds) >>= f
-  f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> mapM f' ds) >>= f
+  f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (mapM f') ds) >>= f
   f' (PositionedDeclaration pos com d) = (PositionedDeclaration pos com <$> f' d) >>= f
   f' other = f other
 
@@ -202,7 +203,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(ValueDeclaration _ _ bs (Left gs)) = foldl (<>) (f d) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (map f' ds)
   f' d@(PositionedDeclaration _ _ d1) = f d <> f' d1
   f' d = f d
 
@@ -266,7 +267,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f' s (ValueDeclaration _ _ bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
   f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
   f' s (TypeClassDeclaration _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (TypeInstanceDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) r0 (map (f'' s) ds)
   f' s (PositionedDeclaration _ _ d1) = f'' s d1
   f' _ _ = r0
 
@@ -335,7 +336,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   f' s (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> mapM (h'' s) bs <*> eitherM (mapM (pairM (g'' s) (g'' s))) (g'' s) val
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> mapM (thirdM (g'' s)) ds
   f' s (TypeClassDeclaration name args implies ds) = TypeClassDeclaration name args implies <$> mapM (f'' s) ds
-  f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> mapM (f'' s) ds
+  f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (mapM (f'' s)) ds
   f' s (PositionedDeclaration pos com d1) = PositionedDeclaration pos com <$> f'' s d1
   f' _ other = return other
 
