@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Error
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -115,6 +115,7 @@ data SimpleErrorMessage
   | PropertyIsMissing String Type
   | CannotApplyFunction Type Expr
   | TypeSynonymInstance
+  | OrphanInstance Ident (Qualified ProperName) [Type]
   | InvalidNewtype
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
@@ -226,6 +227,7 @@ errorCode em = case unwrapErrorMessage em of
   (PropertyIsMissing _ _)       -> "PropertyIsMissing"
   (CannotApplyFunction _ _)     -> "CannotApplyFunction"
   TypeSynonymInstance           -> "TypeSynonymInstance"
+  (OrphanInstance _ _ _)        -> "OrphanInstance"
   InvalidNewtype                -> "InvalidNewtype"
   (InvalidInstanceHead _)       -> "InvalidInstanceHead"
   (TransitiveExportError _ _)   -> "TransitiveExportError"
@@ -545,6 +547,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple TypeSynonymInstance =
       line "Type synonym instances are disallowed"
+    goSimple (OrphanInstance nm cnm ts) =
+      line $ "Instance " ++ show nm ++ " for " ++ show cnm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ " is an orphan instance"
     goSimple InvalidNewtype =
       line "Newtypes must define a single constructor with a single argument"
     goSimple (InvalidInstanceHead ty) =
