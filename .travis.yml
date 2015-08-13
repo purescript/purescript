@@ -17,24 +17,21 @@ install:
   - cabal --version
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
+  # Run sequentially
+  # Travis container infrastructure seems to expose all host CPUs (16?), thus
+  # cabal and ghc tries to use them all. Which is bad idea on a shared box.
+  # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
+  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
   - mkdir -p sandboxes/$GHCVER/${STACKAGE:-none}
   - cabal sandbox init --sandbox sandboxes/$GHCVER/${STACKAGE:-none}
   # Download stackage cabal.config
   # Not sure whether filtering out purescript is necessary
   - if [ -n "$STACKAGE" ]; then curl http://www.stackage.org/$STACKAGE/cabal.config | grep -v purescript > cabal.config; fi
-  # Run with limited concurrency
-  # Travis container infrastructure seems to expose all host CPUs (16?), thus
-  # cabal and ghc tries to use them all. Which is bad idea on a shared box.
-  # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
-  #
-  # We probably want to be running with larger heap sizes when there are lots
-  # of cores, to counteract the synchronization overhead of stop-the-world GC
-  # across many cores. e.g. +RTS -A32m at least.
-  - cabal install --only-dependencies --enable-tests -j2 --ghc-options='+RTS -A32m -RTS'
-  - cabal install hpc-coveralls -j2
+  - cabal install --only-dependencies --enable-tests
+  - cabal install hpc-coveralls
 script:
   - ./travis/configure.sh
-  - cabal build -j2 --ghc-options='+RTS -A32m -RTS'
+  - cabal build
   - cabal test
   - ./travis/test-install.sh
 after_script:
