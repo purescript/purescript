@@ -233,7 +233,7 @@ parseTypeInstanceDeclaration = do
   
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
-  reserved "deriving"
+  reserved "derive"
   reserved "instance"
   name <- parseIdent <* indented <* doubleColon
   deps <- P.optionMaybe $ do

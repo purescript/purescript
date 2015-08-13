@@ -10,4 +10,4 @@ data A
   | C (Array A) 
   | D { a :: A }
 
-deriving instance genericA :: Generic A
+derive instance genericA :: Generic A
