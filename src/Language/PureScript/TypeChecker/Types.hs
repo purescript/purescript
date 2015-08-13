@@ -52,7 +52,6 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
-import Language.PureScript.TypeChecker.Deriving
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Monad
@@ -560,9 +559,6 @@ check' (Constructor c) ty = do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
-
-check' e@TypeClassInstanceMemberFunction{} ty = flip check' ty =<< elaborateInstance e
-
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty

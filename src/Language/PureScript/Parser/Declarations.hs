@@ -229,7 +229,21 @@ parseTypeInstanceDeclaration = do
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty members
+  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty (Just members)
+  
+parseDerivingInstanceDeclaration :: TokenParser Declaration
+parseDerivingInstanceDeclaration = do
+  reserved "deriving"
+  reserved "instance"
+  name <- parseIdent <* indented <* doubleColon
+  deps <- P.optionMaybe $ do
+    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
+    indented
+    rfatArrow
+    return deps
+  className <- indented *> parseQualified properName
+  ty <- P.many (indented *> noWildcards parseTypeAtom)
+  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty Nothing
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration
@@ -248,6 +262,7 @@ parseDeclaration = positioned (P.choice
                    , parseImportDeclaration
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration
+                   , parseDerivingInstanceDeclaration
                    ]) P.<?> "declaration"
 
 parseLocalDeclaration :: TokenParser Declaration

@@ -122,10 +122,10 @@ library
                      Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.TypeClasses
+                     Language.PureScript.Sugar.TypeClasses.Deriving 
                      Language.PureScript.Sugar.TypeDeclarations
                      Language.PureScript.Traversals
                      Language.PureScript.TypeChecker
-                     Language.PureScript.TypeChecker.Deriving
                      Language.PureScript.TypeChecker.Entailment
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad

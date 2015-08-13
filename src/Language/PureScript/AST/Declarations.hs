@@ -154,7 +154,7 @@ data Declaration
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] [Declaration]
+  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] (Maybe [Declaration])
   -- |
   -- A declaration with source position information
   --
@@ -375,9 +375,6 @@ data Expr
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
   | SuperClassDictionary (Qualified ProperName) [Type]
-  -- |
-  -- A placeholder for a member function of a typeclass instance. To be elaborated during typechecking. (function name, class name, name of the type gaining the instance).
-  | TypeClassInstanceMemberFunction Ident (Qualified ProperName) (Qualified ProperName)
   -- |
   -- A value with source position information
   --
