@@ -9,10 +9,10 @@
 -- Portability :
 --
 -- |
--- | Module for exhaustivity checking over pattern matching definitions
--- | The algorithm analyses the clauses of a definition one by one from top
--- | to bottom, where in each step it has the cases already missing (uncovered),
--- | and it generates the new set of missing cases.
+-- Module for exhaustivity checking over pattern matching definitions.
+-- The algorithm analyses the clauses of a definition one by one from top
+-- to bottom, where in each step it has the cases already missing (uncovered),
+-- and it generates the new set of missing cases.
 -- 
 -----------------------------------------------------------------------------
 
@@ -26,7 +26,7 @@ module Language.PureScript.Linter.Exhaustive
 
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
-import Data.List (foldl', sortBy, nub)
+import Data.List (sortBy, nub)
 import Data.Function (on)
 
 import Control.Monad (unless)
@@ -43,6 +43,12 @@ import Language.PureScript.Types as P
 import Language.PureScript.Errors
 
 import Language.PureScript.AST.Traversals (everywhereOnValuesTopDownM)
+
+-- |
+-- The maximum number of non-exhaustive cases.
+--
+maxCases :: Int
+maxCases = 1000
 
 -- |
 -- Qualifies a propername from a given qualified propername and a default module name
@@ -210,7 +216,7 @@ isExhaustiveGuard (Left gs) = not . null $ filter (\(g, _) -> isOtherwise g) gs
 isExhaustiveGuard (Right _) = True 
 
 -- |
--- Returns the uncovered set of case alternatives
+-- Returns the uncovered set of case alternatives.
 --
 missingCases :: Environment -> ModuleName -> [Binder] -> CaseAlternative -> ([[Binder]], Maybe Bool)
 missingCases env mn uncovered ca = missingCasesMultiple env mn uncovered (caseAlternativeBinders ca)
@@ -223,22 +229,20 @@ missingAlternative env mn ca uncovered
   mcases = missingCases env mn uncovered ca
 
 -- |
--- Main exhaustivity checking function
+-- Main exhaustivity checking function.
 -- Starting with the set `uncovered = { _ }` (nothing covered, one `_` for each function argument),
 -- it partitions that set with the new uncovered cases, until it consumes the whole set of clauses.
 -- Then, returns the uncovered set of case alternatives.
 -- 
 checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> [CaseAlternative] -> m ()
-checkExhaustive env mn cas = makeResult . first nub $ foldl' step ([initial], (pure True, [])) cas
+checkExhaustive env mn cas = makeResult . first (nub . take maxCases) $ foldr step ([initial], (pure True, [])) cas
   where
-  step :: ([[Binder]], (Maybe Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]]))
-  step (uncovered, (nec, redundant)) ca =
+  step :: CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]])) -> ([[Binder]], (Maybe Bool, [[Binder]]))
+  step ca (uncovered, (nec, redundant)) =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        cond = or <$> sequenceA pr
-    in (concat missed, (liftA2 (&&) cond nec,
+        cond = or <$> sequence pr
+    in (if fromMaybe True cond then concat missed else uncovered, (liftA2 (&&) cond nec,
                          if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
-    where
-    sequenceA = foldr (liftA2 (:)) (pure [])
 
   initial :: [Binder]
   initial = initialize numArgs
@@ -254,7 +258,7 @@ checkExhaustive env mn cas = makeResult . first nub $ foldl' step ([initial], (p
     tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
 
 -- |
--- Exhaustivity checking over a list of declarations
+-- Exhaustivity checking over a list of declarations.
 -- 
 checkExhaustiveDecls :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> ModuleName -> [Declaration] -> m ()
 checkExhaustiveDecls env mn ds =
@@ -278,7 +282,7 @@ checkExhaustiveDecls env mn ds =
   checkExpr other = return other
 
 -- |
--- Exhaustivity checking over a single module
+-- Exhaustivity checking over a single module.
 -- 
 checkExhaustiveModule :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> Module -> m ()
 checkExhaustiveModule env (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds
