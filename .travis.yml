@@ -4,6 +4,7 @@ matrix:
   include:
     - env: GHCVER=7.8.4 COVERAGE_SUITE=tests
       compiler: ": #GHC 7.8.4 - tests"
+      # ^ HACK before https://github.com/travis-ci/travis-ci/issues/4393 is resolved
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
       compiler: ": #GHC 7.8.4 - psci-tests"
