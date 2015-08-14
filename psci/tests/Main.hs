@@ -24,8 +24,11 @@ import PSCi
 import Completion
 import Types
 
+import TestsSetup
+
 main :: IO ()
 main = do
+  fetchSupportCode
   Counts{..} <- runTestTT allTests
   when (errors + failures > 0) exitFailure
 

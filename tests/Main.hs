@@ -66,6 +66,8 @@ import qualified System.FilePath.Glob as Glob
 
 import Text.Parsec (ParseError)
 
+import TestsSetup
+
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
@@ -166,11 +168,6 @@ assertDoesNotCompile inputFiles foreigns = do
   trim =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-  where
-  names = ["nodejs", "node"]
-
 main :: IO ()
 main = do
   fetchSupportCode
@@ -204,16 +201,6 @@ main = do
         let fp' = fromMaybe fp $ stripPrefix (failing ++ [pathSeparator]) fp
         in putStrLn $ fp' ++ ": " ++ err
       exitFailure
-
-fetchSupportCode :: IO ()
-fetchSupportCode = do
-  setCurrentDirectory "tests/support"
-  callProcess "npm" ["install"]
-  -- Sometimes we run as a root (e.g. in simple docker containers)
-  -- And we are non-interactive: https://github.com/bower/bower/issues/1162
-  callProcess "node_modules/.bin/bower" ["--allow-root", "install", "--config.interactive=false"]
-  callProcess "node" ["setup.js"]
-  setCurrentDirectory "../.."
 
 supportModules :: [String]
 supportModules =
