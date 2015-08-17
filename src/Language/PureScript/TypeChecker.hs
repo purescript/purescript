@@ -278,15 +278,15 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
 -- required by exported members are also exported.
 --
 typeCheckModule :: Maybe ModuleName -> Module -> Check Module
-typeCheckModule _ (Module _ _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule mainModuleName (Module coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
+typeCheckModule _ (Module _ _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule mainModuleName (Module ss coms mn decls (Just exps)) = rethrow (onErrorMessages (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mainModuleName mn exps decls
   forM_ exps $ \e -> do
     checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
-  return $ Module coms mn decls' (Just exps)
+  return $ Module ss coms mn decls' (Just exps)
   where
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> Check ()

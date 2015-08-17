@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Sugar.ObjectWildcards
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
 -- Stability   :  experimental
@@ -32,7 +32,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 
 desugarObjectConstructors :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
-desugarObjectConstructors (Module coms mn ds exts) = Module coms mn <$> mapM desugarDecl ds <*> pure exts
+desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
   where
 
   desugarDecl :: Declaration -> m Declaration

@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.ModuleDependencies
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -42,7 +42,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 sortModules :: (MonadError MultipleErrors m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
-  let verts = map (\m@(Module _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
+  let verts = map (\m@(Module _ _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
   let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
   return (ms', moduleGraph)

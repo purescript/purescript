@@ -216,7 +216,7 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go _ = []
 
 moduleNames :: [P.Module] -> [String]
-moduleNames ms = nub [show moduleName | P.Module _ moduleName _ _ <- ms]
+moduleNames ms = nub [show moduleName | P.Module _ _ moduleName _ _ <- ms]
 
 directivesFirst :: Completion -> Completion -> Ordering
 directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2
