@@ -66,7 +66,7 @@ data SimpleErrorMessage
   | MultipleFixities Ident
   | OrphanTypeDeclaration Ident
   | OrphanFixityDeclaration String
-  | RedefinedModule ModuleName
+  | RedefinedModule ModuleName [SourceSpan]
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownModule ModuleName
@@ -180,7 +180,7 @@ errorCode em = case unwrapErrorMessage em of
   (MultipleFixities _)          -> "MultipleFixities"
   (OrphanTypeDeclaration _)     -> "OrphanTypeDeclaration"
   (OrphanFixityDeclaration _)   -> "OrphanFixityDeclaration"
-  (RedefinedModule _)           -> "RedefinedModule"
+  (RedefinedModule _ _)         -> "RedefinedModule"
   (RedefinedIdent _)            -> "RedefinedIdent"
   OverlappingNamesInLet         -> "OverlappingNamesInLet"
   (UnknownModule _)             -> "UnknownModule"
@@ -434,8 +434,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Orphan type declaration for " ++ show nm
     goSimple (OrphanFixityDeclaration op) =
       line $ "Orphan fixity declaration for " ++ show op
-    goSimple (RedefinedModule name) =
-      line $ "Module " ++ show name ++ " has been defined multiple times"
+    goSimple (RedefinedModule name filenames) =
+      paras $ [ line $ "Module " ++ show name ++ " has been defined multiple times:"
+              ] ++ map (indent . line . displaySourceSpan) filenames
     goSimple (RedefinedIdent name) =
       line $ "Name " ++ show name ++ " has been defined multiple times"
     goSimple (UnknownModule mn) =

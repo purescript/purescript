@@ -23,7 +23,7 @@ import Language.PureScript.Names
 -- instances will be incorrectly removed in some cases.
 --
 exportedDeclarations :: Module -> [Declaration]
-exportedDeclarations (Module _ _ decls exps) = go decls
+exportedDeclarations (Module _ _ _ decls exps) = go decls
   where
   go = flattenDecls
         >>> filter (isExported exps)

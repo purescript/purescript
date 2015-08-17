@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.AST.SourcePos
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -65,7 +65,7 @@ displayStartEndPos sp =
 displaySourceSpan :: SourceSpan -> String
 displaySourceSpan sp =
   spanName sp ++ " " ++
-    displayStartEndPos sp 
+    displayStartEndPos sp
 
 instance A.ToJSON SourceSpan where
   toJSON SourceSpan{..} =
@@ -73,3 +73,6 @@ instance A.ToJSON SourceSpan where
              , "start" .= spanStart
              , "end"   .= spanEnd
              ]
+
+internalModuleSourceSpan :: String -> SourceSpan
+internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)

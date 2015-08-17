@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.CodeGen.Externs
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -36,8 +36,8 @@ import Language.PureScript.Types
 -- Generate foreign imports for all declarations in a module
 --
 moduleToPs :: Module -> Environment -> String
-moduleToPs (Module _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
-moduleToPs (Module _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
+moduleToPs (Module _ _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
+moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
   let exps = listExports exts
   tell ["module " ++ runModuleName moduleName ++ (if null exps then "" else " (" ++ exps ++ ")") ++ " where"]
   mapM_ declToPs ds

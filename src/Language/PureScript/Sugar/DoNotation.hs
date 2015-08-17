@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Sugar.DoNotation
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -36,7 +36,7 @@ import Control.Monad.Supply.Class
 -- and all @DoNotationLet@ constructors with let expressions.
 --
 desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
-desugarDoModule (Module coms mn ds exts) = Module coms mn <$> parU ds desugarDo <*> pure exts
+desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
 desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (rethrowWithPosition pos $ desugarDo d)

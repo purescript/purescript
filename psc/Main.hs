@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Main
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -66,7 +66,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
     Right ((ms, foreigns), warnings) -> do
       when (P.nonEmpty warnings) $
         hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
-      let filePathMap = M.fromList $ map (\(fp, P.Module _ mn _ _) -> (mn, fp)) ms
+      let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
           makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
       e <- runMake opts $ P.make makeActions (map snd ms)
       case e of
@@ -168,7 +168,7 @@ options = P.Options <$> noTco
                     <*> verboseErrors
                     <*> (not <$> comments)
                     <*> requirePath
-                    
+
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> many inputForeignFile
