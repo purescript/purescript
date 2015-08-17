@@ -227,9 +227,9 @@ missingAlternative env mn ca uncovered
 -- Starting with the set `uncovered = { _ }` (nothing covered, one `_` for each function argument),
 -- it partitions that set with the new uncovered cases, until it consumes the whole set of clauses.
 -- Then, returns the uncovered set of case alternatives.
---
-checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> [CaseAlternative] -> m ()
-checkExhaustive env mn cas = makeResult . first nub $ foldl' step ([initial], (pure True, [])) cas
+-- 
+checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> Int -> [CaseAlternative] -> m ()
+checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Maybe Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
@@ -239,11 +239,6 @@ checkExhaustive env mn cas = makeResult . first nub $ foldl' step ([initial], (p
                          if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
     where
     sequenceA = foldr (liftA2 (:)) (pure [])
-
-  initial :: [Binder]
-  initial = initialize numArgs
-    where
-    numArgs = length . caseAlternativeBinders . head $ cas
 
   makeResult :: ([[Binder]], (Maybe Bool, [[Binder]])) -> m ()
   makeResult (bss, (_, bss')) =
@@ -274,7 +269,7 @@ checkExhaustiveDecls env mn ds =
   in mapM_ f' ds
   where
   checkExpr :: Expr -> m Expr
-  checkExpr c@(Case _ cas)  = checkExhaustive env mn cas >> return c
+  checkExpr c@(Case expr cas)  = checkExhaustive env mn (length expr) cas >> return c
   checkExpr other = return other
 
 -- |
