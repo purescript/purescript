@@ -428,7 +428,7 @@ filterExports mn exps env = do
   filterTypes :: [(ProperName, [ProperName])] -> [(ProperName, [ProperName])] -> DeclarationRef -> m [(ProperName, [ProperName])]
   filterTypes expTys result (PositionedDeclarationRef pos _ r) = rethrowWithPosition pos $ filterTypes expTys result r
   filterTypes expTys result (TypeRef name expDcons) = do
-    dcons <- maybe (throwError . errorMessage . UnknownType $ Qualified (Just mn) name) return $ name `lookup` expTys
+    dcons <- maybe (throwError . errorMessage . UnknownExportType $ name) return $ name `lookup` expTys
     dcons' <- maybe (return dcons) (foldM (filterDcons name dcons) []) expDcons
     return $ (name, dcons') : result
   filterTypes _ result _ = return result
@@ -438,7 +438,7 @@ filterExports mn exps env = do
   filterDcons tcon exps' result name =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage $ UnknownDataConstructor (Qualified (Just mn) name) (Just (Qualified (Just mn) tcon))
+    else throwError . errorMessage $ UnknownExportDataConstructor tcon name
 
   -- Ensure the exported classes exist in the module and add them to the set of exports
   filterClasses :: [ProperName] -> [ProperName] -> DeclarationRef -> m [ProperName]
@@ -446,7 +446,7 @@ filterExports mn exps env = do
   filterClasses exps' result (TypeClassRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage . UnknownTypeClass $ Qualified (Just mn) name
+    else throwError . errorMessage . UnknownExportTypeClass $ name
   filterClasses _ result _ = return result
 
   -- Ensure the exported values exist in the module and add them to the set of exports
@@ -455,7 +455,7 @@ filterExports mn exps env = do
   filterValues exps' result (ValueRef name) =
     if name `elem` exps'
     then return $ name : result
-    else throwError . errorMessage . UnknownValue $ Qualified (Just mn) name
+    else throwError . errorMessage . UnknownExportValue $ name
   filterValues _ result _ = return result
 
   -- Add the exported modules to the set of exports
@@ -553,7 +553,7 @@ resolveImport currentModule importModule exps imps impQual =
   importExplicit imp (TypeRef name dctors) = do
     types' <- updateImports (importedTypes imp) name
     let allDctors = allExportedDataConstructors name
-    dctors' <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
+    dctors' <- maybe (return allDctors) (mapM $ (checkDctorExists name) allDctors) dctors
     dctors'' <- foldM updateImports (importedDataConstructors imp) dctors'
     return $ imp { importedTypes = types', importedDataConstructors = dctors'' }
   importExplicit imp (TypeClassRef name) = do
@@ -568,16 +568,16 @@ resolveImport currentModule importModule exps imps impQual =
     check (PositionedDeclarationRef pos _ r) =
       rethrowWithPosition pos $ check r
     check ref@(ValueRef name) =
-      checkImportExists UnknownValue values name >> return ref
+      checkImportExists UnknownImportValue values name >> return ref
     check ref@(TypeRef name dctors) = do
-      _ <- checkImportExists UnknownType availableTypes name
+      _ <- checkImportExists UnknownImportType availableTypes name
       let allDctors = allExportedDataConstructors name
-      _ <- maybe (return allDctors) (mapM $ checkDctorExists allDctors) dctors
+      _ <- maybe (return allDctors) (mapM $ (checkDctorExists name) allDctors) dctors
       return ref
     check ref@(TypeClassRef name) =
-      checkImportExists UnknownTypeClass classes name >> return ref
+      checkImportExists UnknownImportTypeClass classes name >> return ref
     check ref@(ModuleRef name) =
-      checkImportExists (UnknownModule . (\(Qualified _ m) -> m)) (exportedModules exps) name >> return ref
+      checkImportExists (const UnknownModule) (exportedModules exps) name >> return ref
     check _ = error "Invalid argument to checkRefIsValid"
 
   -- Find all exported data constructors for a given type
@@ -605,15 +605,15 @@ resolveImport currentModule importModule exps imps impQual =
 
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
-  checkDctorExists :: [ProperName] -> ProperName -> m ProperName
-  checkDctorExists = checkImportExists (flip UnknownDataConstructor Nothing)
+  checkDctorExists :: ProperName -> [ProperName] -> ProperName -> m ProperName
+  checkDctorExists tcon = checkImportExists (flip UnknownImportDataConstructor tcon)
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => (Qualified a -> SimpleErrorMessage) -> [a] -> a -> m a
+  checkImportExists :: (Eq a, Show a) => (ModuleName -> a -> SimpleErrorMessage) -> [a] -> a -> m a
   checkImportExists unknown exports item =
       if item `elem` exports
       then return item
-      else throwError . errorMessage . unknown $ Qualified (Just importModule) item
+      else throwError . errorMessage $ unknown importModule item
 
 -- |
 -- Raises an error for when there is more than one definition for something.
