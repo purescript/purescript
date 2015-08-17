@@ -4,11 +4,16 @@ import Prelude
 
 import Data.Generic
 
+data Void
+
+derive instance genericVoid :: Generic Void
+
 data A a 
   = A Number String
   | B Int
   | C (Array (A a)) 
   | D { a :: a }
+  | E Void
 
 derive instance genericA :: (Generic a) => Generic (A a)
 
