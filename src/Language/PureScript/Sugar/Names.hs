@@ -468,10 +468,13 @@ filterExports mn exps env = do
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
 --
-findImports :: [Declaration] -> M.Map ModuleName (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
+findImports :: [Declaration] -> M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)]
 findImports = foldl (findImports' Nothing) M.empty
   where
-  findImports' pos result (ImportDeclaration mn typ qual) = M.insert mn (pos, typ, qual) result
+  findImports' pos result (ImportDeclaration mn typ qual) =
+    case mn `M.lookup` result of
+      Just is -> M.insert mn ((pos, typ, qual):is) result
+      Nothing -> M.insert mn [(pos, typ, qual)] result
   findImports' _ result (PositionedDeclaration pos _ d) = findImports' (Just pos) result d
   findImports' _ result _ = result
 
@@ -486,17 +489,20 @@ resolveImports env (Module _ _ currentModule decls _) =
   -- A Map from module name to the source position for the import, the list of imports from that
   -- module (where Nothing indicates everything is to be imported), and optionally a qualified name
   -- for the module
-  scope :: M.Map ModuleName (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
-  scope = M.insert currentModule (Nothing, Implicit, Nothing) (findImports decls)
+  scope :: M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)]
+  scope = M.insert currentModule [(Nothing, Implicit, Nothing)] (findImports decls)
 
-  resolveImport' :: ImportEnvironment -> (ModuleName, (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)) -> m ImportEnvironment
-  resolveImport' imp (mn, (pos, typ, impQual)) = do
-    modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) return $ mn `M.lookup` env
-    positioned $ resolveImport currentModule mn modExports imp impQual typ
+  resolveImport' :: ImportEnvironment -> (ModuleName, [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)]) -> m ImportEnvironment
+  resolveImport' ie (mn, imps) = foldM go ie imps
     where
-    positioned err = case pos of
-      Nothing -> err
-      Just pos' -> rethrowWithPosition pos' err
+    go :: ImportEnvironment -> (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName) -> m ImportEnvironment
+    go ie' (pos, typ, impQual) = do
+      modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) return $ mn `M.lookup` env
+      positioned $ resolveImport currentModule mn modExports ie' impQual typ
+      where
+      positioned err = case pos of
+        Nothing -> err
+        Just pos' -> rethrowWithPosition pos' err
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
