@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Make
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -28,7 +28,7 @@ module Language.PureScript.Make
   , MakeActions(..)
   , Externs()
   , make
-  
+
   -- * Implementation of Make API using files on disk
   , Make(..)
   , runMake
@@ -92,7 +92,7 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ runModuleName mn
 -- This type exists to make two things abstract:
 --
 -- * The particular backend being used (Javascript, C++11, etc.)
--- 
+--
 -- * The details of how files are read/written etc.
 --
 data MakeActions m = MakeActions {
@@ -148,7 +148,7 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadReader Options m, Mon
      -> m Environment
 make MakeActions{..} ms = do
   (sorted, graph) <- sortModules $ map importPrim ms
-  toRebuild <- foldM (\s (Module _ moduleName' _ _) -> do
+  toRebuild <- foldM (\s (Module _ _ moduleName' _ _) -> do
     inputTimestamp <- getInputTimestamp moduleName'
     outputTimestamp <- getOutputTimestamp moduleName'
     return $ case (inputTimestamp, outputTimestamp) of
@@ -167,12 +167,12 @@ make MakeActions{..} ms = do
   go env ((False, m) : ms') = do
     (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
     go env' ms'
-  go env ((True, m@(Module coms moduleName' _ exps)) : ms') = do
-    lift . progress $ CompilingModule moduleName' 
-    (checked@(Module _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
+  go env ((True, m@(Module ss coms moduleName' _ exps)) : ms') = do
+    lift . progress $ CompilingModule moduleName'
+    (checked@(Module _ _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
     checkExhaustiveModule env' checked
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
-    let mod' = Module coms moduleName' regrouped exps
+    let mod' = Module ss coms moduleName' regrouped exps
         corefn = CF.moduleToCoreFn env' mod'
         [renamed] = renameInModules [corefn]
         exts = moduleToPs mod' env'
@@ -181,15 +181,15 @@ make MakeActions{..} ms = do
 
   rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
   rebuildIfNecessary _ _ [] = return []
-  rebuildIfNecessary graph toRebuild (m@(Module _ moduleName' _ _) : ms') | moduleName' `S.member` toRebuild = do
+  rebuildIfNecessary graph toRebuild (m@(Module _ _ moduleName' _ _) : ms') | moduleName' `S.member` toRebuild = do
     let deps = fromMaybe [] $ moduleName' `M.lookup` graph
         toRebuild' = toRebuild `S.union` S.fromList deps
     (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms'
-  rebuildIfNecessary graph toRebuild (Module _ moduleName' _ _ : ms') = do
+  rebuildIfNecessary graph toRebuild (Module _ _ moduleName' _ _ : ms') = do
     (path, externs) <- readExterns moduleName'
     externsModules <- fmap (map snd) . alterErrors $ parseModulesFromFiles id [(path, externs)]
     case externsModules of
-      [m'@(Module _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
+      [m'@(Module _ _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
       _ -> throwError . errorMessage . InvalidExternsFile $ path
     where
     alterErrors = flip catchError $ \(MultipleErrors errs) ->
@@ -207,9 +207,9 @@ reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
 -- Add an import declaration for a module if it does not already explicitly import it.
 --
 addDefaultImport :: ModuleName -> Module -> Module
-addDefaultImport toImport m@(Module coms mn decls exps)  =
+addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
   where
   isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d

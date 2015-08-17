@@ -25,7 +25,7 @@ import Language.PureScript.Docs.Types
 -- Convert a single Module.
 --
 convertModule :: P.Module -> Module
-convertModule m@(P.Module coms moduleName  _ _) =
+convertModule m@(P.Module _ coms moduleName  _ _) =
   Module (show moduleName) comments (declarations m)
   where
   comments = convertComments coms

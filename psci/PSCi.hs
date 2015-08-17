@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  PSCi
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -67,7 +67,7 @@ supportModuleName = P.ModuleName [P.ProperName "$PSCI", P.ProperName "Support"]
 supportModule :: P.Module
 supportModule =
   case P.parseModulesFromFiles id [("", code)] of
-    Right [(_, P.Module cs _ ds exps)] -> P.Module cs supportModuleName ds exps
+    Right [(_, P.Module ss cs _ ds exps)] -> P.Module ss cs supportModuleName ds exps
     _ -> error "Support module could not be parsed"
   where
   code :: String
@@ -215,7 +215,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     mainDecl = P.ValueDeclaration (P.Ident "main") P.Public [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
 
 
 -- |
@@ -227,7 +227,7 @@ createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBin
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
-    P.Module [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
@@ -237,7 +237,7 @@ createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
   in
-    P.Module [] moduleName (importDecl `map` imports) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName (importDecl `map` imports) Nothing
 
 importDecl :: ImportedModule -> P.Declaration
 importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
@@ -308,7 +308,7 @@ handleShowLoadedModules = do
   psciIO $ readModules loadedModules >>= putStrLn
   return ()
   where readModules = return . unlines . sort . nub . map toModuleName
-        toModuleName =  N.runModuleName . (\ (P.Module _ mdName _ _) -> mdName) . snd
+        toModuleName =  N.runModuleName . (\ (P.Module _ _ mdName _ _) -> mdName) . snd
 
 -- |
 -- Show the imported modules in psci.
@@ -399,7 +399,7 @@ handleBrowse moduleName = do
   case env of
     Left errs -> printErrors errs
     Right env' ->
-      if moduleName `notElem` (nub . map ((\ (P.Module _ modName _ _ ) -> modName) . snd)) (psciLoadedModules st)
+      if moduleName `notElem` (nub . map ((\ (P.Module _ _ modName _ _ ) -> modName) . snd)) (psciLoadedModules st)
         then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
         else printModuleSignatures moduleName env'
 
@@ -485,7 +485,7 @@ whenFileExists :: FilePath -> (FilePath -> PSCI ()) -> PSCI ()
 whenFileExists filePath f = do
   absPath <- psciIO $ expandTilde filePath
   exists <- psciIO $ doesFileExist absPath
-  if exists 
+  if exists
     then f absPath
     else PSCI . outputStrLn $ "Couldn't locate: " ++ filePath
 

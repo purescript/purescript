@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Linter
--- Copyright   :  (c) Copyright 2015 PureScript
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -36,7 +36,7 @@ import Language.PureScript.Linter.Exhaustive as L
 -- |
 -- | Right now, this pass only performs a shadowing check.
 lint :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Module -> m ()
-lint (Module _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ lintDeclaration ds
+lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
   moduleNames :: S.Set Ident
   moduleNames = S.fromList (nub (mapMaybe getDeclIdent ds))

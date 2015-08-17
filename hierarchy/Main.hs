@@ -2,7 +2,7 @@
 --
 -- Module      :  Main
 -- Copyright   :  (c) Hardy Jones 2014
--- License     :  MIT
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Hardy Jones <jones3.hardy@gmail.com>
 -- Stability   :  experimental
@@ -65,7 +65,7 @@ compile (HierarchyOptions inputGlob mOutput) = do
   case modules of
     Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors False errs) >> exitFailure
     Right ms -> do
-      for_ ms $ \(P.Module _ moduleName decls _) ->
+      for_ ms $ \(P.Module _ _ moduleName decls _) ->
         let name = runModuleName moduleName
             tcs = filter P.isTypeClassDeclaration decls
             supers = sort . nub . filter (not . null) $ fmap superClasses tcs

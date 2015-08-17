@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Sugar.TypeClasses
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -54,9 +54,9 @@ desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError Multi
 desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
 
 desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> Desugar m Module
-desugarModule (Module coms name decls (Just exps)) = do
+desugarModule (Module ss coms name decls (Just exps)) = do
   (newExpss, declss) <- unzip <$> parU (sortBy classesFirst decls) (desugarDecl name exps)
-  return $ Module coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
+  return $ Module ss coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
   where
   classesFirst :: Declaration -> Declaration -> Ordering
   classesFirst d1 d2

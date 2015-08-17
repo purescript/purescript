@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Sugar.TypeDeclarations
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -35,9 +35,9 @@ import Language.PureScript.Traversals
 -- Replace all top level type declarations in a module with type annotations
 --
 desugarTypeDeclarationsModule :: (Functor m, Applicative m, MonadError MultipleErrors m) => [Module] -> m [Module]
-desugarTypeDeclarationsModule ms = forM ms $ \(Module coms name ds exps) ->
+desugarTypeDeclarationsModule ms = forM ms $ \(Module ss coms name ds exps) ->
   rethrow (onErrorMessages (ErrorInModule name)) $
-    Module coms name <$> desugarTypeDeclarations ds <*> pure exps
+    Module ss coms name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |
 -- Replace all top level type declarations with type annotations

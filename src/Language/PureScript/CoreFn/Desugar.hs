@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.CoreFn.Desugar
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
 -- Stability   :  experimental
@@ -40,9 +40,9 @@ import qualified Language.PureScript.AST as A
 -- Desugars a module from AST to CoreFn representation.
 --
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
-moduleToCoreFn _ (A.Module _ _ _ Nothing) =
+moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   error "Module exports were not elaborated before moduleToCoreFn"
-moduleToCoreFn env (A.Module coms mn decls (Just exps)) =
+moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls

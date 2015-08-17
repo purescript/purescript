@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.BindingGroups
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -42,13 +42,13 @@ import Language.PureScript.Errors
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
 createBindingGroupsModule :: (Functor m, Applicative m, MonadError MultipleErrors m) => [Module] -> m [Module]
-createBindingGroupsModule = mapM $ \(Module coms name ds exps) -> Module coms name <$> createBindingGroups name ds <*> pure exps
+createBindingGroupsModule = mapM $ \(Module ss coms name ds exps) -> Module ss coms name <$> createBindingGroups name ds <*> pure exps
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule = map $ \(Module coms name ds exps) -> Module coms name (collapseBindingGroups ds) exps
+collapseBindingGroupsModule = map $ \(Module ss coms name ds exps) -> Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups :: (Functor m, Applicative m, MonadError MultipleErrors m) => ModuleName -> [Declaration] -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls

@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.Sugar.Names
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
 -- Stability   :  experimental
@@ -49,9 +49,13 @@ type ExportEnvironment = M.Map ModuleName Exports
 data Exports = Exports
   {
   -- |
+  -- The filename of the module these exports are for
+  --
+    moduleSourceSpan :: SourceSpan
+  -- |
   -- The types exported from each module
   --
-    exportedTypes :: [(ProperName, [ProperName])]
+  , exportedTypes :: [(ProperName, [ProperName])]
   -- |
   -- The classes exported from each module
   --
@@ -102,11 +106,11 @@ updateExportedModule env mn update = do
 -- |
 -- Adds an empty module to an ExportEnvironment.
 --
-addEmptyModule :: (Applicative m, MonadError MultipleErrors m) => ExportEnvironment -> ModuleName -> m ExportEnvironment
-addEmptyModule env name =
-  if name `M.member` env
-    then throwError . errorMessage $ RedefinedModule name
-    else return $ M.insert name (Exports [] [] [] []) env
+addEmptyModule :: (Applicative m, MonadError MultipleErrors m) => ExportEnvironment -> ModuleName -> SourceSpan -> m ExportEnvironment
+addEmptyModule env name ss =
+  case name `M.lookup` env of
+    Just m -> throwError . errorMessage $ RedefinedModule name [moduleSourceSpan m, ss]
+    Nothing -> return $ M.insert name (Exports ss [] [] [] []) env
 
 -- |
 -- Adds a type belonging to a module to the export environment.
@@ -164,9 +168,9 @@ desugarImports modules = do
   mapM (renameInModule' unfilteredExports exports) modules'
   where
   moduleReexports :: Module -> Module
-  moduleReexports (Module coms mn decls exps) =
+  moduleReexports (Module ss coms mn decls exps) =
     let importedMods = catMaybes findImports'
-    in (Module coms mn (decls ++ (concatMap reexports importedMods)) exps)
+    in (Module ss coms mn (decls ++ (concatMap reexports importedMods)) exps)
     where
     imports :: [Declaration]
     imports = filter isImportDecl decls
@@ -174,7 +178,7 @@ desugarImports modules = do
     findImports' = go <$> modules
       where
       go :: Module -> Maybe (Declaration, Module)
-      go m@(Module _ mn' _ (Just exps'))
+      go m@(Module _ _ mn' _ (Just exps'))
         | any isModExport exps', Just d <- find ((== mn') . importedModName) imports = Just (d, m)
         where
         importedModName :: Declaration -> ModuleName
@@ -183,14 +187,14 @@ desugarImports modules = do
         importedModName _ = error "Not an import decl"
       go _ = Nothing
     reexports :: (Declaration, Module) -> [Declaration]
-    reexports (ImportDeclaration _ (Hiding refs) _, (Module coms' mn' ds' (Just exps'))) =
+    reexports (ImportDeclaration _ (Hiding refs) _, (Module ss' coms' mn' ds' (Just exps'))) =
       case nonHiddenRefs of
         [] -> []
-        _ -> reexports (ImportDeclaration mn' Implicit Nothing, Module coms' mn' ds' (Just nonHiddenRefs))
+        _ -> reexports (ImportDeclaration mn' Implicit Nothing, Module ss' coms' mn' ds' (Just nonHiddenRefs))
       where
       nonHiddenRefs :: [DeclarationRef]
       nonHiddenRefs = filter isModExport exps' \\ filter isModExport refs
-    reexports (ImportDeclaration _ ty qual, Module _ _ _ (Just exps')) =
+    reexports (ImportDeclaration _ ty qual, Module _ _ _ _ (Just exps')) =
       let ty' = case ty of
                   Explicit _ -> Explicit []
                   _ -> ty
@@ -199,7 +203,7 @@ desugarImports modules = do
       go :: DeclarationRef -> Maybe ModuleName
       go (ModuleRef mn') = Just mn'
       go _ = Nothing
-    reexports (PositionedDeclaration _ _ d, m@(Module _ _ _ (Just _))) = reexports (d, m)
+    reexports (PositionedDeclaration _ _ d, m@(Module _ _ _ _ (Just _))) = reexports (d, m)
     reexports _ = []
 
   isModExport :: DeclarationRef -> Bool
@@ -210,7 +214,7 @@ desugarImports modules = do
   -- exported members remain. If the module does not explicitly export anything, everything is
   -- exported.
   filterModuleExports :: ExportEnvironment -> Module -> m ExportEnvironment
-  filterModuleExports env (Module _ mn _ (Just exps))
+  filterModuleExports env (Module _ _ mn _ (Just exps))
     | any isSelfModuleExport exps, Just exps' <- M.lookup mn env =
         let moduleNames = filter (/= mn) $ (\(ModuleRef mn') -> mn') <$> filter isModExport exps
         in return $ M.insert mn (exps' {exportedModules = moduleNames}) env
@@ -219,13 +223,13 @@ desugarImports modules = do
     isSelfModuleExport (ModuleRef mn') | mn' == mn = True
     isSelfModuleExport (PositionedDeclarationRef _ _ ref) = isSelfModuleExport ref
     isSelfModuleExport _ = False
-  filterModuleExports env (Module _ mn _ (Just exps)) = filterExports mn exps env
+  filterModuleExports env (Module _ _ mn _ (Just exps)) = filterExports mn exps env
   filterModuleExports env _ = return env
 
   -- Rename and check all the names within a module. We tweak the global exports environment so
   -- the module has access to an unfiltered list of its own members.
   renameInModule' :: ExportEnvironment -> ExportEnvironment -> Module -> m Module
-  renameInModule' unfilteredExports exports m@(Module _ mn _ _) =
+  renameInModule' unfilteredExports exports m@(Module _ _ mn _ _) =
     rethrow (onErrorMessages (ErrorInModule mn)) $ do
       let env = M.update (\_ -> M.lookup mn unfilteredExports) mn exports
       let exps = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn exports
@@ -237,7 +241,7 @@ desugarImports modules = do
 -- as it will also make all data constructor exports explicit.
 --
 elaborateExports :: Exports -> Module -> Module
-elaborateExports exps (Module coms mn decls _) = Module coms mn decls (Just $
+elaborateExports exps (Module ss coms mn decls _) = Module ss coms mn decls (Just $
   map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (exportedTypes exps) ++
   map TypeClassRef (exportedTypeClasses exps) ++
   map ValueRef (exportedValues exps) ++
@@ -248,7 +252,7 @@ elaborateExports exps (Module coms mn decls _) = Module coms mn decls (Just $
 -- This ensures transitive instances are included when using a member from a module.
 --
 elaborateImports :: Module -> Module
-elaborateImports (Module coms mn decls exps) = Module coms mn decls' exps
+elaborateImports (Module ss coms mn decls exps) = Module ss coms mn decls' exps
   where
   decls' :: [Declaration]
   decls' =
@@ -265,8 +269,8 @@ elaborateImports (Module coms mn decls exps) = Module coms mn decls' exps
 -- qualified names are valid.
 --
 renameInModule :: forall m. (Applicative m, MonadError MultipleErrors m) => ImportEnvironment -> ExportEnvironment -> Module -> m Module
-renameInModule imports exports (Module coms mn decls exps) =
-  Module coms mn <$> parU decls go <*> pure exps
+renameInModule imports exports (Module ss coms mn decls exps) =
+  Module ss coms mn <$> parU decls go <*> pure exps
   where
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
@@ -372,14 +376,14 @@ findExports = foldM addModule $ M.singleton (ModuleName [ProperName C.prim]) pri
   where
 
   -- The exported types from the Prim module
-  primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] [] []
+  primExports = Exports (internalModuleSourceSpan "<Prim>") (mkTypeEntry `map` M.keys primTypes) [] [] []
     where
     mkTypeEntry (Qualified _ name) = (name, [])
 
   -- Add all of the exported declarations from a module to the global export environment
   addModule :: ExportEnvironment -> Module -> m ExportEnvironment
-  addModule env (Module _ mn ds _) = do
-    env' <- addEmptyModule env mn
+  addModule env (Module ss _ mn ds _) = do
+    env' <- addEmptyModule env mn ss
     rethrow (onErrorMessages (ErrorInModule mn)) $ foldM (addDecl mn) env' ds
 
   -- Add a declaration from a module to the global export environment
@@ -475,7 +479,7 @@ findImports = foldl (findImports' Nothing) M.empty
 -- Constructs a local environment for a module.
 --
 resolveImports :: forall m. (Applicative m, MonadError MultipleErrors m) => ExportEnvironment -> Module -> m ImportEnvironment
-resolveImports env (Module _ currentModule decls _) =
+resolveImports env (Module _ _ currentModule decls _) =
   foldM resolveImport' (ImportEnvironment M.empty M.empty M.empty M.empty) (M.toList scope)
   where
 
