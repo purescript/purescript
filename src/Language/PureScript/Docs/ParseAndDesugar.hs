@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Applicative
 
 import Control.Monad.Trans.Except
+import Control.Monad.Writer (WriterT(), runWriterT)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 
@@ -118,7 +119,8 @@ desugar :: [P.Module] -> Either P.MultipleErrors [P.Module]
 desugar = P.evalSupplyT 0 . desugar'
   where
   desugar' :: [P.Module] -> P.SupplyT (Either P.MultipleErrors) [P.Module]
-  desugar' = mapM P.desugarDoModule >=> P.desugarCasesModule >=> P.desugarImports
+  desugar' = mapM P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports
+  ignoreWarnings m = liftM fst (runWriterT m)
 
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input' = (,) input' <$> readFile input'
