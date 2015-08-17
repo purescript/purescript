@@ -75,6 +75,14 @@ data SimpleErrorMessage
   | UnknownValue (Qualified Ident)
   | UnknownDataConstructor (Qualified ProperName) (Maybe (Qualified ProperName))
   | UnknownTypeConstructor (Qualified ProperName)
+  | UnknownImportType ModuleName ProperName
+  | UnknownExportType ProperName
+  | UnknownImportTypeClass ModuleName ProperName
+  | UnknownExportTypeClass ProperName
+  | UnknownImportValue ModuleName Ident
+  | UnknownExportValue Ident
+  | UnknownImportDataConstructor ModuleName ProperName ProperName
+  | UnknownExportDataConstructor ProperName ProperName
   | ConflictingImport String ModuleName
   | ConflictingImports String ModuleName ModuleName
   | ConflictingTypeDecls ProperName
@@ -164,82 +172,90 @@ instance UnificationError Kind ErrorMessage where
 --
 errorCode :: ErrorMessage -> String
 errorCode em = case unwrapErrorMessage em of
-  (ErrorParsingExterns _)       -> "ErrorParsingExterns"
-  (ErrorParsingFFIModule _)     -> "ErrorParsingFFIModule"
-  (ErrorParsingModule _)        -> "ErrorParsingModule"
-  MissingFFIModule{}            -> "MissingFFIModule"
-  MultipleFFIModules{}          -> "MultipleFFIModules"
-  UnnecessaryFFIModule{}        -> "UnnecessaryFFIModule"
-  (InvalidExternsFile _)        -> "InvalidExternsFile"
-  (CannotGetFileInfo _)         -> "CannotGetFileInfo"
-  (CannotReadFile _)            -> "CannotReadFile"
-  (CannotWriteFile _)           -> "CannotWriteFile"
-  (InfiniteType _)              -> "InfiniteType"
-  (InfiniteKind _)              -> "InfiniteKind"
-  CannotReorderOperators        -> "CannotReorderOperators"
-  (MultipleFixities _)          -> "MultipleFixities"
-  (OrphanTypeDeclaration _)     -> "OrphanTypeDeclaration"
-  (OrphanFixityDeclaration _)   -> "OrphanFixityDeclaration"
-  (RedefinedModule _ _)         -> "RedefinedModule"
-  (RedefinedIdent _)            -> "RedefinedIdent"
-  OverlappingNamesInLet         -> "OverlappingNamesInLet"
-  (UnknownModule _)             -> "UnknownModule"
-  (UnknownType _)               -> "UnknownType"
-  (UnknownTypeClass _)          -> "UnknownTypeClass"
-  (UnknownValue _)              -> "UnknownValue"
-  (UnknownDataConstructor _ _)  -> "UnknownDataConstructor"
-  (UnknownTypeConstructor _)    -> "UnknownTypeConstructor"
-  (ConflictingImport _ _)       -> "ConflictingImport"
-  (ConflictingImports _ _ _)    -> "ConflictingImports"
-  (ConflictingTypeDecls _)      -> "ConflictingTypeDecls"
-  (ConflictingCtorDecls _)      -> "ConflictingCtorDecls"
-  (TypeConflictsWithClass _)    -> "TypeConflictsWithClass"
-  (CtorConflictsWithClass _)    -> "CtorConflictsWithClass"
-  (ClassConflictsWithType _)    -> "ClassConflictsWithType"
-  (ClassConflictsWithCtor _)    -> "ClassConflictsWithCtor"
-  (DuplicateClassExport _)      -> "DuplicateClassExport"
-  (DuplicateValueExport _)      -> "DuplicateValueExport"
-  (DuplicateTypeArgument _)     -> "DuplicateTypeArgument"
-  InvalidDoBind                 -> "InvalidDoBind"
-  InvalidDoLet                  -> "InvalidDoLet"
-  (CycleInDeclaration _)        -> "CycleInDeclaration"
-  (CycleInTypeSynonym _)        -> "CycleInTypeSynonym"
-  (CycleInModules _)            -> "CycleInModules"
-  (NameIsUndefined _)           -> "NameIsUndefined"
-  (NameNotInScope _)            -> "NameNotInScope"
-  (UndefinedTypeVariable _)     -> "UndefinedTypeVariable"
-  (PartiallyAppliedSynonym _)   -> "PartiallyAppliedSynonym"
-  (EscapedSkolem _)             -> "EscapedSkolem"
-  UnspecifiedSkolemScope        -> "UnspecifiedSkolemScope"
-  (TypesDoNotUnify _ _)         -> "TypesDoNotUnify"
-  (KindsDoNotUnify _ _)         -> "KindsDoNotUnify"
-  (ConstrainedTypeUnified _ _)  -> "ConstrainedTypeUnified"
-  (OverlappingInstances _ _ _)  -> "OverlappingInstances"
-  (NoInstanceFound _ _)         -> "NoInstanceFound"
-  (CannotDerive _ _)            -> "CannotDerive"
-  (CannotFindDerivingType _)    -> "CannotFindDerivingType"
-  (DuplicateLabel _ _)          -> "DuplicateLabel"
-  (DuplicateValueDeclaration _) -> "DuplicateValueDeclaration"
-  (ArgListLengthsDiffer _)      -> "ArgListLengthsDiffer"
-  (OverlappingArgNames _)       -> "OverlappingArgNames"
-  (MissingClassMember _)        -> "MissingClassMember"
-  (ExtraneousClassMember _)     -> "ExtraneousClassMember"
-  (ExpectedType _)              -> "ExpectedType"
-  (IncorrectConstructorArity _) -> "IncorrectConstructorArity"
-  SubsumptionCheckFailed        -> "SubsumptionCheckFailed"
-  (ExprDoesNotHaveType _ _)     -> "ExprDoesNotHaveType"
-  (PropertyIsMissing _ _)       -> "PropertyIsMissing"
-  (CannotApplyFunction _ _)     -> "CannotApplyFunction"
-  TypeSynonymInstance           -> "TypeSynonymInstance"
-  (OrphanInstance _ _ _)        -> "OrphanInstance"
-  InvalidNewtype                -> "InvalidNewtype"
-  (InvalidInstanceHead _)       -> "InvalidInstanceHead"
-  (TransitiveExportError _ _)   -> "TransitiveExportError"
-  (ShadowedName _)              -> "ShadowedName"
-  (WildcardInferredType _)      -> "WildcardInferredType"
-  (NotExhaustivePattern _ _)    -> "NotExhaustivePattern"
-  (OverlappingPattern _ _)      -> "OverlappingPattern"
-  (ClassOperator _ _)           -> "ClassOperator"
+  ErrorParsingExterns{} -> "ErrorParsingExterns"
+  ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
+  ErrorParsingModule{} -> "ErrorParsingModule"
+  MissingFFIModule{} -> "MissingFFIModule"
+  MultipleFFIModules{} -> "MultipleFFIModules"
+  UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
+  InvalidExternsFile{} -> "InvalidExternsFile"
+  CannotGetFileInfo{} -> "CannotGetFileInfo"
+  CannotReadFile{} -> "CannotReadFile"
+  CannotWriteFile{} -> "CannotWriteFile"
+  InfiniteType{} -> "InfiniteType"
+  InfiniteKind{} -> "InfiniteKind"
+  CannotReorderOperators -> "CannotReorderOperators"
+  MultipleFixities{} -> "MultipleFixities"
+  OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
+  OrphanFixityDeclaration{} -> "OrphanFixityDeclaration"
+  RedefinedModule{} -> "RedefinedModule"
+  RedefinedIdent{} -> "RedefinedIdent"
+  OverlappingNamesInLet -> "OverlappingNamesInLet"
+  UnknownModule{} -> "UnknownModule"
+  UnknownType{} -> "UnknownType"
+  UnknownTypeClass{} -> "UnknownTypeClass"
+  UnknownValue{} -> "UnknownValue"
+  UnknownDataConstructor{} -> "UnknownDataConstructor"
+  UnknownTypeConstructor{} -> "UnknownTypeConstructor"
+  UnknownImportType{} -> "UnknownImportType"
+  UnknownExportType{} -> "UnknownExportType"
+  UnknownImportTypeClass{} -> "UnknownImportTypeClass"
+  UnknownExportTypeClass{} -> "UnknownExportTypeClass"
+  UnknownImportValue{} -> "UnknownImportValue"
+  UnknownExportValue{} -> "UnknownExportValue"
+  UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
+  UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
+  ConflictingImport{} -> "ConflictingImport"
+  ConflictingImports{} -> "ConflictingImports"
+  ConflictingTypeDecls{} -> "ConflictingTypeDecls"
+  ConflictingCtorDecls{} -> "ConflictingCtorDecls"
+  TypeConflictsWithClass{} -> "TypeConflictsWithClass"
+  CtorConflictsWithClass{} -> "CtorConflictsWithClass"
+  ClassConflictsWithType{} -> "ClassConflictsWithType"
+  ClassConflictsWithCtor{} -> "ClassConflictsWithCtor"
+  DuplicateClassExport{} -> "DuplicateClassExport"
+  DuplicateValueExport{} -> "DuplicateValueExport"
+  DuplicateTypeArgument{} -> "DuplicateTypeArgument"
+  InvalidDoBind -> "InvalidDoBind"
+  InvalidDoLet -> "InvalidDoLet"
+  CycleInDeclaration{} -> "CycleInDeclaration"
+  CycleInTypeSynonym{} -> "CycleInTypeSynonym"
+  CycleInModules{} -> "CycleInModules"
+  NameIsUndefined{} -> "NameIsUndefined"
+  NameNotInScope{} -> "NameNotInScope"
+  UndefinedTypeVariable{} -> "UndefinedTypeVariable"
+  PartiallyAppliedSynonym{} -> "PartiallyAppliedSynonym"
+  EscapedSkolem{} -> "EscapedSkolem"
+  UnspecifiedSkolemScope -> "UnspecifiedSkolemScope"
+  TypesDoNotUnify{} -> "TypesDoNotUnify"
+  KindsDoNotUnify{} -> "KindsDoNotUnify"
+  ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
+  OverlappingInstances{} -> "OverlappingInstances"
+  NoInstanceFound{} -> "NoInstanceFound"
+  CannotDerive{} -> "CannotDerive"
+  CannotFindDerivingType{} -> "CannotFindDerivingType"
+  DuplicateLabel{} -> "DuplicateLabel"
+  DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
+  ArgListLengthsDiffer{} -> "ArgListLengthsDiffer"
+  OverlappingArgNames{} -> "OverlappingArgNames"
+  MissingClassMember{} -> "MissingClassMember"
+  ExtraneousClassMember{} -> "ExtraneousClassMember"
+  ExpectedType{} -> "ExpectedType"
+  IncorrectConstructorArity{} -> "IncorrectConstructorArity"
+  SubsumptionCheckFailed -> "SubsumptionCheckFailed"
+  ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
+  PropertyIsMissing{} -> "PropertyIsMissing"
+  CannotApplyFunction{} -> "CannotApplyFunction"
+  TypeSynonymInstance -> "TypeSynonymInstance"
+  OrphanInstance{} -> "OrphanInstance"
+  InvalidNewtype -> "InvalidNewtype"
+  InvalidInstanceHead{} -> "InvalidInstanceHead"
+  TransitiveExportError{} -> "TransitiveExportError"
+  ShadowedName{} -> "ShadowedName"
+  WildcardInferredType{} -> "WildcardInferredType"
+  NotExhaustivePattern{} -> "NotExhaustivePattern"
+  OverlappingPattern{} -> "OverlappingPattern"
+  ClassOperator{} -> "ClassOperator"
 
 -- |
 -- A stack trace for an error
@@ -451,6 +467,22 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Unknown type constructor " ++ show name
     goSimple (UnknownDataConstructor dc tc) =
       line $ "Unknown data constructor " ++ show dc ++ foldMap ((" for type constructor " ++) . show) tc
+    goSimple (UnknownImportType mn name) =
+      line $ "Module " ++ show mn ++ " does not export type " ++ show name
+    goSimple (UnknownExportType name) =
+      line $ "Cannot export unknown type " ++ show name
+    goSimple (UnknownImportTypeClass mn name) =
+      line $ "Module " ++ show mn ++ " does not export type class " ++ show name
+    goSimple (UnknownExportTypeClass name) =
+      line $ "Cannot export unknown type class " ++ show name
+    goSimple (UnknownImportValue mn name) =
+      line $ "Module " ++ show mn ++ " does not export value " ++ show name
+    goSimple (UnknownExportValue name) =
+      line $ "Cannot export unknown value " ++ show name
+    goSimple (UnknownImportDataConstructor mn tcon dcon) =
+      line $ "Module " ++ show mn ++ " does not export data constructor " ++ show dcon ++ " for type " ++ show tcon
+    goSimple (UnknownExportDataConstructor tcon dcon) =
+      line $ "Cannot export data constructor " ++ show dcon ++ " for type " ++ show tcon ++ " as it has not been declared"
     goSimple (ConflictingImport nm mn) =
       line $ "Cannot declare " ++ show nm ++ " since another declaration of that name was imported from " ++ show mn
     goSimple (ConflictingImports nm m1 m2) =
