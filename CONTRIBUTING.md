@@ -38,3 +38,7 @@ You can automate this (if you have bash):
 
 - If the issue is actually a question, please consider asking on Reddit, Stack Overflow or IRC first.
 - Please include a minimal, repeatable test case with any bug report.
+
+## Copyright and Licensing
+
+For any code change, please append a copyright and licensing notice to the [CONTRIBUTORS.md](CONTRIBUTORS.md) file.
