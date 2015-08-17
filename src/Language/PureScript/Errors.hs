@@ -454,7 +454,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple (ConflictingImport nm mn) =
       line $ "Cannot declare " ++ show nm ++ " since another declaration of that name was imported from " ++ show mn
     goSimple (ConflictingImports nm m1 m2) =
-      line $ "Conflicting imports for " ++ show nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
+      line $ "Conflicting imports for " ++ nm ++ " from modules " ++ show m1 ++ " and " ++ show m2
     goSimple (ConflictingTypeDecls nm) =
       line $ "Conflicting type declarations for " ++ show nm
     goSimple (ConflictingCtorDecls nm) =

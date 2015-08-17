@@ -589,11 +589,14 @@ resolveImport currentModule importModule exps imps impQual =
   updateImports m name = case M.lookup (Qualified impQual name) m of
     Nothing -> return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name) m
     Just (Qualified Nothing _) -> error "Invalid state in updateImports"
-    Just (Qualified (Just mn) _) -> throwError . errorMessage $ err
-      where
-      err = if currentModule `elem` [mn, importModule]
-            then ConflictingImport (show name) importModule
-            else ConflictingImports (show name) mn importModule
+    Just (Qualified (Just mn) _)
+      | mn == importModule -> return m
+      | otherwise -> throwError . errorMessage $ err
+        where
+        err = if currentModule `elem` [mn, importModule]
+              then ConflictingImport (show name) importModule
+              else ConflictingImports (show name) mn importModule
+
 
   -- The available values, types, and classes in the module being imported
   values = exportedValues exps
