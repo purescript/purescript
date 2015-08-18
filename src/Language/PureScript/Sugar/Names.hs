@@ -571,7 +571,7 @@ resolveImport currentModule importModule exps imps impQual =
     check (PositionedDeclarationRef pos _ r) =
       rethrowWithPosition pos $ check r
     check (ValueRef name) =
-      checkImportExists UnknownImportValue values name >> return ()
+      checkImportExists UnknownImportValue values name
     check (TypeRef name dctors) = do
       checkImportExists UnknownImportType availableTypes name
       let allDctors = allExportedDataConstructors name
