@@ -62,6 +62,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.Directory
+import qualified System.Info
 import qualified System.FilePath.Glob as Glob
 
 import Text.Parsec (ParseError)
