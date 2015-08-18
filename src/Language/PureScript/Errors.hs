@@ -855,7 +855,7 @@ warnWithPosition :: (MonadWriter MultipleErrors m) => SourceSpan -> m a -> m a
 warnWithPosition pos = censor (onErrorMessages (withPosition pos))
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
-withPosition pos (PositionedError _ err) = withPosition pos err
+withPosition _ (PositionedError pos err) = withPosition pos err
 withPosition pos err = PositionedError pos err
 
 -- |
