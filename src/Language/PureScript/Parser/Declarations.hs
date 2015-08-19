@@ -434,7 +434,7 @@ parseDo :: TokenParser Expr
 parseDo = do
   reserved "do"
   C.indented
-  Do <$> C.mark (P.many (C.same *> C.mark parseDoNotationElement))
+  Do <$> C.mark (P.many1 (C.same *> C.mark parseDoNotationElement))
 
 parseDoNotationLet :: TokenParser DoNotationElement
 parseDoNotationLet = DoNotationLet <$> (reserved "let" *> C.indented *> C.mark (P.many1 (C.same *> parseLocalDeclaration)))
