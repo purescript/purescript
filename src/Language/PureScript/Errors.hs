@@ -134,6 +134,7 @@ data SimpleErrorMessage
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | ClassOperator ProperName Ident
+  | MisleadingEmptyTypeImport ModuleName ProperName
   deriving (Show)
 
 -- |
@@ -256,6 +257,7 @@ errorCode em = case unwrapErrorMessage em of
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   ClassOperator{} -> "ClassOperator"
+  MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
 
 -- |
 -- A stack trace for an error
@@ -606,6 +608,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , indent $ line $ "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
             , indent $ line $ show opName ++ " = someMember"
             ]
+    goSimple (MisleadingEmptyTypeImport mn name) =
+      line $ "Importing type " ++ show name ++ "(..) from " ++ show mn ++ " is misleading as it has no exported data constructors"
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     goSimple (NotExhaustivePattern bs b) =
@@ -845,11 +849,14 @@ rethrow f = flip catchError $ \e -> throwError (f e)
 -- Rethrow an error with source position information
 --
 rethrowWithPosition :: (MonadError MultipleErrors m) => SourceSpan -> m a -> m a
-rethrowWithPosition pos = rethrow (onErrorMessages withPosition)
-  where
-  withPosition :: ErrorMessage -> ErrorMessage
-  withPosition (PositionedError _ err) = withPosition err
-  withPosition err = PositionedError pos err
+rethrowWithPosition pos = rethrow (onErrorMessages (withPosition pos))
+
+warnWithPosition :: (MonadWriter MultipleErrors m) => SourceSpan -> m a -> m a
+warnWithPosition pos = censor (onErrorMessages (withPosition pos))
+
+withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
+withPosition _ (PositionedError pos err) = withPosition pos err
+withPosition pos err = PositionedError pos err
 
 -- |
 -- Collect errors in in parallel
