@@ -78,8 +78,8 @@ entails env moduleName context = solve
         unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
         unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return a
-        unique xs@(x : _) | pairwise overlapping (map snd xs) = throwError . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) xs) -- TODO: use simplest instance
-                          | otherwise = return x
+        unique tcds | pairwise overlapping (map snd tcds) = throwError . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
+                    | otherwise = return (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
         -- |
         -- Check if two dictionaries are overlapping
