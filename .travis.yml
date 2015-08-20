@@ -6,7 +6,7 @@ env:
   - GHCVER=7.10.1
   - GHCVER=7.8.4 STACKAGE=lts-2.22
   # 7.10.2 Pending https://github.com/travis-ci/apt-package-whitelist/pull/686
-  - GHCVER=7.10.1 STACKAGE=lts-3.0
+  - GHCVER=7.10.1 STACKAGE=lts-3.1
   - GHCVER=7.10.1 STACKAGE=nightly-2015-08-12
 before_install:
   - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
