@@ -130,7 +130,7 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --  * Process module imports
 --
 typeCheckAll :: Maybe ModuleName -> ModuleName -> [DeclarationRef] -> [Declaration] -> Check [Declaration]
-typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphanFixities ds
+typeCheckAll mainModuleName moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
   where
   go :: Declaration -> Check Declaration
   go (DataDeclaration dtype name args dctors) = do
@@ -236,16 +236,16 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
     checkOrphanInstance moduleName className tys
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) className tys (Just deps) TCDRegular isInstanceExported
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps) TCDRegular
     addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (canonicalizeDictionary dict) dict
     return d
 
     where
 
     checkOrphanInstance :: ModuleName -> Qualified ProperName -> [Type] -> Check ()
-    checkOrphanInstance mn (Qualified (Just mn') _) tys
-      | mn == mn' || any checkType tys = return ()
-      | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys
+    checkOrphanInstance mn (Qualified (Just mn') _) tys'
+      | mn == mn' || any checkType tys' = return ()
+      | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
       where
       checkType :: Type -> Bool
       checkType (TypeVar _) = False
@@ -254,14 +254,6 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
       checkType (TypeApp t1 _) = checkType t1
       checkType _ = error "Invalid type in instance in checkOrphanInstance"
     checkOrphanInstance _ _ _ = error "Unqualified class name in checkOrphanInstance"
-
-    isInstanceExported :: Bool
-    isInstanceExported = any exportsInstance exps
-
-    exportsInstance :: DeclarationRef -> Bool
-    exportsInstance (TypeInstanceRef name) | name == dictName = True
-    exportsInstance (PositionedDeclarationRef _ _ r) = exportsInstance r
-    exportsInstance _ = False
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,

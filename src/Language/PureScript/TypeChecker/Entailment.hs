@@ -41,13 +41,11 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
-newtype Work = Work Integer deriving (Show, Eq, Ord, Num)
-
 -- |
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Bool -> Check Expr
+entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Check Expr
 entails env moduleName context = solve
   where
     forClassName :: Qualified ProperName -> [TypeClassDictionaryInScope]
@@ -56,56 +54,57 @@ entails env moduleName context = solve
     findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
-    solve :: Constraint -> Bool -> Check Expr
-    solve (className, tys) trySuperclasses = do
-      let dicts = flip evalStateT (Work 0) $ go trySuperclasses className tys
-      checkOverlaps dicts
+    solve :: Constraint -> Check Expr
+    solve (className, tys) = do
+      dict <- go 0 className tys
+      return $ dictionaryValueToValue dict
       where
-      go :: Bool -> Qualified ProperName -> [Type] -> StateT Work [] DictionaryValue
-      go trySuperclasses' className' tys' = do
-        workDone <- get
-        guard $ workDone < 1000
-        modify (1 +)
-        directInstances <|> superclassInstances
+      go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
+      go work _ _ | work > 1000 = error "Overworked!"
+      go work className' tys' = do
+        let instances = do
+              tcd <- forClassName className'
+              -- Make sure the type unifies with the type in the type instance definition
+              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
+              return (subst, tcd)
+        (subst, tcd) <- unique instances
+        -- Solve any necessary subgoals
+        args <- solveSubgoals subst (tcdDependencies tcd)
+        return $ foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index) 
+                       (mkDictionary (canonicalizeDictionary tcd) args) 
+                       (tcdPath tcd)
         where
-        directInstances :: StateT Work [] DictionaryValue
-        directInstances = do
-          tcd <- lift $ forClassName className'
-          -- Make sure the type unifies with the type in the type instance definition
-          subst <- lift . maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
-          -- Solve any necessary subgoals
-          args <- solveSubgoals subst (tcdDependencies tcd)
-          return $ mkDictionary (canonicalizeDictionary tcd) args
+            
+        unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
+        unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
+        unique [a] = return a
+        unique xs@(x : _) | pairwise overlapping (map snd xs) = throwError . errorMessage $ OverlappingInstances className' tys' [] -- include overlaps in error, use simplest instance
+                          | otherwise = return x
 
-        superclassInstances :: StateT Work [] DictionaryValue
-        superclassInstances = do
-          guard trySuperclasses'
-          (subclassName, (args, _, implies)) <- lift $ M.toList (typeClasses env)
-          -- Try each superclass
-          (index, (superclass, suTyArgs)) <- lift $ zip [0..] implies
-          -- Make sure the type class name matches the superclass name
-          guard $ className' == superclass
-          -- Make sure the types unify with the types in the superclass implication
-          subst <- lift . maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' suTyArgs
-          -- Finally, satisfy the subclass constraint
-          args' <- lift . maybeToList $ mapM ((`lookup` subst) . fst) args
-          suDict <- go True subclassName args'
-          return $ SubclassDictionaryValue suDict superclass index
+        -- |
+        -- Check if two dictionaries are overlapping
+        --
+        -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
+        -- been caught when constructing superclass dictionaries.
+        overlapping :: TypeClassDictionaryInScope -> TypeClassDictionaryInScope -> Bool
+        overlapping TypeClassDictionaryInScope{ tcdPath = _ : _ } _ = False
+        overlapping _ TypeClassDictionaryInScope{ tcdPath = _ : _ } = False
+        overlapping tcd1 tcd2 = tcdName tcd1 /= tcdName tcd2
 
-      -- Create dictionaries for subgoals which still need to be solved by calling go recursively
-      -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
-      -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-      solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> StateT Work [] (Maybe [DictionaryValue])
-      solveSubgoals _ Nothing = return Nothing
-      solveSubgoals subst (Just subgoals) = do
-        dict <- mapM (uncurry (go True) . second (map (replaceAllTypeVars subst))) subgoals
-        return $ Just dict
+        -- Create dictionaries for subgoals which still need to be solved by calling go recursively
+        -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
+        -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
+        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> Check (Maybe [DictionaryValue])
+        solveSubgoals _ Nothing = return Nothing
+        solveSubgoals subst (Just subgoals) = do
+          dict <- mapM (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
+          return $ Just dict
         
-      -- Make a dictionary from subgoal dictionaries by applying the correct function
-      mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
-      mkDictionary fnName Nothing = LocalDictionaryValue fnName
-      mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
-      mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
+        -- Make a dictionary from subgoal dictionaries by applying the correct function
+        mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
+        mkDictionary fnName Nothing = LocalDictionaryValue fnName
+        mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
+        mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
       
       -- Turn a DictionaryValue into a Expr
       dictionaryValueToValue :: DictionaryValue -> Expr
@@ -122,46 +121,7 @@ entails env moduleName context = solve
         let grps = groupBy ((==) `on` fst) subst
         guard (all (pairwise (unifiesWith env) . map snd) grps)
         return $ map head grps
-      -- |
-      -- Check for overlapping instances
-      --
-      checkOverlaps :: [DictionaryValue] -> Check Expr
-      checkOverlaps dicts =
-        case [ (d1, d2) | d1 <- dicts, d2 <- dicts, d1 `overlapping` d2 ] of
-          ds@(_ : _) -> throwError . errorMessage $ OverlappingInstances className tys $ nub (map fst ds)
-          _ -> case chooseSimplestDictionaries dicts of
-                 [] -> throwError . errorMessage $ NoInstanceFound className tys
-                 d : _ -> return $ dictionaryValueToValue d
-      -- Choose the simplest DictionaryValues from a list of candidates
-      -- The reason for this function is as follows:
-      -- When considering overlapping instances, we don't want to consider the same dictionary
-      -- to be an overlap of itself when obtained as a superclass of another class.
-      -- Observing that we probably don't want to select a superclass instance when an instance
-      -- is available directly, and that there is no way for a superclass instance to actually
-      -- introduce an overlap that wouldn't have been there already, we simply remove dictionaries
-      -- obtained as superclass instances if there are simpler instances available.
-      chooseSimplestDictionaries :: [DictionaryValue] -> [DictionaryValue]
-      chooseSimplestDictionaries ds = case filter isSimpleDictionaryValue ds of
-                                        [] -> ds
-                                        simple -> simple
-      isSimpleDictionaryValue SubclassDictionaryValue{} = False
-      isSimpleDictionaryValue (DependentDictionaryValue _ ds) = all isSimpleDictionaryValue ds
-      isSimpleDictionaryValue _ = True
-      -- |
-      -- Check if two dictionaries are overlapping
-      --
-      -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
-      -- been caught when constructing superclass dictionaries.
-      --
-      overlapping :: DictionaryValue -> DictionaryValue -> Bool
-      overlapping (LocalDictionaryValue nm1)         (LocalDictionaryValue nm2)  | nm1 == nm2 = False
-      overlapping (GlobalDictionaryValue nm1)        (GlobalDictionaryValue nm2) | nm1 == nm2 = False
-      overlapping (DependentDictionaryValue nm1 ds1) (DependentDictionaryValue nm2 ds2)
-        | nm1 == nm2 = or $ zipWith overlapping ds1 ds2
-      overlapping SubclassDictionaryValue{} _ = False
-      overlapping _ SubclassDictionaryValue{} = False
-      overlapping _ _ = True
-
+      
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 

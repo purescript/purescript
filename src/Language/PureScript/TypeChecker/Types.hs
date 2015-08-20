@@ -166,7 +166,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary b (nm, tys) sco) = TypeClassDictionary b (nm, map f tys) sco
+  g (TypeClassDictionary (nm, tys) sco) = TypeClassDictionary (nm, map f tys) sco
   g other = other
 
 -- |
@@ -177,9 +177,9 @@ replaceTypeClassDictionaries mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
   where
-  go (TypeClassDictionary trySuperclasses constraint dicts) = do
+  go (TypeClassDictionary constraint dicts) = do
     env <- getEnv
-    entails env mn dicts constraint trySuperclasses
+    entails env mn dicts constraint 
   go other = return other
 
 -- |
@@ -202,7 +202,7 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    dicts <- getTypeClassDictionaries
    (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
-   return (foldl App val (map (flip (TypeClassDictionary True) dicts) constraints), ty')
+   return (foldl App val (map (flip TypeClassDictionary dicts) constraints), ty')
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- |
@@ -268,7 +268,7 @@ infer' (Var var) = do
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip (TypeClassDictionary True) dicts) constraints)) ty'
+      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
@@ -292,7 +292,7 @@ infer' (Let ds val) = do
   return $ TypedValue True (Let ds' val') valTy
 infer' (SuperClassDictionary className tys) = do
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary False (className, tys) dicts
+  return $ TypeClassDictionary (className, tys) dicts
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
@@ -449,10 +449,25 @@ check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Qualified _ (ProperName className), _) -> do
     n <- liftCheck freshDictionaryName
     return $ Ident $ "__dict_" ++ className ++ "_" ++ show n
-  val' <- withBindingGroupVisible $ withTypeClassDictionaries (zipWith (\name (className, instanceTy) ->
-    TypeClassDictionaryInScope name className instanceTy Nothing TCDRegular False) (map (Qualified Nothing) dictNames)
-      constraints) $ check val ty
+  dicts <- join <$> liftCheck (zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints)
+  val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
+  where
+  -- | Add a dictionary for the constraint to the scope, and dictionaries 
+  -- for all implies superclass instances.
+  newDictionaries :: [(Qualified ProperName, Integer)] -> Qualified Ident -> (Qualified ProperName, [Type]) -> Check [TypeClassDictionaryInScope]
+  newDictionaries path name (className, instanceTy) = do
+    tcs <- gets (typeClasses . checkEnv) 
+    let (args, _, superclasses) = fromMaybe (error "newDictionaries: type class lookup failed") $ M.lookup className tcs
+    supDicts <- join <$> zipWithM (\(supName, supArgs) index -> 
+                                      newDictionaries ((supName, index) : path) 
+                                                      name 
+                                                      (supName, instantiateSuperclass (map fst args) supArgs instanceTy)
+                                  ) superclasses [0..]
+    return (TypeClassDictionaryInScope name path className instanceTy Nothing TCDRegular : supDicts)
+
+  instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
+  instantiateSuperclass args supArgs tys = traceShow (args, supArgs, tys) $ map (replaceAllTypeVars (zip args tys)) supArgs
 check' val (SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
   check val ty
@@ -501,13 +516,9 @@ check' (SuperClassDictionary className tys) _ = do
   -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the
   -- correct super instance dictionaries in scope, and these are not available when the type class
   -- declaration gets desugared.
-  --
-  -- Note also that the first argument to TypeClassDictionary is False, meaning we _do not_ want
-  -- to consider superclass instances when searching for this dictionary - doing so might lead
-  -- to traversing a cycle in the instance graph.
   -}
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary False (className, tys) dicts
+  return $ TypeClassDictionary (className, tys) dicts
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty1
@@ -648,7 +659,7 @@ checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
-  checkFunctionApplication' (foldl App fn (map (flip (TypeClassDictionary True) dicts) constraints)) fnTy arg ret
+  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg ret
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
 checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
