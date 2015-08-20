@@ -467,7 +467,7 @@ check' val t@(ConstrainedType constraints ty) = do
     return (TypeClassDictionaryInScope name path className instanceTy Nothing TCDRegular : supDicts)
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
-  instantiateSuperclass args supArgs tys = traceShow (args, supArgs, tys) $ map (replaceAllTypeVars (zip args tys)) supArgs
+  instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 check' val (SaturatedTypeSynonym name args) = do
   ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
   check val ty

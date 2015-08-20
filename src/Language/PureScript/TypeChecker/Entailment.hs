@@ -60,7 +60,7 @@ entails env moduleName context = solve
       return $ dictionaryValueToValue dict
       where
       go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
-      go work _ _ | work > 1000 = error "Overworked!"
+      go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
         let instances = do
               tcd <- forClassName className'
@@ -78,7 +78,7 @@ entails env moduleName context = solve
         unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
         unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return a
-        unique xs@(x : _) | pairwise overlapping (map snd xs) = throwError . errorMessage $ OverlappingInstances className' tys' [] -- include overlaps in error, use simplest instance
+        unique xs@(x : _) | pairwise overlapping (map snd xs) = throwError . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) xs) -- TODO: use simplest instance
                           | otherwise = return x
 
         -- |
