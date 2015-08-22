@@ -11,7 +11,7 @@ import Control.Monad
 import Control.Applicative
 
 import Control.Monad.Trans.Except
-import Control.Monad.Writer (WriterT(), runWriterT)
+import Control.Monad.Writer.Strict (WriterT(), runWriterT)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 

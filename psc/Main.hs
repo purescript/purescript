@@ -22,7 +22,7 @@ module Main where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 
 import Data.Version (showVersion)
 import qualified Data.Map as M
