@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
     prettyPrintBinder,
@@ -25,7 +27,9 @@ import Data.List (intercalate)
 import Control.Arrow ((<+>), runKleisli, second)
 import Control.PatternArrows
 import Control.Monad.State
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 
 import Language.PureScript.AST
 import Language.PureScript.Names

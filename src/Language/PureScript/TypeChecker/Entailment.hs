@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Entailment (
     entails
@@ -22,7 +23,9 @@ module Language.PureScript.TypeChecker.Entailment (
 import Data.Function (on)
 import Data.List
 import Data.Maybe (maybeToList)
+#if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (foldMap)
+#endif
 import qualified Data.Map as M
 
 import Control.Applicative

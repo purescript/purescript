@@ -17,12 +17,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP #-}
 
 module PSCi where
 
 import Data.Foldable (traverse_)
 import Data.List (intercalate, nub, sort)
+#if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
+#endif
 import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M

@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Publish
   ( preparePackage
@@ -32,7 +33,9 @@ import Safe (headMay)
 import Data.Aeson.BetterErrors
 import qualified Data.Text as T
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Category ((>>>))
 import Control.Arrow ((***))
 import Control.Exception (catch, try)

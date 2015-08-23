@@ -12,9 +12,13 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Traversals where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 
 fstM :: (Functor f) => (a -> f c) -> (a, b) -> f (c, b)
 fstM f (a, b) = flip (,) b <$> f a

@@ -31,13 +31,15 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, CPP #-}
 
 module Language.PureScript.CodeGen.JS.Optimizer (
     optimize
 ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative (Applicative)
+#endif
 import Control.Monad.Reader (MonadReader, ask, asks)
 import Control.Monad.Supply.Class (MonadSupply)
 

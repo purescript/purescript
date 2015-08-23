@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, GADTs #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, GADTs, CPP #-}
 
 module Language.PureScript.TypeChecker.Synonyms (
     saturateAllTypeSynonyms,
@@ -27,7 +27,9 @@ module Language.PureScript.TypeChecker.Synonyms (
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 

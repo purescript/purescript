@@ -1,13 +1,19 @@
+{-# LANGUAGE CPP #-}
+
 module Completion where
 
 import Data.Maybe (mapMaybe)
 import Data.List (nub, nubBy, sortBy, isPrefixOf, stripPrefix)
 import Data.Char (isUpper)
 import Data.Function (on)
+#if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
+#endif
 
 import Control.Arrow (second)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative ((<$>), (<*>))
+#endif
 import Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
 import Control.Monad.Trans.State.Strict
 

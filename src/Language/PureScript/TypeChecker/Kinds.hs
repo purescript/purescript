@@ -15,6 +15,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, TupleSections #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Kinds (
     kindOf,
@@ -29,7 +30,9 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 
 import Control.Arrow (second)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State

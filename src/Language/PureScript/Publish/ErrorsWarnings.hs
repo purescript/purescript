@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Publish.ErrorsWarnings
   ( PackageError(..)
@@ -15,12 +16,16 @@ module Language.PureScript.Publish.ErrorsWarnings
   , renderWarnings
   ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative ((<$>))
+#endif
 import Data.Aeson.BetterErrors
 import Data.Version
 import Data.Maybe
 import Data.Monoid
+#if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (foldMap)
+#endif
 import Data.List (intersperse, intercalate)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty

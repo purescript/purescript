@@ -14,12 +14,15 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.ObjectWildcards (
   desugarObjectConstructors
 ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class

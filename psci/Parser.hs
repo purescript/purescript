@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Parser
   ( parseCommand
   ) where
@@ -22,7 +24,9 @@ import Prelude hiding (lex)
 import Data.Char (isSpace)
 import Data.List (intercalate)
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative hiding (many)
+#endif
 
 import Text.Parsec hiding ((<|>))
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Docs.ParseAndDesugar
   ( parseAndDesugar
@@ -8,10 +9,12 @@ module Language.PureScript.Docs.ParseAndDesugar
 import qualified Data.Map as M
 import Control.Arrow (first)
 import Control.Monad
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 
 import Control.Monad.Trans.Except
-import Control.Monad.Writer.Strict (WriterT(), runWriterT)
+import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 

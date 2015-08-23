@@ -15,6 +15,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.Names (
   desugarImports
@@ -23,7 +24,9 @@ module Language.PureScript.Sugar.Names (
 import Data.List (find, nub, (\\))
 import Data.Maybe (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative (Applicative(..), (<$>), (<*>))
+#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)

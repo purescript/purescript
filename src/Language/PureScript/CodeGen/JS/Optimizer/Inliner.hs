@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineVariables,
   inlineValues,
@@ -24,7 +26,9 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   evaluateIifes
 ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative (Applicative)
+#endif
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Data.Maybe (fromMaybe)
 

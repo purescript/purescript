@@ -20,6 +20,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.Operators (
   rebracket,
@@ -31,7 +32,9 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class

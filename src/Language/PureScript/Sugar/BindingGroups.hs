@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.BindingGroups (
     createBindingGroups,
@@ -26,7 +27,9 @@ module Language.PureScript.Sugar.BindingGroups (
 import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
 

@@ -19,6 +19,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Make
   (
@@ -35,7 +36,9 @@ module Language.PureScript.Make
   , buildMakeActions
   ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -49,7 +52,9 @@ import Data.List (sortBy, groupBy)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
 import Data.Foldable (for_)
+#if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
+#endif
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.Set as S
