@@ -53,7 +53,7 @@ import Control.Applicative
 import Control.Arrow ((>>>))
 
 import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 import Control.Monad.Error.Class

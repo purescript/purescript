@@ -5,7 +5,7 @@ module Main where
 import Control.Monad.Trans.State.Strict (runStateT)
 import Control.Monad (when, forM)
 import Control.Applicative
-import Control.Monad.Writer (runWriterT)
+import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Trans.Except (runExceptT)
 
 import Data.List (sort)
