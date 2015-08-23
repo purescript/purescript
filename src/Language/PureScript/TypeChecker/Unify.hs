@@ -14,7 +14,9 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.PureScript.TypeChecker.Unify (
     unifyTypes,
@@ -157,14 +159,14 @@ unifiesWith _ REmpty REmpty = True
 unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
-      
+
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
   in all (\(t1, t2) -> unifiesWith e t1 t2) int && go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
-  go [] REmpty          [] REmpty          = True 
+  go [] REmpty          [] REmpty          = True
   go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) = s1 == s2
   go _  (TUnknown _)    _  _               = True

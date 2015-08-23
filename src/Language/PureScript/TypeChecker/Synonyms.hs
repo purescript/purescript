@@ -13,7 +13,10 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, GADTs, CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Synonyms (
     saturateAllTypeSynonyms,

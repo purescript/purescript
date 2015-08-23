@@ -31,7 +31,8 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.CodeGen.JS.Optimizer (
     optimize

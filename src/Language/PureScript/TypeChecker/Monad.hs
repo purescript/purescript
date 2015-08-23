@@ -13,8 +13,13 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances, RankNTypes,
-    MultiParamTypeClasses, FlexibleContexts, GADTs, CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Monad where
 

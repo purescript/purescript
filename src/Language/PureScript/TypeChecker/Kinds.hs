@@ -14,7 +14,9 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, TupleSections #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Kinds (
@@ -75,12 +77,12 @@ instance Unifiable Check Kind where
 --
 kindOf :: ModuleName -> Type -> Check Kind
 kindOf _ ty = fst <$> kindOfWithScopedVars ty
-    
+
 -- |
 -- Infer the kind of a single type, returning the kinds of any scoped type variables
 --
-kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])   
-kindOfWithScopedVars ty = 
+kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])
+kindOfWithScopedVars ty =
   rethrow (onErrorMessages (ErrorCheckingKind ty)) $
     fmap tidyUp . liftUnify $ infer ty
   where
