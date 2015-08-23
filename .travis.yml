@@ -1,14 +1,32 @@
+language: c
 sudo: false
-env:
-  - GHCVER=7.8.4 COVERAGE_SUITE=tests
-  - GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
-  - GHCVER=7.6.3
-  - GHCVER=7.10.1
-  - GHCVER=7.8.4 STACKAGE=lts-2.22
-  # 7.10.2 Pending https://github.com/travis-ci/apt-package-whitelist/pull/686
-  - GHCVER=7.10.1 STACKAGE=lts-3.1
-  - GHCVER=7.10.1 STACKAGE=nightly-2015-08-12
+matrix:
+  include:
+    - env: GHCVER=7.8.4 COVERAGE_SUITE=tests
+      compiler: ": #GHC 7.8.4 - tests"
+      # ^ HACK before https://github.com/travis-ci/travis-ci/issues/4393 is resolved
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
+      compiler: ": #GHC 7.8.4 - psci-tests"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.8.4 STACKAGE=lts-22
+      compiler: ": #GHC 7.8.4 - lts-2.22"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.6.3
+      compiler: ": #GHC 7.6.3"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.6.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.1
+      compiler: ": #GHC 7.10.1"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    # 7.10.2 Pending https://github.com/travis-ci/apt-package-whitelist/pull/686
+    - env: GHCVER=7.10.1 STACKAGE=lts=3.1 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.1 lts-3.1"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.1 STACKAGE=nightly-2015-08-12
+      compiler: ": #GHC 7.10.1 nightly-2015-08-12"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
 before_install:
+  - unset CC
   - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
   - export PATH="/opt/cabal/1.22/bin:$PATH"
   - export PATH="$HOME/.cabal/bin:$PATH"
@@ -23,13 +41,20 @@ install:
   # cabal and ghc tries to use them all. Which is bad idea on a shared box.
   # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
   - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
-  - mkdir -p sandboxes/$GHCVER/${STACKAGE:-none}
-  - cabal sandbox init --sandbox sandboxes/$GHCVER/${STACKAGE:-none}
-  # Download stackage cabal.config
-  # Not sure whether filtering out purescript is necessary
+  # Cache sandboxes in ~/cabal-sandboxes
+  # Move right sandbox to .cabal-sandbox if exists
+  - if [ -d ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} ]; then
+      mv ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} .cabal-sandbox;
+    fi
+  - mkdir -p .cabal-sandbox
+  - cabal sandbox init --sandbox .cabal-sandbox
+  # Download stackage cabal.config, not sure whether filtering is necessary
   - if [ -n "$STACKAGE" ]; then curl http://www.stackage.org/$STACKAGE/cabal.config | grep -v purescript > cabal.config; fi
   - cabal install --only-dependencies --enable-tests
   - cabal install hpc-coveralls
+  # Snapshot state of the sandbox now, so we don't need to make new one for test install
+  - rm -rf ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
+  - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
 script:
   - ./travis/configure.sh
   - cabal build
@@ -50,18 +75,6 @@ deploy:
   on:
     all_branches: true
     tags: true
-addons:
-  apt:
-    sources:
-      - hvr-ghc
-    packages:
-      - cabal-install-1.22
-      - ghc-7.6.3
-      - ghc-7.8.4
-      - ghc-7.10.1
-      - happy-1.19.5
-      - alex-3.1.4
 cache:
   directories:
-    - sandboxes/
-    - ../install-test/sandboxes/
+    - ~/cabal-sandboxes
