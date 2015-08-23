@@ -18,6 +18,7 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Linter.Exhaustive
   ( checkExhaustive
@@ -237,8 +238,10 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
         cond = or <$> sequenceA pr
     in (concat missed, (liftA2 (&&) cond nec,
                          if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
+#if __GLASGOW_HASKELL__ < 710
     where
     sequenceA = foldr (liftA2 (:)) (pure [])
+#endif
 
   makeResult :: ([[Binder]], (Maybe Bool, [[Binder]])) -> m ()
   makeResult (bss, (_, bss')) =
