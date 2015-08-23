@@ -1,3 +1,5 @@
+-- @shouldFailWith NoInstanceFound
+
 module Main where
 
 import Prelude

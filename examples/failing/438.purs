@@ -1,4 +1,4 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith PossiblyInfiniteInstance
 
 -- See issue 438 for details: this test is mainly here to test that code like
 -- this doesn't cause the compiler to loop.

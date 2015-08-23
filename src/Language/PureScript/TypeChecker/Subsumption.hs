@@ -69,7 +69,7 @@ subsumes' val ty1 (KindedType ty2 _) =
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
-  subsumes' (Just $ foldl App val (map (flip (TypeClassDictionary True) dicts) constraints)) ty1 ty2
+  subsumes' (Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)) ty1 ty2
 subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
   let
     (ts1, r1') = rowToList r1

@@ -26,30 +26,18 @@ import Language.PureScript.Types
 --
 data TypeClassDictionaryInScope
   = TypeClassDictionaryInScope {
-    -- |
-    -- The identifier with which the dictionary can be accessed at runtime
-    --
+    -- | The identifier with which the dictionary can be accessed at runtime
       tcdName :: Qualified Ident
-    -- |
-    -- The name of the type class to which this type class instance applies
-    --
+    -- | How to obtain this instance via superclass relationships
+    , tcdPath :: [(Qualified ProperName, Integer)]
+    -- | The name of the type class to which this type class instance applies
     , tcdClassName :: Qualified ProperName
-    -- |
-    -- The types to which this type class instance applies
-    --
+    -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [Type]
-    -- |
-    -- Type class dependencies which must be satisfied to construct this dictionary
-    --
+    -- | Type class dependencies which must be satisfied to construct this dictionary
     , tcdDependencies :: Maybe [Constraint]
-    -- |
-    -- The type of this dictionary
-    --
+    -- | The type of this dictionary
     , tcdType :: TypeClassDictionaryType
-    -- |
-    -- Is this instance exported by its module?
-    --
-    , tcdExported :: Bool
     } deriving (Show, Data, Typeable)
 
 -- |
