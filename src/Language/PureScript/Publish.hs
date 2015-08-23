@@ -39,7 +39,7 @@ import Control.Exception (catch, try)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.Except
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 
 import System.Directory (doesFileExist, findExecutable)
 import System.Process (readProcess)
