@@ -13,7 +13,10 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Types (
     typesOf
@@ -40,7 +43,9 @@ import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Unify

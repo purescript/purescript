@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Parser.Kinds (
     parseKind
 ) where
@@ -20,7 +22,9 @@ module Language.PureScript.Parser.Kinds (
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 

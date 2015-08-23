@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.TypeChecker.Skolems (
     newSkolemConstant,
     introduceSkolemScope,
@@ -25,7 +27,9 @@ module Language.PureScript.TypeChecker.Skolems (
 import Data.List (nub, (\\))
 import Data.Monoid
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 

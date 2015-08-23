@@ -15,13 +15,16 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.TypeDeclarations (
     desugarTypeDeclarations,
     desugarTypeDeclarationsModule
 ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad (forM)
 import Control.Monad.Error.Class (MonadError(..))
 

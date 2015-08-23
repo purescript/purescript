@@ -16,6 +16,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Types where
 
@@ -26,7 +27,9 @@ import qualified Data.Aeson.TH as A
 
 import Control.Monad.Unify
 import Control.Arrow (second)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad ((<=<))
 
 import Language.PureScript.Names

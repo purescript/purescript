@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker (
     module T,
@@ -31,7 +32,9 @@ import Data.Foldable (for_)
 
 import qualified Data.Map as M
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative ((<$>), (<*))
+#endif
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 

@@ -20,6 +20,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Bundle (
      bundle
@@ -38,7 +39,9 @@ import Data.Version (showVersion)
 
 import qualified Data.Set as S
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad
 import Control.Monad.Error.Class
 import Language.JavaScript.Parser

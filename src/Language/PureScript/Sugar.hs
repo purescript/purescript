@@ -14,12 +14,15 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Monad
 import Control.Category ((>>>))
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad.Error.Class (MonadError())
 import Control.Monad.Writer.Class (MonadWriter())
 import Control.Monad.Supply.Class

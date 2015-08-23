@@ -17,6 +17,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.CodeGen.JS
   ( module AST
@@ -28,7 +29,9 @@ module Language.PureScript.CodeGen.JS
 import Data.List ((\\), delete, intersect)
 import qualified Data.Traversable as T (traverse)
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Arrow ((&&&))
 import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)

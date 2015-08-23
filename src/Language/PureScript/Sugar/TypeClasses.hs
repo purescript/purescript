@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.TypeClasses
   ( desugarTypeClasses
@@ -33,7 +34,9 @@ import Language.PureScript.Types
 
 import qualified Language.PureScript.Constants as C
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Arrow (first, second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State

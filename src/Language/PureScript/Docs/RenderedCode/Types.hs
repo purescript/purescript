@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 -- | Data types and functions for representing a simplified form of PureScript
 -- code, intended for use in e.g. HTML documentation.
@@ -30,9 +31,11 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordWhere
  ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative ((<$>), (<*>), (*>), pure)
 import Data.Foldable
 import Data.Monoid
+#endif
 import qualified Data.Aeson as A
 import Data.Aeson.BetterErrors
 import Control.Monad.Error.Class (MonadError(..))
