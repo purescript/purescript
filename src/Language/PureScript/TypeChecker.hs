@@ -246,9 +246,9 @@ typeCheckAll mainModuleName moduleName exps ds = mapM go ds <* mapM_ checkOrphan
     where
 
     checkOrphanInstance :: ModuleName -> Qualified ProperName -> [Type] -> Check ()
-    checkOrphanInstance mn (Qualified (Just mn') _) tys
-      | mn == mn' || any checkType tys = return ()
-      | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys
+    checkOrphanInstance mn (Qualified (Just mn') _) tys'
+      | mn == mn' || any checkType tys' = return ()
+      | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
       where
       checkType :: Type -> Bool
       checkType (TypeVar _) = False
