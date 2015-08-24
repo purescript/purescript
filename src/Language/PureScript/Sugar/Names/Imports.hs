@@ -38,7 +38,7 @@ import Language.PureScript.Sugar.Names.Env
 
 -- Finds the imports within a module, mapping the imported module name to an optional set of
 -- explicitly imported declarations.
-findImports :: forall m. (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Declaration] -> m (M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])
+findImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Declaration] -> m (M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])
 findImports = foldM (go Nothing) M.empty
   where
   go pos result (ImportDeclaration mn typ qual) = do
@@ -59,7 +59,7 @@ findImports = foldM (go Nothing) M.empty
 -- |
 -- Constructs a set of imports for a module.
 --
-resolveImports :: forall m. (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
+resolveImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
   censor (onErrorMessages (ErrorInModule currentModule)) $ do
     scope <- M.insert currentModule [(Nothing, Implicit, Nothing)] <$> findImports decls
