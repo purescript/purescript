@@ -827,7 +827,11 @@ prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
 prettyPrintParseError :: P.ParseError -> Box.Box
 prettyPrintParseError = (prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input") . PE.errorMessages
 
--- | Pretty print ParseError detail messages. Adapted from Text.Parsec.Error.showErrorMessages.
+-- |
+-- Pretty print ParseError detail messages.
+--
+-- Adapted from 'Text.Parsec.Error.showErrorMessages', see <https://github.com/aslatter/parsec/blob/v3.1.9/Text/Parsec/Error.hs#L173>.
+--
 prettyPrintParseErrorMessages :: String -> String -> String -> String -> String -> [Message] -> Box.Box
 prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEndOfInput msgs
   | null msgs = Box.text msgUnknown
