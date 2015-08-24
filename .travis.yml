@@ -56,7 +56,7 @@ install:
   - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
 script:
   - ./travis/configure.sh
-  - cabal build
+  - cabal build --ghc-options="-Werror"
   - cabal test
   - ./travis/test-install.sh
 after_script:
