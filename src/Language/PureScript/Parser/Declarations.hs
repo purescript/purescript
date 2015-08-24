@@ -64,8 +64,6 @@ withSourceSpan f p = do
   end <- P.getPosition
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
   return $ f sp comments x
-  where
-  toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 kindedIdent :: TokenParser (String, Maybe Kind)
 kindedIdent = (, Nothing) <$> identifier
@@ -287,8 +285,6 @@ parseModule = do
   end <- P.getPosition
   let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
   return $ Module ss comments name decls exports
-  where
-  toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- |
 -- Parse a collection of modules
@@ -304,9 +300,19 @@ parseModulesFromFiles toFilePath input = do
   return $ collect modules
   where
   wrapError :: Either P.ParseError a -> m a
-  wrapError = either (throwError . errorMessage . ErrorParsingModule) return
+  wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
   collect :: [(k, [v])] -> [(k, v)]
   collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
+
+toPositionedError :: P.ParseError -> ErrorMessage
+toPositionedError perr = PositionedError (SourceSpan name start end) (SimpleErrorWrapper (ErrorParsingModule perr))
+  where
+  name   = (P.sourceName . P.errorPos) perr
+  start  = (toSourcePos  . P.errorPos) perr
+  end    = start
+
+toSourcePos :: P.SourcePos -> SourcePos
+toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- |
 -- Parse a collection of modules

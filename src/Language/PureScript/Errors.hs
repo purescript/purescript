@@ -45,6 +45,9 @@ import Language.PureScript.TypeClassDictionaries
 import qualified Text.PrettyPrint.Boxes as Box
 
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Error as PE
+import Text.Parsec.Error (Message(..))
+import Data.List (nub)
 
 -- |
 -- A type of error messages
@@ -405,7 +408,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (ErrorParsingExterns err) =
       paras [ lineWithLevel "parsing externs files: "
-            , indent . line . show $ err
+            , indent . prettyPrintParseError $ err
             ]
     goSimple (ErrorParsingFFIModule path) =
       paras [ line "Unable to parse module from FFI file: "
@@ -413,7 +416,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
-            , indent . line . show $ err
+            , indent . prettyPrintParseError $ err
             ]
     goSimple (MissingFFIModule mn) =
       line $ "Missing FFI implementations for module " ++ show mn
@@ -713,9 +716,6 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     go (SimpleErrorWrapper sem) = goSimple sem
 
-  line :: String -> Box.Box
-  line = Box.text
-
   lineWithLevel :: String -> Box.Box
   lineWithLevel text = line $ show level ++ " " ++ text
 
@@ -732,9 +732,6 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
-
-  indent :: Box.Box -> Box.Box
-  indent = Box.moveRight 2
 
   -- |
   -- Render a DictionaryValue fit for human consumption in error messages
@@ -825,6 +822,56 @@ prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
     Box.vcat Box.left [ Box.text intro
                       , Box.vsep 1 Box.left result
                       ]
+
+-- | Pretty print a Parsec ParseError as a Box
+prettyPrintParseError :: P.ParseError -> Box.Box
+prettyPrintParseError = (prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input") . PE.errorMessages
+
+-- | Pretty print ParseError detail messages. Adapted from Text.Parsec.Error.showErrorMessages.
+prettyPrintParseErrorMessages :: String -> String -> String -> String -> String -> [Message] -> Box.Box
+prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEndOfInput msgs
+  | null msgs = Box.text msgUnknown
+  | otherwise = Box.vcat Box.left $ map Box.text $ clean [showSysUnExpect,showUnExpect,showExpect,showMessages]
+
+  where
+  (sysUnExpect,msgs1) = span ((SysUnExpect "") ==) msgs
+  (unExpect,msgs2)    = span ((UnExpect    "") ==) msgs1
+  (expect,messages)   = span ((Expect      "") ==) msgs2
+
+  showExpect      = showMany msgExpecting expect
+  showUnExpect    = showMany msgUnExpected unExpect
+  showSysUnExpect | not (null unExpect) ||
+                    null sysUnExpect = ""
+                  | null firstMsg    = msgUnExpected ++ " " ++ msgEndOfInput
+                  | otherwise        = msgUnExpected ++ " " ++ firstMsg
+    where
+    firstMsg  = PE.messageString (head sysUnExpect)
+
+  showMessages      = showMany "" messages
+
+  -- helpers
+  showMany pre msgs' = case clean (map PE.messageString msgs') of
+                         [] -> ""
+                         ms | null pre  -> commasOr ms
+                            | otherwise -> pre ++ " " ++ commasOr ms
+
+  commasOr []       = ""
+  commasOr [m]      = m
+  commasOr ms       = commaSep (init ms) ++ " " ++ msgOr ++ " " ++ last ms
+
+  commaSep          = separate ", " . clean
+
+  separate   _ []     = ""
+  separate   _ [m]    = m
+  separate sep (m:ms) = m ++ sep ++ separate sep ms
+
+  clean             = nub . filter (not . null)
+
+indent :: Box.Box -> Box.Box
+indent = Box.moveRight 2
+
+line :: String -> Box.Box
+line = Box.text
 
 renderBox :: Box.Box -> String
 renderBox = unlines . map trimEnd . lines . Box.render
