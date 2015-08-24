@@ -166,7 +166,7 @@ library
     buildable: True
     hs-source-dirs: src
     other-modules: Paths_purescript
-    ghc-options: -Wall -Werror -O2
+    ghc-options: -Wall -O2
 
 executable psc
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -175,7 +175,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    ghc-options: -Wall -Werror -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -192,7 +192,7 @@ executable psci
                    Completion
                    PSCi
                    IO
-    ghc-options: -Wall -Werror -O2
+    ghc-options: -Wall -O2
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
@@ -205,14 +205,14 @@ executable psc-docs
     other-modules: Ctags
                    Etags
                    Tags
-    ghc-options: -Wall -Werror -O2
+    ghc-options: -Wall -O2
 
 executable psc-publish
     build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-publish
-    ghc-options: -Wall -Werror -O2
+    ghc-options: -Wall -O2
 
 executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
@@ -222,7 +222,7 @@ executable psc-hierarchy
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
-    ghc-options: -Wall -Werror -O2
+    ghc-options: -Wall -O2
 
 executable psc-bundle
   main-is:             Main.hs
@@ -237,7 +237,7 @@ executable psc-bundle
                        transformers-compat -any,
                        optparse-applicative >= 0.10.0,
                        Glob -any
-  ghc-options:         -Wall -Werror -O2
+  ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
 test-suite tests
