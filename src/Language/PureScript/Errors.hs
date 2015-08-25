@@ -392,7 +392,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
   prettyPrintErrorMessage em =
     paras $
       go em:suggestions em ++
-      [line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this error."]
+      [line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this " ++ levelText ++ "."]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
@@ -727,6 +727,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
 
   lineWithLevel :: String -> Box.Box
   lineWithLevel text = line $ show level ++ " " ++ text
+
+  levelText :: String
+  levelText = case level of
+    Error -> "error"
+    Warning -> "warning"
 
   suggestions :: ErrorMessage -> [Box.Box]
   suggestions = suggestions' . unwrapErrorMessage
