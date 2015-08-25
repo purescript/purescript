@@ -38,26 +38,29 @@ import Language.PureScript.Types
 moduleToPs :: Module -> Environment -> String
 moduleToPs (Module _ _ _ _ Nothing) _ = error "Module exports were not elaborated in moduleToPs"
 moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execWriter $ do
-  let exps = listExports exts
+  let exps = listRefs exts
   tell ["module " ++ runModuleName moduleName ++ (if null exps then "" else " (" ++ exps ++ ")") ++ " where"]
   mapM_ declToPs ds
   mapM_ exportToPs exts
   where
 
-    listExports :: [DeclarationRef] -> String
-    listExports = intercalate ", " . mapMaybe listExport
+    listRefs :: [DeclarationRef] -> String
+    listRefs = intercalate ", " . mapMaybe listRef
 
-    listExport :: DeclarationRef -> Maybe String
-    listExport (PositionedDeclarationRef _ _ d) = listExport d
-    listExport (TypeRef name Nothing) = Just $ show name ++ "()"
-    listExport (TypeRef name (Just dctors)) = Just $ show name ++ "(" ++ intercalate ", " (map show dctors) ++ ")"
-    listExport (ValueRef name) = Just $ show name
-    listExport (TypeClassRef name) = Just $ show name
-    listExport (ModuleRef name) = Just $ "module " ++ show name
-    listExport _ = Nothing
+    listRef :: DeclarationRef -> Maybe String
+    listRef (PositionedDeclarationRef _ _ d) = listRef d
+    listRef (TypeRef name Nothing) = Just $ show name ++ "()"
+    listRef (TypeRef name (Just dctors)) = Just $ show name ++ "(" ++ intercalate ", " (map show dctors) ++ ")"
+    listRef (ValueRef name) = Just $ show name
+    listRef (TypeClassRef name) = Just $ show name
+    listRef (ModuleRef name) = Just $ "module " ++ show name
+    listRef _ = Nothing
 
     declToPs :: Declaration -> Writer [String] ()
-    declToPs (ImportDeclaration mn _ _) = tell ["import " ++ show mn ++ " ()"]
+    declToPs (ImportDeclaration mn imp Nothing) =
+      tell ["import " ++ show mn ++ importToPs imp]
+    declToPs (ImportDeclaration mn imp (Just qual)) =
+      tell ["import qualified " ++ show mn ++ importToPs imp ++ " as " ++ show qual]
     declToPs (FixityDeclaration (Fixity assoc prec) op) =
       case find exportsOp exts of
         Nothing -> return ()
@@ -69,6 +72,11 @@ moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execW
       exportsOp _ = False
     declToPs (PositionedDeclaration _ com d) = mapM_ commentToPs com >> declToPs d
     declToPs _ = return ()
+
+    importToPs :: ImportDeclarationType -> String
+    importToPs Implicit = ""
+    importToPs (Explicit refs) = " (" ++ listRefs refs ++ ")"
+    importToPs (Hiding refs) = " hiding (" ++ listRefs refs ++ ")"
 
     commentToPs :: Comment -> Writer [String] ()
     commentToPs (LineComment s) = tell ["-- " ++ s]
