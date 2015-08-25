@@ -1,11 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP #-}
 
 module Main where
 
 import Control.Monad.Trans.State.Strict (runStateT)
 import Control.Monad (when, forM)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Trans.Except (runExceptT)
 
