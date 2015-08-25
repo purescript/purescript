@@ -62,7 +62,7 @@ desugarImports modules = do
   renameInModule' env m@(Module _ _ mn _ _) =
     rethrow (onErrorMessages (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn env
-      elaborateImports <$> renameInModule env imps (elaborateExports exps m)
+      elaborateImports imps <$> renameInModule env imps (elaborateExports exps m)
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that
@@ -70,11 +70,12 @@ desugarImports modules = do
 -- explicit.
 --
 elaborateExports :: Exports -> Module -> Module
-elaborateExports exps (Module ss coms mn decls _) =
+elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $
     Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (my exportedTypes) ++
            map TypeClassRef (my exportedTypeClasses) ++
-           map ValueRef (my exportedValues)
+           map ValueRef (my exportedValues) ++
+           maybe [] (filter isModuleRef) refs
   where
   -- Extracts a list of values from the exports and filters out any values that
   -- are re-exports from other modules.
@@ -85,15 +86,15 @@ elaborateExports exps (Module ss coms mn decls _) =
 -- Add `import X ()` for any modules where there are only fully qualified references to members.
 -- This ensures transitive instances are included when using a member from a module.
 --
-elaborateImports :: Module -> Module
-elaborateImports (Module ss coms mn decls exps) = Module ss coms mn decls' exps
+elaborateImports :: Imports -> Module -> Module
+elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' exps
   where
   decls' :: [Declaration]
   decls' =
     let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
     in mkImport `map` nub (f `concatMap` decls) ++ decls
   fqValues :: Expr -> [ModuleName]
-  fqValues (Var (Qualified (Just mn') _)) = [mn']
+  fqValues (Var (Qualified (Just mn') _)) | notElem mn' (importedModules imps) = [mn']
   fqValues _ = []
   mkImport :: ModuleName -> Declaration
   mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing
