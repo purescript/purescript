@@ -88,6 +88,10 @@ instance Eq DeclarationRef where
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
 
+isModuleRef :: DeclarationRef -> Bool
+isModuleRef (ModuleRef _) = True
+isModuleRef _ = False
+
 -- |
 -- The data type which specifies type of import declaration
 --

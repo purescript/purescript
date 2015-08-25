@@ -10,15 +10,17 @@
 -- |
 --
 -----------------------------------------------------------------------------
+
+{-# LANGUAGE CPP #-}
+
 module TestsSetup where
 
 import Data.Maybe (fromMaybe)
-import Control.Applicative
 
+#if __GLASGOW_HASKELL__ < 710
+import Control.Applicative
+#endif
 import Control.Monad
-
-import Control.Applicative
-
 import Control.Monad.Trans.Maybe
 
 import System.Process

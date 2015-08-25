@@ -89,6 +89,7 @@ data SimpleErrorMessage
   | UnknownExportTypeClass ProperName
   | UnknownImportValue ModuleName Ident
   | UnknownExportValue Ident
+  | UnknownExportModule ModuleName
   | UnknownImportDataConstructor ModuleName ProperName ProperName
   | UnknownExportDataConstructor ProperName ProperName
   | ConflictingImport String ModuleName
@@ -144,6 +145,7 @@ data SimpleErrorMessage
   | OverlappingPattern [[Binder]] Bool
   | ClassOperator ProperName Ident
   | MisleadingEmptyTypeImport ModuleName ProperName
+  | ImportHidingModule ModuleName
   deriving (Show)
 
 -- |
@@ -213,6 +215,7 @@ errorCode em = case unwrapErrorMessage em of
   UnknownExportTypeClass{} -> "UnknownExportTypeClass"
   UnknownImportValue{} -> "UnknownImportValue"
   UnknownExportValue{} -> "UnknownExportValue"
+  UnknownExportModule{} -> "UnknownExportModule"
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
   UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
   ConflictingImport{} -> "ConflictingImport"
@@ -268,6 +271,7 @@ errorCode em = case unwrapErrorMessage em of
   OverlappingPattern{} -> "OverlappingPattern"
   ClassOperator{} -> "ClassOperator"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
+  ImportHidingModule{} -> "ImportHidingModule"
 
 -- |
 -- A stack trace for an error
@@ -491,6 +495,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Module " ++ show mn ++ " does not export value " ++ show name
     goSimple (UnknownExportValue name) =
       line $ "Cannot export unknown value " ++ show name
+    goSimple (UnknownExportModule name) =
+      line $ "Cannot export unknown module " ++ show name ++ ", it either does not exist or has not been imported by the current module"
     goSimple (UnknownImportDataConstructor mn tcon dcon) =
       line $ "Module " ++ show mn ++ " does not export data constructor " ++ show dcon ++ " for type " ++ show tcon
     goSimple (UnknownExportDataConstructor tcon dcon) =
@@ -622,6 +628,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             ]
     goSimple (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " ++ show name ++ "(..) from " ++ show mn ++ " is misleading as it has no exported data constructors"
+    goSimple (ImportHidingModule name) =
+      line $ "Attempted to hide module " ++ show name ++ " in import expression, this is not permitted"
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     goSimple (NotExhaustivePattern bs b) =

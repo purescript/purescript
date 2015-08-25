@@ -102,3 +102,16 @@ instance (a ~ ProperName) => A.FromJSON (Qualified a) where
 qualify :: ModuleName -> Qualified a -> (ModuleName, a)
 qualify m (Qualified Nothing a) = (m, a)
 qualify _ (Qualified (Just m) a) = (m, a)
+
+-- |
+-- Makes a qualified value from a name and module name.
+--
+mkQualified :: a -> ModuleName -> Qualified a
+mkQualified name mn = Qualified (Just mn) name
+
+-- |
+-- Checks whether a qualified value is actually qualified with a module reference
+--
+isUnqualified :: Qualified a -> Bool
+isUnqualified (Qualified Nothing _) = True
+isUnqualified _ = False
