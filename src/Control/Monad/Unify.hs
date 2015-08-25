@@ -28,6 +28,7 @@ import Data.Monoid
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.HashMap.Strict as M
 
@@ -92,7 +93,7 @@ class UnificationError t e where
 -- The type checking monad, which provides the state of the type checker, and error reporting capabilities
 --
 newtype UnifyT t m a = UnifyT { unUnify :: StateT (UnifyState t) m a }
-  deriving (Functor, Monad, Applicative, Alternative, MonadPlus)
+  deriving (Functor, Monad, Applicative, Alternative, MonadPlus, MonadWriter w)
 
 instance (MonadState s m) => MonadState s (UnifyT t m) where
   get = UnifyT . lift $ get

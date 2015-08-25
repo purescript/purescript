@@ -184,7 +184,7 @@ replaceTypeClassDictionaries mn =
   where
   go (TypeClassDictionary constraint dicts) = do
     env <- getEnv
-    entails env mn dicts constraint 
+    entails env mn dicts constraint
   go other = return other
 
 -- |
@@ -305,7 +305,7 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
-infer' (PositionedValue pos _ val) = rethrowWithPosition pos $ infer' val
+infer' (PositionedValue pos _ val) = warnAndRethrowWithPosition pos $ infer' val
 infer' _ = error "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
@@ -334,7 +334,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   bindNames dict $ do
     makeBindingGroupVisible
     inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = rethrowWithPosition pos $ do
+inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPosition pos $ do
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos com d' : ds', val')
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
@@ -406,7 +406,7 @@ inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
-  rethrowWithPosition pos $ inferBinder val binder
+  warnAndRethrowWithPosition pos $ inferBinder val binder
 
 -- |
 -- Check the types of the return values in a set of binders in a case statement
@@ -458,15 +458,15 @@ check' val t@(ConstrainedType constraints ty) = do
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
   where
-  -- | Add a dictionary for the constraint to the scope, and dictionaries 
+  -- | Add a dictionary for the constraint to the scope, and dictionaries
   -- for all implies superclass instances.
   newDictionaries :: [(Qualified ProperName, Integer)] -> Qualified Ident -> (Qualified ProperName, [Type]) -> Check [TypeClassDictionaryInScope]
   newDictionaries path name (className, instanceTy) = do
-    tcs <- gets (typeClasses . checkEnv) 
+    tcs <- gets (typeClasses . checkEnv)
     let (args, _, superclasses) = fromMaybe (error "newDictionaries: type class lookup failed") $ M.lookup className tcs
-    supDicts <- join <$> zipWithM (\(supName, supArgs) index -> 
-                                      newDictionaries ((supName, index) : path) 
-                                                      name 
+    supDicts <- join <$> zipWithM (\(supName, supArgs) index ->
+                                      newDictionaries ((supName, index) : path)
+                                                      name
                                                       (supName, instantiateSuperclass (map fst args) supArgs instanceTy)
                                   ) superclasses [0..]
     return (TypeClassDictionaryInScope name path className instanceTy Nothing TCDRegular : supDicts)
@@ -586,7 +586,7 @@ check' val kt@(KindedType ty kind) = do
   val' <- check' val ty
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
-  rethrowWithPosition pos $ check' val ty
+  warnAndRethrowWithPosition pos $ check' val ty
 check' val ty = throwError . errorMessage $ ExprDoesNotHaveType val ty
 
 containsTypeSynonyms :: Type -> Bool

@@ -841,6 +841,9 @@ interpretMultipleErrorsAndWarnings (err, ws) = do
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
 
+warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
+warnAndRethrow f = rethrow f . censor f
+
 -- |
 -- Rethrow an error with source position information
 --
@@ -849,6 +852,9 @@ rethrowWithPosition pos = rethrow (onErrorMessages (withPosition pos))
 
 warnWithPosition :: (MonadWriter MultipleErrors m) => SourceSpan -> m a -> m a
 warnWithPosition pos = censor (onErrorMessages (withPosition pos))
+
+warnAndRethrowWithPosition :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => SourceSpan -> m a -> m a
+warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
 withPosition _ (PositionedError pos err) = withPosition pos err
