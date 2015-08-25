@@ -26,7 +26,7 @@ import Data.List (find, intersect)
 import Data.Maybe (fromMaybe, mapMaybe)
 
 #if __GLASGOW_HASKELL__ < 710
-import Control.Applicative (Applicative(..), (<$>), (<*>))
+import Control.Applicative (Applicative(..), (<$>))
 #endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
