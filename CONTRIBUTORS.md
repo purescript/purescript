@@ -2,6 +2,8 @@
 
 This file lists the contributors to the PureScript compiler project, and the terms under which their code is licensed.
 
+### Individuals
+
 - [@5outh](https://github.com/5outh) (Benjamin Kovach) - My existing contributions and all future contributions until further notice are Copyright Benjamin Kovach, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
 - [@andyarvanitis](https://github.com/andyarvanitis) (Andy Arvanitis) My existing contributions and all future contributions until further notice are Copyright Andy Arvanitis, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@anthok88](https://github.com/anthoq88) - My existing contributions and all future contributions until further notice are Copyright anthoq88, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license
@@ -40,6 +42,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@pelotom](https://github.com/pelotom) (Thomas Crockett) My existing contributions and all future contributions until further notice are Copyright Thomas Crockett, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@phadej](https://github.com/phadej) (Oleg Grenrus) My existing contributions and all future contributions until further notice are Copyright Oleg Grenrus, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@pseudonom](https://github.com/pseudonom) (Eric Easley) My existing contributions and all future contributions until further notice are Copyright Eric Easley, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- [@puffnfresh](https://github.com/puffnfresh) (Brian McKenna) All contributions I made during June 2015 were during employment at [SlamData, Inc.](#Companies) who owns the copyright. I assign copyright of all my personal contributions before June 2015 to the owners of the PureScript compiler.
 - [@robdaemon](https://github.com/robdaemon) (Robert Roland) My existing contributions and all future contributions until further notice are Copyright Robert Roland, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@RossMeikleham](https://github.com/RossMeikleham) (Ross Meikleham) My existing contributions and all future contributions until further notice are Copyright Ross Meikleham, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@sebastiaanvisser](https://github.com/sebastiaanvisser) (Sebastiaan Visser) - My existing contributions and all future contributions until further notice are Copyright Sebastiaan Visser, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
@@ -51,3 +54,6 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@zudov](https://github.com/zudov) (Konstantin Zudov) My existing contributions and all future contributions until further notice are Copyright Konstantin Zudov, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 <http://opensource.org/licenses/MIT>.
 
+### Companies
+
+- [@slamdata](https://github.com/slamdata) (SlamData, Inc.) Speaking on behalf of SlamData for SlamData employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright SlamData Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @jdegoes
