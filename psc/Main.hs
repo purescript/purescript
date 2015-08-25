@@ -24,6 +24,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Strict
 
+import Data.List (isSuffixOf, partition)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
@@ -56,9 +57,10 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
   when (null input) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
-  moduleFiles <- readInput (InputOptions input)
+  let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
+  moduleFiles <- readInput (InputOptions pursFiles)
   inputForeign <- globWarningOnMisses warnFileTypeNotFound inputForeignGlob
-  foreignFiles <- forM inputForeign (\inFile -> (inFile,) <$> readFile inFile)
+  foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readFile inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do
       hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
@@ -79,7 +81,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
           exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ((++) "psc: No files found using pattern: ")
+warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: " ++)
 
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
