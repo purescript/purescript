@@ -34,6 +34,7 @@ import Control.Applicative
 import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (tell)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
@@ -83,7 +84,9 @@ entails env moduleName context = solve
         unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
         unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return a
-        unique tcds | pairwise overlapping (map snd tcds) = throwError . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
+        unique tcds | pairwise overlapping (map snd tcds) = do
+                        tell . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
+                        return (head tcds)
                     | otherwise = return (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
         -- |
@@ -94,6 +97,8 @@ entails env moduleName context = solve
         overlapping :: TypeClassDictionaryInScope -> TypeClassDictionaryInScope -> Bool
         overlapping TypeClassDictionaryInScope{ tcdPath = _ : _ } _ = False
         overlapping _ TypeClassDictionaryInScope{ tcdPath = _ : _ } = False
+        overlapping TypeClassDictionaryInScope{ tcdDependencies = Nothing } _ = False
+        overlapping _ TypeClassDictionaryInScope{ tcdDependencies = Nothing } = False
         overlapping tcd1 tcd2 = tcdName tcd1 /= tcdName tcd2
 
         -- Create dictionaries for subgoals which still need to be solved by calling go recursively

@@ -1,5 +1,4 @@
--- @shouldFailWith OverlappingInstances
-module OverlappingInstances where
+module Main where
 
 import Prelude
 
@@ -21,4 +20,4 @@ instance ordA :: Ord A where
 test :: forall a. (Ord a) => a -> a -> String
 test x y = show $ x == y
 
-main = Control.Monad.Eff.Console.log $ test A B
+main = Test.Assert.assert $ test A B == "false"

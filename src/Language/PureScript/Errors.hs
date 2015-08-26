@@ -558,10 +558,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "with type"
             , indent $ line $ prettyPrintType t2
             ]
-    goSimple (OverlappingInstances nm ts ds) =
+    goSimple (OverlappingInstances nm ts (d : ds)) =
       paras [ line $ "Overlapping instances found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ ":"
-            , line $ intercalate ", " (map show ds)
+            , indent $ paras (line (show d ++ " (chosen)") : map (line . show) ds)
             ]
+    goSimple OverlappingInstances{} = error "OverlappingInstances: empty instance list"
     goSimple (NoInstanceFound nm ts) =
       line $ "No instance found for " ++ show nm ++ " " ++ unwords (map prettyPrintTypeAtom ts)
     goSimple (PossiblyInfiniteInstance nm ts) =
