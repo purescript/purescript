@@ -1,5 +1,4 @@
--- @shouldFailWith OverlappingInstances
-module OverlappingInstances where
+module Main where
 
 import Prelude
 
