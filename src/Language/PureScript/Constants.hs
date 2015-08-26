@@ -89,6 +89,9 @@ unsafeIndex = "unsafeIndex"
 (<<<) :: String
 (<<<) = "<<<"
 
+compose :: String
+compose = "compose"
+
 -- Functions
 
 negate :: String
@@ -235,8 +238,8 @@ booleanAlgebraBoolean = "booleanAlgebraBoolean"
 semigroupString :: String
 semigroupString = "semigroupString"
 
-semigroupoidArr :: String
-semigroupoidArr = "semigroupoidArr"
+semigroupoidFn :: String
+semigroupoidFn = "semigroupoidFn"
 
 -- Generic Deriving
 

@@ -66,7 +66,7 @@ optimize js = do
 optimize' :: (Monad m, MonadReader Options m, Applicative m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  untilFixedPoint (inlineArrComposition . applyAll
+  untilFixedPoint (inlineFnComposition . applyAll
     [ collapseNestedBlocks
     , collapseNestedIfs
     , tco opts

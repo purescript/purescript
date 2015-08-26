@@ -20,7 +20,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner (
   inlineValues,
   inlineOperator,
   inlineCommonOperators,
-  inlineArrComposition,
+  inlineFnComposition,
   etaConvert,
   unThunk,
   evaluateIifes
@@ -244,18 +244,18 @@ inlineCommonOperators = applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineArrComposition :: (Applicative m, MonadSupply m) => JS -> m JS
-inlineArrComposition = everywhereOnJSTopDownM convert
+inlineFnComposition :: (Applicative m, MonadSupply m) => JS -> m JS
+inlineFnComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS
-  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isArrCompose dict' fn =
+  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z]) | isFnCompose dict' fn =
     return $ JSApp x [JSApp y [z]]
-  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isArrCompose dict' fn = do
+  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isFnCompose dict' fn = do
     arg <- freshName
     return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp x [JSApp y [JSVar arg]]])
   convert other = return other
-  isArrCompose :: JS -> JS -> Bool
-  isArrCompose dict' fn = isDict semigroupoidArr dict' && isPreludeFn (C.<<<) fn
+  isFnCompose :: JS -> JS -> Bool
+  isFnCompose dict' fn = isDict semigroupoidFn dict' && (isPreludeFn (C.<<<) fn || isPreludeFn (C.compose) fn)
 
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
@@ -314,5 +314,5 @@ boundedBoolean = (C.prelude, C.boundedBoolean)
 booleanAlgebraBoolean :: (String, String)
 booleanAlgebraBoolean = (C.prelude, C.booleanAlgebraBoolean)
 
-semigroupoidArr :: (String, String)
-semigroupoidArr = (C.prelude, C.semigroupoidArr)
+semigroupoidFn :: (String, String)
+semigroupoidFn = (C.prelude, C.semigroupoidFn)
