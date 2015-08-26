@@ -10,4 +10,4 @@ instance showA1 :: Show A where
 instance showA2 :: Show A where
   show A = "Instance 2"
 
-main = Control.Monad.Eff.Console.log $ show A
+main = Test.Assert.assert $ show A == "Instance 1"
