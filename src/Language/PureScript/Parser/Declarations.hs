@@ -366,7 +366,7 @@ parseConstructor = Constructor <$> C.parseQualified C.properName
 
 parseCase :: TokenParser Expr
 parseCase = Case <$> P.between (P.try (reserved "case")) (C.indented *> reserved "of") (return <$> parseValue)
-                 <*> (C.indented *> C.mark (P.many (C.same *> C.mark parseCaseAlternative)))
+                 <*> (C.indented *> C.mark (P.many1 (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: TokenParser CaseAlternative
 parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
