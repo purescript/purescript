@@ -55,14 +55,14 @@ import System.FilePath.Posix ((</>))
 --
 moduleToJs :: forall m. (Applicative m, Monad m, MonadReader Options m, MonadSupply m)
            => Module Ann -> Maybe JS -> m [JS]
-moduleToJs (Module coms mn imps exps foreigns decls) foreign = do
+moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
   jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
   jsDecls <- mapM bindToJs decls
   optimized <- T.traverse (T.traverse optimize) jsDecls
   comments <- not <$> asks optionsNoComments
   let strict = JSStringLiteral "use strict"
   let header = if comments && not (null coms) then JSComment coms strict else strict
-  let foreign' = [JSVariableIntroduction "$foreign" foreign | not $ null foreigns || foreign == Nothing]
+  let foreign' = [JSVariableIntroduction "$foreign" foreign_ | not $ null foreigns || foreign_ == Nothing]
   let moduleBody = header : foreign' ++ jsImports ++ concat optimized
   let foreignExps = exps `intersect` (fst `map` foreigns)
   let standardExps = exps \\ foreignExps
