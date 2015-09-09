@@ -23,7 +23,6 @@ import Prelude hiding (userError)
 
 import Data.Maybe
 import Data.Char (isSpace)
-import Data.String (fromString)
 import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
 import Data.List.Split (splitOn)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -32,6 +31,8 @@ import Data.Function (on)
 import Safe (headMay)
 import Data.Aeson.BetterErrors
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
 
 #if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
@@ -245,7 +246,7 @@ data DependencyStatus
 getResolvedDependencies :: [PackageName] -> PrepareM [(PackageName, Version)]
 getResolvedDependencies declaredDeps = do
   bower <- findBowerExecutable
-  depsBS <- fromString <$> readProcess' bower ["list", "--json", "--offline"] ""
+  depsBS <- packUtf8 <$> readProcess' bower ["list", "--json", "--offline"] ""
 
   -- Check for undeclared dependencies
   toplevels <- catchJSON (parse asToplevelDependencies depsBS)
@@ -255,6 +256,7 @@ getResolvedDependencies declaredDeps = do
   handleDeps deps
 
   where
+  packUtf8 = TL.encodeUtf8 . TL.pack
   catchJSON = flip catchLeft (internalError . JSONError FromBowerList)
 
 findBowerExecutable :: PrepareM String
