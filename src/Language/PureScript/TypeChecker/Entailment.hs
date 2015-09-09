@@ -76,11 +76,11 @@ entails env moduleName context = solve
         (subst, tcd) <- unique instances
         -- Solve any necessary subgoals
         args <- solveSubgoals subst (tcdDependencies tcd)
-        return $ foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index) 
-                       (mkDictionary (canonicalizeDictionary tcd) args) 
+        return $ foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
+                       (mkDictionary (canonicalizeDictionary tcd) args)
                        (tcdPath tcd)
         where
-            
+
         unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
         unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return a
@@ -109,13 +109,13 @@ entails env moduleName context = solve
         solveSubgoals subst (Just subgoals) = do
           dict <- mapM (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
           return $ Just dict
-        
+
         -- Make a dictionary from subgoal dictionaries by applying the correct function
         mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
         mkDictionary fnName Nothing = LocalDictionaryValue fnName
         mkDictionary fnName (Just []) = GlobalDictionaryValue fnName
         mkDictionary fnName (Just dicts) = DependentDictionaryValue fnName dicts
-      
+
       -- Turn a DictionaryValue into a Expr
       dictionaryValueToValue :: DictionaryValue -> Expr
       dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
@@ -128,10 +128,10 @@ entails env moduleName context = solve
       -- Ensure that a substitution is valid
       verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
       verifySubstitution subst = do
-        let grps = groupBy ((==) `on` fst) subst
+        let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
         guard (all (pairwise (unifiesWith env) . map snd) grps)
         return $ map head grps
-      
+
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
@@ -143,7 +143,7 @@ typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String
 typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2 
+typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2
                                                                                   <*> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
   Left  _  -> Nothing
@@ -152,16 +152,16 @@ typeHeadsAreEqual _ _ REmpty REmpty = Just []
 typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
-      
+
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int 
+  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int
           <*> go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-  go [] REmpty          [] REmpty          = Just [] 
-  go [] (TUnknown _)    _  _               = Just [] 
+  go [] REmpty          [] REmpty          = Just []
+  go [] (TUnknown _)    _  _               = Just []
   go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
   go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
