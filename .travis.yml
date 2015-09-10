@@ -18,11 +18,11 @@ matrix:
     - env: GHCVER=7.10.1
       compiler: ": #GHC 7.10.1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 STACKAGE=lts=3.2 RUNSDISTTESTS=YES
-      compiler: ": #GHC 7.10.2 lts-3.2"
+    - env: GHCVER=7.10.2 STACKAGE=lts=3.4 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.2 lts-3.4"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.10.2 STACKAGE=nightly-2015-08-24
-      compiler: ": #GHC 7.10.2 nightly-2015-08-24"
+      compiler: ": #GHC 7.10.2 nightly-2015-09-09"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
 before_install:
   - unset CC
