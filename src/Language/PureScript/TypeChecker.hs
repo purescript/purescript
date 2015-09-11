@@ -206,7 +206,7 @@ typeCheckAll mainModuleName moduleName _ ds = mapM go ds <* mapM_ checkOrphanFix
     warnAndRethrow (onErrorMessages (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
-      guardWith (errorMessage (ExpectedType kind)) $ kind == Star
+      guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })

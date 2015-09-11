@@ -128,7 +128,7 @@ data SimpleErrorMessage
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
   | ExtraneousClassMember Ident
-  | ExpectedType Kind
+  | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified ProperName)
   | SubsumptionCheckFailed
   | ExprDoesNotHaveType Expr Type
@@ -590,8 +590,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Member " ++ show ident ++ " has not been implemented"
     goSimple (ExtraneousClassMember ident) =
       line $ "Member " ++ show ident ++ " is not a member of the class being instantiated"
-    goSimple (ExpectedType kind) =
-      line $ "Expected type of kind *, was " ++ prettyPrintKind kind
+    goSimple (ExpectedType ty kind) =
+      paras [ line "In a type-annotated expression x :: t, the type t must have kind *."
+            , line $ "The error arises from the type " ++ prettyPrintType ty ++ " having the kind "  ++ prettyPrintKind kind ++ " instead."
+            ]
     goSimple (IncorrectConstructorArity nm) =
       line $ "Wrong number of arguments to constructor " ++ show nm
     goSimple SubsumptionCheckFailed = line $ "Unable to check type subsumption"
