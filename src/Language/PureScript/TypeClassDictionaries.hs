@@ -38,7 +38,7 @@ data TypeClassDictionaryInScope
     , tcdDependencies :: Maybe [Constraint]
     -- | The type of this dictionary
     , tcdType :: TypeClassDictionaryType
-    } deriving (Show, Data, Typeable)
+    } deriving (Show, Read, Data, Typeable)
 
 -- |
 -- The type of a type class dictionary
@@ -51,7 +51,7 @@ data TypeClassDictionaryType
   -- |
   -- A type class dictionary which is an alias for an imported dictionary from another module
   --
-  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+  | TCDAlias (Qualified Ident) deriving (Show, Read, Eq, Data, Typeable)
 
 -- |
 -- A simplified representation of expressions which are used to represent type
@@ -74,7 +74,7 @@ data DictionaryValue
   -- A subclass dictionary
   --
   | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
-  deriving (Show, Ord, Eq)
+  deriving (Show, Read, Ord, Eq)
 
 -- |
 -- Find the original dictionary which a type class dictionary in scope refers to

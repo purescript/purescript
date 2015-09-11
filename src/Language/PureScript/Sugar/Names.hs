@@ -208,12 +208,12 @@ renameInModule env imports (Module ss coms mn decls exps) =
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names
   -- (e.g. M.Map -> Data.Map.Map).
-  update :: (Ord a, Show a) => (Qualified a -> SimpleErrorMessage)
-                            -> M.Map (Qualified a) (Qualified a, ModuleName)
-                            -> (Exports -> a -> Maybe (Qualified a))
-                            -> Qualified a
-                            -> Maybe SourceSpan
-                            -> m (Qualified a)
+  update :: (Ord a) => (Qualified a -> SimpleErrorMessage)
+                       -> M.Map (Qualified a) (Qualified a, ModuleName)
+                       -> (Exports -> a -> Maybe (Qualified a))
+                       -> Qualified a
+                       -> Maybe SourceSpan
+                       -> m (Qualified a)
   update unknown imps getE qname@(Qualified mn' name) pos = positioned $
     case (M.lookup qname imps, mn') of
       -- We found the name in our imports, so we return the name for it,

@@ -69,7 +69,7 @@ getConstructors env defmn n = extractConstructors lnte
   getConsDataName con = qualifyName nm defmn con
     where
     nm = case getConsInfo con of
-           Nothing -> error $ "ProperName " ++ show con ++ " not in the scope of the current environment in getConsDataName."
+           Nothing -> error $ "Constructor " ++ showQualified runProperName con ++ " not in the scope of the current environment in getConsDataName."
            Just (_, pm, _, _) -> pm
 
   getConsInfo :: (Qualified ProperName) -> Maybe (DataDeclType, ProperName, Type, [Ident])
@@ -280,4 +280,3 @@ checkExhaustiveDecls env mn ds =
 --
 checkExhaustiveModule :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> Module -> m ()
 checkExhaustiveModule env (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds
-

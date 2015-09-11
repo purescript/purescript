@@ -60,7 +60,7 @@ data TestResult
   = ParseFailed String
   | Mismatch ByteString ByteString -- ^ encoding before, encoding after
   | Pass ByteString
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Test JSON encoding/decoding; parse the package, roundtrip to/from JSON,
 -- and check we get the same string.

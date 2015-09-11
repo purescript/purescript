@@ -26,6 +26,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows
 
 import Language.PureScript.Types
+import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Kinds
@@ -37,11 +38,11 @@ typeLiterals = mkPattern match
   match TypeWildcard = Just "_"
   match (TypeVar var) = Just var
   match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
-  match (TypeConstructor ctor) = Just $ show ctor
+  match (TypeConstructor ctor) = Just $ showQualified runProperName ctor
   match (TUnknown u) = Just $ '_' : show u
   match (Skolem name s _) = Just $ name ++ show s
-  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
-  match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
+  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> showQualified runProperName pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
+  match (SaturatedTypeSynonym name args) = Just $ showQualified runProperName name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
   match REmpty = Just "()"
   match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
@@ -124,4 +125,3 @@ prettyPrintTypeAtom = fromMaybe (error "Incomplete pattern") . pattern matchType
 --
 prettyPrintType :: Type -> String
 prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
-

@@ -39,7 +39,7 @@ import Language.PureScript.Traversals
 -- |
 -- An identifier for the scope of a skolem variable
 --
-newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Eq, Ord, Data, Typeable, A.ToJSON, A.FromJSON)
+newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Read, Eq, Ord, Data, Typeable, A.ToJSON, A.FromJSON)
 
 -- |
 -- The type of types
@@ -105,7 +105,7 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintForAll [String] Type deriving (Show, Eq, Ord, Data, Typeable)
+  | PrettyPrintForAll [String] Type deriving (Show, Read,Eq, Ord, Data, Typeable)
 
 -- |
 -- A typeclass constraint

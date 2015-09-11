@@ -49,22 +49,22 @@ moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execW
 
     listRef :: DeclarationRef -> Maybe String
     listRef (PositionedDeclarationRef _ _ d) = listRef d
-    listRef (TypeRef name Nothing) = Just $ show name ++ "()"
-    listRef (TypeRef name (Just dctors)) = Just $ show name ++ "(" ++ intercalate ", " (map show dctors) ++ ")"
-    listRef (ValueRef name) = Just $ show name
-    listRef (TypeClassRef name) = Just $ show name
-    listRef (ModuleRef name) = Just $ "module " ++ show name
+    listRef (TypeRef name Nothing) = Just $ runProperName name ++ "()"
+    listRef (TypeRef name (Just dctors)) = Just $ runProperName name ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
+    listRef (ValueRef name) = Just $ showIdent name
+    listRef (TypeClassRef name) = Just $ runProperName name
+    listRef (ModuleRef name) = Just $ "module " ++ runModuleName name
     listRef _ = Nothing
 
     declToPs :: Declaration -> Writer [String] ()
     declToPs (ImportDeclaration mn imp Nothing) =
-      tell ["import " ++ show mn ++ importToPs imp]
+      tell ["import " ++ runModuleName mn ++ importToPs imp]
     declToPs (ImportDeclaration mn imp (Just qual)) =
-      tell ["import qualified " ++ show mn ++ importToPs imp ++ " as " ++ show qual]
+      tell ["import qualified " ++ runModuleName mn ++ importToPs imp ++ " as " ++ runModuleName qual]
     declToPs (FixityDeclaration (Fixity assoc prec) op) =
       case find exportsOp exts of
         Nothing -> return ()
-        Just _ -> tell [ unwords [ show assoc, show prec, op ] ]
+        Just _ -> tell [ unwords [ showAssoc assoc, show prec, op ] ]
       where
       exportsOp :: DeclarationRef -> Bool
       exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r
@@ -86,14 +86,14 @@ moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execW
     exportToPs (PositionedDeclarationRef _ _ r) = exportToPs r
     exportToPs (TypeRef pn dctors) =
       case Qualified (Just moduleName) pn `M.lookup` types env of
-        Nothing -> error $ show pn ++ " has no kind in exportToPs"
+        Nothing -> error $ runProperName pn ++ " has no kind in exportToPs"
         Just (kind, ExternData) ->
-          tell ["foreign import data " ++ show pn ++ " :: " ++ prettyPrintKind kind]
+          tell ["foreign import data " ++ runProperName pn ++ " :: " ++ prettyPrintKind kind]
         Just (_, DataType args tys) -> do
           let dctors' = fromMaybe (map fst tys) dctors
               printDctor dctor = case dctor `lookup` tys of
                                    Nothing -> Nothing
-                                   Just tyArgs -> Just $ show dctor ++ " " ++ unwords (map prettyPrintTypeAtom tyArgs)
+                                   Just tyArgs -> Just $ runProperName dctor ++ " " ++ unwords (map prettyPrintTypeAtom tyArgs)
           let dtype = if length dctors' == 1 && isNewtypeConstructor env (Qualified (Just moduleName) $ head dctors')
                       then "newtype"
                       else "data"
@@ -101,7 +101,7 @@ moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execW
           tell [dtype ++ " " ++ typeName ++ (if null dctors' then "" else " = " ++ intercalate " | " (mapMaybe printDctor dctors'))]
         Just (_, TypeSynonym) ->
           case Qualified (Just moduleName) pn `M.lookup` typeSynonyms env of
-            Nothing -> error $ show pn ++ " has no type synonym info in exportToPs"
+            Nothing -> error $ runProperName pn ++ " has no type synonym info in exportToPs"
             Just (args, synTy) ->
               let
                 typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing pn)) (map toTypeVar args)
@@ -110,29 +110,29 @@ moduleToPs (Module _ _ moduleName ds (Just exts)) env = intercalate "\n" . execW
 
     exportToPs (ValueRef ident) =
       case (moduleName, ident) `M.lookup` names env of
-        Nothing -> error $ show ident ++ " has no type in exportToPs"
+        Nothing -> error $ showIdent ident ++ " has no type in exportToPs"
         Just (ty, nk, _) | nk == Public || nk == External ->
-          tell ["foreign import " ++ show ident ++ " :: " ++ prettyPrintType ty]
+          tell ["foreign import " ++ showIdent ident ++ " :: " ++ prettyPrintType ty]
         _ -> return ()
     exportToPs (TypeClassRef className) =
       case Qualified (Just moduleName) className `M.lookup` typeClasses env of
-        Nothing -> error $ show className ++ " has no type class definition in exportToPs"
+        Nothing -> error $ runProperName className ++ " has no type class definition in exportToPs"
         Just (args, members, implies) -> do
           let impliesString = if null implies
                               then ""
-                              else "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
+                              else "(" ++ intercalate ", " (map (\(pn, tys') -> showQualified runProperName pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) implies) ++ ") <= "
               typeName = prettyPrintType $ foldl TypeApp (TypeConstructor (Qualified Nothing className)) (map toTypeVar args)
           tell ["class " ++ impliesString ++ typeName ++ " where"]
           forM_ (filter (isValueExported . fst) members) $ \(member ,ty) ->
-            tell [ "  " ++ show member ++ " :: " ++ prettyPrintType ty ]
+            tell [ "  " ++ showIdent member ++ " :: " ++ prettyPrintType ty ]
 
     exportToPs (TypeInstanceRef ident) = do
       let TypeClassDictionaryInScope { tcdClassName = className, tcdInstanceTypes = tys, tcdDependencies = deps} =
             fromMaybe (error $ "Type class instance has no dictionary in exportToPs") . find (\tcd -> tcdName tcd == Qualified (Just moduleName) ident && tcdType tcd == TCDRegular) . maybe [] (M.elems >=> M.elems) . M.lookup (Just moduleName) $ typeClassDictionaries env
       let constraintsText = case fromMaybe [] deps of
                               [] -> ""
-                              cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "
-      tell ["foreign import instance " ++ show ident ++ " :: " ++ constraintsText ++ show className ++ " " ++ unwords (map prettyPrintTypeAtom tys)]
+                              cs -> "(" ++ intercalate ", " (map (\(pn, tys') -> showQualified runProperName pn ++ " " ++ unwords (map prettyPrintTypeAtom tys')) cs) ++ ") => "
+      tell ["foreign import instance " ++ showIdent ident ++ " :: " ++ constraintsText ++ showQualified runProperName className ++ " " ++ unwords (map prettyPrintTypeAtom tys)]
 
     exportToPs (ModuleRef _) = return ()
 

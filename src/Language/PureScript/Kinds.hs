@@ -49,7 +49,7 @@ data Kind
   -- |
   -- Function kinds
   --
-  | FunKind Kind Kind deriving (Show, Eq, Ord, Data, Typeable)
+  | FunKind Kind Kind deriving (Show, Read, Eq, Ord, Data, Typeable)
 
 $(A.deriveJSON A.defaultOptions ''Kind)
 

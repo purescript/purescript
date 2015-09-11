@@ -25,7 +25,7 @@ import Language.PureScript.Parser.Lexer (reservedPsNames, opChars)
 parens :: String -> String
 parens s = ('(':s) ++ ")"
 
-newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
+newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Read, Eq, Ord)
 
 -- |
 -- Number of characters per identation level

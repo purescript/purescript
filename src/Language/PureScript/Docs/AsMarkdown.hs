@@ -98,7 +98,7 @@ childToString f decl@ChildDeclaration{..} =
 data First
   = First
   | NotFirst
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord)
 
 type Docs = Writer [String] ()
 

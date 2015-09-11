@@ -147,7 +147,7 @@ getModulesAndBookmarks = do
   renderModules bookmarks modules =
     return (bookmarks, map D.convertModule modules)
 
-data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
+data TreeStatus = Clean | Dirty deriving (Show, Read, Eq, Ord, Enum)
 
 getGitWorkingTreeStatus :: PrepareM TreeStatus
 getGitWorkingTreeStatus = do
@@ -228,7 +228,7 @@ data DependencyStatus
   | ResolvedVersion String
     -- ^ Resolved to a version. The String argument is the resolution tag (eg,
     -- "v0.1.0").
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq)
 
 -- Go through all bower dependencies which contain purescript code, and
 -- extract their versions.

@@ -111,7 +111,7 @@ resolveImport currentModule importModule exps imps impQual =
     check _ = error "Invalid argument to checkRefs"
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a, Show a) => (ModuleName -> a -> SimpleErrorMessage) -> [a] -> a -> m ()
+  checkImportExists :: (Eq a) => (ModuleName -> a -> SimpleErrorMessage) -> [a] -> a -> m ()
   checkImportExists unknown exports item =
     when (item `notElem` exports) $ throwError . errorMessage $ unknown importModule item
 
@@ -149,20 +149,20 @@ resolveImport currentModule importModule exps imps impQual =
   importExplicit imp (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos . warnWithPosition pos $ importExplicit imp r
   importExplicit imp (ValueRef name) = do
-    values' <- updateImports (importedValues imp) (exportedValues exps) name
+    values' <- updateImports (importedValues imp) showIdent (exportedValues exps) name
     return $ imp { importedValues = values' }
   importExplicit imp (TypeRef name dctors) = do
-    types' <- updateImports (importedTypes imp) (first fst `map` exportedTypes exps) name
+    types' <- updateImports (importedTypes imp) runProperName (first fst `map` exportedTypes exps) name
     let exportedDctors :: [(ProperName, ModuleName)]
         exportedDctors = allExportedDataConstructors name
         dctorNames :: [ProperName]
         dctorNames = fst `map` exportedDctors
     maybe (return ()) (mapM_ $ checkDctorExists name dctorNames) dctors
     when (null dctorNames && isNothing dctors) . tell . errorMessage $ MisleadingEmptyTypeImport importModule name
-    dctors' <- foldM (flip updateImports exportedDctors) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
+    dctors' <- foldM (\m -> updateImports m runProperName exportedDctors) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
   importExplicit imp (TypeClassRef name) = do
-    typeClasses' <- updateImports (importedTypeClasses imp) (exportedTypeClasses exps) name
+    typeClasses' <- updateImports (importedTypeClasses imp) runProperName (exportedTypeClasses exps) name
     return $ imp { importedTypeClasses = typeClasses' }
   importExplicit _ _ = error "Invalid argument to importExplicit"
 
@@ -174,11 +174,12 @@ resolveImport currentModule importModule exps imps impQual =
       Just ((_, dctors), mn) -> map (, mn) dctors
 
   -- Add something to the Imports if it does not already exist there
-  updateImports :: (Ord a, Show a) => M.Map (Qualified a) (Qualified a, ModuleName)
-                                   -> [(a, ModuleName)]
-                                   -> a
-                                   -> m (M.Map (Qualified a) (Qualified a, ModuleName))
-  updateImports imps' exps' name = case M.lookup (Qualified impQual name) imps' of
+  updateImports :: (Ord a) => M.Map (Qualified a) (Qualified a, ModuleName)
+                              -> (a -> String)
+                              -> [(a, ModuleName)]
+                              -> a
+                              -> m (M.Map (Qualified a) (Qualified a, ModuleName))
+  updateImports imps' render exps' name = case M.lookup (Qualified impQual name) imps' of
 
     -- If the name is not already present add it to the list, after looking up
     -- where it was originally defined
@@ -195,8 +196,8 @@ resolveImport currentModule importModule exps imps impQual =
        | otherwise -> throwError . errorMessage $ err
         where
         err = if currentModule `elem` [mn, importModule]
-              then ConflictingImport (show name) importModule
-              else ConflictingImports (show name) mn importModule
+              then ConflictingImport (render name) importModule
+              else ConflictingImports (render name) mn importModule
 
     Just (Qualified Nothing _, _) ->
       error "Invalid state in updateImports"

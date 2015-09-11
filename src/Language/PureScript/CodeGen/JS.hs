@@ -172,7 +172,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
              then foreignIdent ident
              else varToJs qi
   valueToJs (Var (_, _, _, Just IsForeign) ident) =
-    error $ "Encountered an unqualified reference to a foreign ident " ++ show ident
+    error $ "Encountered an unqualified reference to a foreign ident " ++ showQualified showIdent ident
   valueToJs (Var _ ident) =
     return $ varToJs ident
   valueToJs (Case (maybeSpan, _, _, _) values binders) = do
@@ -320,8 +320,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
       return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
-  binderToJs _ _ b@(ConstructorBinder{}) =
-    error $ "Invalid ConstructorBinder in binderToJs: " ++ show b
+  binderToJs _ _ ConstructorBinder{} =
+    error "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs varName done (NamedBinder _ ident binder) = do
     js <- binderToJs varName done binder
     return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)

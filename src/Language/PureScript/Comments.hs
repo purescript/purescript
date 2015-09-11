@@ -22,4 +22,4 @@ import qualified Data.Data as D
 data Comment
   = LineComment String
   | BlockComment String
-  deriving (Show, Eq, Ord, D.Data, D.Typeable)
+  deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)

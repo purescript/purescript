@@ -204,7 +204,7 @@ displayUserError e = case e of
   ParseAndDesugarError (D.ParseError err) ->
     vcat
       [ para "Parse error:"
-      , indented (para (show err))
+      , indented (P.prettyPrintMultipleErrorsBox False err)
       ]
   ParseAndDesugarError (D.SortModulesError err) ->
     vcat
