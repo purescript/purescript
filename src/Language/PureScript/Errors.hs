@@ -443,9 +443,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , indent . line $ path
             ]
     goSimple InvalidDoBind =
-      line "Bind statement cannot be the last statement in a do block"
+      line "Bind statement cannot be the last statement in a do block. The last statement must be an expression."
     goSimple InvalidDoLet =
-      line "Let statement cannot be the last statement in a do block"
+      line "Let statement cannot be the last statement in a do block. The last statement must be an expression."
     goSimple CannotReorderOperators =
       line "Unable to reorder operators"
     goSimple UnspecifiedSkolemScope =
@@ -453,11 +453,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple OverlappingNamesInLet =
       line "Overlapping names in let binding."
     goSimple (InfiniteType ty) =
-      paras [ line "Infinite type detected: "
+      paras [ line "An infinite type was inferred for an expression: "
             , indent $ line $ prettyPrintType ty
             ]
     goSimple (InfiniteKind ki) =
-      paras [ line "Infinite kind detected: "
+      paras [ line "An infinite kind was inferred for a type: "
             , indent $ line $ prettyPrintKind ki
             ]
     goSimple (MultipleFixities name) =
@@ -534,9 +534,11 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple (UndefinedTypeVariable name) =
       line $ "Type variable " ++ show name ++ " is undefined"
     goSimple (PartiallyAppliedSynonym name) =
-      line $ "Partially applied type synonym " ++ show name
+      paras [ line $ "Partially applied type synonym " ++ show name
+            , line "Type synonyms must be applied to all of their type arguments."
+            ]
     goSimple (EscapedSkolem binding) =
-      paras $ [ line "Rigid/skolem type variable has escaped." ]
+      paras $ [ line "A type variable has escaped its scope." ]
                      <> foldMap (\expr -> [ line "Relevant expression: "
                                           , indent $ line $ prettyPrintValue expr
                                           ]) binding
@@ -610,7 +612,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple TypeSynonymInstance =
       line "Type synonym instances are disallowed"
     goSimple (OrphanInstance nm cnm ts) =
-      line $ "Instance " ++ show nm ++ " for " ++ show cnm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ " is an orphan instance"
+      paras [ line $ "Instance " ++ show nm ++ " for " ++ show cnm ++ " " ++ unwords (map prettyPrintTypeAtom ts) ++ " is an orphan instance."
+            , line "An orphan instance is an instance which is defined in neither the class module nor the data type module."
+            , line "Consider moving the instance, if possible, or using a newtype wrapper."
+            ]
     goSimple InvalidNewtype =
       line "Newtypes must define a single constructor with a single argument"
     goSimple (InvalidInstanceHead ty) =
@@ -634,15 +639,16 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     goSimple (WildcardInferredType ty) =
       line $ "The wildcard type definition has the inferred type " ++ prettyPrintType ty
     goSimple (NotExhaustivePattern bs b) =
-      indent $ paras $ [ line "Pattern could not be determined to cover all cases."
-              , line $ "The definition has the following uncovered cases:\n"
+      paras $ [ line "A case expression could not be determined to cover all inputs."
+              , line "The following additional cases are required to cover all inputs:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
-              ] ++ if not b then [line "..."] else []
+              ] ++
+              [ line "..." | not b ]
     goSimple (OverlappingPattern bs b) =
-      indent $ paras $ [ line "Redundant cases have been detected."
-              , line $ "The definition has the following redundant cases:\n"
+      paras $ [ line "A case expression contains unreachable cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
-              ] ++ if not b then [line "..."] else []
+              ] ++
+              [ line "..." | not b ]
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map show names) ++ ":"
             , indent $ go err
