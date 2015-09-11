@@ -63,7 +63,7 @@ parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
-                       <*> parseConstrainedType
+                       <*> parseType
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor
@@ -79,21 +79,21 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeConstructor
             , parseForAll
             , parens parseRow
-            , parens parsePolyType ])
+            , parseConstrainedType
+            , parens parsePolyType
+            ])
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- P.optionMaybe . P.try $ do
-    constraints <- parens . commaSep1 $ do
-      className <- parseQualified properName
-      indented
-      ty <- P.many parseTypeAtom
-      return (className, ty)
-    _ <- rfatArrow
-    return constraints
+  constraints <- parens . commaSep1 $ do
+    className <- parseQualified properName
+    indented
+    ty <- P.many parseTypeAtom
+    return (className, ty)
+  _ <- rfatArrow
   indented
   ty <- parseType
-  return $ maybe ty (flip ConstrainedType ty) constraints
+  return $ ConstrainedType constraints ty
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
