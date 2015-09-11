@@ -292,7 +292,7 @@ typeClassMemberName :: Declaration -> String
 typeClassMemberName (TypeDeclaration ident _) = runIdent ident
 typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
 typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
-typeClassMemberName d = error "typeClassMemberName: Invalid declaration in type class definition"
+typeClassMemberName _ = error "typeClassMemberName: Invalid declaration in type class definition"
 
 superClassDictionaryNames :: [Constraint] -> [String]
 superClassDictionaryNames supers =
