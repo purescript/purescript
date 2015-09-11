@@ -141,7 +141,7 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
   ty' <- replaceTypeWildcards ty
   -- Kind check
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
-  checkTypeKind kind
+  checkTypeKind ty kind
   -- Check the type with the new names in scope
   ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
   val'' <- if checkType
@@ -190,8 +190,8 @@ replaceTypeClassDictionaries mn =
 -- |
 -- Check the kind of a type, failing if it is not of kind *.
 --
-checkTypeKind :: Kind -> UnifyT t Check ()
-checkTypeKind kind = guardWith (errorMessage (ExpectedType kind)) $ kind == Star
+checkTypeKind :: Type -> Kind -> UnifyT t Check ()
+checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
 
 -- |
 -- Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -301,7 +301,7 @@ infer' (SuperClassDictionary className tys) = do
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
-  checkTypeKind kind
+  checkTypeKind ty kind
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
@@ -313,7 +313,7 @@ inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
-  checkTypeKind kind
+  checkTypeKind ty kind
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
@@ -527,7 +527,7 @@ check' (SuperClassDictionary className tys) _ = do
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty1
-  checkTypeKind kind
+  checkTypeKind ty1 kind
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
@@ -582,7 +582,7 @@ check' val ty | containsTypeSynonyms ty = do
   ty' <- introduceSkolemScope <=< expandAllTypeSynonyms <=< replaceTypeWildcards $ ty
   check val ty'
 check' val kt@(KindedType ty kind) = do
-  checkTypeKind kind
+  checkTypeKind ty kind
   val' <- check' val ty
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
