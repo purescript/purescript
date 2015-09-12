@@ -14,9 +14,12 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.AST.Declarations where
+
+import Data.Aeson.TH
 
 import qualified Data.Data as D
 import qualified Data.Map as M
@@ -147,10 +150,6 @@ data Declaration
   --
   | ExternDataDeclaration ProperName Kind
   -- |
-  -- A type class instance foreign import
-  --
-  | ExternInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type]
-  -- |
   -- A fixity declaration (fixity data, operator name)
   --
   | FixityDeclaration Fixity String
@@ -221,14 +220,6 @@ isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl (PositionedDeclaration _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
-
--- |
--- Test if a declaration is a type class instance foreign import
---
-isExternInstanceDecl :: Declaration -> Bool
-isExternInstanceDecl ExternInstanceDeclaration{} = True
-isExternInstanceDecl (PositionedDeclaration _ _ d) = isExternInstanceDecl d
-isExternInstanceDecl _ = False
 
 -- |
 -- Test if a declaration is a fixity declaration
@@ -442,3 +433,6 @@ data DoNotationElement
   -- A do notation element with source position information
   --
   | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement deriving (Show, Read, D.Data, D.Typeable)
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)

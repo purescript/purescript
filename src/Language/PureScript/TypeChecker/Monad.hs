@@ -76,7 +76,7 @@ withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified 
 withTypeClassDictionaries :: (MonadState CheckState m) => [TypeClassDictionaryInScope] -> m a -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (canonicalizeDictionary entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
+  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdName entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
@@ -276,4 +276,3 @@ liftUnifyWarnings replace unify = do
   let uust = unifyCurrentSubstitution ust
   tell $ onErrorMessages (replace uust) w
   return (a, uust)
-

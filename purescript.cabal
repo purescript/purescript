@@ -68,8 +68,8 @@ library
                      Language.PureScript.AST.Traversals
                      Language.PureScript.AST.Exported
                      Language.PureScript.Bundle
+                     Language.PureScript.Externs
                      Language.PureScript.CodeGen
-                     Language.PureScript.CodeGen.Externs
                      Language.PureScript.CodeGen.JS
                      Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.JS.Common

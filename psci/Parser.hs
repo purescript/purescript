@@ -131,7 +131,6 @@ acceptable P.DataDeclaration{} = True
 acceptable P.TypeSynonymDeclaration{} = True
 acceptable P.ExternDeclaration{} = True
 acceptable P.ExternDataDeclaration{} = True
-acceptable P.ExternInstanceDeclaration{} = True
 acceptable P.TypeClassDeclaration{} = True
 acceptable P.TypeInstanceDeclaration{} = True
 acceptable _ = False

@@ -225,7 +225,6 @@ importToCoreFn _ = Nothing
 --
 externToCoreFn :: A.Declaration -> Maybe ForeignDecl
 externToCoreFn (A.ExternDeclaration name ty) = Just (name, ty)
-externToCoreFn (A.ExternInstanceDeclaration name _ _ _) = Just (name, tyObject)
 externToCoreFn (A.PositionedDeclaration _ _ d) = externToCoreFn d
 externToCoreFn _ = Nothing
 

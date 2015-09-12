@@ -48,14 +48,18 @@ import Control.Monad.Writer.Strict
 import Control.Monad.Supply
 
 import Data.Function (on)
-import Data.List (sortBy, groupBy)
+import Data.Either (partitionEithers)
+import Data.List (sortBy, groupBy, foldl')
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
+import Data.String (fromString)
 import Data.Foldable (for_)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
 #endif
 import Data.Version (showVersion)
+import Data.Aeson (encode, decode)
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -65,14 +69,13 @@ import System.FilePath ((</>), takeDirectory)
 import System.IO.Error (tryIOError)
 
 import Language.PureScript.AST
-import Language.PureScript.CodeGen.Externs (moduleToPs)
+import Language.PureScript.Externs
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.ModuleDependencies
 import Language.PureScript.Names
 import Language.PureScript.Options
-import Language.PureScript.Parser
 import Language.PureScript.Pretty
 import Language.PureScript.Renamer
 import Language.PureScript.Sugar
@@ -116,7 +119,7 @@ data MakeActions m = MakeActions {
   -- |
   -- Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , readExterns :: ModuleName -> m (FilePath, String)
+  , readExterns :: ModuleName -> m (FilePath, B.ByteString)
   -- |
   -- Run the code generator for the module and write any required output files.
   --
@@ -130,7 +133,7 @@ data MakeActions m = MakeActions {
 -- |
 -- Generated code for an externs file.
 --
-type Externs = String
+type Externs = B.ByteString
 
 -- |
 -- Determines when to rebuild a module
@@ -161,18 +164,16 @@ make MakeActions{..} ms = do
       (Left RebuildNever, Just _) -> s
       _ -> S.insert moduleName' s) S.empty sorted
 
-  marked <- rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
-  for_ marked $ \(willRebuild, m) -> when willRebuild (lint m)
-  (desugared, nextVar) <- runSupplyT 0 $ zip (map fst marked) <$> desugar (map snd marked)
-  evalSupplyT nextVar $ go initEnvironment desugared
+  (externs, toBuild) <- partitionEithers <$> rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
+  for_ toBuild lint
+  (desugared, nextVar) <- runSupplyT 0 $ desugar externs toBuild
+  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+  evalSupplyT nextVar $ go env desugared
   where
 
-  go :: Environment -> [(Bool, Module)] -> SupplyT m Environment
+  go :: Environment -> [Module] -> SupplyT m Environment
   go env [] = return env
-  go env ((False, m) : ms') = do
-    (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
-    go env' ms'
-  go env ((True, m@(Module ss coms moduleName' _ exps)) : ms') = do
+  go env (m@(Module ss coms moduleName' _ exps) : ms') = do
     lift . progress $ CompilingModule moduleName'
     (checked@(Module _ _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
     checkExhaustiveModule env' checked
@@ -180,27 +181,28 @@ make MakeActions{..} ms = do
     let mod' = Module ss coms moduleName' regrouped exps
         corefn = CF.moduleToCoreFn env' mod'
         [renamed] = renameInModules [corefn]
-        exts = moduleToPs mod' env'
+        exts = encode $ moduleToExternsFile mod' env'
     codegen renamed env' exts
     go env' ms'
 
-  rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [(Bool, Module)]
-  rebuildIfNecessary _ _ [] = return []
-  rebuildIfNecessary graph toRebuild (m@(Module _ _ moduleName' _ _) : ms') | moduleName' `S.member` toRebuild = do
-    let deps = fromMaybe [] $ moduleName' `M.lookup` graph
-        toRebuild' = toRebuild `S.union` S.fromList deps
-    (:) (True, m) <$> rebuildIfNecessary graph toRebuild' ms'
-  rebuildIfNecessary graph toRebuild (Module _ _ moduleName' _ _ : ms') = do
-    (path, externs) <- readExterns moduleName'
-    externsModules <- fmap (map snd) . alterErrors $ parseModulesFromFiles id [(path, externs)]
-    case externsModules of
-      [m'@(Module _ _ moduleName'' _ _)] | moduleName'' == moduleName' -> (:) (False, m') <$> rebuildIfNecessary graph toRebuild ms'
-      _ -> throwError . errorMessage . InvalidExternsFile $ path
+  rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [Either ExternsFile Module]
+  rebuildIfNecessary graph = rebuildIfNecessary'
     where
-    alterErrors = flip catchError $ \(MultipleErrors errs) ->
-      throwError . MultipleErrors $ flip map errs $ \e -> case e of
-        SimpleErrorWrapper (ErrorParsingModule err) -> SimpleErrorWrapper (ErrorParsingExterns err)
-        _ -> e
+    rebuildIfNecessary' :: S.Set ModuleName -> [Module] -> m [Either ExternsFile Module]
+    rebuildIfNecessary' _ [] = return []
+    rebuildIfNecessary' toRebuild (m@(Module _ _ moduleName' _ _) : ms')
+      | moduleName' `S.member` toRebuild = rebuild toRebuild m moduleName' ms'
+    rebuildIfNecessary' toRebuild (m@(Module _ _ moduleName' _ _) : ms') = do
+      (_, externsJson) <- readExterns moduleName'
+      case decode externsJson of
+        Just externs
+          | efVersion externs == showVersion Paths.version -> (Left externs :) <$> rebuildIfNecessary' toRebuild ms'
+        _ -> rebuild toRebuild m moduleName' ms'
+
+    rebuild :: S.Set ModuleName -> Module -> ModuleName -> [Module] -> m [Either ExternsFile Module]
+    rebuild toRebuild m moduleName ms' = do
+      let deps = fromMaybe [] $ moduleName `M.lookup` graph
+      (Right m :) <$> rebuildIfNecessary' (toRebuild `S.union` S.fromList deps) ms'
 
 reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
 reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
@@ -268,12 +270,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp mn = do
     let filePath = runModuleName mn
         jsFile = outputDir </> filePath </> "index.js"
-        externsFile = outputDir </> filePath </> "externs.purs"
+        externsFile = outputDir </> filePath </> "externs.json"
     min <$> getTimestamp jsFile <*> getTimestamp externsFile
 
-  readExterns :: ModuleName -> Make (FilePath, String)
+  readExterns :: ModuleName -> Make (FilePath, B.ByteString)
   readExterns mn = do
-    let path = outputDir </> runModuleName mn </> "externs.purs"
+    let path = outputDir </> runModuleName mn </> "externs.json"
     (path, ) <$> readTextFile path
 
   codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
@@ -290,12 +292,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     pjs <- prettyPrintJS <$> J.moduleToJs m foreignInclude
     let filePath = runModuleName mn
         jsFile = outputDir </> filePath </> "index.js"
-        externsFile = outputDir </> filePath </> "externs.purs"
+        externsFile = outputDir </> filePath </> "externs.json"
         foreignFile = outputDir </> filePath </> "foreign.js"
         prefix = ["Generated by psc version " ++ showVersion Paths.version | usePrefix]
         js = unlines $ map ("// " ++) prefix ++ [pjs]
     lift $ do
-      writeTextFile jsFile js
+      writeTextFile jsFile (fromString js)
       for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
 
@@ -307,13 +309,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
 
-  readTextFile :: FilePath -> Make String
-  readTextFile path = makeIO (const (SimpleErrorWrapper $ CannotReadFile path)) $ readFile path
+  readTextFile :: FilePath -> Make B.ByteString
+  readTextFile path = makeIO (const (SimpleErrorWrapper $ CannotReadFile path)) $ B.readFile path
 
-  writeTextFile :: FilePath -> String -> Make ()
+  writeTextFile :: FilePath -> B.ByteString -> Make ()
   writeTextFile path text = makeIO (const (SimpleErrorWrapper $ CannotWriteFile path)) $ do
     mkdirp path
-    writeFile path text
+    B.writeFile path text
     where
     mkdirp :: FilePath -> IO ()
     mkdirp = createDirectoryIfMissing True . takeDirectory

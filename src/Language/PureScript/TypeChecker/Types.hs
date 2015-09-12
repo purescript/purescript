@@ -469,7 +469,7 @@ check' val t@(ConstrainedType constraints ty) = do
                                                       name
                                                       (supName, instantiateSuperclass (map fst args) supArgs instanceTy)
                                   ) superclasses [0..]
-    return (TypeClassDictionaryInScope name path className instanceTy Nothing TCDRegular : supDicts)
+    return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
   instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs

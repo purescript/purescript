@@ -122,7 +122,7 @@ desugar :: [P.Module] -> Either P.MultipleErrors [P.Module]
 desugar = P.evalSupplyT 0 . desugar'
   where
   desugar' :: [P.Module] -> P.SupplyT (Either P.MultipleErrors) [P.Module]
-  desugar' = mapM P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports
+  desugar' = mapM P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports []
   ignoreWarnings m = liftM fst (runWriterT m)
 
 parseFile :: FilePath -> IO (FilePath, String)

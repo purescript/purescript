@@ -12,10 +12,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
---{-# LANGUAGE ScopedTypeVariables #-}
---{-# LANGUAGE PatternGuards #-}
---{-# LANGUAGE RankNTypes #-}
---{-# LANGUAGE TupleSections #-}
 
 module Language.PureScript.Sugar.Names.Env
   ( Imports(..)
@@ -23,7 +19,7 @@ module Language.PureScript.Sugar.Names.Env
   , Exports(..)
   , nullExports
   , Env
-  , initEnv
+  , primEnv
   , envModuleSourceSpan
   , envModuleImports
   , envModuleExports
@@ -32,10 +28,10 @@ module Language.PureScript.Sugar.Names.Env
   , exportValue
   ) where
 
+import qualified Data.Map as M
+
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-
-import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -136,11 +132,9 @@ primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] []
   where
   mkTypeEntry (Qualified _ name) = ((name, []), ModuleName [ProperName "Prim"])
 
--- |
--- The initial global import/export environment containing the @Prim@ module.
---
-initEnv :: Env
-initEnv = M.singleton
+-- | Environment which only contains the Prim module.
+primEnv :: Env
+primEnv = M.singleton
   (ModuleName [ProperName "Prim"])
   (internalModuleSourceSpan "<Prim>", nullImports, primExports)
 
