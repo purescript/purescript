@@ -169,8 +169,9 @@ unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   go [] REmpty          [] REmpty          = True
   go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) = s1 == s2
-  go _  (TUnknown _)    _  _               = True
-  go _  _               _  (TUnknown _)    = True
+  go [] (TUnknown _)    _  _               = True
+  go _  _               [] (TUnknown _)    = True
+  go _  (TUnknown _)    _  (TUnknown _)    = True
   go _  _               _  _               = False
 unifiesWith _ _ _ = False
 
