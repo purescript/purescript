@@ -29,20 +29,20 @@ type Precedence = Integer
 -- |
 -- Associativity for infix operators
 --
-data Associativity = Infixl | Infixr | Infix deriving (Eq, Ord, D.Data, D.Typeable)
+data Associativity = Infixl | Infixr | Infix deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)
 
-instance Show Associativity where
-  show Infixl = "infixl"
-  show Infixr = "infixr"
-  show Infix  = "infix"
+showAssoc :: Associativity -> String
+showAssoc Infixl = "infixl"
+showAssoc Infixr = "infixr"
+showAssoc Infix  = "infix"
 
 instance A.ToJSON Associativity where
-  toJSON = A.toJSON . show
+  toJSON = A.toJSON . showAssoc
 
 -- |
 -- Fixity data for infix operators
 --
-data Fixity = Fixity Associativity Precedence deriving (Show, Eq, Ord, D.Data, D.Typeable)
+data Fixity = Fixity Associativity Precedence deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)
 
 instance A.ToJSON Fixity where
   toJSON (Fixity associativity precedence) =

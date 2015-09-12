@@ -41,7 +41,7 @@ data CompletionContext
   | CtxIdentifier
   | CtxType
   | CtxFixed String
-  deriving (Show)
+  deriving (Show, Read)
 
 -- |
 -- Loads module, function, and file completions.
@@ -143,34 +143,34 @@ getImportedModules = asks psciImportedModules
 getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
-mapLoadedModulesAndQualify :: (Show a) => (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
-mapLoadedModulesAndQualify f = do
+mapLoadedModulesAndQualify :: (a -> String) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
+mapLoadedModulesAndQualify sho f = do
   ms <- getLoadedModules
   let argPairs = do m <- ms
                     fm <- f m
                     return (m, fm)
-  concat <$> traverse (uncurry getAllQualifications) argPairs
+  concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
 
 getIdentNames :: CompletionM [String]
-getIdentNames = mapLoadedModulesAndQualify identNames
+getIdentNames = mapLoadedModulesAndQualify P.showIdent identNames
 
 getDctorNames :: CompletionM [String]
-getDctorNames = mapLoadedModulesAndQualify dctorNames
+getDctorNames = mapLoadedModulesAndQualify P.runProperName dctorNames
 
 getTypeNames :: CompletionM [String]
-getTypeNames = mapLoadedModulesAndQualify typeDecls
+getTypeNames = mapLoadedModulesAndQualify P.runProperName typeDecls
 
 -- | Given a module and a declaration in that module, return all possible ways
 -- it could have been referenced given the current PSCiState - including fully
 -- qualified, qualified using an alias, and unqualified.
-getAllQualifications :: (Show a) => P.Module -> (a, P.Declaration) -> CompletionM [String]
-getAllQualifications m (declName, decl) = do
+getAllQualifications :: (a -> String) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
+getAllQualifications sho m (declName, decl) = do
   imports <- getAllImportsOf m
   let fullyQualified = qualifyWith (Just (P.getModuleName m))
   let otherQuals = nub (concatMap qualificationsUsing imports)
   return $ fullyQualified : otherQuals
   where
-  qualifyWith mMod = show (P.Qualified mMod declName)
+  qualifyWith mMod = P.showQualified sho (P.Qualified mMod declName)
   referencedBy refs = P.isExported (Just refs) decl
 
   qualificationsUsing (_, importType, asQ') =
@@ -222,7 +222,7 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go _ = []
 
 moduleNames :: [P.Module] -> [String]
-moduleNames ms = nub [show moduleName | P.Module _ _ moduleName _ _ <- ms]
+moduleNames ms = nub [P.runModuleName moduleName | P.Module _ _ moduleName _ _ <- ms]
 
 directivesFirst :: Completion -> Completion -> Ordering
 directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2

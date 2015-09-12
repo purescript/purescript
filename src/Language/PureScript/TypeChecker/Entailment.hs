@@ -122,7 +122,7 @@ entails env moduleName context = solve
       dictionaryValueToValue (GlobalDictionaryValue fnName) = Var fnName
       dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
       dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
-        App (Accessor (C.__superclass_ ++ show superclassName ++ "_" ++ show index)
+        App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
                       (dictionaryValueToValue dict))
             valUndefined
       -- Ensure that a substitution is valid

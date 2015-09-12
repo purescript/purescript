@@ -26,7 +26,7 @@ import Language.PureScript.Docs.Types
 --
 convertModule :: P.Module -> Module
 convertModule m@(P.Module _ coms moduleName  _ _) =
-  Module (show moduleName) comments (declarations m)
+  Module (P.runModuleName moduleName) comments (declarations m)
   where
   comments = convertComments coms
   declarations =
@@ -106,13 +106,13 @@ addDefaultFixity decl@Declaration{..}
   defaultFixity = P.Fixity P.Infixl (-1)
 
 getDeclarationTitle :: P.Declaration -> Maybe String
-getDeclarationTitle (P.TypeDeclaration name _)               = Just (show name)
-getDeclarationTitle (P.ExternDeclaration name _)             = Just (show name)
-getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (show name)
-getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (show name)
-getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (show name)
-getDeclarationTitle (P.TypeClassDeclaration name _ _ _)      = Just (show name)
-getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (show name)
+getDeclarationTitle (P.TypeDeclaration name _)               = Just (P.showIdent name)
+getDeclarationTitle (P.ExternDeclaration name _)             = Just (P.showIdent name)
+getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (P.runProperName name)
+getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (P.runProperName name)
+getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (P.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration name _ _ _)      = Just (P.runProperName name)
+getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.FixityDeclaration _ name)             = Just ("(" ++ name ++ ")")
 getDeclarationTitle (P.PositionedDeclaration _ _ d)          = getDeclarationTitle d
 getDeclarationTitle _                                        = Nothing
@@ -142,7 +142,7 @@ convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
   info = DataDeclaration dtype args
   children = map convertCtor ctors
   convertCtor (ctor', tys) =
-    ChildDeclaration (show ctor') Nothing Nothing (ChildDataConstructor tys)
+    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
 convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
@@ -155,7 +155,7 @@ convertDeclaration (P.TypeClassDeclaration _ args implies ds) title = do
   convertClassMember (P.PositionedDeclaration _ _ d) =
     convertClassMember d
   convertClassMember (P.TypeDeclaration ident' ty) =
-    ChildDeclaration (show ident') Nothing Nothing (ChildTypeClassMember ty)
+    ChildDeclaration (P.showIdent ident') Nothing Nothing (ChildTypeClassMember ty)
   convertClassMember _ =
     error "Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title = do
@@ -163,7 +163,7 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   where
   classNameString = unQual className
   typeNameStrings = nub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
-  unQual x = let (P.Qualified _ y) = x in show y
+  unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
   extractProperNames (P.TypeConstructor n) = [unQual n]
   extractProperNames (P.SaturatedTypeSynonym n _) = [unQual n]
@@ -225,4 +225,3 @@ collectBookmarks' m =
   map (P.getModuleName m, )
       (mapMaybe getDeclarationTitle
                 (P.exportedDeclarations m))
-

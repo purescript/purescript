@@ -115,7 +115,7 @@ data Token
   | CharLiteral Char
   | StringLiteral String
   | Number (Either Integer Double)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord)
 
 prettyPrintToken :: Token -> String
 prettyPrintToken LParen            = "("
@@ -153,8 +153,9 @@ data PositionedToken = PositionedToken
   , ptComments  :: [Comment]
   } deriving (Eq)
 
+-- Parsec requires this instance for various token-level combinators
 instance Show PositionedToken where
-  show = show . ptToken
+  show = prettyPrintToken . ptToken
 
 lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
 lex filePath input = P.parse parseTokens filePath input
@@ -251,7 +252,7 @@ parseToken = P.choice
     where
     -- lookAhead doesn't consume any input if its parser succeeds
     -- if notFollowedBy fails though, the consumed '0' will break the choice chain
-    consumeLeadingZero = P.lookAhead (P.char '0' >> 
+    consumeLeadingZero = P.lookAhead (P.char '0' >>
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
 
 -- |
@@ -517,4 +518,3 @@ reservedTypeNames = [ "forall", "where" ]
 --
 opChars :: [Char]
 opChars = ":!#$%&*+./<=>?@\\^|-~"
-

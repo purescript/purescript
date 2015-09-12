@@ -47,4 +47,4 @@ data Literal a
   -- |
   -- An object literal
   --
-  | ObjectLiteral [(String, a)] deriving (Show, D.Data, D.Typeable, Functor)
+  | ObjectLiteral [(String, a)] deriving (Show, Read, D.Data, D.Typeable, Functor)

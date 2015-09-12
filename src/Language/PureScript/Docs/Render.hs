@@ -29,7 +29,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       , renderType' ty
       ]
     DataDeclaration dtype args ->
-      [ keyword (show dtype)
+      [ keyword (P.showDataDeclType dtype)
       , renderType' (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->

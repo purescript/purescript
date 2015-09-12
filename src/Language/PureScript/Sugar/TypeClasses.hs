@@ -292,10 +292,10 @@ typeClassMemberName :: Declaration -> String
 typeClassMemberName (TypeDeclaration ident _) = runIdent ident
 typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
 typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
-typeClassMemberName d = error $ "Invalid declaration in type class definition: " ++ show d
+typeClassMemberName _ = error "typeClassMemberName: Invalid declaration in type class definition"
 
 superClassDictionaryNames :: [Constraint] -> [String]
 superClassDictionaryNames supers =
-  [ C.__superclass_ ++ show pn ++ "_" ++ show (index :: Integer)
+  [ C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer)
   | (index, (pn, _)) <- zip [0..] supers
   ]

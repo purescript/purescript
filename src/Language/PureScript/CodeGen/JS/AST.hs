@@ -53,7 +53,7 @@ data UnaryOperator
   -- |
   -- Constructor
   --
-  | JSNew deriving (Show, Eq, Data, Typeable)
+  | JSNew deriving (Show, Read, Eq, Data, Typeable)
 
 -- |
 -- Built-in binary operators
@@ -134,7 +134,7 @@ data BinaryOperator
   -- |
   -- Bitwise right shift with zero-fill
   --
-  | ZeroFillShiftRight deriving (Show, Eq, Data, Typeable)
+  | ZeroFillShiftRight deriving (Show, Read, Eq, Data, Typeable)
 
 -- |
 -- Data type for simplified Javascript expressions
@@ -255,7 +255,7 @@ data JS
   -- |
   -- Commented Javascript
   --
-  | JSComment [Comment] JS deriving (Show, Eq, Data, Typeable)
+  | JSComment [Comment] JS deriving (Show, Read, Eq, Data, Typeable)
 
 --
 -- Traversals

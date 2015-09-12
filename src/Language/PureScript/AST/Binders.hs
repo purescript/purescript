@@ -69,7 +69,7 @@ data Binder
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourceSpan [Comment] Binder deriving (Show, Eq, D.Data, D.Typeable)
+  | PositionedBinder SourceSpan [Comment] Binder deriving (Show, Read, Eq, D.Data, D.Typeable)
 
 -- |
 -- Collect all names introduced in binders in an expression

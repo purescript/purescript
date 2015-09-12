@@ -42,7 +42,7 @@ import Language.PureScript.Environment
 -- a list of declarations, and a list of the declarations that are
 -- explicitly exported. If the export list is Nothing, everything is exported.
 --
-data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, D.Data, D.Typeable)
+data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef]) deriving (Show, Read, D.Data, D.Typeable)
 
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
@@ -76,7 +76,7 @@ data DeclarationRef
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show, Read, D.Data, D.Typeable)
 
 instance Eq DeclarationRef where
   (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
@@ -108,7 +108,7 @@ data ImportDeclarationType
   -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show, Read, D.Data, D.Typeable)
 
 -- |
 -- The data type of declarations
@@ -171,7 +171,7 @@ data Declaration
   -- A declaration with source position information
   --
   | PositionedDeclaration SourceSpan [Comment] Declaration
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show, Read, D.Data, D.Typeable)
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
@@ -179,7 +179,7 @@ data TypeInstanceBody
   = DerivedInstance
   -- | This is a regular (explicit) instance
   | ExplicitInstance [Declaration]
-  deriving (Show, D.Data, D.Typeable)
+  deriving (Show, Read, D.Data, D.Typeable)
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
 mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
@@ -406,7 +406,7 @@ data Expr
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourceSpan [Comment] Expr deriving (Show, D.Data, D.Typeable)
+  | PositionedValue SourceSpan [Comment] Expr deriving (Show, Read, D.Data, D.Typeable)
 
 -- |
 -- An alternative in a case statement
@@ -420,7 +420,7 @@ data CaseAlternative = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: Either [(Guard, Expr)] Expr
-  } deriving (Show, D.Data, D.Typeable)
+  } deriving (Show, Read, D.Data, D.Typeable)
 
 -- |
 -- A statement in a do-notation block
@@ -441,4 +441,4 @@ data DoNotationElement
   -- |
   -- A do notation element with source position information
   --
-  | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement deriving (Show, D.Data, D.Typeable)
+  | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement deriving (Show, Read, D.Data, D.Typeable)

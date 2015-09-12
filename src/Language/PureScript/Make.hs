@@ -86,7 +86,7 @@ import qualified Paths_purescript as Paths
 -- | Progress messages from the make process
 data ProgressMessage
   = CompilingModule ModuleName
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord)
 
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> String
@@ -139,7 +139,7 @@ data RebuildPolicy
   -- | Never rebuild this module
   = RebuildNever
   -- | Always rebuild this module
-  | RebuildAlways deriving (Show, Eq, Ord)
+  | RebuildAlways deriving (Show, Read, Eq, Ord)
 
 -- |
 -- Compiles in "make" mode, compiling each module separately to a js files and an externs file

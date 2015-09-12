@@ -45,7 +45,7 @@ typeLiterals = mkPattern match
               , syntax "}"
               ]
   match (TypeConstructor (Qualified mn name)) =
-    Just (ctor (show name) (maybeToContainingModule mn))
+    Just (ctor (runProperName name) (maybeToContainingModule mn))
   match (ConstrainedType deps ty) =
     Just $ mintersperse sp
             [ syntax "(" <> constraints <> syntax ")"

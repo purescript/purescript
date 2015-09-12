@@ -152,10 +152,10 @@ inputFile = strArgument $
   <> help "The input .purs file(s)"
 
 instance Read Format where
-    readsPrec _ "etags" = [(Etags, "")]
-    readsPrec _ "ctags" = [(Ctags, "")]
-    readsPrec _ "markdown" = [(Markdown, "")]
-    readsPrec _ _ = []
+  readsPrec _ "etags" = [(Etags, "")]
+  readsPrec _ "ctags" = [(Ctags, "")]
+  readsPrec _ "markdown" = [(Markdown, "")]
+  readsPrec _ _ = []
 
 format :: Parser Format
 format = option auto $ value Markdown

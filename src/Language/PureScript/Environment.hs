@@ -57,7 +57,7 @@ data Environment = Environment {
   -- Type classes
   --
   , typeClasses :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
-  } deriving (Show)
+  } deriving (Show, Read)
 
 -- |
 -- The initial environment with no values and only the default javascript types defined
@@ -76,7 +76,7 @@ data NameVisibility
   -- |
   -- The name is defined in the another binding group, or has been made visible by a function binder
   --
-  | Defined deriving (Show, Eq)
+  | Defined deriving (Show, Read, Eq)
 
 -- |
 -- A flag for whether a name is for an private or public value - only public values will be
@@ -95,7 +95,7 @@ data NameKind
   -- |
   -- A name for member introduced by foreign import
   --
-  | External deriving (Show, Eq, Data, Typeable)
+  | External deriving (Show, Read, Eq, Data, Typeable)
 
 -- |
 -- The kinds of a type
@@ -121,7 +121,7 @@ data TypeKind
   -- A scoped type variable
   --
   | ScopedTypeVar
-   deriving (Show, Eq, Data, Typeable)
+   deriving (Show, Read, Eq, Data, Typeable)
 
 -- |
 -- The type ('data' or 'newtype') of a data type declaration
@@ -134,14 +134,14 @@ data DataDeclType
   -- |
   -- A newtype constructor
   --
-  | Newtype deriving (Eq, Ord, Data, Typeable)
+  | Newtype deriving (Show, Read, Eq, Ord, Data, Typeable)
 
-instance Show DataDeclType where
-  show Data = "data"
-  show Newtype = "newtype"
+showDataDeclType :: DataDeclType -> String
+showDataDeclType Data = "data"
+showDataDeclType Newtype = "newtype"
 
 instance A.ToJSON DataDeclType where
-  toJSON = A.toJSON . show
+  toJSON = A.toJSON . showDataDeclType
 
 instance A.FromJSON DataDeclType where
   parseJSON = A.withText "DataDeclType" $ \str ->

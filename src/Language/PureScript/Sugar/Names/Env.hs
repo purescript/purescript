@@ -67,7 +67,7 @@ data Imports = Imports
   -- The list of modules that have been imported into the current scope.
   --
   , importedModules :: [ModuleName]
-  } deriving (Show)
+  } deriving (Show, Read)
 
 -- |
 -- An empty 'Imports' value.
@@ -95,7 +95,7 @@ data Exports = Exports
   -- came from.
   --
   , exportedValues :: [(Ident, ModuleName)]
-  } deriving (Show)
+  } deriving (Show, Read)
 
 -- |
 -- An empty 'Exports' value.
@@ -184,7 +184,7 @@ exportValue exps name mn = do
 -- Adds an entry to a list of exports unless it is already present, in which case an error is
 -- returned.
 --
-addExport :: (MonadError MultipleErrors m, Eq a, Show a) => (a -> SimpleErrorMessage) -> a -> ModuleName -> [(a, ModuleName)] -> m [(a, ModuleName)]
+addExport :: (MonadError MultipleErrors m, Eq a) => (a -> SimpleErrorMessage) -> a -> ModuleName -> [(a, ModuleName)] -> m [(a, ModuleName)]
 addExport what name mn exports =
   if any ((== name) . fst) exports
   then throwConflictError what name
@@ -193,5 +193,5 @@ addExport what name mn exports =
 -- |
 -- Raises an error for when there is more than one definition for something.
 --
-throwConflictError :: (MonadError MultipleErrors m, Show a) => (a -> SimpleErrorMessage) -> a -> m b
+throwConflictError :: (MonadError MultipleErrors m) => (a -> SimpleErrorMessage) -> a -> m b
 throwConflictError conflict = throwError . errorMessage . conflict
