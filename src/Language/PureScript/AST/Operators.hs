@@ -36,8 +36,17 @@ showAssoc Infixl = "infixl"
 showAssoc Infixr = "infixr"
 showAssoc Infix  = "infix"
 
+readAssoc :: String -> Associativity
+readAssoc "infixl" = Infixl
+readAssoc "infixr" = Infixr
+readAssoc "infix"  = Infix
+readAssoc _ = error "readAssoc: no parse"
+
 instance A.ToJSON Associativity where
   toJSON = A.toJSON . showAssoc
+
+instance A.FromJSON Associativity where
+  parseJSON = fmap readAssoc . A.parseJSON
 
 -- |
 -- Fixity data for infix operators

@@ -16,7 +16,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
-module Language.PureScript.Sugar.Names.Imports (resolveImports) where
+module Language.PureScript.Sugar.Names.Imports
+  ( resolveImports
+  , resolveModuleImport
+  ) where
 
 import Data.List (find)
 import Data.Maybe (fromMaybe, isNothing)
@@ -59,25 +62,29 @@ findImports = foldM (go Nothing) M.empty
 -- |
 -- Constructs a set of imports for a module.
 --
-resolveImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
+resolveImports :: (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
   censor (onErrorMessages (ErrorInModule currentModule)) $ do
     scope <- M.insert currentModule [(Nothing, Implicit, Nothing)] <$> findImports decls
-    foldM resolveImport' nullImports (M.toList scope)
-  where
+    foldM (resolveModuleImport currentModule env) nullImports (M.toList scope)
 
-  resolveImport' :: Imports -> (ModuleName, [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)]) -> m Imports
-  resolveImport' ie (mn, imps) = foldM go ie imps
+-- | Constructs a set of imports for a single module import.
+resolveModuleImport ::
+  forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  ModuleName -> Env -> Imports ->
+  (ModuleName, [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)]) ->
+  m Imports
+resolveModuleImport currentModule env ie (mn, imps) = foldM go ie imps
+  where
+  go :: Imports -> (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName) -> m Imports
+  go ie' (pos, typ, impQual) = do
+    modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) (return . envModuleExports) $ mn `M.lookup` env
+    let ie'' = ie' { importedModules = mn : importedModules ie' }
+    positioned $ resolveImport currentModule mn modExports ie'' impQual typ
     where
-    go :: Imports -> (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName) -> m Imports
-    go ie' (pos, typ, impQual) = do
-      modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) (return . envModuleExports) $ mn `M.lookup` env
-      let ie'' = ie' { importedModules = mn : importedModules ie' }
-      positioned $ resolveImport currentModule mn modExports ie'' impQual typ
-      where
-      positioned err = case pos of
-        Nothing -> err
-        Just pos' -> rethrowWithPosition pos' err
+    positioned err = case pos of
+      Nothing -> err
+      Just pos' -> rethrowWithPosition pos' err
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.

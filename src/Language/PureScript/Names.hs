@@ -15,6 +15,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
 
 module Language.PureScript.Names where
@@ -22,6 +23,7 @@ module Language.PureScript.Names where
 import Data.List
 import Data.Data
 import Data.List.Split (splitOn)
+import Data.Aeson.TH
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 
@@ -54,7 +56,7 @@ newtype ProperName = ProperName { runProperName :: String } deriving (Show, Read
 -- |
 -- Module names
 --
-data ModuleName = ModuleName [ProperName] deriving (Show, Read, Eq, Ord, Data, Typeable)
+newtype ModuleName = ModuleName [ProperName] deriving (Show, Read, Eq, Ord, Data, Typeable)
 
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
@@ -89,7 +91,6 @@ instance (a ~ ProperName) => A.FromJSON (Qualified a) where
     where
     reconstructModuleName = moduleNameFromString . intercalate "." . reverse
 
-
 -- |
 -- Provide a default module name, if a name is unqualified
 --
@@ -109,3 +110,7 @@ mkQualified name mn = Qualified (Just mn) name
 isUnqualified :: Qualified a -> Bool
 isUnqualified (Qualified Nothing _) = True
 isUnqualified _ = False
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ProperName)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)

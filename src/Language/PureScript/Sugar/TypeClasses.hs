@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.TypeClasses
@@ -28,6 +29,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Externs
 import Language.PureScript.Sugar.CaseDeclarations
 import Control.Monad.Supply.Class
 import Language.PureScript.Types
@@ -45,7 +47,7 @@ import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
 
-type MemberMap = M.Map (ModuleName, ProperName) Declaration
+type MemberMap = M.Map (ModuleName, ProperName) ([(String, Maybe Kind)], [Constraint], [Declaration])
 
 type Desugar = StateT MemberMap
 
@@ -53,8 +55,15 @@ type Desugar = StateT MemberMap
 -- Add type synonym declarations for type class dictionary types, and value declarations for type class
 -- instance dictionary expressions.
 --
-desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
-desugarTypeClasses = flip evalStateT M.empty . mapM desugarModule
+desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugarTypeClasses externs = flip evalStateT initialState . mapM desugarModule
+  where
+  initialState :: MemberMap
+  initialState = M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+
+  fromExternsDecl :: ModuleName -> ExternsDeclaration -> Maybe ((ModuleName, ProperName), ([(String, Maybe Kind)], [Constraint], [Declaration]))
+  fromExternsDecl mn (EDClass name args members implies) = Just ((mn, name), (args, implies, map (uncurry TypeDeclaration) members))
+  fromExternsDecl _ _ = Nothing
 
 desugarModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
@@ -166,9 +175,8 @@ desugarDecl :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErro
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
-    modify (M.insert (mn, name) d)
+    modify (M.insert (mn, name) (args, implies, members))
     return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go d@(ExternInstanceDeclaration name _ className tys) = return (expRef name className tys, [d])
   go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = error "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
@@ -239,7 +247,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (TypeClassDeclaration _ args implies tyDecls) <-
+  (args, implies, tyDecls) <-
     maybe (throwError . errorMessage $ UnknownTypeClass className) return $
       M.lookup (qualify mn className) m
 
