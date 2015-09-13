@@ -60,7 +60,9 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
 
         f' :: Declaration -> MultipleErrors
         f' (PositionedDeclaration pos _ dec) = onErrorMessages (PositionedError pos) (f' dec)
-        f' dec = f dec <> checkTypeVars dec
+        f' dec@(ValueDeclaration name _ _ _) = onErrorMessages (ErrorInValueDeclaration name) (f dec <> checkTypeVarsInDecl dec)
+        f' (TypeDeclaration name ty) = onErrorMessages (ErrorInTypeDeclaration name) (checkTypeVars ty)
+        f' dec = f dec <> checkTypeVarsInDecl dec
 
     in tell (f' d)
     where
@@ -90,11 +92,11 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
     bindName :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
     bindName = bind ShadowedName
 
-  checkTypeVars :: Declaration -> MultipleErrors
-  checkTypeVars d =
-    let (checkShadow, _, _, _, _) = accumTypes (everythingWithContextOnTypes S.empty mempty mappend step)
-        (checkUnused, _, _, _, _) = accumTypes findUnused
-    in checkShadow d <> checkUnused d
+  checkTypeVarsInDecl :: Declaration -> MultipleErrors
+  checkTypeVarsInDecl d = let (f, _, _, _, _) = accumTypes checkTypeVars in f d
+
+  checkTypeVars :: Type -> MultipleErrors
+  checkTypeVars ty = everythingWithContextOnTypes S.empty mempty mappend step ty <> findUnused ty
     where
     step :: S.Set String -> Type -> (S.Set String, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
@@ -102,9 +104,9 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
     bindVar :: S.Set String -> String -> (S.Set String, MultipleErrors)
     bindVar = bind ShadowedTypeVar
     findUnused :: Type -> MultipleErrors
-    findUnused ty =
-      let used = usedTypeVariables ty
-          declared = everythingOnTypes (++) go ty
+    findUnused ty' =
+      let used = usedTypeVariables ty'
+          declared = everythingOnTypes (++) go ty'
           unused = nub declared \\ nub used
       in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
       where

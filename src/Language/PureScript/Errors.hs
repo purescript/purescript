@@ -170,6 +170,7 @@ data ErrorMessage
   | ErrorInDataBindingGroup ErrorMessage
   | ErrorInTypeSynonym ProperName ErrorMessage
   | ErrorInValueDeclaration Ident ErrorMessage
+  | ErrorInTypeDeclaration Ident ErrorMessage
   | ErrorInForeignImport Ident ErrorMessage
   | PositionedError SourceSpan ErrorMessage
   | SimpleErrorWrapper SimpleErrorMessage
@@ -340,6 +341,7 @@ unwrapErrorMessage em = case em of
   (ErrorInTypeConstructor _ err)  -> unwrapErrorMessage err
   (ErrorInTypeSynonym _ err)      -> unwrapErrorMessage err
   (ErrorInValueDeclaration _ err) -> unwrapErrorMessage err
+  (ErrorInTypeDeclaration _ err)  -> unwrapErrorMessage err
   (ErrorInferringType _ err)      -> unwrapErrorMessage err
   (ErrorUnifyingTypes _ _ err)    -> unwrapErrorMessage err
   (NotYetDefined _ err)           -> unwrapErrorMessage err
@@ -386,6 +388,7 @@ onTypesInErrorMessageM f = g
     g (ErrorInDataBindingGroup e) = ErrorInDataBindingGroup <$> (g e)
     g (ErrorInTypeSynonym x e) = ErrorInTypeSynonym x <$> (g e)
     g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> (g e)
+    g (ErrorInTypeDeclaration x e) = ErrorInTypeDeclaration x <$> (g e)
     g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> (g e)
     g (PositionedError x e) = PositionedError x <$> (g e)
     g (SimpleErrorWrapper sem) = SimpleErrorWrapper <$> gSimple sem
@@ -740,6 +743,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ lineWithLevel $ "in value declaration " ++ showIdent n ++ ":"
             , go err
             ]
+    go (ErrorInTypeDeclaration n err) =
+      paras [ lineWithLevel $ "in type declaration for " ++ showIdent n ++ ":"
+            , go err
+            ]
     go (ErrorInForeignImport nm err) =
       paras [ lineWithLevel $ "in foreign import " ++ showIdent nm ++ ":"
             , go err
@@ -805,6 +812,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     unwrap pos (ErrorInDataBindingGroup err) = ErrorInDataBindingGroup (unwrap pos err)
     unwrap pos (ErrorInTypeSynonym nm err) = ErrorInTypeSynonym nm (unwrap pos err)
     unwrap pos (ErrorInValueDeclaration nm err) = ErrorInValueDeclaration nm (unwrap pos err)
+    unwrap pos (ErrorInTypeDeclaration nm err) = ErrorInTypeDeclaration nm (unwrap pos err)
     unwrap pos (ErrorInForeignImport nm err) = ErrorInForeignImport nm (unwrap pos err)
     unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
     unwrap _   (PositionedError pos err) = unwrap (Just pos) err
