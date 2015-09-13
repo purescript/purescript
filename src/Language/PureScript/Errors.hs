@@ -141,6 +141,7 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
   | ShadowedTypeVar String
+  | UnusedTypeVar String
   | WildcardInferredType Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
@@ -268,6 +269,7 @@ errorCode em = case unwrapErrorMessage em of
   TransitiveExportError{} -> "TransitiveExportError"
   ShadowedName{} -> "ShadowedName"
   ShadowedTypeVar{} -> "ShadowedTypeVar"
+  UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
@@ -633,6 +635,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Name '" ++ showIdent nm ++ "' was shadowed"
     goSimple (ShadowedTypeVar tv) =
       line $ "Type variable '" ++ tv ++ "' was shadowed"
+    goSimple (UnusedTypeVar tv) =
+      line $ "Type variable '" ++ tv ++ "' was declared but not used"
     goSimple (ClassOperator className opName) =
       paras [ line $ "Class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
             , indent $ line "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"

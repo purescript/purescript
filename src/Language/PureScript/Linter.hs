@@ -19,7 +19,7 @@
 
 module Language.PureScript.Linter (lint, module L) where
 
-import Data.List (mapAccumL, nub)
+import Data.List (mapAccumL, nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
 
@@ -60,7 +60,7 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
 
         f' :: Declaration -> MultipleErrors
         f' (PositionedDeclaration pos _ dec) = onErrorMessages (PositionedError pos) (f' dec)
-        f' dec = f dec <> checkShadowedTypeVars dec
+        f' dec = f dec <> checkTypeVars dec
 
     in tell (f' d)
     where
@@ -90,17 +90,27 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
     bindName :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
     bindName = bind ShadowedName
 
-  checkShadowedTypeVars :: Declaration -> MultipleErrors
-  checkShadowedTypeVars d =
-    let (f, _, _, _, _) = accumTypes go in f d
+  checkTypeVars :: Declaration -> MultipleErrors
+  checkTypeVars d =
+    let (checkShadow, _, _, _, _) = accumTypes (everythingWithContextOnTypes S.empty mempty mappend step)
+        (checkUnused, _, _, _, _) = accumTypes findUnused
+    in checkShadow d <> checkUnused d
     where
-    go :: Type -> MultipleErrors
-    go = everythingWithContextOnTypes S.empty mempty mappend step
     step :: S.Set String -> Type -> (S.Set String, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
     step s _ = (s, mempty)
     bindVar :: S.Set String -> String -> (S.Set String, MultipleErrors)
     bindVar = bind ShadowedTypeVar
+    findUnused :: Type -> MultipleErrors
+    findUnused ty =
+      let used = usedTypeVariables ty
+          declared = everythingOnTypes (++) go ty
+          unused = nub declared \\ nub used
+      in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
+      where
+      go :: Type -> [String]
+      go (ForAll tv _ _) = [tv]
+      go _ = []
 
   bind :: (Ord a) => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
   bind mkError s name | name `S.member` s = (s, errorMessage (mkError name))
