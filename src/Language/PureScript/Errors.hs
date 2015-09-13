@@ -140,6 +140,7 @@ data SimpleErrorMessage
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
+  | ShadowedTypeVar String
   | WildcardInferredType Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
@@ -266,6 +267,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidInstanceHead{} -> "InvalidInstanceHead"
   TransitiveExportError{} -> "TransitiveExportError"
   ShadowedName{} -> "ShadowedName"
+  ShadowedTypeVar{} -> "ShadowedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
@@ -628,7 +630,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras $ line ("An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
               : map (line . prettyPrintExport) ys
     goSimple (ShadowedName nm) =
-      line $ "Name '" ++ showIdent nm ++ "' was shadowed."
+      line $ "Name '" ++ showIdent nm ++ "' was shadowed"
+    goSimple (ShadowedTypeVar tv) =
+      line $ "Type variable '" ++ tv ++ "' was shadowed"
     goSimple (ClassOperator className opName) =
       paras [ line $ "Class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
             , indent $ line "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
