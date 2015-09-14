@@ -1,5 +1,5 @@
--- @shouldFailWith ExprDoesNotHaveType
--- @shouldFailWith ExprDoesNotHaveType
+-- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith TypesDoNotUnify
 module MultipleErrors where
 
 import Prelude
