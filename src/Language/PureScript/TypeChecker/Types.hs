@@ -592,7 +592,12 @@ check' val kt@(KindedType ty kind) = do
   return $ TypedValue True val' kt
 check' (PositionedValue pos _ val) ty =
   warnAndRethrowWithPosition pos $ check' val ty
-check' val ty = throwError . errorMessage $ ExprDoesNotHaveType val ty
+check' val ty = do
+  TypedValue _ val' ty' <- infer val
+  mt <- subsumes (Just val') ty' ty
+  case mt of
+    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Just v' -> return $ TypedValue True v' ty
 
 containsTypeSynonyms :: Type -> Bool
 containsTypeSynonyms = everythingOnTypes (||) go where
