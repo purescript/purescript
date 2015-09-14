@@ -223,6 +223,8 @@ missingAlternative env mn ca uncovered
   where
   mcases = missingCases env mn uncovered ca
 
+
+
 -- |
 -- Main exhaustivity checking function
 -- Starting with the set `uncovered = { _ }` (nothing covered, one `_` for each function argument),
@@ -235,9 +237,10 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
   step :: ([[Binder]], (Maybe Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        cond = or <$> sequenceA pr
-    in (concat missed, (liftA2 (&&) cond nec,
-                         if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
+        (missed', approx) = splitAt 10000 (concat missed)
+        cond = liftA2 (&&) (or <$> sequenceA pr) nec
+    in (missed', (if null approx then cond else Nothing,
+                  if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
 #if __GLASGOW_HASKELL__ < 710
     where
     sequenceA = foldr (liftA2 (:)) (pure [])
