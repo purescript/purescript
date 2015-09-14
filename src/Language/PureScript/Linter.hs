@@ -19,7 +19,7 @@
 
 module Language.PureScript.Linter (lint, module L) where
 
-import Data.List (mapAccumL, nub)
+import Data.List (mapAccumL, nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
 
@@ -33,6 +33,7 @@ import Control.Monad.Writer.Class
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
+import Language.PureScript.Types
 import Language.PureScript.Linter.Exhaustive as L
 
 -- | Lint the PureScript AST.
@@ -59,7 +60,9 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
 
         f' :: Declaration -> MultipleErrors
         f' (PositionedDeclaration pos _ dec) = onErrorMessages (PositionedError pos) (f' dec)
-        f' dec = f dec
+        f' dec@(ValueDeclaration name _ _ _) = onErrorMessages (ErrorInValueDeclaration name) (f dec <> checkTypeVarsInDecl dec)
+        f' (TypeDeclaration name ty) = onErrorMessages (ErrorInTypeDeclaration name) (checkTypeVars ty)
+        f' dec = f dec <> checkTypeVarsInDecl dec
 
     in tell (f' d)
     where
@@ -75,17 +78,42 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
     stepD s _ = (s, mempty)
 
     stepE :: S.Set Ident -> Expr -> (S.Set Ident, MultipleErrors)
-    stepE s (Abs (Left name) _) = bind s name
+    stepE s (Abs (Left name) _) = bindName s name
     stepE s (Let ds' _) =
-      case mapAccumL bind s (nub (mapMaybe getDeclIdent ds')) of
+      case mapAccumL bindName s (nub (mapMaybe getDeclIdent ds')) of
         (s', es) -> (s', mconcat es)
     stepE s _ = (s, mempty)
 
     stepB :: S.Set Ident -> Binder -> (S.Set Ident, MultipleErrors)
-    stepB s (VarBinder name) = bind s name
-    stepB s (NamedBinder name _) = bind s name
+    stepB s (VarBinder name) = bindName s name
+    stepB s (NamedBinder name _) = bindName s name
     stepB s _ = (s, mempty)
 
-    bind :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
-    bind s name | name `S.member` s = (s, errorMessage (ShadowedName name))
-                | otherwise = (S.insert name s, mempty)
+    bindName :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
+    bindName = bind ShadowedName
+
+  checkTypeVarsInDecl :: Declaration -> MultipleErrors
+  checkTypeVarsInDecl d = let (f, _, _, _, _) = accumTypes checkTypeVars in f d
+
+  checkTypeVars :: Type -> MultipleErrors
+  checkTypeVars ty = everythingWithContextOnTypes S.empty mempty mappend step ty <> findUnused ty
+    where
+    step :: S.Set String -> Type -> (S.Set String, MultipleErrors)
+    step s (ForAll tv _ _) = bindVar s tv
+    step s _ = (s, mempty)
+    bindVar :: S.Set String -> String -> (S.Set String, MultipleErrors)
+    bindVar = bind ShadowedTypeVar
+    findUnused :: Type -> MultipleErrors
+    findUnused ty' =
+      let used = usedTypeVariables ty'
+          declared = everythingOnTypes (++) go ty'
+          unused = nub declared \\ nub used
+      in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
+      where
+      go :: Type -> [String]
+      go (ForAll tv _ _) = [tv]
+      go _ = []
+
+  bind :: (Ord a) => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
+  bind mkError s name | name `S.member` s = (s, errorMessage (mkError name))
+                      | otherwise = (S.insert name s, mempty)
