@@ -270,11 +270,8 @@ infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
   checkVisibility moduleName var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable moduleName $ var
-  case ty of
-    ConstrainedType constraints ty' -> do
-      dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
-    _ -> return $ TypedValue True (Var var) ty
+  (expr, ty') <- instantiatePolyTypeWithUnknowns (Var var) ty
+  return $ TypedValue True expr ty'
 infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
