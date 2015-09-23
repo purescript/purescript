@@ -75,10 +75,14 @@ entails env moduleName context = solve
       go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
+        -- We need to desugar synonyms here so that forClassName can find the correct modules
+        -- in types hidden inside the synonyms.
+        -- TODO: this can go away when synonyms get desugared up front.
+        tys'' <- mapM expandAllTypeSynonyms tys'
         let instances = do
-              tcd <- forClassName className' tys'
+              tcd <- forClassName className' tys''
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
+              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys'' (tcdInstanceTypes tcd)
               return (subst, tcd)
         (subst, tcd) <- unique instances
         -- Solve any necessary subgoals
