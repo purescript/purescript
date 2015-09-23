@@ -282,10 +282,10 @@ infer' v@(Constructor c) = do
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
-  ts <- mapM infer vals
+  (vals', ts) <- instantiateForBinders vals binders
   ret <- fresh
-  binders' <- checkBinders (map (\(TypedValue _ _ t) -> t) ts) ret binders
-  return $ TypedValue True (Case ts binders') ret
+  binders' <- checkBinders ts ret binders
+  return $ TypedValue True (Case vals' binders') ret
 infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   v2@(TypedValue _ _ t2) <- infer th
@@ -376,7 +376,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
         go [] ty' = case (val, ty') of
           (TypeConstructor _, TypeApp _ _) -> throwIncorrectArity
           _ -> do
-            _ <- subsumes Nothing val ty'
+            _ <- val =?= ty'
             return M.empty
         go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
           M.union <$> inferBinder obj binder <*> go binders' ret
@@ -407,6 +407,26 @@ inferBinder val (NamedBinder name binder) = do
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPosition pos $ inferBinder val binder
+
+-- | Returns true if a binder requires its argument type to be a monotype.
+-- | If this is the case, we need to instantiate any polymorphic types before checking binders.
+binderRequiresMonotype :: Binder -> Bool
+binderRequiresMonotype NullBinder = False
+binderRequiresMonotype (VarBinder _) = False
+binderRequiresMonotype (NamedBinder _ b) = binderRequiresMonotype b
+binderRequiresMonotype (PositionedBinder _ _ b) = binderRequiresMonotype b
+binderRequiresMonotype _ = True
+
+-- | Instantiate polytypes only when necessitated by a binder.
+instantiateForBinders :: [Expr] -> [CaseAlternative] -> UnifyT Type Check ([Expr], [Type])
+instantiateForBinders vals cas = fmap unzip $ zipWithM (\val inst -> do
+  TypedValue _ val' ty <- infer val
+  if inst
+    then instantiatePolyTypeWithUnknowns val' ty
+    else return (val', ty)) vals shouldInstantiate
+  where
+  shouldInstantiate :: [Bool]
+  shouldInstantiate = map (any binderRequiresMonotype) . transpose . map caseAlternativeBinders $ cas
 
 -- |
 -- Check the types of the return values in a set of binders in a case statement
@@ -537,8 +557,7 @@ check' (TypedValue checkType val ty1) ty2 = do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
       return $ TypedValue checkType val''' ty2'
 check' (Case vals binders) ret = do
-  vals' <- mapM infer vals
-  let ts = map (\(TypedValue _ _ t) -> t) vals'
+  (vals', ts) <- instantiateForBinders vals binders
   binders' <- checkBinders ts ret binders
   return $ TypedValue True (Case vals' binders') ret
 check' (IfThenElse cond th el) ty = do
@@ -567,14 +586,16 @@ check' (Accessor prop val) ty = do
   rest <- fresh
   val' <- check val (TypeApp tyObject (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
-check' (Constructor c) ty = do
+check' v@(Constructor c) ty = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-      _ <- subsumes Nothing repl ty
-      return $ TypedValue True (Constructor c) ty
+      mv <- subsumes (Just v) repl ty
+      case mv of
+        Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+        Just v' -> return $ TypedValue True v' ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
