@@ -83,9 +83,9 @@ removeParens =
   go val = val
 
 externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity)]
-externsFixities ExternsFile{..} = 
+externsFixities ExternsFile{..} =
   [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec)
-  | (assoc, prec, op) <- efFixities
+  | ExternsFixity assoc prec op <- efFixities
   ]
 
 collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity)]
