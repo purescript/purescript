@@ -63,7 +63,6 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Rows
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
-import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -94,11 +93,7 @@ typesOf mainModuleName moduleName vals = do
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    -- Remove type synonyms placeholders, and replace
-    -- top-level unification variables with named type variables.
-    let val'' = overTypes desaturateAllTypeSynonyms val'
-        ty' = varIfUnknown . desaturateAllTypeSynonyms $ ty
-    return (ident, (val'', ty'))
+    return (ident, (val', ty))
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
@@ -143,7 +138,7 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
   checkTypeKind ty kind
   -- Check the type with the new names in scope
-  ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
+  ty'' <- introduceSkolemScope <=< replaceTypeWildcards $ ty'
   val'' <- if checkType
            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
            else return (TypedValue False val' ty'')
@@ -182,9 +177,7 @@ replaceTypeClassDictionaries mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
   where
-  go (TypeClassDictionary constraint dicts) = do
-    env <- getEnv
-    entails env mn dicts constraint
+  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
 
 -- |
@@ -269,7 +262,7 @@ infer' (App f arg) = do
 infer' (Var var) = do
   Just moduleName <- checkCurrentModule <$> get
   checkVisibility moduleName var
-  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable moduleName $ var
+  ty <- introduceSkolemScope <=< replaceTypeWildcards <=< lookupVariable moduleName $ var
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
@@ -279,7 +272,7 @@ infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
-    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
+    Just (_, _, ty, _) -> do (v', ty') <- sndM introduceSkolemScope <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
   ts <- mapM infer vals
@@ -302,7 +295,7 @@ infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
   checkTypeKind ty kind
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  ty' <- introduceSkolemScope <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
 infer' (PositionedValue pos _ val) = warnAndRethrowWithPosition pos $ infer' val
@@ -315,7 +308,7 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue 
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty
   checkTypeKind ty kind
   let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  ty' <- introduceSkolemScope <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
   bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
@@ -346,9 +339,6 @@ inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
 inferProperty (TypeApp obj row) prop | obj == tyObject = do
   let (props, _) = rowToList row
   return $ lookup prop props
-inferProperty (SaturatedTypeSynonym name args) prop = do
-  replaced <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  inferProperty replaced prop
 inferProperty (ForAll ident ty _) prop = do
   replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
@@ -370,7 +360,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contain constraints") ty
-      fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
+      fn' <- introduceSkolemScope fn
       go binders fn'
         where
         go [] ty' = case (val, ty') of
@@ -473,9 +463,6 @@ check' val t@(ConstrainedType constraints ty) = do
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
   instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
-check' val (SaturatedTypeSynonym name args) = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  check val ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -509,8 +496,8 @@ check' (App f arg) ret = do
 check' v@(Var var) ty = do
   Just moduleName <- checkCurrentModule <$> get
   checkVisibility moduleName var
-  repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  repl <- introduceSkolemScope <=< lookupVariable moduleName $ var
+  ty' <- introduceSkolemScope <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
@@ -528,8 +515,8 @@ check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- liftCheck $ kindOfWithScopedVars ty1
   checkTypeKind ty1 kind
-  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
-  ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
+  ty1' <- introduceSkolemScope <=< replaceTypeWildcards $ ty1
+  ty2' <- introduceSkolemScope <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
@@ -572,15 +559,12 @@ check' (Constructor c) ty = do
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
     Just (_, _, ty1, _) -> do
-      repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
+      repl <- introduceSkolemScope ty1
       _ <- subsumes Nothing repl ty
       return $ TypedValue True (Constructor c) ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
-check' val ty | containsTypeSynonyms ty = do
-  ty' <- introduceSkolemScope <=< expandAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  check val ty'
 check' val kt@(KindedType ty kind) = do
   checkTypeKind ty kind
   val' <- check' val ty
@@ -588,11 +572,6 @@ check' val kt@(KindedType ty kind) = do
 check' (PositionedValue pos _ val) ty =
   warnAndRethrowWithPosition pos $ check' val ty
 check' val ty = throwError . errorMessage $ ExprDoesNotHaveType val ty
-
-containsTypeSynonyms :: Type -> Bool
-containsTypeSynonyms = everythingOnTypes (||) go where
-  go (SaturatedTypeSynonym _ _) = True
-  go _ = False
 
 
 -- |
@@ -657,9 +636,6 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
   ret' <- maybe fresh return ret
   u =?= function ty ret'
   return (ret', App fn arg')
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do

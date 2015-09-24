@@ -125,6 +125,7 @@ library
                      Language.PureScript.Sugar.Names.Exports
                      Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
+                     Language.PureScript.Sugar.Synonyms
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeClasses.Deriving
                      Language.PureScript.Sugar.TypeDeclarations
@@ -136,7 +137,6 @@ library
                      Language.PureScript.TypeChecker.Rows
                      Language.PureScript.TypeChecker.Skolems
                      Language.PureScript.TypeChecker.Subsumption
-                     Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
