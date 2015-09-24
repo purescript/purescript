@@ -12,6 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -22,6 +23,10 @@ module Language.PureScript.AST.SourcePos where
 import qualified Data.Data as D
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
+
+#if __GLASGOW_HASKELL__ < 710
+import Control.Applicative
+#endif
 
 -- |
 -- Source position information
