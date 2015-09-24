@@ -20,6 +20,8 @@
 
 module Language.PureScript.Externs
   ( ExternsFile(..)
+  , ExternsImport(..)
+  , ExternsFixity(..)
   , ExternsDeclaration(..)
   , moduleToExternsFile
   , applyExternsFileToEnvironment
@@ -55,27 +57,76 @@ data ExternsFile = ExternsFile
   -- ^ List of module exports
   , efExports :: [DeclarationRef]
   -- ^ List of module imports
-  , efImports :: [(ModuleName, ImportDeclarationType, Maybe ModuleName)]
+  , efImports :: [ExternsImport]
   -- ^ List of operators and their fixities
-  , efFixities :: [(Associativity, Precedence, String)]
+  , efFixities :: [ExternsFixity]
   -- ^ List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
+  } deriving (Show, Read)
+
+-- | A module import in an externs file
+data ExternsImport = ExternsImport
+  {
+  -- ^ The imported module
+    eiModule :: ModuleName
+  -- ^ The import type: regular, qualified or hiding
+  , eiImportType :: ImportDeclarationType
+  -- ^ The imported-as name, for qualified imports
+  , eiImportedAs :: Maybe ModuleName
+  } deriving (Show, Read)
+
+-- | A fixity declaration in an externs file
+data ExternsFixity = ExternsFixity
+  {
+  -- ^ The associativity of the operator
+    efAssociativity :: Associativity
+  -- ^ The precedence level of the operator
+  , efPrecedence :: Precedence
+  -- ^ The operator symbol
+  , efOperator :: String
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
   -- ^ A type declaration
-    EDType ProperName Kind TypeKind
+    EDType
+      { edTypeName :: ProperName
+      , edTypeKind :: Kind
+      , edTypeDeclarationKind :: TypeKind
+      }
   -- ^ A type synonym
-  | EDTypeSynonym ProperName [(String, Maybe Kind)] Type
+  | EDTypeSynonym
+      { edTypeSynonymName :: ProperName
+      , edTypeSynonymArguments :: [(String, Maybe Kind)]
+      , edTypeSynonymType :: Type
+      }
   -- ^ A data construtor
-  | EDDataConstructor ProperName DataDeclType ProperName Type [Ident]
+  | EDDataConstructor
+      { edDataCtorName :: ProperName
+      , edDataCtorOrigin :: DataDeclType
+      , edDataCtorTypeCtor :: ProperName
+      , edDataCtorType :: Type
+      , edDataCtorFields :: [Ident]
+      }
   -- ^ A value declaration
-  | EDValue Ident Type
+  | EDValue
+      { edValueName :: Ident
+      , edValueType :: Type
+      }
   -- ^ A type class declaration
-  | EDClass ProperName [(String, Maybe Kind)] [(Ident, Type)] [Constraint]
+  | EDClass
+      { edClassName :: ProperName
+      , edClassTypeArguments :: [(String, Maybe Kind)]
+      , edClassMembers :: [(Ident, Type)]
+      , edClassConstraints :: [Constraint]
+      }
   -- ^ An instance declaration
-  | EDInstance (Qualified ProperName) Ident [Type] (Maybe [Constraint])
+  | EDInstance
+      { edInstanceClassName :: Qualified ProperName
+      , edInstanceName :: Ident
+      , edInstanceTypes :: [Type]
+      , edInstanceConstraints :: Maybe [Constraint]
+      }
   deriving (Show, Read)
 
 -- | Convert an externs file back into a module
@@ -111,8 +162,8 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efFixities      = mapMaybe fixityDecl ds
   efDeclarations  = concatMap toExternsDeclaration efExports
 
-  fixityDecl :: Declaration -> Maybe (Associativity, Precedence, String)
-  fixityDecl (FixityDeclaration (Fixity assoc prec) op) = fmap (const (assoc, prec, op)) (find exportsOp exps)
+  fixityDecl :: Declaration -> Maybe ExternsFixity
+  fixityDecl (FixityDeclaration (Fixity assoc prec) op) = fmap (const (ExternsFixity assoc prec op)) (find exportsOp exps)
     where
     exportsOp :: DeclarationRef -> Bool
     exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r
@@ -121,8 +172,8 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   fixityDecl (PositionedDeclaration _ _ d) = fixityDecl d
   fixityDecl _ = Nothing
 
-  importDecl :: Declaration -> Maybe (ModuleName, ImportDeclarationType, Maybe ModuleName)
-  importDecl (ImportDeclaration m mt qmn) = Just (m, mt, qmn)
+  importDecl :: Declaration -> Maybe ExternsImport
+  importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl (PositionedDeclaration _ _ d) = importDecl d
   importDecl _ = Nothing
 
@@ -159,5 +210,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
       ]
   toExternsDeclaration _ = []
 
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)

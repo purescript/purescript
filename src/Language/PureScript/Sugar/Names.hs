@@ -56,7 +56,7 @@ desugarImports externs modules = do
     let members = Exports{..}
         ss = internalModuleSourceSpan "<Externs>"
         env' = M.insert efModuleName (ss, nullImports, members) env
-        fromEFImport (mn, mt, qmn) = (mn, [(Nothing, mt, qmn)])
+        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, mt, qmn)])
     imps <- foldM (resolveModuleImport efModuleName env') nullImports (map fromEFImport efImports)
     exps <- resolveExports env' efModuleName imps members efExports
     return $ M.insert efModuleName (ss, imps, exps) env
