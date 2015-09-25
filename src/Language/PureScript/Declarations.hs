@@ -464,7 +464,11 @@ data Binder
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourcePos Binder deriving (Show, D.Data, D.Typeable)
+  | PositionedBinder SourcePos Binder
+  -- |
+  -- A binder with a type annotation
+  --
+  | TypedBinder Type Binder deriving (Show, D.Data, D.Typeable)
 
 -- |
 -- Collect all names introduced in binders in an expression
