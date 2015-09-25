@@ -1,23 +1,15 @@
 module Main where
 
+import Prelude
 import Control.Monad.Eff
-import Debug.Trace
-
-foreign import data Assert :: !
-
-foreign import assert
-  "function assert(x) {\
-  \  return function () {\
-  \    if (!x) throw new Error('assertion failed');\
-  \    return {};\
-  \  };\
-  \};" :: forall e. Boolean -> Eff (assert :: Assert | e) Unit
+import Control.Monad.Eff.Console
+import Test.Assert
 
 main = do
-  assert (1 < 2)
-  assert (2 == 2)
-  assert (3 > 1)
+  assert (1.0 < 2.0)
+  assert (2.0 == 2.0)
+  assert (3.0 > 1.0)
   assert ("a" < "b")
   assert ("a" == "a")
   assert ("z" > "a")
-  trace "Done!"
+  log "Done!"

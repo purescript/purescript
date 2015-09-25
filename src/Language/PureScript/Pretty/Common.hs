@@ -17,7 +17,7 @@ module Language.PureScript.Pretty.Common where
 
 import Control.Monad.State
 import Data.List (intercalate)
-import Language.PureScript.Parser.Common (reservedPsNames, opChars)
+import Language.PureScript.Parser.Lexer (reservedPsNames, opChars)
 
 -- |
 -- Wrap a string in parentheses
@@ -25,7 +25,7 @@ import Language.PureScript.Parser.Common (reservedPsNames, opChars)
 parens :: String -> String
 parens s = ('(':s) ++ ")"
 
-newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Eq, Ord)
+newtype PrinterState = PrinterState { indent :: Int } deriving (Show, Read, Eq, Ord)
 
 -- |
 -- Number of characters per identation level
@@ -65,5 +65,5 @@ prettyPrintMany f xs = do
 --
 prettyPrintObjectKey :: String -> String
 prettyPrintObjectKey s | s `elem` reservedPsNames = show s
-                       | head s `elem` opChars = show s
+                       | any (`elem` opChars) s = show s
                        | otherwise = s

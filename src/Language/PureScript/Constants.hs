@@ -15,7 +15,7 @@
 
 module Language.PureScript.Constants where
 
--- Prelude Operators
+-- Operators
 
 ($) :: String
 ($) = "$"
@@ -65,28 +65,49 @@ module Language.PureScript.Constants where
 (/=) :: String
 (/=) = "/="
 
-(&) :: String
-(&) = "&"
-
-bar :: String
-bar = "|"
-
-(^) :: String
-(^) = "^"
-
 (&&) :: String
 (&&) = "&&"
 
 (||) :: String
 (||) = "||"
 
+bind :: String
+bind = "bind"
+
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
--- Prelude Operator Functions
+(.|.) :: String
+(.|.) = ".|."
+
+(.&.) :: String
+(.&.) = ".&."
+
+(.^.) :: String
+(.^.) = ".^."
+
+(<<<) :: String
+(<<<) = "<<<"
+
+compose :: String
+compose = "compose"
+
+-- Functions
 
 negate :: String
 negate = "negate"
+
+not :: String
+not = "not"
+
+conj :: String
+conj = "conj"
+
+disj :: String
+disj = "disj"
+
+mod :: String
+mod = "mod"
 
 shl :: String
 shl = "shl"
@@ -100,10 +121,19 @@ zshr = "zshr"
 complement :: String
 complement = "complement"
 
-not :: String
-not = "not"
-
 -- Prelude Values
+
+zero :: String
+zero = "zero"
+
+one :: String
+one = "one"
+
+bottom :: String
+bottom = "bottom"
+
+top :: String
+top = "top"
 
 return :: String
 return = "return"
@@ -123,9 +153,6 @@ whileE = "whileE"
 runST :: String
 runST = "runST"
 
-runSTArray :: String
-runSTArray = "runSTArray"
-
 stRefValue :: String
 stRefValue = "value"
 
@@ -141,17 +168,19 @@ writeSTRef = "writeSTRef"
 modifySTRef :: String
 modifySTRef = "modifySTRef"
 
-peekSTArray :: String
-peekSTArray = "peekSTArray"
-
-pokeSTArray :: String
-pokeSTArray = "pokeSTArray"
-
 mkFn :: String
 mkFn = "mkFn"
 
 runFn :: String
 runFn = "runFn"
+
+unit :: String
+unit = "unit"
+
+-- Prim values
+
+undefined :: String
+undefined = "undefined"
 
 -- Type Class Dictionary Names
 
@@ -164,14 +193,35 @@ applicativeEffDictionary = "applicativeEff"
 bindEffDictionary :: String
 bindEffDictionary = "bindEff"
 
-numNumber :: String
-numNumber = "numNumber"
+semiringNumber :: String
+semiringNumber = "semiringNumber"
+
+semiringInt :: String
+semiringInt = "semiringInt"
+
+ringNumber :: String
+ringNumber = "ringNumber"
+
+ringInt :: String
+ringInt = "ringInt"
+
+moduloSemiringNumber :: String
+moduloSemiringNumber = "moduloSemiringNumber"
+
+moduloSemiringInt :: String
+moduloSemiringInt = "moduloSemiringInt"
 
 ordNumber :: String
 ordNumber = "ordNumber"
 
+ordInt :: String
+ordInt = "ordInt"
+
 eqNumber :: String
 eqNumber = "eqNumber"
+
+eqInt :: String
+eqInt = "eqInt"
 
 eqString :: String
 eqString = "eqString"
@@ -179,17 +229,31 @@ eqString = "eqString"
 eqBoolean :: String
 eqBoolean = "eqBoolean"
 
-bitsNumber :: String
-bitsNumber = "bitsNumber"
+boundedBoolean :: String
+boundedBoolean = "boundedBoolean"
 
-boolLikeBoolean :: String
-boolLikeBoolean = "boolLikeBoolean"
+booleanAlgebraBoolean :: String
+booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
 
-semigroupoidArr :: String
-semigroupoidArr = "semigroupoidArr"
+semigroupoidFn :: String
+semigroupoidFn = "semigroupoidFn"
+
+-- Generic Deriving
+
+generic :: String
+generic = "Generic"
+
+toSpine :: String
+toSpine = "toSpine"
+
+fromSpine :: String
+fromSpine = "fromSpine"
+
+toSignature :: String
+toSignature = "toSignature"
 
 -- Main module
 
@@ -201,6 +265,9 @@ main = "main"
 __superclass_ :: String
 __superclass_ = "__superclass_"
 
+__unused :: String
+__unused = "__unused"
+
 -- Modules
 
 prim :: String
@@ -209,8 +276,8 @@ prim = "Prim"
 prelude :: String
 prelude = "Prelude"
 
-preludeUnsafe :: String
-preludeUnsafe = "Prelude_Unsafe"
+dataArrayUnsafe :: String
+dataArrayUnsafe = "Data_Array_Unsafe"
 
 eff :: String
 eff = "Control_Monad_Eff"
@@ -220,3 +287,6 @@ st = "Control_Monad_ST"
 
 dataFunction :: String
 dataFunction = "Data_Function"
+
+dataIntBits :: String
+dataIntBits = "Data_Int_Bits"

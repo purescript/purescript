@@ -1,3 +1,6 @@
+-- @shouldFailWith ErrorParsingModule
 module Main where
 
-  func = \ -> "no"
+import Prelude
+
+func = \ -> "no"

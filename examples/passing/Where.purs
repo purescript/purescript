@@ -7,43 +7,43 @@ import Control.Monad.ST
 test1 x = y
   where
   y :: Number
-  y = x + 1 
+  y = x + 1.0
 
 test2 x y = x' + y'
   where
-  x' = x + 1
-  y' = y + 1
-  
+  x' = x + 1.0
+  y' = y + 1.0
 
-test3 = f 1 2 3
+
+test3 = f 1.0 2.0 3.0
   where f x y z = x + y + z
-        
 
-test4 = f (+) [1, 2]
+
+test4 = f (+) [1.0, 2.0]
   where f x [y, z] = x y z
-        
 
-test5 = g 10
-  where 
-  f x | x > 0 = g (x / 2) + 1
-  f x = 0
-  g x = f (x - 1) + 1
 
-test6 = if f true then f 1 else f 2
+test5 = g 10.0
+  where
+  f x | x > 0.0 = g (x / 2.0) + 1.0
+  f x = 0.0
+  g x = f (x - 1.0) + 1.0
+
+test6 = if f true then f 1.0 else f 2.0
   where f :: forall a. a -> a
         f x = x
 
 test7 :: Number -> Number
 test7 x = go x
-  where 
+  where
   go y | (x - 0.1 < y * y) && (y * y < x + 0.1) = y
-  go y = go $ (y + x / y) / 2
+  go y = go $ (y + x / y) / 2.0
 
 main = do
-  Debug.Trace.print (test1 1)
-  Debug.Trace.print (test2 1 2)
-  Debug.Trace.print test3
-  Debug.Trace.print test4
-  Debug.Trace.print test5
-  Debug.Trace.print test6
-  Debug.Trace.print (test7 100)
+  Control.Monad.Eff.Console.print (test1 1.0)
+  Control.Monad.Eff.Console.print (test2 1.0 2.0)
+  Control.Monad.Eff.Console.print test3
+  Control.Monad.Eff.Console.print test4
+  Control.Monad.Eff.Console.print test5
+  Control.Monad.Eff.Console.print test6
+  Control.Monad.Eff.Console.print (test7 100.0)

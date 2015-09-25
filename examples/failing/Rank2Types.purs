@@ -1,7 +1,8 @@
+-- @shouldFailWith TypesDoNotUnify
 module Main where
 
-  import Prelude
+import Prelude
 
-  foreign import test :: (forall a. a -> a) -> Number
+foreign import test :: (forall a. a -> a) -> Number
 
-  test1 = test (\n -> n + 1)
+test1 = test (\n -> n + 1)

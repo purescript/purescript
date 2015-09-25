@@ -1,16 +1,11 @@
 module Main where
 
 import Prelude
+import Test.Assert
 
-tail = \(_:xs) -> xs
+snd = \[_, y] -> y
 
-foreign import error
-  "function error(msg) {\
-  \  throw msg;\
-  \}" :: forall a. String -> a
-
-main = 
-  let ts = tail [1, 2, 3] in
-  if ts == [2, 3] 
-  then Debug.Trace.trace "Done"
-  else error "Incorrect result from 'tails'."
+main = do
+  let ts = snd [1.0, 2.0]
+  assert' "Incorrect result from 'snd'." (ts == 2.0)
+  Control.Monad.Eff.Console.log "Done"

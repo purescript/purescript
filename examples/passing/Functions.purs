@@ -1,15 +1,15 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  test1 = \_ -> 0
+test1 = \_ -> 0.0
 
-  test2 = \a b -> a + b + 1
+test2 = \a b -> a + b + 1.0
 
-  test3 = \a -> a
+test3 = \a -> a
 
-  test4 = \(%%) -> 1 %% 2
+test4 = \(%%) -> 1.0 %% 2.0
 
-  test5 = \(+++) (***) -> 1 +++ 2 *** 3
+test5 = \(+++) (***) -> 1.0 +++ 2.0 *** 3.0
 
-  main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

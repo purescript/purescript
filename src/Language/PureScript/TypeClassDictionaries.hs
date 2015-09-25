@@ -26,37 +26,37 @@ import Language.PureScript.Types
 --
 data TypeClassDictionaryInScope
   = TypeClassDictionaryInScope {
-    -- |
-    -- The identifier with which the dictionary can be accessed at runtime
-    --
+    -- | The identifier with which the dictionary can be accessed at runtime
       tcdName :: Qualified Ident
-    -- |
-    -- The name of the type class to which this type class instance applies
-    --
+    -- | How to obtain this instance via superclass relationships
+    , tcdPath :: [(Qualified ProperName, Integer)]
+    -- | The name of the type class to which this type class instance applies
     , tcdClassName :: Qualified ProperName
-    -- |
-    -- The types to which this type class instance applies
-    --
+    -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [Type]
-    -- |
-    -- Type class dependencies which must be satisfied to construct this dictionary
-    --
-    , tcdDependencies :: Maybe [(Qualified ProperName, [Type])]
-    -- |
-    -- The type of this dictionary
-    --
-    , tcdType :: TypeClassDictionaryType
-    } deriving (Show, Data, Typeable)
+    -- | Type class dependencies which must be satisfied to construct this dictionary
+    , tcdDependencies :: Maybe [Constraint]
+    } deriving (Show, Read, Data, Typeable)
 
 -- |
--- The type of a type class dictionary
+-- A simplified representation of expressions which are used to represent type
+-- class dictionaries at runtime, which can be compared for equality
 --
-data TypeClassDictionaryType
+data DictionaryValue
   -- |
-  -- A regular type class dictionary
+  -- A dictionary which is brought into scope by a local constraint
   --
-  = TCDRegular
+  = LocalDictionaryValue (Qualified Ident)
   -- |
-  -- A type class dictionary which is an alias for an imported dictionary from another module
+  -- A dictionary which is brought into scope by an instance declaration
   --
-  | TCDAlias (Qualified Ident) deriving (Show, Eq, Data, Typeable)
+  | GlobalDictionaryValue (Qualified Ident)
+  -- |
+  -- A dictionary which depends on other dictionaries
+  --
+  | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
+  -- |
+  -- A subclass dictionary
+  --
+  | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
+  deriving (Show, Read, Ord, Eq)

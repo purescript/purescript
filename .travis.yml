@@ -1,3 +1,79 @@
-language: haskell
+language: c
+sudo: false
+matrix:
+  include:
+    - env: GHCVER=7.8.4 COVERAGE_SUITE=tests
+      compiler: ": #GHC 7.8.4 - tests"
+      # ^ HACK before https://github.com/travis-ci/travis-ci/issues/4393 is resolved
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
+      compiler: ": #GHC 7.8.4 - psci-tests"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.8.4 STACKAGE=lts-22
+      compiler: ": #GHC 7.8.4 - lts-2.22"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.6.3
+      compiler: ": #GHC 7.6.3"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.6.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.1
+      compiler: ": #GHC 7.10.1"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.2 STACKAGE=lts=3.4 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.2 lts-3.4"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.2 STACKAGE=nightly-2015-08-24
+      compiler: ": #GHC 7.10.2 nightly-2015-09-09"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+before_install:
+  - unset CC
+  - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
+  - export PATH="/opt/cabal/1.22/bin:$PATH"
+  - export PATH="$HOME/.cabal/bin:$PATH"
+  - export PATH="/opt/happy/1.19.5/bin:/$PATH"
+  - export PATH="/opt/alex/3.1.4/bin:/$PATH"
+install:
+  - cabal --version
+  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+  - travis_retry cabal update
+  # Run sequentially
+  # Travis container infrastructure seems to expose all host CPUs (16?), thus
+  # cabal and ghc tries to use them all. Which is bad idea on a shared box.
+  # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
+  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
+  # Cache sandboxes in ~/cabal-sandboxes
+  # Move right sandbox to .cabal-sandbox if exists
+  - if [ -d ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} ]; then
+      mv ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} .cabal-sandbox;
+    fi
+  - mkdir -p .cabal-sandbox
+  - cabal sandbox init --sandbox .cabal-sandbox
+  # Download stackage cabal.config, not sure whether filtering is necessary
+  - if [ -n "$STACKAGE" ]; then curl http://www.stackage.org/$STACKAGE/cabal.config | grep -v purescript > cabal.config; fi
+  - cabal install --only-dependencies --enable-tests
+  - cabal install hpc-coveralls
+  # Snapshot state of the sandbox now, so we don't need to make new one for test install
+  - rm -rf ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
+  - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
+script:
+  - ./travis/configure.sh
+  - cabal build --ghc-options="-Werror"
+  - cabal test
+  - ./travis/test-install.sh
+after_script:
+  - ./travis/after.sh
 notifications:
   email: true
+before_deploy: "./bundle/build.sh linux64"
+deploy:
+  provider: releases
+  api_key: $RELEASE_KEY
+  file:
+    - bundle/linux64.tar.gz
+    - bundle/linux64.sha
+  skip_cleanup: true
+  on:
+    all_branches: true
+    tags: true
+cache:
+  directories:
+    - ~/cabal-sandboxes

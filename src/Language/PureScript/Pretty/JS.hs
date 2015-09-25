@@ -13,21 +13,28 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Pretty.JS (
     prettyPrintJS
 ) where
 
-import Language.PureScript.Pretty.Common
-import Language.PureScript.CodeGen.JS (identNeedsEscaping)
-import Language.PureScript.CodeGen.JS.AST
-
 import Data.List
 import Data.Maybe (fromMaybe)
-import qualified Control.Arrow as A
-import Control.Arrow ((<+>))
-import Control.PatternArrows
+
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
+import Control.Arrow ((<+>))
 import Control.Monad.State
+import Control.PatternArrows
+import qualified Control.Arrow as A
+
+import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.CodeGen.JS.Common
+import Language.PureScript.Pretty.Common
+import Language.PureScript.Comments
+
 import Numeric
 
 literals :: Pattern PrinterState JS String
@@ -117,6 +124,32 @@ literals = mkPattern' match
     [ return $ lbl ++ ": "
     , prettyPrintJS' js
     ]
+  match (JSComment com js) = fmap concat $ sequence $
+    [ return "\n"
+    , currentIndent
+    , return "/**\n"
+    ] ++
+    map asLine (concatMap commentLines com) ++
+    [ currentIndent
+    , return " */\n"
+    , currentIndent
+    , prettyPrintJS' js
+    ]
+    where
+    commentLines :: Comment -> [String]
+    commentLines (LineComment s) = [s]
+    commentLines (BlockComment s) = lines s
+
+    asLine :: String -> StateT PrinterState Maybe String
+    asLine s = do
+      i <- currentIndent
+      return $ i ++ " * " ++ removeComments s ++ "\n"
+
+    removeComments :: String -> String
+    removeComments ('*' : '/' : s) = removeComments s
+    removeComments (c : s) = c : removeComments s
+
+    removeComments [] = []
   match (JSRaw js) = return js
   match _ = mzero
 
@@ -134,6 +167,7 @@ string s = '"' : concatMap encodeChar s ++ "\""
   encodeChar '\\' = "\\\\"
   encodeChar c | fromEnum c > 0xFFF = "\\u" ++ showHex (fromEnum c) ""
   encodeChar c | fromEnum c > 0xFF = "\\u0" ++ showHex (fromEnum c) ""
+  encodeChar c | fromEnum c > 0x7E || fromEnum c < 0x20 = "\\x" ++ showHex (fromEnum c) ""
   encodeChar c = [c]
 
 conditional :: Pattern PrinterState JS ((JS, JS), JS)
@@ -180,17 +214,26 @@ instanceOf = mkPattern match
   match (JSInstanceOf val ty) = Just (val, ty)
   match _ = Nothing
 
-unary :: UnaryOperator -> String -> Operator PrinterState JS String
-unary op str = Wrap match (++)
+unary' :: UnaryOperator -> (JS -> String) -> Operator PrinterState JS String
+unary' op mkStr = Wrap match (++)
   where
   match :: Pattern PrinterState JS (String, JS)
   match = mkPattern match'
     where
-    match' (JSUnary op' val) | op' == op = Just (str, val)
+    match' (JSUnary op' val) | op' == op = Just (mkStr val, val)
     match' _ = Nothing
 
+unary :: UnaryOperator -> String -> Operator PrinterState JS String
+unary op str = unary' op (const str)
+
+negateOperator :: Operator PrinterState JS String
+negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
+  where
+  isNegate (JSUnary Negate _) = True
+  isNegate _ = False
+
 binary :: BinaryOperator -> String -> Operator PrinterState JS String
-binary op str = AssocR match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
+binary op str = AssocL match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
   match :: Pattern PrinterState JS (JS, JS)
   match = mkPattern match'
@@ -234,26 +277,26 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         ++ fromMaybe "" name
                         ++ "(" ++ intercalate ", " args ++ ") "
                         ++ ret ]
-                  , [ binary    LessThan             "<" ]
-                  , [ binary    LessThanOrEqualTo    "<=" ]
-                  , [ binary    GreaterThan          ">" ]
-                  , [ binary    GreaterThanOrEqualTo ">=" ]
                   , [ Wrap typeOf $ \_ s -> "typeof " ++ s ]
-                  , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
-                  , [ unary     Not                  "!" ]
-                  , [ unary     BitwiseNot           "~" ]
-                  , [ unary     Negate               "-" ]
-                  , [ unary     Positive             "+" ]
-                  , [ binary    Multiply             "*" ]
-                  , [ binary    Divide               "/" ]
-                  , [ binary    Modulus              "%" ]
-                  , [ binary    Add                  "+" ]
-                  , [ binary    Subtract             "-" ]
-                  , [ binary    ShiftLeft            "<<" ]
-                  , [ binary    ShiftRight           ">>" ]
-                  , [ binary    ZeroFillShiftRight   ">>>" ]
-                  , [ binary    EqualTo              "===" ]
-                  , [ binary    NotEqualTo           "!==" ]
+                  , [ unary     Not                  "!"
+                    , unary     BitwiseNot           "~"
+                    , unary     Positive             "+"
+                    , negateOperator ]
+                  , [ binary    Multiply             "*"
+                    , binary    Divide               "/"
+                    , binary    Modulus              "%" ]
+                  , [ binary    Add                  "+"
+                    , binary    Subtract             "-" ]
+                  , [ binary    ShiftLeft            "<<"
+                    , binary    ShiftRight           ">>"
+                    , binary    ZeroFillShiftRight   ">>>" ]
+                  , [ binary    LessThan             "<"
+                    , binary    LessThanOrEqualTo    "<="
+                    , binary    GreaterThan          ">"
+                    , binary    GreaterThanOrEqualTo ">="
+                    , AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
+                  , [ binary    EqualTo              "==="
+                    , binary    NotEqualTo           "!==" ]
                   , [ binary    BitwiseAnd           "&" ]
                   , [ binary    BitwiseXor           "^" ]
                   , [ binary    BitwiseOr            "|" ]

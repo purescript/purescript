@@ -1,14 +1,12 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  type Foo a = [a]  
+length :: forall a. Array a -> Int
+length _ = 0
 
-  foreign import length
-    "function length(a) {\
-    \  return a.length;\
-    \}" :: forall a. [a] -> Number
+type Foo a = Array a
 
-  foo _ = length ([] :: Foo Number)
+foo _ = length ([] :: Foo Number)
 
-  main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

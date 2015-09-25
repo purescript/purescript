@@ -13,396 +13,350 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
-module Language.PureScript.CodeGen.JS (
-    module AST,
-    ModuleType(..),
-    declToJs,
-    moduleToJs,
-    identNeedsEscaping
-) where
+module Language.PureScript.CodeGen.JS
+  ( module AST
+  , module Common
+  , moduleToJs
+  , mainCall
+  ) where
 
-import Data.Maybe (catMaybes, fromJust)
-import Data.Function (on)
-import Data.List (nub, (\\), delete, sortBy)
+import Data.List ((\\), delete, intersect)
+import qualified Data.Traversable as T (traverse)
 
-import Control.Monad (replicateM, forM)
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
+import Control.Arrow ((&&&))
+import Control.Monad (replicateM, forM)
+import Control.Monad.Reader (MonadReader, asks)
+import Control.Monad.Supply.Class
 
-import Language.PureScript.Names
-import Language.PureScript.Declarations
-import Language.PureScript.Options
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
-import Language.PureScript.Types
-import Language.PureScript.Optimizer
-import Language.PureScript.CodeGen.Common
-import Language.PureScript.Environment
-import Language.PureScript.Supply
+import Language.PureScript.CodeGen.JS.Common as Common
+import Language.PureScript.CoreFn
+import Language.PureScript.Names
+import Language.PureScript.CodeGen.JS.Optimizer
+import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
--- |
--- Different types of modules which are supported
---
-data ModuleType = CommonJS | Globals
+import System.FilePath.Posix ((</>))
 
 -- |
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: (Functor m, Applicative m, Monad m) => ModuleType -> Options -> Module -> Environment -> SupplyT m [JS]
-moduleToJs mt opts (Module name decls (Just exps)) env = do
-  let jsImports = map (importToJs mt opts) . delete (ModuleName [ProperName C.prim]) . (\\ [name]) . nub $ concatMap imports decls
-  jsDecls <- mapM (\decl -> declToJs opts name decl env) decls
-  let optimized = concat $ map (map $ optimize opts) $ catMaybes jsDecls
-  let isModuleEmpty = null optimized
-  let moduleBody = JSStringLiteral "use strict" : jsImports ++ optimized
-  let moduleExports = JSObjectLiteral $ concatMap exportToJs exps
-  return $ case mt of
-    CommonJS -> moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) moduleExports]
-    Globals | not isModuleEmpty ->
-      [ JSVariableIntroduction (fromJust (optionsBrowserNamespace opts))
-                               (Just (JSBinary Or (JSVar (fromJust (optionsBrowserNamespace opts))) (JSObjectLiteral [])) )
-      , JSAssignment (JSAccessor (moduleNameToJs name) (JSVar (fromJust (optionsBrowserNamespace opts))))
-                     (JSApp (JSFunction Nothing [] (JSBlock (moduleBody ++ [JSReturn moduleExports]))) [])
-      ]
-    _ -> []
-moduleToJs _ _ _ _ = error "Exports should have been elaborated in name desugaring"
+moduleToJs :: forall m. (Applicative m, Monad m, MonadReader Options m, MonadSupply m)
+           => Module Ann -> Maybe JS -> m [JS]
+moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
+  jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
+  jsDecls <- mapM bindToJs decls
+  optimized <- T.traverse (T.traverse optimize) jsDecls
+  comments <- not <$> asks optionsNoComments
+  let strict = JSStringLiteral "use strict"
+  let header = if comments && not (null coms) then JSComment coms strict else strict
+  let foreign' = [JSVariableIntroduction "$foreign" foreign_ | not $ null foreigns || foreign_ == Nothing]
+  let moduleBody = header : foreign' ++ jsImports ++ concat optimized
+  let foreignExps = exps `intersect` (fst `map` foreigns)
+  let standardExps = exps \\ foreignExps
+  let exps' = JSObjectLiteral $ map (runIdent &&& JSVar . identToJs) standardExps
+                             ++ map (runIdent &&& foreignIdent) foreignExps
+  return $ moduleBody ++ [JSAssignment (JSAccessor "exports" (JSVar "module")) exps']
 
-importToJs :: ModuleType -> Options -> ModuleName -> JS
-importToJs mt opts mn = JSVariableIntroduction (moduleNameToJs mn) (Just moduleBody)
   where
-  moduleBody = case mt of
-    CommonJS -> JSApp (JSVar "require") [JSStringLiteral (runModuleName mn)]
-    Globals -> JSAccessor (moduleNameToJs mn) (JSVar (fromJust (optionsBrowserNamespace opts)))
 
-imports :: Declaration -> [ModuleName]
-imports (ImportDeclaration mn _ _) = [mn]
-imports other =
-  let (f, _, _, _, _) = everythingOnValues (++) (const []) collectV collectB (const []) (const [])
-  in f other
-  where
-  collectV :: Expr -> [ModuleName]
-  collectV (Var (Qualified (Just mn) _)) = [mn]
-  collectV (Constructor (Qualified (Just mn) _)) = [mn]
-  collectV (TypeClassDictionaryConstructorApp (Qualified (Just mn) _) _) = [mn]
-  collectV _ = []
-  collectB :: Binder -> [ModuleName]
-  collectB (ConstructorBinder (Qualified (Just mn) _) _) = [mn]
-  collectB _ = []
+  -- |
+  -- Generates Javascript code for a module import.
+  --
+  importToJs :: ModuleName -> m JS
+  importToJs mn' = do
+    path <- asks optionsRequirePath
+    let moduleBody = JSApp (JSVar "require") [JSStringLiteral (maybe id (</>) path $ runModuleName mn')]
+    return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
 
--- |
--- Generate code in the simplified Javascript intermediate representation for a declaration
---
-declToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Declaration -> Environment -> SupplyT m (Maybe [JS])
-declToJs opts mp (ValueDeclaration ident _ _ _ val) e = do
-  js <- valueToJs opts mp e val
-  return $ Just [JSVariableIntroduction (identToJs ident) (Just js)]
-declToJs opts mp (BindingGroupDeclaration vals) e = do
-  jss <- flip mapM vals $ \(ident, _, val) -> do
-    js <- valueToJs opts mp e val
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a declaration
+  --
+  bindToJs :: Bind Ann -> m [JS]
+  bindToJs (NonRec ident val) = return <$> nonRecToJS ident val
+  bindToJs (Rec vals) = forM vals (uncurry nonRecToJS)
+
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a single non-recursive
+  -- declaration.
+  --
+  -- The main purpose of this function is to handle code generation for comments.
+  --
+  nonRecToJS :: Ident -> Expr Ann -> m JS
+  nonRecToJS i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
+    withoutComment <- asks optionsNoComments
+    if withoutComment
+       then nonRecToJS i (modifyAnn removeComments e)
+       else JSComment com <$> nonRecToJS i (modifyAnn removeComments e)
+  nonRecToJS ident val = do
+    js <- valueToJs val
     return $ JSVariableIntroduction (identToJs ident) (Just js)
-  return $ Just jss
-declToJs _ _ (DataDeclaration Newtype _ _ [((ProperName ctor), _)]) _ =
-  return $ Just $ [JSVariableIntroduction ctor (Just $
-                    JSObjectLiteral [("create",
-                      JSFunction Nothing ["value"]
-                        (JSBlock [JSReturn $ JSVar "value"]))])]
-declToJs _ _ (DataDeclaration Newtype _ _ _) _ =
-  error "newtype has multiple constructors"
-declToJs _ mp (DataDeclaration Data _ _ ctors) e = do
-  return $ Just $ flip concatMap ctors $ \(pn@(ProperName ctor), tys) ->
-      let propName = if isNullaryConstructor e (Qualified (Just mp) pn) then "value" else "create"
-      in [ makeConstructor ctor (length tys)
-         , JSAssignment (JSAccessor propName (JSVar ctor)) (go pn 0 (length tys) [])
-         ]
+
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a variable based on a
+  -- PureScript identifier.
+  --
+  var :: Ident -> JS
+  var = JSVar . identToJs
+
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for an accessor based on
+  -- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
+  -- indexer is returned.
+  --
+  accessor :: Ident -> JS -> JS
+  accessor (Ident prop) = accessorString prop
+  accessor (Op op) = JSIndexer (JSStringLiteral op)
+
+  accessorString :: String -> JS -> JS
+  accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
+                      | otherwise = JSAccessor prop
+
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a value or expression.
+  --
+  valueToJs :: Expr Ann -> m JS
+  valueToJs (Literal _ l) =
+    literalToValueJS l
+  valueToJs (Var (_, _, _, Just (IsConstructor _ [])) name) =
+    return $ JSAccessor "value" $ qualifiedToJS id name
+  valueToJs (Var (_, _, _, Just (IsConstructor _ _)) name) =
+    return $ JSAccessor "create" $ qualifiedToJS id name
+  valueToJs (Accessor _ prop val) =
+    accessorString prop <$> valueToJs val
+  valueToJs (ObjectUpdate _ o ps) = do
+    obj <- valueToJs o
+    sts <- mapM (sndM valueToJs) ps
+    extendObj obj sts
+  valueToJs e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
+    let args = unAbs e
+    in return $ JSFunction Nothing (map identToJs args) (JSBlock $ map assign args)
     where
-    makeConstructor :: String -> Int -> JS
-    makeConstructor ctorName n =
-      let
-        args = [ "value" ++ show index | index <- [0..n-1] ]
-        body = [ JSAssignment (JSAccessor arg (JSVar "this")) (JSVar arg) | arg <- args ]
-      in JSFunction (Just ctorName) args (JSBlock body)
-    go :: ProperName -> Int -> Int -> [JS] -> JS
-    go pn _ 0 values = JSUnary JSNew $ JSApp (JSVar $ runProperName pn) (reverse values)
-    go pn index n values =
-      JSFunction Nothing ["value" ++ show index]
-        (JSBlock [JSReturn (go pn (index + 1) (n - 1) (JSVar ("value" ++ show index) : values))])
-declToJs opts mp (DataBindingGroupDeclaration ds) e = do
-  jss <- mapM (\decl -> declToJs opts mp decl e) ds
-  return $ Just $ concat $ catMaybes jss
-declToJs _ _ (TypeClassDeclaration name _ supers members) _ =
-  return $ Just $ [
-    JSFunction (Just $ runProperName name) (identToJs `map` args)
-      (JSBlock $ assn `map` args)]
-  where
-  assn :: Ident -> JS
-  assn arg = JSAssignment (accessor arg (JSVar "this")) (var arg)
-  args :: [Ident]
-  args = sortBy (compare `on` runIdent) $ memberNames ++ superNames
-  memberNames :: [Ident]
-  memberNames = memberToName `map` members
-  superNames :: [Ident]
-  superNames = [ toSuperName superclass index
-               | (index, (superclass, _)) <- zip [0..] supers
-               ]
-  toSuperName :: Qualified ProperName -> Integer -> Ident
-  toSuperName pn index = Ident $ C.__superclass_ ++ show pn ++ "_" ++ show index
-  memberToName :: Declaration -> Ident
-  memberToName (TypeDeclaration ident _) = ident
-  memberToName (PositionedDeclaration _ d) = memberToName d
-  memberToName _ = error "Invalid declaration in type class definition"
-declToJs _ _ (ExternDeclaration _ _ (Just js) _) _ = return $ Just [js]
-declToJs opts mp (PositionedDeclaration _ d) e = declToJs opts mp d e
-declToJs _ _ _ _ = return Nothing
+    unAbs :: Expr Ann -> [Ident]
+    unAbs (Abs _ arg val) = arg : unAbs val
+    unAbs _ = []
+    assign :: Ident -> JS
+    assign name = JSAssignment (accessorString (runIdent name) (JSVar "this"))
+                               (var name)
+  valueToJs (Abs _ arg val) = do
+    ret <- valueToJs val
+    return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
+  valueToJs e@App{} = do
+    let (f, args) = unApp e []
+    args' <- mapM valueToJs args
+    case f of
+      Var (_, _, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
+        return $ JSUnary JSNew $ JSApp (qualifiedToJS id name) args'
+      Var (_, _, _, Just IsTypeClassConstructor) name ->
+        return $ JSUnary JSNew $ JSApp (qualifiedToJS id name) args'
+      _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs f
+    where
+    unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
+    unApp (App _ val arg) args = unApp val (arg : args)
+    unApp other args = (other, args)
+  valueToJs (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
+    return $ if mn' == mn
+             then foreignIdent ident
+             else varToJs qi
+  valueToJs (Var (_, _, _, Just IsForeign) ident) =
+    error $ "Encountered an unqualified reference to a foreign ident " ++ showQualified showIdent ident
+  valueToJs (Var _ ident) =
+    return $ varToJs ident
+  valueToJs (Case (maybeSpan, _, _, _) values binders) = do
+    vals <- mapM valueToJs values
+    bindersToJs maybeSpan binders vals
+  valueToJs (Let _ ds val) = do
+    ds' <- concat <$> mapM bindToJs ds
+    ret <- valueToJs val
+    return $ JSApp (JSFunction Nothing [] (JSBlock (ds' ++ [JSReturn ret]))) []
+  valueToJs (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
+    return $ JSVariableIntroduction ctor (Just $
+                JSObjectLiteral [("create",
+                  JSFunction Nothing ["value"]
+                    (JSBlock [JSReturn $ JSVar "value"]))])
+  valueToJs (Constructor _ _ (ProperName ctor) []) =
+    return $ iife ctor [ JSFunction (Just ctor) [] (JSBlock [])
+           , JSAssignment (JSAccessor "value" (JSVar ctor))
+                (JSUnary JSNew $ JSApp (JSVar ctor) []) ]
+  valueToJs (Constructor _ _ (ProperName ctor) fields) =
+    let constructor =
+          let body = [ JSAssignment (JSAccessor (identToJs f) (JSVar "this")) (var f) | f <- fields ]
+          in JSFunction (Just ctor) (identToJs `map` fields) (JSBlock body)
+        createFn =
+          let body = JSUnary JSNew $ JSApp (JSVar ctor) (var `map` fields)
+          in foldr (\f inner -> JSFunction Nothing [identToJs f] (JSBlock [JSReturn inner])) body fields
+    in return $ iife ctor [ constructor
+                          , JSAssignment (JSAccessor "create" (JSVar ctor)) createFn
+                          ]
 
--- |
--- Generate key//value pairs for an object literal exporting values from a module.
---
-exportToJs :: DeclarationRef -> [(String, JS)]
-exportToJs (TypeRef _ (Just dctors)) = map ((\n -> (n, var (Ident n))) . runProperName) dctors
-exportToJs (ValueRef name) = [(runIdent name, var name)]
-exportToJs (TypeInstanceRef name) = [(runIdent name, var name)]
-exportToJs (TypeClassRef name) = [(runProperName name, var $ Ident $ runProperName name)]
-exportToJs _ = []
+  iife :: String -> [JS] -> JS
+  iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
--- |
--- Generate code in the simplified Javascript intermediate representation for a variable based on a
--- PureScript identifier.
---
-var :: Ident -> JS
-var = JSVar . identToJs
+  literalToValueJS :: Literal (Expr Ann) -> m JS
+  literalToValueJS (NumericLiteral n) = return $ JSNumericLiteral n
+  literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
+  literalToValueJS (CharLiteral c) = return $ JSStringLiteral [c]
+  literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral b
+  literalToValueJS (ArrayLiteral xs) = JSArrayLiteral <$> mapM valueToJs xs
+  literalToValueJS (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM valueToJs) ps
 
--- |
--- Generate code in the simplified Javascript intermediate representation for an accessor based on
--- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
--- indexer is returned.
---
-accessor :: Ident -> JS -> JS
-accessor (Ident prop) = accessorString prop
-accessor (Op op) = JSIndexer (JSStringLiteral op)
-
-accessorString :: String -> JS -> JS
-accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)
-                    | otherwise = JSAccessor prop
-
--- |
--- Generate code in the simplified Javascript intermediate representation for a value or expression.
---
-valueToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> Expr -> SupplyT m JS
-valueToJs _ _ _ (NumericLiteral n) = return $ JSNumericLiteral n
-valueToJs _ _ _ (StringLiteral s) = return $ JSStringLiteral s
-valueToJs _ _ _ (BooleanLiteral b) = return $ JSBooleanLiteral b
-valueToJs opts m e (ArrayLiteral xs) = JSArrayLiteral <$> mapM (valueToJs opts m e) xs
-valueToJs opts m e (ObjectLiteral ps) = JSObjectLiteral <$> mapM (sndM (valueToJs opts m e)) ps
-valueToJs opts m e (TypeClassDictionaryConstructorApp name (TypedValue _ (ObjectLiteral ps) _)) =
-  JSUnary JSNew . JSApp (qualifiedToJS m (Ident . runProperName) name) <$> mapM (valueToJs opts m e . snd) (sortBy (compare `on` fst) ps)
-valueToJs _ _ _ TypeClassDictionaryConstructorApp{} =
-  error "TypeClassDictionaryConstructorApp did not contain object literal"
-valueToJs opts m e (ObjectUpdate o ps) = do
-  obj <- valueToJs opts m e o
-  sts <- mapM (sndM (valueToJs opts m e)) ps
-  extendObj obj sts
-valueToJs _ m e (Constructor name) =
-  let propName = if isNullaryConstructor e name then "value" else "create"
-  in return $ JSAccessor propName $ qualifiedToJS m (Ident . runProperName) name
-valueToJs opts m e (Case values binders) = do
-  vals <- mapM (valueToJs opts m e) values
-  bindersToJs opts m e binders vals
-valueToJs opts m e (IfThenElse cond th el) = JSConditional <$> valueToJs opts m e cond <*> valueToJs opts m e th <*> valueToJs opts m e el
-valueToJs opts m e (Accessor prop val) = accessorString prop <$> valueToJs opts m e val
-valueToJs opts m e v@App{} = do
-  let (f, args) = unApp v []
-  args' <- mapM (valueToJs opts m e) args
-  case f of
-    Constructor name | isNewtypeConstructor e name && length args == 1 -> return (head args')
-    Constructor name | getConstructorArity e name == length args ->
-      return $ JSUnary JSNew $ JSApp (qualifiedToJS m (Ident . runProperName) name) args'
-    _ -> flip (foldl (\fn a -> JSApp fn [a])) args' <$> valueToJs opts m e f
-  where
-  unApp :: Expr -> [Expr] -> (Expr, [Expr])
-  unApp (App val arg) args = unApp val (arg : args)
-  unApp (PositionedValue _ val) args = unApp val args
-  unApp (TypedValue _ val _) args = unApp val args
-  unApp other args = (other, args)
-valueToJs opts m e (Let ds val) = do
-  decls <- concat . catMaybes <$> mapM (flip (declToJs opts m) e) ds
-  ret <- valueToJs opts m e val
-  return $ JSApp (JSFunction Nothing [] (JSBlock (decls ++ [JSReturn ret]))) []
-valueToJs opts m e (Abs (Left arg) val) = do
-  ret <- valueToJs opts m e val
-  return $ JSFunction Nothing [identToJs arg] (JSBlock [JSReturn ret])
-valueToJs opts m e (TypedValue _ (Abs (Left arg) val) ty) | optionsPerformRuntimeTypeChecks opts = do
-  let arg' = identToJs arg
-  ret <- valueToJs opts m e val
-  return $ JSFunction Nothing [arg'] (JSBlock $ runtimeTypeChecks arg' ty ++ [JSReturn ret])
-valueToJs _ m _ (Var ident) = return $ varToJs m ident
-valueToJs opts m e (TypedValue _ val _) = valueToJs opts m e val
-valueToJs opts m e (PositionedValue _ val) = valueToJs opts m e val
-valueToJs _ _ _ (TypeClassDictionary _ _ _) = error "Type class dictionary was not replaced"
-valueToJs _ _ _ _ = error "Invalid argument to valueToJs"
-
--- |
--- Shallow copy an object.
---
-extendObj :: (Functor m, Applicative m, Monad m) => JS -> [(String, JS)] -> SupplyT m JS
-extendObj obj sts = do
-  newObj <- freshName
-  key <- freshName
-  let
-    jsKey = JSVar key
-    jsNewObj = JSVar newObj
-    block = JSBlock (objAssign:copy:extend ++ [JSReturn jsNewObj])
-    objAssign = JSVariableIntroduction newObj (Just $ JSObjectLiteral [])
-    copy = JSForIn key obj $ JSBlock [JSIfElse cond assign Nothing]
-    cond = JSApp (JSAccessor "hasOwnProperty" obj) [jsKey]
-    assign = JSBlock [JSAssignment (JSIndexer jsKey jsNewObj) (JSIndexer jsKey obj)]
-    stToAssign (s, js) = JSAssignment (JSAccessor s jsNewObj) js
-    extend = map stToAssign sts
-  return $ JSApp (JSFunction Nothing [] block) []
-
--- |
--- Generate code in the simplified Javascript intermediate representation for runtime type checks.
---
-runtimeTypeChecks :: String -> Type -> [JS]
-runtimeTypeChecks arg ty =
-  let
-    argTy = getFunctionArgumentType ty
-  in
-    maybe [] (argumentCheck (JSVar arg)) argTy
-  where
-  getFunctionArgumentType :: Type -> Maybe Type
-  getFunctionArgumentType (TypeApp (TypeApp t funArg) _) | t == tyFunction = Just funArg
-  getFunctionArgumentType (ForAll _ ty' _) = getFunctionArgumentType ty'
-  getFunctionArgumentType _ = Nothing
-  argumentCheck :: JS -> Type -> [JS]
-  argumentCheck val t | t == tyNumber = [typeCheck val "number"]
-  argumentCheck val t | t == tyString = [typeCheck val "string"]
-  argumentCheck val t | t == tyBoolean = [typeCheck val "boolean"]
-  argumentCheck val (TypeApp t _) | t == tyArray = [arrayCheck val]
-  argumentCheck val (TypeApp t row) | t == tyObject =
+  -- |
+  -- Shallow copy an object.
+  --
+  extendObj :: JS -> [(String, JS)] -> m JS
+  extendObj obj sts = do
+    newObj <- freshName
+    key <- freshName
     let
-      (pairs, _) = rowToList row
-    in
-      typeCheck val "object" : concatMap (\(prop, ty') -> argumentCheck (accessorString prop val) ty') pairs
-  argumentCheck val (TypeApp (TypeApp t _) _) | t == tyFunction = [typeCheck val "function"]
-  argumentCheck val (ForAll _ ty' _) = argumentCheck val ty'
-  argumentCheck _ _ = []
-  typeCheck :: JS -> String -> JS
-  typeCheck js ty' = JSIfElse (JSBinary NotEqualTo (JSTypeOf js) (JSStringLiteral ty')) (JSBlock [JSThrow (JSStringLiteral $ ty' ++ " expected")]) Nothing
-  arrayCheck :: JS -> JS
-  arrayCheck js = JSIfElse (JSUnary Not (JSApp (JSAccessor "isArray" (JSVar "Array")) [js])) (JSBlock [JSThrow (JSStringLiteral "Array expected")]) Nothing
+      jsKey = JSVar key
+      jsNewObj = JSVar newObj
+      block = JSBlock (objAssign:copy:extend ++ [JSReturn jsNewObj])
+      objAssign = JSVariableIntroduction newObj (Just $ JSObjectLiteral [])
+      copy = JSForIn key obj $ JSBlock [JSIfElse cond assign Nothing]
+      cond = JSApp (JSAccessor "hasOwnProperty" obj) [jsKey]
+      assign = JSBlock [JSAssignment (JSIndexer jsKey jsNewObj) (JSIndexer jsKey obj)]
+      stToAssign (s, js) = JSAssignment (JSAccessor s jsNewObj) js
+      extend = map stToAssign sts
+    return $ JSApp (JSFunction Nothing [] block) []
 
--- |
--- Generate code in the simplified Javascript intermediate representation for a reference to a
--- variable.
---
-varToJs :: ModuleName -> Qualified Ident -> JS
-varToJs _ (Qualified Nothing ident) = var ident
-varToJs m qual = qualifiedToJS m id qual
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- variable.
+  --
+  varToJs :: Qualified Ident -> JS
+  varToJs (Qualified Nothing ident) = var ident
+  varToJs qual = qualifiedToJS id qual
 
--- |
--- Generate code in the simplified Javascript intermediate representation for a reference to a
--- variable that may have a qualified name.
---
-qualifiedToJS :: ModuleName -> (a -> Ident) -> Qualified a -> JS
-qualifiedToJS m f (Qualified (Just m') a) | m /= m' = accessor (f a) (JSVar (moduleNameToJs m'))
-qualifiedToJS _ f (Qualified _ a) = JSVar $ identToJs (f a)
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- variable that may have a qualified name.
+  --
+  qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
+  qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = JSVar . runIdent $ f a
+  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (JSVar (moduleNameToJs mn'))
+  qualifiedToJS f (Qualified _ a) = JSVar $ identToJs (f a)
 
--- |
--- Generate code in the simplified Javascript intermediate representation for pattern match binders
--- and guards.
---
-bindersToJs :: (Functor m, Applicative m, Monad m) => Options -> ModuleName -> Environment -> [CaseAlternative] -> [JS] -> SupplyT m JS
-bindersToJs opts m e binders vals = do
-  valNames <- replicateM (length vals) freshName
-  let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
-  jss <- forM binders $ \(CaseAlternative bs grd result) -> do
-    ret <- valueToJs opts m e result
-    go valNames [JSReturn ret] bs grd
-  return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow $ JSUnary JSNew $ JSApp (JSVar "Error") $ [JSStringLiteral "Failed pattern match"]])))
-                 []
-  where
-    go :: (Functor m, Applicative m, Monad m) => [String] -> [JS] -> [Binder] -> Maybe Guard -> SupplyT m [JS]
-    go _ done [] Nothing = return done
-    go _ done [] (Just cond) = do
-      cond' <- valueToJs opts m e cond
-      return [JSIfElse cond' (JSBlock done) Nothing]
-    go (v:vs) done' (b:bs) grd = do
-      done'' <- go vs done' bs grd
-      binderToJs m e v done'' b
-    go _ _ _ _ = error "Invalid arguments to bindersToJs"
+  foreignIdent :: Ident -> JS
+  foreignIdent ident = accessorString (runIdent ident) (JSVar "$foreign")
 
--- |
--- Generate code in the simplified Javascript intermediate representation for a pattern match
--- binder.
---
-binderToJs :: (Functor m, Applicative m, Monad m) => ModuleName -> Environment -> String -> [JS] -> Binder -> SupplyT m [JS]
-binderToJs _ _ _ done NullBinder = return done
-binderToJs _ _ varName done (StringBinder str) =
-  return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral str)) (JSBlock done) Nothing]
-binderToJs _ _ varName done (NumberBinder num) =
-  return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSNumericLiteral num)) (JSBlock done) Nothing]
-binderToJs _ _ varName done (BooleanBinder True) =
-  return [JSIfElse (JSVar varName) (JSBlock done) Nothing]
-binderToJs _ _ varName done (BooleanBinder False) =
-  return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
-binderToJs _ _ varName done (VarBinder ident) =
-  return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
-binderToJs m e varName done (ConstructorBinder ctor bs) | isNewtypeConstructor e ctor =
-  case bs of
-    [b] -> binderToJs m e varName done b
-    _ -> error "binder for newtype constructor should have a single argument"
-binderToJs m e varName done (ConstructorBinder ctor bs) = do
-  js <- go 0 done bs
-  if isOnlyConstructor e ctor
-  then
-    return js
-  else
-    return [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS m (Ident . runProperName) ctor))
-                     (JSBlock js)
-                     Nothing]
-  where
-  go :: (Functor m, Applicative m, Monad m) => Integer -> [JS] -> [Binder] -> SupplyT m [JS]
-  go _ done' [] = return done'
-  go index done' (binder:bs') = do
-    argVar <- freshName
-    done'' <- go (index + 1) done' bs'
-    js <- binderToJs m e argVar done'' binder
-    return (JSVariableIntroduction argVar (Just (JSAccessor ("value" ++ show index) (JSVar varName))) : js)
-binderToJs m e varName done (ObjectBinder bs) = go done bs
-  where
-  go :: (Functor m, Applicative m, Monad m) => [JS] -> [(String, Binder)] -> SupplyT m [JS]
-  go done' [] = return done'
-  go done' ((prop, binder):bs') = do
-    propVar <- freshName
-    done'' <- go done' bs'
-    js <- binderToJs m e propVar done'' binder
-    return (JSVariableIntroduction propVar (Just (accessorString prop (JSVar varName))) : js)
-binderToJs m e varName done (ArrayBinder bs) = do
-  js <- go done 0 bs
-  return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
-  where
-  go :: (Functor m, Applicative m, Monad m) => [JS] -> Integer -> [Binder] -> SupplyT m [JS]
-  go done' _ [] = return done'
-  go done' index (binder:bs') = do
-    elVar <- freshName
-    done'' <- go done' (index + 1) bs'
-    js <- binderToJs m e elVar done'' binder
-    return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
-binderToJs m e varName done (ConsBinder headBinder tailBinder) = do
-  headVar <- freshName
-  tailVar <- freshName
-  js1 <- binderToJs m e headVar done headBinder
-  js2 <- binderToJs m e tailVar js1 tailBinder
-  return [JSIfElse (JSBinary GreaterThan (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left 0))) (JSBlock
-    ( JSVariableIntroduction headVar (Just (JSIndexer (JSNumericLiteral (Left 0)) (JSVar varName))) :
-      JSVariableIntroduction tailVar (Just (JSApp (JSAccessor "slice" (JSVar varName)) [JSNumericLiteral (Left 1)])) :
-      js2
-    )) Nothing]
-binderToJs m e varName done (NamedBinder ident binder) = do
-  js <- binderToJs m e varName done binder
-  return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
-binderToJs m e varName done (PositionedBinder _ binder) =
-  binderToJs m e varName done binder
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for pattern match binders
+  -- and guards.
+  --
+  bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [JS] -> m JS
+  bindersToJs maybeSpan binders vals = do
+    valNames <- replicateM (length vals) freshName
+    let assignments = zipWith JSVariableIntroduction valNames (map Just vals)
+    jss <- forM binders $ \(CaseAlternative bs result) -> do
+      ret <- guardsToJs result
+      go valNames ret bs
+    return $ JSApp (JSFunction Nothing [] (JSBlock (assignments ++ concat jss ++ [JSThrow $ failedPatternError valNames])))
+                   []
+    where
+      go :: [String] -> [JS] -> [Binder Ann] -> m [JS]
+      go _ done [] = return done
+      go (v:vs) done' (b:bs) = do
+        done'' <- go vs done' bs
+        binderToJs v done'' b
+      go _ _ _ = error "Invalid arguments to bindersToJs"
+
+      failedPatternError :: [String] -> JS
+      failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral errorMessage) (JSArrayLiteral $ zipWith valueError names vals)]
+
+      errorMessage :: String
+      errorMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan ++ ": "
+
+      valueError :: String -> JS -> JS
+      valueError _ l@(JSNumericLiteral _) = l
+      valueError _ l@(JSStringLiteral _)  = l
+      valueError _ l@(JSBooleanLiteral _) = l
+      valueError s _                      = JSAccessor "name" . JSAccessor "constructor" $ JSVar s
+
+      guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
+      guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
+        cond' <- valueToJs cond
+        done  <- valueToJs val
+        return $ JSIfElse cond' (JSBlock [JSReturn done]) Nothing
+      guardsToJs (Right v) = return . JSReturn <$> valueToJs v
+
+  -- |
+  -- Generate code in the simplified Javascript intermediate representation for a pattern match
+  -- binder.
+  --
+  binderToJs :: String -> [JS] -> Binder Ann -> m [JS]
+  binderToJs _ done (NullBinder{}) = return done
+  binderToJs varName done (LiteralBinder _ l) =
+    literalToBinderJS varName done l
+  binderToJs varName done (VarBinder _ ident) =
+    return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : done)
+  binderToJs varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
+    binderToJs varName done b
+  binderToJs varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+    js <- go (zip fields bs) done
+    return $ case ctorType of
+      ProductType -> js
+      SumType ->
+        [JSIfElse (JSInstanceOf (JSVar varName) (qualifiedToJS (Ident . runProperName) ctor))
+                  (JSBlock js)
+                  Nothing]
+    where
+    go :: [(Ident, Binder Ann)] -> [JS] -> m [JS]
+    go [] done' = return done'
+    go ((field, binder) : remain) done' = do
+      argVar <- freshName
+      done'' <- go remain done'
+      js <- binderToJs argVar done'' binder
+      return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
+  binderToJs _ _ ConstructorBinder{} =
+    error "binderToJs: Invalid ConstructorBinder in binderToJs"
+  binderToJs varName done (NamedBinder _ ident binder) = do
+    js <- binderToJs varName done binder
+    return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)
+
+  literalToBinderJS :: String -> [JS] -> Literal (Binder Ann) -> m [JS]
+  literalToBinderJS varName done (NumericLiteral num) =
+    return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSNumericLiteral num)) (JSBlock done) Nothing]
+  literalToBinderJS varName done (CharLiteral c) =
+    return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral [c])) (JSBlock done) Nothing]
+  literalToBinderJS varName done (StringLiteral str) =
+    return [JSIfElse (JSBinary EqualTo (JSVar varName) (JSStringLiteral str)) (JSBlock done) Nothing]
+  literalToBinderJS varName done (BooleanLiteral True) =
+    return [JSIfElse (JSVar varName) (JSBlock done) Nothing]
+  literalToBinderJS varName done (BooleanLiteral False) =
+    return [JSIfElse (JSUnary Not (JSVar varName)) (JSBlock done) Nothing]
+  literalToBinderJS varName done (ObjectLiteral bs) = go done bs
+    where
+    go :: [JS] -> [(String, Binder Ann)] -> m [JS]
+    go done' [] = return done'
+    go done' ((prop, binder):bs') = do
+      propVar <- freshName
+      done'' <- go done' bs'
+      js <- binderToJs propVar done'' binder
+      return (JSVariableIntroduction propVar (Just (accessorString prop (JSVar varName))) : js)
+  literalToBinderJS varName done (ArrayLiteral bs) = do
+    js <- go done 0 bs
+    return [JSIfElse (JSBinary EqualTo (JSAccessor "length" (JSVar varName)) (JSNumericLiteral (Left (fromIntegral $ length bs)))) (JSBlock js) Nothing]
+    where
+    go :: [JS] -> Integer -> [Binder Ann] -> m [JS]
+    go done' _ [] = return done'
+    go done' index (binder:bs') = do
+      elVar <- freshName
+      done'' <- go done' (index + 1) bs'
+      js <- binderToJs elVar done'' binder
+      return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
+
+mainCall :: ModuleName -> String -> JS
+mainCall mmi ns = JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar ns))) []

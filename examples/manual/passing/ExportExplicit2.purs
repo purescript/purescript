@@ -1,6 +1,6 @@
 module M1 (bar) where
 
-  foo :: Number  
+  foo :: Number
   foo = 0
 
   bar :: Number
@@ -12,4 +12,4 @@ module Main where
 
   testBar = bar
 
-  main = Debug.Trace.trace "Done"
+  main = Control.Monad.Eff.Console.log "Done"

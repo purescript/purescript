@@ -6,8 +6,8 @@ module M1 (X(..)) where
 module Main where
 
   import M1
-  
+
   -- should fail as Z is not exported from M1
   testZ = M1.Z
 
-  main = Debug.Trace.trace "Done"
+  main = Control.Monad.Eff.Console.log "Done"

@@ -1,4 +1,7 @@
+-- @shouldFailWith MissingClassMember
 module Main where
+
+import Prelude
 
 class A a where
   a :: a -> String

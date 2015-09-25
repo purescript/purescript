@@ -1,9 +1,9 @@
 module Main where
 
-  import Prelude ()
+import Prelude ()
 
-  fns = \f -> if f true then f else \x -> x 
+fns = \f -> if f true then f else \x -> x
 
-  not = \x -> if x then false else true
+not = \x -> if x then false else true
 
-  main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 test' x = x
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

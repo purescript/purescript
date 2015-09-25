@@ -1,18 +1,18 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  gcd :: Number -> Number -> Number
-  gcd 0 x = x
-  gcd x 0 = x
-  gcd x y | x > y = gcd (x % y) y
-  gcd x y = gcd (y % x) x
+gcd :: Number -> Number -> Number
+gcd 0.0 x = x
+gcd x 0.0 = x
+gcd x y | x > y = gcd (x `mod` y) y
+gcd x y = gcd (y `mod` x) x
 
-  guardsTest (x:xs) | x > 0 = guardsTest xs
-  guardsTest xs = xs
+guardsTest [x] | x > 0.0 = []
+guardsTest xs = xs
 
-  data A = A
+data A = A
 
-  parseTest A 0 = 0
-    
-  main = Debug.Trace.trace "Done"
+parseTest A 0.0 = 0.0
+
+main = Control.Monad.Eff.Console.log "Done"

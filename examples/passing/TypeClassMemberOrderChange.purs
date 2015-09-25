@@ -1,11 +1,13 @@
 module Main where
 
+import Prelude
+
 class Test a where
   fn :: a -> a -> a
   val :: a
-  
+
 instance testBoolean :: Test Boolean where
   val = true
   fn x y = y
 
-main = Debug.Trace.trace (show (fn true val))
+main = Control.Monad.Eff.Console.log (show (fn true val))

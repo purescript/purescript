@@ -1,6 +1,9 @@
+-- @shouldFailWith TypesDoNotUnify
+
 module Main where
 
-import Debug.Trace
+import Prelude
+import Control.Monad.Eff.Console
 
 bar :: Number -> Number -> Number
 bar n m = n + m

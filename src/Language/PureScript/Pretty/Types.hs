@@ -26,20 +26,23 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows
 
 import Language.PureScript.Types
+import Language.PureScript.Names
+import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
+import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Environment
 
 typeLiterals :: Pattern () Type String
 typeLiterals = mkPattern match
   where
+  match TypeWildcard = Just "_"
   match (TypeVar var) = Just var
   match (PrettyPrintObject row) = Just $ "{ " ++ prettyPrintRow row ++ " }"
-  match (PrettyPrintArray ty) = Just $ "[" ++ prettyPrintType ty ++ "]"
-  match (TypeConstructor ctor) = Just $ show ctor
-  match (TUnknown u) = Just $ 'u' : show u
+  match (TypeConstructor ctor) = Just $ showQualified runProperName ctor
+  match (TUnknown u) = Just $ '_' : show u
   match (Skolem name s _) = Just $ name ++ show s
-  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> show pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
-  match (SaturatedTypeSynonym name args) = Just $ show name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
+  match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> showQualified runProperName pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
+  match (SaturatedTypeSynonym name args) = Just $ showQualified runProperName name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
   match REmpty = Just "()"
   match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
@@ -71,11 +74,16 @@ appliedFunction = mkPattern match
   match (PrettyPrintFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
+kinded :: Pattern () Type (Kind, Type)
+kinded = mkPattern match
+  where
+  match (KindedType t k) = Just (k, t)
+  match _ = Nothing
+
 insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-  convert (TypeApp a el) | a == tyArray = PrettyPrintArray el
   convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
   convert other = other
   convertForAlls (ForAll ident ty _) = go [ident] ty
@@ -96,6 +104,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ AssocR appliedFunction $ \arg ret -> arg ++ " -> " ++ ret
                     ]
                   , [ Wrap forall_ $ \idents ty -> "forall " ++ unwords idents ++ ". " ++ ty ]
+                  , [ Wrap kinded $ \k ty -> ty ++ " :: " ++ prettyPrintKind k ]
                   ]
 
 forall_ :: Pattern () Type ([String], Type)
@@ -116,4 +125,3 @@ prettyPrintTypeAtom = fromMaybe (error "Incomplete pattern") . pattern matchType
 --
 prettyPrintType :: Type -> String
 prettyPrintType = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
-

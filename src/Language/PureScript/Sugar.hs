@@ -13,30 +13,42 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Monad
 import Control.Category ((>>>))
-import Control.Monad.Trans.Class
+#if __GLASGOW_HASKELL__ < 710
+import Control.Applicative
+#endif
+import Control.Monad.Error.Class (MonadError())
+import Control.Monad.Writer.Class (MonadWriter())
+import Control.Monad.Supply.Class
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.Supply
+import Language.PureScript.Externs
 
-import Language.PureScript.Sugar.Operators as S
-import Language.PureScript.Sugar.DoNotation as S
-import Language.PureScript.Sugar.CaseDeclarations as S
-import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.Sugar.BindingGroups as S
-import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.CaseDeclarations as S
+import Language.PureScript.Sugar.DoNotation as S
 import Language.PureScript.Sugar.Names as S
+import Language.PureScript.Sugar.ObjectWildcards as S
+import Language.PureScript.Sugar.Operators as S
+import Language.PureScript.Sugar.TypeClasses as S
+import Language.PureScript.Sugar.TypeClasses.Deriving as S
+import Language.PureScript.Sugar.TypeDeclarations as S
 
 -- |
 -- The desugaring pipeline proceeds as follows:
 --
---  * Introduce type synonyms for type class dictionaries
+--  * Remove signed literals in favour of `negate` applications
 --
---  * Rebracket user-defined binary operators
+--  * Desugar object literals with wildcards into lambdas
+--
+--  * Desugar operator sections
 --
 --  * Desugar do-notation using the @Prelude.Monad@ type class
 --
@@ -44,16 +56,24 @@ import Language.PureScript.Sugar.Names as S
 --
 --  * Desugar type declarations into value declarations with explicit type annotations
 --
---  * Group mutually recursive value and data declarations into binding groups.
---
 --  * Qualify any unqualified names and types
 --
-desugar :: [Module] -> SupplyT (Either ErrorStack) [Module]
-desugar = map removeSignedLiterals
-          >>> mapM desugarDoModule
-          >=> desugarCasesModule
-          >=> lift . (desugarTypeDeclarationsModule
-                      >=> desugarImports
-                      >=> rebracket)
-          >=> desugarTypeClasses
-          >=> lift . createBindingGroupsModule
+--  * Rebracket user-defined binary operators
+--
+--  * Introduce type synonyms for type class dictionaries
+--
+--  * Group mutually recursive value and data declarations into binding groups.
+--
+desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugar externs =
+  map removeSignedLiterals
+    >>> mapM desugarObjectConstructors
+    >=> mapM desugarOperatorSections
+    >=> mapM desugarDoModule
+    >=> desugarCasesModule
+    >=> desugarTypeDeclarationsModule
+    >=> desugarImports externs
+    >=> rebracket externs
+    >=> mapM deriveInstances
+    >=> desugarTypeClasses externs
+    >=> createBindingGroupsModule

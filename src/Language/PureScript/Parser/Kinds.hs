@@ -13,24 +13,28 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module Language.PureScript.Parser.Kinds (
     parseKind
 ) where
 
 import Language.PureScript.Kinds
-import Language.PureScript.Parser.State
 import Language.PureScript.Parser.Common
+import Language.PureScript.Parser.Lexer
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseStar :: P.Parsec String ParseState Kind
-parseStar = const Star <$> lexeme (P.char '*')
+parseStar :: TokenParser Kind
+parseStar = const Star <$> symbol' "*"
 
-parseBang :: P.Parsec String ParseState Kind
-parseBang = const Bang <$> lexeme (P.char '!')
+parseBang :: TokenParser Kind
+parseBang = const Bang <$> symbol' "!"
 
-parseTypeAtom :: P.Parsec String ParseState Kind
+parseTypeAtom :: TokenParser Kind
 parseTypeAtom = indented *> P.choice (map P.try
             [ parseStar
             , parseBang
@@ -38,8 +42,8 @@ parseTypeAtom = indented *> P.choice (map P.try
 -- |
 -- Parse a kind
 --
-parseKind :: P.Parsec String ParseState Kind
+parseKind :: TokenParser Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
-  operators = [ [ P.Prefix (lexeme (P.char '#') >> return Row) ]
-              , [ P.Infix (lexeme (P.try (P.string "->")) >> return FunKind) P.AssocRight ] ]
+  operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
+              , [ P.Infix ((P.try rarrow) >> return FunKind) P.AssocRight ] ]

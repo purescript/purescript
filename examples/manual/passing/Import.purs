@@ -13,7 +13,7 @@ module M2 where
   import M1
 
   main = \_ -> foo 42
-    
+
 module Main where
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

@@ -1,4 +1,7 @@
+-- @shouldFailWith CycleInDeclaration
 module MutRec where
+
+import Prelude
 
 x = y
 

@@ -1,14 +1,15 @@
 module Main where
 
-import Debug.Trace
+import Prelude
+import Control.Monad.Eff.Console
 import Control.Monad.Eff
 import Control.Monad.ST
 
-f x y = 
+f x y =
   let
-    g = case y of 
-	  0 -> x
-          x -> 1 + x * x
+    g = case y of
+	  0.0 -> x
+          x -> 1.0 + x * x
   in g + x + y
 
-main = print $ f 1 10
+main = print $ f 1.0 10.0

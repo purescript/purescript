@@ -17,4 +17,4 @@ instance coerceRefl :: Coerce a a where
 instance coerceShow :: (Prelude.Show a) => Coerce a String where
   coerce = show
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

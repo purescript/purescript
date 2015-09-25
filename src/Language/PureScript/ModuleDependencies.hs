@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Language.PureScript.ModuleDependencies
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -12,18 +12,23 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.ModuleDependencies (
   sortModules,
   ModuleGraph
 ) where
 
+import Control.Monad.Error.Class (MonadError(..))
+
 import Data.Graph
 import Data.List (nub)
 import Data.Maybe (mapMaybe)
 
-import Language.PureScript.Declarations
+import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.Errors
 
 -- |
 -- A list of modules with their dependencies
@@ -35,9 +40,9 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: [Module] -> Either String ([Module], ModuleGraph)
+sortModules :: (MonadError MultipleErrors m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
-  let verts = map (\m@(Module _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
+  let verts = map (\m@(Module _ _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
   ms' <- mapM toModule $ stronglyConnComp verts
   let moduleGraph = map (\(_, mn, deps) -> (mn, deps)) verts
   return (ms', moduleGraph)
@@ -54,7 +59,6 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 
   forValues :: Expr -> [ModuleName]
   forValues (Var (Qualified (Just mn) _)) = [mn]
-  forValues (BinaryNoParens (Qualified (Just mn) _) _ _) = [mn]
   forValues (Constructor (Qualified (Just mn) _)) = [mn]
   forValues (TypedValue _ _ ty) = forTypes ty
   forValues _ = []
@@ -64,13 +68,10 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
   forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
   forTypes _ = []
 
-getModuleName :: Module -> ModuleName
-getModuleName (Module mn _ _) = mn
-
 -- |
 -- Convert a strongly connected component of the module graph to a module
 --
-toModule :: SCC Module -> Either String Module
+toModule :: (MonadError MultipleErrors m) => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = Left $ "Cycle in module dependencies: " ++ show (map getModuleName ms)
+toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)

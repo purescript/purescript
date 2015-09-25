@@ -12,5 +12,5 @@ id x = x
 test1 x = id $ id $ id $ id $ x
 
 test2 x = id id $ id x
-    
-main = Debug.Trace.trace "Done"
+
+main = Control.Monad.Eff.Console.log "Done"

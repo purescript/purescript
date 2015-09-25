@@ -1,16 +1,18 @@
 module Main where
 
-runNat f = f 0 (\n -> n + 1)
+import Prelude hiding (add)
 
-zero z _ = z
+runNat f = f 0.0 (\n -> n + 1.0)
 
-succ f zero succ = succ (f zero succ)
+zero' z _ = z
 
-add f g zero succ = g (f zero succ) succ
+succ f zero' succ = succ (f zero' succ)
 
-one = succ zero
-two = succ one
+add f g zero' succ = g (f zero' succ) succ
+
+one' = succ zero'
+two = succ one'
 four = add two two
 fourNumber = runNat four
 
-main = Debug.Trace.trace $ show fourNumber
+main = Control.Monad.Eff.Console.log $ show fourNumber

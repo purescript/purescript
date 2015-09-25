@@ -1,7 +1,9 @@
 module Main where
 
-f x y z = 
-  let f 1 2 3 = 1 
+import Prelude
+
+f x y z =
+  let f 1.0 2.0 3.0 = 1.0
   in f x z y
-  
-main = Debug.Trace.trace $ show $ f 1 3 2
+
+main = Control.Monad.Eff.Console.log $ show $ f 1.0 3.0 2.0

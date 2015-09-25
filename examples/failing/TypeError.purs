@@ -1,5 +1,6 @@
+-- @shouldFailWith TypesDoNotUnify
 module Main where
 
-  import Prelude
+import Prelude
 
-  test = 1 ++ "A"
+test = 1 ++ "A"

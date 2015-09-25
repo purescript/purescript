@@ -1,18 +1,18 @@
 module Main where
 
-  import Prelude ()
+import Prelude ()
 
-  type List a = forall r. r -> (a -> r -> r) -> r
+type List a = forall r. r -> (a -> r -> r) -> r
 
-  empty :: forall a. List a
-  empty = \r f -> r
+empty :: forall a. List a
+empty = \r f -> r
 
-  cons :: forall a. a -> List a -> List a
-  cons = \a l r f -> f a (l r f)
+cons :: forall a. a -> List a -> List a
+cons = \a l r f -> f a (l r f)
 
-  append :: forall a. List a -> List a -> List a
-  append = \l1 l2 r f -> l2 (l1 r f) f
+append :: forall a. List a -> List a -> List a
+append = \l1 l2 r f -> l2 (l1 r f) f
 
-  test = append (cons 1 empty) (cons 2 empty)
+test = append (cons 1 empty) (cons 2 empty)
 
-  main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

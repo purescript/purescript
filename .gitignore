@@ -9,3 +9,9 @@ cabal.sandbox.config
 *.lksh*
 .virthualenv
 .psci_modules/
+.test_modules/
+bower_components/
+node_modules
+tmp/
+.stack-work/
+tests/support/flattened/

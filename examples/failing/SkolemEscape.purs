@@ -1,5 +1,8 @@
+-- @shouldFailWith EscapedSkolem
 module Main where
 
-  foreign import foo :: (forall a. a -> a) -> Number
+import Prelude
 
-  test = \x -> foo x
+foreign import foo :: (forall a. a -> a) -> Number
+
+test = \x -> foo x

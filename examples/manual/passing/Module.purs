@@ -22,7 +22,7 @@ module M2 where
 
   match :: M1.Foo -> String
   match = \f -> case f of M1.Foo s -> s ++ "foo"
-    
+
 module Main where
 
-main = Debug.Trace.trace "Done"
+main = Control.Monad.Eff.Console.log "Done"

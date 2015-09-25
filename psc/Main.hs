@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Main
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
+-- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+-- License     :  MIT (http://opensource.org/licenses/MIT)
 --
 -- Maintainer  :  Phil Freeman <paf31@cantab.net>
 -- Stability   :  experimental
@@ -12,143 +12,179 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main where
 
 import Control.Applicative
-import Control.Monad.Error
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Strict
 
+import Data.List (isSuffixOf, partition)
 import Data.Version (showVersion)
+import qualified Data.Map as M
 
-import System.Console.CmdTheLine
-import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory)
+import Options.Applicative as Opts
+
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (stderr)
-
-import Text.Parsec (ParseError)
+import System.IO (hPutStrLn, stderr)
+import System.FilePath.Glob (glob)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
-import qualified System.IO.UTF8 as U
 
-preludeFilename :: IO FilePath
-preludeFilename = Paths.getDataFileName "prelude/prelude.purs"
+import Language.PureScript.Make
 
-readInput :: Maybe [FilePath] -> IO (Either ParseError [(FilePath, P.Module)])
-readInput Nothing = do
-  text <- getContents
-  return $ map ((,) undefined) <$> P.runIndentParser "" P.parseModules text
-readInput (Just input) = fmap collect $ forM input $ \inputFile -> do
-  text <- U.readFile inputFile
-  return $ (inputFile, P.runIndentParser inputFile P.parseModules text)
-  where
-  collect :: [(FilePath, Either ParseError [P.Module])] -> Either ParseError [(FilePath, P.Module)]
-  collect = fmap concat . sequence . map (\(fp, e) -> fmap (map ((,) fp)) e)
-
-compile :: P.Options -> Maybe [FilePath] -> Maybe FilePath -> Maybe FilePath -> IO ()
-compile opts input output externs = do
-  modules <- readInput input
-  case modules of
-    Left err -> do
-      U.hPutStr stderr $ show err
-      exitFailure
-    Right ms -> do
-      case P.compile opts (map snd ms) of
-        Left err -> do
-          U.hPutStrLn stderr err
-          exitFailure
-        Right (js, exts, _) -> do
-          case output of
-            Just path -> mkdirp path >> U.writeFile path js
-            Nothing -> U.putStrLn js
-          case externs of
-            Just path -> mkdirp path >> U.writeFile path exts
-            Nothing -> return ()
-          exitSuccess
-
-mkdirp :: FilePath -> IO ()
-mkdirp = createDirectoryIfMissing True . takeDirectory
-
-useStdIn :: Term Bool
-useStdIn = value . flag $ (optInfo [ "s", "stdin" ])
-     { optDoc = "Read from standard input" }
-
-inputFiles :: Term [FilePath]
-inputFiles = value $ posAny [] $ posInfo
-     { posDoc = "The input .ps files" }
-
-outputFile :: Term (Maybe FilePath)
-outputFile = value $ opt Nothing $ (optInfo [ "o", "output" ])
-     { optDoc = "The output .js file" }
-
-externsFile :: Term (Maybe FilePath)
-externsFile = value $ opt Nothing $ (optInfo [ "e", "externs" ])
-     { optDoc = "The output .e.ps file" }
-
-noTco :: Term Bool
-noTco = value $ flag $ (optInfo [ "no-tco" ])
-     { optDoc = "Disable tail call optimizations" }
-
-performRuntimeTypeChecks :: Term Bool
-performRuntimeTypeChecks = value $ flag $ (optInfo [ "runtime-type-checks" ])
-     { optDoc = "Generate runtime type checks" }
-
-noPrelude :: Term Bool
-noPrelude = value $ flag $ (optInfo [ "no-prelude" ])
-     { optDoc = "Omit the Prelude" }
-
-noMagicDo :: Term Bool
-noMagicDo = value $ flag $ (optInfo [ "no-magic-do" ])
-     { optDoc = "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad." }
-
-runMain :: Term (Maybe String)
-runMain = value $ defaultOpt (Just "Main") Nothing $ (optInfo [ "main" ])
-     { optDoc = "Generate code to run the main method in the specified module." }
-
-noOpts :: Term Bool
-noOpts = value $ flag $ (optInfo [ "no-opts" ])
-     { optDoc = "Skip the optimization phase." }
-
-browserNamespace :: Term String
-browserNamespace = value $ opt "PS" $ (optInfo [ "browser-namespace" ])
-     { optDoc = "Specify the namespace that PureScript modules will be exported to when running in the browser." }
-
-dceModules :: Term [String]
-dceModules = value $ optAll [] $ (optInfo [ "m", "module" ])
-     { optDoc = "Enables dead code elimination, all code which is not a transitive dependency of a specified module will be removed. This argument can be used multiple times." }
-
-codeGenModules :: Term [String]
-codeGenModules = value $ optAll [] $ (optInfo [ "codegen" ])
-     { optDoc = "A list of modules for which Javascript and externs should be generated. This argument can be used multiple times." }
-
-verboseErrors :: Term Bool
-verboseErrors = value $ flag $ (optInfo [ "v", "verbose-errors" ])
-     { optDoc = "Display verbose error messages" }
-
-options :: Term P.Options
-options = P.Options <$> noPrelude <*> noTco <*> performRuntimeTypeChecks <*> noMagicDo <*> runMain <*> noOpts <*> (Just <$> browserNamespace) <*> dceModules <*> codeGenModules <*> verboseErrors
-
-stdInOrInputFiles :: FilePath -> Term (Maybe [FilePath])
-stdInOrInputFiles prelude = combine <$> useStdIn <*> (not <$> noPrelude) <*> inputFiles
-  where
-  combine False True input = Just (prelude : input)
-  combine False False input = Just input
-  combine True _ _ = Nothing
-
-term :: FilePath -> Term (IO ())
-term prelude = compile <$> options <*> stdInOrInputFiles prelude <*> outputFile <*> externsFile
-
-termInfo :: TermInfo
-termInfo = defTI
-  { termName = "psc"
-  , version  = showVersion Paths.version
-  , termDoc  = "Compiles PureScript to Javascript"
+data PSCMakeOptions = PSCMakeOptions
+  { pscmInput        :: [FilePath]
+  , pscmForeignInput :: [FilePath]
+  , pscmOutputDir    :: FilePath
+  , pscmOpts         :: P.Options
+  , pscmUsePrefix    :: Bool
   }
 
-main :: IO ()
-main = do
-  prelude <- preludeFilename
-  run (term prelude, termInfo)
+data InputOptions = InputOptions
+  { ioInputFiles  :: [FilePath]
+  }
 
+compile :: PSCMakeOptions -> IO ()
+compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
+  input <- globWarningOnMisses warnFileTypeNotFound inputGlob
+  when (null input) $ do
+    hPutStrLn stderr "psc: No input files."
+    exitFailure
+  let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
+  moduleFiles <- readInput (InputOptions pursFiles)
+  inputForeign <- globWarningOnMisses warnFileTypeNotFound inputForeignGlob
+  foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readFile inFile)
+  case runWriterT (parseInputs moduleFiles foreignFiles) of
+    Left errs -> do
+      hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
+      exitFailure
+    Right ((ms, foreigns), warnings) -> do
+      when (P.nonEmpty warnings) $
+        hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
+      let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
+          makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
+      e <- runMake opts $ P.make makeActions (map snd ms)
+      case e of
+        Left errs -> do
+          hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
+          exitFailure
+        Right (_, warnings') -> do
+          when (P.nonEmpty warnings') $
+            hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
+          exitSuccess
+
+warnFileTypeNotFound :: String -> IO ()
+warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: " ++)
+
+globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
+globWarningOnMisses warn = concatMapM globWithWarning
+  where
+  globWithWarning pattern = do
+    paths <- glob pattern
+    when (null paths) $ warn pattern
+    return paths
+  concatMapM f = liftM concat . mapM f
+
+readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
+readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
+
+parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
+            => [(Either P.RebuildPolicy FilePath, String)]
+            -> [(FilePath, P.ForeignJS)]
+            -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName FilePath)
+parseInputs modules foreigns =
+  (,) <$> P.parseModulesFromFiles (either (const "") id) modules
+      <*> P.parseForeignModulesFromFiles foreigns
+
+inputFile :: Parser FilePath
+inputFile = strArgument $
+     metavar "FILE"
+  <> help "The input .purs file(s)"
+
+inputForeignFile :: Parser FilePath
+inputForeignFile = strOption $
+     short 'f'
+  <> long "ffi"
+  <> help "The input .js file(s) providing foreign import implementations"
+
+outputDirectory :: Parser FilePath
+outputDirectory = strOption $
+     short 'o'
+  <> long "output"
+  <> Opts.value "output"
+  <> showDefault
+  <> help "The output directory"
+
+requirePath :: Parser (Maybe FilePath)
+requirePath = optional $ strOption $
+     short 'r'
+  <> long "require-path"
+  <> help "The path prefix to use for require() calls in the generated JavaScript"
+
+noTco :: Parser Bool
+noTco = switch $
+     long "no-tco"
+  <> help "Disable tail call optimizations"
+
+noMagicDo :: Parser Bool
+noMagicDo = switch $
+     long "no-magic-do"
+  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad"
+
+noOpts :: Parser Bool
+noOpts = switch $
+     long "no-opts"
+  <> help "Skip the optimization phase"
+
+comments :: Parser Bool
+comments = switch $
+     short 'c'
+  <> long "comments"
+  <> help "Include comments in the generated code"
+
+verboseErrors :: Parser Bool
+verboseErrors = switch $
+     short 'v'
+  <> long "verbose-errors"
+  <> help "Display verbose error messages"
+
+noPrefix :: Parser Bool
+noPrefix = switch $
+     short 'p'
+  <> long "no-prefix"
+  <> help "Do not include comment header"
+
+
+options :: Parser P.Options
+options = P.Options <$> noTco
+                    <*> noMagicDo
+                    <*> pure Nothing
+                    <*> noOpts
+                    <*> verboseErrors
+                    <*> (not <$> comments)
+                    <*> requirePath
+
+pscMakeOptions :: Parser PSCMakeOptions
+pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> many inputForeignFile
+                                <*> outputDirectory
+                                <*> options
+                                <*> (not <$> noPrefix)
+
+main :: IO ()
+main = execParser opts >>= compile
+  where
+  opts        = info (version <*> helper <*> pscMakeOptions) infoModList
+  infoModList = fullDesc <> headerInfo <> footerInfo
+  headerInfo  = header   "psc - Compiles PureScript to Javascript"
+  footerInfo  = footer $ "psc " ++ showVersion Paths.version
+
+  version :: Parser (a -> a)
+  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden

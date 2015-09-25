@@ -1,12 +1,12 @@
 module Main where
 
-  import Prelude
+import Prelude
 
-  k :: String -> Number -> String
-  k x y = x
+k :: String -> Number -> String
+k x y = x
 
-  iterate :: forall a. Number -> (a -> a) -> a -> a
-  iterate 0 f a = a
-  iterate n f a = iterate (n - 1) f (f a)
-    
-  main = Debug.Trace.trace "Done"
+iterate :: forall a. Number -> (a -> a) -> a -> a
+iterate 0.0 f a = a
+iterate n f a = iterate (n - 1.0) f (f a)
+
+main = Control.Monad.Eff.Console.log "Done"

@@ -20,51 +20,30 @@ module Language.PureScript.Options where
 --
 data Options = Options {
     -- |
-    -- Disable inclusion of the built in Prelude
-    --
-    optionsNoPrelude :: Bool
-    -- |
     -- Disable tail-call elimination
-    --
-  , optionsNoTco :: Bool
-    -- |
-    -- Perform type checks at runtime
-    --
-  , optionsPerformRuntimeTypeChecks :: Bool
+    optionsNoTco :: Bool
     -- |
     -- Disable inlining of calls to return and bind for the Eff monad
-    --
   , optionsNoMagicDo :: Bool
     -- |
     -- When specified, checks the type of `main` in the module, and generate a call to run main
     -- after the module definitions.
-    --
   , optionsMain :: Maybe String
     -- |
     -- Skip all optimizations
-    --
   , optionsNoOptimizations :: Bool
     -- |
-    -- Specify the namespace that PureScript modules will be exported to when running in the
-    -- browser.
-    --
-  , optionsBrowserNamespace :: Maybe String
-    -- |
-    -- The modules to keep while enabling dead code elimination
-    --
-  , optionsModules :: [String]
-    -- |
-    -- The modules to code gen
-    --
-  , optionsCodeGenModules :: [String]
-    -- |
     -- Verbose error message
-    --
   , optionsVerboseErrors :: Bool
+    -- |
+    -- Remove the comments from the generated js
+  , optionsNoComments :: Bool
+    -- |
+    -- The path to prepend to require statements
+  , optionsRequirePath :: Maybe FilePath
   } deriving Show
 
 -- |
--- Default compiler options
---
+-- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False False False Nothing False Nothing [] [] False
+defaultOptions = Options False False Nothing False False False Nothing

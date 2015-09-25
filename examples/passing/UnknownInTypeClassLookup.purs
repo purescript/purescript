@@ -1,5 +1,7 @@
 module Main where
 
+import Prelude
+
 class EQ a b
 
 instance eqAA :: EQ a a
@@ -9,4 +11,4 @@ test _ _ = "Done"
 
 runTest a = test a a
 
-main = Debug.Trace.trace $ runTest 0
+main = Control.Monad.Eff.Console.log $ runTest 0.0

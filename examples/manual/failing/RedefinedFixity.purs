@@ -1,6 +1,8 @@
 module RedefinedFixity where
 
-  (!?) x y = x + y
-  
-  infix 2 !?
-  infix 2 !?
+import Prelude
+
+(!?) x y = x + y
+
+infix 2 !?
+infix 2 !?
