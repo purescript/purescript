@@ -1,4 +1,3 @@
--- @shouldFailWith TypeSynonymInstance
 module Main where
 
 import Prelude
@@ -10,3 +9,5 @@ type Bar = String
 
 instance fooBar :: Foo Bar where
   foo s = s
+
+main = Control.Monad.Eff.Console.log "Done"
