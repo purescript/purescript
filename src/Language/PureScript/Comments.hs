@@ -14,12 +14,16 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Comments where
 
+import Data.Aeson.TH
 import qualified Data.Data as D
 
 data Comment
   = LineComment String
   | BlockComment String
   deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Comment)

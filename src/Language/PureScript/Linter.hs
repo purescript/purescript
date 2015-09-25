@@ -49,7 +49,6 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
   getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
   getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
   getDeclIdent (ExternDeclaration ident _) = Just ident
-  getDeclIdent (ExternInstanceDeclaration ident _ _ _) = Just ident
   getDeclIdent (TypeInstanceDeclaration ident _ _ _ _) = Just ident
   getDeclIdent (BindingGroupDeclaration _) = error "lint: binding groups should not be desugared yet."
   getDeclIdent _ = Nothing

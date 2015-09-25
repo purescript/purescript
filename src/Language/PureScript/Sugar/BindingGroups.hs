@@ -78,7 +78,6 @@ createBindingGroups moduleName = mapM f <=< handleDecls
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              filter isExternDataDecl ds ++
-             filter isExternInstanceDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassDeclaration ds ++
              filter isTypeClassInstanceDeclaration ds ++

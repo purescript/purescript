@@ -115,16 +115,6 @@ parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "import" *> indented *>
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                           <*> (indented *> doubleColon *> parseKind)
-   <|> (do reserved "instance"
-           name <- parseIdent <* indented <* doubleColon
-           deps <- P.option [] $ do
-             deps' <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-             indented
-             rfatArrow
-             return deps'
-           className <- indented *> parseQualified properName
-           tys <- P.many (indented *> noWildcards parseTypeAtom)
-           return $ ExternInstanceDeclaration name deps className tys)
    <|> (do ident <- parseIdent
            -- TODO: add a wiki page link with migration info
            -- TODO: remove this deprecation warning in 0.8

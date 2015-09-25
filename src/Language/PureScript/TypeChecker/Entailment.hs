@@ -22,7 +22,7 @@ module Language.PureScript.TypeChecker.Entailment (
 
 import Data.Function (on)
 import Data.List
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, mapMaybe)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (foldMap)
 #endif
@@ -54,8 +54,15 @@ import qualified Language.PureScript.Constants as C
 entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Check Expr
 entails env moduleName context = solve
   where
-    forClassName :: Qualified ProperName -> [TypeClassDictionaryInScope]
-    forClassName cn = findDicts cn Nothing ++ findDicts cn (Just moduleName)
+    forClassName :: Qualified ProperName -> [Type] -> [TypeClassDictionaryInScope]
+    forClassName cn@(Qualified (Just mn) _) tys = concatMap (findDicts cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
+    forClassName _ _ = error "forClassName: expected qualified class name"
+
+    ctorModules :: Type -> Maybe ModuleName
+    ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
+    ctorModules (TypeConstructor (Qualified Nothing _)) = error "ctorModules: unqualified type name"
+    ctorModules (TypeApp ty _) = ctorModules ty
+    ctorModules _ = Nothing
 
     findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
@@ -68,16 +75,20 @@ entails env moduleName context = solve
       go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
+        -- We need to desugar synonyms here so that forClassName can find the correct modules
+        -- in types hidden inside the synonyms.
+        -- TODO: this can go away when synonyms get desugared up front.
+        tys'' <- mapM expandAllTypeSynonyms tys'
         let instances = do
-              tcd <- forClassName className'
+              tcd <- forClassName className' tys''
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys' (tcdInstanceTypes tcd)
+              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys'' (tcdInstanceTypes tcd)
               return (subst, tcd)
         (subst, tcd) <- unique instances
         -- Solve any necessary subgoals
         args <- solveSubgoals subst (tcdDependencies tcd)
         return $ foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
-                       (mkDictionary (canonicalizeDictionary tcd) args)
+                       (mkDictionary (tcdName tcd) args)
                        (tcdPath tcd)
         where
 

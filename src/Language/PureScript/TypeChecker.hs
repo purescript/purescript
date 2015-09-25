@@ -212,16 +212,11 @@ typeCheckAll mainModuleName moduleName _ ds = mapM go ds <* mapM_ checkOrphanFix
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })
     return d
   go (d@(FixityDeclaration{})) = return d
-  go (d@(ImportDeclaration importedModule _ _)) = do
-    instances <- lookupTypeClassDictionaries $ Just importedModule
-    addTypeClassDictionaries (Just moduleName) instances
-    return d
+  go (d@(ImportDeclaration{})) = return d
   go (d@(TypeClassDeclaration pn args implies tys)) = do
     addTypeClass moduleName pn args implies tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys _)) =
-    goInstance d dictName deps className tys
-  go (d@(ExternInstanceDeclaration dictName deps className tys)) =
     goInstance d dictName deps className tys
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
@@ -239,8 +234,8 @@ typeCheckAll mainModuleName moduleName _ ds = mapM go ds <* mapM_ checkOrphanFix
     mapM_ (checkTypeClassInstance moduleName) tys
     forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
     checkOrphanInstance moduleName className tys
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps) TCDRegular
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (canonicalizeDictionary dict) dict
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
     return d
 
     where
@@ -295,7 +290,6 @@ typeCheckModule mainModuleName (Module ss coms mn decls (Just exps)) = warnAndRe
       exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
       exports (ValueRef id1) (ValueRef id2) = id1 == id2
       exports (TypeClassRef pn1) (TypeClassRef pn2) = pn1 == pn2
-      exports (TypeInstanceRef id1) (TypeInstanceRef id2) = id1 == id2
       exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
       exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
       exports _ _ = False

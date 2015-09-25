@@ -14,11 +14,13 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Environment where
 
 import Data.Data
 import Data.Maybe (fromMaybe)
+import Data.Aeson.TH
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Aeson as A
@@ -42,8 +44,8 @@ data Environment = Environment {
   --
   , types :: M.Map (Qualified ProperName) (Kind, TypeKind)
   -- |
-  -- Data constructors currently in scope, along with their associated data type constructors
-  --
+  -- Data constructors currently in scope, along with their associated type
+  -- constructor name, argument types and return type.
   , dataConstructors :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type, [Ident])
   -- |
   -- Type synonyms currently in scope
@@ -266,3 +268,5 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
 lookupValue env (Qualified (Just mn) ident) = (mn, ident) `M.lookup` names env
 lookupValue _ _ = Nothing
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''TypeKind)

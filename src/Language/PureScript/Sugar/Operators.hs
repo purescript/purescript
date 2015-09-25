@@ -20,6 +20,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.Operators (
@@ -31,6 +32,7 @@ module Language.PureScript.Sugar.Operators (
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
+import Language.PureScript.Externs
 
 #if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
@@ -52,9 +54,9 @@ import qualified Language.PureScript.Constants as C
 -- |
 -- Remove explicit parentheses and reorder binary operator applications
 --
-rebracket :: (Applicative m, MonadError MultipleErrors m) => [Module] -> m [Module]
-rebracket ms = do
-  let fixities = concatMap collectFixities ms
+rebracket :: (Applicative m, MonadError MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+rebracket externs ms = do
+  let fixities = concatMap externsFixities externs ++ concatMap collectFixities ms
   ensureNoDuplicates $ map (\(i, pos, _) -> (i, pos)) fixities
   let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
   mapM (rebracketModule opTable) ms
@@ -79,6 +81,12 @@ removeParens =
   where
   go (Parens val) = val
   go val = val
+
+externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity)]
+externsFixities ExternsFile{..} =
+  [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec)
+  | ExternsFixity assoc prec op <- efFixities
+  ]
 
 collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity)]
 collectFixities (Module _ _ moduleName ds _) = concatMap collect ds

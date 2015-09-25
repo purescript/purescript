@@ -29,6 +29,7 @@ import Control.Monad.Supply.Class
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
+import Language.PureScript.Externs
 
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
@@ -63,15 +64,16 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
-desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Module] -> m [Module]
-desugar = map removeSignedLiterals
-          >>> mapM desugarObjectConstructors
-          >=> mapM desugarOperatorSections
-          >=> mapM desugarDoModule
-          >=> desugarCasesModule
-          >=> desugarTypeDeclarationsModule
-          >=> desugarImports
-          >=> rebracket
-          >=> mapM deriveInstances
-          >=> desugarTypeClasses
-          >=> createBindingGroupsModule
+desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugar externs =
+  map removeSignedLiterals
+    >>> mapM desugarObjectConstructors
+    >=> mapM desugarOperatorSections
+    >=> mapM desugarDoModule
+    >=> desugarCasesModule
+    >=> desugarTypeDeclarationsModule
+    >=> desugarImports externs
+    >=> rebracket externs
+    >=> mapM deriveInstances
+    >=> desugarTypeClasses externs
+    >=> createBindingGroupsModule

@@ -13,6 +13,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.Names (desugarImports) where
@@ -34,6 +35,7 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Errors
 import Language.PureScript.Traversals
+import Language.PureScript.Externs
 import Language.PureScript.Sugar.Names.Env
 import Language.PureScript.Sugar.Names.Imports
 import Language.PureScript.Sugar.Names.Exports
@@ -42,11 +44,47 @@ import Language.PureScript.Sugar.Names.Exports
 -- Replaces all local names with qualified names within a list of modules. The
 -- modules should be topologically sorted beforehand.
 --
-desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Module] -> m [Module]
-desugarImports modules = do
-  env <- foldM updateEnv initEnv modules
-  mapM (renameInModule' env) modules
+desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugarImports externs modules = do
+  env <- foldM externsEnv primEnv externs
+  env' <- foldM updateEnv env modules
+  mapM (renameInModule' env') modules
   where
+  -- | Create an environment from a collection of externs files
+  externsEnv :: Env -> ExternsFile -> m Env
+  externsEnv env ExternsFile{..} = do
+    let members = Exports{..}
+        ss = internalModuleSourceSpan "<Externs>"
+        env' = M.insert efModuleName (ss, nullImports, members) env
+        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, mt, qmn)])
+    imps <- foldM (resolveModuleImport efModuleName env') nullImports (map fromEFImport efImports)
+    exps <- resolveExports env' efModuleName imps members efExports
+    return $ M.insert efModuleName (ss, imps, exps) env
+    where
+
+    exportedTypes :: [((ProperName, [ProperName]), ModuleName)]
+    exportedTypes = mapMaybe toExportedType efExports
+      where
+      toExportedType (TypeRef tyCon dctors) = Just ((tyCon, fromMaybe (mapMaybe forTyCon efDeclarations) dctors), efModuleName)
+        where
+        forTyCon :: ExternsDeclaration -> Maybe ProperName
+        forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
+        forTyCon _ = Nothing
+      toExportedType (PositionedDeclarationRef _ _ r) = toExportedType r
+      toExportedType _ = Nothing
+    exportedTypeClasses :: [(ProperName, ModuleName)]
+    exportedTypeClasses = mapMaybe toExportedTypeClass efExports
+      where
+      toExportedTypeClass (TypeClassRef className) = Just (className, efModuleName)
+      toExportedTypeClass (PositionedDeclarationRef _ _ r) = toExportedTypeClass r
+      toExportedTypeClass _ = Nothing
+    exportedValues :: [(Ident, ModuleName)]
+    exportedValues = mapMaybe toExportedValue efExports
+      where
+      toExportedValue (ValueRef ident) = Just (ident, efModuleName)
+      toExportedValue (PositionedDeclarationRef _ _ r) = toExportedValue r
+      toExportedValue _ = Nothing
+
   updateEnv :: Env -> Module -> m Env
   updateEnv env m@(Module ss _ mn _ refs) =
     case mn `M.lookup` env of
@@ -120,8 +158,6 @@ renameInModule env imports (Module ss coms mn decls exps) =
     (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints pos implies <*> pure ds)
   updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
     (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> mapM (updateTypesEverywhere pos) ts <*> pure ds)
-  updateDecl (pos, bound) (ExternInstanceDeclaration name cs cn ts) =
-    (,) (pos, bound) <$> (ExternInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn Nothing <*> mapM (updateTypesEverywhere pos) ts)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
