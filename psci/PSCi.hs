@@ -555,7 +555,10 @@ loop PSCiOptions{..} = do
             Left err -> outputStrLn err >> go
             Right Nothing -> go
             Right (Just QuitPSCi) -> outputStrLn quitMessage
-            Right (Just c') -> runPSCI (loadAllImportedModules >> handleCommand c') >> go
+            Right (Just c') -> do
+              handleInterrupt (outputStrLn "Interrupted.")
+                              (withInterrupt (runPSCI (loadAllImportedModules >> handleCommand c')))
+              go
 
 multiLineMode :: Parser Bool
 multiLineMode = switch $
