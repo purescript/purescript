@@ -3,6 +3,7 @@ module UnknownSuperclassTypeVar where
 
 import Prelude
 
-class Foo a
+class Foo a where
+  foo :: a -> a
 
 class (Foo b) <= Bar a
