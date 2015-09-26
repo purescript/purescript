@@ -437,10 +437,10 @@ handleKindOf typ = do
 -- Parses the input and returns either a Metacommand, or an error as a string.
 --
 getCommand :: Bool -> InputT (StateT PSCiState IO) (Either String (Maybe Command))
-getCommand singleLineMode = do
-  firstLine <- getInputLine "> "
+getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
+  firstLine <- withInterrupt $ getInputLine "> "
   case firstLine of
-    Nothing -> return (Right Nothing)
+    Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
     Just s | singleLineMode || head s == ':' -> return . either Left (Right . Just) $ parseCommand s
     Just s -> either Left (Right . Just) . parseCommand <$> go [s]
@@ -555,7 +555,10 @@ loop PSCiOptions{..} = do
             Left err -> outputStrLn err >> go
             Right Nothing -> go
             Right (Just QuitPSCi) -> outputStrLn quitMessage
-            Right (Just c') -> runPSCI (loadAllImportedModules >> handleCommand c') >> go
+            Right (Just c') -> do
+              handleInterrupt (outputStrLn "Interrupted.")
+                              (withInterrupt (runPSCI (loadAllImportedModules >> handleCommand c')))
+              go
 
 multiLineMode :: Parser Bool
 multiLineMode = switch $
