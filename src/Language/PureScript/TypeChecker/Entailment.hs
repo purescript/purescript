@@ -41,7 +41,6 @@ import Language.PureScript.Errors
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types

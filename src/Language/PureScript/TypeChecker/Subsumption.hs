@@ -20,7 +20,6 @@ module Language.PureScript.TypeChecker.Subsumption (
 import Data.List (sortBy)
 import Data.Ord (comparing)
 
-import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
@@ -29,7 +28,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 

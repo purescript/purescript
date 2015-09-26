@@ -40,7 +40,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Types
 
 instance Partial Type where
