@@ -170,11 +170,11 @@ make MakeActions{..} ms = do
   go :: Environment -> [(Bool, Module)] -> SupplyT m Environment
   go env [] = return env
   go env ((False, m) : ms') = do
-    (_, env') <- lift . runCheck' env $ typeCheckModule Nothing m
+    (_, env') <- lift . runCheck' env $ typeCheckModule m
     go env' ms'
   go env ((True, m@(Module ss coms moduleName' _ exps)) : ms') = do
     lift . progress $ CompilingModule moduleName'
-    (checked@(Module _ _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
+    (checked@(Module _ _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule m
     checkExhaustiveModule env' checked
     regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
     let mod' = Module ss coms moduleName' regrouped exps
