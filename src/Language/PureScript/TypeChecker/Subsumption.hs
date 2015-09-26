@@ -57,12 +57,6 @@ subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) 
   _ <- subsumes Nothing arg2 arg1
   _ <- subsumes Nothing ret1 ret2
   return val
-subsumes' val (SaturatedTypeSynonym name tyArgs) ty2 = do
-  ty1 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  subsumes val ty1 ty2
-subsumes' val ty1 (SaturatedTypeSynonym name tyArgs) = do
-  ty2 <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  subsumes val ty1 ty2
 subsumes' val (KindedType ty1 _) ty2 =
   subsumes val ty1 ty2
 subsumes' val ty1 (KindedType ty2 _) =

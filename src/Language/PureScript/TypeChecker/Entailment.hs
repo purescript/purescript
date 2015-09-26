@@ -145,9 +145,6 @@ typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Jus
 typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2
                                                                                   <*> typeHeadsAreEqual m e t1 t2
-typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
-  Left  _  -> Nothing
-  Right t1 -> typeHeadsAreEqual m e t1 t2
 typeHeadsAreEqual _ _ REmpty REmpty = Just []
 typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1

@@ -69,10 +69,6 @@ unifyTypes t1 t2 = rethrow (onErrorMessages (ErrorUnifyingTypes t1 t2)) $
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = u =:= t
   unifyTypes' t (TUnknown u) = u =:= t
-  unifyTypes' (SaturatedTypeSynonym name args) ty = do
-    ty1 <- introduceSkolemScope <=< expandTypeSynonym name $ args
-    ty1 `unifyTypes` ty
-  unifyTypes' ty s@(SaturatedTypeSynonym _ _) = s `unifyTypes` ty
   unifyTypes' (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
@@ -132,10 +128,6 @@ unifyRows r1 r2 =
     rest <- fresh
     u1 =:= rowFromList (sd2, rest)
     u2 =:= rowFromList (sd1, rest)
-  unifyRows' sd1 (SaturatedTypeSynonym name args) sd2 r2' = do
-    r1' <- expandTypeSynonym name $ args
-    unifyRows (rowFromList (sd1, r1')) (rowFromList (sd2, r2'))
-  unifyRows' sd1 r1' sd2 r2'@(SaturatedTypeSynonym _ _) = unifyRows' sd2 r2' sd1 r1'
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
@@ -150,11 +142,6 @@ unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
 unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
 unifiesWith e (TypeApp h1 t1) (TypeApp h2 t2) = unifiesWith e h1 h2 && unifiesWith e t1 t2
-unifiesWith e (SaturatedTypeSynonym name args) t2 =
-  case expandTypeSynonym' e name args of
-    Left  _  -> False
-    Right t1 -> unifiesWith e t1 t2
-unifiesWith e t1 t2@(SaturatedTypeSynonym _ _) = unifiesWith e t2 t1
 unifiesWith _ REmpty REmpty = True
 unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1

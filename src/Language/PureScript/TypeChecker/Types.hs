@@ -67,24 +67,17 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants as C
 
 -- |
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
-typesOf mainModuleName moduleName vals = do
+typesOf :: ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
+typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
-    ds1 <- parU typed $ \e -> do
-      triple@(_, (_, ty)) <- checkTypedBindingGroupElement moduleName e dict
-      checkMain (fst e) ty
-      return triple
-    ds2 <- forM untyped $ \e -> do
-      triple@(_, (_, ty)) <- typeForBindingGroupElement e dict untypedDict
-      checkMain (fst e) ty
-      return triple
+    ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
     return $ ds1 ++ ds2
 
   forM tys $ \(ident, (val, ty)) -> do
@@ -94,21 +87,13 @@ typesOf mainModuleName moduleName vals = do
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    -- Remove type synonyms placeholders, and replace
-    -- top-level unification variables with named type variables.
-    let val'' = overTypes desaturateAllTypeSynonyms val'
-        ty' = varIfUnknown . desaturateAllTypeSynonyms $ ty
-    return (ident, (val'', ty'))
+    return (ident, (val', varIfUnknown ty))
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
   -- Replace all the wildcards types with their inferred types
   replace sub (SimpleErrorWrapper (WildcardInferredType ty)) = SimpleErrorWrapper $ WildcardInferredType (sub $? ty)
   replace _ em = em
-  -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
-  checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
-    [eff, a] <- replicateM 2 fresh
-    ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
 
@@ -346,9 +331,6 @@ inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
 inferProperty (TypeApp obj row) prop | obj == tyObject = do
   let (props, _) = rowToList row
   return $ lookup prop props
-inferProperty (SaturatedTypeSynonym name args) prop = do
-  replaced <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  inferProperty replaced prop
 inferProperty (ForAll ident ty _) prop = do
   replaced <- replaceVarWithUnknown ident ty
   inferProperty replaced prop
@@ -493,9 +475,6 @@ check' val t@(ConstrainedType constraints ty) = do
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
   instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
-check' val (SaturatedTypeSynonym name args) = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  check val ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -674,9 +653,6 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
   ret' <- maybe fresh return ret
   u =?= function ty ret'
   return (ret', App fn arg')
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
