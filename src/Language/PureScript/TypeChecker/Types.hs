@@ -167,9 +167,7 @@ replaceTypeClassDictionaries mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
   where
-  go (TypeClassDictionary constraint dicts) = do
-    env <- getEnv
-    entails env mn dicts constraint
+  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
 
 -- |

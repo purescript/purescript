@@ -36,7 +36,6 @@ import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 
-import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
@@ -135,21 +134,21 @@ unifyRows r1 r2 =
 -- |
 -- Check that two types unify
 --
-unifiesWith :: Environment -> Type -> Type -> Bool
-unifiesWith _ (TUnknown u1) (TUnknown u2) | u1 == u2 = True
-unifiesWith _ (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
-unifiesWith _ (TypeVar v1) (TypeVar v2) | v1 == v2 = True
-unifiesWith _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
-unifiesWith e (TypeApp h1 t1) (TypeApp h2 t2) = unifiesWith e h1 h2 && unifiesWith e t1 t2
-unifiesWith _ REmpty REmpty = True
-unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
+unifiesWith :: Type -> Type -> Bool
+unifiesWith (TUnknown u1) (TUnknown u2) | u1 == u2 = True
+unifiesWith (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
+unifiesWith (TypeVar v1) (TypeVar v2) | v1 == v2 = True
+unifiesWith (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
+unifiesWith (TypeApp h1 t1) (TypeApp h2 t2) = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
+unifiesWith REmpty REmpty = True
+unifiesWith r1@(RCons _ _ _) r2@(RCons _ _ _) =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
 
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in all (\(t1, t2) -> unifiesWith e t1 t2) int && go sd1 r1' sd2 r2'
+  in all (uncurry unifiesWith) int && go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
   go [] REmpty          [] REmpty          = True
@@ -159,7 +158,7 @@ unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   go _  _               [] (TUnknown _)    = True
   go _  (TUnknown _)    _  (TUnknown _)    = True
   go _  _               _  _               = False
-unifiesWith _ _ _ = False
+unifiesWith _ _ = False
 
 -- |
 -- Replace a single type variable with a new unification variable
