@@ -407,6 +407,7 @@ inferBinder val (NamedBinder name binder) = do
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPosition pos $ inferBinder val binder
+inferBinder val (TypedBinder ty binder) = val =?= ty >> inferBinder val binder
 
 -- | Returns true if a binder requires its argument type to be a monotype.
 -- | If this is the case, we need to instantiate any polymorphic types before checking binders.
