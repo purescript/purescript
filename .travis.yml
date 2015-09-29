@@ -9,8 +9,8 @@ matrix:
     - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
       compiler: ": #GHC 7.8.4 - psci-tests"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.8.4 STACKAGE=lts-22
-      compiler: ": #GHC 7.8.4 - lts-2.22"
+    - env: GHCVER=7.8.4 STACKAGE=lts-2.22
+      compiler: ": #GHC 7.8.4 - lts-2.22-1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.6.3
       compiler: ": #GHC 7.6.3"
