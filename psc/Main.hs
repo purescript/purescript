@@ -32,6 +32,7 @@ import Options.Applicative as Opts
 
 import System.Exit (exitSuccess, exitFailure)
 import System.IO (hPutStrLn, stderr)
+import System.IO.UTF8
 import System.FilePath.Glob (glob)
 
 import qualified Language.PureScript as P
@@ -60,7 +61,7 @@ compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = d
   let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
   moduleFiles <- readInput (InputOptions pursFiles)
   inputForeign <- globWarningOnMisses warnFileTypeNotFound inputForeignGlob
-  foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readFile inFile)
+  foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
   case runWriterT (parseInputs moduleFiles foreignFiles) of
     Left errs -> do
       hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
@@ -93,7 +94,7 @@ globWarningOnMisses warn = concatMapM globWithWarning
   concatMapM f = liftM concat . mapM f
 
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
-readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readFile inFile
+readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readUTF8File inFile
 
 parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
             => [(Either P.RebuildPolicy FilePath, String)]
@@ -177,6 +178,7 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
+
 
 main :: IO ()
 main = execParser opts >>= compile
