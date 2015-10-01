@@ -162,6 +162,7 @@ library
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
 
+                     System.IO.UTF8
     exposed: True
     buildable: True
     hs-source-dirs: src

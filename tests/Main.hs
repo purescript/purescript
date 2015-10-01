@@ -66,6 +66,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.Directory
+import System.IO.UTF8
 import qualified System.Info
 import qualified System.FilePath.Glob as Glob
 
@@ -97,7 +98,7 @@ makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readFile inputFile
+  text <- readUTF8File inputFile
   return (inputFile, text)
 
 type TestM = WriterT [(FilePath, String)] IO
@@ -157,7 +158,7 @@ assertDoesNotCompile inputFiles foreigns = do
 
   where
   getShouldFailWith =
-    readFile
+    readUTF8File
     >>> liftIO
     >>> fmap (   lines
              >>> mapMaybe (stripPrefix "-- @shouldFailWith ")
@@ -184,7 +185,7 @@ main = do
   supportPurs <- supportFiles "purs"
   supportJS   <- supportFiles "js"
 
-  foreignFiles <- forM supportJS (\f -> (f,) <$> readFile f)
+  foreignFiles <- forM supportJS (\f -> (f,) <$> readUTF8File f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
 
   let passing = cwd </> "examples" </> "passing"
