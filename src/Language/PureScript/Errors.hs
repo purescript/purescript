@@ -145,6 +145,7 @@ data SimpleErrorMessage
   | WildcardInferredType Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
+  | IncompleteExhaustivityCheck
   | ClassOperator ProperName Ident
   | MisleadingEmptyTypeImport ModuleName ProperName
   | ImportHidingModule ModuleName
@@ -274,6 +275,7 @@ errorCode em = case unwrapErrorMessage em of
   WildcardInferredType{} -> "WildcardInferredType"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
+  IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
   ClassOperator{} -> "ClassOperator"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
@@ -662,6 +664,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
               ] ++
               [ line "..." | not b ]
+    goSimple IncompleteExhaustivityCheck =
+      paras [ line "An exhaustivity check was abandoned due to too many possible cases."
+            , line "You may want to decomposing your data types into smaller types."
+            ]
     go (NotYetDefined names err) =
       paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map showIdent names) ++ ":"
             , indent $ go err
