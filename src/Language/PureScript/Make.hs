@@ -203,7 +203,7 @@ make MakeActions{..} ms = do
                   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
                   lint m
                   ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
-                  (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule Nothing desugared
+                  (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
                   checkExhaustiveModule env' checked
                   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
                   let mod' = Module ss coms moduleName regrouped exps

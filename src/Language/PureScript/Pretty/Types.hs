@@ -42,7 +42,6 @@ typeLiterals = mkPattern match
   match (TUnknown u) = Just $ '_' : show u
   match (Skolem name s _) = Just $ name ++ show s
   match (ConstrainedType deps ty) = Just $ "(" ++ intercalate ", " (map (\(pn, ty') -> showQualified runProperName pn ++ " " ++ unwords (map prettyPrintTypeAtom ty')) deps) ++ ") => " ++ prettyPrintType ty
-  match (SaturatedTypeSynonym name args) = Just $ showQualified runProperName name ++ "<" ++ intercalate "," (map prettyPrintTypeAtom args) ++ ">"
   match REmpty = Just "()"
   match row@RCons{} = Just $ '(' : prettyPrintRow row ++ ")"
   match _ = Nothing
