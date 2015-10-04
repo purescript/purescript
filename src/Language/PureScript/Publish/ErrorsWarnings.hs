@@ -98,10 +98,10 @@ renderError err =
   case err of
     UserError e ->
       vcat
-        [ para (concat
-          [ "There is a problem with your package, which meant that "
-          , "it could not be published."
-          ])
+        [ para (
+          "There is a problem with your package, which meant that " ++
+          "it could not be published."
+          )
         , para "Details:"
         , indented (displayUserError e)
         ]
@@ -123,10 +123,10 @@ renderError err =
 displayUserError :: UserError -> Box
 displayUserError e = case e of
   BowerJSONNotFound ->
-    para (concat
-      [ "The bower.json file was not found. Please create one, or run "
-      , "`pulp init`."
-      ])
+    para (
+      "The bower.json file was not found. Please create one, or run " ++
+      "`pulp init`."
+      )
   BowerExecutableNotFound names ->
     para (concat
       [ "The Bower executable was not found (tried: ", format names, "). Please"
@@ -217,10 +217,10 @@ displayUserError e = case e of
       , indented (P.prettyPrintMultipleErrorsBox False err)
       ]
   DirtyWorkingTree ->
-    para (concat
-        [ "Your git working tree is dirty. Please commit, discard, or stash "
-        , "your changes first."
-        ])
+    para (
+        "Your git working tree is dirty. Please commit, discard, or stash " ++
+        "your changes first."
+        )
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
@@ -356,12 +356,11 @@ warnUndeclaredDependencies pkgNames =
       are          = pl "are" "is"
       dependencies = pl "dependencies" "a dependency"
   in vcat $
-    [ para (concat
+    para (concat
       [ "The following Bower ", packages, " ", are, " installed, but not "
       , "declared as ", dependencies, " in your bower.json file:"
       ])
-    ] ++
-      bulletedList runPackageName (NonEmpty.toList pkgNames)
+    : bulletedList runPackageName (NonEmpty.toList pkgNames)
 
 warnUnacceptableVersions :: NonEmpty (PackageName, String) -> Box
 warnUnacceptableVersions pkgs =

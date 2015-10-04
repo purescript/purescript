@@ -425,7 +425,7 @@ asSourceSpan = P.SourceSpan <$> key "name" asString
 
 instance A.ToJSON a => A.ToJSON (Package a) where
   toJSON Package{..} =
-    A.object $
+    A.object
       [ "packageMeta"          .= pkgMeta
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag

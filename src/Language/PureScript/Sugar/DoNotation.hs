@@ -42,13 +42,13 @@ desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError MultipleE
 desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
 desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
-desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (rethrowWithPosition pos $ desugarDo d)
+desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in f d
   where
   bind :: Expr
-  bind = Var (Qualified Nothing (Ident (C.bind)))
+  bind = Var (Qualified Nothing (Ident C.bind))
 
   replace :: Expr -> m Expr
   replace (Do els) = go els

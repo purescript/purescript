@@ -132,7 +132,7 @@ elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' 
     let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
     in mkImport `map` nub (f `concatMap` decls) ++ decls
   fqValues :: Expr -> [ModuleName]
-  fqValues (Var (Qualified (Just mn') _)) | notElem mn' (importedModules imps) = [mn']
+  fqValues (Var (Qualified (Just mn') _)) | mn' `notElem` importedModules imps = [mn']
   fqValues _ = []
   mkImport :: ModuleName -> Declaration
   mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing

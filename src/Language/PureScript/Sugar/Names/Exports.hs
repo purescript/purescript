@@ -205,9 +205,8 @@ filterModule mn exps refs = do
   -- the data constructor to check.
   checkDcon :: ProperName -> [ProperName] -> ProperName -> m ()
   checkDcon tcon exps' name =
-    if name `elem` exps'
-    then return ()
-    else throwError . errorMessage $ UnknownExportDataConstructor tcon name
+    unless (name `elem` exps') $
+      throwError . errorMessage $ UnknownExportDataConstructor tcon name
 
   -- Takes a list of all the exportable classes, the accumulated list of
   -- filtered exports, and a `DeclarationRef` for an explicit export. When the
