@@ -151,24 +151,25 @@ parseImportDeclaration' = do
   where
   stdImport = do
     moduleName' <- moduleName
-    stdImportHiding moduleName' <|> stdImportQualifying moduleName'
+    suffixHiding moduleName' <|> suffixQualifyingList moduleName'
     where
-    stdImportHiding mn = do
+    suffixHiding mn = do
       reserved "hiding"
-      declType <- importDeclarationType Hiding
+      declType <- qualifyingList Hiding
       return (mn, declType, Nothing)
-    stdImportQualifying mn = do
-      declType <- importDeclarationType Explicit
-      return (mn, declType, Nothing)
+    suffixQualifyingList mn = do
+      declType <- qualifyingList Explicit
+      qName <- P.optionMaybe qualifiedName
+      return (mn, declType, qName)
+  qualifiedName = reserved "as" *> moduleName
   qualImport = do
     reserved "qualified"
     indented
     moduleName' <- moduleName
-    declType <- importDeclarationType Explicit
-    reserved "as"
-    asQ <- moduleName
-    return (moduleName', declType, Just asQ)
-  importDeclarationType expectedType = do
+    declType <- qualifyingList Explicit
+    qName <- qualifiedName
+    return (moduleName', declType, Just qName)
+  qualifyingList expectedType = do
     idents <- P.optionMaybe $ indented *> parens (commaSep parseDeclarationRef)
     return $ fromMaybe Implicit (expectedType <$> idents)
 
