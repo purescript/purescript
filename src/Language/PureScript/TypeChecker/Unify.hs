@@ -133,7 +133,7 @@ unifyRows r1 r2 =
     u1 =:= rowFromList (sd2, rest)
     u2 =:= rowFromList (sd1, rest)
   unifyRows' sd1 (SaturatedTypeSynonym name args) sd2 r2' = do
-    r1' <- expandTypeSynonym name $ args
+    r1' <- expandTypeSynonym name args
     unifyRows (rowFromList (sd1, r1')) (rowFromList (sd2, r2'))
   unifyRows' sd1 r1' sd2 r2'@(SaturatedTypeSynonym _ _) = unifyRows' sd2 r2' sd1 r1'
   unifyRows' [] REmpty [] REmpty = return ()
@@ -156,14 +156,14 @@ unifiesWith e (SaturatedTypeSynonym name args) t2 =
     Right t1 -> unifiesWith e t1 t2
 unifiesWith e t1 t2@(SaturatedTypeSynonym _ _) = unifiesWith e t2 t1
 unifiesWith _ REmpty REmpty = True
-unifiesWith e r1@(RCons _ _ _) r2@(RCons _ _ _) =
+unifiesWith e r1@RCons{} r2@RCons{} =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
 
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in all (\(t1, t2) -> unifiesWith e t1 t2) int && go sd1 r1' sd2 r2'
+  in all (uncurry (unifiesWith e)) int && go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
   go [] REmpty          [] REmpty          = True

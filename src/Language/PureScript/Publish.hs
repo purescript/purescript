@@ -153,7 +153,7 @@ getGitWorkingTreeStatus :: PrepareM TreeStatus
 getGitWorkingTreeStatus = do
   out <- readProcess' "git" ["status", "--porcelain"] ""
   return $
-    if null . filter (not . null) . lines $ out
+    if all null . lines $ out
       then Clean
       else Dirty
 

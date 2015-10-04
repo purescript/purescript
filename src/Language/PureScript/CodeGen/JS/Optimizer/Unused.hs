@@ -29,7 +29,7 @@ removeCodeAfterReturnStatements = everywhereOnJS (removeFromBlock go)
   where
   go :: [JS] -> [JS]
   go jss | not (any isJSReturn jss) = jss
-         | otherwise = let (body, ret : _) = span (not . isJSReturn) jss in body ++ [ret]
+         | otherwise = let (body, ret : _) = break isJSReturn jss in body ++ [ret]
   isJSReturn (JSReturn _) = True
   isJSReturn _ = False
 
