@@ -17,7 +17,10 @@ module Language.PureScript.Pretty.Common where
 
 import Control.Monad.State
 import Data.List (intercalate)
+
 import Language.PureScript.Parser.Lexer (reservedPsNames, opChars)
+
+import Text.PrettyPrint.Boxes
 
 -- |
 -- Wrap a string in parentheses
@@ -67,3 +70,11 @@ prettyPrintObjectKey :: String -> String
 prettyPrintObjectKey s | s `elem` reservedPsNames = show s
                        | any (`elem` opChars) s = show s
                        | otherwise = s
+
+-- | Place a box before another, vertically when the first box takes up multiple lines.
+before :: Box -> Box -> Box
+before b1 b2 | rows b1 > 1 = b1 // b2
+             | otherwise = b1 <> b2
+
+beforeWithSpace :: Box -> Box -> Box
+beforeWithSpace b1 = before (b1 <> text " ")

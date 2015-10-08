@@ -21,172 +21,111 @@ module Language.PureScript.Pretty.Values (
     prettyPrintBinderAtom
 ) where
 
-import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
 
-import Control.Arrow ((<+>), runKleisli, second)
-import Control.PatternArrows
-import Control.Monad.State
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
+import Control.Arrow (second)
 
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (prettyPrintType, prettyPrintTypeAtom)
+import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
 
-literals :: Pattern PrinterState Expr String
-literals = mkPattern' match
+import Text.PrettyPrint.Boxes
+
+-- | Render an aligned list of items separated with commas
+list :: Char -> Char -> (a -> Box) -> [a] -> Box
+list open close _ [] = text [open, close]
+list open close f xs = vcat left (zipWith toLine [0 :: Int ..] xs ++ [ text [ close ] ])
   where
-  match :: Expr -> StateT PrinterState Maybe String
-  match (NumericLiteral n) = return $ either show show n
-  match (StringLiteral s) = return $ show s
-  match (CharLiteral c) = return $ show c
-  match (BooleanLiteral True) = return "true"
-  match (BooleanLiteral False) = return "false"
-  match (ArrayLiteral xs) = return $ "[" ++ intercalate ", " (map prettyPrintValue xs) ++ "]"
-  match (ObjectLiteral ps) = prettyPrintObject' $ second Just `map` ps
-  match (ObjectConstructor ps) = prettyPrintObject' ps
-  match (ObjectGetter prop) = return $ "(." ++ prop ++ ")"
-  match (TypeClassDictionaryConstructorApp className ps) = concat <$> sequence
-    [ return (showQualified runProperName className ++ "(\n")
-    , match ps
-    , return ")"
-    ]
-  match (Constructor name) = return $ showQualified runProperName name
-  match (Case values binders) = concat <$> sequence
-    [ return "case "
-    , unwords <$> forM values prettyPrintValue'
-    , return " of\n"
-    , withIndent $ prettyPrintMany prettyPrintCaseAlternative binders
-    , currentIndent
-    ]
-  match (Let ds val) = concat <$> sequence
-    [ return "let\n"
-    , withIndent $ prettyPrintMany prettyPrintDeclaration ds
-    , return "\n"
-    , currentIndent
-    , return "in "
-    , prettyPrintValue' val
-    ]
-  match (Var ident) = return $ showQualified showIdent ident
-  match (Do els) = concat <$> sequence
-    [ return "do\n"
-    , withIndent $ prettyPrintMany prettyPrintDoNotationElement els
-    , currentIndent
-    ]
-  match (OperatorSection op (Right val)) = return $ "(" ++ prettyPrintValue op ++ " " ++ prettyPrintValue val ++ ")"
-  match (OperatorSection op (Left val)) = return $ "(" ++ prettyPrintValue val ++ " " ++ prettyPrintValue op ++ ")"
-  match (TypeClassDictionary (name, tys) _) = return $ "<<dict " ++ showQualified runProperName name ++ " " ++ unwords (map prettyPrintTypeAtom tys) ++ ">>"
-  match (SuperClassDictionary name _) = return $ "<<superclass dict " ++ showQualified runProperName name ++ ">>"
-  match (TypedValue _ val _) = prettyPrintValue' val
-  match (PositionedValue _ _ val) = prettyPrintValue' val
-  match _ = mzero
+  toLine i a = text [ if i == 0 then open else ',', ' ' ] <> f a
 
-prettyPrintDeclaration :: Declaration -> StateT PrinterState Maybe String
-prettyPrintDeclaration (TypeDeclaration ident ty) = return $ showIdent ident ++ " :: " ++ prettyPrintType ty
-prettyPrintDeclaration (ValueDeclaration ident _ [] (Right val)) = concat <$> sequence
-  [ return $ showIdent ident ++ " = "
-  , prettyPrintValue' val
-  ]
+prettyPrintObject :: [(String, Maybe Expr)] -> Box
+prettyPrintObject = list '{' '}' prettyPrintObjectProperty
+  where
+  prettyPrintObjectProperty :: (String, Maybe Expr) -> Box
+  prettyPrintObjectProperty (key, value) = text (prettyPrintObjectKey key ++ ": ") <> maybe (text "_") prettyPrintValue value
+
+-- | Pretty-print an expression
+prettyPrintValue :: Expr -> Box
+prettyPrintValue (IfThenElse cond th el) =
+  (text "if " <> prettyPrintValueAtom cond)
+  // moveRight 2 (vcat left [ text "then " <> prettyPrintValueAtom th
+                            , text "else " <> prettyPrintValueAtom el
+                            ])
+prettyPrintValue (Accessor prop val) = prettyPrintValueAtom val <> text ("." ++ show prop)
+prettyPrintValue (ObjectUpdate o ps) = prettyPrintValueAtom o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> prettyPrintValue val) ps
+prettyPrintValue (ObjectUpdater o ps) = maybe (text "_") prettyPrintValueAtom o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> maybe (text "_") prettyPrintValue val) ps
+prettyPrintValue (App val arg) = prettyPrintValueAtom val `beforeWithSpace` prettyPrintValueAtom arg
+prettyPrintValue (Abs (Left arg) val) = text ('\\' : showIdent arg ++ " -> ") // moveRight 2 (prettyPrintValue val)
+prettyPrintValue (TypeClassDictionaryConstructorApp className ps) =
+  text (runProperName (disqualify className) ++ " ") <> prettyPrintValueAtom ps
+prettyPrintValue (Case values binders) =
+  (text "case " <> foldl1 beforeWithSpace (map prettyPrintValueAtom values) <> text " of") //
+    moveRight 2 (vcat left (map prettyPrintCaseAlternative binders))
+prettyPrintValue (Let ds val) =
+  text "let" //
+    moveRight 2 (vcat left (map prettyPrintDeclaration ds)) //
+    (text "in " <> prettyPrintValue val)
+prettyPrintValue (Do els) =
+  text "do " <> vcat left (map prettyPrintDoNotationElement els)
+prettyPrintValue (TypeClassDictionary (name, tys) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
+prettyPrintValue (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
+prettyPrintValue (PositionedValue _ _ val) = prettyPrintValue val
+prettyPrintValue expr = prettyPrintValueAtom expr
+
+-- | Pretty-print an atomic expression, adding parentheses if necessary.
+prettyPrintValueAtom :: Expr -> Box
+prettyPrintValueAtom (NumericLiteral n) = text $ either show show n
+prettyPrintValueAtom (StringLiteral s) = text $ show s
+prettyPrintValueAtom (CharLiteral c) = text $ show c
+prettyPrintValueAtom (BooleanLiteral True) = text "true"
+prettyPrintValueAtom (BooleanLiteral False) = text "false"
+prettyPrintValueAtom (ArrayLiteral xs) = list '[' ']' prettyPrintValue xs
+prettyPrintValueAtom (ObjectLiteral ps) = prettyPrintObject $ second Just `map` ps
+prettyPrintValueAtom (ObjectConstructor ps) = prettyPrintObject ps
+prettyPrintValueAtom (ObjectGetter prop) = text $ "_." ++ show prop
+prettyPrintValueAtom (Constructor name) = text $ runProperName (disqualify name)
+prettyPrintValueAtom (Var ident) = text $ showIdent (disqualify ident)
+prettyPrintValueAtom (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue op) `beforeWithSpace` prettyPrintValue val) `before` text ")"
+prettyPrintValueAtom (OperatorSection op (Left val)) = ((text "(" <> prettyPrintValue val) `beforeWithSpace` prettyPrintValue op) `before` text ")"
+prettyPrintValueAtom (TypedValue _ val _) = prettyPrintValue val
+prettyPrintValueAtom (PositionedValue _ _ val) = prettyPrintValueAtom val
+prettyPrintValueAtom expr = (text "(" <> prettyPrintValue expr) `before` text ")"
+
+prettyPrintDeclaration :: Declaration -> Box
+prettyPrintDeclaration (TypeDeclaration ident ty) =
+  text (showIdent ident ++ " :: ") <> typeAsBox ty
+prettyPrintDeclaration (ValueDeclaration ident _ [] (Right val)) =
+  text (showIdent ident ++ " = ") <> prettyPrintValue val
 prettyPrintDeclaration (PositionedDeclaration _ _ d) = prettyPrintDeclaration d
 prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
-prettyPrintCaseAlternative :: CaseAlternative -> StateT PrinterState Maybe String
+prettyPrintCaseAlternative :: CaseAlternative -> Box
 prettyPrintCaseAlternative (CaseAlternative binders result) =
-  concat <$> sequence
-    [ return (unwords (map prettyPrintBinderAtom binders))
-    , prettyPrintResult result
-    ]
+  text (unwords (map prettyPrintBinderAtom binders)) <> prettyPrintResult result
   where
-  prettyPrintResult (Left gs) = concat <$> sequence
-      [ return "\n"
-      , withIndent $ prettyPrintMany prettyPrintGuardedValue gs
-      ]
-  prettyPrintResult (Right v) = (" -> " ++) <$> prettyPrintValue' v
+  prettyPrintResult :: Either [(Guard, Expr)] Expr -> Box
+  prettyPrintResult (Left gs) =
+    vcat left (map prettyPrintGuardedValue gs)
+  prettyPrintResult (Right v) = text " -> " <> prettyPrintValue v
 
-  prettyPrintGuardedValue (grd, val) =
-    concat <$> sequence
-      [ return "| "
-      , prettyPrintValue' grd
-      , return " -> "
-      , prettyPrintValue' val
-      ]
+  prettyPrintGuardedValue :: (Guard, Expr) -> Box
+  prettyPrintGuardedValue (grd, val) = foldl1 before
+    [ text " | "
+    , prettyPrintValue grd
+    , text " -> "
+    , prettyPrintValue val
+    ]
 
-prettyPrintDoNotationElement :: DoNotationElement -> StateT PrinterState Maybe String
+prettyPrintDoNotationElement :: DoNotationElement -> Box
 prettyPrintDoNotationElement (DoNotationValue val) =
-  prettyPrintValue' val
+  prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationBind binder val) =
-  concat <$> sequence
-    [ return (prettyPrintBinder binder)
-    , return " <- "
-    , prettyPrintValue' val
-    ]
+  text (prettyPrintBinder binder ++ " <- ") <> prettyPrintValue val
 prettyPrintDoNotationElement (DoNotationLet ds) =
-  concat <$> sequence
-    [ return "let "
-    , withIndent $ prettyPrintMany prettyPrintDeclaration ds
-    ]
+  text "let" //
+    moveRight 2 (vcat left (map prettyPrintDeclaration ds))
 prettyPrintDoNotationElement (PositionedDoNotationElement _ _ el) = prettyPrintDoNotationElement el
-
-prettyPrintObject' :: [(String, Maybe Expr)] -> StateT PrinterState Maybe String
-prettyPrintObject' [] = return "{}"
-prettyPrintObject' ps = return $ "{ " ++ intercalate ", " (map prettyPrintObjectProperty ps) ++ "}"
-  where
-  prettyPrintObjectProperty :: (String, Maybe Expr) -> String
-  prettyPrintObjectProperty (key, value) = prettyPrintObjectKey key ++ ": " ++ maybe "_" prettyPrintValue value
-
-ifThenElse :: Pattern PrinterState Expr ((Expr, Expr), Expr)
-ifThenElse = mkPattern match
-  where
-  match (IfThenElse cond th el) = Just ((th, el), cond)
-  match _ = Nothing
-
-accessor :: Pattern PrinterState Expr (String, Expr)
-accessor = mkPattern match
-  where
-  match (Accessor prop val) = Just (prop, val)
-  match _ = Nothing
-
-objectUpdate :: Pattern PrinterState Expr ([String], Expr)
-objectUpdate = mkPattern match
-  where
-  match (ObjectUpdate o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ prettyPrintValue val, o)
-  match (ObjectUpdater o ps) = Just (flip map ps $ \(key, val) -> key ++ " = " ++ maybe "_" prettyPrintValue val, fromMaybe (Var (Qualified Nothing $ Ident "_")) o)
-  match _ = Nothing
-
-app :: Pattern PrinterState Expr (String, Expr)
-app = mkPattern match
-  where
-  match (App val arg) = Just (prettyPrintValue arg, val)
-  match _ = Nothing
-
-lam :: Pattern PrinterState Expr (String, Expr)
-lam = mkPattern match
-  where
-  match (Abs (Left arg) val) = Just (showIdent arg, val)
-  match _ = Nothing
-
--- |
--- Generate a pretty-printed string representing an expression
---
-prettyPrintValue :: Expr -> String
-prettyPrintValue = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintValue'
-
-prettyPrintValue' :: Expr -> StateT PrinterState Maybe String
-prettyPrintValue' = runKleisli $ runPattern matchValue
-  where
-  matchValue :: Pattern PrinterState Expr String
-  matchValue = buildPrettyPrinter operators (literals <+> fmap parens matchValue)
-  operators :: OperatorTable PrinterState Expr String
-  operators =
-    OperatorTable [ [ Wrap accessor $ \prop val -> val ++ "." ++ prop ]
-                  , [ Wrap objectUpdate $ \ps val -> val ++ "{ " ++ intercalate ", " ps ++ " }" ]
-                  , [ Wrap app $ \arg val -> val ++ "(" ++ arg ++ ")" ]
-                  , [ Split lam $ \arg val -> "\\" ++ arg ++ " -> " ++ prettyPrintValue val ]
-                  , [ Wrap ifThenElse $ \(th, el) cond -> "if " ++ cond ++ " then " ++ prettyPrintValue th ++ " else " ++ prettyPrintValue el ]
-                  ]
 
 prettyPrintBinderAtom :: Binder -> String
 prettyPrintBinderAtom NullBinder = "_"
@@ -196,7 +135,7 @@ prettyPrintBinderAtom (NumberBinder num) = either show show num
 prettyPrintBinderAtom (BooleanBinder True) = "true"
 prettyPrintBinderAtom (BooleanBinder False) = "false"
 prettyPrintBinderAtom (VarBinder ident) = showIdent ident
-prettyPrintBinderAtom (ConstructorBinder ctor []) = showQualified runProperName ctor
+prettyPrintBinderAtom (ConstructorBinder ctor []) = runProperName (disqualify ctor)
 prettyPrintBinderAtom (ObjectBinder bs) =
   "{ "
   ++ intercalate ", " (map prettyPrintObjectPropertyBinder bs)
@@ -216,7 +155,7 @@ prettyPrintBinderAtom b = parens (prettyPrintBinder b)
 -- Generate a pretty-printed string representing a Binder
 --
 prettyPrintBinder :: Binder -> String
-prettyPrintBinder (ConstructorBinder ctor []) = showQualified runProperName ctor
-prettyPrintBinder (ConstructorBinder ctor args) = showQualified runProperName ctor ++ " " ++ unwords (map prettyPrintBinderAtom args)
+prettyPrintBinder (ConstructorBinder ctor []) = runProperName (disqualify ctor)
+prettyPrintBinder (ConstructorBinder ctor args) = runProperName (disqualify ctor) ++ " " ++ unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
 prettyPrintBinder b = prettyPrintBinderAtom b
