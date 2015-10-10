@@ -21,6 +21,7 @@
 
 module PSCi where
 
+import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
 import Data.List (intercalate, nub, sort, sortBy)
 #if __GLASGOW_HASKELL__ < 710
@@ -381,13 +382,14 @@ printModuleSignatures moduleName env =
   PSCI $ let namesEnv = P.names env
              moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
              typesEnv = P.types env
+             typeSynonymsEnv = P.typeSynonyms env
              moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typesEnv
              dataConstructorsEnv = P.dataConstructors env
              moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructorsEnv
              in case moduleNamesIdent of
                   [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
                   _ -> do
-                    (outputStr   . unlines . sort . map (showType . findType typesEnv)) moduleTypes
+                    (outputStr   . unlines . sort . mapMaybe (showType typeSynonymsEnv . findType typesEnv)) moduleTypes
                     (outputStr   . unlines . map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructorsEnv)) moduleDataConstructors
                     (outputStrLn . unlines . sort . map (showNameType . findNameType namesEnv)) moduleNamesIdent
 
@@ -406,14 +408,21 @@ printModuleSignatures moduleName env =
         showDataConstructor _ = error "The impossible happened in printModuleSignatures."
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
-        showType :: (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> String
-        showType (P.Qualified _ name, Just (_, P.TypeSynonym)) = "type " ++ P.runProperName name -- what can we print here?
-        showType (P.Qualified _ name, Just (_, P.DataType _ pt)) =
-          "data " ++ P.runProperName name ++ if null pt then "" else " = " ++ printCons
-            where printCons = intercalate " | " (map (\(cons,idents) -> unwords (P.runProperName cons : map prettyPrintType idents)) pt)
-                  prettyPrintType t@(P.TypeApp _ _) = "(" ++ P.prettyPrintType t ++ ")"
-                  prettyPrintType t = P.prettyPrintType t
-        showType _ = error "The impossible happened in printModuleSignatures."
+        showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type) -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> Maybe String
+        showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
+          case (typ, M.lookup n typeSynonymsEnv) of
+            (Just (_, P.TypeSynonym), Just (_, dtType)) ->
+                Just ("type " ++ P.runProperName name ++ " = " ++ P.prettyPrintType dtType)
+
+            (Just (_, P.DataType _ pt), _) ->
+                Just ("data " ++ P.runProperName name ++ if null pt then "" else " = " ++ printCons pt)
+
+            _ ->
+              Nothing
+
+          where printCons pt = intercalate " | " (map (\(cons,idents) -> unwords (P.runProperName cons : map prettyPrintType idents)) pt)
+                prettyPrintType t@(P.TypeApp _ _) = "(" ++ P.prettyPrintType t ++ ")"
+                prettyPrintType t = P.prettyPrintType t
 
 
 
