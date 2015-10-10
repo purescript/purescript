@@ -80,12 +80,12 @@ updateScope :: Ident -> Rename Ident
 updateScope i@(Ident name) | name == C.__unused = return i
 updateScope name = do
   scope <- get
-  name' <- case name `S.member` rsUsedNames scope of
-             True -> do
+  name' <- if name `S.member` rsUsedNames scope
+             then do
                let newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
                    Just newName = find (`S.notMember` rsUsedNames scope) newNames
                return newName
-             False -> return name
+             else return name
   modify $ \s -> s { rsBoundNames = M.insert name name' (rsBoundNames s)
                    , rsUsedNames  = S.insert name' (rsUsedNames s)
                    }

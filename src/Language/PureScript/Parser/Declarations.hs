@@ -176,9 +176,9 @@ parseImportDeclaration' = do
 
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
-  parseModuleRef <|> (
-  withSourceSpan PositionedDeclarationRef $
-  ValueRef <$> parseIdent
+  parseModuleRef <|>
+  withSourceSpan PositionedDeclarationRef
+  (ValueRef <$> parseIdent
     <|> do name <- properName
            dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
            return $ maybe (TypeClassRef name) (TypeRef name) dctors
@@ -204,8 +204,8 @@ parseTypeClassDeclaration = do
     mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
 
-parseTypeInstanceDeclaration :: TokenParser Declaration
-parseTypeInstanceDeclaration = do
+parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
+parseInstanceDeclaration = do
   reserved "instance"
   name <- parseIdent <* indented <* doubleColon
   deps <- P.optionMaybe $ do
@@ -215,24 +215,21 @@ parseTypeInstanceDeclaration = do
     return deps
   className <- indented *> parseQualified properName
   ty <- P.many (indented *> noWildcards parseTypeAtom)
+  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
+
+parseTypeInstanceDeclaration :: TokenParser Declaration
+parseTypeInstanceDeclaration = do
+  instanceDecl <- parseInstanceDeclaration
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty (ExplicitInstance members)
+  return $ instanceDecl (ExplicitInstance members)
 
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
-  reserved "instance"
-  name <- parseIdent <* indented <* doubleColon
-  deps <- P.optionMaybe $ do
-    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-    indented
-    rfatArrow
-    return deps
-  className <- indented *> parseQualified properName
-  ty <- P.many (indented *> noWildcards parseTypeAtom)
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty DerivedInstance
+  instanceDecl <- parseInstanceDeclaration
+  return $ instanceDecl DerivedInstance
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration

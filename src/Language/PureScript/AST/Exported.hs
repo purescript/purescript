@@ -66,7 +66,7 @@ filterInstances (Just exps) =
   --  * the name is defined in a different module (and must be exported from
   --    that module; the code would fail to compile otherwise).
   visibleOutside _ (Qualified (Just _) _) = True
-  visibleOutside refs (Qualified Nothing n) = any (== n) refs
+  visibleOutside refs (Qualified Nothing n) = n `elem` refs
 
   typeName (TypeRef n _) = Just n
   typeName (PositionedDeclarationRef _ _ r) = typeName r

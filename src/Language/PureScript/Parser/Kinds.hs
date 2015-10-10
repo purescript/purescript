@@ -46,4 +46,4 @@ parseKind :: TokenParser Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
   operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
-              , [ P.Infix ((P.try rarrow) >> return FunKind) P.AssocRight ] ]
+              , [ P.Infix (P.try rarrow >> return FunKind) P.AssocRight ] ]

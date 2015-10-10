@@ -124,5 +124,5 @@ tco' = everywhereOnJS convert
   hasFunction :: JS -> Bool 
   hasFunction = getAny . everythingOnJS mappend (Any . isFunction)
     where
-    isFunction (JSFunction _ _ _) = True
+    isFunction JSFunction{} = True
     isFunction _ = False

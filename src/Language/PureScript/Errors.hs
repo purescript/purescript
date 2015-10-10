@@ -20,7 +20,7 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose)
+import Data.List (intercalate, transpose, nub)
 import Data.Function (on)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (fold, foldMap)
@@ -52,7 +52,6 @@ import qualified Text.PrettyPrint.Boxes as Box
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
 import Text.Parsec.Error (Message(..))
-import Data.List (nub)
 
 -- |
 -- A type of error messages
@@ -366,33 +365,33 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f = g
   where
-    gSimple (InfiniteType t) = InfiniteType <$> (f t)
-    gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> (f t1) <*> (f t2)
-    gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> (f t1) <*> (f t2)
-    gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> (f t)
-    gSimple (PropertyIsMissing s t) = PropertyIsMissing s <$> (f t)
-    gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> (pure e)
+    gSimple (InfiniteType t) = InfiniteType <$> f t
+    gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+    gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
+    gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
+    gSimple (PropertyIsMissing s t) = PropertyIsMissing s <$> f t
+    gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
     gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
     gSimple other = pure other
-    g (ErrorInSubsumption t1 t2 em) = ErrorInSubsumption <$> (f t1) <*> (f t2) <*> (g em)
-    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> (f t1) <*> (f t2) <*> (g e)
-    g (ErrorCheckingType e t em) = ErrorCheckingType e <$> (f t) <*> (g em)
-    g (ErrorCheckingKind t em) = ErrorCheckingKind <$> (f t) <*> g em
-    g (ErrorInApplication e1 t1 e2 em) = ErrorInApplication e1 <$> (f t1) <*> (pure e2) <*> (g em)
-    g (NotYetDefined x e) = NotYetDefined x <$> (g e)
-    g (ErrorInExpression x e) = ErrorInExpression x <$> (g e)
-    g (ErrorInModule x e) = ErrorInModule x <$> (g e)
-    g (ErrorInInstance x y e) = ErrorInInstance x y <$> (g e)
-    g (ErrorInferringType x e) = ErrorInferringType x <$> (g e)
-    g (ErrorInDataConstructor x e) = ErrorInDataConstructor x <$> (g e)
-    g (ErrorInTypeConstructor x e) = ErrorInTypeConstructor x <$> (g e)
-    g (ErrorInBindingGroup x e) = ErrorInBindingGroup x <$> (g e)
-    g (ErrorInDataBindingGroup e) = ErrorInDataBindingGroup <$> (g e)
-    g (ErrorInTypeSynonym x e) = ErrorInTypeSynonym x <$> (g e)
-    g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> (g e)
-    g (ErrorInTypeDeclaration x e) = ErrorInTypeDeclaration x <$> (g e)
-    g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> (g e)
-    g (PositionedError x e) = PositionedError x <$> (g e)
+    g (ErrorInSubsumption t1 t2 em) = ErrorInSubsumption <$> f t1 <*> f t2 <*> g em
+    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> f t1 <*> f t2 <*> g e
+    g (ErrorCheckingType e t em) = ErrorCheckingType e <$> f t <*> g em
+    g (ErrorCheckingKind t em) = ErrorCheckingKind <$> f t <*> g em
+    g (ErrorInApplication e1 t1 e2 em) = ErrorInApplication e1 <$> f t1 <*> pure e2 <*> g em
+    g (NotYetDefined x e) = NotYetDefined x <$> g e
+    g (ErrorInExpression x e) = ErrorInExpression x <$> g e
+    g (ErrorInModule x e) = ErrorInModule x <$> g e
+    g (ErrorInInstance x y e) = ErrorInInstance x y <$> g e
+    g (ErrorInferringType x e) = ErrorInferringType x <$> g e
+    g (ErrorInDataConstructor x e) = ErrorInDataConstructor x <$> g e
+    g (ErrorInTypeConstructor x e) = ErrorInTypeConstructor x <$> g e
+    g (ErrorInBindingGroup x e) = ErrorInBindingGroup x <$> g e
+    g (ErrorInDataBindingGroup e) = ErrorInDataBindingGroup <$> g e
+    g (ErrorInTypeSynonym x e) = ErrorInTypeSynonym x <$> g e
+    g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> g e
+    g (ErrorInTypeDeclaration x e) = ErrorInTypeDeclaration x <$> g e
+    g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> g e
+    g (PositionedError x e) = PositionedError x <$> g e
     g (SimpleErrorWrapper sem) = SimpleErrorWrapper <$> gSimple sem
 
 -- |
@@ -738,7 +737,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , go err
             ]
     go (ErrorInDataBindingGroup err) =
-      paras [ lineWithLevel $ "in data binding group:"
+      paras [ lineWithLevel "in data binding group:"
             , go err
             ]
     go (ErrorInTypeSynonym name err) =
@@ -857,7 +856,7 @@ prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
                       , result
                       ]
 prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
-  result <- forM es $ (liftM $ Box.moveRight 2) . prettyPrintSingleError full level
+  result <- forM es $ liftM (Box.moveRight 2) . prettyPrintSingleError full level
   return $
     Box.vcat Box.left [ Box.text intro
                       , Box.vsep 1 Box.left result
@@ -865,7 +864,7 @@ prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
 
 -- | Pretty print a Parsec ParseError as a Box
 prettyPrintParseError :: P.ParseError -> Box.Box
-prettyPrintParseError = (prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input") . PE.errorMessages
+prettyPrintParseError = prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" . PE.errorMessages
 
 -- |
 -- Pretty print ParseError detail messages.
@@ -878,9 +877,9 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
   | otherwise = Box.vcat Box.left $ map Box.text $ clean [showSysUnExpect,showUnExpect,showExpect,showMessages]
 
   where
-  (sysUnExpect,msgs1) = span ((SysUnExpect "") ==) msgs
-  (unExpect,msgs2)    = span ((UnExpect    "") ==) msgs1
-  (expect,messages)   = span ((Expect      "") ==) msgs2
+  (sysUnExpect,msgs1) = span (SysUnExpect "" ==) msgs
+  (unExpect,msgs2)    = span (UnExpect    "" ==) msgs1
+  (expect,messages)   = span (Expect      "" ==) msgs2
 
   showExpect      = showMany msgExpecting expect
   showUnExpect    = showMany msgUnExpected unExpect
@@ -928,7 +927,7 @@ renderBox = unlines . map trimEnd . lines . Box.render
 interpretMultipleErrorsAndWarnings :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => (Either MultipleErrors a, MultipleErrors) -> m a
 interpretMultipleErrorsAndWarnings (err, ws) = do
   tell ws
-  either throwError return $ err
+  either throwError return err
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
