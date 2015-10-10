@@ -399,7 +399,7 @@ binderRequiresMonotype _ = True
 
 -- | Instantiate polytypes only when necessitated by a binder.
 instantiateForBinders :: [Expr] -> [CaseAlternative] -> UnifyT Type Check ([Expr], [Type])
-instantiateForBinders vals cas = fmap unzip $ zipWithM (\val inst -> do
+instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
   TypedValue _ val' ty <- infer val
   if inst
     then instantiatePolyTypeWithUnknowns val' ty

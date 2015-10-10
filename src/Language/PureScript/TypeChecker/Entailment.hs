@@ -13,7 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Entailment (

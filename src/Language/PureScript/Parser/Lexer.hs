@@ -479,7 +479,7 @@ identifier = token go P.<?> "identifier"
   go _ = Nothing
 
 validModuleName :: String -> Bool
-validModuleName s = not ('_' `elem` s)
+validModuleName s = '_' `notElem` s
 
 -- |
 -- A list of purescript reserved identifiers

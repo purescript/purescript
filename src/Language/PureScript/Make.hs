@@ -52,7 +52,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 
 import Control.Concurrent.Lifted as C
 
-import Data.List (foldl')
+import Data.List (foldl', sort)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Time.Clock
 import Data.String (fromString)
@@ -159,6 +159,8 @@ make :: forall m. (Functor m, Applicative m, Monad m, MonadBaseControl IO m, Mon
      -> [Module]
      -> m Environment
 make MakeActions{..} ms = do
+  checkModuleNamesAreUnique
+
   (sorted, graph) <- sortModules ms
 
   barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
@@ -178,12 +180,32 @@ make MakeActions{..} ms = do
   return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment (fromMaybe (error "make: externs were missing but no errors reported.") externs)
 
   where
+  checkModuleNamesAreUnique :: m ()
+  checkModuleNamesAreUnique =
+    case findDuplicate (map getModuleName ms) of
+      Nothing -> return ()
+      Just mn -> throwError . errorMessage $ DuplicateModuleName mn
+
+  -- Verify that a list of values has unique keys
+  findDuplicate :: (Ord a) => [a] -> Maybe a
+  findDuplicate = go . sort
+    where
+    go (x : y : xs)
+      | x == y = Just x
+      | otherwise = go (y : xs)
+    go _ = Nothing
+
   -- Sort a list so its elements appear in the same order as in another list.
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
   buildModule :: [(ModuleName, (C.MVar (Maybe ExternsFile), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
   buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
+    -- We need to wait for dependencies to be built, before checking if the current
+    -- module should be rebuilt, so the first thing to do is to wait on the
+    -- MVars for the module's dependencies.
+    mexterns <- sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
+
     outputTimestamp <- getOutputTimestamp moduleName
     dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
     inputTimestamp <- getInputTimestamp moduleName
@@ -194,29 +216,31 @@ make MakeActions{..} ms = do
                           (Left RebuildNever, _, Just _) -> False
                           _ -> True
 
-    exts <- if shouldRebuild
-              then do
-                mexterns <- sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
+    let rebuild =
+          case mexterns of
+            Just externs -> do
+              progress $ CompilingModule moduleName
+              let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+              lint m
+              ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
+              (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
+              checkExhaustiveModule env' checked
+              regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+              let mod' = Module ss coms moduleName regrouped exps
+                  corefn = CF.moduleToCoreFn env' mod'
+                  [renamed] = renameInModules [corefn]
+                  exts = moduleToExternsFile mod' env'
+              evalSupplyT nextVar $ codegen renamed env' $ encode exts
+              markComplete (Just exts) Nothing
+            Nothing -> markComplete Nothing Nothing
 
-                for mexterns $ \externs -> do
-                  progress $ CompilingModule moduleName
-                  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-                  lint m
-                  ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
-                  (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
-                  checkExhaustiveModule env' checked
-                  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
-                  let mod' = Module ss coms moduleName regrouped exps
-                      corefn = CF.moduleToCoreFn env' mod'
-                      [renamed] = renameInModules [corefn]
-                      exts = moduleToExternsFile mod' env'
-                  evalSupplyT nextVar $ codegen renamed env' $ encode exts
-                  return exts
-              else do
-                mexts <- decodeExterns . snd <$> readExterns moduleName
-                return $ Just $ fromMaybe (error "make: externs files are out of date. Try 'rm output/*/externs.json'.") mexts
-
-    markComplete exts Nothing
+    if shouldRebuild
+      then rebuild
+      else do
+        mexts <- decodeExterns . snd <$> readExterns moduleName
+        case mexts of
+          Just exts -> markComplete (Just exts) Nothing
+          Nothing -> rebuild
     where
     markComplete :: Maybe ExternsFile -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do

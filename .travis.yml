@@ -9,8 +9,8 @@ matrix:
     - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
       compiler: ": #GHC 7.8.4 - psci-tests"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.8.4 STACKAGE=lts-22
-      compiler: ": #GHC 7.8.4 - lts-2.22"
+    - env: GHCVER=7.8.4 STACKAGE=lts-2.22
+      compiler: ": #GHC 7.8.4 - lts-2.22-1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.6.3
       compiler: ": #GHC 7.6.3"
@@ -18,11 +18,11 @@ matrix:
     - env: GHCVER=7.10.1
       compiler: ": #GHC 7.10.1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 STACKAGE=lts=3.4 RUNSDISTTESTS=YES
-      compiler: ": #GHC 7.10.2 lts-3.4"
+    - env: GHCVER=7.10.2 STACKAGE=lts=3.6 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.2 lts-3.6"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 STACKAGE=nightly-2015-08-24
-      compiler: ": #GHC 7.10.2 nightly-2015-09-09"
+    - env: GHCVER=7.10.2 STACKAGE=nightly-2015-09-29
+      compiler: ": #GHC 7.10.2 nightly-2015-09-29"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
 before_install:
   - unset CC

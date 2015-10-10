@@ -385,7 +385,7 @@ isModuleEmpty (Module _ els) = all isElementEmpty els
   where
   isElementEmpty :: ModuleElement -> Bool
   isElementEmpty (ExportsList exps) = null exps
-  isElementEmpty (Require _ _ _) = True
+  isElementEmpty Require{} = True
   isElementEmpty (Other _) = True
   isElementEmpty _ = False
 

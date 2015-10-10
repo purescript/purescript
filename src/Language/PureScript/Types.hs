@@ -22,6 +22,7 @@ module Language.PureScript.Types where
 
 import Data.Data
 import Data.List (nub)
+import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
@@ -152,10 +153,7 @@ replaceAllTypeVars = go []
   where
 
   go :: [String] -> [(String, Type)] -> Type -> Type
-  go _  m (TypeVar v) =
-    case v `lookup` m of
-      Just r -> r
-      Nothing -> TypeVar v
+  go _  m (TypeVar v) = fromMaybe (TypeVar v) (v `lookup` m)
   go bs m (TypeApp t1 t2) = TypeApp (go bs m t1) (go bs m t2)
   go bs m f@(ForAll v t sco) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
                              | v `elem` usedVars =

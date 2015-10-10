@@ -27,6 +27,7 @@ module Language.PureScript.CodeGen.JS
   ) where
 
 import Data.List ((\\), delete, intersect)
+import Data.Maybe (isNothing)
 import qualified Data.Traversable as T (traverse)
 
 #if __GLASGOW_HASKELL__ < 710
@@ -62,7 +63,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
   comments <- not <$> asks optionsNoComments
   let strict = JSStringLiteral "use strict"
   let header = if comments && not (null coms) then JSComment coms strict else strict
-  let foreign' = [JSVariableIntroduction "$foreign" foreign_ | not $ null foreigns || foreign_ == Nothing]
+  let foreign' = [JSVariableIntroduction "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
   let moduleBody = header : foreign' ++ jsImports ++ concat optimized
   let foreignExps = exps `intersect` (fst `map` foreigns)
   let standardExps = exps \\ foreignExps

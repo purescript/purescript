@@ -59,7 +59,7 @@ desugarTypeDeclarations (TypeDeclaration name ty : d : rest) = do
     (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
     return (ident, nameKind, PositionedValue pos com val)
   fromValueDeclaration _ = throwError . errorMessage $ OrphanTypeDeclaration name
-desugarTypeDeclarations (TypeDeclaration name _ : []) = throwError . errorMessage $ OrphanTypeDeclaration name
+desugarTypeDeclarations [TypeDeclaration name _] = throwError . errorMessage $ OrphanTypeDeclaration name
 desugarTypeDeclarations (ValueDeclaration name nameKind bs val : rest) = do
   let (_, f, _) = everywhereOnValuesTopDownM return go return
       f' (Left gs) = Left <$> mapM (pairM return f) gs
