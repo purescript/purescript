@@ -22,7 +22,7 @@
 module PSCi where
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort)
+import Data.List (intercalate, nub, sort, sortBy)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
 #endif
@@ -380,17 +380,29 @@ printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
 printModuleSignatures moduleName env =
   PSCI $ let namesEnv = P.names env
              moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
+             dataConstructorsEnv = P.dataConstructors env
+             moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructorsEnv
              in case moduleNamesIdent of
                   [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
-                  _ -> ( outputStrLn
-                       . unlines
-                       . sort
-                       . map (showType . findType namesEnv)) moduleNamesIdent
+                  _ -> do
+                    (outputStr   . unlines . sort . map (showType . findType namesEnv)) moduleNamesIdent
+                    (outputStrLn . unlines . map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructorsEnv)) moduleDataConstructors
+
   where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
         showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
-        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
+        showType (mIdent, Just (mType, _, _)) = P.showIdent mIdent ++ " :: " ++ P.prettyPrintType mType
         showType _ = error "The impossible happened in printModuleSignatures."
+        findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
+        findDataConstructor envDataCons name = (name, M.lookup name envDataCons)
+        compareDatatypes :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Ordering
+        compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
+        compareDatatypes _ _ = error "The impossible happened in printModuleSignatures."
+        showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
+        showDataConstructor all@(P.Qualified _ name, Just (_, _, dtType, _)) = P.runProperName name ++ " :: " ++ P.prettyPrintType dtType
+        showDataConstructor _ = error "The impossible happened in printModuleSignatures."
+
+
 
 -- |
 -- Browse a module and displays its signature (if module exists).
