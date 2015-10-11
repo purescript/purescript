@@ -39,7 +39,7 @@ import Language.PureScript.Traversals
 --
 desugarTypeDeclarationsModule :: (Functor m, Applicative m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarTypeDeclarationsModule ms = forM ms $ \(Module ss coms name ds exps) ->
-  rethrow (onErrorMessages (ErrorInModule name)) $
+  rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> desugarTypeDeclarations ds <*> pure exps
 
 -- |

@@ -103,7 +103,7 @@ typesOf mainModuleName moduleName vals = do
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
   -- Replace all the wildcards types with their inferred types
-  replace sub (SimpleErrorWrapper (WildcardInferredType ty)) = SimpleErrorWrapper $ WildcardInferredType (sub $? ty)
+  replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints $ WildcardInferredType (sub $? ty)
   replace _ em = em
   -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
   checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
@@ -214,7 +214,7 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
 infer :: Expr -> UnifyT Type Check Expr
-infer val = rethrow (onErrorMessages (ErrorInferringType val)) $ infer' val
+infer val = rethrow (addHint (ErrorInferringType val)) $ infer' val
 
 -- |
 -- Infer a type for a value
@@ -457,7 +457,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
 check :: Expr -> Type -> UnifyT Type Check Expr
-check val ty = rethrow (onErrorMessages (ErrorCheckingType val ty)) $ check' val ty
+check val ty = rethrow (addHint (ErrorCheckingType val ty)) $ check' val ty
 
 -- |
 -- Check the type of a value
@@ -646,7 +646,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = rethrow (onErrorMessages (ErrorInApplication fn fnTy arg)) $ do
+checkFunctionApplication fn fnTy arg ret = rethrow (addHint (ErrorInApplication fn fnTy arg)) $ do
   subst <- unifyCurrentSubstitution <$> UnifyT get
   checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
 

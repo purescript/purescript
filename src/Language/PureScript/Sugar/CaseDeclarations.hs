@@ -50,7 +50,7 @@ isLeft (Right _) = False
 --
 desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
-  rethrow (onErrorMessages (ErrorInModule name)) $
+  rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
 
 desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]

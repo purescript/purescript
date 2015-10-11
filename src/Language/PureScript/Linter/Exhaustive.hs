@@ -281,8 +281,8 @@ checkExhaustiveDecls env mn ds =
         where
         convert :: (Ident, NameKind, Expr) -> Declaration
         convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
-      f' d@(ValueDeclaration name _ _ _) = censor (onErrorMessages (ErrorInValueDeclaration name)) $ f d
-      f' (PositionedDeclaration pos com dec) = PositionedDeclaration pos com <$> censor (onErrorMessages (PositionedError pos)) (f' dec)
+      f' d@(ValueDeclaration name _ _ _) = censor (addHint (ErrorInValueDeclaration name)) $ f d
+      f' (PositionedDeclaration pos com dec) = PositionedDeclaration pos com <$> censor (addHint (PositionedError pos)) (f' dec)
       -- Don't generate two warnings for desugared dictionaries.
       f' d@TypeInstanceDeclaration{} = return d
       f' d = f d
@@ -297,4 +297,4 @@ checkExhaustiveDecls env mn ds =
 -- Exhaustivity checking over a single module
 --
 checkExhaustiveModule :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> Module -> m ()
-checkExhaustiveModule env (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds
+checkExhaustiveModule env (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds

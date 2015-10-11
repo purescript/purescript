@@ -63,7 +63,7 @@ instance Unifiable Check Type where
 -- Unify two types, updating the current substitution
 --
 unifyTypes :: Type -> Type -> UnifyT Type Check ()
-unifyTypes t1 t2 = rethrow (onErrorMessages (ErrorUnifyingTypes t1 t2)) $
+unifyTypes t1 t2 = rethrow (addHint (ErrorUnifyingTypes t1 t2)) $
   unifyTypes' t1 t2
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()

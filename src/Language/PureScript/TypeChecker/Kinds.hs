@@ -83,7 +83,7 @@ kindOf _ ty = fst <$> kindOfWithScopedVars ty
 --
 kindOfWithScopedVars :: Type -> Check (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
-  rethrow (onErrorMessages (ErrorCheckingKind ty)) $
+  rethrow (addHint (ErrorCheckingKind ty)) $
     fmap tidyUp . liftUnify $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (sub $? k)
@@ -161,7 +161,7 @@ starIfUnknown k = k
 -- Infer a kind for a type
 --
 infer :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
-infer ty = rethrow (onErrorMessages (ErrorCheckingKind ty)) $ infer' ty
+infer ty = rethrow (addHint (ErrorCheckingKind ty)) $ infer' ty
 
 infer' :: Type -> UnifyT Kind Check (Kind, [(String, Kind)])
 infer' (ForAll ident ty _) = do
