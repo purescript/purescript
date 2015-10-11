@@ -378,36 +378,42 @@ handleTypeOf val = do
 -- Pretty print a module's signatures
 --
 printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
-printModuleSignatures moduleName env =
-  PSCI $ let namesEnv = P.names env
-             moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
-             typesEnv = P.types env
-             typeSynonymsEnv = P.typeSynonyms env
-             moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typesEnv
-             dataConstructorsEnv = P.dataConstructors env
-             moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructorsEnv
-             in case moduleNamesIdent of
-                  [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
-                  _ -> do
-                    (outputStr   . unlines . sort . mapMaybe (showType typeSynonymsEnv . findType typesEnv)) moduleTypes
-                    (outputStr   . unlines . map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructorsEnv)) moduleDataConstructors
-                    (outputStrLn . unlines . sort . map (showNameType . findNameType namesEnv)) moduleNamesIdent
+printModuleSignatures moduleName (P.Environment {..}) =
+  PSCI $ let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
+             moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
+             moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
 
-  where findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+         in do
+           printModule's "types"             (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes
+           printModule's "data constructors" (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors
+           printModule's "functions"         (sort . map (showNameType . findNameType names)) moduleNamesIdent
+           outputStrLn ""
+
+
+  where printModule's what _  [] = outputStr $ "This module '" ++ P.runModuleName moduleName ++ "' does not export" ++ what ++ "."
+        printModule's _ showF xs = (outputStr . unlines . showF) xs
+
+        findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
         showNameType (mIdent, Just (mType, _, _)) = P.showIdent mIdent ++ " :: " ++ P.prettyPrintType mType
         showNameType _ = error "The impossible happened in printModuleSignatures."
+
         findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
         findDataConstructor envDataCons name = (name, M.lookup name envDataCons)
+
         compareDatatypes :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Ordering
         compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
         compareDatatypes _ _ = error "The impossible happened in printModuleSignatures."
+
         showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
         showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = P.runProperName name ++ " :: " ++ P.prettyPrintType dtType
         showDataConstructor _ = error "The impossible happened in printModuleSignatures."
+
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
+
         showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type) -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> Maybe String
         showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
@@ -421,6 +427,7 @@ printModuleSignatures moduleName env =
               Nothing
 
           where printCons pt = intercalate " | " (map (\(cons,idents) -> unwords (P.runProperName cons : map prettyPrintType idents)) pt)
+
                 prettyPrintType t@(P.TypeApp _ _) = "(" ++ P.prettyPrintType t ++ ")"
                 prettyPrintType t = P.prettyPrintType t
 
