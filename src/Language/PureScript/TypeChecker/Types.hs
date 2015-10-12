@@ -246,15 +246,10 @@ infer' (ObjectUpdate o ps) = do
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyObject $ rowFromList (newTys, row)
 infer' (Accessor prop val) = do
-  typed@(TypedValue _ _ objTy) <- infer val
-  propTy <- inferProperty objTy prop
-  case propTy of
-    Nothing -> do
-      field <- fresh
-      rest <- fresh
-      _ <- subsumes Nothing objTy (TypeApp tyObject (RCons prop field rest))
-      return $ TypedValue True (Accessor prop typed) field
-    Just ty -> return $ TypedValue True (Accessor prop typed) ty
+  field <- fresh
+  rest <- fresh
+  typed <- check val (TypeApp tyObject (RCons prop field rest))
+  return $ TypedValue True (Accessor prop typed) field
 infer' (Abs (Left arg) ret) = do
   ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
@@ -338,21 +333,6 @@ inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethr
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos com d' : ds', val')
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
-
--- |
--- Infer the type of a property inside a record with a given type
---
-inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
-inferProperty (TypeApp obj row) prop | obj == tyObject = do
-  let (props, _) = rowToList row
-  return $ lookup prop props
-inferProperty (SaturatedTypeSynonym name args) prop = do
-  replaced <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  inferProperty replaced prop
-inferProperty (ForAll ident ty _) prop = do
-  replaced <- replaceVarWithUnknown ident ty
-  inferProperty replaced prop
-inferProperty _ _ = return Nothing
 
 -- |
 -- Infer the types of variables brought into scope by a binder
