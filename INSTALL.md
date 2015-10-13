@@ -23,12 +23,21 @@ requirements.
 
 ## Compiling from source
 
-GHC 7.6.1 or newer is required to compile from source. The easiest way is to
-use `cabal-install`:
+GHC 7.6.1 or newer is required to compile from source. The easiest way is to 
+use stack:
 
 ```
-$ cabal update && cabal install purescript
+$ stack install purescript
 ```
+
+This will then copy the compiler and utilities into `~/.local/bin`.
+
+
+If you don't have stack installed yet there are install instructions
+[here](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
+
+If you don't have ghc installed yet, stack will prompt you to run `stack setup`
+which will install ghc for you.
 
 The PureScript compiler has been known to run on OS X 10.6 when built with GHC
 7.6.
