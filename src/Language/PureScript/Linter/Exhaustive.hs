@@ -46,8 +46,6 @@ import Language.PureScript.Kinds
 import Language.PureScript.Types as P
 import Language.PureScript.Errors
 
-import Language.PureScript.AST.Traversals (everywhereOnValuesTopDownM)
-
 -- | There are two modes of failure for the redudancy check:
 --
 -- 1. Exhaustivity was incomeplete due to too many cases, so we couldn't determine redundancy.
@@ -273,25 +271,36 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
 -- Exhaustivity checking over a list of declarations
 --
 checkExhaustiveDecls :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> ModuleName -> [Declaration] -> m ()
-checkExhaustiveDecls env mn ds =
-  let (f, _, _) = everywhereOnValuesTopDownM return checkExpr return
-
-      f' :: Declaration -> m Declaration
-      f' d@(BindingGroupDeclaration bs) = mapM_ (f' . convert) bs >> return d
-        where
-        convert :: (Ident, NameKind, Expr) -> Declaration
-        convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
-      f' d@(ValueDeclaration name _ _ _) = censor (addHint (ErrorInValueDeclaration name)) $ f d
-      f' (PositionedDeclaration pos com dec) = PositionedDeclaration pos com <$> censor (addHint (PositionedError pos)) (f' dec)
-      -- Don't generate two warnings for desugared dictionaries.
-      f' d@TypeInstanceDeclaration{} = return d
-      f' d = f d
-
-  in mapM_ f' ds
+checkExhaustiveDecls env mn = mapM_ onDecl
   where
-  checkExpr :: Expr -> m Expr
-  checkExpr c@(Case expr cas)  = checkExhaustive env mn (length expr) cas >> return c
-  checkExpr other = return other
+  onDecl :: Declaration -> m ()
+  onDecl (BindingGroupDeclaration bs) = mapM_ (onDecl . convert) bs
+    where
+    convert :: (Ident, NameKind, Expr) -> Declaration
+    convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
+  onDecl (ValueDeclaration name _ _ (Right e)) = censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (PositionedDeclaration pos _ dec) = censor (addHint (PositionedError pos)) (onDecl dec)
+  onDecl _ = return ()
+
+  onExpr :: Expr -> m ()
+  onExpr (UnaryMinus e) = onExpr e
+  onExpr (ArrayLiteral es) = mapM_ onExpr es
+  onExpr (ObjectLiteral es) = mapM_ (onExpr . snd) es
+  onExpr (TypeClassDictionaryConstructorApp _ e) = onExpr e
+  onExpr (Accessor _ e) = onExpr e
+  onExpr (ObjectUpdate o es) = onExpr o >> mapM_ (onExpr . snd) es
+  onExpr (Abs _ e) = onExpr e
+  onExpr (App e1 e2) = onExpr e1 >> onExpr e2
+  onExpr (IfThenElse e1 e2 e3) = onExpr e1 >> onExpr e2 >> onExpr e3
+  onExpr (Case es cas) = checkExhaustive env mn (length es) cas >> mapM_ onExpr es >> mapM_ onCaseAlternative cas
+  onExpr (TypedValue _ e _) = onExpr e
+  onExpr (Let ds e) = mapM_ onDecl ds >> onExpr e
+  onExpr (PositionedValue pos _ e) = censor (addHint (PositionedError pos)) (onExpr e)
+  onExpr _ = return ()
+
+  onCaseAlternative :: CaseAlternative -> m ()
+  onCaseAlternative (CaseAlternative _ (Left es)) = mapM_ (\(e, g) -> onExpr e >> onExpr g) es
+  onCaseAlternative (CaseAlternative _ (Right e)) = onExpr e
 
 -- |
 -- Exhaustivity checking over a single module
