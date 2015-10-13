@@ -141,6 +141,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
+  | MissingTypeDeclaration Ident
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -279,6 +280,7 @@ errorCode em = case unwrapErrorMessage em of
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
+  MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -659,6 +661,12 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
     renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "The wildcard type definition has the inferred type "
             , indent $ typeAsBox ty
+            ]
+    renderSimpleErrorMessage (MissingTypeDeclaration ident) =
+      paras [ line $ "No type declaration was provided for the top-level declaration of " ++ showIdent ident ++ "."
+            , line "It is good practice to provide type declarations as a form of documentation."
+            , line "Consider using a type wildcard to display the inferred type:"
+            , indent $ line $ showIdent ident ++ " :: _"
             ]
     renderSimpleErrorMessage (NotExhaustivePattern bs b) =
       paras $ [ line "A case expression could not be determined to cover all inputs."
