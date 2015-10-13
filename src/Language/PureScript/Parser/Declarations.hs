@@ -293,7 +293,7 @@ parseModulesFromFiles toFilePath input = do
   collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
 
 toPositionedError :: P.ParseError -> ErrorMessage
-toPositionedError perr = PositionedError (SourceSpan name start end) (SimpleErrorWrapper (ErrorParsingModule perr))
+toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
   name   = (P.sourceName . P.errorPos) perr
   start  = (toSourcePos  . P.errorPos) perr

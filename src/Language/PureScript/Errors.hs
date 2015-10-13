@@ -20,10 +20,11 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub)
+import Data.List (intercalate, transpose, nub, nubBy, partition)
 import Data.Function (on)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (fold, foldMap)
+import Data.Traversable (traverse)
 #else
 import Data.Foldable (fold)
 #endif
@@ -53,9 +54,7 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
 import Text.Parsec.Error (Message(..))
 
--- |
--- A type of error messages
---
+-- | A type of error messages
 data SimpleErrorMessage
   = ErrorParsingExterns P.ParseError
   | ErrorParsingFFIModule FilePath
@@ -142,45 +141,54 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
+  | MissingTypeDeclaration Ident
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
   | ClassOperator ProperName Ident
   | MisleadingEmptyTypeImport ModuleName ProperName
   | ImportHidingModule ModuleName
-  deriving (Show)
+  deriving Show
 
--- |
--- Wrapper of simpler errors
---
-data ErrorMessage
-  = NotYetDefined [Ident] ErrorMessage
-  | ErrorUnifyingTypes Type Type ErrorMessage
-  | ErrorInExpression Expr ErrorMessage
-  | ErrorInModule ModuleName ErrorMessage
-  | ErrorInInstance (Qualified ProperName) [Type] ErrorMessage
-  | ErrorInSubsumption Type Type ErrorMessage
-  | ErrorCheckingType Expr Type ErrorMessage
-  | ErrorCheckingKind Type ErrorMessage
-  | ErrorInferringType Expr ErrorMessage
-  | ErrorInApplication Expr Type Expr ErrorMessage
-  | ErrorInDataConstructor ProperName ErrorMessage
-  | ErrorInTypeConstructor ProperName ErrorMessage
-  | ErrorInBindingGroup [Ident] ErrorMessage
-  | ErrorInDataBindingGroup ErrorMessage
-  | ErrorInTypeSynonym ProperName ErrorMessage
-  | ErrorInValueDeclaration Ident ErrorMessage
-  | ErrorInTypeDeclaration Ident ErrorMessage
-  | ErrorInForeignImport Ident ErrorMessage
-  | PositionedError SourceSpan ErrorMessage
-  | SimpleErrorWrapper SimpleErrorMessage
-  deriving (Show)
+-- | Error message hints, providing more detailed information about failure.
+data ErrorMessageHint
+  = NotYetDefined [Ident]
+  | ErrorUnifyingTypes Type Type
+  | ErrorInExpression Expr
+  | ErrorInModule ModuleName
+  | ErrorInInstance (Qualified ProperName) [Type]
+  | ErrorInSubsumption Type Type
+  | ErrorCheckingType Expr Type
+  | ErrorCheckingKind Type
+  | ErrorInferringType Expr
+  | ErrorInApplication Expr Type Expr
+  | ErrorInDataConstructor ProperName
+  | ErrorInTypeConstructor ProperName
+  | ErrorInBindingGroup [Ident]
+  | ErrorInDataBindingGroup
+  | ErrorInTypeSynonym ProperName
+  | ErrorInValueDeclaration Ident
+  | ErrorInTypeDeclaration Ident
+  | ErrorInForeignImport Ident
+  | PositionedError SourceSpan
+  deriving Show
+
+-- | Categories of hints
+data HintCategory
+  = ExprHint
+  | KindHint
+  | CheckHint
+  | PositionHint
+  | OtherHint
+  deriving (Show, Eq)
+
+data ErrorMessage = ErrorMessage [ErrorMessageHint] SimpleErrorMessage deriving (Show)
 
 instance UnificationError Type ErrorMessage where
-  occursCheckFailed t = SimpleErrorWrapper $ InfiniteType t
+  occursCheckFailed t = ErrorMessage [] $ InfiniteType t
 
 instance UnificationError Kind ErrorMessage where
-  occursCheckFailed k = SimpleErrorWrapper $ InfiniteKind k
+  occursCheckFailed k = ErrorMessage [] $ InfiniteKind k
 
 -- |
 -- Get the error code for a particular error type
@@ -272,6 +280,7 @@ errorCode em = case unwrapErrorMessage em of
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
+  MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -299,7 +308,7 @@ nonEmpty = not . null . runMultipleErrors
 -- Create an error set from a single simple error message
 --
 errorMessage :: SimpleErrorMessage -> MultipleErrors
-errorMessage err = MultipleErrors [SimpleErrorWrapper err]
+errorMessage err = MultipleErrors [ErrorMessage [] err]
 
 
 -- |
@@ -308,11 +317,13 @@ errorMessage err = MultipleErrors [SimpleErrorWrapper err]
 singleError :: ErrorMessage -> MultipleErrors
 singleError = MultipleErrors . pure
 
--- |
--- Lift a function on ErrorMessage to a function on MultipleErrors
---
+-- | Lift a function on ErrorMessage to a function on MultipleErrors
 onErrorMessages :: (ErrorMessage -> ErrorMessage) -> MultipleErrors -> MultipleErrors
 onErrorMessages f = MultipleErrors . map f . runMultipleErrors
+
+-- | Add a hint to an error message
+addHint :: ErrorMessageHint -> MultipleErrors -> MultipleErrors
+addHint hint = onErrorMessages $ \(ErrorMessage hints se) -> ErrorMessage (hint : hints) se
 
 -- | The various types of things which might need to be relabelled in errors messages.
 data LabelType = TypeLabel | SkolemLabel String deriving (Show, Read, Eq, Ord)
@@ -327,27 +338,7 @@ data Level = Error | Warning deriving Show
 -- Extract nested error messages from wrapper errors
 --
 unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
-unwrapErrorMessage em = case em of
-  (ErrorCheckingKind _ err)       -> unwrapErrorMessage err
-  (ErrorCheckingType _ _ err)     -> unwrapErrorMessage err
-  (ErrorInApplication _ _ _ err)  -> unwrapErrorMessage err
-  (ErrorInBindingGroup _ err)     -> unwrapErrorMessage err
-  (ErrorInDataBindingGroup err)   -> unwrapErrorMessage err
-  (ErrorInDataConstructor _ err)  -> unwrapErrorMessage err
-  (ErrorInExpression _ err)       -> unwrapErrorMessage err
-  (ErrorInForeignImport _ err)    -> unwrapErrorMessage err
-  (ErrorInInstance _ _ err)       -> unwrapErrorMessage err
-  (ErrorInModule _ err)           -> unwrapErrorMessage err
-  (ErrorInSubsumption _ _ err)    -> unwrapErrorMessage err
-  (ErrorInTypeConstructor _ err)  -> unwrapErrorMessage err
-  (ErrorInTypeSynonym _ err)      -> unwrapErrorMessage err
-  (ErrorInValueDeclaration _ err) -> unwrapErrorMessage err
-  (ErrorInTypeDeclaration _ err)  -> unwrapErrorMessage err
-  (ErrorInferringType _ err)      -> unwrapErrorMessage err
-  (ErrorUnifyingTypes _ _ err)    -> unwrapErrorMessage err
-  (NotYetDefined _ err)           -> unwrapErrorMessage err
-  (PositionedError _ err)         -> unwrapErrorMessage err
-  (SimpleErrorWrapper sem)        -> sem
+unwrapErrorMessage (ErrorMessage _ se) = se
 
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes
@@ -363,7 +354,7 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
   replaceTypes other = return other
 
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
-onTypesInErrorMessageM f = g
+onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
     gSimple (InfiniteType t) = InfiniteType <$> f t
     gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
@@ -373,204 +364,191 @@ onTypesInErrorMessageM f = g
     gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
     gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
     gSimple other = pure other
-    g (ErrorInSubsumption t1 t2 em) = ErrorInSubsumption <$> f t1 <*> f t2 <*> g em
-    g (ErrorUnifyingTypes t1 t2 e) = ErrorUnifyingTypes <$> f t1 <*> f t2 <*> g e
-    g (ErrorCheckingType e t em) = ErrorCheckingType e <$> f t <*> g em
-    g (ErrorCheckingKind t em) = ErrorCheckingKind <$> f t <*> g em
-    g (ErrorInApplication e1 t1 e2 em) = ErrorInApplication e1 <$> f t1 <*> pure e2 <*> g em
-    g (NotYetDefined x e) = NotYetDefined x <$> g e
-    g (ErrorInExpression x e) = ErrorInExpression x <$> g e
-    g (ErrorInModule x e) = ErrorInModule x <$> g e
-    g (ErrorInInstance x y e) = ErrorInInstance x y <$> g e
-    g (ErrorInferringType x e) = ErrorInferringType x <$> g e
-    g (ErrorInDataConstructor x e) = ErrorInDataConstructor x <$> g e
-    g (ErrorInTypeConstructor x e) = ErrorInTypeConstructor x <$> g e
-    g (ErrorInBindingGroup x e) = ErrorInBindingGroup x <$> g e
-    g (ErrorInDataBindingGroup e) = ErrorInDataBindingGroup <$> g e
-    g (ErrorInTypeSynonym x e) = ErrorInTypeSynonym x <$> g e
-    g (ErrorInValueDeclaration x e) = ErrorInValueDeclaration x <$> g e
-    g (ErrorInTypeDeclaration x e) = ErrorInTypeDeclaration x <$> g e
-    g (ErrorInForeignImport x e) = ErrorInForeignImport x <$> g e
-    g (PositionedError x e) = PositionedError x <$> g e
-    g (SimpleErrorWrapper sem) = SimpleErrorWrapper <$> gSimple sem
+    gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
+    gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
+    gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
+    gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
+    gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
+    gHint other = pure other
 
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
 prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State UnknownMap Box.Box
-prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFirst . reverseHints <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
  where
-  -- |
+
   -- Pretty print an ErrorMessage
-  --
   prettyPrintErrorMessage :: ErrorMessage -> Box.Box
-  prettyPrintErrorMessage em =
+  prettyPrintErrorMessage (ErrorMessage hints simple) =
     paras $
-      go em:suggestions em ++
+      map renderHint hints ++
+      renderSimpleErrorMessage simple :
+      suggestions simple ++
       [line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this " ++ levelText ++ "."]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
 
-    go :: ErrorMessage -> Box.Box
-    goSimple (CannotGetFileInfo path) =
+    renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
+    renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
             , indent . line $ path
             ]
-    goSimple (CannotReadFile path) =
+    renderSimpleErrorMessage (CannotReadFile path) =
       paras [ line "Unable to read file: "
             , indent . line $ path
             ]
-    goSimple (CannotWriteFile path) =
+    renderSimpleErrorMessage (CannotWriteFile path) =
       paras [ line "Unable to write file: "
             , indent . line $ path
             ]
-    goSimple (ErrorParsingExterns err) =
+    renderSimpleErrorMessage (ErrorParsingExterns err) =
       paras [ lineWithLevel "parsing externs files: "
             , prettyPrintParseError err
             ]
-    goSimple (ErrorParsingFFIModule path) =
+    renderSimpleErrorMessage (ErrorParsingFFIModule path) =
       paras [ line "Unable to parse module from FFI file: "
             , indent . line $ path
             ]
-    goSimple (ErrorParsingModule err) =
+    renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
             ]
-    goSimple (MissingFFIModule mn) =
+    renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "Missing FFI implementations for module " ++ runModuleName mn
-    goSimple (UnnecessaryFFIModule mn path) =
+    renderSimpleErrorMessage (UnnecessaryFFIModule mn path) =
       paras [ line $ "Unnecessary FFI implementations have been provided for module " ++ runModuleName mn ++ ": "
             , indent . line $ path
             ]
-    goSimple (MultipleFFIModules mn paths) =
+    renderSimpleErrorMessage (MultipleFFIModules mn paths) =
       paras [ line $ "Multiple FFI implementations have been provided for module " ++ runModuleName mn ++ ": "
             , indent . paras $ map line paths
             ]
-    goSimple (InvalidExternsFile path) =
+    renderSimpleErrorMessage (InvalidExternsFile path) =
       paras [ line "Externs file is invalid: "
             , indent . line $ path
             ]
-    goSimple InvalidDoBind =
+    renderSimpleErrorMessage InvalidDoBind =
       line "Bind statement cannot be the last statement in a do block. The last statement must be an expression."
-    goSimple InvalidDoLet =
+    renderSimpleErrorMessage InvalidDoLet =
       line "Let statement cannot be the last statement in a do block. The last statement must be an expression."
-    goSimple CannotReorderOperators =
+    renderSimpleErrorMessage CannotReorderOperators =
       line "Unable to reorder operators"
-    goSimple UnspecifiedSkolemScope =
+    renderSimpleErrorMessage UnspecifiedSkolemScope =
       line "Skolem variable scope is unspecified"
-    goSimple OverlappingNamesInLet =
+    renderSimpleErrorMessage OverlappingNamesInLet =
       line "Overlapping names in let binding."
-    goSimple (InfiniteType ty) =
+    renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , indent $ typeAsBox ty
             ]
-    goSimple (InfiniteKind ki) =
+    renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
             , indent $ kindAsBox ki
             ]
-    goSimple (MultipleFixities name) =
+    renderSimpleErrorMessage (MultipleFixities name) =
       line $ "Multiple fixity declarations for " ++ showIdent name
-    goSimple (OrphanTypeDeclaration nm) =
+    renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "Orphan type declaration for " ++ showIdent nm
-    goSimple (OrphanFixityDeclaration op) =
+    renderSimpleErrorMessage (OrphanFixityDeclaration op) =
       line $ "Orphan fixity declaration for " ++ show op
-    goSimple (RedefinedModule name filenames) =
+    renderSimpleErrorMessage (RedefinedModule name filenames) =
       paras [ line ("Module " ++ runModuleName name ++ " has been defined multiple times:")
             , indent . paras $ map (line . displaySourceSpan) filenames
             ]
-    goSimple (RedefinedIdent name) =
+    renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "Name " ++ showIdent name ++ " has been defined multiple times"
-    goSimple (UnknownModule mn) =
+    renderSimpleErrorMessage (UnknownModule mn) =
       line $ "Unknown module " ++ runModuleName mn
-    goSimple (UnknownType name) =
+    renderSimpleErrorMessage (UnknownType name) =
       line $ "Unknown type " ++ showQualified runProperName name
-    goSimple (UnknownTypeClass name) =
+    renderSimpleErrorMessage (UnknownTypeClass name) =
       line $ "Unknown type class " ++ showQualified runProperName name
-    goSimple (UnknownValue name) =
+    renderSimpleErrorMessage (UnknownValue name) =
       line $ "Unknown value " ++ showQualified showIdent name
-    goSimple (UnknownTypeConstructor name) =
+    renderSimpleErrorMessage (UnknownTypeConstructor name) =
       line $ "Unknown type constructor " ++ showQualified runProperName name
-    goSimple (UnknownDataConstructor dc tc) =
+    renderSimpleErrorMessage (UnknownDataConstructor dc tc) =
       line $ "Unknown data constructor " ++ showQualified runProperName dc ++ foldMap ((" for type constructor " ++) . showQualified runProperName) tc
-    goSimple (UnknownImportType mn name) =
+    renderSimpleErrorMessage (UnknownImportType mn name) =
       line $ "Module " ++ runModuleName mn ++ " does not export type " ++ runProperName name
-    goSimple (UnknownExportType name) =
+    renderSimpleErrorMessage (UnknownExportType name) =
       line $ "Cannot export unknown type " ++ runProperName name
-    goSimple (UnknownImportTypeClass mn name) =
+    renderSimpleErrorMessage (UnknownImportTypeClass mn name) =
       line $ "Module " ++ runModuleName mn ++ " does not export type class " ++ runProperName name
-    goSimple (UnknownExportTypeClass name) =
+    renderSimpleErrorMessage (UnknownExportTypeClass name) =
       line $ "Cannot export unknown type class " ++ runProperName name
-    goSimple (UnknownImportValue mn name) =
+    renderSimpleErrorMessage (UnknownImportValue mn name) =
       line $ "Module " ++ runModuleName mn ++ " does not export value " ++ showIdent name
-    goSimple (UnknownExportValue name) =
+    renderSimpleErrorMessage (UnknownExportValue name) =
       line $ "Cannot export unknown value " ++ showIdent name
-    goSimple (UnknownExportModule name) =
+    renderSimpleErrorMessage (UnknownExportModule name) =
       line $ "Cannot export unknown module " ++ runModuleName name ++ ", it either does not exist or has not been imported by the current module"
-    goSimple (UnknownImportDataConstructor mn tcon dcon) =
+    renderSimpleErrorMessage (UnknownImportDataConstructor mn tcon dcon) =
       line $ "Module " ++ runModuleName mn ++ " does not export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon
-    goSimple (UnknownExportDataConstructor tcon dcon) =
+    renderSimpleErrorMessage (UnknownExportDataConstructor tcon dcon) =
       line $ "Cannot export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon ++ " as it has not been declared"
-    goSimple (ConflictingImport nm mn) =
+    renderSimpleErrorMessage (ConflictingImport nm mn) =
       line $ "Cannot declare " ++ show nm ++ " since another declaration of that name was imported from " ++ runModuleName mn
-    goSimple (ConflictingImports nm m1 m2) =
+    renderSimpleErrorMessage (ConflictingImports nm m1 m2) =
       line $ "Conflicting imports for " ++ nm ++ " from modules " ++ runModuleName m1 ++ " and " ++ runModuleName m2
-    goSimple (ConflictingTypeDecls nm) =
+    renderSimpleErrorMessage (ConflictingTypeDecls nm) =
       line $ "Conflicting type declarations for " ++ runProperName nm
-    goSimple (ConflictingCtorDecls nm) =
+    renderSimpleErrorMessage (ConflictingCtorDecls nm) =
       line $ "Conflicting data constructor declarations for " ++ runProperName nm
-    goSimple (TypeConflictsWithClass nm) =
+    renderSimpleErrorMessage (TypeConflictsWithClass nm) =
       line $ "Type " ++ runProperName nm ++ " conflicts with type class declaration of the same name"
-    goSimple (CtorConflictsWithClass nm) =
+    renderSimpleErrorMessage (CtorConflictsWithClass nm) =
       line $ "Data constructor " ++ runProperName nm ++ " conflicts with type class declaration of the same name"
-    goSimple (ClassConflictsWithType nm) =
+    renderSimpleErrorMessage (ClassConflictsWithType nm) =
       line $ "Type class " ++ runProperName nm ++ " conflicts with type declaration of the same name"
-    goSimple (ClassConflictsWithCtor nm) =
+    renderSimpleErrorMessage (ClassConflictsWithCtor nm) =
       line $ "Type class " ++ runProperName nm ++ " conflicts with data constructor declaration of the same name"
-    goSimple (DuplicateClassExport nm) =
+    renderSimpleErrorMessage (DuplicateClassExport nm) =
       line $ "Duplicate export declaration for type class " ++ runProperName nm
-    goSimple (DuplicateValueExport nm) =
+    renderSimpleErrorMessage (DuplicateValueExport nm) =
       line $ "Duplicate export declaration for value " ++ showIdent nm
-    goSimple (CycleInDeclaration nm) =
+    renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "Cycle in declaration of " ++ showIdent nm
-    goSimple (CycleInModules mns) =
+    renderSimpleErrorMessage (CycleInModules mns) =
       line $ "Cycle in module dependencies: " ++ intercalate ", " (map runModuleName mns)
-    goSimple (CycleInTypeSynonym pn) =
+    renderSimpleErrorMessage (CycleInTypeSynonym pn) =
       line $ "Cycle in type synonym" ++ foldMap ((" " ++) . runProperName) pn
-    goSimple (NameIsUndefined ident) =
+    renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ showIdent ident ++ " is undefined"
-    goSimple (NameNotInScope ident) =
+    renderSimpleErrorMessage (NameNotInScope ident) =
       line $ showIdent ident ++ " may not be defined in the current scope"
-    goSimple (UndefinedTypeVariable name) =
+    renderSimpleErrorMessage (UndefinedTypeVariable name) =
       line $ "Type variable " ++ runProperName name ++ " is undefined"
-    goSimple (PartiallyAppliedSynonym name) =
+    renderSimpleErrorMessage (PartiallyAppliedSynonym name) =
       paras [ line $ "Partially applied type synonym " ++ showQualified runProperName name
             , line "Type synonyms must be applied to all of their type arguments."
             ]
-    goSimple (EscapedSkolem binding) =
+    renderSimpleErrorMessage (EscapedSkolem binding) =
       paras $ [ line "A type variable has escaped its scope." ]
                      <> foldMap (\expr -> [ line "Relevant expression: "
                                           , indent $ prettyPrintValue expr
                                           ]) binding
-    goSimple (TypesDoNotUnify t1 t2)
+    renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
       = paras [ line "Cannot unify type"
               , indent $ typeAsBox t1
               , line "with type"
               , indent $ typeAsBox t2
               ]
-    goSimple (KindsDoNotUnify k1 k2) =
+    renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Cannot unify kind"
             , indent $ kindAsBox k1
             , line "with kind"
             , indent $ kindAsBox k2
             ]
-    goSimple (ConstrainedTypeUnified t1 t2) =
+    renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Cannot unify constrained type"
             , indent $ typeAsBox t1
             , line "with type"
             , indent $ typeAsBox t2
             ]
-    goSimple (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
       paras [ line "Overlapping instances found for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
@@ -578,46 +556,46 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "The following instances were found:"
             , indent $ paras (line (showQualified showIdent d ++ " (chosen)") : map (line . showQualified showIdent) ds)
             ]
-    goSimple OverlappingInstances{} = error "OverlappingInstances: empty instance list"
-    goSimple (NoInstanceFound nm ts) =
+    renderSimpleErrorMessage OverlappingInstances{} = error "OverlappingInstances: empty instance list"
+    renderSimpleErrorMessage (NoInstanceFound nm ts) =
       paras [ line "No instance found for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             ]
-    goSimple (PossiblyInfiniteInstance nm ts) =
+    renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Instance for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             , line "is possibly infinite."
             ]
-    goSimple (CannotDerive nm ts) =
+    renderSimpleErrorMessage (CannotDerive nm ts) =
       paras [ line "Cannot derive an instance for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             ]
-    goSimple (CannotFindDerivingType nm) =
+    renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive instance, because the type declaration for " ++ runProperName nm ++ " could not be found."
-    goSimple (DuplicateLabel l expr) =
+    renderSimpleErrorMessage (DuplicateLabel l expr) =
       paras $ [ line $ "Duplicate label " ++ show l ++ " in row." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , indent $ prettyPrintValue expr'
                                              ]) expr
-    goSimple (DuplicateTypeArgument name) =
+    renderSimpleErrorMessage (DuplicateTypeArgument name) =
       line $ "Duplicate type argument " ++ show name
-    goSimple (DuplicateValueDeclaration nm) =
+    renderSimpleErrorMessage (DuplicateValueDeclaration nm) =
       line $ "Duplicate value declaration for " ++ showIdent nm
-    goSimple (ArgListLengthsDiffer ident) =
+    renderSimpleErrorMessage (ArgListLengthsDiffer ident) =
       line $ "Argument list lengths differ in declaration " ++ showIdent ident
-    goSimple (OverlappingArgNames ident) =
+    renderSimpleErrorMessage (OverlappingArgNames ident) =
       line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . showIdent) ident
-    goSimple (MissingClassMember ident) =
+    renderSimpleErrorMessage (MissingClassMember ident) =
       line $ "Member " ++ showIdent ident ++ " has not been implemented"
-    goSimple (ExtraneousClassMember ident) =
+    renderSimpleErrorMessage (ExtraneousClassMember ident) =
       line $ "Member " ++ showIdent ident ++ " is not a member of the class being instantiated"
-    goSimple (ExpectedType ty kind) =
+    renderSimpleErrorMessage (ExpectedType ty kind) =
       paras [ line "In a type-annotated expression x :: t, the type t must have kind *."
             , line "The error arises from the type"
             , indent $ typeAsBox ty
@@ -625,29 +603,29 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , indent $ kindAsBox kind
             , line "instead."
             ]
-    goSimple (IncorrectConstructorArity nm) =
+    renderSimpleErrorMessage (IncorrectConstructorArity nm) =
       line $ "Wrong number of arguments to constructor " ++ showQualified runProperName nm
-    goSimple SubsumptionCheckFailed = line "Unable to check type subsumption"
-    goSimple (ExprDoesNotHaveType expr ty) =
+    renderSimpleErrorMessage SubsumptionCheckFailed = line "Unable to check type subsumption"
+    renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
             , indent $ prettyPrintValue expr
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
-    goSimple (PropertyIsMissing prop row) =
+    renderSimpleErrorMessage (PropertyIsMissing prop row) =
       paras [ line "Row"
             , indent $ prettyPrintRowWith '(' ')' row
             , line $ "lacks required property " ++ show prop
             ]
-    goSimple (CannotApplyFunction fn arg) =
+    renderSimpleErrorMessage (CannotApplyFunction fn arg) =
       paras [ line "Cannot apply function of type"
             , indent $ typeAsBox fn
             , line "to argument"
             , indent $ prettyPrintValue arg
             ]
-    goSimple TypeSynonymInstance =
+    renderSimpleErrorMessage TypeSynonymInstance =
       line "Type synonym instances are disallowed"
-    goSimple (OrphanInstance nm cnm ts) =
+    renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
       paras [ line $ "Instance " ++ showIdent nm ++ " for "
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName cnm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
@@ -656,146 +634,124 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "An orphan instance is an instance which is defined in neither the class module nor the data type module."
             , line "Consider moving the instance, if possible, or using a newtype wrapper."
             ]
-    goSimple InvalidNewtype =
+    renderSimpleErrorMessage InvalidNewtype =
       line "Newtypes must define a single constructor with a single argument"
-    goSimple (InvalidInstanceHead ty) =
+    renderSimpleErrorMessage (InvalidInstanceHead ty) =
       paras [ line "Invalid type in class instance head:"
             , indent $ typeAsBox ty
             ]
-    goSimple (TransitiveExportError x ys) =
+    renderSimpleErrorMessage (TransitiveExportError x ys) =
       paras $ line ("An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
               : map (line . prettyPrintExport) ys
-    goSimple (ShadowedName nm) =
+    renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name '" ++ showIdent nm ++ "' was shadowed"
-    goSimple (ShadowedTypeVar tv) =
+    renderSimpleErrorMessage (ShadowedTypeVar tv) =
       line $ "Type variable '" ++ tv ++ "' was shadowed"
-    goSimple (UnusedTypeVar tv) =
+    renderSimpleErrorMessage (UnusedTypeVar tv) =
       line $ "Type variable '" ++ tv ++ "' was declared but not used"
-    goSimple (ClassOperator className opName) =
+    renderSimpleErrorMessage (ClassOperator className opName) =
       paras [ line $ "Class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
             , line "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
             , indent . line $ showIdent opName ++ " = someMember"
             ]
-    goSimple (MisleadingEmptyTypeImport mn name) =
+    renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " ++ runProperName name ++ "(..) from " ++ runModuleName mn ++ " is misleading as it has no exported data constructors"
-    goSimple (ImportHidingModule name) =
+    renderSimpleErrorMessage (ImportHidingModule name) =
       line $ "Attempted to hide module " ++ runModuleName name ++ " in import expression, this is not permitted"
-    goSimple (WildcardInferredType ty) =
+    renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "The wildcard type definition has the inferred type "
             , indent $ typeAsBox ty
             ]
-    goSimple (NotExhaustivePattern bs b) =
+    renderSimpleErrorMessage (MissingTypeDeclaration ident) =
+      paras [ line $ "No type declaration was provided for the top-level declaration of " ++ showIdent ident ++ "."
+            , line "It is good practice to provide type declarations as a form of documentation."
+            , line "Consider using a type wildcard to display the inferred type:"
+            , indent $ line $ showIdent ident ++ " :: _"
+            ]
+    renderSimpleErrorMessage (NotExhaustivePattern bs b) =
       paras $ [ line "A case expression could not be determined to cover all inputs."
               , line "The following additional cases are required to cover all inputs:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
               ] ++
               [ line "..." | not b ]
-    goSimple (OverlappingPattern bs b) =
+    renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
               ] ++
               [ line "..." | not b ]
-    goSimple IncompleteExhaustivityCheck =
+    renderSimpleErrorMessage IncompleteExhaustivityCheck =
       paras [ line "An exhaustivity check was abandoned due to too many possible cases."
             , line "You may want to decomposing your data types into smaller types."
             ]
-    go (NotYetDefined names err) =
-      paras [ line $ "The following are not yet defined here: " ++ intercalate ", " (map showIdent names) ++ ":"
-            , go err
-            ]
-    go (ErrorUnifyingTypes t1 t2 err) =
+
+    renderHint :: ErrorMessageHint -> Box.Box
+    renderHint (NotYetDefined names) =
+      line $ "The following are not yet defined here: " ++ intercalate ", " (map showIdent names) ++ ":"
+    renderHint (ErrorUnifyingTypes t1 t2) =
       paras [ lineWithLevel "unifying type "
             , indent $ typeAsBox t1
             , line "with type"
             , indent $ typeAsBox t2
-            , go err
             ]
-    go (ErrorInExpression expr err) =
+    renderHint (ErrorInExpression expr) =
       paras [ lineWithLevel "in expression:"
             , indent $ prettyPrintValue expr
-            , go err
             ]
-    go (ErrorInModule mn err) =
+    renderHint (ErrorInModule mn) =
       paras [ lineWithLevel $ "in module " ++ runModuleName mn ++ ":"
-            , go err
             ]
-    go (ErrorInSubsumption t1 t2 err) =
+    renderHint (ErrorInSubsumption t1 t2) =
       paras [ lineWithLevel "checking that type "
             , indent $ typeAsBox t1
             , line "subsumes type"
             , indent $ typeAsBox t2
-            , go err
             ]
-    go (ErrorInInstance nm ts err) =
+    renderHint (ErrorInInstance nm ts) =
       paras [ lineWithLevel "in type class instance"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
-            , go err
             ]
-    go (ErrorCheckingKind ty err) =
+    renderHint (ErrorCheckingKind ty) =
       paras [ lineWithLevel "checking kind of type "
             , indent $ typeAsBox ty
-            , go err
             ]
-    go (ErrorInferringType expr err) =
+    renderHint (ErrorInferringType expr) =
       paras [ lineWithLevel "inferring type of value "
             , indent $ prettyPrintValue expr
-            , go err
             ]
-    go (ErrorCheckingType expr ty err) =
+    renderHint (ErrorCheckingType expr ty) =
       paras [ lineWithLevel "checking that value "
             , indent $ prettyPrintValue expr
             , line "has type"
             , indent $ typeAsBox ty
-            , go err
             ]
-    go (ErrorInApplication f t a err) =
+    renderHint (ErrorInApplication f t a) =
       paras [ lineWithLevel "applying function"
             , indent $ prettyPrintValue f
             , line "of type"
             , indent $ typeAsBox t
             , line "to argument"
             , indent $ prettyPrintValue a
-            , go err
             ]
-    go (ErrorInDataConstructor nm err) =
-      paras [ lineWithLevel $ "in data constructor " ++ runProperName nm ++ ":"
-            , go err
-            ]
-    go (ErrorInTypeConstructor nm err) =
-      paras [ lineWithLevel $ "in type constructor " ++ runProperName nm ++ ":"
-            , go err
-            ]
-    go (ErrorInBindingGroup nms err) =
-      paras [ lineWithLevel $ "in binding group " ++ intercalate ", " (map showIdent nms) ++ ":"
-            , go err
-            ]
-    go (ErrorInDataBindingGroup err) =
-      paras [ lineWithLevel "in data binding group:"
-            , go err
-            ]
-    go (ErrorInTypeSynonym name err) =
-      paras [ lineWithLevel $ "in type synonym " ++ runProperName name ++ ":"
-            , go err
-            ]
-    go (ErrorInValueDeclaration n err) =
-      paras [ lineWithLevel $ "in value declaration " ++ showIdent n ++ ":"
-            , go err
-            ]
-    go (ErrorInTypeDeclaration n err) =
-      paras [ lineWithLevel $ "in type declaration for " ++ showIdent n ++ ":"
-            , go err
-            ]
-    go (ErrorInForeignImport nm err) =
-      paras [ lineWithLevel $ "in foreign import " ++ showIdent nm ++ ":"
-            , go err
-            ]
-    go (PositionedError srcSpan err) =
-      paras [ lineWithLevel $ "at " ++ displaySourceSpan srcSpan ++ ":"
-            , go err
-            ]
-    go (SimpleErrorWrapper sem) = goSimple sem
+    renderHint (ErrorInDataConstructor nm) =
+      lineWithLevel $ "in data constructor " ++ runProperName nm ++ ":"
+    renderHint (ErrorInTypeConstructor nm) =
+      lineWithLevel $ "in type constructor " ++ runProperName nm ++ ":"
+    renderHint (ErrorInBindingGroup nms) =
+      lineWithLevel $ "in binding group " ++ intercalate ", " (map showIdent nms) ++ ":"
+    renderHint ErrorInDataBindingGroup =
+      lineWithLevel "in data binding group:"
+    renderHint (ErrorInTypeSynonym name) =
+      lineWithLevel $ "in type synonym " ++ runProperName name ++ ":"
+    renderHint (ErrorInValueDeclaration n) =
+      lineWithLevel $ "in value declaration " ++ showIdent n ++ ":"
+    renderHint (ErrorInTypeDeclaration n) =
+      lineWithLevel $ "in type declaration for " ++ showIdent n ++ ":"
+    renderHint (ErrorInForeignImport nm) =
+      lineWithLevel $ "in foreign import " ++ showIdent nm ++ ":"
+    renderHint (PositionedError srcSpan) =
+      lineWithLevel $ "at " ++ displaySourceSpan srcSpan ++ ":"
 
   lineWithLevel :: String -> Box.Box
   lineWithLevel text = line $ show level ++ " " ++ text
@@ -805,23 +761,19 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     Error -> "error"
     Warning -> "warning"
 
-  suggestions :: ErrorMessage -> [Box.Box]
-  suggestions = suggestions' . unwrapErrorMessage
-    where
-    suggestions' (ConflictingImport nm im) = [ line $ "Possible fix: hide " ++ show nm ++ " when importing " ++ runModuleName im ++ ":"
+  suggestions :: SimpleErrorMessage -> [Box.Box]
+  suggestions (ConflictingImport nm im) = [ line $ "Possible fix: hide " ++ show nm ++ " when importing " ++ runModuleName im ++ ":"
                                              , indent . line $ "import " ++ runModuleName im ++ " hiding (" ++ nm ++ ")"
                                              ]
-    suggestions' (TypesDoNotUnify t1 t2)
-      | isObject t1 && isFunction t2 = [line "Note that function composition in PureScript is defined using (<<<)"]
-      | otherwise             = []
-    suggestions' _ = []
+  suggestions (TypesDoNotUnify t1 t2)
+    | isObject t1 && isFunction t2 = [line "Note that function composition in PureScript is defined using (<<<)"]
+    | otherwise             = []
+  suggestions _ = []
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
 
-  -- |
   -- Pretty print and export declaration
-  --
   prettyPrintExport :: DeclarationRef -> String
   prettyPrintExport (TypeRef pn _) = runProperName pn
   prettyPrintExport (ValueRef ident) = showIdent ident
@@ -830,38 +782,44 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
   prettyPrintExport (ModuleRef name) = "module " ++ runModuleName name
   prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 
-  -- |
-  -- Simplify an error message
-  --
-  simplifyErrorMessage :: ErrorMessage -> ErrorMessage
-  simplifyErrorMessage = unwrap Nothing
+  -- Hints get added at the front, so we need to reverse them before rendering
+  reverseHints :: ErrorMessage -> ErrorMessage
+  reverseHints (ErrorMessage hints simple) = ErrorMessage (reverse hints) simple
+
+  -- | Put positional hints at the front of the list
+  positionHintsFirst :: ErrorMessage -> ErrorMessage
+  positionHintsFirst (ErrorMessage hints simple) = ErrorMessage (uncurry (++) $ partition (isPositionHint . hintCategory) hints) simple
     where
-    unwrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
-    unwrap pos (ErrorInExpression _ err) = unwrap pos err
-    unwrap pos (ErrorInInstance name ts err) = ErrorInInstance name ts (unwrap pos err)
-    unwrap pos (ErrorInSubsumption t1 t2 err) = ErrorInSubsumption t1 t2 (unwrap pos err)
-    unwrap pos (ErrorUnifyingTypes _ _ err) = unwrap pos err
-    unwrap pos (ErrorInferringType _ err) = unwrap pos err
-    unwrap pos (ErrorCheckingType _ _ err) = unwrap pos err
-    unwrap pos (ErrorCheckingKind ty err) = ErrorCheckingKind ty (unwrap pos err)
-    unwrap pos (ErrorInModule mn err) = ErrorInModule mn (unwrap pos err)
-    unwrap pos (ErrorInApplication _ _ _ err) = unwrap pos err
-    unwrap pos (ErrorInDataConstructor nm err) = ErrorInDataConstructor nm (unwrap pos err)
-    unwrap pos (ErrorInTypeConstructor nm err) = ErrorInTypeConstructor nm (unwrap pos err)
-    unwrap pos (ErrorInBindingGroup nms err) = ErrorInBindingGroup nms (unwrap pos err)
-    unwrap pos (ErrorInDataBindingGroup err) = ErrorInDataBindingGroup (unwrap pos err)
-    unwrap pos (ErrorInTypeSynonym nm err) = ErrorInTypeSynonym nm (unwrap pos err)
-    unwrap pos (ErrorInValueDeclaration nm err) = ErrorInValueDeclaration nm (unwrap pos err)
-    unwrap pos (ErrorInTypeDeclaration nm err) = ErrorInTypeDeclaration nm (unwrap pos err)
-    unwrap pos (ErrorInForeignImport nm err) = ErrorInForeignImport nm (unwrap pos err)
-    unwrap pos (NotYetDefined ns err) = NotYetDefined ns (unwrap pos err)
-    unwrap _   (PositionedError pos err) = unwrap (Just pos) err
-    unwrap pos other = wrap pos other
+    isPositionHint :: HintCategory -> Bool
+    isPositionHint PositionHint = True
+    isPositionHint OtherHint = True
+    isPositionHint _ = False
 
-    wrap :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
-    wrap Nothing    = id
-    wrap (Just pos) = PositionedError pos
+  -- | Simplify an error message
+  simplifyErrorMessage :: ErrorMessage -> ErrorMessage
+  simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (simplifyHints hints) simple
+    where
+    -- Take the last instance of each "hint category"
+    simplifyHints :: [ErrorMessageHint] -> [ErrorMessageHint]
+    simplifyHints = reverse . nubBy categoriesEqual . reverse
 
+    -- Don't remove hints in the "other" category
+    categoriesEqual :: ErrorMessageHint -> ErrorMessageHint -> Bool
+    categoriesEqual x y =
+      case (hintCategory x, hintCategory y) of
+        (OtherHint, _) -> False
+        (_, OtherHint) -> False
+        (c1, c2) -> c1 == c2
+
+  hintCategory :: ErrorMessageHint -> HintCategory
+  hintCategory ErrorCheckingType{}  = ExprHint
+  hintCategory ErrorInferringType{} = ExprHint
+  hintCategory ErrorInExpression{}  = ExprHint
+  hintCategory ErrorUnifyingTypes{} = CheckHint
+  hintCategory ErrorInSubsumption{} = CheckHint
+  hintCategory ErrorInApplication{} = CheckHint
+  hintCategory PositionedError{}    = PositionHint
+  hintCategory _                    = OtherHint
 
 -- |
 -- Pretty print multiple errors
@@ -988,8 +946,7 @@ warnAndRethrowWithPosition :: (MonadError MultipleErrors m, MonadWriter Multiple
 warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
-withPosition _ (PositionedError pos err) = withPosition pos err
-withPosition pos err = PositionedError pos err
+withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : hints) se
 
 -- |
 -- Collect errors in in parallel

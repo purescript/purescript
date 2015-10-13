@@ -70,6 +70,7 @@ prettyPrintValue (Do els) =
   text "do " <> vcat left (map prettyPrintDoNotationElement els)
 prettyPrintValue (TypeClassDictionary (name, tys) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
 prettyPrintValue (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
+prettyPrintValue (TypedValue _ val _) = prettyPrintValue val
 prettyPrintValue (PositionedValue _ _ val) = prettyPrintValue val
 prettyPrintValue expr = prettyPrintValueAtom expr
 
@@ -88,7 +89,7 @@ prettyPrintValueAtom (Constructor name) = text $ runProperName (disqualify name)
 prettyPrintValueAtom (Var ident) = text $ showIdent (disqualify ident)
 prettyPrintValueAtom (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue op) `beforeWithSpace` prettyPrintValue val) `before` text ")"
 prettyPrintValueAtom (OperatorSection op (Left val)) = ((text "(" <> prettyPrintValue val) `beforeWithSpace` prettyPrintValue op) `before` text ")"
-prettyPrintValueAtom (TypedValue _ val _) = prettyPrintValue val
+prettyPrintValueAtom (TypedValue _ val _) = prettyPrintValueAtom val
 prettyPrintValueAtom (PositionedValue _ _ val) = prettyPrintValueAtom val
 prettyPrintValueAtom expr = (text "(" <> prettyPrintValue expr) `before` text ")"
 

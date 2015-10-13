@@ -50,7 +50,7 @@ buildTypeSubstitution m = go 0 []
   where
   go :: Int -> [Type] -> Type -> Either ErrorMessage (Maybe Type)
   go c args (TypeConstructor ctor) | M.lookup ctor m == Just c = return (Just $ SaturatedTypeSynonym ctor args)
-  go c _    (TypeConstructor ctor) | M.lookup ctor m >  Just c = throwError $ SimpleErrorWrapper $ PartiallyAppliedSynonym ctor
+  go c _    (TypeConstructor ctor) | M.lookup ctor m >  Just c = throwError $ ErrorMessage [] $ PartiallyAppliedSynonym ctor
   go c args (TypeApp f arg) = go (c + 1) (arg:args) f
   go _ _ _ = return Nothing
 
