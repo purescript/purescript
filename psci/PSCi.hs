@@ -263,10 +263,10 @@ makeIO f io = do
 
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
 make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms))
-    where
-    filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
-    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
-    actions' = actions { P.progress = const (return ()) }
+  where
+  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
+  actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+  actions' = actions { P.progress = const (return ()) }
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.

@@ -32,6 +32,9 @@ source-repository head
 
 library
     build-depends: base >=4.6 && <5,
+                   lifted-base >= 0.2.3 && < 0.2.4,
+                   monad-control >= 1.0.0.0 && < 1.1,
+                   transformers-base >= 0.4.0 && < 0.5,
                    containers -any,
                    unordered-containers -any,
                    dlist -any,
@@ -176,7 +179,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,

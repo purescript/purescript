@@ -98,6 +98,7 @@ data SimpleErrorMessage
   | CtorConflictsWithClass ProperName
   | ClassConflictsWithType ProperName
   | ClassConflictsWithCtor ProperName
+  | DuplicateModuleName ModuleName
   | DuplicateClassExport ProperName
   | DuplicateValueExport Ident
   | DuplicateTypeArgument String
@@ -237,6 +238,7 @@ errorCode em = case unwrapErrorMessage em of
   CtorConflictsWithClass{} -> "CtorConflictsWithClass"
   ClassConflictsWithType{} -> "ClassConflictsWithType"
   ClassConflictsWithCtor{} -> "ClassConflictsWithCtor"
+  DuplicateModuleName{} -> "DuplicateModuleName"
   DuplicateClassExport{} -> "DuplicateClassExport"
   DuplicateValueExport{} -> "DuplicateValueExport"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
@@ -505,6 +507,8 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
       line $ "Type class " ++ runProperName nm ++ " conflicts with type declaration of the same name"
     renderSimpleErrorMessage (ClassConflictsWithCtor nm) =
       line $ "Type class " ++ runProperName nm ++ " conflicts with data constructor declaration of the same name"
+    renderSimpleErrorMessage (DuplicateModuleName mn) =
+      line $ "Module " ++ runModuleName mn ++ " has been defined multiple times."
     renderSimpleErrorMessage (DuplicateClassExport nm) =
       line $ "Duplicate export declaration for type class " ++ runProperName nm
     renderSimpleErrorMessage (DuplicateValueExport nm) =

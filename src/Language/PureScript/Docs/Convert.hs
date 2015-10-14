@@ -166,7 +166,6 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
   extractProperNames (P.TypeConstructor n) = [unQual n]
-  extractProperNames (P.SaturatedTypeSynonym n _) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)

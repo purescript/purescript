@@ -207,7 +207,6 @@ renameInModule env imports (Module ss coms mn decls exps) =
     where
     updateType :: Type -> m Type
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name pos <*> pure tys
     updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints pos cs <*> pure t
     updateType t = return t
 

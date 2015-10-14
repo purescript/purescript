@@ -19,6 +19,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.Make
@@ -39,29 +41,31 @@ module Language.PureScript.Make
 #if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
 #endif
-import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Except
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Control.Monad.Supply
+import Control.Monad.Base (MonadBase(..))
+import Control.Monad.Trans.Control (MonadBaseControl(..))
 
-import Data.Function (on)
-import Data.Either (partitionEithers)
-import Data.List (sortBy, groupBy, foldl')
-import Data.Maybe (fromMaybe)
+import Control.Concurrent.Lifted as C
+
+import Data.List (foldl', sort)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
 #endif
+import Data.Traversable (for)
 import Data.Version (showVersion)
 import Data.Aeson (encode, decode)
 import qualified Data.ByteString.Lazy as B
-import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import System.Directory
        (doesFileExist, getModificationTime, createDirectoryIfMissing)
@@ -150,65 +154,113 @@ data RebuildPolicy
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Functor m, Applicative m, Monad m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Functor m, Applicative m, Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
      -> m Environment
 make MakeActions{..} ms = do
-  (sorted, graph) <- sortModules $ map importPrim ms
-  toRebuild <- foldM (\s (Module _ _ moduleName' _ _) -> do
-    inputTimestamp <- getInputTimestamp moduleName'
-    outputTimestamp <- getOutputTimestamp moduleName'
-    return $ case (inputTimestamp, outputTimestamp) of
-      (Right (Just t1), Just t2) | t1 < t2 -> s
-      (Left RebuildNever, Just _) -> s
-      _ -> S.insert moduleName' s) S.empty sorted
+  checkModuleNamesAreUnique
 
-  (externs, toBuild) <- partitionEithers <$> rebuildIfNecessary (reverseDependencies graph) toRebuild sorted
-  for_ toBuild lint
-  (desugared, nextVar) <- runSupplyT 0 $ desugar externs toBuild
-  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-  evalSupplyT nextVar $ go env desugared
+  (sorted, graph) <- sortModules ms
+
+  barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+
+  for_ sorted $ \m -> fork $ do
+    let deps = fromMaybe (error "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
+    buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
+
+  -- Wait for all threads to complete, and collect errors.
+  errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
+
+  -- All threads have completed, rethrow any caught errors.
+  unless (null errors) $ throwError (mconcat errors)
+
+  -- Bundle up all the externs and return them as an Environment
+  externs <- sequence <$> for barriers (takeMVar . fst . snd)
+  return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment (fromMaybe (error "make: externs were missing but no errors reported.") externs)
+
   where
+  checkModuleNamesAreUnique :: m ()
+  checkModuleNamesAreUnique =
+    case findDuplicate (map getModuleName ms) of
+      Nothing -> return ()
+      Just mn -> throwError . errorMessage $ DuplicateModuleName mn
 
-  go :: Environment -> [Module] -> SupplyT m Environment
-  go env [] = return env
-  go env (m@(Module ss coms moduleName' _ exps) : ms') = do
-    lift . progress $ CompilingModule moduleName'
-    (checked@(Module _ _ _ elaborated _), env') <- lift . runCheck' env $ typeCheckModule Nothing m
-    checkExhaustiveModule env' checked
-    regrouped <- createBindingGroups moduleName' . collapseBindingGroups $ elaborated
-    let mod' = Module ss coms moduleName' regrouped exps
-        corefn = CF.moduleToCoreFn env' mod'
-        [renamed] = renameInModules [corefn]
-        exts = encode $ moduleToExternsFile mod' env'
-    codegen renamed env' exts
-    go env' ms'
-
-  rebuildIfNecessary :: M.Map ModuleName [ModuleName] -> S.Set ModuleName -> [Module] -> m [Either ExternsFile Module]
-  rebuildIfNecessary graph = rebuildIfNecessary'
+  -- Verify that a list of values has unique keys
+  findDuplicate :: (Ord a) => [a] -> Maybe a
+  findDuplicate = go . sort
     where
-    rebuildIfNecessary' :: S.Set ModuleName -> [Module] -> m [Either ExternsFile Module]
-    rebuildIfNecessary' _ [] = return []
-    rebuildIfNecessary' toRebuild (m@(Module _ _ moduleName' _ _) : ms')
-      | moduleName' `S.member` toRebuild = rebuild toRebuild m moduleName' ms'
-    rebuildIfNecessary' toRebuild (m@(Module _ _ moduleName' _ _) : ms') = do
-      (_, externsJson) <- readExterns moduleName'
-      case decode externsJson of
-        Just externs
-          | efVersion externs == showVersion Paths.version -> (Left externs :) <$> rebuildIfNecessary' toRebuild ms'
-        _ -> rebuild toRebuild m moduleName' ms'
+    go (x : y : xs)
+      | x == y = Just x
+      | otherwise = go (y : xs)
+    go _ = Nothing
 
-    rebuild :: S.Set ModuleName -> Module -> ModuleName -> [Module] -> m [Either ExternsFile Module]
-    rebuild toRebuild m moduleName ms' = do
-      let deps = fromMaybe [] $ moduleName `M.lookup` graph
-      (Right m :) <$> rebuildIfNecessary' (toRebuild `S.union` S.fromList deps) ms'
+  -- Sort a list so its elements appear in the same order as in another list.
+  inOrderOf :: (Ord a) => [a] -> [a] -> [a]
+  inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-reverseDependencies :: ModuleGraph -> M.Map ModuleName [ModuleName]
-reverseDependencies g = combine [ (dep, mn) | (mn, deps) <- g, dep <- deps ]
-  where
-  combine :: (Ord a) => [(a, b)] -> M.Map a [b]
-  combine = M.fromList . map ((fst . head) &&& map snd) . groupBy ((==) `on` fst) . sortBy (compare `on` fst)
+  buildModule :: [(ModuleName, (C.MVar (Maybe ExternsFile), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
+  buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
+    -- We need to wait for dependencies to be built, before checking if the current
+    -- module should be rebuilt, so the first thing to do is to wait on the
+    -- MVars for the module's dependencies.
+    mexterns <- sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
+
+    outputTimestamp <- getOutputTimestamp moduleName
+    dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
+    inputTimestamp <- getInputTimestamp moduleName
+
+    let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
+                          (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
+                          (Right (Just t1), Nothing, Just t2) -> t1 > t2
+                          (Left RebuildNever, _, Just _) -> False
+                          _ -> True
+
+    let rebuild =
+          case mexterns of
+            Just externs -> do
+              progress $ CompilingModule moduleName
+              let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+              lint m
+              ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
+              (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
+              checkExhaustiveModule env' checked
+              regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+              let mod' = Module ss coms moduleName regrouped exps
+                  corefn = CF.moduleToCoreFn env' mod'
+                  [renamed] = renameInModules [corefn]
+                  exts = moduleToExternsFile mod' env'
+              evalSupplyT nextVar $ codegen renamed env' $ encode exts
+              markComplete (Just exts) Nothing
+            Nothing -> markComplete Nothing Nothing
+
+    if shouldRebuild
+      then rebuild
+      else do
+        mexts <- decodeExterns . snd <$> readExterns moduleName
+        case mexts of
+          Just exts -> markComplete (Just exts) Nothing
+          Nothing -> rebuild
+    where
+    markComplete :: Maybe ExternsFile -> Maybe MultipleErrors -> m ()
+    markComplete externs errors = do
+      putMVar (fst $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) externs
+      putMVar (snd $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) errors
+
+  maximumMaybe :: (Ord a) => [a] -> Maybe a
+  maximumMaybe [] = Nothing
+  maximumMaybe xs = Just $ maximum xs
+
+  -- Make sure a dependency exists
+  shouldExist :: Maybe UTCTime -> UTCTime
+  shouldExist (Just t) = t
+  shouldExist _ = error "make: dependency should already have been built."
+
+  decodeExterns :: B.ByteString -> Maybe ExternsFile
+  decodeExterns bs = do
+    externs <- decode bs
+    guard $ efVersion externs == showVersion Paths.version
+    return externs
 
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
@@ -230,6 +282,14 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 --
 newtype Make a = Make { unMake :: ReaderT Options (WriterT MultipleErrors (ExceptT MultipleErrors IO)) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
+
+instance MonadBase IO Make where
+  liftBase = liftIO
+
+instance MonadBaseControl IO Make where
+  type StM Make a = Either MultipleErrors (a, MultipleErrors)
+  liftBaseWith f = Make $ liftBaseWith $ \q -> f (q . unMake)
+  restoreM = Make . restoreM
 
 -- |
 -- Execute a 'Make' monad, returning either errors, or the result of the compile plus any warnings.

@@ -9,6 +9,9 @@ set -e              # exit on error
 set -u              # exit on undefined variable
 set -o pipefail     # propagate nonzero exit codes through pipelines
 
+export LC_CTYPE=C
+export LANG=C
+
 if ! which cabal-dependency-licenses >/dev/null; then
     echo "$0: the program 'cabal-dependency-licenses' is required." >&2
     echo "$0: see Hackage: https://hackage.haskell.org/package/cabal-dependency-licenses" >&2
