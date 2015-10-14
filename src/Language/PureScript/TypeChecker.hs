@@ -51,7 +51,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
   forM_ dctors $ \(dctor, tys) ->
-    warnAndRethrow (onErrorMessages (ErrorInDataConstructor dctor)) $
+    warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor :: ModuleName -> DataDeclType -> ProperName -> [String] -> ProperName -> [Type] -> Check ()
@@ -137,7 +137,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
   where
   go :: Declaration -> Check Declaration
   go (DataDeclaration dtype name args dctors) = do
-    warnAndRethrow (onErrorMessages (ErrorInTypeConstructor name)) $ do
+    warnAndRethrow (addHint (ErrorInTypeConstructor name)) $ do
       when (dtype == Newtype) $ checkNewtype dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
@@ -150,7 +150,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype
     checkNewtype _ = throwError . errorMessage $ InvalidNewtype
   go (d@(DataBindingGroupDeclaration tys)) = do
-    warnAndRethrow (onErrorMessages ErrorInDataBindingGroup) $ do
+    warnAndRethrow (addHint ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
@@ -171,7 +171,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty) = do
-    warnAndRethrow (onErrorMessages (ErrorInTypeSynonym name)) $ do
+    warnAndRethrow (addHint (ErrorInTypeSynonym name)) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
@@ -179,14 +179,14 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     return $ TypeSynonymDeclaration name args ty
   go (TypeDeclaration{}) = error "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val)) =
-    warnAndRethrow (onErrorMessages (ErrorInValueDeclaration name)) $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
   go (ValueDeclaration{}) = error "Binders were not desugared"
   go (BindingGroupDeclaration vals) =
-    warnAndRethrow (onErrorMessages (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
+    warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
@@ -203,7 +203,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
   go (d@(ExternDeclaration name ty)) = do
-    warnAndRethrow (onErrorMessages (ErrorInForeignImport name)) $ do
+    warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf moduleName ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
@@ -269,7 +269,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
 --
 typeCheckModule :: Module -> Check Module
 typeCheckModule (Module _ _ _ _ Nothing) = error "exports should have been elaborated"
-typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (onErrorMessages (ErrorInModule mn)) $ do
+typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mn exps decls
   forM_ exps $ \e -> do

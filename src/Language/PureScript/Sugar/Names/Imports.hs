@@ -64,7 +64,7 @@ findImports = foldM (go Nothing) M.empty
 --
 resolveImports :: (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
-  censor (onErrorMessages (ErrorInModule currentModule)) $ do
+  censor (addHint (ErrorInModule currentModule)) $ do
     scope <- M.insert currentModule [(Nothing, Implicit, Nothing)] <$> findImports decls
     foldM (resolveModuleImport currentModule env) nullImports (M.toList scope)
 

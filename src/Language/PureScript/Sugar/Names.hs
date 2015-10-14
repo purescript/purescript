@@ -98,7 +98,7 @@ desugarImports externs modules = do
 
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
-    rethrow (onErrorMessages (ErrorInModule mn)) $ do
+    rethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn env
       elaborateImports imps <$> renameInModule env imps (elaborateExports exps m)
 

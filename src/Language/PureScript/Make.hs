@@ -365,15 +365,15 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   getTimestamp :: FilePath -> Make (Maybe UTCTime)
-  getTimestamp path = makeIO (const (SimpleErrorWrapper $ CannotGetFileInfo path)) $ do
+  getTimestamp path = makeIO (const (ErrorMessage [] $ CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
 
   readTextFile :: FilePath -> Make B.ByteString
-  readTextFile path = makeIO (const (SimpleErrorWrapper $ CannotReadFile path)) $ B.readFile path
+  readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ B.readFile path
 
   writeTextFile :: FilePath -> B.ByteString -> Make ()
-  writeTextFile path text = makeIO (const (SimpleErrorWrapper $ CannotWriteFile path)) $ do
+  writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
     mkdirp path
     B.writeFile path text
     where
