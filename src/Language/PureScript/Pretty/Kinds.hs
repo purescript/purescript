@@ -14,8 +14,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Pretty.Kinds (
-    prettyPrintKind,
-    kindAsBox
+    prettyPrintKind
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -24,15 +23,14 @@ import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows
 
 import Language.PureScript.Kinds
+import Language.PureScript.Pretty.Common
 
-import Text.PrettyPrint.Boxes (Box(), text, render, (<>))
-
-typeLiterals :: Pattern () Kind Box
+typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
-  match Star = Just $ text "*"
-  match Bang = Just $ text "!"
-  match (KUnknown u) = Just $ text $ 'u' : show u
+  match Star = Just "*"
+  match Bang = Just "!"
+  match (KUnknown u) = Just $ 'u' : show u
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)
@@ -49,15 +47,12 @@ funKind = mkPattern match
 
 -- | Generate a pretty-printed string representing a Kind
 prettyPrintKind :: Kind -> String
-prettyPrintKind = render . kindAsBox
-
-kindAsBox :: Kind -> Box
-kindAsBox = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
+prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
   where
-  matchKind :: Pattern () Kind Box
-  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap ((text "(" <>) . (<> text ")")) matchKind)
+  matchKind :: Pattern () Kind String
+  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
 
-  operators :: OperatorTable () Kind Box
+  operators :: OperatorTable () Kind String
   operators =
-    OperatorTable [ [ Wrap matchRow $ \_ k -> text "# " <> k]
-                  , [ AssocR funKind $ \arg ret -> arg <> text " -> " <> ret ] ]
+    OperatorTable [ [ Wrap matchRow $ \_ k -> "# " ++ k]
+                  , [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]

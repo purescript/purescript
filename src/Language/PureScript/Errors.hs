@@ -447,7 +447,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             ]
     renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
-            , indent $ kindAsBox ki
+            , indent $ line $ prettyPrintKind ki
             ]
     renderSimpleErrorMessage (MultipleFixities name) =
       line $ "Multiple fixity declarations for " ++ showIdent name
@@ -542,9 +542,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
               ]
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Cannot unify kind"
-            , indent $ kindAsBox k1
+            , indent $ line $ prettyPrintKind k1
             , line "with kind"
-            , indent $ kindAsBox k2
+            , indent $ line $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Cannot unify constrained type"
@@ -604,7 +604,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , line "The error arises from the type"
             , indent $ typeAsBox ty
             , line "having the kind"
-            , indent $ kindAsBox kind
+            , indent $ line $ prettyPrintKind kind
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm) =
