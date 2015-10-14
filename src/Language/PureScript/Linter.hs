@@ -40,7 +40,7 @@ import Language.PureScript.Linter.Exhaustive as L
 -- |
 -- | Right now, this pass only performs a shadowing check.
 lint :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Module -> m ()
-lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ lintDeclaration ds
+lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
   moduleNames :: S.Set Ident
   moduleNames = S.fromList (nub (mapMaybe getDeclIdent ds))
@@ -58,9 +58,9 @@ lint (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ mapM_ 
     let (f, _, _, _, _) = everythingWithContextOnValues moduleNames mempty mappend stepD stepE stepB def def
 
         f' :: Declaration -> MultipleErrors
-        f' (PositionedDeclaration pos _ dec) = onErrorMessages (PositionedError pos) (f' dec)
-        f' dec@(ValueDeclaration name _ _ _) = onErrorMessages (ErrorInValueDeclaration name) (f dec <> checkTypeVarsInDecl dec)
-        f' (TypeDeclaration name ty) = onErrorMessages (ErrorInTypeDeclaration name) (checkTypeVars ty)
+        f' (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f' dec)
+        f' dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (f dec <> checkTypeVarsInDecl dec)
+        f' (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
         f' dec = f dec <> checkTypeVarsInDecl dec
 
     in tell (f' d)

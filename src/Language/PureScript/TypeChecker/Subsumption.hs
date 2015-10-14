@@ -37,7 +37,7 @@ import Language.PureScript.Types
 -- Check whether one type subsumes another, rethrowing errors to provide a better error message
 --
 subsumes :: Maybe Expr -> Type -> Type -> UnifyT Type Check (Maybe Expr)
-subsumes val ty1 ty2 = rethrow (onErrorMessages (ErrorInSubsumption ty1 ty2)) $ subsumes' val ty1 ty2
+subsumes val ty1 ty2 = rethrow (addHint (ErrorInSubsumption ty1 ty2)) $ subsumes' val ty1 ty2
 
 -- |
 -- Check whether one type subsumes another

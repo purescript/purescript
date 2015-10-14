@@ -243,7 +243,7 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
-  rethrow (onErrorMessages (ErrorInInstance className tys)) $ do
+  rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class

@@ -464,7 +464,7 @@ handleCommand (LoadFile filePath) = whenFileExists filePath $ \absPath -> do
     Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
 handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
   foreignsOrError <- psciIO . runMake $ do
-    foreignFile <- makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile absPath)) (readFile absPath)
+    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readFile absPath)
     P.parseForeignModulesFromFiles [(absPath, foreignFile)]
   case foreignsOrError of
     Left err -> PSCI $ outputStrLn $ P.prettyPrintMultipleErrors False err
@@ -533,7 +533,7 @@ loop PSCiOptions{..} = do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.SimpleErrorWrapper $ P.CannotReadFile inFile)) (readFile inFile))
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readFile inFile))
         P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
