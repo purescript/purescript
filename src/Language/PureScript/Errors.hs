@@ -144,7 +144,9 @@ data SimpleErrorMessage
   | ClassOperator ProperName Ident
   | MisleadingEmptyTypeImport ModuleName ProperName
   | ImportHidingModule ModuleName
-  deriving Show
+  | UnusedImport ModuleName
+  | UnusedExplicitImport ModuleName [String]
+  deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
 data ErrorMessageHint
@@ -280,6 +282,8 @@ errorCode em = case unwrapErrorMessage em of
   ClassOperator{} -> "ClassOperator"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
+  UnusedImport{} -> "UnusedImport"
+  UnusedExplicitImport{} -> "UnusedExplicitImport"
 
 -- |
 -- A stack trace for an error
@@ -688,6 +692,12 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line "An exhaustivity check was abandoned due to too many possible cases."
             , line "You may want to decompose your data types into smaller types."
             ]
+    renderSimpleErrorMessage (UnusedImport name) =
+      line $ "The import of module " ++ runModuleName name ++ " is redundant"
+
+    renderSimpleErrorMessage (UnusedExplicitImport name names) =
+      paras [ line $ "The import of module " ++ runModuleName name ++ " contains the following unused references:"
+            , indent $ paras $ map line names ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

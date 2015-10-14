@@ -36,6 +36,7 @@ import Language.PureScript.Names
 import Language.PureScript.Errors
 import Language.PureScript.Types
 import Language.PureScript.Linter.Exhaustive as L
+import Language.PureScript.Linter.Imports as L
 
 -- | Lint the PureScript AST.
 -- |
