@@ -184,7 +184,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   cycleError :: (MonadError MultipleErrors m) => Declaration -> [Declaration] -> m a
   cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
   cycleError (ValueDeclaration n _ _ (Right _)) [] = throwError . errorMessage $ CycleInDeclaration n
-  cycleError d ds@(_:_) = rethrow (onErrorMessages (NotYetDefined (map getIdent ds))) $ cycleError d []
+  cycleError d ds@(_:_) = rethrow (addHint (NotYetDefined (map getIdent ds))) $ cycleError d []
   cycleError _ _ = error "Expected ValueDeclaration"
 
 toDataBindingGroup :: (MonadError MultipleErrors m) => SCC Declaration -> m Declaration

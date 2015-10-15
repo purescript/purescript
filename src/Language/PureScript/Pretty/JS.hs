@@ -45,13 +45,13 @@ literals = mkPattern' match
   match (JSStringLiteral s) = return $ string s
   match (JSBooleanLiteral True) = return "true"
   match (JSBooleanLiteral False) = return "false"
-  match (JSArrayLiteral xs) = fmap concat $ sequence
+  match (JSArrayLiteral xs) = concat <$> sequence
     [ return "[ "
-    , fmap (intercalate ", ") $ forM xs prettyPrintJS'
+    , intercalate ", " <$> forM xs prettyPrintJS'
     , return " ]"
     ]
   match (JSObjectLiteral []) = return "{}"
-  match (JSObjectLiteral ps) = fmap concat $ sequence
+  match (JSObjectLiteral ps) = concat <$> sequence
     [ return "{\n"
     , withIndent $ do
         jss <- forM ps $ \(key, value) -> fmap ((objectPropertyToString key ++ ": ") ++) . prettyPrintJS' $ value
@@ -65,7 +65,7 @@ literals = mkPattern' match
     objectPropertyToString :: String -> String
     objectPropertyToString s | identNeedsEscaping s = show s
                              | otherwise = s
-  match (JSBlock sts) = fmap concat $ sequence
+  match (JSBlock sts) = concat <$> sequence
     [ return "{\n"
     , withIndent $ prettyStatements sts
     , return "\n"
@@ -73,23 +73,23 @@ literals = mkPattern' match
     , return "}"
     ]
   match (JSVar ident) = return ident
-  match (JSVariableIntroduction ident value) = fmap concat $ sequence
+  match (JSVariableIntroduction ident value) = concat <$> sequence
     [ return "var "
     , return ident
     , maybe (return "") (fmap (" = " ++) . prettyPrintJS') value
     ]
-  match (JSAssignment target value) = fmap concat $ sequence
+  match (JSAssignment target value) = concat <$> sequence
     [ prettyPrintJS' target
     , return " = "
     , prettyPrintJS' value
     ]
-  match (JSWhile cond sts) = fmap concat $ sequence
+  match (JSWhile cond sts) = concat <$> sequence
     [ return "while ("
     , prettyPrintJS' cond
     , return ") "
     , prettyPrintJS' sts
     ]
-  match (JSFor ident start end sts) = fmap concat $ sequence
+  match (JSFor ident start end sts) = concat <$> sequence
     [ return $ "for (var " ++ ident ++ " = "
     , prettyPrintJS' start
     , return $ "; " ++ ident ++ " < "
@@ -97,30 +97,30 @@ literals = mkPattern' match
     , return $ "; " ++ ident ++ "++) "
     , prettyPrintJS' sts
     ]
-  match (JSForIn ident obj sts) = fmap concat $ sequence
+  match (JSForIn ident obj sts) = concat <$> sequence
     [ return $ "for (var " ++ ident ++ " in "
     , prettyPrintJS' obj
     , return ") "
     , prettyPrintJS' sts
     ]
-  match (JSIfElse cond thens elses) = fmap concat $ sequence
+  match (JSIfElse cond thens elses) = concat <$> sequence
     [ return "if ("
     , prettyPrintJS' cond
     , return ") "
     , prettyPrintJS' thens
     , maybe (return "") (fmap (" else " ++) . prettyPrintJS') elses
     ]
-  match (JSReturn value) = fmap concat $ sequence
+  match (JSReturn value) = concat <$> sequence
     [ return "return "
     , prettyPrintJS' value
     ]
-  match (JSThrow value) = fmap concat $ sequence
+  match (JSThrow value) = concat <$> sequence
     [ return "throw "
     , prettyPrintJS' value
     ]
   match (JSBreak lbl) = return $ "break " ++ lbl
   match (JSContinue lbl) = return $ "continue " ++ lbl
-  match (JSLabel lbl js) = fmap concat $ sequence
+  match (JSLabel lbl js) = concat <$> sequence
     [ return $ lbl ++ ": "
     , prettyPrintJS' js
     ]

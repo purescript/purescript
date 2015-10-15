@@ -43,7 +43,7 @@ import Language.PureScript.Sugar.Names.Env
 --
 findExportable :: forall m. (Applicative m, MonadError MultipleErrors m) => Module -> m Exports
 findExportable (Module _ _ mn ds _) =
-  rethrow (onErrorMessages (ErrorInModule mn)) $ foldM updateExports nullExports ds
+  rethrow (addHint (ErrorInModule mn)) $ foldM updateExports nullExports ds
   where
   updateExports :: Exports -> Declaration -> m Exports
   updateExports exps (TypeClassDeclaration tcn _ _ ds') = do
@@ -67,7 +67,7 @@ findExportable (Module _ _ mn ds _) =
 --
 resolveExports :: forall m. (Applicative m, MonadError MultipleErrors m) => Env -> ModuleName -> Imports -> Exports -> [DeclarationRef] -> m Exports
 resolveExports env mn imps exps refs =
-  rethrow (onErrorMessages (ErrorInModule mn)) $ do
+  rethrow (addHint (ErrorInModule mn)) $ do
     filtered <- filterModule mn exps refs
     foldM elaborateModuleExports filtered refs
 
@@ -205,9 +205,8 @@ filterModule mn exps refs = do
   -- the data constructor to check.
   checkDcon :: ProperName -> [ProperName] -> ProperName -> m ()
   checkDcon tcon exps' name =
-    if name `elem` exps'
-    then return ()
-    else throwError . errorMessage $ UnknownExportDataConstructor tcon name
+    unless (name `elem` exps') $
+      throwError . errorMessage $ UnknownExportDataConstructor tcon name
 
   -- Takes a list of all the exportable classes, the accumulated list of
   -- filtered exports, and a `DeclarationRef` for an explicit export. When the

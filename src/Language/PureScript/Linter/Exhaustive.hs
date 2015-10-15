@@ -29,6 +29,9 @@ import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.List (foldl', sortBy, nub)
 import Data.Function (on)
+#if __GLASGOW_HASKELL__ < 710
+import Data.Traversable (sequenceA)
+#endif
 
 import Control.Monad (unless)
 import Control.Applicative
@@ -43,7 +46,13 @@ import Language.PureScript.Kinds
 import Language.PureScript.Types as P
 import Language.PureScript.Errors
 
-import Language.PureScript.AST.Traversals (everywhereOnValuesTopDownM)
+-- | There are two modes of failure for the redudancy check:
+--
+-- 1. Exhaustivity was incomeplete due to too many cases, so we couldn't determine redundancy.
+-- 2. We didn't attempt to determine redundancy for a binder, e.g. an integer binder.
+--
+-- We want to warn the user in the first case.
+data RedudancyError = Incomplete | Unknown
 
 -- |
 -- Qualifies a propername from a given qualified propername and a default module name
@@ -59,20 +68,20 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
 --        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> (Qualified ProperName) -> [(ProperName, [Type])]
+getConstructors :: Environment -> ModuleName -> Qualified ProperName -> [(ProperName, [Type])]
 getConstructors env defmn n = extractConstructors lnte
   where
   qpn :: Qualified ProperName
   qpn = getConsDataName n
 
-  getConsDataName :: (Qualified ProperName) -> (Qualified ProperName)
+  getConsDataName :: Qualified ProperName -> Qualified ProperName
   getConsDataName con = qualifyName nm defmn con
     where
     nm = case getConsInfo con of
            Nothing -> error $ "Constructor " ++ showQualified runProperName con ++ " not in the scope of the current environment in getConsDataName."
            Just (_, pm, _, _) -> pm
 
-  getConsInfo :: (Qualified ProperName) -> Maybe (DataDeclType, ProperName, Type, [Ident])
+  getConsInfo :: Qualified ProperName -> Maybe (DataDeclType, ProperName, Type, [Ident])
   getConsInfo con = M.lookup con dce
     where
     dce :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type, [Ident])
@@ -103,27 +112,27 @@ genericMerge _ [] [] = []
 genericMerge f bs [] = map (\(s, b) -> f s (Just b) Nothing) bs
 genericMerge f [] bs = map (\(s, b) -> f s Nothing (Just b)) bs
 genericMerge f bsl@((s, b):bs) bsr@((s', b'):bs')
-  | s < s' = (f s (Just b) Nothing) : genericMerge f bs bsr
-  | s > s' = (f s' Nothing (Just b')) : genericMerge f bsl bs'
-  | otherwise = (f s (Just b) (Just b')) : genericMerge f bs bs'
+  | s < s' = f s (Just b) Nothing : genericMerge f bs bsr
+  | s > s' = f s' Nothing (Just b') : genericMerge f bsl bs'
+  | otherwise = f s (Just b) (Just b') : genericMerge f bs bs'
 
 -- |
 -- Find the uncovered set between two binders:
 -- the first binder is the case we are trying to cover, the second one is the matching binder
 --
-missingCasesSingle :: Environment -> ModuleName -> Binder -> Binder -> ([Binder], Maybe Bool)
-missingCasesSingle _ _ _ NullBinder = ([], Just True)
-missingCasesSingle _ _ _ (VarBinder _) = ([], Just True)
+missingCasesSingle :: Environment -> ModuleName -> Binder -> Binder -> ([Binder], Either RedudancyError Bool)
+missingCasesSingle _ _ _ NullBinder = ([], return True)
+missingCasesSingle _ _ _ (VarBinder _) = ([], return True)
 missingCasesSingle env mn (VarBinder _) b = missingCasesSingle env mn NullBinder b
 missingCasesSingle env mn br (NamedBinder _ bl) = missingCasesSingle env mn br bl
 missingCasesSingle env mn NullBinder cb@(ConstructorBinder con _) =
-  (concatMap (\cp -> fst $ missingCasesSingle env mn cp cb) allPatterns, Just True)
+  (concatMap (\cp -> fst $ missingCasesSingle env mn cp cb) allPatterns, return True)
   where
   allPatterns = map (\(p, t) -> ConstructorBinder (qualifyName p mn con) (initialize $ length t))
                   $ getConstructors env mn con
 missingCasesSingle env mn cb@(ConstructorBinder con bs) (ConstructorBinder con' bs')
   | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder con) bs'', pr)
-  | otherwise = ([cb], Just False)
+  | otherwise = ([cb], return False)
 missingCasesSingle env mn NullBinder (ObjectBinder bs) =
   (map (ObjectBinder . zip (map fst bs)) allMisses, pr)
   where
@@ -146,12 +155,12 @@ missingCasesSingle env mn (ObjectBinder bs) (ObjectBinder bs') =
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder (BooleanBinder b) = ([BooleanBinder $ not b], Just True)
+missingCasesSingle _ _ NullBinder (BooleanBinder b) = ([BooleanBinder $ not b], return True)
 missingCasesSingle _ _ (BooleanBinder bl) (BooleanBinder br)
-  | bl == br = ([], Just True)
-  | otherwise = ([BooleanBinder bl], Just False)
+  | bl == br = ([], return True)
+  | otherwise = ([BooleanBinder bl], return False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
-missingCasesSingle _ _ b _ = ([b], Nothing)
+missingCasesSingle _ _ b _ = ([b], Left Unknown)
 
 -- |
 -- Returns the uncovered set of binders
@@ -179,7 +188,7 @@ missingCasesSingle _ _ b _ = ([b], Nothing)
 --       redundant or not, but uncovered at least. If we use `y` instead, we'll need to have a redundancy checker
 --       (which ought to be available soon), or increase the complexity of the algorithm.
 --
-missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Maybe Bool)
+missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Either RedudancyError Bool)
 missingCasesMultiple env mn = go
   where
   go [] [] = ([], pure True)
@@ -213,10 +222,10 @@ isExhaustiveGuard (Right _) = True
 -- |
 -- Returns the uncovered set of case alternatives
 --
-missingCases :: Environment -> ModuleName -> [Binder] -> CaseAlternative -> ([[Binder]], Maybe Bool)
+missingCases :: Environment -> ModuleName -> [Binder] -> CaseAlternative -> ([[Binder]], Either RedudancyError Bool)
 missingCases env mn uncovered ca = missingCasesMultiple env mn uncovered (caseAlternativeBinders ca)
 
-missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> ([[Binder]], Maybe Bool)
+missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> ([[Binder]], Either RedudancyError Bool)
 missingAlternative env mn ca uncovered
   | isExhaustiveGuard (caseAlternativeResult ca) = mcases
   | otherwise = ([uncovered], snd mcases)
@@ -232,51 +241,69 @@ missingAlternative env mn ca uncovered
 checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> Int -> [CaseAlternative] -> m ()
 checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
-  step :: ([[Binder]], (Maybe Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Maybe Bool, [[Binder]]))
+  step :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedudancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        cond = or <$> sequenceA pr
-    in (concat missed, (liftA2 (&&) cond nec,
-                         if fromMaybe True cond then redundant else caseAlternativeBinders ca : redundant))
-#if __GLASGOW_HASKELL__ < 710
-    where
-    sequenceA = foldr (liftA2 (:)) (pure [])
-#endif
+        (missed', approx) = splitAt 10000 (concat missed)
+        cond = liftA2 (&&) (or <$> sequenceA pr) nec
+    in (missed', ( if null approx
+                     then cond
+                     else Left Incomplete
+                 , if either (const True) id cond
+                     then redundant
+                     else caseAlternativeBinders ca : redundant
+                 )
+       )
 
-  makeResult :: ([[Binder]], (Maybe Bool, [[Binder]])) -> m ()
-  makeResult (bss, (_, bss')) =
+  makeResult :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> m ()
+  makeResult (bss, (rr, bss')) =
     do unless (null bss) tellExhaustive
        unless (null bss') tellRedundant
+       case rr of
+         Left Incomplete -> tellIncomplete
+         _ -> return ()
     where
     tellExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
     tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
+    tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
 
 -- |
 -- Exhaustivity checking over a list of declarations
 --
 checkExhaustiveDecls :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> ModuleName -> [Declaration] -> m ()
-checkExhaustiveDecls env mn ds =
-  let (f, _, _) = everywhereOnValuesTopDownM return checkExpr return
-
-      f' :: Declaration -> m Declaration
-      f' d@(BindingGroupDeclaration bs) = mapM_ (f' . convert) bs >> return d
-        where
-        convert :: (Ident, NameKind, Expr) -> Declaration
-        convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
-      f' d@(ValueDeclaration name _ _ _) = censor (onErrorMessages (ErrorInValueDeclaration name)) $ f d
-      f' (PositionedDeclaration pos com dec) = PositionedDeclaration pos com <$> censor (onErrorMessages (PositionedError pos)) (f' dec)
-      -- Don't generate two warnings for desugared dictionaries.
-      f' d@TypeInstanceDeclaration{} = return d
-      f' d = f d
-
-  in mapM_ f' ds
+checkExhaustiveDecls env mn = mapM_ onDecl
   where
-  checkExpr :: Expr -> m Expr
-  checkExpr c@(Case expr cas)  = checkExhaustive env mn (length expr) cas >> return c
-  checkExpr other = return other
+  onDecl :: Declaration -> m ()
+  onDecl (BindingGroupDeclaration bs) = mapM_ (onDecl . convert) bs
+    where
+    convert :: (Ident, NameKind, Expr) -> Declaration
+    convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
+  onDecl (ValueDeclaration name _ _ (Right e)) = censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (PositionedDeclaration pos _ dec) = censor (addHint (PositionedError pos)) (onDecl dec)
+  onDecl _ = return ()
+
+  onExpr :: Expr -> m ()
+  onExpr (UnaryMinus e) = onExpr e
+  onExpr (ArrayLiteral es) = mapM_ onExpr es
+  onExpr (ObjectLiteral es) = mapM_ (onExpr . snd) es
+  onExpr (TypeClassDictionaryConstructorApp _ e) = onExpr e
+  onExpr (Accessor _ e) = onExpr e
+  onExpr (ObjectUpdate o es) = onExpr o >> mapM_ (onExpr . snd) es
+  onExpr (Abs _ e) = onExpr e
+  onExpr (App e1 e2) = onExpr e1 >> onExpr e2
+  onExpr (IfThenElse e1 e2 e3) = onExpr e1 >> onExpr e2 >> onExpr e3
+  onExpr (Case es cas) = checkExhaustive env mn (length es) cas >> mapM_ onExpr es >> mapM_ onCaseAlternative cas
+  onExpr (TypedValue _ e _) = onExpr e
+  onExpr (Let ds e) = mapM_ onDecl ds >> onExpr e
+  onExpr (PositionedValue pos _ e) = censor (addHint (PositionedError pos)) (onExpr e)
+  onExpr _ = return ()
+
+  onCaseAlternative :: CaseAlternative -> m ()
+  onCaseAlternative (CaseAlternative _ (Left es)) = mapM_ (\(e, g) -> onExpr e >> onExpr g) es
+  onCaseAlternative (CaseAlternative _ (Right e)) = onExpr e
 
 -- |
 -- Exhaustivity checking over a single module
 --
 checkExhaustiveModule :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> Module -> m ()
-checkExhaustiveModule env (Module _ _ mn ds _) = censor (onErrorMessages (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds
+checkExhaustiveModule env (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds

@@ -13,7 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Entailment (
@@ -38,10 +37,8 @@ import Control.Monad.Writer.Class (tell)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -51,8 +48,8 @@ import qualified Language.PureScript.Constants as C
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: Environment -> ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Check Expr
-entails env moduleName context = solve
+entails :: ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Check Expr
+entails moduleName context = solve
   where
     forClassName :: Qualified ProperName -> [Type] -> [TypeClassDictionaryInScope]
     forClassName cn@(Qualified (Just mn) _) tys = concatMap (findDicts cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
@@ -75,14 +72,10 @@ entails env moduleName context = solve
       go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
-        -- We need to desugar synonyms here so that forClassName can find the correct modules
-        -- in types hidden inside the synonyms.
-        -- TODO: this can go away when synonyms get desugared up front.
-        tys'' <- mapM expandAllTypeSynonyms tys'
         let instances = do
-              tcd <- forClassName className' tys''
+              tcd <- forClassName className' tys'
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName env) tys'' (tcdInstanceTypes tcd)
+              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
               return (subst, tcd)
         (subst, tcd) <- unique instances
         -- Solve any necessary subgoals
@@ -140,7 +133,7 @@ entails env moduleName context = solve
       verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
       verifySubstitution subst = do
         let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-        guard (all (pairwise (unifiesWith env) . map snd) grps)
+        guard (all (pairwise unifiesWith . map snd) grps)
         return $ map head grps
 
     valUndefined :: Expr
@@ -150,24 +143,21 @@ entails env moduleName context = solve
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
-typeHeadsAreEqual :: ModuleName -> Environment -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
-typeHeadsAreEqual _ _ t                    (TypeVar v)                     = Just [(v, t)]
-typeHeadsAreEqual _ _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual m e (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m e h1 h2
-                                                                                  <*> typeHeadsAreEqual m e t1 t2
-typeHeadsAreEqual m e (SaturatedTypeSynonym name args) t2 = case expandTypeSynonym' e name args of
-  Left  _  -> Nothing
-  Right t1 -> typeHeadsAreEqual m e t1 t2
-typeHeadsAreEqual _ _ REmpty REmpty = Just []
-typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
+typeHeadsAreEqual :: ModuleName -> Type -> Type -> Maybe [(String, Type)]
+typeHeadsAreEqual _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
+typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
+typeHeadsAreEqual _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+typeHeadsAreEqual m (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m h1 h2
+                                                                                <*> typeHeadsAreEqual m t1 t2
+typeHeadsAreEqual _ REmpty REmpty = Just []
+typeHeadsAreEqual m r1@RCons{} r2@RCons{} =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
 
       int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
       sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
       sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in (++) <$> foldMap (\(t1, t2) -> typeHeadsAreEqual m e t1 t2) int
+  in (++) <$> foldMap (uncurry (typeHeadsAreEqual m)) int
           <*> go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
@@ -177,7 +167,7 @@ typeHeadsAreEqual m e r1@(RCons _ _ _) r2@(RCons _ _ _) =
   go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
   go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
   go _  _               _  _               = Nothing
-typeHeadsAreEqual _ _ _ _ = Nothing
+typeHeadsAreEqual _ _ _ = Nothing
 
 -- |
 -- Check all values in a list pairwise match a predicate

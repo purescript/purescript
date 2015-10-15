@@ -102,7 +102,7 @@ ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
   go [] = return ()
   go [_] = return ()
   go ((x@(Qualified (Just mn) name), _) : (y, pos) : _) | x == y =
-    rethrow (onErrorMessages (ErrorInModule mn)) $
+    rethrow (addHint (ErrorInModule mn)) $
       rethrowWithPosition pos $
         throwError . errorMessage $ MultipleFixities name
   go (_ : rest) = go rest

@@ -151,33 +151,34 @@ parseImportDeclaration' = do
   where
   stdImport = do
     moduleName' <- moduleName
-    stdImportHiding moduleName' <|> stdImportQualifying moduleName'
+    suffixHiding moduleName' <|> suffixQualifyingList moduleName'
     where
-    stdImportHiding mn = do
+    suffixHiding mn = do
       reserved "hiding"
-      declType <- importDeclarationType Hiding
+      declType <- qualifyingList Hiding
       return (mn, declType, Nothing)
-    stdImportQualifying mn = do
-      declType <- importDeclarationType Explicit
-      return (mn, declType, Nothing)
+    suffixQualifyingList mn = do
+      declType <- qualifyingList Explicit
+      qName <- P.optionMaybe qualifiedName
+      return (mn, declType, qName)
+  qualifiedName = reserved "as" *> moduleName
   qualImport = do
     reserved "qualified"
     indented
     moduleName' <- moduleName
-    declType <- importDeclarationType Explicit
-    reserved "as"
-    asQ <- moduleName
-    return (moduleName', declType, Just asQ)
-  importDeclarationType expectedType = do
+    declType <- qualifyingList Explicit
+    qName <- qualifiedName
+    return (moduleName', declType, Just qName)
+  qualifyingList expectedType = do
     idents <- P.optionMaybe $ indented *> parens (commaSep parseDeclarationRef)
     return $ fromMaybe Implicit (expectedType <$> idents)
 
 
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
-  parseModuleRef <|> (
-  withSourceSpan PositionedDeclarationRef $
-  ValueRef <$> parseIdent
+  parseModuleRef <|>
+  withSourceSpan PositionedDeclarationRef
+  (ValueRef <$> parseIdent
     <|> do name <- properName
            dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
            return $ maybe (TypeClassRef name) (TypeRef name) dctors
@@ -203,8 +204,8 @@ parseTypeClassDeclaration = do
     mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
 
-parseTypeInstanceDeclaration :: TokenParser Declaration
-parseTypeInstanceDeclaration = do
+parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
+parseInstanceDeclaration = do
   reserved "instance"
   name <- parseIdent <* indented <* doubleColon
   deps <- P.optionMaybe $ do
@@ -214,24 +215,21 @@ parseTypeInstanceDeclaration = do
     return deps
   className <- indented *> parseQualified properName
   ty <- P.many (indented *> noWildcards parseTypeAtom)
+  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
+
+parseTypeInstanceDeclaration :: TokenParser Declaration
+parseTypeInstanceDeclaration = do
+  instanceDecl <- parseInstanceDeclaration
   members <- P.option [] . P.try $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty (ExplicitInstance members)
+  return $ instanceDecl (ExplicitInstance members)
 
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
-  reserved "instance"
-  name <- parseIdent <* indented <* doubleColon
-  deps <- P.optionMaybe $ do
-    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
-    indented
-    rfatArrow
-    return deps
-  className <- indented *> parseQualified properName
-  ty <- P.many (indented *> noWildcards parseTypeAtom)
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty DerivedInstance
+  instanceDecl <- parseInstanceDeclaration
+  return $ instanceDecl DerivedInstance
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration
@@ -295,7 +293,7 @@ parseModulesFromFiles toFilePath input = do
   collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
 
 toPositionedError :: P.ParseError -> ErrorMessage
-toPositionedError perr = PositionedError (SourceSpan name start end) (SimpleErrorWrapper (ErrorParsingModule perr))
+toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
   name   = (P.sourceName . P.errorPos) perr
   start  = (toSourcePos  . P.errorPos) perr

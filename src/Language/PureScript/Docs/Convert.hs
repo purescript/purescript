@@ -147,7 +147,7 @@ convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
   basicDeclaration title (TypeSynonymDeclaration args ty)
-convertDeclaration (P.TypeClassDeclaration _ args implies ds) title = do
+convertDeclaration (P.TypeClassDeclaration _ args implies ds) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
   info = TypeClassDeclaration args implies
@@ -158,7 +158,7 @@ convertDeclaration (P.TypeClassDeclaration _ args implies ds) title = do
     ChildDeclaration (P.showIdent ident') Nothing Nothing (ChildTypeClassMember ty)
   convertClassMember _ =
     error "Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title = do
+convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
   Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
@@ -166,7 +166,6 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
   extractProperNames (P.TypeConstructor n) = [unQual n]
-  extractProperNames (P.SaturatedTypeSynonym n _) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
