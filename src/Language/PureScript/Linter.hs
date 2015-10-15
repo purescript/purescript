@@ -86,6 +86,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     stepB :: S.Set Ident -> Binder -> (S.Set Ident, MultipleErrors)
     stepB s (VarBinder name) = bindName s name
     stepB s (NamedBinder name _) = bindName s name
+    stepB s (TypedBinder _ b) = stepB s b
     stepB s _ = (s, mempty)
 
     bindName :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)

@@ -159,4 +159,5 @@ prettyPrintBinder :: Binder -> String
 prettyPrintBinder (ConstructorBinder ctor []) = runProperName (disqualify ctor)
 prettyPrintBinder (ConstructorBinder ctor args) = runProperName (disqualify ctor) ++ " " ++ unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
+prettyPrintBinder (TypedBinder ty binder) = prettyPrintType ty ++ " :: " ++ prettyPrintBinder binder
 prettyPrintBinder b = prettyPrintBinderAtom b

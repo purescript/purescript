@@ -79,6 +79,7 @@ everywhereOnValues f g h = (f', g', h')
   h' (ArrayBinder bs) = h (ArrayBinder (map h' bs))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
   h' (PositionedBinder pos com b) = h (PositionedBinder pos com (h' b))
+  h' (TypedBinder t b) = h (TypedBinder t (h' b))
   h' other = h other
 
   handleCaseAlternative :: CaseAlternative -> CaseAlternative
@@ -135,6 +136,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   h' (ArrayBinder bs) = ArrayBinder <$> mapM (h' <=< h) bs
   h' (NamedBinder name b) = NamedBinder name <$> (h b >>= h')
   h' (PositionedBinder pos com b) = PositionedBinder pos com <$> (h b >>= h')
+  h' (TypedBinder t b) = TypedBinder t <$> (h b >>= h')
   h' other = h other
 
   handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM (h' <=< h) bs
@@ -187,6 +189,7 @@ everywhereOnValuesM f g h = (f', g', h')
   h' (ArrayBinder bs) = (ArrayBinder <$> mapM h' bs) >>= h
   h' (NamedBinder name b) = (NamedBinder name <$> h' b) >>= h
   h' (PositionedBinder pos com b) = (PositionedBinder pos com <$> h' b) >>= h
+  h' (TypedBinder t b) = (TypedBinder t <$> h' b) >>= h
   h' other = h other
 
   handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> mapM h' bs
@@ -242,6 +245,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   h' b@(ArrayBinder bs) = foldl (<>) (h b) (map h' bs)
   h' b@(NamedBinder _ b1) = h b <> h' b1
   h' b@(PositionedBinder _ _ b1) = h b <> h' b1
+  h' b@(TypedBinder _ b1) = h b <> h' b1
   h' b = h b
 
   i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val
@@ -310,6 +314,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (NamedBinder _ b1) = h'' s b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
+  h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = r0
 
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
@@ -379,6 +384,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   h' s (ArrayBinder bs) = ArrayBinder <$> mapM (h'' s) bs
   h' s (NamedBinder name b) = NamedBinder name <$> h'' s b
   h' s (PositionedBinder pos com b) = PositionedBinder pos com <$> h'' s b
+  h' s (TypedBinder t b) = TypedBinder t <$> h'' s b
   h' _ other = return other
 
   i'' s = uncurry i' <=< i s
