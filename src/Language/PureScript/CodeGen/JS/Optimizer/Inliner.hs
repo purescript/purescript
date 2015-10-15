@@ -255,7 +255,7 @@ inlineFnComposition = everywhereOnJSTopDownM convert
     return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp x [JSApp y [JSVar arg]]])
   convert other = return other
   isFnCompose :: JS -> JS -> Bool
-  isFnCompose dict' fn = isDict semigroupoidFn dict' && (isPreludeFn (C.<<<) fn || isPreludeFn (C.compose) fn)
+  isFnCompose dict' fn = isDict semigroupoidFn dict' && (isPreludeFn (C.<<<) fn || isPreludeFn C.compose fn)
 
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName

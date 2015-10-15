@@ -104,6 +104,10 @@ qualify _ (Qualified (Just m) a) = (m, a)
 mkQualified :: a -> ModuleName -> Qualified a
 mkQualified name mn = Qualified (Just mn) name
 
+-- | Remove the module name from a qualified name
+disqualify :: Qualified a -> a
+disqualify (Qualified _ a) = a
+
 -- |
 -- Checks whether a qualified value is actually qualified with a module reference
 --

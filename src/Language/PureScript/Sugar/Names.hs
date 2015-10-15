@@ -98,7 +98,7 @@ desugarImports externs modules = do
 
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
-    rethrow (onErrorMessages (ErrorInModule mn)) $ do
+    rethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn env
       elaborateImports imps <$> renameInModule env imps (elaborateExports exps m)
 
@@ -132,7 +132,7 @@ elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' 
     let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
     in mkImport `map` nub (f `concatMap` decls) ++ decls
   fqValues :: Expr -> [ModuleName]
-  fqValues (Var (Qualified (Just mn') _)) | notElem mn' (importedModules imps) = [mn']
+  fqValues (Var (Qualified (Just mn') _)) | mn' `notElem` importedModules imps = [mn']
   fqValues _ = []
   mkImport :: ModuleName -> Declaration
   mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing
@@ -211,7 +211,6 @@ renameInModule env imports (Module ss coms mn decls exps) =
     where
     updateType :: Type -> m Type
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (SaturatedTypeSynonym name tys) = SaturatedTypeSynonym <$> updateTypeName name pos <*> pure tys
     updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints pos cs <*> pure t
     updateType t = return t
 

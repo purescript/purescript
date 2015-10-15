@@ -101,7 +101,7 @@ data CaseAlternative a = CaseAlternative
 instance Functor CaseAlternative where
 
   fmap f (CaseAlternative cabs car) = CaseAlternative
-    (fmap (fmap f) $ cabs)
+    (fmap (fmap f) cabs)
     (either (Left . fmap (fmap f *** fmap f)) (Right . fmap f) car)
 
 -- |

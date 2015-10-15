@@ -219,10 +219,10 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d = f d
 
   g' v@(UnaryMinus v1) = g v <> g' v1
-  g' v@(BinaryNoParens op v1 v2) = g v <> g op <> g' v1 <> g' v2
+  g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
   g' v@(Parens v1) = g v <> g' v1
-  g' v@(OperatorSection op (Left v1)) = g v <> g op <> g' v1
-  g' v@(OperatorSection op (Right v1)) = g v <> g op <> g' v1
+  g' v@(OperatorSection op (Left v1)) = g v <> g' op <> g' v1
+  g' v@(OperatorSection op (Right v1)) = g v <> g' op <> g' v1
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
   g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
   g' v@(ObjectConstructor vs) = foldl (<>) (g v) (map g' (mapMaybe snd vs))

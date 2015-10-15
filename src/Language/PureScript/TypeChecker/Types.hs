@@ -67,24 +67,17 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants as C
 
 -- |
 -- Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 --
-typesOf :: Maybe ModuleName -> ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
-typesOf mainModuleName moduleName vals = do
+typesOf :: ModuleName -> [(Ident, Expr)] -> Check [(Ident, (Expr, Type))]
+typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
-    ds1 <- parU typed $ \e -> do
-      triple@(_, (_, ty)) <- checkTypedBindingGroupElement moduleName e dict
-      checkMain (fst e) ty
-      return triple
-    ds2 <- forM untyped $ \e -> do
-      triple@(_, (_, ty)) <- typeForBindingGroupElement e dict untypedDict
-      checkMain (fst e) ty
-      return triple
+    ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
     return $ ds1 ++ ds2
 
   forM tys $ \(ident, (val, ty)) -> do
@@ -94,21 +87,13 @@ typesOf mainModuleName moduleName vals = do
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    -- Remove type synonyms placeholders, and replace
-    -- top-level unification variables with named type variables.
-    let val'' = overTypes desaturateAllTypeSynonyms val'
-        ty' = varIfUnknown . desaturateAllTypeSynonyms $ ty
-    return (ident, (val'', ty'))
+    return (ident, (val', varIfUnknown ty))
   where
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
   -- Replace all the wildcards types with their inferred types
-  replace sub (SimpleErrorWrapper (WildcardInferredType ty)) = SimpleErrorWrapper $ WildcardInferredType (sub $? ty)
+  replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints $ WildcardInferredType (sub $? ty)
   replace _ em = em
-  -- If --main is enabled, need to check that `main` has type Eff eff a for some eff, a
-  checkMain nm ty = when (Just moduleName == mainModuleName && nm == Ident C.main) $ do
-    [eff, a] <- replicateM 2 fresh
-    ty =?= TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Control", ProperName "Monad", ProperName "Eff"])) (ProperName "Eff"))) eff) a
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
 
@@ -182,9 +167,7 @@ replaceTypeClassDictionaries mn =
   let (_, f, _) = everywhereOnValuesTopDownM return go return
   in f
   where
-  go (TypeClassDictionary constraint dicts) = do
-    env <- getEnv
-    entails env mn dicts constraint
+  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
 
 -- |
@@ -214,7 +197,7 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 -- Infer a type for a value, rethrowing any error to provide a more useful error message
 --
 infer :: Expr -> UnifyT Type Check Expr
-infer val = rethrow (onErrorMessages (ErrorInferringType val)) $ infer' val
+infer val = rethrow (addHint (ErrorInferringType val)) $ infer' val
 
 -- |
 -- Infer a type for a value
@@ -246,15 +229,10 @@ infer' (ObjectUpdate o ps) = do
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyObject $ rowFromList (newTys, row)
 infer' (Accessor prop val) = do
-  typed@(TypedValue _ _ objTy) <- infer val
-  propTy <- inferProperty objTy prop
-  case propTy of
-    Nothing -> do
-      field <- fresh
-      rest <- fresh
-      _ <- subsumes Nothing objTy (TypeApp tyObject (RCons prop field rest))
-      return $ TypedValue True (Accessor prop typed) field
-    Just ty -> return $ TypedValue True (Accessor prop typed) ty
+  field <- fresh
+  rest <- fresh
+  typed <- check val (TypeApp tyObject (RCons prop field rest))
+  return $ TypedValue True (Accessor prop typed) field
 infer' (Abs (Left arg) ret) = do
   ty <- fresh
   Just moduleName <- checkCurrentModule <$> get
@@ -340,21 +318,6 @@ inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethr
 inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
 
 -- |
--- Infer the type of a property inside a record with a given type
---
-inferProperty :: Type -> String -> UnifyT Type Check (Maybe Type)
-inferProperty (TypeApp obj row) prop | obj == tyObject = do
-  let (props, _) = rowToList row
-  return $ lookup prop props
-inferProperty (SaturatedTypeSynonym name args) prop = do
-  replaced <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  inferProperty replaced prop
-inferProperty (ForAll ident ty _) prop = do
-  replaced <- replaceVarWithUnknown ident ty
-  inferProperty replaced prop
-inferProperty _ _ = return Nothing
-
--- |
 -- Infer the types of variables brought into scope by a binder
 --
 inferBinder :: Type -> Binder -> UnifyT Type Check (M.Map Ident Type)
@@ -420,7 +383,7 @@ binderRequiresMonotype _ = True
 
 -- | Instantiate polytypes only when necessitated by a binder.
 instantiateForBinders :: [Expr] -> [CaseAlternative] -> UnifyT Type Check ([Expr], [Type])
-instantiateForBinders vals cas = fmap unzip $ zipWithM (\val inst -> do
+instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
   TypedValue _ val' ty <- infer val
   if inst
     then instantiatePolyTypeWithUnknowns val' ty
@@ -458,7 +421,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
 check :: Expr -> Type -> UnifyT Type Check Expr
-check val ty = rethrow (onErrorMessages (ErrorCheckingType val ty)) $ check' val ty
+check val ty = rethrow (addHint (ErrorCheckingType val ty)) $ check' val ty
 
 -- |
 -- Check the type of a value
@@ -494,9 +457,6 @@ check' val t@(ConstrainedType constraints ty) = do
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
   instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
-check' val (SaturatedTypeSynonym name args) = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ args
-  check val ty
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -600,9 +560,6 @@ check' v@(Constructor c) ty = do
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
-check' val ty | containsTypeSynonyms ty = do
-  ty' <- introduceSkolemScope <=< expandAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  check val ty'
 check' val kt@(KindedType ty kind) = do
   checkTypeKind ty kind
   val' <- check' val ty
@@ -615,12 +572,6 @@ check' val ty = do
   case mt of
     Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
     Just v' -> return $ TypedValue True v' ty
-
-containsTypeSynonyms :: Type -> Bool
-containsTypeSynonyms = everythingOnTypes (||) go where
-  go (SaturatedTypeSynonym _ _) = True
-  go _ = False
-
 
 -- |
 -- Check the type of a collection of named record fields
@@ -656,7 +607,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
 -- Check the type of a function application, rethrowing errors to provide a better error message
 --
 checkFunctionApplication :: Expr -> Type -> Expr -> Maybe Type -> UnifyT Type Check (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = rethrow (onErrorMessages (ErrorInApplication fn fnTy arg)) $ do
+checkFunctionApplication fn fnTy arg ret = rethrow (addHint (ErrorInApplication fn fnTy arg)) $ do
   subst <- unifyCurrentSubstitution <$> UnifyT get
   checkFunctionApplication' fn (subst $? fnTy) arg (($?) subst <$> ret)
 
@@ -684,9 +635,6 @@ checkFunctionApplication' fn u@(TUnknown _) arg ret = do
   ret' <- maybe fresh return ret
   u =?= function ty ret'
   return (ret', App fn arg')
-checkFunctionApplication' fn (SaturatedTypeSynonym name tyArgs) arg ret = do
-  ty <- introduceSkolemScope <=< expandTypeSynonym name $ tyArgs
-  checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
