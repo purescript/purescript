@@ -273,6 +273,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mn exps decls
   forM_ exps $ \e -> do
+    checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
   return $ Module ss coms mn decls' (Just exps)
@@ -293,6 +294,17 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
       exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
       exports _ _ = False
   checkMemberExport _ _ = return ()
+
+  -- Check that all the type constructors defined in the current module that appear in member types
+  -- have also been exported from the module
+  checkTypesAreExported :: DeclarationRef -> Check ()
+  checkTypesAreExported = checkMemberExport findTcons
+    where
+    findTcons :: Type -> [DeclarationRef]
+    findTcons = everythingOnTypes (++) go
+      where
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [TypeRef name (error "Data constructors unused in checkTypesAreExported")]
+      go _ = []
 
   -- Check that all the classes defined in the current module that appear in member types have also
   -- been exported from the module
