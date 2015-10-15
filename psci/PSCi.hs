@@ -390,7 +390,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
            outputStrLn ""
 
 
-  where printModule's what _  [] = outputStr $ "This module '" ++ P.runModuleName moduleName ++ "' does not export" ++ what ++ "."
+  where printModule's what _  [] = outputStr $ "This module '" ++ P.runModuleName moduleName ++ "' does not export " ++ what ++ ".\n"
         printModule's _ showF xs = (outputStr . unlines . showF) xs
 
         findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
