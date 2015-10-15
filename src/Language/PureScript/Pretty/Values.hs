@@ -28,7 +28,7 @@ import Control.Arrow (second)
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
+import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintType)
 
 import Text.PrettyPrint.Boxes
 
@@ -129,6 +129,7 @@ prettyPrintDoNotationElement (DoNotationLet ds) =
 prettyPrintDoNotationElement (PositionedDoNotationElement _ _ el) = prettyPrintDoNotationElement el
 
 prettyPrintBinderAtom :: Binder -> String
+
 prettyPrintBinderAtom NullBinder = "_"
 prettyPrintBinderAtom (StringBinder str) = show str
 prettyPrintBinderAtom (CharBinder c) = show c
@@ -159,5 +160,6 @@ prettyPrintBinder :: Binder -> String
 prettyPrintBinder (ConstructorBinder ctor []) = runProperName (disqualify ctor)
 prettyPrintBinder (ConstructorBinder ctor args) = runProperName (disqualify ctor) ++ " " ++ unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
-prettyPrintBinder (TypedBinder ty binder) = prettyPrintBinder binder ++ " :: " ++ prettyPrintType ty
+prettyPrintBinder (TypedBinder ty binder) =
+  prettyPrintBinder binder ++ " :: " ++ prettyPrintType ty
 prettyPrintBinder b = prettyPrintBinderAtom b
