@@ -27,7 +27,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\))
+import Data.List (nub, (\\), sort, group)
 import Data.Foldable (for_)
 
 import qualified Data.Map as M
@@ -216,8 +216,14 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
   go (d@(TypeClassDeclaration pn args implies tys)) = do
     addTypeClass moduleName pn args implies tys
     return d
-  go (d@(TypeInstanceDeclaration dictName deps className tys _)) =
-    goInstance d dictName deps className tys
+  go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
+    mapM_ (checkTypeClassInstance moduleName) tys
+    forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
+    checkOrphanInstance dictName className tys
+    _ <- traverseTypeInstanceBody checkInstanceMembers body
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
+    return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
 
@@ -229,29 +235,36 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     warnAndRethrowWithPosition pos $ checkOrphanFixities d
   checkOrphanFixities _ = return ()
 
-  goInstance :: Declaration -> Ident -> [Constraint] -> Qualified ProperName -> [Type] -> Check Declaration
-  goInstance d dictName deps className tys = do
-    mapM_ (checkTypeClassInstance moduleName) tys
-    forM_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
-    checkOrphanInstance moduleName className tys
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
-    return d
-
+  checkInstanceMembers :: [Declaration] -> Check [Declaration]
+  checkInstanceMembers instDecls = do
+    let idents = sort . map head . group . map memberName $ instDecls
+    for_ (firstDuplicate idents) $ \ident ->
+      throwError . errorMessage $ DuplicateValueDeclaration ident
+    return instDecls
     where
+    memberName :: Declaration -> Ident
+    memberName (ValueDeclaration ident _ _ _) = ident
+    memberName (PositionedDeclaration _ _ d) = memberName d
+    memberName _ = error "checkInstanceMembers: Invalid declaration in type instance definition"
 
-    checkOrphanInstance :: ModuleName -> Qualified ProperName -> [Type] -> Check ()
-    checkOrphanInstance mn (Qualified (Just mn') _) tys'
-      | mn == mn' || any checkType tys' = return ()
-      | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
-      where
-      checkType :: Type -> Bool
-      checkType (TypeVar _) = False
-      checkType (TypeConstructor (Qualified (Just mn'') _)) = mn == mn''
-      checkType (TypeConstructor (Qualified Nothing _)) = error "Unqualified type name in checkOrphanInstance"
-      checkType (TypeApp t1 _) = checkType t1
-      checkType _ = error "Invalid type in instance in checkOrphanInstance"
-    checkOrphanInstance _ _ _ = error "Unqualified class name in checkOrphanInstance"
+    firstDuplicate :: (Eq a) => [a] -> Maybe a
+    firstDuplicate (x : xs@(y : _))
+      | x == y = Just x
+      | otherwise = firstDuplicate xs
+    firstDuplicate _ = Nothing
+
+  checkOrphanInstance :: Ident -> Qualified ProperName -> [Type] -> Check ()
+  checkOrphanInstance dictName className@(Qualified (Just mn') _) tys'
+    | moduleName == mn' || any checkType tys' = return ()
+    | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
+    where
+    checkType :: Type -> Bool
+    checkType (TypeVar _) = False
+    checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
+    checkType (TypeConstructor (Qualified Nothing _)) = error "Unqualified type name in checkOrphanInstance"
+    checkType (TypeApp t1 _) = checkType t1
+    checkType _ = error "Invalid type in instance in checkOrphanInstance"
+  checkOrphanInstance _ _ _ = error "Unqualified class name in checkOrphanInstance"
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
