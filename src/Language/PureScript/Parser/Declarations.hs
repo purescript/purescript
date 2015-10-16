@@ -527,6 +527,7 @@ parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators
   where
   -- TODO: remove this deprecation warning in 0.8
   operators = [ [ P.Infix (P.try $ C.indented *> colon *> featureWasRemoved "Cons binders are no longer supported. Consider using purescript-lists or purescript-sequences instead.") P.AssocRight ] ]
+  -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (P.try (indented *> doubleColon) *> parseType)
                  ]
   parseBinderAtom :: TokenParser Binder
