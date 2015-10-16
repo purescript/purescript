@@ -25,6 +25,14 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
                   , psci/tests/data/Sample.purs
+                  , stack.yaml
+                  , stack-lts-2.yaml
+                  , stack-lts-3.yaml
+                  , stack-nightly.yaml
+                  , README.md
+                  , INSTALL.md
+                  , CONTRIBUTORS.md
+                  , CONTRIBUTING.md
 
 source-repository head
     type: git
