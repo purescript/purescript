@@ -28,7 +28,7 @@ import Control.Arrow (second)
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintType)
+import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
 
 import Text.PrettyPrint.Boxes
 
@@ -160,6 +160,5 @@ prettyPrintBinder :: Binder -> String
 prettyPrintBinder (ConstructorBinder ctor []) = runProperName (disqualify ctor)
 prettyPrintBinder (ConstructorBinder ctor args) = runProperName (disqualify ctor) ++ " " ++ unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
-prettyPrintBinder (TypedBinder ty binder) =
-  prettyPrintBinder binder ++ " :: " ++ prettyPrintType ty
+prettyPrintBinder (TypedBinder _ binder) = prettyPrintBinder binder
 prettyPrintBinder b = prettyPrintBinderAtom b
