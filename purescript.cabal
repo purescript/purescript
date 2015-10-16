@@ -29,6 +29,10 @@ extra-source-files: examples/passing/*.purs
                   , stack-lts-2.yaml
                   , stack-lts-3.yaml
                   , stack-nightly.yaml
+                  , README.md
+                  , INSTALL.md
+                  , CONTRIBUTORS.md
+                  , CONTRIBUTING.md
 
 source-repository head
     type: git
