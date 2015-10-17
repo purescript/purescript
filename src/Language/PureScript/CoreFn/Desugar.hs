@@ -166,6 +166,8 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
     binderToCoreFn (Just ss) (com ++ com1) b
+  binderToCoreFn ss com (A.TypedBinder _ b) =
+    binderToCoreFn ss com b
 
   -- |
   -- Gets metadata for values.

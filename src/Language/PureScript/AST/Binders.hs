@@ -21,6 +21,7 @@ import qualified Data.Data as D
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
 import Language.PureScript.Comments
+import Language.PureScript.Types
 
 -- |
 -- Data type for binders
@@ -69,7 +70,11 @@ data Binder
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourceSpan [Comment] Binder deriving (Show, Read, Eq, D.Data, D.Typeable)
+  | PositionedBinder SourceSpan [Comment] Binder
+  -- |
+  -- A binder with a type annotation
+  --
+  | TypedBinder Type Binder deriving (Show, Read, Eq, D.Data, D.Typeable)
 
 -- |
 -- Collect all names introduced in binders in an expression
@@ -83,4 +88,5 @@ binderNames = go []
   go ns (ArrayBinder bs) = foldl go ns bs
   go ns (NamedBinder name b) = go (name : ns) b
   go ns (PositionedBinder _ _ b) = go ns b
+  go ns (TypedBinder _ b) = go ns b
   go ns _ = ns

@@ -190,6 +190,10 @@ renameInModule env imports (Module ss coms mn decls exps) =
     return ((Just pos, bound), v)
   updateBinder s@(pos, _) (ConstructorBinder name b) =
     (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder s (TypedBinder t b) = do
+    (s'@ (span', _), b') <- updateBinder s b
+    t' <- updateTypesEverywhere span' t
+    return (s', TypedBinder t' b')
   updateBinder s v =
     return (s, v)
 

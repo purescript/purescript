@@ -160,6 +160,7 @@ missingCasesSingle _ _ (BooleanBinder bl) (BooleanBinder br)
   | bl == br = ([], return True)
   | otherwise = ([BooleanBinder bl], return False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
+missingCasesSingle env mn b (TypedBinder _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle _ _ b _ = ([b], Left Unknown)
 
 -- |
