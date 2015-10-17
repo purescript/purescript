@@ -126,7 +126,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ AssocR appliedFunction $ \arg ret -> (arg <> text " ") `before` (text "-> " <> ret)
                     ]
                   , [ Wrap forall_ $ \idents ty -> text ("forall " ++ unwords idents ++ ". ") <> ty ]
-                  , [ Wrap kinded $ \k ty -> ty `before` (text " :: " <> kindAsBox k) ]
+                  , [ Wrap kinded $ \k ty -> ty `before` (text (" :: " ++ prettyPrintKind k)) ]
                   ]
 
 forall_ :: Pattern () Type ([String], Type)
