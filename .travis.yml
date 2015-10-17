@@ -15,7 +15,7 @@ matrix:
     - env: GHCVER=7.6.3
       compiler: ": #GHC 7.6.3"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.6.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.1
+    - env: GHCVER=7.10.1 DEPLOY=yes
       compiler: ": #GHC 7.10.1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.10.2 STACKAGE=lts=3.6 RUNSDISTTESTS=YES
@@ -74,6 +74,7 @@ deploy:
   on:
     all_branches: true
     tags: true
+    condition: "$DEPLOY = yes"
 cache:
   directories:
     - ~/cabal-sandboxes
