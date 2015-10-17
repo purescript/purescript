@@ -215,8 +215,8 @@ infer' other = (, []) <$> go other
     return $ Row k1
   go (ConstrainedType deps ty) = do
     forM_ deps $ \(className, tys) -> do
-      _ <- go $ foldl TypeApp (TypeConstructor className) tys
-      return ()
+      k <- go $ foldl TypeApp (TypeConstructor className) tys
+      k =?= Star
     k <- go ty
     k =?= Star
     return Star

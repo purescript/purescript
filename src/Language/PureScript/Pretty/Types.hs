@@ -45,15 +45,17 @@ typeLiterals = mkPattern match
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
   match (TUnknown u) = Just $ text $ '_' : show u
   match (Skolem name s _) = Just $ text $ name ++ show s
-  match (ConstrainedType deps ty) = Just $ constraintsAsBox deps `before` (text ") => " <> typeAsBox ty)
+  match (ConstrainedType deps ty) = Just $ constraintsAsBox deps ty
   match REmpty = Just $ text "()"
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match _ = Nothing
 
-constraintsAsBox :: [(Qualified ProperName, [Type])] -> Box
-constraintsAsBox = vcat left . zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..]
-  where
-  constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)
+constraintsAsBox :: [(Qualified ProperName, [Type])] -> Type -> Box
+constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> typeAsBox ty
+constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> typeAsBox ty)
+
+constraintAsBox :: Qualified ProperName -> [Type] -> Box
+constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)
 
 -- |
 -- Generate a pretty-printed string representing a Row
