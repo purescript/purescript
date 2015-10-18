@@ -98,6 +98,10 @@ prettyPrintDeclaration (TypeDeclaration ident ty) =
   text (showIdent ident ++ " :: ") <> typeAsBox ty
 prettyPrintDeclaration (ValueDeclaration ident _ [] (Right val)) =
   text (showIdent ident ++ " = ") <> prettyPrintValue val
+prettyPrintDeclaration (BindingGroupDeclaration ds) =
+  vsep 1 left (map (prettyPrintDeclaration . toDecl) ds)
+  where
+  toDecl (nm, t, e) = ValueDeclaration nm t [] (Right e)
 prettyPrintDeclaration (PositionedDeclaration _ _ d) = prettyPrintDeclaration d
 prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
 
