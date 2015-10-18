@@ -176,8 +176,9 @@ make MakeActions{..} ms = do
   unless (null errors) $ throwError (mconcat errors)
 
   -- Bundle up all the externs and return them as an Environment
-  externs <- sequence <$> for barriers (takeMVar . fst . snd)
-  return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment (fromMaybe (error "make: externs were missing but no errors reported.") externs)
+  (warnings, externs) <- unzip . fromMaybe (error "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
+  tell (mconcat warnings)
+  return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
 
   where
   checkModuleNamesAreUnique :: m ()
@@ -199,12 +200,12 @@ make MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: [(ModuleName, (C.MVar (Maybe ExternsFile), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
+  buildModule :: [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
   buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
-    mexterns <- sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
+    mexterns <- fmap unzip . sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
 
     outputTimestamp <- getOutputTimestamp moduleName
     dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
@@ -218,20 +219,22 @@ make MakeActions{..} ms = do
 
     let rebuild =
           case mexterns of
-            Just externs -> do
-              progress $ CompilingModule moduleName
-              let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-              lint m
-              ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
-              (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
-              checkExhaustiveModule env' checked
-              regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
-              let mod' = Module ss coms moduleName regrouped exps
-                  corefn = CF.moduleToCoreFn env' mod'
-                  [renamed] = renameInModules [corefn]
-                  exts = moduleToExternsFile mod' env'
-              evalSupplyT nextVar $ codegen renamed env' $ encode exts
-              markComplete (Just exts) Nothing
+            Just (_, externs) -> do
+              (exts, warnings) <- listen $ do
+                progress $ CompilingModule moduleName
+                let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+                lint m
+                ([desugared], nextVar) <- runSupplyT 0 $ desugar externs [m]
+                (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
+                checkExhaustiveModule env' checked
+                regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+                let mod' = Module ss coms moduleName regrouped exps
+                    corefn = CF.moduleToCoreFn env' mod'
+                    [renamed] = renameInModules [corefn]
+                    exts = moduleToExternsFile mod' env'
+                evalSupplyT nextVar $ codegen renamed env' $ encode exts
+                return exts
+              markComplete (Just (warnings, exts)) Nothing
             Nothing -> markComplete Nothing Nothing
 
     if shouldRebuild
@@ -239,10 +242,10 @@ make MakeActions{..} ms = do
       else do
         mexts <- decodeExterns . snd <$> readExterns moduleName
         case mexts of
-          Just exts -> markComplete (Just exts) Nothing
+          Just exts -> markComplete (Just (mempty, exts)) Nothing
           Nothing -> rebuild
     where
-    markComplete :: Maybe ExternsFile -> Maybe MultipleErrors -> m ()
+    markComplete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do
       putMVar (fst $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) externs
       putMVar (snd $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) errors
