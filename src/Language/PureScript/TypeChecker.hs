@@ -280,20 +280,35 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
   where
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> Check ()
+  checkMemberExport extract dr@(TypeRef name dctors) = do
+    env <- getEnv
+    case M.lookup (Qualified (Just mn) name) (typeSynonyms env) of
+      Nothing -> return ()
+      Just (_, ty) -> checkExport dr extract ty
+    case dctors of
+      Nothing -> return ()
+      Just dctors' -> forM_ dctors' $ \dctor ->
+        case M.lookup (Qualified (Just mn) dctor) (dataConstructors env) of
+          Nothing -> return ()
+          Just (_, _, ty, _) -> checkExport dr extract ty
+    return ()
   checkMemberExport extract dr@(ValueRef name) = do
     ty <- lookupVariable mn (Qualified (Just mn) name)
-    case filter (not . exported) (extract ty) of
-      [] -> return ()
-      hidden -> throwError . errorMessage $ TransitiveExportError dr hidden
-      where
-      exported e = any (exports e) exps
-      exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
-      exports (ValueRef id1) (ValueRef id2) = id1 == id2
-      exports (TypeClassRef pn1) (TypeClassRef pn2) = pn1 == pn2
-      exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
-      exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
-      exports _ _ = False
+    checkExport dr extract ty
   checkMemberExport _ _ = return ()
+
+  checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> Check ()
+  checkExport dr extract ty = case filter (not . exported) (extract ty) of
+    [] -> return ()
+    hidden -> throwError . errorMessage $ TransitiveExportError dr hidden
+    where
+    exported e = any (exports e) exps
+    exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
+    exports (ValueRef id1) (ValueRef id2) = id1 == id2
+    exports (TypeClassRef pn1) (TypeClassRef pn2) = pn1 == pn2
+    exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
+    exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
+    exports _ _ = False
 
   -- Check that all the type constructors defined in the current module that appear in member types
   -- have also been exported from the module
