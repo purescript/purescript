@@ -429,7 +429,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
           where printCons pt =
                     Box.vcat Box.left $
-                    map (Box.moveRight 2) $ 
+                    map (Box.moveRight 2) $
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
                     map (\(cons,idents) -> (Box.text (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
 
@@ -438,7 +438,6 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
                 mapFirstRest _ _ [] = []
                 mapFirstRest f g (x:xs) = f x : map g xs
-
 
 
 -- |
