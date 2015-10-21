@@ -50,57 +50,57 @@ import Paths_purescript as Paths
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
   {
-  -- ^ The externs version
+  -- | The externs version
     efVersion :: String
-  -- ^ Module name
+  -- | Module name
   , efModuleName :: ModuleName
-  -- ^ List of module exports
+  -- | List of module exports
   , efExports :: [DeclarationRef]
-  -- ^ List of module imports
+  -- | List of module imports
   , efImports :: [ExternsImport]
-  -- ^ List of operators and their fixities
+  -- | List of operators and their fixities
   , efFixities :: [ExternsFixity]
-  -- ^ List of type and value declaration
+  -- | List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
   } deriving (Show, Read)
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
   {
-  -- ^ The imported module
+  -- | The imported module
     eiModule :: ModuleName
-  -- ^ The import type: regular, qualified or hiding
+  -- | The import type: regular, qualified or hiding
   , eiImportType :: ImportDeclarationType
-  -- ^ The imported-as name, for qualified imports
+  -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
   } deriving (Show, Read)
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
   {
-  -- ^ The associativity of the operator
+  -- | The associativity of the operator
     efAssociativity :: Associativity
-  -- ^ The precedence level of the operator
+  -- | The precedence level of the operator
   , efPrecedence :: Precedence
-  -- ^ The operator symbol
+  -- | The operator symbol
   , efOperator :: String
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
-  -- ^ A type declaration
+  -- | A type declaration
     EDType
       { edTypeName :: ProperName
       , edTypeKind :: Kind
       , edTypeDeclarationKind :: TypeKind
       }
-  -- ^ A type synonym
+  -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName :: ProperName
       , edTypeSynonymArguments :: [(String, Maybe Kind)]
       , edTypeSynonymType :: Type
       }
-  -- ^ A data construtor
+  -- | A data construtor
   | EDDataConstructor
       { edDataCtorName :: ProperName
       , edDataCtorOrigin :: DataDeclType
@@ -108,19 +108,19 @@ data ExternsDeclaration =
       , edDataCtorType :: Type
       , edDataCtorFields :: [Ident]
       }
-  -- ^ A value declaration
+  -- | A value declaration
   | EDValue
       { edValueName :: Ident
       , edValueType :: Type
       }
-  -- ^ A type class declaration
+  -- | A type class declaration
   | EDClass
       { edClassName :: ProperName
       , edClassTypeArguments :: [(String, Maybe Kind)]
       , edClassMembers :: [(Ident, Type)]
       , edClassConstraints :: [Constraint]
       }
-  -- ^ An instance declaration
+  -- | An instance declaration
   | EDInstance
       { edInstanceClassName :: Qualified ProperName
       , edInstanceName :: Ident
