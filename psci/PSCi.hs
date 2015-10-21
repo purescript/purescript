@@ -52,6 +52,7 @@ import System.FilePath (pathSeparator, (</>), isPathSeparator)
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 import System.IO.Error (tryIOError)
+import qualified Text.PrettyPrint.Boxes as Box
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -387,17 +388,17 @@ printModuleSignatures moduleName (P.Environment {..}) =
            printModule's "types"             (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes
            printModule's "data constructors" (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors
            printModule's "functions"         (sort . map (showNameType . findNameType names)) moduleNamesIdent
-           outputStrLn ""
+           outputStrLn   ""
 
 
-  where printModule's what _  [] = outputStr $ "This module '" ++ P.runModuleName moduleName ++ "' does not export " ++ what ++ ".\n"
+  where printModule's what _  [] = outputStrLn $ "This module '" ++ P.runModuleName moduleName ++ "' does not export " ++ what ++ ".\n"
         printModule's _ showF xs = (outputStr . unlines . showF) xs
 
         findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
 
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
-        showNameType (mIdent, Just (mType, _, _)) = P.showIdent mIdent ++ " :: " ++ P.prettyPrintType mType
+        showNameType (mIdent, Just (mType, _, _)) = Box.render (Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType)
         showNameType _ = error "The impossible happened in printModuleSignatures."
 
         findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
@@ -408,7 +409,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
         compareDatatypes _ _ = error "The impossible happened in printModuleSignatures."
 
         showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
-        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = P.runProperName name ++ " :: " ++ P.prettyPrintType dtType
+        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.render (Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType)
         showDataConstructor _ = error "The impossible happened in printModuleSignatures."
 
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
@@ -418,18 +419,25 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
             (Just (_, P.TypeSynonym), Just (_, dtType)) ->
-                Just ("type " ++ P.runProperName name ++ " = " ++ P.prettyPrintType dtType)
+                Just (Box.render $ Box.text ("type " ++ P.runProperName name) Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType))
 
             (Just (_, P.DataType _ pt), _) ->
-                Just ("data " ++ P.runProperName name ++ if null pt then "" else " = " ++ printCons pt)
+                Just $ Box.render (Box.text ("data " ++ P.runProperName name) Box.// printCons pt)
 
             _ ->
               Nothing
 
-          where printCons pt = intercalate " | " (map (\(cons,idents) -> unwords (P.runProperName cons : map prettyPrintType idents)) pt)
+          where printCons pt =
+                    Box.vcat Box.left $
+                    map (Box.moveRight 2) $ 
+                    mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
+                    map (\(cons,idents) -> (Box.text (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
 
-                prettyPrintType t@(P.TypeApp _ _) = "(" ++ P.prettyPrintType t ++ ")"
-                prettyPrintType t = P.prettyPrintType t
+                prettyPrintType t@(P.TypeApp _ _) = Box.text " (" Box.<> P.typeAsBox t Box.<> Box.text ")"
+                prettyPrintType t = Box.moveRight 1 (P.typeAsBox t)
+
+                mapFirstRest _ _ [] = []
+                mapFirstRest f g (x:xs) = f x : map g xs
 
 
 
