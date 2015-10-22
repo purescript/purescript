@@ -269,7 +269,7 @@ test-suite psci-tests
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
                    transformers-compat -any, process -any, HUnit -any, time -any,
-                   Glob -any
+                   Glob -any, boxes >= 0.1.4 && < 0.2.0
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestsSetup
