@@ -685,7 +685,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
               [ line "..." | not b ]
     renderSimpleErrorMessage IncompleteExhaustivityCheck =
       paras [ line "An exhaustivity check was abandoned due to too many possible cases."
-            , line "You may want to decomposing your data types into smaller types."
+            , line "You may want to decompose your data types into smaller types."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box
