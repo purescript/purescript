@@ -372,7 +372,9 @@ inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPosition pos $ inferBinder val binder
 -- TODO: When adding support for polymorphic types, check subsumption here
 -- and change the definition of `binderRequiresMonotype`
-inferBinder val (TypedBinder ty binder) = val =?= ty >> inferBinder val binder
+inferBinder val (TypedBinder ty binder) = do
+  ty' <- replaceAllTypeSynonyms ty
+  val =?= ty' >> inferBinder val binder
 
 -- | Returns true if a binder requires its argument type to be a monotype.
 -- | If this is the case, we need to instantiate any polymorphic types before checking binders.
