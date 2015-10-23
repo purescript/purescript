@@ -207,19 +207,19 @@ make MakeActions{..} ms = do
     -- MVars for the module's dependencies.
     mexterns <- fmap unzip . sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
 
-    outputTimestamp <- getOutputTimestamp moduleName
-    dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
-    inputTimestamp <- getInputTimestamp moduleName
+    case mexterns of
+      Just (_, externs) -> do
+        outputTimestamp <- getOutputTimestamp moduleName
+        dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
+        inputTimestamp <- getInputTimestamp moduleName
 
-    let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
-                          (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
-                          (Right (Just t1), Nothing, Just t2) -> t1 > t2
-                          (Left RebuildNever, _, Just _) -> False
-                          _ -> True
+        let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
+                              (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
+                              (Right (Just t1), Nothing, Just t2) -> t1 > t2
+                              (Left RebuildNever, _, Just _) -> False
+                              _ -> True
 
-    let rebuild =
-          case mexterns of
-            Just (_, externs) -> do
+        let rebuild = do
               (exts, warnings) <- listen $ do
                 progress $ CompilingModule moduleName
                 let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
@@ -235,15 +235,15 @@ make MakeActions{..} ms = do
                 evalSupplyT nextVar $ codegen renamed env' $ encode exts
                 return exts
               markComplete (Just (warnings, exts)) Nothing
-            Nothing -> markComplete Nothing Nothing
 
-    if shouldRebuild
-      then rebuild
-      else do
-        mexts <- decodeExterns . snd <$> readExterns moduleName
-        case mexts of
-          Just exts -> markComplete (Just (mempty, exts)) Nothing
-          Nothing -> rebuild
+        if shouldRebuild
+          then rebuild
+          else do
+            mexts <- decodeExterns . snd <$> readExterns moduleName
+            case mexts of
+              Just exts -> markComplete (Just (mempty, exts)) Nothing
+              Nothing -> rebuild
+      Nothing -> markComplete Nothing Nothing
     where
     markComplete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do
