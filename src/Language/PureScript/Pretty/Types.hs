@@ -45,14 +45,13 @@ typeLiterals = mkPattern match
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
   match (TUnknown u) = Just $ text $ '_' : show u
   match (Skolem name s _) = Just $ text $ name ++ show s
-  match (ConstrainedType deps ty) = Just $ constraintsAsBox deps ty
   match REmpty = Just $ text "()"
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match _ = Nothing
 
-constraintsAsBox :: [(Qualified ProperName, [Type])] -> Type -> Box
-constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> typeAsBox ty
-constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> typeAsBox ty)
+constraintsAsBox :: [(Qualified ProperName, [Type])] -> Box -> Box
+constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> ty
+constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> ty)
 
 constraintAsBox :: Qualified ProperName -> [Type] -> Box
 constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)
@@ -114,6 +113,12 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
 
+constrained :: Pattern () Type ([Constraint], Type)
+constrained = mkPattern match
+  where
+  match (ConstrainedType deps ty) = Just (deps, ty)
+  match _ = Nothing
+
 matchTypeAtom :: Pattern () Type Box
 matchTypeAtom = typeLiterals <+> fmap ((`before` text ")") . (text "(" <>)) matchType
 
@@ -125,6 +130,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
     OperatorTable [ [ AssocL typeApp $ \f x -> f `beforeWithSpace` x ]
                   , [ AssocR appliedFunction $ \arg ret -> (arg <> text " ") `before` (text "-> " <> ret)
                     ]
+                  , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> text ("forall " ++ unwords idents ++ ". ") <> ty ]
                   , [ Wrap kinded $ \k ty -> ty `before` (text (" :: " ++ prettyPrintKind k)) ]
                   ]
