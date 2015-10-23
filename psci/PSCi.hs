@@ -418,11 +418,11 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type) -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> Maybe String
         showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
-            (Just (_, P.TypeSynonym), Just (_, dtType)) ->
-                Just (Box.render $ Box.text ("type " ++ P.runProperName name) Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType))
+            (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
+                Just (Box.render $ Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType))
 
-            (Just (_, P.DataType _ pt), _) ->
-                Just $ Box.render (Box.text ("data " ++ P.runProperName name) Box.// printCons pt)
+            (Just (_, P.DataType typevars pt), _) ->
+                Just $ Box.render (Box.text ("data " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt)
 
             _ ->
               Nothing
