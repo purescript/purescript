@@ -25,9 +25,8 @@ module Language.PureScript.Sugar.TypeDeclarations (
 #if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
 #endif
-import Control.Monad (forM, when)
+import Control.Monad (forM)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(tell))
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -38,7 +37,7 @@ import Language.PureScript.Traversals
 -- |
 -- Replace all top level type declarations in a module with type annotations
 --
-desugarTypeDeclarationsModule :: forall m. (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Module] -> m [Module]
+desugarTypeDeclarationsModule :: forall m. (Functor m, Applicative m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarTypeDeclarationsModule ms = forM ms $ \(Module ss coms name ds exps) ->
   rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> desugarTypeDeclarations ds <*> pure exps
