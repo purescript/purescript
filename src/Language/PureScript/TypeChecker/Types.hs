@@ -232,7 +232,7 @@ infer' (ObjectUpdate o ps) = do
   let oldTy = TypeApp tyObject $ rowFromList (oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyObject $ rowFromList (newTys, row)
-infer' (Accessor prop val) = do
+infer' (Accessor prop val) = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
   field <- fresh
   rest <- fresh
   typed <- check val (TypeApp tyObject (RCons prop field rest))
@@ -551,7 +551,7 @@ check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   obj' <- check obj (TypeApp tyObject (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
-check' (Accessor prop val) ty = do
+check' (Accessor prop val) ty = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
   rest <- fresh
   val' <- check val (TypeApp tyObject (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
