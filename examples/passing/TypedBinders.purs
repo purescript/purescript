@@ -54,6 +54,11 @@ test3 n = case n of
 test4 :: Tuple Int Int -> Tuple Int Int 
 test4 = (\(Tuple a b :: Tuple Int Int) -> Tuple b a)
 
+type Int1 = Int
+
+test5 :: Int1 -> Int1
+test5 = \(x :: Int1) -> x
+
 main = do
   let t1 = test
       t2 = test2 id
