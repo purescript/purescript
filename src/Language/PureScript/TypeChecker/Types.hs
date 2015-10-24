@@ -496,7 +496,7 @@ check' v@(Var var) ty = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> error "check: unable to check the subsumes relation."
     Just v'' -> return $ TypedValue True v'' ty'
 check' (SuperClassDictionary className tys) _ = do
   {-
@@ -515,7 +515,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> error "check: unable to check the subsumes relation."
     Just _ -> do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
       return $ TypedValue checkType val''' ty2'
@@ -557,7 +557,7 @@ check' v@(Constructor c) ty = do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       mv <- subsumes (Just v) repl ty
       case mv of
-        Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+        Nothing -> error "check: unable to check the subsumes relation."
         Just v' -> return $ TypedValue True v' ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
@@ -572,7 +572,7 @@ check' val ty = do
   TypedValue _ val' ty' <- infer val
   mt <- subsumes (Just val') ty' ty
   case mt of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> error "check: unable to check the subsumes relation."
     Just v' -> return $ TypedValue True v' ty
 
 -- |

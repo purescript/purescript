@@ -129,7 +129,7 @@ matchOperators ops = parseChains
   extendChain (BinaryNoParens op l r) = Left l : Right op : extendChain r
   extendChain other = [Left other]
   bracketChain :: Chain -> m Expr
-  bracketChain = either (const . throwError . errorMessage $ CannotReorderOperators) return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
+  bracketChain = either (\_ -> error "matchOperators: cannot reorder operators") return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]

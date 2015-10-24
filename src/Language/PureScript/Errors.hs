@@ -42,7 +42,6 @@ import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
 
 import Language.PureScript.AST
-import Language.PureScript.Environment (isObject, isFunction)
 import Language.PureScript.Pretty
 import Language.PureScript.Types
 import Language.PureScript.Names
@@ -62,13 +61,11 @@ data SimpleErrorMessage
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
   | UnnecessaryFFIModule ModuleName FilePath
-  | InvalidExternsFile FilePath
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
   | InfiniteType Type
   | InfiniteKind Kind
-  | CannotReorderOperators
   | MultipleFixities Ident
   | OrphanTypeDeclaration Ident
   | OrphanFixityDeclaration String
@@ -112,7 +109,6 @@ data SimpleErrorMessage
   | UndefinedTypeVariable ProperName
   | PartiallyAppliedSynonym (Qualified ProperName)
   | EscapedSkolem (Maybe Expr)
-  | UnspecifiedSkolemScope
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
@@ -126,10 +122,9 @@ data SimpleErrorMessage
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
-  | ExtraneousClassMember Ident
+  | ExtraneousClassMember Ident (Qualified ProperName)
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified ProperName)
-  | SubsumptionCheckFailed
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing String Type
   | CannotApplyFunction Type Expr
@@ -202,13 +197,11 @@ errorCode em = case unwrapErrorMessage em of
   MissingFFIModule{} -> "MissingFFIModule"
   MultipleFFIModules{} -> "MultipleFFIModules"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
-  InvalidExternsFile{} -> "InvalidExternsFile"
   CannotGetFileInfo{} -> "CannotGetFileInfo"
   CannotReadFile{} -> "CannotReadFile"
   CannotWriteFile{} -> "CannotWriteFile"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
-  CannotReorderOperators -> "CannotReorderOperators"
   MultipleFixities{} -> "MultipleFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
   OrphanFixityDeclaration{} -> "OrphanFixityDeclaration"
@@ -252,7 +245,6 @@ errorCode em = case unwrapErrorMessage em of
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
   PartiallyAppliedSynonym{} -> "PartiallyAppliedSynonym"
   EscapedSkolem{} -> "EscapedSkolem"
-  UnspecifiedSkolemScope -> "UnspecifiedSkolemScope"
   TypesDoNotUnify{} -> "TypesDoNotUnify"
   KindsDoNotUnify{} -> "KindsDoNotUnify"
   ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
@@ -269,7 +261,6 @@ errorCode em = case unwrapErrorMessage em of
   ExtraneousClassMember{} -> "ExtraneousClassMember"
   ExpectedType{} -> "ExpectedType"
   IncorrectConstructorArity{} -> "IncorrectConstructorArity"
-  SubsumptionCheckFailed -> "SubsumptionCheckFailed"
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
   CannotApplyFunction{} -> "CannotApplyFunction"
@@ -385,9 +376,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
   prettyPrintErrorMessage (ErrorMessage hints simple) =
     paras $
       map renderHint hints ++
-      renderSimpleErrorMessage simple :
-      suggestions simple ++
-      [line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this " ++ levelText ++ "."]
+      [ renderSimpleErrorMessage simple
+      , line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this " ++ levelText ++ "."
+      ]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
@@ -410,37 +401,37 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , prettyPrintParseError err
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path) =
-      paras [ line "Unable to parse module from FFI file: "
+      paras [ line "Unable to parse foreign module:"
             , indent . line $ path
+            , line "Ensure that all foreign modules contain a single module header at the start of a line, as follows:"
+            , indent $ line "// module A.B.C"
             ]
     renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
-      line $ "Missing FFI implementations for module " ++ runModuleName mn
+      paras [ line $ "Missing foreign module implementation for module " ++ runModuleName mn
+            , line $ "Provide your foreign module implementation using the --ffi command line option, and ensure that your module contains the following module header:"
+            , indent . line $ "// module " ++ runModuleName mn
+            ]
     renderSimpleErrorMessage (UnnecessaryFFIModule mn path) =
-      paras [ line $ "Unnecessary FFI implementations have been provided for module " ++ runModuleName mn ++ ": "
+      paras [ line $ "An unnecessary foreign module implementation was provided for module " ++ runModuleName mn ++ ": "
             , indent . line $ path
+            , line $ "Module " ++ runModuleName mn ++ " does not contain any foreign import declarations, so a foreign module is not necessary."
             ]
     renderSimpleErrorMessage (MultipleFFIModules mn paths) =
-      paras [ line $ "Multiple FFI implementations have been provided for module " ++ runModuleName mn ++ ": "
+      paras [ line $ "Multiple foreign module implementations have been provided for module " ++ runModuleName mn ++ ": "
             , indent . paras $ map line paths
-            ]
-    renderSimpleErrorMessage (InvalidExternsFile path) =
-      paras [ line "Externs file is invalid: "
-            , indent . line $ path
+            , line "Foreign modules are identified by a unique module name, as follows:"
+            , indent $ line "// module A.B.C"
             ]
     renderSimpleErrorMessage InvalidDoBind =
-      line "Bind statement cannot be the last statement in a do block. The last statement must be an expression."
+      line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
     renderSimpleErrorMessage InvalidDoLet =
-      line "Let statement cannot be the last statement in a do block. The last statement must be an expression."
-    renderSimpleErrorMessage CannotReorderOperators =
-      line "Unable to reorder operators"
-    renderSimpleErrorMessage UnspecifiedSkolemScope =
-      line "Skolem variable scope is unspecified"
+      line "The last statement in a 'do' block must be an expression, but this block ends with a let binding."
     renderSimpleErrorMessage OverlappingNamesInLet =
-      line "Overlapping names in let binding."
+      line "The same name was used more than once in a let binding."
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , indent $ typeAsBox ty
@@ -450,17 +441,17 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , indent $ line $ prettyPrintKind ki
             ]
     renderSimpleErrorMessage (MultipleFixities name) =
-      line $ "Multiple fixity declarations for " ++ showIdent name
+      line $ "There are multiple fixity/precedence declarations for " ++ showIdent name
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
-      line $ "Orphan type declaration for " ++ showIdent nm
+      line $ "The type declaration for " ++ showIdent nm ++ " should be followed by its definition."
     renderSimpleErrorMessage (OrphanFixityDeclaration op) =
-      line $ "Orphan fixity declaration for " ++ show op
+      line $ "The fixity/precedence declaration for " ++ show op ++ " should appear in the same module as its definition."
     renderSimpleErrorMessage (RedefinedModule name filenames) =
-      paras [ line ("Module " ++ runModuleName name ++ " has been defined multiple times:")
+      paras [ line ("The module " ++ runModuleName name ++ " has been defined multiple times:")
             , indent . paras $ map (line . displaySourceSpan) filenames
             ]
     renderSimpleErrorMessage (RedefinedIdent name) =
-      line $ "Name " ++ showIdent name ++ " has been defined multiple times"
+      line $ "The name " ++ showIdent name ++ " has been defined multiple times"
     renderSimpleErrorMessage (UnknownModule mn) =
       line $ "Unknown module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownType name) =
@@ -474,25 +465,30 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
     renderSimpleErrorMessage (UnknownDataConstructor dc tc) =
       line $ "Unknown data constructor " ++ showQualified runProperName dc ++ foldMap ((" for type constructor " ++) . showQualified runProperName) tc
     renderSimpleErrorMessage (UnknownImportType mn name) =
-      line $ "Module " ++ runModuleName mn ++ " does not export type " ++ runProperName name
+      line $ "The type " ++ runProperName name ++ " is not exported by the module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownExportType name) =
       line $ "Cannot export unknown type " ++ runProperName name
     renderSimpleErrorMessage (UnknownImportTypeClass mn name) =
-      line $ "Module " ++ runModuleName mn ++ " does not export type class " ++ runProperName name
+      line $ "The type class " ++ runProperName name ++ " is not exported by the module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownExportTypeClass name) =
       line $ "Cannot export unknown type class " ++ runProperName name
     renderSimpleErrorMessage (UnknownImportValue mn name) =
-      line $ "Module " ++ runModuleName mn ++ " does not export value " ++ showIdent name
+      line $ "The value " ++ showIdent name ++ " is not exported by the module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownExportValue name) =
       line $ "Cannot export unknown value " ++ showIdent name
     renderSimpleErrorMessage (UnknownExportModule name) =
-      line $ "Cannot export unknown module " ++ runModuleName name ++ ", it either does not exist or has not been imported by the current module"
+      paras [ line $ "Cannot export unknown module " ++ runModuleName name
+            , line "It either does not exist or has not been imported by the current module."
+            ]
     renderSimpleErrorMessage (UnknownImportDataConstructor mn tcon dcon) =
-      line $ "Module " ++ runModuleName mn ++ " does not export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon
+      line $ "The data constructor " ++ runProperName dcon ++ " (for type " ++ runProperName tcon ++ ") is not exported by the module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownExportDataConstructor tcon dcon) =
-      line $ "Cannot export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon ++ " as it has not been declared"
+      line $ "Cannot export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon ++ ", as it has not been declared."
     renderSimpleErrorMessage (ConflictingImport nm mn) =
-      line $ "Cannot declare " ++ show nm ++ " since another declaration of that name was imported from " ++ runModuleName mn
+      paras [ line $ "Cannot declare " ++ show nm ++ ", since another declaration of that name was imported from the module " ++ runModuleName mn
+            , line $ "Consider hiding " ++ show nm ++ " when importing " ++ runModuleName mn ++ ":"
+            , indent . line $ "import " ++ runModuleName mn ++ " hiding (" ++ nm ++ ")"
+            ]
     renderSimpleErrorMessage (ConflictingImports nm m1 m2) =
       line $ "Conflicting imports for " ++ nm ++ " from modules " ++ runModuleName m1 ++ " and " ++ runModuleName m2
     renderSimpleErrorMessage (ConflictingTypeDecls nm) =
@@ -500,33 +496,41 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
     renderSimpleErrorMessage (ConflictingCtorDecls nm) =
       line $ "Conflicting data constructor declarations for " ++ runProperName nm
     renderSimpleErrorMessage (TypeConflictsWithClass nm) =
-      line $ "Type " ++ runProperName nm ++ " conflicts with type class declaration of the same name"
+      line $ "The type " ++ runProperName nm ++ " conflicts with type class declaration of the same name."
     renderSimpleErrorMessage (CtorConflictsWithClass nm) =
-      line $ "Data constructor " ++ runProperName nm ++ " conflicts with type class declaration of the same name"
+      line $ "The data constructor " ++ runProperName nm ++ " conflicts with type class declaration of the same name."
     renderSimpleErrorMessage (ClassConflictsWithType nm) =
-      line $ "Type class " ++ runProperName nm ++ " conflicts with type declaration of the same name"
+      line $ "The type class " ++ runProperName nm ++ " conflicts with type declaration of the same name."
     renderSimpleErrorMessage (ClassConflictsWithCtor nm) =
-      line $ "Type class " ++ runProperName nm ++ " conflicts with data constructor declaration of the same name"
+      line $ "The type class " ++ runProperName nm ++ " conflicts with data constructor declaration of the same name."
     renderSimpleErrorMessage (DuplicateModuleName mn) =
-      line $ "Module " ++ runModuleName mn ++ " has been defined multiple times."
+      line $ "The module " ++ runModuleName mn ++ " has been defined multiple times."
     renderSimpleErrorMessage (DuplicateClassExport nm) =
       line $ "Duplicate export declaration for type class " ++ runProperName nm
     renderSimpleErrorMessage (DuplicateValueExport nm) =
       line $ "Duplicate export declaration for value " ++ showIdent nm
     renderSimpleErrorMessage (CycleInDeclaration nm) =
-      line $ "Cycle in declaration of " ++ showIdent nm
+      paras [ line $ "The declaration of " ++ showIdent nm ++ " contains a cycle."
+            , line $ "The value of " ++ showIdent nm ++ " may not be defined here, so this reference is not allowed."
+            , line "You might be able to evaluate this expression lazily, using something like Control.Lazy.fix"
+            ]
     renderSimpleErrorMessage (CycleInModules mns) =
-      line $ "Cycle in module dependencies: " ++ intercalate ", " (map runModuleName mns)
-    renderSimpleErrorMessage (CycleInTypeSynonym pn) =
-      line $ "Cycle in type synonym" ++ foldMap ((" " ++) . runProperName) pn
+      line $ "There is a cycle in the module dependencies: " ++ intercalate ", " (map runModuleName mns)
+    renderSimpleErrorMessage (CycleInTypeSynonym name) =
+      paras [ line $ case name of
+                       Just pn -> "A cycle appears in the definition of the type synonym " ++ runProperName pn
+                       Nothing -> "A cycle appears in a set of type synonym definitions."
+            , line "Cycles are disallowed because they can lead to loops in the type checker."
+            , line "Consider using a 'newtype' instead."
+            ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
-      line $ showIdent ident ++ " is undefined"
+      line $ "The name " ++ showIdent ident ++ " is undefined."
     renderSimpleErrorMessage (NameNotInScope ident) =
-      line $ showIdent ident ++ " may not be defined in the current scope"
+      line $ "The name " ++ showIdent ident ++ " may not be defined in the current scope."
     renderSimpleErrorMessage (UndefinedTypeVariable name) =
-      line $ "Type variable " ++ runProperName name ++ " is undefined"
+      line $ "The type variable " ++ runProperName name ++ " is undefined."
     renderSimpleErrorMessage (PartiallyAppliedSynonym name) =
-      paras [ line $ "Partially applied type synonym " ++ showQualified runProperName name
+      paras [ line $ "The type synonym " ++ showQualified runProperName name ++ " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
     renderSimpleErrorMessage (EscapedSkolem binding) =
@@ -535,25 +539,25 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
                                           , indent $ prettyPrintValue expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
-      = paras [ line "Cannot unify type"
+      = paras [ line "The type"
               , indent $ typeAsBox t1
-              , line "with type"
+              , line "cannot be made equal to the type"
               , indent $ typeAsBox t2
               ]
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
-      paras [ line "Cannot unify kind"
+      paras [ line "The kind"
             , indent $ line $ prettyPrintKind k1
-            , line "with kind"
+            , line "cannot be made equal to the kind"
             , indent $ line $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
-      paras [ line "Cannot unify constrained type"
+      paras [ line "The constrained type"
             , indent $ typeAsBox t1
-            , line "with type"
+            , line "cannot be made equal to the kind"
             , indent $ typeAsBox t2
             ]
     renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
-      paras [ line "Overlapping instances found for"
+      paras [ line "Overlapping type class instances found for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
@@ -562,43 +566,43 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             ]
     renderSimpleErrorMessage OverlappingInstances{} = error "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (NoInstanceFound nm ts) =
-      paras [ line "No instance found for"
+      paras [ line "No type class instance was found for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
-      paras [ line "Instance for"
+      paras [ line "The type class instance for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             , line "is possibly infinite."
             ]
     renderSimpleErrorMessage (CannotDerive nm ts) =
-      paras [ line "Cannot derive an instance for"
+      paras [ line "Cannot derive a type class instance for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
-      line $ "Cannot derive instance, because the type declaration for " ++ runProperName nm ++ " could not be found."
+      line $ "Cannot derive a type class instance, because the type declaration for " ++ runProperName nm ++ " could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
-      paras $ [ line $ "Duplicate label " ++ show l ++ " in row." ]
+      paras $ [ line $ "The duplicate label " ++ show l ++ " appears in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , indent $ prettyPrintValue expr'
                                              ]) expr
     renderSimpleErrorMessage (DuplicateTypeArgument name) =
-      line $ "Duplicate type argument " ++ show name
+      line $ "The type argument " ++ show name ++ " appears more than once."
     renderSimpleErrorMessage (DuplicateValueDeclaration nm) =
-      line $ "Duplicate value declaration for " ++ showIdent nm
+      line $ "Multiple value declarations exist for " ++ showIdent nm ++ "."
     renderSimpleErrorMessage (ArgListLengthsDiffer ident) =
       line $ "Argument list lengths differ in declaration " ++ showIdent ident
     renderSimpleErrorMessage (OverlappingArgNames ident) =
       line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . showIdent) ident
     renderSimpleErrorMessage (MissingClassMember ident) =
-      line $ "Member " ++ showIdent ident ++ " has not been implemented"
-    renderSimpleErrorMessage (ExtraneousClassMember ident) =
-      line $ "Member " ++ showIdent ident ++ " is not a member of the class being instantiated"
+      line $ "The type class member " ++ showIdent ident ++ " has not been implemented."
+    renderSimpleErrorMessage (ExtraneousClassMember ident className) =
+      line $ showIdent ident ++ " is not a member of type class " ++ showQualified runProperName className
     renderSimpleErrorMessage (ExpectedType ty kind) =
       paras [ line "In a type-annotated expression x :: t, the type t must have kind *."
             , line "The error arises from the type"
@@ -608,29 +612,28 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm) =
-      line $ "Wrong number of arguments to constructor " ++ showQualified runProperName nm
-    renderSimpleErrorMessage SubsumptionCheckFailed = line "Unable to check type subsumption"
+      line $ "The data constructor " ++ showQualified runProperName nm ++ " was given the wrong number of arguments in a case expression."
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
-      paras [ line "Expression"
+      paras [ line "The expression"
             , indent $ prettyPrintValue expr
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop row) =
-      paras [ line "Row"
+      paras [ line "The row type"
             , indent $ prettyPrintRowWith '(' ')' row
-            , line $ "lacks required property " ++ show prop
+            , line $ "lacks the required property " ++ show prop
             ]
     renderSimpleErrorMessage (CannotApplyFunction fn arg) =
-      paras [ line "Cannot apply function of type"
+      paras [ line "A function of type"
             , indent $ typeAsBox fn
-            , line "to argument"
+            , line "can not be applied to the argument"
             , indent $ prettyPrintValue arg
             ]
     renderSimpleErrorMessage TypeSynonymInstance =
-      line "Type synonym instances are disallowed"
+      line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
-      paras [ line $ "Instance " ++ showIdent nm ++ " for "
+      paras [ line $ "The type class instance " ++ showIdent nm ++ " for "
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName cnm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
@@ -639,29 +642,31 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , line "Consider moving the instance, if possible, or using a newtype wrapper."
             ]
     renderSimpleErrorMessage InvalidNewtype =
-      line "Newtypes must define a single constructor with a single argument"
+      line "Newtypes must define a single constructor with a single argument."
     renderSimpleErrorMessage (InvalidInstanceHead ty) =
-      paras [ line "Invalid type in class instance head:"
+      paras [ line "An invalid type appears in a type class instance head:"
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
       paras $ line ("An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
               : map (line . prettyPrintExport) ys
     renderSimpleErrorMessage (ShadowedName nm) =
-      line $ "Name '" ++ showIdent nm ++ "' was shadowed"
+      line $ "The name '" ++ showIdent nm ++ "' was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
-      line $ "Type variable '" ++ tv ++ "' was shadowed"
+      line $ "The type variable '" ++ tv ++ "' was shadowed."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
-      line $ "Type variable '" ++ tv ++ "' was declared but not used"
+      line $ "The type variable '" ++ tv ++ "' was declared but not used."
     renderSimpleErrorMessage (ClassOperator className opName) =
-      paras [ line $ "Class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
+      paras [ line $ "The type class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
             , line "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
             , indent . line $ showIdent opName ++ " = someMember"
             ]
     renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
-      line $ "Importing type " ++ runProperName name ++ "(..) from " ++ runModuleName mn ++ " is misleading as it has no exported data constructors"
+      line $ "Importing type " ++ runProperName name ++ "(..) from " ++ runModuleName mn ++ " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
-      line $ "Attempted to hide module " ++ runModuleName name ++ " in import expression, this is not permitted"
+      paras [ line $ "'hiding' imports cannot be used to hide modules."
+            , line $ "An attempt was made to hide the import of " ++ runModuleName name
+            ]
     renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "The wildcard type definition has the inferred type "
             , indent $ typeAsBox ty
@@ -692,9 +697,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
     renderHint (NotYetDefined names) =
       line $ "The following are not yet defined here: " ++ intercalate ", " (map showIdent names) ++ ":"
     renderHint (ErrorUnifyingTypes t1 t2) =
-      paras [ lineWithLevel "unifying type "
+      paras [ lineWithLevel "while trying to make the type "
             , indent $ typeAsBox t1
-            , line "with type"
+            , line "equal to the type"
             , indent $ typeAsBox t2
             ]
     renderHint (ErrorInExpression expr) =
@@ -705,9 +710,9 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
       paras [ lineWithLevel $ "in module " ++ runModuleName mn ++ ":"
             ]
     renderHint (ErrorInSubsumption t1 t2) =
-      paras [ lineWithLevel "checking that type "
+      paras [ lineWithLevel "checking that the type"
             , indent $ typeAsBox t1
-            , line "subsumes type"
+            , line "is more general than the type"
             , indent $ typeAsBox t2
             ]
     renderHint (ErrorInInstance nm ts) =
@@ -717,25 +722,25 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
                                            ]
             ]
     renderHint (ErrorCheckingKind ty) =
-      paras [ lineWithLevel "checking kind of type "
+      paras [ lineWithLevel "checking the kind of the type"
             , indent $ typeAsBox ty
             ]
     renderHint (ErrorInferringType expr) =
-      paras [ lineWithLevel "inferring type of value "
+      paras [ lineWithLevel "inferring the type of the expression"
             , indent $ prettyPrintValue expr
             ]
     renderHint (ErrorCheckingType expr ty) =
-      paras [ lineWithLevel "checking that value "
+      paras [ lineWithLevel "checking that the expression"
             , indent $ prettyPrintValue expr
-            , line "has type"
+            , line "has the type"
             , indent $ typeAsBox ty
             ]
     renderHint (ErrorInApplication f t a) =
-      paras [ lineWithLevel "applying function"
+      paras [ lineWithLevel "applying a function"
             , indent $ prettyPrintValue f
             , line "of type"
             , indent $ typeAsBox t
-            , line "to argument"
+            , line "to the argument"
             , indent $ prettyPrintValue a
             ]
     renderHint (ErrorInDataConstructor nm) =
@@ -764,15 +769,6 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
   levelText = case level of
     Error -> "error"
     Warning -> "warning"
-
-  suggestions :: SimpleErrorMessage -> [Box.Box]
-  suggestions (ConflictingImport nm im) = [ line $ "Possible fix: hide " ++ show nm ++ " when importing " ++ runModuleName im ++ ":"
-                                             , indent . line $ "import " ++ runModuleName im ++ " hiding (" ++ nm ++ ")"
-                                             ]
-  suggestions (TypesDoNotUnify t1 t2)
-    | isObject t1 && isFunction t2 = [line "Note that function composition in PureScript is defined using (<<<)"]
-    | otherwise             = []
-  suggestions _ = []
 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
