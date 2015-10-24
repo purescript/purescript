@@ -411,7 +411,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , prettyPrintParseError err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
-      paras [ line $ "Missing foreign module implementation for module " ++ runModuleName mn
+      paras [ line $ "The foreign module implementation for module " ++ runModuleName mn ++ " is missing."
             , line $ "Provide your foreign module implementation using the --ffi command line option, and ensure that your module contains the following module header:"
             , indent . line $ "// module " ++ runModuleName mn
             ]
@@ -496,13 +496,13 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
     renderSimpleErrorMessage (ConflictingCtorDecls nm) =
       line $ "Conflicting data constructor declarations for " ++ runProperName nm
     renderSimpleErrorMessage (TypeConflictsWithClass nm) =
-      line $ "The type " ++ runProperName nm ++ " conflicts with type class declaration of the same name."
+      line $ "The type " ++ runProperName nm ++ " conflicts with a type class declaration of the same name."
     renderSimpleErrorMessage (CtorConflictsWithClass nm) =
-      line $ "The data constructor " ++ runProperName nm ++ " conflicts with type class declaration of the same name."
+      line $ "The data constructor " ++ runProperName nm ++ " conflicts with a type class declaration of the same name."
     renderSimpleErrorMessage (ClassConflictsWithType nm) =
-      line $ "The type class " ++ runProperName nm ++ " conflicts with type declaration of the same name."
+      line $ "The type class " ++ runProperName nm ++ " conflicts with a type declaration of the same name."
     renderSimpleErrorMessage (ClassConflictsWithCtor nm) =
-      line $ "The type class " ++ runProperName nm ++ " conflicts with data constructor declaration of the same name."
+      line $ "The type class " ++ runProperName nm ++ " conflicts with a data constructor declaration of the same name."
     renderSimpleErrorMessage (DuplicateModuleName mn) =
       line $ "The module " ++ runModuleName mn ++ " has been defined multiple times."
     renderSimpleErrorMessage (DuplicateClassExport nm) =
