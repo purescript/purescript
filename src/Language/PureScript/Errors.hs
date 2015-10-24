@@ -20,7 +20,7 @@
 module Language.PureScript.Errors where
 
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub, nubBy, partition)
+import Data.List (intercalate, transpose, nub, nubBy)
 import Data.Function (on)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (fold, foldMap)
@@ -154,6 +154,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified ProperName) [Type]
   | ErrorInSubsumption Type Type
+  | ErrorCheckingAccessor Expr String
   | ErrorCheckingType Expr Type
   | ErrorCheckingKind Type
   | ErrorInferringType Expr
@@ -367,8 +368,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
 -- Pretty print a single error, simplifying if necessary
 --
 prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State UnknownMap Box.Box
-prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFirst . reverseHints <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
- where
+prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+  where
 
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: ErrorMessage -> Box.Box
@@ -735,6 +736,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
             , line "has type"
             , indent $ typeAsBox ty
             ]
+    renderHint (ErrorCheckingAccessor expr prop) =
+      paras [ lineWithLevel "checking type of property accessor"
+            , indent $ prettyPrintValue (Accessor prop expr)
+            ]
     renderHint (ErrorInApplication f t a) =
       paras [ lineWithLevel "applying a function"
             , indent $ prettyPrintValue f
@@ -781,19 +786,6 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage . positionHintsFir
   prettyPrintExport (TypeInstanceRef ident) = showIdent ident
   prettyPrintExport (ModuleRef name) = "module " ++ runModuleName name
   prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
-
-  -- Hints get added at the front, so we need to reverse them before rendering
-  reverseHints :: ErrorMessage -> ErrorMessage
-  reverseHints (ErrorMessage hints simple) = ErrorMessage (reverse hints) simple
-
-  -- | Put positional hints at the front of the list
-  positionHintsFirst :: ErrorMessage -> ErrorMessage
-  positionHintsFirst (ErrorMessage hints simple) = ErrorMessage (uncurry (++) $ partition (isPositionHint . hintCategory) hints) simple
-    where
-    isPositionHint :: HintCategory -> Bool
-    isPositionHint PositionHint = True
-    isPositionHint OtherHint = True
-    isPositionHint _ = False
 
   -- | Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage
