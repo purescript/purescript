@@ -50,6 +50,7 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Unify
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (tell)
 
 import Language.PureScript.AST
 import Language.PureScript.Environment
@@ -93,6 +94,7 @@ typesOf moduleName vals = do
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (sub $?) val, sub $? ty))) ts
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints $ WildcardInferredType (sub $? ty)
+  replace sub (ErrorMessage hints (MissingTypeDeclaration name ty)) = ErrorMessage hints $ MissingTypeDeclaration name (varIfUnknown (sub $? ty))
   replace _ em = em
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
@@ -139,6 +141,7 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
   ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+  tell . errorMessage $ MissingTypeDeclaration ident ty
   return (ident, (TypedValue True val' ty, ty))
 
 -- |
