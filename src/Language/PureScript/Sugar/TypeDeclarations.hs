@@ -28,7 +28,6 @@ import Control.Applicative
 import Control.Monad (forM)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Environment
