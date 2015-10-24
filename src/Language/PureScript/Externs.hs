@@ -38,6 +38,7 @@ import Data.Aeson.TH
 
 import qualified Data.Map as M
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Names
@@ -152,7 +153,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 
 -- | Generate an externs file for all declarations in a module
 moduleToExternsFile :: Module -> Environment -> ExternsFile
-moduleToExternsFile (Module _ _ _ _ Nothing) _ = error "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
   efVersion       = showVersion Paths.version
@@ -181,7 +182,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (PositionedDeclarationRef _ _ r) = toExternsDeclaration r
   toExternsDeclaration (TypeRef pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
-      Nothing -> error "toExternsDeclaration: no kind in toExternsDeclaration"
+      Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
       Just (kind, TypeSynonym)
         | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
       Just (kind, ExternData) -> [ EDType pn kind ExternData ]
@@ -190,7 +191,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
                             | dctor <- fromMaybe (map fst tys) dctors
                             , (dty, _, ty, args) <- maybeToList (M.lookup (Qualified (Just mn) dctor) (dataConstructors env))
                             ]
-      _ -> error "toExternsDeclaration: Invalid input"
+      _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef ident)
     | Just (ty, _, _) <- (mn, ident) `M.lookup` names env
     = [ EDValue ident ty ]

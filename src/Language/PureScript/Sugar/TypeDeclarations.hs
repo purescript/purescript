@@ -29,6 +29,7 @@ import Control.Monad (forM, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(tell))
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Environment
@@ -63,7 +64,7 @@ desugarTypeDeclarationsModule ms = forM ms $ \(Module ss coms name ds exps) ->
     -- At the top level, match a type signature or emit a warning.
     when reqd $ case val of
                   Right TypedValue{} -> return ()
-                  Left _ -> error "desugarTypeDeclarations: cases were not desugared"
+                  Left _ -> internalError "desugarTypeDeclarations: cases were not desugared"
                   _ -> tell (addHint (ErrorInValueDeclaration name) $ errorMessage $ MissingTypeDeclaration name)
     let (_, f, _) = everywhereOnValuesTopDownM return go return
         f' (Left gs) = Left <$> mapM (pairM return f) gs

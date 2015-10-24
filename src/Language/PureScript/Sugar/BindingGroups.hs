@@ -35,6 +35,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Set as S
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -145,13 +146,13 @@ usedProperNames moduleName =
 getIdent :: Declaration -> Ident
 getIdent (ValueDeclaration ident _ _ _) = ident
 getIdent (PositionedDeclaration _ _ d) = getIdent d
-getIdent _ = error "Expected ValueDeclaration"
+getIdent _ = internalError "Expected ValueDeclaration"
 
 getProperName :: Declaration -> ProperName
 getProperName (DataDeclaration _ pn _ _) = pn
 getProperName (TypeSynonymDeclaration pn _ _) = pn
 getProperName (PositionedDeclaration _ _ d) = getProperName d
-getProperName _ = error "Expected DataDeclaration"
+getProperName _ = internalError "Expected DataDeclaration"
 
 -- |
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
@@ -185,7 +186,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
   cycleError (ValueDeclaration n _ _ (Right _)) [] = throwError . errorMessage $ CycleInDeclaration n
   cycleError d ds@(_:_) = rethrow (addHint (NotYetDefined (map getIdent ds))) $ cycleError d []
-  cycleError _ _ = error "Expected ValueDeclaration"
+  cycleError _ _ = internalError "Expected ValueDeclaration"
 
 toDataBindingGroup :: (MonadError MultipleErrors m) => SCC Declaration -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
@@ -203,6 +204,6 @@ isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
 fromValueDecl (ValueDeclaration ident nameKind [] (Right val)) = (ident, nameKind, val)
-fromValueDecl ValueDeclaration{} = error "Binders should have been desugared"
+fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
-fromValueDecl _ = error "Expected ValueDeclaration"
+fromValueDecl _ = internalError "Expected ValueDeclaration"

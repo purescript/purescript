@@ -27,6 +27,7 @@ import Data.Maybe (fromMaybe)
 import Control.Arrow ((<+>))
 import Control.PatternArrows
 
+import Language.PureScript.Crash
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -136,14 +137,14 @@ forall_ = mkPattern match
   match _ = Nothing
 
 typeAtomAsBox :: Type -> Box
-typeAtomAsBox = fromMaybe (error "Incomplete pattern") . pattern matchTypeAtom () . insertPlaceholders
+typeAtomAsBox = fromMaybe (internalError "Incomplete pattern") . pattern matchTypeAtom () . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a Type, as it should appear inside parentheses
 prettyPrintTypeAtom :: Type -> String
 prettyPrintTypeAtom = render . typeAtomAsBox
 
 typeAsBox :: Type -> Box
-typeAsBox = fromMaybe (error "Incomplete pattern") . pattern matchType () . insertPlaceholders
+typeAsBox = fromMaybe (internalError "Incomplete pattern") . pattern matchType () . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a Type
 prettyPrintType :: Type -> String

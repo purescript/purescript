@@ -35,6 +35,7 @@ import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (tell)
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
@@ -53,11 +54,11 @@ entails moduleName context = solve
   where
     forClassName :: Qualified ProperName -> [Type] -> [TypeClassDictionaryInScope]
     forClassName cn@(Qualified (Just mn) _) tys = concatMap (findDicts cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
-    forClassName _ _ = error "forClassName: expected qualified class name"
+    forClassName _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
-    ctorModules (TypeConstructor (Qualified Nothing _)) = error "ctorModules: unqualified type name"
+    ctorModules (TypeConstructor (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp ty _) = ctorModules ty
     ctorModules _ = Nothing
 

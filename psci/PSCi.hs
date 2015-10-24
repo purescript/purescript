@@ -71,7 +71,7 @@ supportModule :: P.Module
 supportModule =
   case P.parseModulesFromFiles id [("", code)] of
     Right [(_, P.Module ss cs _ ds exps)] -> P.Module ss cs supportModuleName ds exps
-    _ -> error "Support module could not be parsed"
+    _ -> P.internalError "Support module could not be parsed"
   where
   code :: String
   code = unlines
@@ -390,7 +390,7 @@ printModuleSignatures moduleName env =
         findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
         showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
         showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
-        showType _ = error "The impossible happened in printModuleSignatures."
+        showType _ = P.internalError "The impossible happened in printModuleSignatures."
 
 -- |
 -- Browse a module and displays its signature (if module exists).
@@ -482,7 +482,7 @@ handleCommand (KindOf typ) = handleKindOf typ
 handleCommand (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand (ShowInfo QueryLoaded) = handleShowLoadedModules
 handleCommand (ShowInfo QueryImport) = handleShowImportedModules
-handleCommand QuitPSCi = error "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand QuitPSCi = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
 
 whenFileExists :: FilePath -> (FilePath -> PSCI ()) -> PSCI ()
 whenFileExists filePath f = do

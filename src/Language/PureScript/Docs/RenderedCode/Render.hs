@@ -22,6 +22,7 @@ import Data.Maybe (fromMaybe)
 import Control.Arrow ((<+>))
 import Control.PatternArrows
 
+import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Kinds
@@ -163,7 +164,7 @@ renderKind = kind . prettyPrintKind
 --
 renderTypeAtom :: Type -> RenderedCode
 renderTypeAtom =
-  fromMaybe (error "Incomplete pattern") . pattern matchTypeAtom () . preprocessType defaultRenderTypeOptions
+  fromMaybe (internalError "Incomplete pattern") . pattern matchTypeAtom () . preprocessType defaultRenderTypeOptions
 
 
 -- |
@@ -181,4 +182,4 @@ defaultRenderTypeOptions = RenderTypeOptions { prettyPrintObjects = True }
 
 renderTypeWithOptions :: RenderTypeOptions -> Type -> RenderedCode
 renderTypeWithOptions opts =
-  fromMaybe (error "Incomplete pattern") . pattern matchType () . preprocessType opts
+  fromMaybe (internalError "Incomplete pattern") . pattern matchType () . preprocessType opts

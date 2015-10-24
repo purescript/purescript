@@ -30,6 +30,7 @@ import Control.Applicative
 #endif
 import Control.Monad.Writer.Class
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
@@ -50,7 +51,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
   getDeclIdent (ExternDeclaration ident _) = Just ident
   getDeclIdent (TypeInstanceDeclaration ident _ _ _ _) = Just ident
-  getDeclIdent (BindingGroupDeclaration _) = error "lint: binding groups should not be desugared yet."
+  getDeclIdent (BindingGroupDeclaration _) = internalError "lint: binding groups should not be desugared yet."
   getDeclIdent _ = Nothing
 
   lintDeclaration :: Declaration -> m ()

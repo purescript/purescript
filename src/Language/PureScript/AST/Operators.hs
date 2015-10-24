@@ -21,6 +21,8 @@ import qualified Data.Data as D
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
+import Language.PureScript.Crash
+
 -- |
 -- A precedence level for an infix operator
 --
@@ -40,7 +42,7 @@ readAssoc :: String -> Associativity
 readAssoc "infixl" = Infixl
 readAssoc "infixr" = Infixr
 readAssoc "infix"  = Infix
-readAssoc _ = error "readAssoc: no parse"
+readAssoc _ = internalError "readAssoc: no parse"
 
 instance A.ToJSON Associativity where
   toJSON = A.toJSON . showAssoc

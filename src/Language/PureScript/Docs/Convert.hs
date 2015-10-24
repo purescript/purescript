@@ -157,7 +157,7 @@ convertDeclaration (P.TypeClassDeclaration _ args implies ds) title =
   convertClassMember (P.TypeDeclaration ident' ty) =
     ChildDeclaration (P.showIdent ident') Nothing Nothing (ChildTypeClassMember ty)
   convertClassMember _ =
-    error "Invalid argument to convertClassMember."
+    P.internalError "convertDeclaration: Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
   Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
