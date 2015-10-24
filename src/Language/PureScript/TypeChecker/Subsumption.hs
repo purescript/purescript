@@ -20,7 +20,6 @@ module Language.PureScript.TypeChecker.Subsumption (
 import Data.List (sortBy)
 import Data.Ord (comparing)
 
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
 import Language.PureScript.AST
