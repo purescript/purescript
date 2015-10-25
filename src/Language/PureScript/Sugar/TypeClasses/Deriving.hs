@@ -36,6 +36,7 @@ import Control.Monad (replicateM)
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Control.Monad.Error.Class (MonadError(..))
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -116,7 +117,7 @@ mkSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> mapM mkCtorCl
           $ decomposeRec rec
   toSpineFun i _ = lamNull $ App (mkGenVar C.toSpine) i
 mkSpineFunction mn (PositionedDeclaration _ _ d) = mkSpineFunction mn d
-mkSpineFunction _ _ = error "mkSpineFunction: expected DataDeclaration"
+mkSpineFunction _ _ = internalError "mkSpineFunction: expected DataDeclaration"
 
 mkSignatureFunction :: ModuleName -> Declaration -> Expr
 mkSignatureFunction _ (DataDeclaration _ _ _ args) = lamNull . mkSigProd $ map mkProdClause args
@@ -145,7 +146,7 @@ mkSignatureFunction _ (DataDeclaration _ _ _ args) = lamNull . mkSigProd $ map m
   mkProductSignature typ = lamNull $ App (mkGenVar C.toSignature)
                            (TypedValue False (mkGenVar "anyProxy") (proxy typ))
 mkSignatureFunction mn (PositionedDeclaration _ _ d) = mkSignatureFunction mn d
-mkSignatureFunction _ _ = error "mkSignatureFunction: expected DataDeclaration"
+mkSignatureFunction _ _ = internalError "mkSignatureFunction: expected DataDeclaration"
 
 mkFromSpineFunction :: forall m. (Functor m, MonadSupply m) => ModuleName -> Declaration -> m Expr
 mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch <$> mapM mkAlternative args)
@@ -194,7 +195,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
   mkRecFun xs = mkJust $ foldr (\s e -> lam s e) recLiteral (map fst xs)
      where recLiteral = ObjectLiteral $ map (\(s,_) -> (s,mkVar s)) xs
 mkFromSpineFunction mn (PositionedDeclaration _ _ d) = mkFromSpineFunction mn d
-mkFromSpineFunction _ _ = error "mkFromSpineFunction: expected DataDeclaration"
+mkFromSpineFunction _ _ = internalError "mkFromSpineFunction: expected DataDeclaration"
 
 -- Helpers
 

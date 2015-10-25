@@ -20,9 +20,9 @@ module Language.PureScript.TypeChecker.Subsumption (
 import Data.List (sortBy)
 import Data.Ord (comparing)
 
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -50,7 +50,7 @@ subsumes' val ty1 (ForAll ident ty2 sco) =
       sko <- newSkolemConstant
       let sk = skolemize ident sko sco' ty2
       subsumes val ty1 sk
-    Nothing -> throwError . errorMessage $ UnspecifiedSkolemScope
+    Nothing -> internalError "subsumes: unspecified skolem scope"
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
   _ <- subsumes Nothing arg2 arg1
   _ <- subsumes Nothing ret1 ret2

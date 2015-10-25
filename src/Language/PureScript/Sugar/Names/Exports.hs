@@ -33,6 +33,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Map as M
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
@@ -52,7 +53,7 @@ findExportable (Module _ _ mn ds _) =
     where
     go exps'' (TypeDeclaration name _) = exportValue exps'' name mn
     go exps'' (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ go exps'' d
-    go _ _ = error "Invalid declaration in TypeClassDeclaration"
+    go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
   updateExports exps (DataDeclaration _ tn _ dcs) = exportType exps tn (map fst dcs) mn
   updateExports exps (TypeSynonymDeclaration tn _ _) = exportType exps tn [] mn
   updateExports exps (ExternDataDeclaration tn _) = exportType exps tn [] mn
@@ -137,24 +138,24 @@ resolveExports env mn imps exps refs =
   resolveTypeExports tctors dctors = map go tctors
     where
     go :: Qualified ProperName -> ((ProperName, [ProperName]), ModuleName)
-    go (Qualified (Just mn'') name) = fromMaybe (error "Missing value in resolveTypeExports") $ do
+    go (Qualified (Just mn'') name) = fromMaybe (internalError "Missing value in resolveTypeExports") $ do
       exps' <- envModuleExports <$> mn'' `M.lookup` env
       ((_, dctors'), mnOrig) <- find (\((name', _), _) -> name == name') (exportedTypes exps')
       let relevantDctors = mapMaybe (\(Qualified mn''' dctor) -> if mn''' == Just mnOrig then Just dctor else Nothing) dctors
       return ((name, intersect relevantDctors dctors'), mnOrig)
-    go (Qualified Nothing _) = error "Unqualified value in resolveTypeExports"
+    go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
 
   -- Looks up an imported class and re-qualifies it with the original module it
   -- came from.
   resolveClass :: Qualified ProperName -> (ProperName, ModuleName)
-  resolveClass className = splitQual $ fromMaybe (error "Missing value in resolveClass") $
+  resolveClass className = splitQual $ fromMaybe (internalError "Missing value in resolveClass") $
     resolve exportedTypeClasses className
 
   -- Looks up an imported value and re-qualifies it with the original module it
   -- came from.
   resolveValue :: Qualified Ident -> (Ident, ModuleName)
-  resolveValue ident = splitQual $ fromMaybe (error "Missing value in resolveValue") $
+  resolveValue ident = splitQual $ fromMaybe (internalError "Missing value in resolveValue") $
     resolve exportedValues ident
 
   resolve :: (Eq a) => (Exports -> [(a, ModuleName)]) -> Qualified a -> Maybe (Qualified a)
@@ -162,13 +163,13 @@ resolveExports env mn imps exps refs =
     exps' <- envModuleExports <$> mn'' `M.lookup` env
     mn''' <- snd <$> find ((== a) . fst) (f exps')
     return $ Qualified (Just mn''') a
-  resolve _ _ = error "Unqualified value in resolve"
+  resolve _ _ = internalError "Unqualified value in resolve"
 
   -- A partial function that takes a qualified value and extracts the value and
   -- qualified module components.
   splitQual :: Qualified a -> (a, ModuleName)
   splitQual (Qualified (Just mn'') a) = (a, mn'')
-  splitQual _ = error "Unqualified value in splitQual"
+  splitQual _ = internalError "Unqualified value in splitQual"
 
 -- |
 -- Filters the full list of exportable values, types, and classes for a module

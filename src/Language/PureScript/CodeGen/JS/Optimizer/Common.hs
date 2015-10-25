@@ -17,6 +17,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
 import Data.Maybe (fromMaybe)
 
+import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST
 
 applyAll :: [a -> a] -> a -> a
@@ -63,7 +64,7 @@ targetVariable :: JS -> String
 targetVariable (JSVar var) = var
 targetVariable (JSAccessor _ tgt) = targetVariable tgt
 targetVariable (JSIndexer _ tgt) = targetVariable tgt
-targetVariable _ = error "Invalid argument to targetVariable"
+targetVariable _ = internalError "Invalid argument to targetVariable"
 
 isUpdated :: String -> JS -> Bool
 isUpdated var1 = everythingOnJS (||) check

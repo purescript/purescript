@@ -23,6 +23,7 @@ module Language.PureScript.Sugar.CaseDeclarations (
     desugarCasesModule
 ) where
 
+import Language.PureScript.Crash
 import Data.Maybe (catMaybes)
 import Data.List (nub, groupBy)
 
@@ -112,7 +113,7 @@ toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = 
   fromVarBinder (VarBinder name) = return name
   fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
   fromVarBinder (TypedBinder _ b) = fromVarBinder b
-  fromVarBinder _ = error "fromVarBinder: Invalid argument"
+  fromVarBinder _ = internalError "fromVarBinder: Invalid argument"
 toDecls ds@(ValueDeclaration ident _ bs result : _) = do
   let tuples = map toTuple ds
   unless (all ((== length bs) . length . fst) tuples) $
@@ -129,7 +130,7 @@ toDecls ds = return ds
 toTuple :: Declaration -> ([Binder], Either [(Guard, Expr)] Expr)
 toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
-toTuple _ = error "Not a value declaration"
+toTuple _ = internalError "Not a value declaration"
 
 makeCaseDeclaration :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do

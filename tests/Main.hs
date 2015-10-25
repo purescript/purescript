@@ -78,7 +78,7 @@ modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
 makeActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
-makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input file map was read.") foreigns False)
+makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
                          { P.getInputTimestamp = getInputTimestamp
                          , P.getOutputTimestamp = getOutputTimestamp
                          }
@@ -94,7 +94,7 @@ makeActions foreigns = (P.buildMakeActions modulesDir (error "makeActions: input
   getOutputTimestamp mn = do
     let filePath = modulesDir </> P.runModuleName mn
     exists <- liftIO $ doesDirectoryExist filePath
-    return (if exists then Just (error "getOutputTimestamp: read timestamp") else Nothing)
+    return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do

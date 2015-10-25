@@ -25,6 +25,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Aeson as A
 
+import Language.PureScript.Crash
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeClassDictionaries
@@ -252,7 +253,7 @@ primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star
 --
 lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type, [Ident])
 lookupConstructor env ctor =
-  fromMaybe (error "Data constructor not found") $ ctor `M.lookup` dataConstructors env
+  fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
 -- |
 -- Checks whether a data constructor is for a newtype.

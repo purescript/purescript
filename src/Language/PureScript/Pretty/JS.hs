@@ -30,6 +30,7 @@ import Control.Monad.State
 import Control.PatternArrows
 import qualified Control.Arrow as A
 
+import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Pretty.Common
@@ -251,13 +252,13 @@ prettyStatements sts = do
 -- Generate a pretty-printed string representing a Javascript expression
 --
 prettyPrintJS1 :: JS -> String
-prettyPrintJS1 = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
+prettyPrintJS1 = fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
 
 -- |
 -- Generate a pretty-printed string representing a collection of Javascript expressions at the same indentation level
 --
 prettyPrintJS :: [JS] -> String
-prettyPrintJS = fromMaybe (error "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements
+prettyPrintJS = fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements
 
 -- |
 -- Generate an indented, pretty-printed string representing a Javascript expression

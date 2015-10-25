@@ -38,6 +38,7 @@ import Control.Applicative ((<$>), (<*))
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 
+import Language.PureScript.Crash
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -90,7 +91,7 @@ addTypeClass moduleName pn args implies ds =
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
   toPair (PositionedDeclaration _ _ d) = toPair d
-  toPair _ = error "Invalid declaration in TypeClassDeclaration"
+  toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries :: Maybe ModuleName -> M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope) -> Check ()
 addTypeClassDictionaries mn entries =
@@ -147,8 +148,8 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     where
     checkNewtype :: [(ProperName, [Type])] -> Check ()
     checkNewtype [(_, [_])] = return ()
-    checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype
-    checkNewtype _ = throwError . errorMessage $ InvalidNewtype
+    checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype name
+    checkNewtype _ = throwError . errorMessage $ InvalidNewtype name
   go (d@(DataBindingGroupDeclaration tys)) = do
     warnAndRethrow (addHint ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
@@ -177,14 +178,14 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration name args ty
-  go (TypeDeclaration{}) = error "Type declarations should have been removed"
+  go (TypeDeclaration{}) = internalError "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val)) =
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
-  go (ValueDeclaration{}) = error "Binders were not desugared"
+  go (ValueDeclaration{}) = internalError "Binders were not desugared"
   go (BindingGroupDeclaration vals) =
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       forM_ (map (\(ident, _, _) -> ident) vals) $ \name ->
@@ -245,7 +246,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     memberName :: Declaration -> Ident
     memberName (ValueDeclaration ident _ _ _) = ident
     memberName (PositionedDeclaration _ _ d) = memberName d
-    memberName _ = error "checkInstanceMembers: Invalid declaration in type instance definition"
+    memberName _ = internalError "checkInstanceMembers: Invalid declaration in type instance definition"
 
     firstDuplicate :: (Eq a) => [a] -> Maybe a
     firstDuplicate (x : xs@(y : _))
@@ -261,10 +262,10 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     checkType :: Type -> Bool
     checkType (TypeVar _) = False
     checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
-    checkType (TypeConstructor (Qualified Nothing _)) = error "Unqualified type name in checkOrphanInstance"
+    checkType (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     checkType (TypeApp t1 _) = checkType t1
-    checkType _ = error "Invalid type in instance in checkOrphanInstance"
-  checkOrphanInstance _ _ _ = error "Unqualified class name in checkOrphanInstance"
+    checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
+  checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
@@ -274,14 +275,14 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
   withKinds []                  _               = []
   withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
   withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
-  withKinds _                   _               = error "Invalid arguments to peelKinds"
+  withKinds _                   _               = internalError "Invalid arguments to peelKinds"
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are
 -- required by exported members are also exported.
 --
 typeCheckModule :: Module -> Check Module
-typeCheckModule (Module _ _ _ _ Nothing) = error "exports should have been elaborated"
+typeCheckModule (Module _ _ _ _ Nothing) = internalError "exports should have been elaborated"
 typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
   decls' <- typeCheckAll mn exps decls
@@ -331,7 +332,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     findTcons :: Type -> [DeclarationRef]
     findTcons = everythingOnTypes (++) go
       where
-      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [TypeRef name (error "Data constructors unused in checkTypesAreExported")]
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [TypeRef name (internalError "Data constructors unused in checkTypesAreExported")]
       go _ = []
 
   -- Check that all the classes defined in the current module that appear in member types have also
@@ -361,5 +362,5 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     extractMemberName :: Declaration -> Ident
     extractMemberName (PositionedDeclaration _ _ d) = extractMemberName d
     extractMemberName (TypeDeclaration memberName _) = memberName
-    extractMemberName _ = error "Unexpected declaration in typeclass member list"
+    extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

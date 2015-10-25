@@ -52,6 +52,7 @@ import Control.Monad.Unify
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (tell)
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -140,7 +141,7 @@ typeForBindingGroupElement :: (Ident, Expr) -> TypeData -> UntypedData -> UnifyT
 typeForBindingGroupElement (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
-  ty =?= fromMaybe (error "name not found in dictionary") (lookup ident untypedDict)
+  ty =?= fromMaybe (internalError "name not found in dictionary") (lookup ident untypedDict)
   tell . errorMessage $ MissingTypeDeclaration ident ty
   return (ident, (TypedValue True val' ty, ty))
 
@@ -192,7 +193,7 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    dicts <- getTypeClassDictionaries
-   (_, ty') <- instantiatePolyTypeWithUnknowns (error "Types under a constraint cannot themselves be constrained") ty
+   (_, ty') <- instantiatePolyTypeWithUnknowns (internalError "Types under a constraint cannot themselves be constrained") ty
    return (foldl App val (map (flip TypeClassDictionary dicts) constraints), ty')
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
@@ -242,7 +243,7 @@ infer' (Abs (Left arg) ret) = do
   withBindingGroupVisible $ bindLocalVariables moduleName [(arg, ty, Defined)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
     return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
-infer' (Abs (Right _) _) = error "Binder was not desugared"
+infer' (Abs (Right _) _) = internalError "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
   (ret, app) <- checkFunctionApplication f' ft arg Nothing
@@ -287,7 +288,7 @@ infer' (TypedValue checkType val ty) = do
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
 infer' (PositionedValue pos _ val) = warnAndRethrowWithPosition pos $ infer' val
-infer' _ = error "Invalid argument to infer"
+infer' _ = internalError "Invalid argument to infer"
 
 inferLetBinding :: [Declaration] -> [Declaration] -> Expr -> (Expr -> UnifyT Type Check Expr) -> UnifyT Type Check ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
@@ -318,7 +319,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
 inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPosition pos $ do
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos com d' : ds', val')
-inferLetBinding _ _ _ _ = error "Invalid argument to inferLetBinding"
+inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 
 -- |
 -- Infer the types of variables brought into scope by a binder
@@ -335,7 +336,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
-      (_, fn) <- instantiatePolyTypeWithUnknowns (error "Data constructor types cannot contain constraints") ty
+      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       go binders fn'
         where
@@ -454,7 +455,7 @@ check' val t@(ConstrainedType constraints ty) = do
   newDictionaries :: [(Qualified ProperName, Integer)] -> Qualified Ident -> (Qualified ProperName, [Type]) -> Check [TypeClassDictionaryInScope]
   newDictionaries path name (className, instanceTy) = do
     tcs <- gets (typeClasses . checkEnv)
-    let (args, _, superclasses) = fromMaybe (error "newDictionaries: type class lookup failed") $ M.lookup className tcs
+    let (args, _, superclasses) = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(supName, supArgs) index ->
                                       newDictionaries ((supName, index) : path)
                                                       name
@@ -489,7 +490,7 @@ check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
   Just moduleName <- checkCurrentModule <$> get
   ret' <- withBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
   return $ TypedValue True (Abs (Left arg) ret') ty
-check' (Abs (Right _) _) _ = error "Binder was not desugared"
+check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (_, app) <- checkFunctionApplication f' ft arg (Just ret)
@@ -501,7 +502,7 @@ check' v@(Var var) ty = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> internalError "check: unable to check the subsumes relation."
     Just v'' -> return $ TypedValue True v'' ty'
 check' (SuperClassDictionary className tys) _ = do
   {-
@@ -520,7 +521,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> internalError "check: unable to check the subsumes relation."
     Just _ -> do
       val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
       return $ TypedValue checkType val''' ty2'
@@ -562,7 +563,7 @@ check' v@(Constructor c) ty = do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       mv <- subsumes (Just v) repl ty
       case mv of
-        Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+        Nothing -> internalError "check: unable to check the subsumes relation."
         Just v' -> return $ TypedValue True v' ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
@@ -577,7 +578,7 @@ check' val ty = do
   TypedValue _ val' ty' <- infer val
   mt <- subsumes (Just val') ty' ty
   case mt of
-    Nothing -> throwError . errorMessage $ SubsumptionCheckFailed
+    Nothing -> internalError "check: unable to check the subsumes relation."
     Just v' -> return $ TypedValue True v' ty
 
 -- |
