@@ -126,7 +126,8 @@ data SimpleErrorMessage
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified ProperName)
   | ExprDoesNotHaveType Expr Type
-  | PropertyIsMissing String Type
+  | PropertyIsMissing String Expr
+  | AdditionalProperty String Expr
   | CannotApplyFunction Type Expr
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified ProperName) [Type]
@@ -263,6 +264,7 @@ errorCode em = case unwrapErrorMessage em of
   IncorrectConstructorArity{} -> "IncorrectConstructorArity"
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
+  AdditionalProperty{} -> "AdditionalProperty"
   CannotApplyFunction{} -> "CannotApplyFunction"
   TypeSynonymInstance -> "TypeSynonymInstance"
   OrphanInstance{} -> "OrphanInstance"
@@ -353,7 +355,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
     gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
     gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
     gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
-    gSimple (PropertyIsMissing s t) = PropertyIsMissing s <$> f t
     gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
     gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
     gSimple other = pure other
@@ -617,10 +618,15 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (PropertyIsMissing prop row) =
+    renderSimpleErrorMessage (PropertyIsMissing prop expr) =
       paras [ line "Row type"
-            , indent $ prettyPrintRowWith '(' ')' row
+            , indent $ prettyPrintValue expr
             , line $ "lacks required label " ++ show prop
+            ]
+    renderSimpleErrorMessage (AdditionalProperty prop expr) =
+      paras [ line "Type of expression"
+            , indent $ prettyPrintValue expr
+            , line $ "contains additional label " ++ show prop
             ]
     renderSimpleErrorMessage (CannotApplyFunction fn arg) =
       paras [ line "A function of type"

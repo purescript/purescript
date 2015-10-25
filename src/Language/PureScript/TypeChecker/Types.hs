@@ -534,22 +534,22 @@ check' (IfThenElse cond th el) ty = do
   th' <- check th ty
   el' <- check el ty
   return $ TypedValue True (IfThenElse cond' th' el') ty
-check' (ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
+check' e@(ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
-  ps' <- checkProperties ps row False
+  ps' <- checkProperties e ps row False
   return $ TypedValue True (ObjectLiteral ps') t
 check' (TypeClassDictionaryConstructorApp name ps) t = do
   ps' <- check' ps t
   return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
-check' (ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
+check' e@(ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
-  -- We check _obj_ agaist the type _t_ with the types in _ps_ replaced with unknowns.
+  -- We check _obj_ against the type _t_ with the types in _ps_ replaced with unknowns.
   let (propsToCheck, rest) = rowToList row
       (removedProps, remainingProps) = partition (\(p, _) -> p `elem` map fst ps) propsToCheck
   us <- zip (map fst removedProps) <$> replicateM (length ps) fresh
   obj' <- check obj (TypeApp tyObject (rowFromList (us ++ remainingProps, rest)))
-  ps' <- checkProperties ps row True
+  ps' <- checkProperties e ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
   rest <- fresh
@@ -586,8 +586,8 @@ check' val ty = do
 --
 -- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
 --
-checkProperties :: [(String, Expr)] -> Type -> Bool -> UnifyT Type Check [(String, Expr)]
-checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
+checkProperties :: Expr -> [(String, Expr)] -> Type -> Bool -> UnifyT Type Check [(String, Expr)]
+checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _)
     | lax = return []
@@ -595,8 +595,8 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError . errorMessage $ PropertyIsMissing p row
-  go ((p,_):_) [] REmpty = throwError . errorMessage $ PropertyIsMissing p row
+                      | otherwise = throwError . errorMessage $ PropertyIsMissing p expr
+  go ((p,_):_) [] REmpty = throwError . errorMessage $ AdditionalProperty p expr
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do
@@ -609,7 +609,7 @@ checkProperties ps row lax = let (ts, r') = rowToList row in go ps ts r' where
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType (ObjectLiteral ps) (TypeApp tyObject row)
+  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyObject row)
 
 -- |
 -- Check the type of a function application, rethrowing errors to provide a better error message
