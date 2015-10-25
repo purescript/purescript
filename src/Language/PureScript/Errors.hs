@@ -56,8 +56,7 @@ import Text.Parsec.Error (Message(..))
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ErrorParsingExterns P.ParseError
-  | ErrorParsingFFIModule FilePath
+  = ErrorParsingFFIModule FilePath
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
@@ -148,8 +147,7 @@ data SimpleErrorMessage
 
 -- | Error message hints, providing more detailed information about failure.
 data ErrorMessageHint
-  = NotYetDefined [Ident]
-  | ErrorUnifyingTypes Type Type
+  = ErrorUnifyingTypes Type Type
   | ErrorInExpression Expr
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified ProperName) [Type]
@@ -192,7 +190,6 @@ instance UnificationError Kind ErrorMessage where
 --
 errorCode :: ErrorMessage -> String
 errorCode em = case unwrapErrorMessage em of
-  ErrorParsingExterns{} -> "ErrorParsingExterns"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
@@ -375,9 +372,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
   prettyPrintErrorMessage :: ErrorMessage -> Box.Box
   prettyPrintErrorMessage (ErrorMessage hints simple) =
     paras $
-      map renderHint hints ++
-      [ renderSimpleErrorMessage simple
-      , line $ "See " ++ wikiUri ++ " for more information, or to contribute content related to this " ++ levelText ++ "."
+      [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
+      , Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
+                               , line $ "or to contribute content related to this " ++ levelText ++ "."
+                               ]
       ]
     where
     wikiUri :: String
@@ -395,10 +393,6 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (CannotWriteFile path) =
       paras [ line "Unable to write file: "
             , indent . line $ path
-            ]
-    renderSimpleErrorMessage (ErrorParsingExterns err) =
-      paras [ lineWithLevel "parsing externs files: "
-            , prettyPrintParseError err
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path) =
       paras [ line "Unable to parse foreign module:"
@@ -694,81 +688,117 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "You may want to decompose your data types into smaller types."
             ]
 
-    renderHint :: ErrorMessageHint -> Box.Box
-    renderHint (NotYetDefined names) =
-      line $ "The following are not yet defined here: " ++ intercalate ", " (map showIdent names) ++ ":"
-    renderHint (ErrorUnifyingTypes t1 t2) =
-      paras [ lineWithLevel "while trying to match type "
-            , indent $ typeAsBox t1
-            , line "with type"
-            , indent $ typeAsBox t2
+    renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
+    renderHint (ErrorUnifyingTypes t1 t2) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while trying to match type"
+                                 , typeAsBox t1
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "with type"
+                                                   , typeAsBox t2
+                                                   ]
             ]
-    renderHint (ErrorInExpression expr) =
-      paras [ lineWithLevel "in expression:"
-            , indent $ prettyPrintValue expr
+    renderHint (ErrorInExpression expr) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ Box.text "in the expression"
+                                 , prettyPrintValue expr
+                                 ]
             ]
-    renderHint (ErrorInModule mn) =
-      paras [ lineWithLevel $ "in module " ++ runModuleName mn ++ ":"
+    renderHint (ErrorInModule mn) detail =
+      paras [ line $ "in module " ++ runModuleName mn
+            , detail
             ]
-    renderHint (ErrorInSubsumption t1 t2) =
-      paras [ lineWithLevel "checking that type"
-            , indent $ typeAsBox t1
-            , line "is at least as general as type"
-            , indent $ typeAsBox t2
+    renderHint (ErrorInSubsumption t1 t2) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while checking that type"
+                                 , typeAsBox t1
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "is at least as general as type"
+                                                   , typeAsBox t2
+                                                   ]
             ]
-    renderHint (ErrorInInstance nm ts) =
-      paras [ lineWithLevel "in type class instance"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+    renderHint (ErrorInInstance nm ts) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "in type class instance"
+                                 , line (showQualified runProperName nm)
+                                 , Box.vcat Box.left (map typeAtomAsBox ts)
+                                 ]
             ]
-    renderHint (ErrorCheckingKind ty) =
-      paras [ lineWithLevel "checking kind of type"
-            , indent $ typeAsBox ty
+    renderHint (ErrorCheckingKind ty) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while checking the kind of"
+                                 , typeAsBox ty
+                                 ]
             ]
-    renderHint (ErrorInferringType expr) =
-      paras [ lineWithLevel "inferring type of expression"
-            , indent $ prettyPrintValue expr
+    renderHint (ErrorInferringType expr) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while inferring the type of"
+                                 , prettyPrintValue expr
+                                 ]
             ]
-    renderHint (ErrorCheckingType expr ty) =
-      paras [ lineWithLevel "checking that expression"
-            , indent $ prettyPrintValue expr
-            , line "has type"
-            , indent $ typeAsBox ty
+    renderHint (ErrorCheckingType expr ty) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while checking that expression"
+                                 , prettyPrintValue expr
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has type"
+                                                   , typeAsBox ty
+                                                   ]
             ]
-    renderHint (ErrorCheckingAccessor expr prop) =
-      paras [ lineWithLevel "checking type of property accessor"
-            , indent $ prettyPrintValue (Accessor prop expr)
+    renderHint (ErrorCheckingAccessor expr prop) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while checking type of property accessor"
+                                 , prettyPrintValue (Accessor prop expr)
+                                 ]
             ]
-    renderHint (ErrorInApplication f t a) =
-      paras [ lineWithLevel "applying a function"
-            , indent $ prettyPrintValue f
-            , line "of type"
-            , indent $ typeAsBox t
-            , line "to argument"
-            , indent $ prettyPrintValue a
+    renderHint (ErrorInApplication f t a) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while applying a function"
+                                 , prettyPrintValue f
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "of type"
+                                                   , typeAsBox t
+                                                   ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "to argument"
+                                                   , prettyPrintValue a
+                                                   ]
             ]
-    renderHint (ErrorInDataConstructor nm) =
-      lineWithLevel $ "in data constructor " ++ runProperName nm ++ ":"
-    renderHint (ErrorInTypeConstructor nm) =
-      lineWithLevel $ "in type constructor " ++ runProperName nm ++ ":"
-    renderHint (ErrorInBindingGroup nms) =
-      lineWithLevel $ "in binding group " ++ intercalate ", " (map showIdent nms) ++ ":"
-    renderHint ErrorInDataBindingGroup =
-      lineWithLevel "in data binding group:"
-    renderHint (ErrorInTypeSynonym name) =
-      lineWithLevel $ "in type synonym " ++ runProperName name ++ ":"
-    renderHint (ErrorInValueDeclaration n) =
-      lineWithLevel $ "in value declaration " ++ showIdent n ++ ":"
-    renderHint (ErrorInTypeDeclaration n) =
-      lineWithLevel $ "in type declaration for " ++ showIdent n ++ ":"
-    renderHint (ErrorInForeignImport nm) =
-      lineWithLevel $ "in foreign import " ++ showIdent nm ++ ":"
-    renderHint (PositionedError srcSpan) =
-      lineWithLevel $ "at " ++ displaySourceSpan srcSpan ++ ":"
-
-  lineWithLevel :: String -> Box.Box
-  lineWithLevel text = line $ show level ++ " " ++ text
+    renderHint (ErrorInDataConstructor nm) detail =
+      paras [ detail
+            , line $ "in data constructor " ++ runProperName nm
+            ]
+    renderHint (ErrorInTypeConstructor nm) detail =
+      paras [ detail
+            , line $ "in type constructor " ++ runProperName nm
+            ]
+    renderHint (ErrorInBindingGroup nms) detail =
+      paras [ detail
+            , line $ "in binding group " ++ intercalate ", " (map showIdent nms)
+            ]
+    renderHint ErrorInDataBindingGroup detail =
+      paras [ detail
+            , line "in data binding group"
+            ]
+    renderHint (ErrorInTypeSynonym name) detail =
+      paras [ detail
+            , line $ "in type synonym " ++ runProperName name
+            ]
+    renderHint (ErrorInValueDeclaration n) detail =
+      paras [ detail
+            , line $ "in value declaration " ++ showIdent n
+            ]
+    renderHint (ErrorInTypeDeclaration n) detail =
+      paras [ detail
+            , line $ "in type declaration for " ++ showIdent n
+            ]
+    renderHint (ErrorInForeignImport nm) detail =
+      paras [ detail
+            , line $ "in foreign import " ++ showIdent nm
+            ]
+    renderHint (PositionedError srcSpan) detail =
+      paras [ line $ "at " ++ displaySourceSpan srcSpan
+            , detail
+            ]
 
   levelText :: String
   levelText = case level of
