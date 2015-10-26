@@ -373,11 +373,15 @@ inferBinder val (NamedBinder name binder) = do
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPosition pos $ inferBinder val binder
--- TODO: When adding support for polymorphic types, check subsumption here
--- and change the definition of `binderRequiresMonotype`
+-- TODO: When adding support for polymorphic types, check subsumption here,
+-- change the definition of `binderRequiresMonotype`,
+-- and use `kindOfWithScopedVars`.
 inferBinder val (TypedBinder ty binder) = do
-  ty' <- replaceAllTypeSynonyms ty
-  val =?= ty' >> inferBinder val binder
+  ty1 <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  kind <- liftCheck $ kindOf ty1
+  checkTypeKind ty1 kind
+  val =?= ty1
+  inferBinder val binder
 
 -- | Returns true if a binder requires its argument type to be a monotype.
 -- | If this is the case, we need to instantiate any polymorphic types before checking binders.
