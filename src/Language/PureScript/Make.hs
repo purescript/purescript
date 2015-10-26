@@ -178,8 +178,7 @@ make MakeActions{..} ms = do
   unless (null errors) $ throwError (mconcat errors)
 
   -- Bundle up all the externs and return them as an Environment
-  (warnings, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
-  tell (mconcat warnings)
+  (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
   return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
 
   where
