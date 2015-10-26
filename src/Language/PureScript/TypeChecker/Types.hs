@@ -595,8 +595,8 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError . errorMessage $ PropertyIsMissing p expr
-  go ((p,_):_) [] REmpty = throwError . errorMessage $ AdditionalProperty p expr
+                      | otherwise = throwError . errorMessage $ PropertyIsMissing p
+  go ((p,_):_) [] REmpty = throwError . errorMessage $ AdditionalProperty p
   go ((p,v):ps') ts r =
     case lookup p ts of
       Nothing -> do

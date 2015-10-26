@@ -1,5 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
--- TODO: Update type checker to make this fail with PropertyIsMissing instead. 
+-- @shouldFailWith PropertyIsMissing
 module MissingRecordField where
 
 import Prelude ((>))

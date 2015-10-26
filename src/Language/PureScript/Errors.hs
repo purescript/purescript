@@ -126,8 +126,8 @@ data SimpleErrorMessage
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified ProperName)
   | ExprDoesNotHaveType Expr Type
-  | PropertyIsMissing String Expr
-  | AdditionalProperty String Expr
+  | PropertyIsMissing String
+  | AdditionalProperty String
   | CannotApplyFunction Type Expr
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified ProperName) [Type]
@@ -618,16 +618,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (PropertyIsMissing prop expr) =
-      paras [ line "Row type"
-            , indent $ prettyPrintValue expr
-            , line $ "lacks required label " ++ show prop
-            ]
-    renderSimpleErrorMessage (AdditionalProperty prop expr) =
-      paras [ line "Type of expression"
-            , indent $ prettyPrintValue expr
-            , line $ "contains additional label " ++ show prop
-            ]
+    renderSimpleErrorMessage (PropertyIsMissing prop) =
+      line $ "Type of expression lacks required label " ++ show prop ++ "."
+    renderSimpleErrorMessage (AdditionalProperty prop) =
+      line $ "Type of expression contains additional label " ++ show prop ++ "."
     renderSimpleErrorMessage (CannotApplyFunction fn arg) =
       paras [ line "A function of type"
             , indent $ typeAsBox fn
