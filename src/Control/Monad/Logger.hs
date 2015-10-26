@@ -22,6 +22,7 @@ module Control.Monad.Logger where
 import Data.IORef
 
 #if __GLASGOW_HASKELL__ < 710
+import Data.Monoid
 import Control.Applicative
 #endif
 import Control.Monad (ap)
