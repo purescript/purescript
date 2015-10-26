@@ -43,9 +43,10 @@ import Control.Applicative
 #endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Trans.Except
 import Control.Monad.Reader
-import Control.Monad.Writer.Strict
+import Control.Monad.Logger
 import Control.Monad.Supply
 import Control.Monad.Base (MonadBase(..))
 import Control.Monad.Trans.Control (MonadBaseControl(..))
@@ -72,6 +73,7 @@ import System.Directory
 import System.FilePath ((</>), takeDirectory)
 import System.IO.Error (tryIOError)
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Externs
 import Language.PureScript.Environment
@@ -166,7 +168,7 @@ make MakeActions{..} ms = do
   barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
 
   for_ sorted $ \m -> fork $ do
-    let deps = fromMaybe (error "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
     buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
 
   -- Wait for all threads to complete, and collect errors.
@@ -176,7 +178,7 @@ make MakeActions{..} ms = do
   unless (null errors) $ throwError (mconcat errors)
 
   -- Bundle up all the externs and return them as an Environment
-  (warnings, externs) <- unzip . fromMaybe (error "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
+  (warnings, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
   tell (mconcat warnings)
   return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
 
@@ -205,21 +207,21 @@ make MakeActions{..} ms = do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
-    mexterns <- fmap unzip . sequence <$> mapM (readMVar . fst . fromMaybe (error "make: no barrier") . flip lookup barriers) deps
+    mexterns <- fmap unzip . sequence <$> mapM (readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
 
-    outputTimestamp <- getOutputTimestamp moduleName
-    dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
-    inputTimestamp <- getInputTimestamp moduleName
+    case mexterns of
+      Just (_, externs) -> do
+        outputTimestamp <- getOutputTimestamp moduleName
+        dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
+        inputTimestamp <- getInputTimestamp moduleName
 
-    let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
-                          (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
-                          (Right (Just t1), Nothing, Just t2) -> t1 > t2
-                          (Left RebuildNever, _, Just _) -> False
-                          _ -> True
+        let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
+                              (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
+                              (Right (Just t1), Nothing, Just t2) -> t1 > t2
+                              (Left RebuildNever, _, Just _) -> False
+                              _ -> True
 
-    let rebuild =
-          case mexterns of
-            Just (_, externs) -> do
+        let rebuild = do
               (exts, warnings) <- listen $ do
                 progress $ CompilingModule moduleName
                 let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
@@ -235,20 +237,20 @@ make MakeActions{..} ms = do
                 evalSupplyT nextVar $ codegen renamed env' $ encode exts
                 return exts
               markComplete (Just (warnings, exts)) Nothing
-            Nothing -> markComplete Nothing Nothing
 
-    if shouldRebuild
-      then rebuild
-      else do
-        mexts <- decodeExterns . snd <$> readExterns moduleName
-        case mexts of
-          Just exts -> markComplete (Just (mempty, exts)) Nothing
-          Nothing -> rebuild
+        if shouldRebuild
+          then rebuild
+          else do
+            mexts <- decodeExterns . snd <$> readExterns moduleName
+            case mexts of
+              Just exts -> markComplete (Just (mempty, exts)) Nothing
+              Nothing -> rebuild
+      Nothing -> markComplete Nothing Nothing
     where
     markComplete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do
-      putMVar (fst $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) externs
-      putMVar (snd $ fromMaybe (error "make: no barrier") $ lookup moduleName barriers) errors
+      putMVar (fst $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) externs
+      putMVar (snd $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) errors
 
   maximumMaybe :: (Ord a) => [a] -> Maybe a
   maximumMaybe [] = Nothing
@@ -257,7 +259,7 @@ make MakeActions{..} ms = do
   -- Make sure a dependency exists
   shouldExist :: Maybe UTCTime -> UTCTime
   shouldExist (Just t) = t
-  shouldExist _ = error "make: dependency should already have been built."
+  shouldExist _ = internalError "make: dependency should already have been built."
 
   decodeExterns :: B.ByteString -> Maybe ExternsFile
   decodeExterns bs = do
@@ -283,22 +285,22 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 -- |
 -- A monad for running make actions
 --
-newtype Make a = Make { unMake :: ReaderT Options (WriterT MultipleErrors (ExceptT MultipleErrors IO)) a }
+newtype Make a = Make { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
 
 instance MonadBase IO Make where
   liftBase = liftIO
 
 instance MonadBaseControl IO Make where
-  type StM Make a = Either MultipleErrors (a, MultipleErrors)
+  type StM Make a = Either MultipleErrors a
   liftBaseWith f = Make $ liftBaseWith $ \q -> f (q . unMake)
   restoreM = Make . restoreM
 
 -- |
 -- Execute a 'Make' monad, returning either errors, or the result of the compile plus any warnings.
 --
-runMake :: Options -> Make a -> IO (Either MultipleErrors (a, MultipleErrors))
-runMake opts = runExceptT . runWriterT . flip runReaderT opts . unMake
+runMake :: Options -> Make a -> IO (Either MultipleErrors a, MultipleErrors)
+runMake opts = runLogger' . runExceptT . flip runReaderT opts . unMake
 
 makeIO :: (IOError -> ErrorMessage) -> IO a -> Make a
 makeIO f io = do
@@ -324,7 +326,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
-    let path = fromMaybe (error "Module has no filename in 'make'") $ M.lookup mn filePathMap
+    let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
     e1 <- traverseEither getTimestamp path
     fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
     return $ fmap (max fPath) e1

@@ -40,6 +40,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Unify
 
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
@@ -220,4 +221,4 @@ infer' other = (, []) <$> go other
     k <- go ty
     k =?= Star
     return Star
-  go _ = error "Invalid argument to infer"
+  go _ = internalError "Invalid argument to infer"

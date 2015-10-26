@@ -34,6 +34,7 @@ import Control.Monad.Writer (MonadWriter(..), censor)
 
 import qualified Data.Map as M
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Errors
@@ -115,7 +116,7 @@ resolveImport currentModule importModule exps imps impQual =
       checkImportExists UnknownImportTypeClass (fst `map` exportedTypeClasses exps) name
     --check (ModuleRef name) =
     --  checkImportExists (const UnknownModule) (exportedModules exps) name
-    check _ = error "Invalid argument to checkRefs"
+    check _ = internalError "Invalid argument to checkRefs"
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists :: (Eq a) => (ModuleName -> a -> SimpleErrorMessage) -> [a] -> a -> m ()
@@ -171,13 +172,13 @@ resolveImport currentModule importModule exps imps impQual =
   importExplicit imp (TypeClassRef name) = do
     typeClasses' <- updateImports (importedTypeClasses imp) runProperName (exportedTypeClasses exps) name
     return $ imp { importedTypeClasses = typeClasses' }
-  importExplicit _ _ = error "Invalid argument to importExplicit"
+  importExplicit _ _ = internalError "Invalid argument to importExplicit"
 
   -- Find all exported data constructors for a given type
   allExportedDataConstructors :: ProperName -> [(ProperName, ModuleName)]
   allExportedDataConstructors name =
     case find ((== name) . fst . fst) (exportedTypes exps) of
-      Nothing -> error "Invalid state in allExportedDataConstructors"
+      Nothing -> internalError "Invalid state in allExportedDataConstructors"
       Just ((_, dctors), mn) -> map (, mn) dctors
 
   -- Add something to the Imports if it does not already exist there
@@ -191,7 +192,7 @@ resolveImport currentModule importModule exps imps impQual =
     -- If the name is not already present add it to the list, after looking up
     -- where it was originally defined
     Nothing ->
-      let mnOrig = fromMaybe (error "Invalid state in updateImports") (name `lookup` exps')
+      let mnOrig = fromMaybe (internalError "Invalid state in updateImports") (name `lookup` exps')
       in return $ M.insert (Qualified impQual name) (Qualified (Just importModule) name, mnOrig) imps'
 
     -- If the name already is present check whether it's a duplicate import
@@ -199,7 +200,7 @@ resolveImport currentModule importModule exps imps impQual =
     -- re-exports A, importing A and B in C should not result in a "conflicting
     -- import for `x`" error
     Just (Qualified (Just mn) _, mnOrig)
-       | mnOrig == fromMaybe (error "Invalid state in updateImports") (name `lookup` exps') -> return imps'
+       | mnOrig == fromMaybe (internalError "Invalid state in updateImports") (name `lookup` exps') -> return imps'
        | otherwise -> throwError . errorMessage $ err
         where
         err = if currentModule `elem` [mn, importModule]
@@ -207,4 +208,4 @@ resolveImport currentModule importModule exps imps impQual =
               else ConflictingImports (render name) mn importModule
 
     Just (Qualified Nothing _, _) ->
-      error "Invalid state in updateImports"
+      internalError "Invalid state in updateImports"

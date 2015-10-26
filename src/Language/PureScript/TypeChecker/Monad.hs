@@ -153,7 +153,7 @@ checkVisibility :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, Mona
 checkVisibility currentModule name@(Qualified _ var) = do
   vis <- getVisibility currentModule name
   case vis of
-    Undefined -> throwError . errorMessage $ NameNotInScope var
+    Undefined -> throwError . errorMessage $ CycleInDeclaration var
     _ -> return ()
 
 -- |

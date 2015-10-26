@@ -73,7 +73,7 @@ supportModule :: P.Module
 supportModule =
   case P.parseModulesFromFiles id [("", code)] of
     Right [(_, P.Module ss cs _ ds exps)] -> P.Module ss cs supportModuleName ds exps
-    _ -> error "Support module could not be parsed"
+    _ -> P.internalError "Support module could not be parsed"
   where
   code :: String
   code = unlines
@@ -256,7 +256,7 @@ modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
 runMake :: P.Make a -> IO (Either P.MultipleErrors a)
-runMake mk = fmap (fmap fst) $ P.runMake P.defaultOptions mk
+runMake mk = fmap fst $ P.runMake P.defaultOptions mk
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
 makeIO f io = do
@@ -399,18 +399,18 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
         showNameType (mIdent, Just (mType, _, _)) = Box.render (Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType)
-        showNameType _ = error "The impossible happened in printModuleSignatures."
+        showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
         findDataConstructor envDataCons name = (name, M.lookup name envDataCons)
 
         compareDatatypes :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Ordering
         compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
-        compareDatatypes _ _ = error "The impossible happened in printModuleSignatures."
+        compareDatatypes _ _ = P.internalError "The impossible happened in printModuleSignatures."
 
         showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
         showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.render (Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType)
-        showDataConstructor _ = error "The impossible happened in printModuleSignatures."
+        showDataConstructor _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
@@ -530,7 +530,7 @@ handleCommand (KindOf typ) = handleKindOf typ
 handleCommand (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand (ShowInfo QueryLoaded) = handleShowLoadedModules
 handleCommand (ShowInfo QueryImport) = handleShowImportedModules
-handleCommand QuitPSCi = error "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand QuitPSCi = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
 
 whenFileExists :: FilePath -> (FilePath -> PSCI ()) -> PSCI ()
 whenFileExists filePath f = do

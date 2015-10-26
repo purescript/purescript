@@ -22,6 +22,7 @@ module Language.PureScript.Sugar.DoNotation (
     desugarDoModule
 ) where
 
+import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.AST
 import Language.PureScript.Errors
@@ -56,7 +57,7 @@ desugarDo d =
   replace other = return other
 
   go :: [DoNotationElement] -> m Expr
-  go [] = error "The impossible happened in desugarDo"
+  go [] = internalError "The impossible happened in desugarDo"
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest

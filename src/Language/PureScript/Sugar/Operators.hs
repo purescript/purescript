@@ -29,6 +29,7 @@ module Language.PureScript.Sugar.Operators (
   desugarOperatorSections
 ) where
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
@@ -93,7 +94,7 @@ collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity)]
   collect (PositionedDeclaration pos _ (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
-  collect FixityDeclaration{} = error "Fixity without srcpos info"
+  collect FixityDeclaration{} = internalError "Fixity without srcpos info"
   collect _ = []
 
 ensureNoDuplicates :: (MonadError MultipleErrors m) => [(Qualified Ident, SourceSpan)] -> m ()
@@ -129,7 +130,7 @@ matchOperators ops = parseChains
   extendChain (BinaryNoParens op l r) = Left l : Right op : extendChain r
   extendChain other = [Left other]
   bracketChain :: Chain -> m Expr
-  bracketChain = either (const . throwError . errorMessage $ CannotReorderOperators) return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
+  bracketChain = either (\_ -> internalError "matchOperators: cannot reorder operators") return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
   opTable = [P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft]
             : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
             ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]

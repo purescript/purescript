@@ -30,6 +30,7 @@ import Control.Monad.Writer (MonadWriter(..))
 
 import qualified Data.Map as M
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -99,7 +100,7 @@ desugarImports externs modules = do
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
     rethrow (addHint (ErrorInModule mn)) $ do
-      let (_, imps, exps) = fromMaybe (error "Module is missing in renameInModule'") $ M.lookup mn env
+      let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       elaborateImports imps <$> renameInModule env imps (elaborateExports exps m)
 
 -- |

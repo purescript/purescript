@@ -38,6 +38,7 @@ import Control.Monad (replicateM, forM)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
+import Language.PureScript.Crash
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
@@ -272,7 +273,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
       go (v:vs) done' (b:bs) = do
         done'' <- go vs done' bs
         binderToJs v done'' b
-      go _ _ _ = error "Invalid arguments to bindersToJs"
+      go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
       failedPatternError :: [String] -> JS
       failedPatternError names = JSUnary JSNew $ JSApp (JSVar "Error") [JSBinary Add (JSStringLiteral errorMessage) (JSArrayLiteral $ zipWith valueError names vals)]
@@ -322,7 +323,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ = do
       js <- binderToJs argVar done'' binder
       return (JSVariableIntroduction argVar (Just (JSAccessor (identToJs field) (JSVar varName))) : js)
   binderToJs _ _ ConstructorBinder{} =
-    error "binderToJs: Invalid ConstructorBinder in binderToJs"
+    internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs varName done (NamedBinder _ ident binder) = do
     js <- binderToJs varName done binder
     return (JSVariableIntroduction (identToJs ident) (Just (JSVar varName)) : js)

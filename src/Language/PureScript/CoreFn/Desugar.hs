@@ -21,6 +21,7 @@ import qualified Data.Map as M
 
 import Control.Arrow (second, (***))
 
+import Language.PureScript.Crash
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
 import Language.PureScript.CoreFn.Ann
@@ -41,7 +42,7 @@ import qualified Language.PureScript.AST as A
 --
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
-  error "Module exports were not elaborated before moduleToCoreFn"
+  internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
       exps' = nub $ concatMap exportToCoreFn exps
@@ -98,7 +99,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.Abs (Left name) v) =
     Abs (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn _ _ _ (A.Abs _ _) =
-    error "Abs with Binder argument was not desugared before exprToCoreFn mn"
+    internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
   exprToCoreFn ss com ty (A.Var ident) =
@@ -193,7 +194,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
     typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> (ModuleName, ProperName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
-    typeConstructor _ = error "Invalid argument to typeConstructor"
+    typeConstructor _ = internalError "Invalid argument to typeConstructor"
 
 -- |
 -- Find module names from qualified references to values. This is used to

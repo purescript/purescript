@@ -22,6 +22,7 @@ import Data.Maybe (fromMaybe)
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows
 
+import Language.PureScript.Crash
 import Language.PureScript.Kinds
 import Language.PureScript.Pretty.Common
 
@@ -47,7 +48,7 @@ funKind = mkPattern match
 
 -- | Generate a pretty-printed string representing a Kind
 prettyPrintKind :: Kind -> String
-prettyPrintKind = fromMaybe (error "Incomplete pattern") . pattern matchKind ()
+prettyPrintKind = fromMaybe (internalError "Incomplete pattern") . pattern matchKind ()
   where
   matchKind :: Pattern () Kind String
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)

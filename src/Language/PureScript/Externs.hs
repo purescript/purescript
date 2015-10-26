@@ -38,6 +38,7 @@ import Data.Aeson.TH
 
 import qualified Data.Map as M
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Names
@@ -50,57 +51,57 @@ import Paths_purescript as Paths
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
   {
-  -- ^ The externs version
+  -- | The externs version
     efVersion :: String
-  -- ^ Module name
+  -- | Module name
   , efModuleName :: ModuleName
-  -- ^ List of module exports
+  -- | List of module exports
   , efExports :: [DeclarationRef]
-  -- ^ List of module imports
+  -- | List of module imports
   , efImports :: [ExternsImport]
-  -- ^ List of operators and their fixities
+  -- | List of operators and their fixities
   , efFixities :: [ExternsFixity]
-  -- ^ List of type and value declaration
+  -- | List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
   } deriving (Show, Read)
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
   {
-  -- ^ The imported module
+  -- | The imported module
     eiModule :: ModuleName
-  -- ^ The import type: regular, qualified or hiding
+  -- | The import type: regular, qualified or hiding
   , eiImportType :: ImportDeclarationType
-  -- ^ The imported-as name, for qualified imports
+  -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
   } deriving (Show, Read)
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
   {
-  -- ^ The associativity of the operator
+  -- | The associativity of the operator
     efAssociativity :: Associativity
-  -- ^ The precedence level of the operator
+  -- | The precedence level of the operator
   , efPrecedence :: Precedence
-  -- ^ The operator symbol
+  -- | The operator symbol
   , efOperator :: String
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
-  -- ^ A type declaration
+  -- | A type declaration
     EDType
       { edTypeName :: ProperName
       , edTypeKind :: Kind
       , edTypeDeclarationKind :: TypeKind
       }
-  -- ^ A type synonym
+  -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName :: ProperName
       , edTypeSynonymArguments :: [(String, Maybe Kind)]
       , edTypeSynonymType :: Type
       }
-  -- ^ A data construtor
+  -- | A data construtor
   | EDDataConstructor
       { edDataCtorName :: ProperName
       , edDataCtorOrigin :: DataDeclType
@@ -108,19 +109,19 @@ data ExternsDeclaration =
       , edDataCtorType :: Type
       , edDataCtorFields :: [Ident]
       }
-  -- ^ A value declaration
+  -- | A value declaration
   | EDValue
       { edValueName :: Ident
       , edValueType :: Type
       }
-  -- ^ A type class declaration
+  -- | A type class declaration
   | EDClass
       { edClassName :: ProperName
       , edClassTypeArguments :: [(String, Maybe Kind)]
       , edClassMembers :: [(Ident, Type)]
       , edClassConstraints :: [Constraint]
       }
-  -- ^ An instance declaration
+  -- | An instance declaration
   | EDInstance
       { edInstanceClassName :: Qualified ProperName
       , edInstanceName :: Ident
@@ -152,7 +153,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 
 -- | Generate an externs file for all declarations in a module
 moduleToExternsFile :: Module -> Environment -> ExternsFile
-moduleToExternsFile (Module _ _ _ _ Nothing) _ = error "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
   efVersion       = showVersion Paths.version
@@ -181,7 +182,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (PositionedDeclarationRef _ _ r) = toExternsDeclaration r
   toExternsDeclaration (TypeRef pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
-      Nothing -> error "toExternsDeclaration: no kind in toExternsDeclaration"
+      Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
       Just (kind, TypeSynonym)
         | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
       Just (kind, ExternData) -> [ EDType pn kind ExternData ]
@@ -190,7 +191,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
                             | dctor <- fromMaybe (map fst tys) dctors
                             , (dty, _, ty, args) <- maybeToList (M.lookup (Qualified (Just mn) dctor) (dataConstructors env))
                             ]
-      _ -> error "toExternsDeclaration: Invalid input"
+      _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef ident)
     | Just (ty, _, _) <- (mn, ident) `M.lookup` names env
     = [ EDValue ident ty ]

@@ -79,6 +79,7 @@ library
                      Language.PureScript.AST.Traversals
                      Language.PureScript.AST.Exported
                      Language.PureScript.Bundle
+                     Language.PureScript.Crash
                      Language.PureScript.Externs
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.JS
@@ -169,6 +170,7 @@ library
                      Language.PureScript.Publish.ErrorsWarnings
                      Language.PureScript.Publish.BoxesHelpers
 
+                     Control.Monad.Logger
                      Control.Monad.Unify
                      Control.Monad.Supply
                      Control.Monad.Supply.Class

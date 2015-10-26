@@ -25,6 +25,7 @@ import Data.List (intercalate)
 
 import Control.Arrow (second)
 
+import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
@@ -103,7 +104,7 @@ prettyPrintDeclaration (BindingGroupDeclaration ds) =
   where
   toDecl (nm, t, e) = ValueDeclaration nm t [] (Right e)
 prettyPrintDeclaration (PositionedDeclaration _ _ d) = prettyPrintDeclaration d
-prettyPrintDeclaration _ = error "Invalid argument to prettyPrintDeclaration"
+prettyPrintDeclaration _ = internalError "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: CaseAlternative -> Box
 prettyPrintCaseAlternative (CaseAlternative binders result) =

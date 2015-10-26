@@ -36,6 +36,7 @@ import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 
+import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
@@ -74,12 +75,12 @@ unifyTypes t1 t2 = rethrow (addHint (ErrorUnifyingTypes t1 t2)) $
         let sk1 = skolemize ident1 sko sc1' ty1
         let sk2 = skolemize ident2 sko sc2' ty2
         sk1 `unifyTypes` sk2
-      _ -> error "Skolemized type variable was not given a scope"
+      _ -> internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ident sko sc ty1
     sk `unifyTypes` ty2
-  unifyTypes' ForAll{} _ = throwError . errorMessage $ UnspecifiedSkolemScope
+  unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
