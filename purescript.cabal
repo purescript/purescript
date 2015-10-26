@@ -170,6 +170,7 @@ library
                      Language.PureScript.Publish.ErrorsWarnings
                      Language.PureScript.Publish.BoxesHelpers
 
+                     Control.Monad.Logger
                      Control.Monad.Unify
                      Control.Monad.Supply
                      Control.Monad.Supply.Class

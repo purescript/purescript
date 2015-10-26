@@ -43,9 +43,10 @@ import Control.Applicative
 #endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Trans.Except
 import Control.Monad.Reader
-import Control.Monad.Writer.Strict
+import Control.Monad.Logger
 import Control.Monad.Supply
 import Control.Monad.Base (MonadBase(..))
 import Control.Monad.Trans.Control (MonadBaseControl(..))
@@ -284,22 +285,22 @@ importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 -- |
 -- A monad for running make actions
 --
-newtype Make a = Make { unMake :: ReaderT Options (WriterT MultipleErrors (ExceptT MultipleErrors IO)) a }
+newtype Make a = Make { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
 
 instance MonadBase IO Make where
   liftBase = liftIO
 
 instance MonadBaseControl IO Make where
-  type StM Make a = Either MultipleErrors (a, MultipleErrors)
+  type StM Make a = Either MultipleErrors a
   liftBaseWith f = Make $ liftBaseWith $ \q -> f (q . unMake)
   restoreM = Make . restoreM
 
 -- |
 -- Execute a 'Make' monad, returning either errors, or the result of the compile plus any warnings.
 --
-runMake :: Options -> Make a -> IO (Either MultipleErrors (a, MultipleErrors))
-runMake opts = runExceptT . runWriterT . flip runReaderT opts . unMake
+runMake :: Options -> Make a -> IO (Either MultipleErrors a, MultipleErrors)
+runMake opts = runLogger' . runExceptT . flip runReaderT opts . unMake
 
 makeIO :: (IOError -> ErrorMessage) -> IO a -> Make a
 makeIO f io = do
