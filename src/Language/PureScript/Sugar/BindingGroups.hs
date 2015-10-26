@@ -16,6 +16,7 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.BindingGroups (
     createBindingGroups,
@@ -28,6 +29,7 @@ import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
 #if __GLASGOW_HASKELL__ < 710
+import Data.Foldable (foldMap)
 import Control.Applicative
 #endif
 import Control.Monad ((<=<))
@@ -54,20 +56,20 @@ createBindingGroupsModule = mapM $ \(Module ss coms name ds exps) -> Module ss c
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule = map $ \(Module ss coms name ds exps) -> Module ss coms name (collapseBindingGroups ds) exps
 
-createBindingGroups :: (Functor m, Applicative m, MonadError MultipleErrors m) => ModuleName -> [Declaration] -> m [Declaration]
+createBindingGroups :: forall m. (Functor m, Applicative m, MonadError MultipleErrors m) => ModuleName -> [Declaration] -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls
 
   where
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
-  handleExprs :: (Functor m, MonadError MultipleErrors m) => Expr -> m Expr
+  handleExprs :: Expr -> m Expr
   handleExprs (Let ds val) = flip Let val <$> handleDecls ds
   handleExprs other = return other
 
   -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
   --
-  handleDecls :: (Functor m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+  handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = filter isValueDecl ds
         dataDecls = filter isDataDecl ds
@@ -158,7 +160,7 @@ getProperName _ = internalError "Expected DataDeclaration"
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
 --
 --
-toBindingGroup :: (Functor m, MonadError MultipleErrors m) => ModuleName -> SCC Declaration -> m Declaration
+toBindingGroup :: forall m. (Functor m, MonadError MultipleErrors m) => ModuleName -> SCC Declaration -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
 toBindingGroup moduleName (CyclicSCC ds') =
   -- Once we have a mutually-recursive group of declarations, we need to sort
@@ -178,15 +180,14 @@ toBindingGroup moduleName (CyclicSCC ds') =
   valueVerts :: [(Declaration, Ident, [Ident])]
   valueVerts = map (\d -> (d, getIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
-  toBinding :: (MonadError MultipleErrors m) => SCC Declaration -> m (Ident, NameKind, Expr)
+  toBinding :: SCC Declaration -> m (Ident, NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
-  toBinding (CyclicSCC ~(d:ds)) = cycleError d ds
+  toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
-  cycleError :: (MonadError MultipleErrors m) => Declaration -> [Declaration] -> m a
-  cycleError (PositionedDeclaration p _ d) ds = rethrowWithPosition p $ cycleError d ds
-  cycleError (ValueDeclaration n _ _ (Right _)) [] = throwError . errorMessage $ CycleInDeclaration n
-  cycleError d ds@(_:_) = rethrow (addHint (NotYetDefined (map getIdent ds))) $ cycleError d []
-  cycleError _ _ = internalError "Expected ValueDeclaration"
+  cycleError :: Declaration -> MultipleErrors
+  cycleError (PositionedDeclaration p _ d) = onErrorMessages (withPosition p) $ cycleError d
+  cycleError (ValueDeclaration n _ _ (Right _)) = errorMessage $ CycleInDeclaration n
+  cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup :: (MonadError MultipleErrors m) => SCC Declaration -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
