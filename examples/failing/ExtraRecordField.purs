@@ -1,5 +1,4 @@
--- @shouldFailWith PropertyIsMissing
--- TODO: Make this fail with a new error ExtraProperty instead.
+-- @shouldFailWith AdditionalProperty
 module ExtraRecordField where
 
 import Prelude ((<>))
