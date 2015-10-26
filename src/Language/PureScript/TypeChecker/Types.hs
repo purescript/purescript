@@ -79,7 +79,7 @@ typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
+    ds2 <- forM untyped $ \e -> typeForBindingGroupElement True e dict untypedDict
     return $ ds1 ++ ds2
 
   forM tys $ \(ident, (val, ty)) -> do
@@ -137,12 +137,12 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
            else return (TypedValue False val' ty'')
   return (ident, (val'', ty''))
 
-typeForBindingGroupElement :: (Ident, Expr) -> TypeData -> UntypedData -> UnifyT Type Check (Ident, (Expr, Type))
-typeForBindingGroupElement (ident, val) dict untypedDict = do
+typeForBindingGroupElement :: Bool -> (Ident, Expr) -> TypeData -> UntypedData -> UnifyT Type Check (Ident, (Expr, Type))
+typeForBindingGroupElement warn (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
   ty =?= fromMaybe (internalError "name not found in dictionary") (lookup ident untypedDict)
-  tell . errorMessage $ MissingTypeDeclaration ident ty
+  when warn . tell . errorMessage $ MissingTypeDeclaration ident ty
   return (ident, (TypedValue True val' ty, ty))
 
 -- |
@@ -311,7 +311,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
+  ds2' <- forM untyped $ \e -> typeForBindingGroupElement False e dict untypedDict
   let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
   bindNames dict $ do
     makeBindingGroupVisible
