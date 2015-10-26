@@ -338,18 +338,17 @@ inferBinder val (ConstructorBinder ctor binders) = do
     Just (_, _, ty, _) -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
-      go binders fn'
-        where
-        go [] ty' = case (val, ty') of
-          (TypeConstructor _, TypeApp _ _) -> throwIncorrectArity
-          _ -> do
-            _ <- val =?= ty'
-            return M.empty
-        go (binder : binders') (TypeApp (TypeApp t obj) ret) | t == tyFunction =
-          M.union <$> inferBinder obj binder <*> go binders' ret
-        go _ _ = throwIncorrectArity
-        throwIncorrectArity = throwError . errorMessage $ IncorrectConstructorArity ctor
+      let (args, ret) = peelArgs fn'
+      unless (length args == length binders) . throwError . errorMessage $ IncorrectConstructorArity ctor
+      ret =?= val
+      M.unions <$> zipWithM inferBinder (reverse args) binders
     _ -> throwError . errorMessage $ UnknownDataConstructor ctor Nothing
+  where
+  peelArgs :: Type -> ([Type], Type)
+  peelArgs = go []
+    where
+    go args (TypeApp (TypeApp fn arg) ret) | fn == tyFunction = go (arg : args) ret
+    go args ret = (args, ret)
 inferBinder val (ObjectBinder props) = do
   row <- fresh
   rest <- fresh
