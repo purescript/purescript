@@ -206,7 +206,7 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
   go (d@(ExternDeclaration name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
       env <- getEnv
-      kind <- kindOf moduleName ty
+      kind <- kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
       case M.lookup (moduleName, name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name

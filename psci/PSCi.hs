@@ -425,7 +425,7 @@ handleKindOf typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = P.CheckState env' 0 0 (Just mName)
-              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf mName typ')) chk
+              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf typ')) chk
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind

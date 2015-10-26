@@ -76,8 +76,8 @@ instance Unifiable Check Kind where
 -- |
 -- Infer the kind of a single type
 --
-kindOf :: ModuleName -> Type -> Check Kind
-kindOf _ ty = fst <$> kindOfWithScopedVars ty
+kindOf :: Type -> Check Kind
+kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- |
 -- Infer the kind of a single type, returning the kinds of any scoped type variables
