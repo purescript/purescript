@@ -104,7 +104,7 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
 type TestM = WriterT [(FilePath, String)] IO
 
 runTest :: P.Make a -> IO (Either P.MultipleErrors a)
-runTest = fmap (fmap fst) . P.runMake P.defaultOptions
+runTest = fmap fst . P.runMake P.defaultOptions
 
 compile :: [FilePath] -> M.Map P.ModuleName FilePath -> IO (Either P.MultipleErrors P.Environment)
 compile inputFiles foreigns = runTest $ do
