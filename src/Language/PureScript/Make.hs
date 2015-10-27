@@ -59,6 +59,7 @@ import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
 #if __GLASGOW_HASKELL__ < 710
+import Data.Monoid (mempty, mconcat)
 import Data.Traversable (traverse)
 #endif
 import Data.Traversable (for)
