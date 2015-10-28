@@ -2,7 +2,7 @@ module Main where
 
 import Control.Monad.Eff.Console
 
-class Partial where
+class Partial 
 
 data List a = Nil | Cons a (List a)
 
