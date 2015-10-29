@@ -156,6 +156,7 @@ data ErrorMessageHint
   | ErrorCheckingAccessor Expr String
   | ErrorCheckingType Expr Type
   | ErrorCheckingKind Type
+  | ErrorCheckingGuard
   | ErrorInferringType Expr
   | ErrorInApplication Expr Type Expr
   | ErrorInDataConstructor ProperName
@@ -530,15 +531,15 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
                                           , indent $ prettyPrintValue expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
-      = paras [ line "Could not match expected type"
+      = paras [ line "Could not match type"
               , indent $ typeAsBox t1
-              , line "with actual type"
+              , line "with type"
               , indent $ typeAsBox t2
               ]
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
-      paras [ line "Could not match expected kind"
+      paras [ line "Could not match kind"
             , indent $ line $ prettyPrintKind k1
-            , line "with actual kind"
+            , line "with kind"
             , indent $ line $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
@@ -729,6 +730,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , Box.hsep 1 Box.top [ line "while checking the kind of"
                                  , typeAsBox ty
                                  ]
+            ]
+    renderHint ErrorCheckingGuard detail =
+      paras [ detail
+            , line "while checking the type of a guard clause"
             ]
     renderHint (ErrorInferringType expr) detail =
       paras [ detail
