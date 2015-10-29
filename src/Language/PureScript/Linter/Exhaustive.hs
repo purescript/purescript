@@ -246,7 +246,7 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
   step :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedudancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        (missed', approx) = splitAt 10000 (concat missed)
+        (missed', approx) = splitAt 10000 (nub (concat missed))
         cond = liftA2 (&&) (or <$> sequenceA pr) nec
     in (missed', ( if null approx
                      then cond
