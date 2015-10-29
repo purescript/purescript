@@ -22,6 +22,7 @@ import Data.List (find, nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 
 #if __GLASGOW_HASKELL__ < 710
+import Data.Monoid (mempty)
 import Control.Applicative (Applicative(..), (<$>), (<*>))
 #endif
 import Control.Monad
