@@ -68,7 +68,7 @@ bindTypes newNames action = do
 -- |
 -- Temporarily bind a collection of names to types
 --
-withScopedTypeVars :: (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m) => ModuleName -> [(String, Kind)] -> m a -> m a
+withScopedTypeVars :: (Functor m, Applicative m, MonadState CheckState m, MonadWriter MultipleErrors m) => ModuleName -> [(String, Kind)] -> m a -> m a
 withScopedTypeVars mn ks ma = do
   orig <- get
   for_ ks $ \(name, _) ->
