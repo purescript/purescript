@@ -26,7 +26,7 @@ import Control.Applicative (Applicative(..), (<$>), (<*>))
 #endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer (MonadWriter(..))
+import Control.Monad.Writer (MonadWriter(..), censor)
 
 import qualified Data.Map as M
 
@@ -47,10 +47,13 @@ import Language.PureScript.Sugar.Names.Exports
 --
 desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 desugarImports externs modules = do
-  env <- foldM externsEnv primEnv externs
+  env <- silence $ foldM externsEnv primEnv externs
   env' <- foldM updateEnv env modules
   mapM (renameInModule' env') modules
   where
+  silence :: m a -> m a
+  silence = censor (const mempty)
+
   -- | Create an environment from a collection of externs files
   externsEnv :: Env -> ExternsFile -> m Env
   externsEnv env ExternsFile{..} = do
