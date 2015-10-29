@@ -418,7 +418,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
       case result of
         Left gs -> do
           gs' <- forM gs $ \(grd, val) -> do
-            grd' <- check grd tyBoolean
+            grd' <- rethrow (addHint ErrorCheckingGuard) $ check grd tyBoolean
             val' <- TypedValue True <$> check val ret <*> pure ret
             return (grd', val')
           return $ Left gs'
