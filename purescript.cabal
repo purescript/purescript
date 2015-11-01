@@ -68,7 +68,7 @@ library
                    Glob >= 0.7 && < 0.8,
                    process >= 1.2.0 && < 1.4,
                    safe >= 0.3.9 && < 0.4,
-                   semigroups >= 0.16.2 && < 0.18
+                   semigroups >= 0.16.2 && < 0.19
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
