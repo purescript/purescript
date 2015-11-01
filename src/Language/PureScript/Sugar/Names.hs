@@ -108,7 +108,7 @@ desugarImports externs modules = do
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule env imps (elaborateExports exps m)
-      findUnusedImports m imps used
+      findUnusedImports m env used
       return $ elaborateImports imps m'
 
 -- |
@@ -231,7 +231,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) IsProperName
 
   updateDataConstructorName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) IsProperName
+  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName
 
   updateClassName  :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
   updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) IsProperName
