@@ -35,9 +35,9 @@ type UsedImports = M.Map ModuleName [Name]
 -- or references in an explicit import list.
 --
 findUnusedImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Module -> Env -> UsedImports -> m ()
-findUnusedImports (Module _ _ _ mdecls _) env usedImps = do
+findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   imps <- findImports mdecls
-  forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` autoIncludes) $
+  forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` alwaysUsedModules) $
     forM_ decls $ \(ss, declType, qualifierName) -> censor (onErrorMessages $ addModuleLocError ss) $
       let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames mni ++ M.findWithDefault [] mni usedImps in
       case declType of
@@ -52,8 +52,12 @@ findUnusedImports (Module _ _ _ mdecls _) env usedImps = do
   sugarNames (ModuleName [ProperName n]) | n == C.prelude = [ IdentName $ Qualified Nothing (Ident C.bind) ]
   sugarNames _ = []
 
-  autoIncludes :: [ ModuleName ]
-  autoIncludes = [ ModuleName [ProperName C.prim] ]
+  -- rely on exports being elaborated by this point
+  alwaysUsedModules :: [ ModuleName ]
+  alwaysUsedModules = ModuleName [ProperName C.prim] : maybe [] (mapMaybe isExport) mexports
+    where
+      isExport (ModuleRef mn) = Just mn
+      isExport _ = Nothing
 
   typeForDCtor :: ModuleName -> ProperName -> Maybe ProperName
   typeForDCtor mn pn =
