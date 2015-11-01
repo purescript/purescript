@@ -108,6 +108,7 @@ library
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
+                     Language.PureScript.Linter.Imports
                      Language.PureScript.Make
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names

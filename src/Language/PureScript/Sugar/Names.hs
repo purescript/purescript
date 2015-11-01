@@ -28,6 +28,7 @@ import Control.Applicative (Applicative(..), (<$>), (<*>))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)
+import Control.Monad.State.Lazy
 
 import qualified Data.Map as M
 
@@ -41,6 +42,7 @@ import Language.PureScript.Externs
 import Language.PureScript.Sugar.Names.Env
 import Language.PureScript.Sugar.Names.Imports
 import Language.PureScript.Sugar.Names.Exports
+import Language.PureScript.Linter.Imports
 
 -- |
 -- Replaces all local names with qualified names within a list of modules. The
@@ -103,9 +105,11 @@ desugarImports externs modules = do
 
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
-    rethrow (addHint (ErrorInModule mn)) $ do
+    warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
-      elaborateImports imps <$> renameInModule env imps (elaborateExports exps m)
+      (m', used) <- flip runStateT M.empty $ renameInModule env imps (elaborateExports exps m)
+      findUnusedImports m env used
+      return $ elaborateImports imps m'
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that
@@ -146,10 +150,11 @@ elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' 
 -- Replaces all local names with qualified names within a module and checks that all existing
 -- qualified names are valid.
 --
-renameInModule :: forall m. (Applicative m, MonadError MultipleErrors m) => Env -> Imports -> Module -> m Module
+renameInModule :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m) => Env -> Imports -> Module -> m Module
 renameInModule env imports (Module ss coms mn decls exps) =
   Module ss coms mn <$> parU decls go <*> pure exps
   where
+
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
   updateDecl :: (Maybe SourceSpan, [Ident]) -> Declaration -> m ((Maybe SourceSpan, [Ident]), Declaration)
@@ -168,7 +173,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
-
+  --
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((Just pos', bound), v)
@@ -189,7 +194,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateValue s@(pos, _) (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
-
+  --
   updateBinder :: (Maybe SourceSpan, [Ident]) -> Binder -> m ((Maybe SourceSpan, [Ident]), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((Just pos, bound), v)
@@ -201,8 +206,8 @@ renameInModule env imports (Module ss coms mn decls exps) =
     return (s', TypedBinder t' b')
   updateBinder s v =
     return (s, v)
-
-  updateCase :: (Maybe SourceSpan, [Ident]) -> CaseAlternative -> m ((Maybe SourceSpan, [Ident]), CaseAlternative)
+  --
+  updateCase :: (Maybe SourceSpan, [Ident]) -> CaseAlternative ->  m ((Maybe SourceSpan, [Ident]), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) =
     return ((pos, concatMap binderNames bs ++ bound), c)
 
@@ -223,16 +228,16 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateConstraints pos = mapM (\(name, ts) -> (,) <$> updateClassName name pos <*> mapM (updateTypesEverywhere pos) ts)
 
   updateTypeName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes)
+  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) IsProperName
 
   updateDataConstructorName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes)
+  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName
 
   updateClassName  :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses)
+  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) IsProperName
 
   updateValueName  :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
-  updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues)
+  updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName
 
   -- Used when performing an update to qualify values and classes with their
   -- module of original definition.
@@ -255,16 +260,22 @@ renameInModule env imports (Module ss coms mn decls exps) =
   update :: (Ord a) => (Qualified a -> SimpleErrorMessage)
                        -> M.Map (Qualified a) (Qualified a, ModuleName)
                        -> (Exports -> a -> Maybe (Qualified a))
+                       -> (Qualified a -> Name)
                        -> Qualified a
                        -> Maybe SourceSpan
                        -> m (Qualified a)
-  update unknown imps getE qname@(Qualified mn' name) pos = positioned $
+  update unknown imps getE toName qname@(Qualified mn' name) pos = positioned $
     case (M.lookup qname imps, mn') of
       -- We found the name in our imports, so we return the name for it,
       -- qualifying with the name of the module it was originally defined in
       -- rather than the module we're importing from, to handle the case of
       -- re-exports.
-      (Just (_, mnOrig), _) -> return $ Qualified (Just mnOrig) name
+      (Just (qn, mnOrig), _) -> do
+        case qn of
+          Qualified (Just mnNew) _ ->
+            modify $ \result -> M.insert mnNew (maybe [toName qname] (toName qname :) (mnNew `M.lookup` result)) result
+          _ -> return ()
+        return $ Qualified (Just mnOrig) name
       -- If the name wasn't found in our imports but was qualified then we need
       -- to check whether it's a failed import from a "pseudo" module (created
       -- by qualified importing). If that's not the case, then we just need to
