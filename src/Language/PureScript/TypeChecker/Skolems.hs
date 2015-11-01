@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Language.PureScript.TypeChecker.Skolems (
     newSkolemConstant,
@@ -31,7 +32,7 @@ import Data.Monoid
 import Control.Applicative
 #endif
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Unify
+import Control.Monad.State.Class (MonadState(..), gets, modify)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -42,13 +43,16 @@ import Language.PureScript.Types
 -- |
 -- Generate a new skolem constant
 --
-newSkolemConstant :: UnifyT Type Check Int
-newSkolemConstant = fresh'
+newSkolemConstant :: (MonadState CheckState m) => m Int
+newSkolemConstant = do
+  s <- gets checkNextSkolem
+  modify $ \st -> st { checkNextSkolem = s + 1 }
+  return s
 
 -- |
 -- Introduce skolem scope at every occurence of a ForAll
 --
-introduceSkolemScope :: Type -> UnifyT Type Check Type
+introduceSkolemScope :: (Functor m, Applicative m, MonadState CheckState m) => Type -> m Type
 introduceSkolemScope = everywhereOnTypesM go
   where
   go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)
@@ -57,8 +61,11 @@ introduceSkolemScope = everywhereOnTypesM go
 -- |
 -- Generate a new skolem scope
 --
-newSkolemScope :: UnifyT Type Check SkolemScope
-newSkolemScope = SkolemScope <$> fresh'
+newSkolemScope :: (MonadState CheckState m) => m SkolemScope
+newSkolemScope = do
+  s <- gets checkNextSkolemScope
+  modify $ \st -> st { checkNextSkolemScope = s + 1 }
+  return $ SkolemScope s
 
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
@@ -86,7 +93,7 @@ skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id on
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: Expr -> Check ()
+skolemEscapeCheck :: (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.

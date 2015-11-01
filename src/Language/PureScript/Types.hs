@@ -26,7 +26,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
-import Control.Monad.Unify
 import Control.Arrow (second)
 #if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
@@ -49,7 +48,7 @@ data Type
   -- |
   -- A unification variable of type Type
   --
-  = TUnknown Unknown
+  = TUnknown Int
   -- |
   -- A named type variable
   --
