@@ -38,15 +38,16 @@ findUnusedImports :: forall m. (Applicative m, MonadError MultipleErrors m, Mona
 findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   imps <- findImports mdecls
   forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` alwaysUsedModules) $
-    forM_ decls $ \(ss, declType, qualifierName) -> censor (onErrorMessages $ addModuleLocError ss) $
-      let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames mni ++ M.findWithDefault [] mni usedImps in
-      case declType of
-        Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
-        Explicit declrefs -> do
-          let idents = mapMaybe runDeclRef declrefs
-          let diff = idents \\ usedNames
-          unless (null diff) $ tell $ errorMessage $ UnusedExplicitImport mni diff
-        _ -> return ()
+    forM_ decls $ \(ss, declType, qualifierName) ->
+      censor (onErrorMessages $ addModuleLocError ss) $ unless (qnameUsed qualifierName) $
+        let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames mni ++ M.findWithDefault [] mni usedImps in
+        case declType of
+          Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
+          Explicit declrefs -> do
+            let idents = mapMaybe runDeclRef declrefs
+            let diff = idents \\ usedNames
+            unless (null diff) $ tell $ errorMessage $ UnusedExplicitImport mni diff
+          _ -> return ()
   where
   sugarNames :: ModuleName -> [ Name ]
   sugarNames (ModuleName [ProperName n]) | n == C.prelude = [ IdentName $ Qualified Nothing (Ident C.bind) ]
@@ -58,6 +59,10 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
     where
       isExport (ModuleRef mn) = Just mn
       isExport _ = Nothing
+
+  qnameUsed :: Maybe ModuleName -> Bool
+  qnameUsed (Just qn) = qn `elem` alwaysUsedModules
+  qnameUsed Nothing = False
 
   typeForDCtor :: ModuleName -> ProperName -> Maybe ProperName
   typeForDCtor mn pn =
