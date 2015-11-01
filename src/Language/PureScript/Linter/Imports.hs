@@ -39,7 +39,7 @@ findUnusedImports (Module _ _ _ mdecls _) env usedImps = do
   imps <- findImports mdecls
   forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` autoIncludes) $
     forM_ decls $ \(ss, declType, qualifierName) -> censor (onErrorMessages $ addModuleLocError ss) $
-      let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames ++ M.findWithDefault [] mni usedImps in
+      let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames mni ++ M.findWithDefault [] mni usedImps in
       case declType of
         Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
         Explicit declrefs -> do
@@ -48,8 +48,9 @@ findUnusedImports (Module _ _ _ mdecls _) env usedImps = do
           unless (null diff) $ tell $ errorMessage $ UnusedExplicitImport mni diff
         _ -> return ()
   where
-  sugarNames :: [ Name ]
-  sugarNames = [ IdentName $ Qualified Nothing (Ident C.bind) ]
+  sugarNames :: ModuleName -> [ Name ]
+  sugarNames (ModuleName [ProperName n]) | n == C.prelude = [ IdentName $ Qualified Nothing (Ident C.bind) ]
+  sugarNames _ = []
 
   autoIncludes :: [ ModuleName ]
   autoIncludes = [ ModuleName [ProperName C.prim] ]
