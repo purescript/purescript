@@ -37,6 +37,7 @@ import Data.Maybe (fromMaybe)
 import Control.Applicative
 import Control.Arrow ((+++))
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Parallel.Strategies (withStrategy, parList, rseq)
 
 import Language.PureScript.AST
 import Language.PureScript.Comments
@@ -274,23 +275,26 @@ parseModule = do
   let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
   return $ Module ss comments name decls exports
 
--- |
--- Parse a collection of modules
---
+-- | Parse a collection of modules in parallel
 parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m, Functor m) =>
                                      (k -> FilePath) -> [(k, String)] -> m [(k, Module)]
 parseModulesFromFiles toFilePath input = do
-  modules <- parU input $ \(k, content) -> do
+  modules <- flip parU id $ map wrapError $ inParallel $ flip map input $ \(k, content) -> do
     let filename = toFilePath k
-    ts <- wrapError $ lex filename content
-    ms <- wrapError $ runTokenParser filename parseModules ts
+    ts <- lex filename content
+    ms <- runTokenParser filename parseModules ts
     return (k, ms)
   return $ collect modules
   where
-  wrapError :: Either P.ParseError a -> m a
-  wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
   collect :: [(k, [v])] -> [(k, v)]
   collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
+  wrapError :: Either P.ParseError a -> m a
+  wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
+  -- It is enough to force each parse result to WHNF, since success or failure can't be
+  -- determined until the end of the file, so this effectively distributes parsing of each file
+  -- to a different spark.
+  inParallel :: [Either P.ParseError (k, [Module])] -> [Either P.ParseError (k, [Module])]
+  inParallel = withStrategy (parList rseq)
 
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
