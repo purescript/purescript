@@ -517,11 +517,13 @@ parseNullBinder :: TokenParser Binder
 parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
-parseIdentifierAndBinder = do
-  name <- lname <|> stringLiteral
-  C.indented *> (equals <|> colon)
-  binder <- C.indented *> parseBinder
-  return (name, binder)
+parseIdentifierAndBinder =
+  do name <- lname
+     b <- P.option (VarBinder (Ident name)) rest
+     return (name, b)
+  <|> (,) <$> stringLiteral <*> rest
+  where
+  rest = C.indented *> (equals <|> colon) *> C.indented *> parseBinder
 
 -- |
 -- Parse a binder
