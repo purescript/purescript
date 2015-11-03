@@ -24,6 +24,7 @@
 module Language.PureScript.TypeChecker.Monad where
 
 import Data.Maybe
+import Data.Foldable (for_)
 import qualified Data.Map as M
 
 #if __GLASGOW_HASKELL__ < 710
@@ -67,8 +68,13 @@ bindTypes newNames action = do
 -- |
 -- Temporarily bind a collection of names to types
 --
-withScopedTypeVars :: (Functor m, MonadState CheckState m) => ModuleName -> [(String, Kind)] -> m a -> m a
-withScopedTypeVars mn ks = bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks))
+withScopedTypeVars :: (Functor m, Applicative m, MonadState CheckState m, MonadWriter MultipleErrors m) => ModuleName -> [(String, Kind)] -> m a -> m a
+withScopedTypeVars mn ks ma = do
+  orig <- get
+  for_ ks $ \(name, _) ->
+    when (Qualified (Just mn) (ProperName name) `M.member` types (checkEnv orig)) $
+      tell . errorMessage $ ShadowedTypeVar name
+  bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
 
 -- |
 -- Temporarily make a collection of type class dictionaries available
