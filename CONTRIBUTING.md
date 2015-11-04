@@ -30,7 +30,7 @@ updated.
 You can automate this (if you have bash):
 
 - get a copy of [cabal-dependency-licenses][]
-- run at the command line: `./license/generate > LICENSE`
+- run at the command line: `runhaskell license-generator/generate.hs > LICENSE`
 
 [cabal-dependency-licenses]: https://github.com/jaspervdj/cabal-dependency-licenses
 
