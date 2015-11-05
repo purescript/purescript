@@ -17,7 +17,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Kinds (
     kindOf,
@@ -26,15 +25,15 @@ module Language.PureScript.TypeChecker.Kinds (
     kindsOfAll
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Maybe (fromMaybe)
 
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 
 import Control.Arrow (second)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -141,7 +140,7 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 --
 solveTypes :: Bool -> [Type] -> [Kind] -> Kind -> UnifyT Kind Check Kind
 solveTypes isData ts kargs tyCon = do
-  ks <- mapM (fmap fst . infer) ts
+  ks <- traverse (fmap fst . infer) ts
   when isData $ do
     tyCon =?= foldr FunKind Star kargs
     forM_ ks $ \k -> k =?= Star

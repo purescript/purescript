@@ -13,16 +13,15 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Parser.JS
   ( ForeignJS()
   , parseForeignModulesFromFiles
   ) where
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative ((*>), (<*))
-#endif
+import Prelude ()
+import Prelude.Compat hiding (lex)
+
 import Control.Monad (forM_, when, msum)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -32,7 +31,6 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
-import Prelude hiding (lex)
 import qualified Data.Map as M
 import qualified Text.Parsec as PS
 

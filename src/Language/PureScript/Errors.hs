@@ -15,19 +15,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Errors where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Either (lefts, rights)
 import Data.List (intercalate, transpose, nub, nubBy)
 import Data.Function (on)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Foldable (fold, foldMap)
-import Data.Traversable (traverse)
-#else
 import Data.Foldable (fold)
-#endif
 
 import qualified Data.Map as M
 
@@ -35,9 +32,6 @@ import Control.Monad
 import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative ((<$>), (<*>), Applicative, pure)
-#endif
 import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
 

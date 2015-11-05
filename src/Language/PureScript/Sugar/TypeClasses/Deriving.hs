@@ -19,19 +19,18 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.TypeClasses.Deriving (
     deriveInstances
 ) where
 
-import Data.List
+import Prelude ()
+import Prelude.Compat
+
+import Data.List (foldl', find, sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad (replicateM)
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Control.Monad.Error.Class (MonadError(..))

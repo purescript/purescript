@@ -2,7 +2,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Publish
   ( preparePackage
@@ -19,7 +18,8 @@ module Language.PureScript.Publish
   , getResolvedDependencies
   ) where
 
-import Prelude hiding (userError)
+import Prelude ()
+import Prelude.Compat hiding (userError)
 
 import Data.Maybe
 import Data.Char (isSpace)
@@ -28,15 +28,13 @@ import Data.List.Split (splitOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Version
 import Data.Function (on)
+import Data.Foldable (traverse_)
 import Safe (headMay)
 import Data.Aeson.BetterErrors
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Category ((>>>))
 import Control.Arrow ((***))
 import Control.Exception (catch, try)
@@ -304,7 +302,7 @@ asDependencyStatus = do
 
 warnUndeclared :: [PackageName] -> [PackageName] -> PrepareM ()
 warnUndeclared declared actual =
-  mapM_ (warn . UndeclaredDependency) (actual \\ declared)
+  traverse_ (warn . UndeclaredDependency) (actual \\ declared)
 
 handleDeps ::
   [(PackageName, DependencyStatus)] -> PrepareM [(PackageName, Version)]
@@ -314,8 +312,8 @@ handleDeps deps = do
     (x:xs) ->
       userError (MissingDependencies (x :| xs))
     [] -> do
-      mapM_ (warn . NoResolvedVersion) noVersion
-      withVersions <- catMaybes <$> mapM tryExtractVersion' installed
+      traverse_ (warn . NoResolvedVersion) noVersion
+      withVersions <- catMaybes <$> traverse tryExtractVersion' installed
       filterM (liftIO . isPureScript . bowerDir . fst) withVersions
 
   where

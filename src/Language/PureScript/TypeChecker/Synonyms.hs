@@ -17,18 +17,17 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Synonyms (
     replaceAllTypeSynonyms
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 

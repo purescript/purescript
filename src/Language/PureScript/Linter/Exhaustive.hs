@@ -18,20 +18,19 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Linter.Exhaustive
   ( checkExhaustive
   , checkExhaustiveModule
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.List (foldl', sortBy, nub)
 import Data.Function (on)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Traversable (sequenceA)
-#endif
 
 import Control.Monad (unless)
 import Control.Applicative

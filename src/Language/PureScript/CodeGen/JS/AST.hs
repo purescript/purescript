@@ -14,18 +14,14 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.CodeGen.JS.AST where
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative (Applicative, (<$>), (<*>))
-#endif
+import Prelude ()
+import Prelude.Compat
+
 import Control.Monad.Identity
 import Data.Data
-#if __GLASGOW_HASKELL__ < 710
-import Data.Traversable (traverse)
-#endif
 
 import Language.PureScript.Comments
 import Language.PureScript.Traversals

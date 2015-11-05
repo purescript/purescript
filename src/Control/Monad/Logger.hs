@@ -12,19 +12,17 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.Logger where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.IORef
 
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid
-import Control.Applicative
-#endif
 import Control.Monad (ap)
 import Control.Monad.IO.Class
 import Control.Monad.Writer.Class

@@ -40,6 +40,7 @@ source-repository head
 
 library
     build-depends: base >=4.6 && <5,
+                   base-compat >=0.6.0,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
                    transformers-base >= 0.4.0 && < 0.5,

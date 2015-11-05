@@ -16,7 +16,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Types (
     typesOf
@@ -38,14 +37,14 @@ module Language.PureScript.TypeChecker.Types (
       Check a function of a given type returns a value of another type when applied to its arguments
 -}
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Either (lefts, rights)
-import Data.List
+import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Unify
@@ -213,20 +212,20 @@ infer' v@(StringLiteral _) = return $ TypedValue True v tyString
 infer' v@(CharLiteral _) = return $ TypedValue True v tyChar
 infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
 infer' (ArrayLiteral vals) = do
-  ts <- mapM infer vals
+  ts <- traverse infer vals
   els <- fresh
   forM_ ts $ \(TypedValue _ _ t) -> els =?= t
   return $ TypedValue True (ArrayLiteral ts) (TypeApp tyArray els)
 infer' (ObjectLiteral ps) = do
   ensureNoDuplicateProperties ps
-  ts <- mapM (infer . snd) ps
+  ts <- traverse (infer . snd) ps
   let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
       ty = TypeApp tyObject $ rowFromList (fields, REmpty)
   return $ TypedValue True (ObjectLiteral (zip (map fst ps) ts)) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- fresh
-  newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> mapM (infer . snd) ps
+  newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> traverse (infer . snd) ps
   let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) fresh
   let oldTy = TypeApp tyObject $ rowFromList (oldTys, row)
@@ -365,7 +364,7 @@ inferBinder val (ObjectBinder props) = do
     return $ m1 `M.union` m2
 inferBinder val (ArrayBinder binders) = do
   el <- fresh
-  m1 <- M.unions <$> mapM (inferBinder el) binders
+  m1 <- M.unions <$> traverse (inferBinder el) binders
   val =?= TypeApp tyArray el
   return m1
 inferBinder val (NamedBinder name binder) = do
