@@ -26,7 +26,6 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Maybe
-import Data.Foldable (for_)
 import qualified Data.Map as M
 
 import Control.Arrow (second)
