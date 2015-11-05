@@ -11,7 +11,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,12 +21,13 @@ module Language.PureScript.Sugar.Names.Exports
   , resolveExports
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (find, intersect)
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Foldable (traverse_)
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative (Applicative(..), (<$>))
-#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -197,7 +197,7 @@ filterModule mn exps refs = do
       Nothing -> throwError . errorMessage . UnknownExportType $ name
       Just ((_, dcons), _) -> do
         let expDcons' = fromMaybe dcons expDcons
-        mapM_ (checkDcon name dcons) expDcons'
+        traverse_ (checkDcon name dcons) expDcons'
         return $ ((name, expDcons'), mn) : result
   filterTypes _ result _ = return result
 

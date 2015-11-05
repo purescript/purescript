@@ -16,13 +16,15 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.TypeClasses
   ( desugarTypeClasses
   , typeClassMemberName
   , superClassDictionaryNames
   ) where
+
+import Prelude ()
+import Prelude.Compat
 
 import Language.PureScript.Crash
 import Language.PureScript.AST hiding (isExported)
@@ -37,9 +39,6 @@ import Language.PureScript.Types
 
 import qualified Language.PureScript.Constants as C
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Arrow (first, second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -57,7 +56,7 @@ type Desugar = StateT MemberMap
 -- instance dictionary expressions.
 --
 desugarTypeClasses :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
-desugarTypeClasses externs = flip evalStateT initialState . mapM desugarModule
+desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModule
   where
   initialState :: MemberMap
   initialState = M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
@@ -262,7 +261,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       let memberTypes = map (second (replaceAllTypeVars (zip (map fst args) tys))) instanceTys
 
       -- Create values for the type instance members
-      members <- zip (map typeClassMemberName decls) <$> mapM (memberToValue memberTypes) decls
+      members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
 
       -- Create the type of the dictionary
       -- The type is an object type, but depending on type instance dependencies, may be constrained.

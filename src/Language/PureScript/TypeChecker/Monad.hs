@@ -19,17 +19,16 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker.Monad where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Maybe
 import Data.Foldable (for_)
 import qualified Data.Map as M
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.State
 import Control.Monad.Unify
 import Control.Monad.Writer.Strict

@@ -1,17 +1,16 @@
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Docs.ParseAndDesugar
   ( parseAndDesugar
   , ParseDesugarError(..)
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import qualified Data.Map as M
 import Control.Arrow (first)
 import Control.Monad
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 
 import Control.Monad.Trans.Except
 import Control.Monad.Writer.Strict (runWriterT)
@@ -53,8 +52,8 @@ parseAndDesugar ::
   -> ([Bookmark] -> [P.Module] -> IO a)
   -> IO (Either ParseDesugarError a)
 parseAndDesugar inputFiles depsFiles callback = do
-  inputFiles' <- mapM (parseAs Local) inputFiles
-  depsFiles'  <- mapM (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
+  inputFiles' <- traverse (parseAs Local) inputFiles
+  depsFiles'  <- traverse (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
 
   runExceptT $ do
     ms         <- parseFiles (inputFiles' ++ depsFiles')
@@ -122,7 +121,7 @@ desugar :: [P.Module] -> Either P.MultipleErrors [P.Module]
 desugar = P.evalSupplyT 0 . desugar'
   where
   desugar' :: [P.Module] -> P.SupplyT (Either P.MultipleErrors) [P.Module]
-  desugar' = mapM P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports []
+  desugar' = traverse P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports []
   ignoreWarnings m = liftM fst (runWriterT m)
 
 parseFile :: FilePath -> IO (FilePath, String)

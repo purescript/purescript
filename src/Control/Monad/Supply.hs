@@ -14,15 +14,14 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 
 module Control.Monad.Supply where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Functor.Identity
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader

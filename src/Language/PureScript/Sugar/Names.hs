@@ -11,20 +11,18 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.Names (desugarImports) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (find, nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid (mempty)
-import Control.Applicative (Applicative(..), (<$>), (<*>))
-#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)
@@ -52,7 +50,7 @@ desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWr
 desugarImports externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
   env' <- foldM updateEnv env modules
-  mapM (renameInModule' env') modules
+  traverse (renameInModule' env') modules
   where
   silence :: m a -> m a
   silence = censor (const mempty)
@@ -161,13 +159,13 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (_, bound) d@(PositionedDeclaration pos _ _) =
     return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
-    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> mapM (sndM (mapM (updateTypesEverywhere pos))) dctors)
+    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> traverse (sndM (traverse (updateTypesEverywhere pos))) dctors)
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
     (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (TypeClassDeclaration className args implies ds) =
     (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints pos implies <*> pure ds)
   updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
-    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> mapM (updateTypesEverywhere pos) ts <*> pure ds)
+    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> traverse (updateTypesEverywhere pos) ts <*> pure ds)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
@@ -225,7 +223,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
     updateType t = return t
 
   updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = mapM (\(name, ts) -> (,) <$> updateClassName name pos <*> mapM (updateTypesEverywhere pos) ts)
+  updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
 
   updateTypeName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
   updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) IsProperName

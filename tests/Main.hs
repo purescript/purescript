@@ -16,7 +16,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE CPP #-}
 
 -- Failing tests can specify the kind of error that should be thrown with a
 -- @shouldFailWith declaration. For example:
@@ -35,6 +34,9 @@
 
 module Main (main) where
 
+import Prelude ()
+import Prelude.Compat
+
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
@@ -42,18 +44,12 @@ import qualified Language.PureScript.CoreFn as CF
 import Data.Char (isSpace)
 import Data.Maybe (mapMaybe, fromMaybe)
 import Data.List (isSuffixOf, sort, stripPrefix)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Traversable (traverse)
-#endif
 import Data.Time.Clock (UTCTime())
 
 import qualified Data.Map as M
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Arrow ((>>>))
 
 import Control.Monad.Reader

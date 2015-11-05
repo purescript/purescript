@@ -40,6 +40,7 @@ source-repository head
 
 library
     build-depends: base >=4.6 && <5,
+                   base-compat >=0.6.0,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
                    transformers-base >= 0.4.0 && < 0.5,
@@ -197,7 +198,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any, Glob -any
+                   transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0
 
     main-is: Main.hs
     buildable: True
@@ -260,7 +261,7 @@ test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
                    transformers -any, process -any, transformers-compat -any, time -any,
-                   Glob -any
+                   Glob -any, base-compat >=0.6.0
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestsSetup
@@ -272,7 +273,7 @@ test-suite psci-tests
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
                    transformers-compat -any, process -any, HUnit -any, time -any,
-                   Glob -any
+                   Glob -any, base-compat >=0.6.0
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestsSetup
