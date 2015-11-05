@@ -47,7 +47,7 @@ import qualified Language.PureScript.Constants as C
 -- return a type class dictionary reference.
 --
 entails :: forall m.
-  (MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   ModuleName ->
   M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) ->
   Constraint ->
