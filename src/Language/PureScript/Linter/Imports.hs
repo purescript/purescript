@@ -1,8 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Linter.Imports (findUnusedImports, Name(..), UsedImports()) where
+
+import Prelude ()
+import Prelude.Compat
 
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
@@ -10,9 +12,6 @@ import Data.List ((\\), find)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class
 import Control.Monad(unless,when)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Data.Foldable (forM_)
 
 import Language.PureScript.AST.Declarations

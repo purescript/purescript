@@ -20,7 +20,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Bundle (
      bundle
@@ -31,6 +30,9 @@ module Language.PureScript.Bundle (
    , printErrorMessage
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (nub)
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Generics (everything, everywhere, mkQ, mkT)
@@ -39,9 +41,6 @@ import Data.Version (showVersion)
 
 import qualified Data.Set as S
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
 import Control.Monad.Error.Class
 import Language.JavaScript.Parser
@@ -212,7 +211,7 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 -- Other constructor.
 toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSNode -> m Module
 toModule mids mid top
-  | JSSourceElementsTop ns <- node top = Module mid <$> mapM toModuleElement ns
+  | JSSourceElementsTop ns <- node top = Module mid <$> traverse toModuleElement ns
   | otherwise = err InvalidTopLevel
   where
   err = throwError . ErrorInModule mid
@@ -262,7 +261,7 @@ toModule mids mid top
     , JSOperator eq <- node op
     , JSLiteral "=" <- node eq
     , JSObjectLiteral _ props _ <- node obj
-    = ExportsList <$> mapM toExport (filter (not . isSeparator) (map node props))
+    = ExportsList <$> traverse toExport (filter (not . isSeparator) (map node props))
     where
     toExport :: Node -> m (ExportType, String, JSNode, [Key])
     toExport (JSPropertyNameandValue name _ [val] ) =
@@ -544,7 +543,7 @@ bundle inputStrs entryPoints mainModule namespace = do
 
   let mids = S.fromList (map (moduleName . fst) input)
 
-  modules <- mapM (fmap withDeps . uncurry (toModule mids)) input
+  modules <- traverse (fmap withDeps . uncurry (toModule mids)) input
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)

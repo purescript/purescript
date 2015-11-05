@@ -15,9 +15,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.AST.Declarations where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Aeson.TH
 
@@ -25,10 +27,6 @@ import qualified Data.Data as D
 import qualified Data.Map as M
 
 import Control.Monad.Identity
-
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Operators

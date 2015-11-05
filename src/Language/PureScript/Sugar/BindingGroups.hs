@@ -15,7 +15,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.BindingGroups (
@@ -25,13 +24,12 @@ module Language.PureScript.Sugar.BindingGroups (
     collapseBindingGroupsModule
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Graph
 import Data.List (nub, intersect)
 import Data.Maybe (isJust, mapMaybe)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Foldable (foldMap)
-import Control.Applicative
-#endif
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
 

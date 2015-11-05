@@ -21,7 +21,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Make
   (
@@ -38,14 +37,16 @@ module Language.PureScript.Make
   , buildMakeActions
   ) where
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad
+import Prelude ()
+import Prelude.Compat
+
+import Control.Monad hiding (sequence)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
+import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Except
-import Control.Monad.Reader
+import Control.Monad.IO.Class
+import Control.Monad.Reader (MonadReader(..), ReaderT(..))
 import Control.Monad.Logger
 import Control.Monad.Supply
 import Control.Monad.Base (MonadBase(..))
@@ -58,10 +59,6 @@ import Data.Maybe (fromMaybe, catMaybes)
 import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid (mempty, mconcat)
-import Data.Traversable (traverse)
-#endif
 import Data.Traversable (for)
 import Data.Version (showVersion)
 import Data.Aeson (encode, decode)
@@ -207,12 +204,12 @@ make MakeActions{..} ms = do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
-    mexterns <- fmap unzip . sequence <$> mapM (readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
+    mexterns <- fmap unzip . sequence <$> traverse (readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
 
     case mexterns of
       Just (_, externs) -> do
         outputTimestamp <- getOutputTimestamp moduleName
-        dependencyTimestamp <- maximumMaybe <$> mapM (fmap shouldExist . getOutputTimestamp) deps
+        dependencyTimestamp <- maximumMaybe <$> traverse (fmap shouldExist . getOutputTimestamp) deps
         inputTimestamp <- getInputTimestamp moduleName
 
         let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of

@@ -16,20 +16,19 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.CaseDeclarations (
     desugarCases,
     desugarCasesModule
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Language.PureScript.Crash
 import Data.Maybe (catMaybes)
 import Data.List (nub, groupBy)
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class

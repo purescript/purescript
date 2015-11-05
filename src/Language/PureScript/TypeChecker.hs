@@ -16,12 +16,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.TypeChecker (
     module T,
     typeCheckModule
 ) where
+
+import Prelude ()
+import Prelude.Compat
 
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Kinds as T
@@ -30,15 +32,11 @@ import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
 import Data.List (nub, (\\), sort, group)
-import Data.Foldable (for_)
-import Data.Traversable (for)
+import Data.Foldable (for_, traverse_)
 
 import qualified Data.Map as M
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad (when, unless, void)
+import Control.Monad (when, unless, void, forM, forM_)
 import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -79,7 +77,7 @@ addDataConstructor ::
   m ()
 addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
-  mapM_ checkTypeSynonyms tys
+  traverse_ checkTypeSynonyms tys
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
@@ -198,7 +196,7 @@ typeCheckAll :: forall m.
   [DeclarationRef] ->
   [Declaration] ->
   m [Declaration]
-typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
+typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkOrphanFixities ds
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration dtype name args dctors) = do
@@ -255,11 +253,11 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
       for_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
       tys <- typesOf moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
-      vals' <- for [ (name, val, nameKind, ty)
-                   | (name, nameKind, _) <- vals
-                   , (name', (val, ty)) <- tys
-                   , name == name'
-                   ] $ \(name, val, nameKind, ty) -> do
+      vals' <- forM [ (name, val, nameKind, ty)
+                    | (name, nameKind, _) <- vals
+                    , (name', (val, ty)) <- tys
+                    , name == name'
+                    ] $ \(name, val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (name, nameKind, val)
       return $ BindingGroupDeclaration vals'
@@ -282,8 +280,8 @@ typeCheckAll moduleName _ ds = mapM go ds <* mapM_ checkOrphanFixities ds
     addTypeClass moduleName pn args implies tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
-    mapM_ (checkTypeClassInstance moduleName) tys
-    for_ deps $ mapM_ (checkTypeClassInstance moduleName) . snd
+    traverse_ (checkTypeClassInstance moduleName) tys
+    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . snd
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)

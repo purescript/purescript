@@ -16,9 +16,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Types where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Data
 import Data.List (nub)
@@ -27,9 +29,6 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
 import Control.Arrow (second)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad ((<=<))
 
 import Language.PureScript.Names

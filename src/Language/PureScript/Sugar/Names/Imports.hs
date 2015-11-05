@@ -11,7 +11,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -22,13 +21,14 @@ module Language.PureScript.Sugar.Names.Imports
   , findImports
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (find)
 import Data.Maybe (fromMaybe, isNothing)
+import Data.Foldable (traverse_)
 
 import Control.Arrow (first)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative (Applicative(..), (<$>))
-#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)
@@ -57,7 +57,7 @@ findImports = foldM (go Nothing) M.empty
 
   -- Ensure that classes don't appear in an `import X hiding (...)`
   checkImportRefType :: ImportDeclarationType -> m ()
-  checkImportRefType (Hiding refs) = mapM_ checkImportRef refs
+  checkImportRefType (Hiding refs) = traverse_ checkImportRef refs
   checkImportRefType _ = return ()
   checkImportRef :: DeclarationRef -> m ()
   checkImportRef (ModuleRef name) = throwError . errorMessage $ ImportHidingModule name
@@ -105,7 +105,7 @@ resolveImport currentModule importModule exps imps impQual =
 
   -- Check that a 'DeclarationRef' refers to an importable symbol
   checkRefs :: [DeclarationRef] -> m ()
-  checkRefs = mapM_ check
+  checkRefs = traverse_ check
     where
     check (PositionedDeclarationRef pos _ r) =
       rethrowWithPosition pos $ check r
@@ -114,7 +114,7 @@ resolveImport currentModule importModule exps imps impQual =
     check (TypeRef name dctors) = do
       checkImportExists UnknownImportType ((fst . fst) `map` exportedTypes exps) name
       let allDctors = fst `map` allExportedDataConstructors name
-      maybe (return ()) (mapM_ $ checkDctorExists name allDctors) dctors
+      maybe (return ()) (traverse_ $ checkDctorExists name allDctors) dctors
     check (TypeClassRef name) =
       checkImportExists UnknownImportTypeClass (fst `map` exportedTypeClasses exps) name
     --check (ModuleRef name) =
@@ -168,7 +168,7 @@ resolveImport currentModule importModule exps imps impQual =
         exportedDctors = allExportedDataConstructors name
         dctorNames :: [ProperName]
         dctorNames = fst `map` exportedDctors
-    maybe (return ()) (mapM_ $ checkDctorExists name dctorNames) dctors
+    maybe (return ()) (traverse_ $ checkDctorExists name dctorNames) dctors
     when (null dctorNames && isNothing dctors) . tell . errorMessage $ MisleadingEmptyTypeImport importModule name
     dctors' <- foldM (\m -> updateImports m runProperName exportedDctors) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }

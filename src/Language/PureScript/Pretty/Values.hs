@@ -13,8 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
-
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
     prettyPrintBinder,

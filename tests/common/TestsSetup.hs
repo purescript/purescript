@@ -10,18 +10,13 @@
 -- |
 --
 -----------------------------------------------------------------------------
-
-{-# LANGUAGE CPP #-}
-
 module TestsSetup where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Maybe (fromMaybe)
-
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
-
 import Control.Monad.Trans.Maybe
 
 import System.Process

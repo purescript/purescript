@@ -13,20 +13,18 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
-
 module Language.PureScript.Pretty.JS (
     prettyPrintJS
 ) where
 
-import Data.List
+import Prelude ()
+import Prelude.Compat
+
+import Data.List hiding (concat, concatMap)
 import Data.Maybe (fromMaybe)
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Arrow ((<+>))
-import Control.Monad.State
+import Control.Monad.State hiding (sequence)
 import Control.PatternArrows
 import qualified Control.Arrow as A
 
@@ -199,7 +197,7 @@ app :: Pattern PrinterState JS (String, JS)
 app = mkPattern' match
   where
   match (JSApp val args) = do
-    jss <- mapM prettyPrintJS' args
+    jss <- traverse prettyPrintJS' args
     return (intercalate ", " jss, val)
   match _ = mzero
 

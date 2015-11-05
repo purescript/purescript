@@ -18,7 +18,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Language.PureScript.TypeChecker.Kinds (
     kindOf,
@@ -27,12 +27,12 @@ module Language.PureScript.TypeChecker.Kinds (
     kindsOfAll
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import qualified Data.Map as M
 
 import Control.Arrow (second)
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -179,7 +179,7 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 -- | Solve the set of kind constraints associated with the data constructors for a type constructor
 solveTypes :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Bool -> [Type] -> [Kind] -> Kind -> m Kind
 solveTypes isData ts kargs tyCon = do
-  ks <- mapM (fmap fst . infer) ts
+  ks <- traverse (fmap fst . infer) ts
   when isData $ do
     unifyKinds tyCon (foldr FunKind Star kargs)
     forM_ ks $ \k -> unifyKinds k Star
