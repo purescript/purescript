@@ -21,8 +21,9 @@
 
 module PSCi where
 
+import Data.Maybe (mapMaybe)
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort)
+import Data.List (intercalate, nub, sort, sortBy)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (traverse)
 #endif
@@ -51,6 +52,7 @@ import System.FilePath (pathSeparator, (</>), isPathSeparator)
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 import System.IO.Error (tryIOError)
+import qualified Text.PrettyPrint.Boxes as Box
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -377,20 +379,66 @@ handleTypeOf val = do
 -- Pretty print a module's signatures
 --
 printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
-printModuleSignatures moduleName env =
-  PSCI $ let namesEnv = P.names env
-             moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) namesEnv
-             in case moduleNamesIdent of
-                  [] -> outputStrLn $ "This module '"++ P.runModuleName moduleName ++"' does not export functions."
-                  _ -> ( outputStrLn
-                       . unlines
-                       . sort
-                       . map (showType . findType namesEnv)) moduleNamesIdent
-  where findType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
-        findType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
-        showType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
-        showType (mIdent, Just (mType, _, _)) = show mIdent ++ " :: " ++ P.prettyPrintType mType
-        showType _ = P.internalError "The impossible happened in printModuleSignatures."
+printModuleSignatures moduleName (P.Environment {..}) =
+  PSCI $ let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
+             moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
+             moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
+
+         in do
+           printModule's "types"             (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes
+           printModule's "data constructors" (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors
+           printModule's "functions"         (sort . map (showNameType . findNameType names)) moduleNamesIdent
+           outputStrLn   ""
+
+
+  where printModule's what _  [] = outputStrLn $ "This module '" ++ P.runModuleName moduleName ++ "' does not export " ++ what ++ ".\n"
+        printModule's _ showF xs = (outputStr . unlines . showF) xs
+
+        findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+        findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+
+        showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
+        showNameType (mIdent, Just (mType, _, _)) = Box.render (Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType)
+        showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
+
+        findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
+        findDataConstructor envDataCons name = (name, M.lookup name envDataCons)
+
+        compareDatatypes :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Ordering
+        compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
+        compareDatatypes _ _ = P.internalError "The impossible happened in printModuleSignatures."
+
+        showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
+        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.render (Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType)
+        showDataConstructor _ = P.internalError "The impossible happened in printModuleSignatures."
+
+        findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
+        findType envTypes name = (name, M.lookup name envTypes)
+
+        showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type) -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> Maybe String
+        showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
+          case (typ, M.lookup n typeSynonymsEnv) of
+            (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
+                Just (Box.render $ Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType))
+
+            (Just (_, P.DataType typevars pt), _) ->
+                Just $ Box.render (Box.text ("data " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt)
+
+            _ ->
+              Nothing
+
+          where printCons pt =
+                    Box.vcat Box.left $
+                    map (Box.moveRight 2) $
+                    mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
+                    map (\(cons,idents) -> (Box.text (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
+
+                prettyPrintType t@(P.TypeApp _ _) = Box.text " (" Box.<> P.typeAsBox t Box.<> Box.text ")"
+                prettyPrintType t = Box.moveRight 1 (P.typeAsBox t)
+
+                mapFirstRest _ _ [] = []
+                mapFirstRest f g (x:xs) = f x : map g xs
+
 
 -- |
 -- Browse a module and displays its signature (if module exists).
