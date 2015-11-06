@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
@@ -10,10 +9,10 @@ module Language.PureScript.Docs.Types
   )
   where
 
+import Prelude ()
+import Prelude.Compat
+
 import Control.Arrow (first, (***))
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative ((<$>), (<$), (<*>), pure)
-#endif
 import Control.Monad (when)
 import Data.Maybe (mapMaybe)
 import Data.Version

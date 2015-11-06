@@ -13,23 +13,18 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
-
 module Language.PureScript.TypeChecker.Entailment (
     entails
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.Function (on)
-import Data.List
+import Data.List (minimumBy, sortBy, groupBy)
 import Data.Maybe (maybeToList, mapMaybe)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Foldable (foldMap)
-#endif
 import qualified Data.Map as M
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
@@ -112,7 +107,7 @@ entails moduleName context = solve
         solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> Check (Maybe [DictionaryValue])
         solveSubgoals _ Nothing = return Nothing
         solveSubgoals subst (Just subgoals) = do
-          dict <- mapM (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
+          dict <- traverse (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
           return $ Just dict
 
         -- Make a dictionary from subgoal dictionaries by applying the correct function

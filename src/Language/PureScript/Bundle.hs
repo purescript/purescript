@@ -20,7 +20,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Bundle (
      bundle
@@ -31,17 +30,17 @@ module Language.PureScript.Bundle (
    , printErrorMessage
 ) where
 
-import Data.List (nub)
-import Data.Maybe (mapMaybe, catMaybes)
+import Prelude ()
+import Prelude.Compat
+
+import Data.List (nub, stripPrefix)
+import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
 import Data.Version (showVersion)
 
 import qualified Data.Set as S
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad
 import Control.Monad.Error.Class
 import Language.JavaScript.Parser
@@ -139,12 +138,13 @@ node (NN n) = n
 node (NT n _ _) = n
 
 -- | Calculate the ModuleIdentifier which a require(...) statement imports.
-checkImportPath :: String -> ModuleIdentifier -> S.Set String -> Maybe ModuleIdentifier
-checkImportPath "./foreign" m _     =
+checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String -> Maybe ModuleIdentifier
+checkImportPath _ "./foreign" m _ =
   Just (ModuleIdentifier (moduleName m) Foreign)
-checkImportPath name        _ names
-  | name `S.member` names = Just (ModuleIdentifier name Regular)
-checkImportPath _           _ _     = Nothing
+checkImportPath requirePath name _ names
+  | Just name' <- stripPrefix (fromMaybe "" requirePath) name
+  , name' `S.member` names = Just (ModuleIdentifier name' Regular)
+checkImportPath _ _ _ _ = Nothing
 
 -- | Compute the dependencies of all elements in a module, and add them to the tree.
 --
@@ -210,9 +210,9 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSNode -> m Module
-toModule mids mid top
-  | JSSourceElementsTop ns <- node top = Module mid <$> mapM toModuleElement ns
+toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSNode -> m Module
+toModule requirePath mids mid top
+  | JSSourceElementsTop ns <- node top = Module mid <$> traverse toModuleElement ns
   | otherwise = err InvalidTopLevel
   where
   err = throwError . ErrorInModule mid
@@ -227,7 +227,7 @@ toModule mids mid top
     , JSIdentifier "require" <- node req
     , JSArguments _ [ impS ] _ <- node impP
     , JSStringLiteral _ importPath <- node impS
-    , Just importPath' <- checkImportPath importPath mid mids
+    , Just importPath' <- checkImportPath requirePath importPath mid mids
     = pure (Require n importName importPath')
   toModuleElement n
     | JSVariables var [ varIntro ] _ <- node n
@@ -262,7 +262,7 @@ toModule mids mid top
     , JSOperator eq <- node op
     , JSLiteral "=" <- node eq
     , JSObjectLiteral _ props _ <- node obj
-    = ExportsList <$> mapM toExport (filter (not . isSeparator) (map node props))
+    = ExportsList <$> traverse toExport (filter (not . isSeparator) (map node props))
     where
     toExport :: Node -> m (ExportType, String, JSNode, [Key])
     toExport (JSPropertyNameandValue name _ [val] ) =
@@ -536,15 +536,16 @@ bundle :: forall m. (Applicative m, MonadError ErrorMessage m)
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
+       -> Maybe FilePath -- ^ The require path prefix
        -> m String
-bundle inputStrs entryPoints mainModule namespace = do
+bundle inputStrs entryPoints mainModule namespace requirePath = do
   input <- forM inputStrs $ \(ident, js) -> do
                 ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
 
   let mids = S.fromList (map (moduleName . fst) input)
 
-  modules <- mapM (fmap withDeps . uncurry (toModule mids)) input
+  modules <- traverse (fmap withDeps . uncurry (toModule requirePath mids)) input
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)

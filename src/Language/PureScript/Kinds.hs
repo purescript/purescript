@@ -14,16 +14,15 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Kinds where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Data
 import qualified Data.Aeson.TH as A
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.Unify (Unknown)
 
 -- |

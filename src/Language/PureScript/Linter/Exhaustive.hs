@@ -18,20 +18,19 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Linter.Exhaustive
   ( checkExhaustive
   , checkExhaustiveModule
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.List (foldl', sortBy, nub)
 import Data.Function (on)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Traversable (sequenceA)
-#endif
 
 import Control.Monad (unless)
 import Control.Applicative
@@ -246,7 +245,7 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
   step :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedudancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        (missed', approx) = splitAt 10000 (concat missed)
+        (missed', approx) = splitAt 10000 (nub (concat missed))
         cond = liftA2 (&&) (or <$> sequenceA pr) nec
     in (missed', ( if null approx
                      then cond

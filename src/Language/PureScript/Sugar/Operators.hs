@@ -21,7 +21,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar.Operators (
   rebracket,
@@ -29,15 +28,15 @@ module Language.PureScript.Sugar.Operators (
   desugarOperatorSections
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Externs
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
@@ -60,7 +59,7 @@ rebracket externs ms = do
   let fixities = concatMap externsFixities externs ++ concatMap collectFixities ms
   ensureNoDuplicates $ map (\(i, pos, _) -> (i, pos)) fixities
   let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
-  mapM (rebracketModule opTable) ms
+  traverse (rebracketModule opTable) ms
 
 removeSignedLiterals :: Module -> Module
 removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
@@ -164,7 +163,7 @@ matchOp op = do
   guard $ ident == op
 
 desugarOperatorSections :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
-desugarOperatorSections (Module ss coms mn ds exts) = Module ss coms mn <$> mapM goDecl ds <*> pure exts
+desugarOperatorSections (Module ss coms mn ds exts) = Module ss coms mn <$> traverse goDecl ds <*> pure exts
   where
 
   goDecl :: Declaration -> m Declaration

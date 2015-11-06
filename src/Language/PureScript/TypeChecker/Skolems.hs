@@ -13,8 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
-
 module Language.PureScript.TypeChecker.Skolems (
     newSkolemConstant,
     introduceSkolemScope,
@@ -24,12 +22,12 @@ module Language.PureScript.TypeChecker.Skolems (
     skolemEscapeCheck
 ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (nub, (\\))
 import Data.Monoid
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Unify
 
@@ -72,11 +70,16 @@ skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
 -- only example of scoped type variables.
 --
 skolemizeTypesInValue :: String -> Int -> SkolemScope -> Expr -> Expr
-skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id go id in f
+skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id onExpr onBinder in f
   where
-  go (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
-  go (TypedValue check val ty) = TypedValue check val (skolemize ident sko scope ty)
-  go other = other
+  onExpr :: Expr -> Expr
+  onExpr (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
+  onExpr (TypedValue check val ty) = TypedValue check val (skolemize ident sko scope ty)
+  onExpr other = other
+
+  onBinder :: Binder -> Binder
+  onBinder (TypedBinder ty b) = TypedBinder (skolemize ident sko scope ty) b
+  onBinder other = other
 
 -- |
 -- Ensure skolem variables do not escape their scope

@@ -15,19 +15,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Errors where
+
+import Prelude ()
+import Prelude.Compat
 
 import Data.Either (lefts, rights)
 import Data.List (intercalate, transpose, nub, nubBy)
 import Data.Function (on)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Foldable (fold, foldMap)
-import Data.Traversable (traverse)
-#else
 import Data.Foldable (fold)
-#endif
 
 import qualified Data.Map as M
 
@@ -35,9 +32,6 @@ import Control.Monad
 import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative ((<$>), (<*>), Applicative, pure)
-#endif
 import Control.Monad.Trans.State.Lazy
 import Control.Arrow(first)
 
@@ -144,7 +138,9 @@ data SimpleErrorMessage
   | ClassOperator ProperName Ident
   | MisleadingEmptyTypeImport ModuleName ProperName
   | ImportHidingModule ModuleName
-  deriving Show
+  | UnusedImport ModuleName
+  | UnusedExplicitImport ModuleName [String]
+  deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
 data ErrorMessageHint
@@ -156,6 +152,7 @@ data ErrorMessageHint
   | ErrorCheckingAccessor Expr String
   | ErrorCheckingType Expr Type
   | ErrorCheckingKind Type
+  | ErrorCheckingGuard
   | ErrorInferringType Expr
   | ErrorInApplication Expr Type Expr
   | ErrorInDataConstructor ProperName
@@ -279,6 +276,8 @@ errorCode em = case unwrapErrorMessage em of
   ClassOperator{} -> "ClassOperator"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
+  UnusedImport{} -> "UnusedImport"
+  UnusedExplicitImport{} -> "UnusedExplicitImport"
 
 -- |
 -- A stack trace for an error
@@ -530,15 +529,15 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
                                           , indent $ prettyPrintValue expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
-      = paras [ line "Could not match expected type"
+      = paras [ line "Could not match type"
               , indent $ typeAsBox t1
-              , line "with actual type"
+              , line "with type"
               , indent $ typeAsBox t2
               ]
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
-      paras [ line "Could not match expected kind"
+      paras [ line "Could not match kind"
             , indent $ line $ prettyPrintKind k1
-            , line "with actual kind"
+            , line "with kind"
             , indent $ line $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
@@ -687,6 +686,12 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line "An exhaustivity check was abandoned due to too many possible cases."
             , line "You may want to decompose your data types into smaller types."
             ]
+    renderSimpleErrorMessage (UnusedImport name) =
+      line $ "The import of module " ++ runModuleName name ++ " is redundant"
+
+    renderSimpleErrorMessage (UnusedExplicitImport name names) =
+      paras [ line $ "The import of module " ++ runModuleName name ++ " contains the following unused references:"
+            , indent $ paras $ map line names ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
@@ -729,6 +734,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
             , Box.hsep 1 Box.top [ line "while checking the kind of"
                                  , typeAsBox ty
                                  ]
+            ]
+    renderHint ErrorCheckingGuard detail =
+      paras [ detail
+            , line "while checking the type of a guard clause"
             ]
     renderHint (ErrorInferringType expr) detail =
       paras [ detail

@@ -1,5 +1,5 @@
 name: purescript
-version: 0.7.5
+version: 0.7.5.3
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -40,6 +40,7 @@ source-repository head
 
 library
     build-depends: base >=4.6 && <5,
+                   base-compat >=0.6.0,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
                    transformers-base >= 0.4.0 && < 0.5,
@@ -68,7 +69,8 @@ library
                    Glob >= 0.7 && < 0.8,
                    process >= 1.2.0 && < 1.4,
                    safe >= 0.3.9 && < 0.4,
-                   semigroups >= 0.16.2 && < 0.18
+                   semigroups >= 0.16.2 && < 0.19,
+                   parallel >= 3.2 && < 3.3
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -108,6 +110,7 @@ library
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
+                     Language.PureScript.Linter.Imports
                      Language.PureScript.Make
                      Language.PureScript.ModuleDependencies
                      Language.PureScript.Names
@@ -195,7 +198,7 @@ executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any, Glob -any,
+                   transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
                    boxes >= 0.1.4 && < 0.2.0
 
     main-is: Main.hs
@@ -259,7 +262,7 @@ test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
                    transformers -any, process -any, transformers-compat -any, time -any,
-                   Glob -any
+                   Glob -any, base-compat >=0.6.0
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestsSetup
@@ -271,7 +274,7 @@ test-suite psci-tests
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
                    transformers-compat -any, process -any, HUnit -any, time -any,
-                   Glob -any, boxes >= 0.1.4 && < 0.2.0
+                   Glob -any, base-compat >=0.6.0, boxes >= 0.1.4 && < 0.2.0
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestsSetup

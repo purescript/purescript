@@ -14,15 +14,14 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Sugar (desugar, module S) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Control.Monad
 import Control.Category ((>>>))
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
 import Control.Monad.Error.Class (MonadError())
 import Control.Monad.Writer.Class (MonadWriter())
 import Control.Monad.Supply.Class
@@ -67,13 +66,13 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 desugar externs =
   map removeSignedLiterals
-    >>> mapM desugarObjectConstructors
-    >=> mapM desugarOperatorSections
-    >=> mapM desugarDoModule
+    >>> traverse desugarObjectConstructors
+    >=> traverse desugarOperatorSections
+    >=> traverse desugarDoModule
     >=> desugarCasesModule
     >=> desugarTypeDeclarationsModule
     >=> desugarImports externs
     >=> rebracket externs
-    >=> mapM deriveInstances
+    >=> traverse deriveInstances
     >=> desugarTypeClasses externs
     >=> createBindingGroupsModule

@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- | Functions for producing RenderedCode values from PureScript Type values.
 
 module Language.PureScript.Docs.RenderedCode.Render (
@@ -11,12 +9,11 @@ module Language.PureScript.Docs.RenderedCode.Render (
     defaultRenderTypeOptions,
     renderTypeWithOptions
 ) where
+  
+import Prelude ()
+import Prelude.Compat
 
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid ((<>), mconcat, mempty)
-#else
 import Data.Monoid ((<>))
-#endif
 import Data.Maybe (fromMaybe)
 
 import Control.Arrow ((<+>))

@@ -12,19 +12,17 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.Logger where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.IORef
 
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid
-import Control.Applicative
-#endif
 import Control.Monad (ap)
 import Control.Monad.IO.Class
 import Control.Monad.Writer.Class
@@ -57,15 +55,13 @@ instance (Monoid w) => MonadIO (Logger w) where
   liftIO = Logger . const
 
 instance (Monoid w) => MonadWriter w (Logger w) where
-  tell w = Logger $ \r -> modifyIORef' r (mappend w)
+  tell w = Logger $ \r -> atomicModifyIORef' r $ \w' -> (mappend w' w, ())
   listen l = Logger $ \r -> do
     (a, w) <- liftIO (runLogger' l)
-    modifyIORef' r (mappend w)
-    return (a, w)
+    atomicModifyIORef' r $ \w' -> (mappend w' w, (a, w))
   pass l = Logger $ \r -> do
     ((a, f), w) <- liftIO (runLogger' l)
-    modifyIORef' r (mappend (f w))
-    return a
+    atomicModifyIORef' r $ \w' -> (mappend w' (f w), a)
 
 instance (Monoid w) => MonadBase IO (Logger w) where
   liftBase = liftIO

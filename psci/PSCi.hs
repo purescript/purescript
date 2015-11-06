@@ -17,16 +17,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE CPP #-}
 
 module PSCi where
 
-import Data.Maybe (mapMaybe)
+import Prelude ()
+import Prelude.Compat
+
 import Data.Foldable (traverse_)
+import Data.Maybe (mapMaybe)
 import Data.List (intercalate, nub, sort, sortBy)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Traversable (traverse)
-#endif
 import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -473,7 +472,7 @@ handleKindOf typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = P.CheckState env' 0 0 (Just mName)
-              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf mName typ')) chk
+              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf typ')) chk
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
@@ -555,7 +554,7 @@ loadUserConfig = onFirstFileMatching readCommands pathGetters
     if exists
     then do
       ls <- lines <$> readFile configFile
-      case mapM parseCommand ls of
+      case traverse parseCommand ls of
         Left err -> print err >> exitFailure
         Right cs -> return $ Just cs
     else
@@ -572,8 +571,8 @@ consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad",
 loop :: PSCiOptions -> IO ()
 loop PSCiOptions{..} = do
   config <- loadUserConfig
-  inputFiles <- concat <$> mapM glob psciInputFile
-  foreignFiles <- concat <$> mapM glob psciForeignInputFiles
+  inputFiles <- concat <$> traverse glob psciInputFile
+  foreignFiles <- concat <$> traverse glob psciForeignInputFiles
   modulesOrFirstError <- loadAllModules inputFiles
   case modulesOrFirstError of
     Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
@@ -588,7 +587,7 @@ loop PSCiOptions{..} = do
         Right foreigns ->
           flip evalStateT (PSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
-            traverse_ (mapM_ (runPSCI . handleCommand)) config
+            traverse_ (traverse_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules
             unless (consoleIsDefined (map snd modules')) . outputStrLn $ unlines
               [ "PSCi requires the purescript-console module to be installed."

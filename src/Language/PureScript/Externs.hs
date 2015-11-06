@@ -13,7 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -27,13 +26,13 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Data.List (find, foldl')
 import Data.Maybe (mapMaybe, maybeToList, fromMaybe)
 import Data.Foldable (fold)
 import Data.Version (showVersion)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid
-#endif
 import Data.Aeson.TH
 
 import qualified Data.Map as M
