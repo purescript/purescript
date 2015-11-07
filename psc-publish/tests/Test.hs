@@ -46,8 +46,8 @@ clonePackage = do
       readProcess "git" ["tag", "v999.0.0"] "" >>= putStr
 
 bowerInstall :: IO ()
-bowerInstall = do
-  pushd packageDir $ do
+bowerInstall =
+  pushd packageDir $
     readProcess "bower" ["install"] "" >>= putStr
 
 getPackage :: IO UploadedPackage
