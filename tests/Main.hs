@@ -14,7 +14,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 -- Failing tests can specify the kind of error that should be thrown with a

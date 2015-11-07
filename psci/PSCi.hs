@@ -29,7 +29,6 @@ import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
-import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -253,7 +252,7 @@ modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
 runMake :: P.Make a -> IO (Either P.MultipleErrors a)
-runMake mk = fmap fst $ P.runMake P.defaultOptions mk
+runMake mk = fst <$> P.runMake P.defaultOptions mk
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
 makeIO f io = do
@@ -441,8 +440,8 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
   case firstLine of
     Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
-    Just s | singleLineMode || head s == ':' -> return . either Left (Right . Just) $ parseCommand s
-    Just s -> either Left (Right . Just) . parseCommand <$> go [s]
+    Just s | singleLineMode || head s == ':' -> return .fmap Just $ parseCommand s
+    Just s -> fmap Just . parseCommand <$> go [s]
   where
     go :: [String] -> InputT (StateT PSCiState IO) String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "

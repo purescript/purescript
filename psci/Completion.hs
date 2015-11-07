@@ -172,12 +172,8 @@ getAllQualifications sho m (declName, decl) = do
     let q = qualifyWith asQ'
     in case importType of
           P.Implicit      -> [q]
-          P.Explicit refs -> if referencedBy refs
-                               then [q]
-                               else []
-          P.Hiding refs   -> if referencedBy refs
-                               then []
-                               else [q]
+          P.Explicit refs -> [q | referencedBy refs]
+          P.Hiding refs   -> [q | not $ referencedBy refs]
 
 
 -- | Returns all the ImportedModule values referring to imports of a particular

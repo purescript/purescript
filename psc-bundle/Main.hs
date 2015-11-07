@@ -12,7 +12,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -53,16 +52,16 @@ data Options = Options
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
 guessModuleIdentifier :: (Applicative m, MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
-guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> (guessModuleType (takeFileName filename))
+guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
   where
   guessModuleType "index.js" = pure Regular
-  guessModuleType "foreign.js" = pure Foreign 
+  guessModuleType "foreign.js" = pure Foreign
   guessModuleType name = throwError $ UnsupportedModulePath name
 
 -- | The main application function.
 -- This function parses the input files, performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-app :: forall m. (Applicative m, MonadError ErrorMessage m, MonadIO m) => Options -> m String
+app :: (Applicative m, MonadError ErrorMessage m, MonadIO m) => Options -> m String
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
@@ -72,11 +71,11 @@ app Options{..} = do
     js <- liftIO (readFile filename)
     mid <- guessModuleIdentifier filename
     return (mid, js)
-    
-  let entryIds = (map (`ModuleIdentifier` Regular) optionsEntryPoints)
+
+  let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
   bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath
-    
+
 -- | Command line options parser.
 options :: Parser Options
 options = Options <$> some inputFile
@@ -85,29 +84,29 @@ options = Options <$> some inputFile
                   <*> optional mainModule
                   <*> namespace
                   <*> optional requirePath
-  where                  
+  where
   inputFile :: Parser FilePath
   inputFile = strArgument $
        metavar "FILE"
     <> help "The input .js file(s)"
-    
+
   outputFile :: Parser FilePath
   outputFile = strOption $
        short 'o'
     <> long "output"
     <> help "The output .js file"
-    
+
   entryPoint :: Parser String
   entryPoint = strOption $
        short 'm'
     <> long "module"
     <> help "Entry point module name(s). All code which is not a transitive dependency of an entry point module will be removed."
-      
+
   mainModule :: Parser String
   mainModule = strOption $
        long "main"
     <> help "Generate code to run the main method in the specified module."
-    
+
   namespace :: Parser String
   namespace = strOption $
        short 'n'
@@ -122,8 +121,8 @@ options = Options <$> some inputFile
     <> long "require-path"
     <> Opts.value ""
     <> help "The path prefix used in require() calls in the generated JavaScript"
-    
--- | Make it go. 
+
+-- | Make it go.
 main :: IO ()
 main = do
   opts <- execParser (info (version <*> helper <*> options) infoModList)
