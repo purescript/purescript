@@ -29,7 +29,6 @@ import Data.Foldable (fold)
 import qualified Data.Map as M
 
 import Control.Monad
-import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
@@ -177,12 +176,6 @@ data HintCategory
 
 data ErrorMessage = ErrorMessage [ErrorMessageHint] SimpleErrorMessage deriving (Show)
 
-instance UnificationError Type ErrorMessage where
-  occursCheckFailed t = ErrorMessage [] $ InfiniteType t
-
-instance UnificationError Kind ErrorMessage where
-  occursCheckFailed k = ErrorMessage [] $ InfiniteKind k
-
 -- |
 -- Get the error code for a particular error type
 --
@@ -285,12 +278,6 @@ errorCode em = case unwrapErrorMessage em of
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
 
-instance UnificationError Type MultipleErrors where
-  occursCheckFailed t = MultipleErrors [occursCheckFailed t]
-
-instance UnificationError Kind MultipleErrors where
-  occursCheckFailed k = MultipleErrors [occursCheckFailed k]
-
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
 nonEmpty = not . null . runMultipleErrors
@@ -320,7 +307,7 @@ addHint hint = onErrorMessages $ \(ErrorMessage hints se) -> ErrorMessage (hint 
 data LabelType = TypeLabel | SkolemLabel String deriving (Show, Read, Eq, Ord)
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
-type UnknownMap = M.Map (LabelType, Unknown) Unknown
+type UnknownMap = M.Map (LabelType, Int) Int
 
 -- | How critical the issue is
 data Level = Error | Warning deriving Show
@@ -334,7 +321,7 @@ unwrapErrorMessage (ErrorMessage _ se) = se
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes
   where
-  lookupTable :: (LabelType, Unknown) -> UnknownMap -> (Unknown, UnknownMap)
+  lookupTable :: (LabelType, Int) -> UnknownMap -> (Int, UnknownMap)
   lookupTable x m = case M.lookup x m of
                       Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
                       Just i  -> (i, m)

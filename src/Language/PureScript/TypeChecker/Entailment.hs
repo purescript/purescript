@@ -13,6 +13,9 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.TypeChecker.Entailment (
     entails
 ) where
@@ -28,13 +31,12 @@ import qualified Data.Map as M
 import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (tell)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -44,7 +46,12 @@ import qualified Language.PureScript.Constants as C
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: ModuleName -> M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) -> Constraint -> Check Expr
+entails :: forall m.
+  (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  ModuleName ->
+  M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) ->
+  Constraint ->
+  m Expr
 entails moduleName context = solve
   where
     forClassName :: Qualified ProperName -> [Type] -> [TypeClassDictionaryInScope]
@@ -60,12 +67,12 @@ entails moduleName context = solve
     findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
-    solve :: Constraint -> Check Expr
+    solve :: Constraint -> m Expr
     solve (className, tys) = do
       dict <- go 0 className tys
       return $ dictionaryValueToValue dict
       where
-      go :: Int -> Qualified ProperName -> [Type] -> Check DictionaryValue
+      go :: Int -> Qualified ProperName -> [Type] -> m DictionaryValue
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
         let instances = do
@@ -81,7 +88,7 @@ entails moduleName context = solve
                        (tcdPath tcd)
         where
 
-        unique :: [(a, TypeClassDictionaryInScope)] -> Check (a, TypeClassDictionaryInScope)
+        unique :: [(a, TypeClassDictionaryInScope)] -> m (a, TypeClassDictionaryInScope)
         unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return a
         unique tcds | pairwise overlapping (map snd tcds) = do
@@ -104,7 +111,7 @@ entails moduleName context = solve
         -- Create dictionaries for subgoals which still need to be solved by calling go recursively
         -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
         -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> Check (Maybe [DictionaryValue])
+        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> m (Maybe [DictionaryValue])
         solveSubgoals _ Nothing = return Nothing
         solveSubgoals subst (Just subgoals) = do
           dict <- traverse (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals

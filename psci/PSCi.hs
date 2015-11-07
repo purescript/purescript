@@ -33,12 +33,11 @@ import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.Except (ExceptT(), runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Writer.Strict (runWriter)
-import qualified Control.Monad.Trans.State.Lazy as L
+import Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import Options.Applicative as Opts
 
@@ -422,8 +421,11 @@ handleKindOf typ = do
     Right env' ->
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
-          let chk = P.CheckState env' 0 0 (Just mName)
-              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf typ')) chk
+          let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
+              k   = check (P.kindOf typ') chk
+
+              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check sew cs = fst . runWriter . runExceptT . runStateT sew $ cs
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
