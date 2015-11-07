@@ -49,9 +49,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       [ keywordClass ]
       ++ maybeToList superclasses
       ++ [renderType' (typeApp declTitle args)]
-      ++ if any (isTypeClassMember . cdeclInfo) declChildren
-            then [keywordWhere]
-            else []
+      ++ [keywordWhere | any (isTypeClassMember . cdeclInfo) declChildren]
 
       where
       superclasses

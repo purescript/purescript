@@ -168,7 +168,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
     return $ CaseAlternative [ prodBinder [ StringBinder (runProperName ctorName), ArrayBinder (map VarBinder idents)]]
                . Right
                $ liftApplicative (mkJust $ Constructor (Qualified (Just mn) ctorName))
-                                 (zipWith fromSpineFun (map (Var . (Qualified Nothing)) idents) tys)
+                                 (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys)
 
   addCatch :: [CaseAlternative] -> [CaseAlternative]
   addCatch = (++ [catchAll])
@@ -191,7 +191,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
                    $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar x)) y) rs)
 
   mkRecFun :: [(String, Type)] -> Expr
-  mkRecFun xs = mkJust $ foldr (\s e -> lam s e) recLiteral (map fst xs)
+  mkRecFun xs = mkJust $ foldr lam recLiteral (map fst xs)
      where recLiteral = ObjectLiteral $ map (\(s,_) -> (s,mkVar s)) xs
 mkFromSpineFunction mn (PositionedDeclaration _ _ d) = mkFromSpineFunction mn d
 mkFromSpineFunction _ _ = internalError "mkFromSpineFunction: expected DataDeclaration"
@@ -218,13 +218,13 @@ mkVarMn :: Maybe ModuleName -> String -> Expr
 mkVarMn mn s = Var (Qualified mn (Ident s))
 
 mkVar :: String -> Expr
-mkVar s = mkVarMn Nothing s
+mkVar = mkVarMn Nothing
 
 mkPrelVar :: String -> Expr
-mkPrelVar s = mkVarMn (Just (ModuleName [ProperName C.prelude])) s
+mkPrelVar = mkVarMn (Just (ModuleName [ProperName C.prelude]))
 
 mkGenVar :: String -> Expr
-mkGenVar s = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic])) s
+mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
 
 decomposeRec :: Type -> [(String, Type)]
 decomposeRec = sortBy (comparing fst) . go

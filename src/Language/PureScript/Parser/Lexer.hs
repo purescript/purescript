@@ -158,7 +158,7 @@ instance Show PositionedToken where
   show = prettyPrintToken . ptToken
 
 lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
-lex filePath input = P.parse parseTokens filePath input
+lex = P.parse parseTokens
 
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof

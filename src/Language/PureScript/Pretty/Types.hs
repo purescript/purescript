@@ -133,7 +133,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                     ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> text ("forall " ++ unwords idents ++ ". ") <> ty ]
-                  , [ Wrap kinded $ \k ty -> ty `before` (text (" :: " ++ prettyPrintKind k)) ]
+                  , [ Wrap kinded $ \k ty -> ty `before` text (" :: " ++ prettyPrintKind k) ]
                   ]
 
 forall_ :: Pattern () Type ([String], Type)
