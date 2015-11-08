@@ -577,7 +577,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (ArgListLengthsDiffer ident) =
       line $ "Argument list lengths differ in declaration " ++ showIdent ident
     renderSimpleErrorMessage (OverlappingArgNames ident) =
-      line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . showIdent) ident
+      line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration " ++) . showIdent) ident
     renderSimpleErrorMessage (MissingClassMember ident) =
       line $ "Type class member " ++ showIdent ident ++ " has not been implemented."
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
