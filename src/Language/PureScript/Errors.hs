@@ -513,7 +513,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (EscapedSkolem binding) =
       paras $ [ line "A type variable has escaped its scope." ]
                      <> foldMap (\expr -> [ line "Relevant expression: "
-                                          , indent $ prettyPrintValue expr
+                                          , indent $ prettyPrintValue valueDepth expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
       = paras [ line "Could not match type"
@@ -568,7 +568,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (DuplicateLabel l expr) =
       paras $ [ line $ "Label " ++ show l ++ " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
-                                             , indent $ prettyPrintValue expr'
+                                             , indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
     renderSimpleErrorMessage (DuplicateTypeArgument name) =
       line $ "Type argument " ++ show name ++ " appears more than once."
@@ -594,7 +594,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Data constructor " ++ showQualified runProperName nm ++ " was given the wrong number of arguments in a case expression."
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
-            , indent $ prettyPrintValue expr
+            , indent $ prettyPrintValue valueDepth expr
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
@@ -606,7 +606,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line "A function of type"
             , indent $ typeAsBox fn
             , line "can not be applied to the argument"
-            , indent $ prettyPrintValue arg
+            , indent $ prettyPrintValue valueDepth arg
             ]
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
@@ -693,7 +693,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorInExpression expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ Box.text "in the expression"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorInModule mn) detail =
@@ -729,13 +729,13 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorInferringType expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while inferring the type of"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorCheckingType expr ty) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking that expression"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has type"
                                                    , typeAsBox ty
@@ -744,19 +744,19 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , prettyPrintValue (Accessor prop expr)
+                                 , prettyPrintValue valueDepth (Accessor prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while applying a function"
-                                 , prettyPrintValue f
+                                 , prettyPrintValue valueDepth f
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "of type"
                                                    , typeAsBox t
                                                    ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "to argument"
-                                                   , prettyPrintValue a
+                                                   , prettyPrintValue valueDepth a
                                                    ]
             ]
     renderHint (ErrorInDataConstructor nm) detail =
@@ -795,6 +795,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line $ "at " ++ displaySourceSpan srcSpan
             , detail
             ]
+
+  valueDepth :: Int
+  valueDepth | full = 1000
+             | otherwise = 3
 
   levelText :: String
   levelText = case level of
