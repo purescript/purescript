@@ -46,7 +46,10 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
           Explicit declrefs -> do
             let idents = mapMaybe runDeclRef declrefs
             let diff = idents \\ usedNames
-            unless (null diff) $ tell $ errorMessage $ UnusedExplicitImport mni diff
+            case (length diff, length idents) of
+              (0, _) -> return ()
+              (n, m) | n == m -> tell $ errorMessage $ UnusedImport mni
+              _ -> tell $ errorMessage $ UnusedExplicitImport mni diff
           _ -> return ()
   where
   sugarNames :: ModuleName -> [ Name ]
