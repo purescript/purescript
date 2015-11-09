@@ -139,6 +139,8 @@ data SimpleErrorMessage
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
   | UnusedExplicitImport ModuleName [String]
+  | UnusedDctorImport ProperName
+  | UnusedDctorExplicitImport ProperName [ProperName]
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -271,6 +273,9 @@ errorCode em = case unwrapErrorMessage em of
   ImportHidingModule{} -> "ImportHidingModule"
   UnusedImport{} -> "UnusedImport"
   UnusedExplicitImport{} -> "UnusedExplicitImport"
+  UnusedDctorImport{} -> "UnusedDctorImport"
+  UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
+
 
 -- |
 -- A stack trace for an error
@@ -679,6 +684,13 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (UnusedExplicitImport name names) =
       paras [ line $ "The import of module " ++ runModuleName name ++ " contains the following unused references:"
             , indent $ paras $ map line names ]
+
+    renderSimpleErrorMessage (UnusedDctorImport name) =
+      line $ "The import of type " ++ runProperName name ++ " includes data constructors but only the type is used"
+
+    renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
+      paras [ line $ "The import of type " ++ runProperName name ++ " includes the following unused data constructors:"
+            , indent $ paras $ map (line .runProperName) names ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

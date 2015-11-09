@@ -8,7 +8,7 @@ import Prelude.Compat
 
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
-import Data.List ((\\), find)
+import Data.List ((\\), find, intersect)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class
 import Control.Monad(unless,when)
@@ -40,8 +40,10 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` alwaysUsedModules) $
     forM_ decls $ \(ss, declType, qualifierName) ->
       censor (onErrorMessages $ addModuleLocError ss) $ unless (qnameUsed qualifierName) $
-        let usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) $ sugarNames mni ++ M.findWithDefault [] mni usedImps in
-        case declType of
+        let names = sugarNames mni ++ M.findWithDefault [] mni usedImps
+            usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) names
+            usedDctors = mapMaybe (matchDctor qualifierName) names
+        in case declType of
           Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
           Explicit declrefs -> do
             let idents = mapMaybe runDeclRef declrefs
@@ -50,6 +52,17 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
               (0, _) -> return ()
               (n, m) | n == m -> tell $ errorMessage $ UnusedImport mni
               _ -> tell $ errorMessage $ UnusedExplicitImport mni diff
+
+            -- If we've not already warned a type is unused, check its data constructors
+            forM_ (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
+              let allCtors = dctorsForType mni tn
+              when (runProperName tn `elem` usedNames) $ case (c, null $ usedDctors `intersect` allCtors) of
+                (_, True) -> tell $ errorMessage $ UnusedDctorImport tn
+                (Just ctors, False) -> let ddiff = ctors \\ usedDctors
+                                       in unless (null ddiff) $ tell $ errorMessage $ UnusedDctorExplicitImport tn ddiff
+                _ -> return ()
+            return ()
+
           _ -> return ()
   where
   sugarNames :: ModuleName -> [ Name ]
@@ -67,14 +80,23 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   qnameUsed (Just qn) = qn `elem` alwaysUsedModules
   qnameUsed Nothing = False
 
+  dtys :: ModuleName -> [((ProperName, [ProperName]), ModuleName)]
+  dtys mn = maybe [] exportedTypes $ envModuleExports <$> mn `M.lookup` env
+
+  dctorsForType :: ModuleName -> ProperName -> [ProperName]
+  dctorsForType mn tn =
+    maybe [] getDctors (find matches $ dtys mn)
+    where
+      matches ((ty, _),_) = ty == tn
+      getDctors ((_,ctors),_) = ctors
+
   typeForDCtor :: ModuleName -> ProperName -> Maybe ProperName
   typeForDCtor mn pn =
-    getTy <$> find matches tys
+    getTy <$> find matches (dtys mn)
     where
       matches ((_, ctors), _) = pn `elem` ctors
       getTy ((ty, _), _) = ty
-      tys :: [((ProperName, [ProperName]), ModuleName)]
-      tys = maybe [] exportedTypes $ envModuleExports <$> mn `M.lookup` env
+
 
 matchName :: (ProperName -> Maybe ProperName) -> Maybe ModuleName -> Name -> Maybe String
 matchName _ qual (IdentName (Qualified q x)) | q == qual = Just $ showIdent x
@@ -82,11 +104,20 @@ matchName _ qual (IsProperName (Qualified q x)) | q == qual = Just $ runProperNa
 matchName lookupDc qual (DctorName (Qualified q x)) | q == qual = runProperName <$> lookupDc x
 matchName _ _ _ = Nothing
 
+matchDctor :: Maybe ModuleName -> Name -> Maybe ProperName
+matchDctor qual (DctorName (Qualified q x)) | q == qual = Just x
+matchDctor _ _ = Nothing
+
 runDeclRef :: DeclarationRef -> Maybe String
 runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
 runDeclRef (ValueRef ident) = Just $ showIdent ident
 runDeclRef (TypeRef pn _) = Just $ runProperName pn
 runDeclRef _ = Nothing
+
+getTypeRef :: DeclarationRef -> Maybe (ProperName, Maybe [ProperName])
+getTypeRef (PositionedDeclarationRef _ _ ref) = getTypeRef ref
+getTypeRef (TypeRef pn x) = Just (pn, x)
+getTypeRef _ = Nothing
 
 addModuleLocError :: Maybe SourceSpan -> ErrorMessage -> ErrorMessage
 addModuleLocError sp err =
