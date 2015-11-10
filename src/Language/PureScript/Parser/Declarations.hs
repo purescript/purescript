@@ -334,9 +334,14 @@ parseObjectLiteral :: TokenParser Expr
 parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
 
 parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
-parseIdentifierAndValue = (,) <$> (C.indented *> (lname <|> stringLiteral) <* C.indented <* colon)
-                              <*> (C.indented *> val)
+parseIdentifierAndValue =
+  do
+    name <- C.indented *> lname
+    b <- P.option (Just $ Var $ Qualified Nothing (Ident name)) rest
+    return (name, b)
+  <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
+  rest = C.indented *> colon *>  C.indented *>  val
   val = (Just <$> parseValue) <|> (underscore *> pure Nothing)
 
 parseAbs :: TokenParser Expr
