@@ -164,7 +164,7 @@ string s = '"' : concatMap encodeChar s ++ "\""
   encodeChar '\r' = "\\r"
   encodeChar '"'  = "\\\""
   encodeChar '\\' = "\\\\"
-  encodeChar c | fromEnum c > 0xFFFF = "\\u" ++ showHex highSurrogate "" ++ "\\u" ++ showHex lowSurrogate ""
+  encodeChar c | fromEnum c > 0xFFFF = "\\u" ++ showHex highSurrogate ("\\u" ++ showHex lowSurrogate "")
     where
     (h, l) = divMod (fromEnum c - 0x10000) 0x400
     highSurrogate = h + 0xD800
