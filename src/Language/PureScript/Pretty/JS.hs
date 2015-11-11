@@ -166,6 +166,7 @@ string s = '"' : concatMap encodeChar s ++ "\""
   encodeChar '\\' = "\\\\"
   encodeChar c | fromEnum c > 0xFFF = "\\u" ++ showHex (fromEnum c) ""
   encodeChar c | fromEnum c > 0xFF = "\\u0" ++ showHex (fromEnum c) ""
+  encodeChar c | fromEnum c < 0x10 = "\\x0" ++ showHex (fromEnum c) ""
   encodeChar c | fromEnum c > 0x7E || fromEnum c < 0x20 = "\\x" ++ showHex (fromEnum c) ""
   encodeChar c = [c]
 
