@@ -944,7 +944,7 @@ renderBox = unlines . map trimEnd . lines . Box.render
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
 
-reifyErrors :: (MonadError e m) => m a -> m (Either e a)
+reifyErrors :: (Functor m, MonadError e m) => m a -> m (Either e a)
 reifyErrors ma = catchError (fmap Right ma) (return . Left)
 
 reflectErrors :: (MonadError e m) => m (Either e a) -> m a

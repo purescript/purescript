@@ -211,14 +211,14 @@ freshDictionaryName = do
 
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
 liftUnify ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
+  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   m a ->
   m (a, Substitution)
 liftUnify = liftUnifyWarnings (const id)
 
 -- | Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
 liftUnifyWarnings ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
+  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   (Substitution -> ErrorMessage -> ErrorMessage) ->
   m a ->
   m (a, Substitution)
