@@ -384,15 +384,16 @@ printModuleSignatures moduleName (P.Environment {..}) =
         moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
         moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
 
-  in do
+  in
     -- print each component
-    printModule's (sort . mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
-    printModule's (sort . mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
-    printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
-    printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
-    outputStrLn   ""
+    (outputStr . Box.render . Box.hcat Box.top)
+      [ printModule's (sort . mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
+      , printModule's (sort . mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
+      , printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
+      , printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
+      ]
 
-  where printModule's showF = outputStr . unlines . showF
+  where printModule's showF = Box.text . unlines . showF
 
         findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
