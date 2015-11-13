@@ -24,7 +24,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Foldable (traverse_)
-import Data.Maybe (mapMaybe, isJust)
+import Data.Maybe (mapMaybe)
 import Data.List (intersperse, intercalate, nub, sort, sortBy)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
@@ -389,7 +389,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
   in do
     -- print each component
     printModule's (sort . mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
-    printModule's (sort . mapMaybe (showType dataConstructors typeSynonyms . findType types)) moduleTypes -- types
+    printModule's (sort . mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
     printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
     printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
     outputStrLn   ""
@@ -446,14 +446,15 @@ printModuleSignatures moduleName (P.Environment {..}) =
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
 
-        showType :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident])
+        showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])
+                 -> M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident])
                  -> M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type)
                  -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
                  -> Maybe String
-        showType dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
+        showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
             (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
-                if isJust $ P.objectType dtType
+                if M.member n typeClassesEnv
                 then
                   Nothing
                 else

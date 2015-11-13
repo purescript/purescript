@@ -22,7 +22,6 @@
 
 module Language.PureScript.Sugar.TypeClasses.Deriving (
     deriveInstances
-  , objectType
 ) where
 
 import Prelude ()
