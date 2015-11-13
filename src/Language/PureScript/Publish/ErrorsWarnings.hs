@@ -160,9 +160,9 @@ displayUserError e = case e of
         , indented (para "* {MAJOR}.{MINOR}.{PATCH} (example: \"1.6.2\")")
         , spacer
         , para (concat
-           [ "If the version you are publishing is not yet tagged, you might want to use"
-           , "the --dry-run flag instead, which removes this requirement. Run"
-           , "psc-publish --help for more details."
+           [ "If the version you are publishing is not yet tagged, you might "
+           , "want to use the --dry-run flag instead, which removes this "
+           , "requirement. Run psc-publish --help for more details."
            ])
         ]
   AmbiguousVersions vs ->
