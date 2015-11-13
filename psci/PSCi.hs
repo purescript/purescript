@@ -24,8 +24,8 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Foldable (traverse_)
-import Data.Maybe (mapMaybe)
-import Data.List (intercalate, nub, sort, sortBy)
+import Data.Maybe (mapMaybe, isJust)
+import Data.List (intersperse, intercalate, nub, sort, sortBy)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -382,12 +382,14 @@ printModuleSignatures moduleName (P.Environment {..}) =
   PSCI $
     -- get relevant components of a module from environment
     let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
+        moduleTypeClasses = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typeClasses
         moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
         moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
 
   in do
     -- print each component
-    printModule's (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes -- types
+    printModule's (sort . mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
+    printModule's (sort . mapMaybe (showType dataConstructors typeSynonyms . findType types)) moduleTypes -- types
     printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
     printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
     outputStrLn   ""
@@ -412,17 +414,64 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.render (Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType)
         showDataConstructor _ = P.internalError "The impossible happened in printModuleSignatures."
 
+
+        findTypeClass :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]))
+        findTypeClass envTypeClasses name = (name, M.lookup name envTypeClasses)
+
+        showTypeClass :: (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])) -> Maybe String
+        showTypeClass (_, Nothing) = Nothing
+        showTypeClass (P.Qualified _ name, Just (vars, body, constrs)) =
+            let constraints =
+                    if null constrs
+                    then Box.text ""
+                    else Box.text "("
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Qualified _ pn, lt) -> Box.text (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) constrs)
+                         Box.<> Box.text ") <= "
+                className =
+                    Box.text (P.runProperName name)
+                    Box.<> Box.text (concatMap ((' ':) . fst) vars)
+                classBody =
+                    Box.vcat Box.top (map (\(i, t) -> Box.text (P.showIdent i ++ " ::") Box.<+> P.typeAsBox t) body)
+
+            in
+              Just $
+                Box.render $
+                  (Box.text "class "
+                  Box.<> constraints
+                  Box.<> className
+                  Box.<+> if null body then Box.text "" else Box.text "where")
+                  Box.// Box.moveRight 2 classBody
+
+
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
 
-        showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type) -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind)) -> Maybe String
-        showType typeSynonymsEnv (n@(P.Qualified _ name), typ) =
+        showType :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident])
+                 -> M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type)
+                 -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
+                 -> Maybe String
+        showType dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
             (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
-                Just (Box.render $ Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType))
+                if isJust $ P.objectType dtType
+                then
+                  Nothing
+                else
+                  Just $ Box.render $
+                    Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars)
+                    Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType)
 
             (Just (_, P.DataType typevars pt), _) ->
-                Just $ Box.render (Box.text ("data " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt)
+              let prefix =
+                    case pt of
+                      [(dtProperName,_)] ->
+                        case M.lookup (P.Qualified modul dtProperName) dataConstructorsEnv of
+                          Just (dataDeclType, _, _, _) -> P.showDataDeclType dataDeclType
+                          _ -> "data"
+                      _ -> "data"
+
+              in
+                Just $ Box.render (Box.text (prefix ++ " " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt)
 
             _ ->
               Nothing
