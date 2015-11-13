@@ -379,19 +379,20 @@ handleTypeOf val = do
 --
 printModuleSignatures :: P.ModuleName -> P.Environment -> PSCI ()
 printModuleSignatures moduleName (P.Environment {..}) =
-  PSCI $ let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
-             moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
-             moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
+  PSCI $
+    -- get relevant components of a module from environment
+    let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
+        moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
+        moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
 
-         in do
-           printModule's "types"             (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes
-           printModule's "data constructors" (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors
-           printModule's "functions"         (sort . map (showNameType . findNameType names)) moduleNamesIdent
-           outputStrLn   ""
+  in do
+    -- print each component
+    printModule's (sort . mapMaybe (showType typeSynonyms . findType types)) moduleTypes -- types
+    printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
+    printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
+    outputStrLn   ""
 
-
-  where printModule's what _  [] = outputStrLn $ "This module '" ++ P.runModuleName moduleName ++ "' does not export " ++ what ++ ".\n"
-        printModule's _ showF xs = (outputStr . unlines . showF) xs
+  where printModule's showF = outputStr . unlines . showF
 
         findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
@@ -427,13 +428,12 @@ printModuleSignatures moduleName (P.Environment {..}) =
               Nothing
 
           where printCons pt =
+                    Box.moveRight 2 $
                     Box.vcat Box.left $
-                    map (Box.moveRight 2) $
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
                     map (\(cons,idents) -> (Box.text (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
 
-                prettyPrintType t@(P.TypeApp _ _) = Box.text " (" Box.<> P.typeAsBox t Box.<> Box.text ")"
-                prettyPrintType t = Box.moveRight 1 (P.typeAsBox t)
+                prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox t
 
                 mapFirstRest _ _ [] = []
                 mapFirstRest f g (x:xs) = f x : map g xs
