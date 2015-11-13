@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Language.PureScript.TypeChecker.Skolems (
     newSkolemConstant,
     introduceSkolemScope,
@@ -27,26 +29,31 @@ import Prelude.Compat
 
 import Data.List (nub, (\\))
 import Data.Monoid
+import Data.Functor.Identity (Identity(), runIdentity)
 
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Unify
+import Control.Monad.State.Class (MonadState(..), gets, modify)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
+import Language.PureScript.Traversals (defS)
 
 -- |
 -- Generate a new skolem constant
 --
-newSkolemConstant :: UnifyT Type Check Int
-newSkolemConstant = fresh'
+newSkolemConstant :: (MonadState CheckState m) => m Int
+newSkolemConstant = do
+  s <- gets checkNextSkolem
+  modify $ \st -> st { checkNextSkolem = s + 1 }
+  return s
 
 -- |
 -- Introduce skolem scope at every occurence of a ForAll
 --
-introduceSkolemScope :: Type -> UnifyT Type Check Type
+introduceSkolemScope :: (Functor m, Applicative m, MonadState CheckState m) => Type -> m Type
 introduceSkolemScope = everywhereOnTypesM go
   where
   go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)
@@ -55,8 +62,11 @@ introduceSkolemScope = everywhereOnTypesM go
 -- |
 -- Generate a new skolem scope
 --
-newSkolemScope :: UnifyT Type Check SkolemScope
-newSkolemScope = SkolemScope <$> fresh'
+newSkolemScope :: (MonadState CheckState m) => m SkolemScope
+newSkolemScope = do
+  s <- gets checkNextSkolemScope
+  modify $ \st -> st { checkNextSkolemScope = s + 1 }
+  return $ SkolemScope s
 
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
@@ -70,21 +80,31 @@ skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
 -- only example of scoped type variables.
 --
 skolemizeTypesInValue :: String -> Int -> SkolemScope -> Expr -> Expr
-skolemizeTypesInValue ident sko scope = let (_, f, _) = everywhereOnValues id onExpr onBinder in f
+skolemizeTypesInValue ident sko scope =
+  let
+    (_, f, _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS
+  in runIdentity . f
   where
-  onExpr :: Expr -> Expr
-  onExpr (SuperClassDictionary c ts) = SuperClassDictionary c (map (skolemize ident sko scope) ts)
-  onExpr (TypedValue check val ty) = TypedValue check val (skolemize ident sko scope ty)
-  onExpr other = other
+  onExpr :: [String] -> Expr -> Identity ([String], Expr)
+  onExpr sco (SuperClassDictionary c ts)
+    | ident `notElem` sco = return (sco, SuperClassDictionary c (map (skolemize ident sko scope) ts))
+  onExpr sco (TypedValue check val ty)
+    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ty))
+  onExpr sco other = return (sco, other)
 
-  onBinder :: Binder -> Binder
-  onBinder (TypedBinder ty b) = TypedBinder (skolemize ident sko scope ty) b
-  onBinder other = other
+  onBinder :: [String] -> Binder -> Identity ([String], Binder)
+  onBinder sco (TypedBinder ty b)
+    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ty) b)
+  onBinder sco other = return (sco, other)
+
+  peelTypeVars :: Type -> [String]
+  peelTypeVars (ForAll i ty _) = i : peelTypeVars ty
+  peelTypeVars _ = []
 
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: Expr -> Check ()
+skolemEscapeCheck :: (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.

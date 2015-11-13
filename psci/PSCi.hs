@@ -30,17 +30,15 @@ import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
-import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.Except (ExceptT(), runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Writer.Strict (runWriter)
-import qualified Control.Monad.Trans.State.Lazy as L
+import Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import Options.Applicative as Opts
 
@@ -255,7 +253,7 @@ modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
 runMake :: P.Make a -> IO (Either P.MultipleErrors a)
-runMake mk = fmap fst $ P.runMake P.defaultOptions mk
+runMake mk = fst <$> P.runMake P.defaultOptions mk
 
 makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
 makeIO f io = do
@@ -521,8 +519,11 @@ handleKindOf typ = do
     Right env' ->
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
-          let chk = P.CheckState env' 0 0 (Just mName)
-              k   = fst . runWriter . runExceptT $ L.runStateT (P.unCheck (P.kindOf typ')) chk
+          let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
+              k   = check (P.kindOf typ') chk
+
+              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check sew cs = fst . runWriter . runExceptT . runStateT sew $ cs
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind
@@ -539,8 +540,8 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
   case firstLine of
     Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
-    Just s | singleLineMode || head s == ':' -> return . either Left (Right . Just) $ parseCommand s
-    Just s -> either Left (Right . Just) . parseCommand <$> go [s]
+    Just s | singleLineMode || head s == ':' -> return .fmap Just $ parseCommand s
+    Just s -> fmap Just . parseCommand <$> go [s]
   where
     go :: [String] -> InputT (StateT PSCiState IO) String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "

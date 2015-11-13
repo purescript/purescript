@@ -66,7 +66,7 @@ removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds)
   where
   (f', _, _) = everywhereOnValues id go id
 
-  go (UnaryMinus val) = App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.negate))) val
+  go (UnaryMinus val) = App (Var (Qualified Nothing (Ident C.negate))) val
   go other = other
 
 rebracketModule :: (Applicative m, MonadError MultipleErrors m) => [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> m Module

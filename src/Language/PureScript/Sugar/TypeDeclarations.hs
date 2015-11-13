@@ -61,9 +61,13 @@ desugarTypeDeclarationsModule ms = forM ms $ \(Module ss coms name ds exps) ->
     let (_, f, _) = everywhereOnValuesTopDownM return go return
         f' (Left gs) = Left <$> mapM (pairM return f) gs
         f' (Right v) = Right <$> f v
-    (:) <$> (ValueDeclaration name nameKind bs <$> f' val) <*> desugarTypeDeclarations rest
+    (:) <$> (ValueDeclaration name nameKind bs <$> f' val)
+        <*> desugarTypeDeclarations rest
     where
     go (Let ds val') = Let <$> desugarTypeDeclarations ds <*> pure val'
     go other = return other
+  desugarTypeDeclarations (TypeInstanceDeclaration nm deps cls args (ExplicitInstance ds) : rest) =
+    (:) <$> (TypeInstanceDeclaration nm deps cls args . ExplicitInstance <$> desugarTypeDeclarations ds)
+        <*> desugarTypeDeclarations rest
   desugarTypeDeclarations (d:ds) = (:) d <$> desugarTypeDeclarations ds
   desugarTypeDeclarations [] = return []

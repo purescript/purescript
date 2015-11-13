@@ -29,7 +29,6 @@ import Data.Foldable (fold)
 import qualified Data.Map as M
 
 import Control.Monad
-import Control.Monad.Unify
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
@@ -177,12 +176,6 @@ data HintCategory
 
 data ErrorMessage = ErrorMessage [ErrorMessageHint] SimpleErrorMessage deriving (Show)
 
-instance UnificationError Type ErrorMessage where
-  occursCheckFailed t = ErrorMessage [] $ InfiniteType t
-
-instance UnificationError Kind ErrorMessage where
-  occursCheckFailed k = ErrorMessage [] $ InfiniteKind k
-
 -- |
 -- Get the error code for a particular error type
 --
@@ -285,12 +278,6 @@ errorCode em = case unwrapErrorMessage em of
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
 
-instance UnificationError Type MultipleErrors where
-  occursCheckFailed t = MultipleErrors [occursCheckFailed t]
-
-instance UnificationError Kind MultipleErrors where
-  occursCheckFailed k = MultipleErrors [occursCheckFailed k]
-
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
 nonEmpty = not . null . runMultipleErrors
@@ -320,7 +307,7 @@ addHint hint = onErrorMessages $ \(ErrorMessage hints se) -> ErrorMessage (hint 
 data LabelType = TypeLabel | SkolemLabel String deriving (Show, Read, Eq, Ord)
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
-type UnknownMap = M.Map (LabelType, Unknown) Unknown
+type UnknownMap = M.Map (LabelType, Int) Int
 
 -- | How critical the issue is
 data Level = Error | Warning deriving Show
@@ -334,7 +321,7 @@ unwrapErrorMessage (ErrorMessage _ se) = se
 replaceUnknowns :: Type -> State UnknownMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes
   where
-  lookupTable :: (LabelType, Unknown) -> UnknownMap -> (Unknown, UnknownMap)
+  lookupTable :: (LabelType, Int) -> UnknownMap -> (Int, UnknownMap)
   lookupTable x m = case M.lookup x m of
                       Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
                       Just i  -> (i, m)
@@ -526,7 +513,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (EscapedSkolem binding) =
       paras $ [ line "A type variable has escaped its scope." ]
                      <> foldMap (\expr -> [ line "Relevant expression: "
-                                          , indent $ prettyPrintValue expr
+                                          , indent $ prettyPrintValue valueDepth expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
       = paras [ line "Could not match type"
@@ -581,7 +568,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (DuplicateLabel l expr) =
       paras $ [ line $ "Label " ++ show l ++ " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
-                                             , indent $ prettyPrintValue expr'
+                                             , indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
     renderSimpleErrorMessage (DuplicateTypeArgument name) =
       line $ "Type argument " ++ show name ++ " appears more than once."
@@ -590,7 +577,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (ArgListLengthsDiffer ident) =
       line $ "Argument list lengths differ in declaration " ++ showIdent ident
     renderSimpleErrorMessage (OverlappingArgNames ident) =
-      line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration" ++) . showIdent) ident
+      line $ "Overlapping names in function/binder" ++ foldMap ((" in declaration " ++) . showIdent) ident
     renderSimpleErrorMessage (MissingClassMember ident) =
       line $ "Type class member " ++ showIdent ident ++ " has not been implemented."
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
@@ -607,7 +594,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       line $ "Data constructor " ++ showQualified runProperName nm ++ " was given the wrong number of arguments in a case expression."
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
-            , indent $ prettyPrintValue expr
+            , indent $ prettyPrintValue valueDepth expr
             , line "does not have type"
             , indent $ typeAsBox ty
             ]
@@ -619,7 +606,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line "A function of type"
             , indent $ typeAsBox fn
             , line "can not be applied to the argument"
-            , indent $ prettyPrintValue arg
+            , indent $ prettyPrintValue valueDepth arg
             ]
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
@@ -706,7 +693,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorInExpression expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ Box.text "in the expression"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorInModule mn) detail =
@@ -742,13 +729,13 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorInferringType expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while inferring the type of"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorCheckingType expr ty) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking that expression"
-                                 , prettyPrintValue expr
+                                 , prettyPrintValue valueDepth expr
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has type"
                                                    , typeAsBox ty
@@ -757,19 +744,19 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , prettyPrintValue (Accessor prop expr)
+                                 , prettyPrintValue valueDepth (Accessor prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while applying a function"
-                                 , prettyPrintValue f
+                                 , prettyPrintValue valueDepth f
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "of type"
                                                    , typeAsBox t
                                                    ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "to argument"
-                                                   , prettyPrintValue a
+                                                   , prettyPrintValue valueDepth a
                                                    ]
             ]
     renderHint (ErrorInDataConstructor nm) detail =
@@ -808,6 +795,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line $ "at " ++ displaySourceSpan srcSpan
             , detail
             ]
+
+  valueDepth :: Int
+  valueDepth | full = 1000
+             | otherwise = 3
 
   levelText :: String
   levelText = case level of

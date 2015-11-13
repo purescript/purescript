@@ -23,8 +23,6 @@ import Prelude.Compat
 import Data.Data
 import qualified Data.Aeson.TH as A
 
-import Control.Monad.Unify (Unknown)
-
 -- |
 -- The data type of kinds
 --
@@ -32,7 +30,7 @@ data Kind
   -- |
   -- Unification variable of type Kind
   --
-  = KUnknown Unknown
+  = KUnknown Int
   -- |
   -- The kind of types
   --

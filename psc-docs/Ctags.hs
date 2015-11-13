@@ -5,7 +5,7 @@ import Tags
 import Data.List (sort)
 
 dumpCtags :: [(String, P.Module)] -> [String]
-dumpCtags = sort . concat . (map renderModCtags)
+dumpCtags = sort . concatMap renderModCtags
 
 renderModCtags :: (String, P.Module) -> [String]
 renderModCtags (path, mdl) = sort tagLines

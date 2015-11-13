@@ -28,7 +28,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
-import Control.Monad.Unify
 import Control.Arrow (second)
 import Control.Monad ((<=<))
 
@@ -48,7 +47,7 @@ data Type
   -- |
   -- A unification variable of type Type
   --
-  = TUnknown Unknown
+  = TUnknown Int
   -- |
   -- A named type variable
   --

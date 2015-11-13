@@ -19,7 +19,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Language.PureScript.Bundle (
      bundle
@@ -531,7 +530,7 @@ codeGen optionsMainModule optionsNamespace ms = renderToString (NN (JSSourceElem
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-bundle :: forall m. (Applicative m, MonadError ErrorMessage m)
+bundle :: (Applicative m, MonadError ErrorMessage m)
        => [(ModuleIdentifier, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.

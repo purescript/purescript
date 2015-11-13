@@ -334,9 +334,14 @@ parseObjectLiteral :: TokenParser Expr
 parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
 
 parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
-parseIdentifierAndValue = (,) <$> (C.indented *> (lname <|> stringLiteral) <* C.indented <* colon)
-                              <*> (C.indented *> val)
+parseIdentifierAndValue =
+  do
+    name <- C.indented *> lname
+    b <- P.option (Just $ Var $ Qualified Nothing (Ident name)) rest
+    return (name, b)
+  <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
+  rest = C.indented *> colon *>  C.indented *>  val
   val = (Just <$> parseValue) <|> (underscore *> pure Nothing)
 
 parseAbs :: TokenParser Expr
@@ -414,8 +419,8 @@ parseInfixExpr = P.between tick tick parseValue
 parseOperatorSection :: TokenParser Expr
 parseOperatorSection = parens $ left <|> right
   where
-  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> parseValueAtom)
-  left = flip OperatorSection <$> (Left <$> parseValueAtom) <* indented <*> parseInfixExpr
+  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
+  left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
 parsePropertyUpdate :: TokenParser (String, Maybe Expr)
 parsePropertyUpdate = do
@@ -449,21 +454,25 @@ parseDoNotationElement = P.choice
 parseObjectGetter :: TokenParser Expr
 parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
 
+-- | Expressions including indexers and record updates
+indexersAndAccessors :: TokenParser Expr
+indexersAndAccessors = C.buildPostfixParser postfixTable parseValueAtom
+  where
+  postfixTable = [ parseAccessor
+                 , P.try . parseUpdaterBody . Just ]
+
 -- |
 -- Parse a value
 --
 parseValue :: TokenParser Expr
 parseValue = withSourceSpan PositionedValue
   (P.buildExpressionParser operators
-    . C.buildPostfixParser postfixTable2
+    . C.buildPostfixParser postfixTable
     $ indexersAndAccessors) P.<?> "expression"
   where
-  indexersAndAccessors = C.buildPostfixParser postfixTable1 parseValueAtom
-  postfixTable1 = [ parseAccessor
-                  , P.try . parseUpdaterBody . Just ]
-  postfixTable2 = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
-                  , \v -> flip (TypedValue True) <$> (P.try (C.indented *> doubleColon) *> parsePolyType) <*> pure v
-                  ]
+  postfixTable = [ \v -> P.try (flip App <$> (C.indented *> indexersAndAccessors)) <*> pure v
+                 , \v -> flip (TypedValue True) <$> (P.try (C.indented *> doubleColon) *> parsePolyType) <*> pure v
+                 ]
   operators = [ [ P.Prefix (P.try (C.indented *> symbol' "-") >> return UnaryMinus)
                 ]
               , [ P.Infix (P.try (C.indented *> parseInfixExpr P.<?> "infix expression") >>= \ident ->
