@@ -386,20 +386,20 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
   in
     -- print each component
-    (outputStr . Box.render . Box.hcat Box.top)
-      [ printModule's (sort . mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
-      , printModule's (sort . mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
+    (outputStr . Box.render . Box.vcat Box.left)
+      [ printModule's (mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
+      , printModule's (mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
       , printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
-      , printModule's (sort . map (showNameType . findNameType names)) moduleNamesIdent -- functions
+      , printModule's (map (showNameType . findNameType names)) moduleNamesIdent -- functions
       ]
 
-  where printModule's showF = Box.text . unlines . showF
+  where printModule's showF = Box.vsep 1 Box.left . showF
 
         findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
         findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
 
-        showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> String
-        showNameType (mIdent, Just (mType, _, _)) = Box.render (Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType)
+        showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> Box.Box
+        showNameType (mIdent, Just (mType, _, _)) = Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
@@ -409,15 +409,15 @@ printModuleSignatures moduleName (P.Environment {..}) =
         compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
         compareDatatypes _ _ = P.internalError "The impossible happened in printModuleSignatures."
 
-        showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> String
-        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.render (Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType)
+        showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Box.Box
+        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType
         showDataConstructor _ = P.internalError "The impossible happened in printModuleSignatures."
 
 
         findTypeClass :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]))
         findTypeClass envTypeClasses name = (name, M.lookup name envTypeClasses)
 
-        showTypeClass :: (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])) -> Maybe String
+        showTypeClass :: (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])) -> Maybe Box.Box
         showTypeClass (_, Nothing) = Nothing
         showTypeClass (P.Qualified _ name, Just (vars, body, constrs)) =
             let constraints =
@@ -434,12 +434,11 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
             in
               Just $
-                Box.render $
-                  (Box.text "class "
-                  Box.<> constraints
-                  Box.<> className
-                  Box.<+> if null body then Box.text "" else Box.text "where")
-                  Box.// Box.moveRight 2 classBody
+                (Box.text "class "
+                Box.<> constraints
+                Box.<> className
+                Box.<+> if null body then Box.text "" else Box.text "where")
+                Box.// Box.moveRight 2 classBody
 
 
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
@@ -449,7 +448,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
                  -> M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident])
                  -> M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type)
                  -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
-                 -> Maybe String
+                 -> Maybe Box.Box
         showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
             (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
@@ -457,7 +456,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
                 then
                   Nothing
                 else
-                  Just $ Box.render $
+                  Just $
                     Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars)
                     Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType)
 
@@ -471,7 +470,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
                       _ -> "data"
 
               in
-                Just $ Box.render (Box.text (prefix ++ " " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt)
+                Just $ Box.text (prefix ++ " " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt
 
             _ ->
               Nothing
