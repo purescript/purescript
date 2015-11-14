@@ -211,21 +211,21 @@ freshDictionaryName = do
 
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
 liftUnify ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m) =>
+  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   m a ->
   m (a, Substitution)
 liftUnify = liftUnifyWarnings (const id)
 
 -- | Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
 liftUnifyWarnings ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m) =>
+  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   (Substitution -> ErrorMessage -> ErrorMessage) ->
   m a ->
   m (a, Substitution)
 liftUnifyWarnings replace ma = do
   orig <- get
   modify $ \st -> st { checkSubstitution = emptySubstitution }
-  (a, w) <- censor (const mempty) . listen $ ma
+  (a, w) <- reflectErrors . censor (const mempty) . reifyErrors . listen $ ma
   subst <- gets checkSubstitution
   tell . onErrorMessages (replace subst) $ w
   modify $ \st -> st { checkSubstitution = checkSubstitution orig }

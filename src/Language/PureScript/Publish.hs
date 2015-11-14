@@ -122,7 +122,7 @@ preparePackage' opts = do
   requireCleanWorkingTree
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
-                    >>= flip catchLeft (userError . CouldntParseBowerJSON)
+                    >>= flip catchLeft (userError . CouldntDecodeBowerJSON)
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgGithub                   <- getBowerInfo pkgMeta
   (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
