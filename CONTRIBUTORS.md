@@ -56,6 +56,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@zudov](https://github.com/zudov) (Konstantin Zudov) My existing contributions and all future contributions until further notice are Copyright Konstantin Zudov, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@senju](https://github.com/senju) - My existing contributions and all future contributions until further notice are Copyright senju, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 <http://opensource.org/licenses/MIT>.
+- [@soupi](https://github.com/soupi) (Gil Mizrahi) My existing contributions and all future contributions until further notice are Copyright Gil Mizrahi, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 
