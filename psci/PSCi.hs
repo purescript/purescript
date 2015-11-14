@@ -25,7 +25,7 @@ import Prelude.Compat
 
 import Data.Foldable (traverse_)
 import Data.Maybe (mapMaybe)
-import Data.List (intersperse, intercalate, nub, sort, sortBy)
+import Data.List (intersperse, intercalate, nub, sort)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -382,14 +382,12 @@ printModuleSignatures moduleName (P.Environment {..}) =
     let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
         moduleTypeClasses = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typeClasses
         moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
-        moduleDataConstructors = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) dataConstructors
 
   in
     -- print each component
-    (outputStr . Box.render . Box.vcat Box.left)
+    (outputStr . unlines . map trimEnd . lines . Box.render . Box.vsep 1 Box.left)
       [ printModule's (mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
       , printModule's (mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
-      , printModule's (map showDataConstructor . sortBy compareDatatypes . map (findDataConstructor dataConstructors)) moduleDataConstructors -- data constructors
       , printModule's (map (showNameType . findNameType names)) moduleNamesIdent -- functions
       ]
 
@@ -401,18 +399,6 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> Box.Box
         showNameType (mIdent, Just (mType, _, _)) = Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
-
-        findDataConstructor :: M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident]))
-        findDataConstructor envDataCons name = (name, M.lookup name envDataCons)
-
-        compareDatatypes :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Ordering
-        compareDatatypes (_, Just (_, dtName1, _, _)) (_, Just (_, dtName2, _, _)) = dtName1 `compare` dtName2
-        compareDatatypes _ _ = P.internalError "The impossible happened in printModuleSignatures."
-
-        showDataConstructor :: (P.Qualified P.ProperName, Maybe (P.DataDeclType, P.ProperName, P.Type, [P.Ident])) -> Box.Box
-        showDataConstructor (P.Qualified _ name, Just (_, _, dtType, _)) = Box.text (P.runProperName name ++ " :: ") Box.<> P.typeAsBox dtType
-        showDataConstructor _ = P.internalError "The impossible happened in printModuleSignatures."
-
 
         findTypeClass :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]))
         findTypeClass envTypeClasses name = (name, M.lookup name envTypeClasses)
@@ -485,6 +471,8 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
                 mapFirstRest _ _ [] = []
                 mapFirstRest f g (x:xs) = f x : map g xs
+
+        trimEnd = reverse . dropWhile (== ' ') . reverse
 
 
 -- |
