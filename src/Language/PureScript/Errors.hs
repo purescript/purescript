@@ -32,7 +32,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
-import Control.Arrow(first)
+import Control.Arrow (first)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -939,18 +939,16 @@ renderBox = unlines . map trimEnd . lines . Box.render
   trimEnd = reverse . dropWhile (== ' ') . reverse
 
 -- |
--- Interpret multiple errors and warnings in a monad supporting errors and warnings
---
-interpretMultipleErrorsAndWarnings :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => (Either MultipleErrors a, MultipleErrors) -> m a
-interpretMultipleErrorsAndWarnings (err, ws) = do
-  tell ws
-  either throwError return err
-
--- |
 -- Rethrow an error with a more detailed error message in the case of failure
 --
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
+
+reifyErrors :: (Functor m, MonadError e m) => m a -> m (Either e a)
+reifyErrors ma = catchError (fmap Right ma) (return . Left)
+
+reflectErrors :: (MonadError e m) => m (Either e a) -> m a
+reflectErrors ma = ma >>= either throwError return
 
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f

@@ -158,7 +158,7 @@ resolveImport currentModule importModule exps imps impQual =
   -- Import something explicitly
   importExplicit :: Imports -> DeclarationRef -> m Imports
   importExplicit imp (PositionedDeclarationRef pos _ r) =
-    rethrowWithPosition pos . warnWithPosition pos $ importExplicit imp r
+    warnAndRethrowWithPosition pos $ importExplicit imp r
   importExplicit imp (ValueRef name) = do
     values' <- updateImports (importedValues imp) showIdent (exportedValues exps) name
     return $ imp { importedValues = values' }
