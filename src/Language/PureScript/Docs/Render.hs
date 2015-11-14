@@ -71,11 +71,7 @@ renderChildDeclarationWithOptions :: RenderTypeOptions -> ChildDeclaration -> Re
 renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of
     ChildInstance constraints ty ->
-      [ keywordInstance
-      , ident cdeclTitle
-      , syntax "::"
-      ] ++ maybeToList (renderConstraints constraints)
-        ++ [ renderType' ty ]
+      maybeToList (renderConstraints constraints) ++ [ renderType' ty ]
     ChildDataConstructor args ->
       [ renderType' typeApp' ]
       where
