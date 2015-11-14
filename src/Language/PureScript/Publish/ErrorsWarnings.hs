@@ -29,7 +29,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as T
 
 import Control.Exception (IOException)
-import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName)
+import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBowerError)
 import qualified Web.Bower.PackageMeta as Bower
 
 import qualified Language.PureScript as P
@@ -55,8 +55,7 @@ data PackageWarning
 data UserError
   = BowerJSONNotFound
   | BowerExecutableNotFound [String] -- list of executable names tried
-  | CouldntParseBowerJSON (ParseError BowerError)
-  | BowerJSONNameMissing
+  | CouldntDecodeBowerJSON (ParseError BowerError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
@@ -130,21 +129,12 @@ displayUserError e = case e of
       ])
     where
     format = intercalate ", " . map show
-  CouldntParseBowerJSON err ->
+  CouldntDecodeBowerJSON err ->
     vcat
-      [ successivelyIndented
-        [ "The bower.json file could not be parsed as JSON:"
-        , "aeson reported: " ++ show err
-        ]
-      , para "Please ensure that your bower.json file is valid JSON."
-      ]
-  BowerJSONNameMissing ->
-    vcat
-      [ successivelyIndented
-        [ "In bower.json:"
-        , "the \"name\" key was not found."
-        ]
-      , para "Please give your package a name first."
+      [ para "There was a problem with your bower.json file:"
+      , indented (vcat (map (para . T.unpack) (displayError showBowerError err)))
+      , spacer
+      , para "Please ensure that your bower.json file is valid."
       ]
   TagMustBeCheckedOut ->
       vcat
