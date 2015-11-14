@@ -56,7 +56,6 @@ data UserError
   = BowerJSONNotFound
   | BowerExecutableNotFound [String] -- list of executable names tried
   | CouldntParseBowerJSON (ParseError BowerError)
-  | BowerJSONNameMissing
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
@@ -137,14 +136,6 @@ displayUserError e = case e of
         , "aeson reported: " ++ show err
         ]
       , para "Please ensure that your bower.json file is valid JSON."
-      ]
-  BowerJSONNameMissing ->
-    vcat
-      [ successivelyIndented
-        [ "In bower.json:"
-        , "the \"name\" key was not found."
-        ]
-      , para "Please give your package a name first."
       ]
   TagMustBeCheckedOut ->
       vcat
