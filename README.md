@@ -10,6 +10,8 @@ A small strongly typed programming language with expressive types that compiles 
 
 ## Language info
 
+[![Join the chat at https://gitter.im/purescript/purescript](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/purescript/purescript?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 - [PureScript home](http://purescript.org)
 - [Releases & changelog](https://github.com/purescript/purescript/releases)
 - [Contributing to PureScript](https://github.com/purescript/purescript/blob/master/CONTRIBUTING.md)
