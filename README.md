@@ -3,7 +3,6 @@
 A small strongly typed programming language with expressive types that compiles to Javascript, written in and inspired by Haskell.
 
 [![Hackage](https://img.shields.io/hackage/v/purescript.svg)](http://hackage.haskell.org/package/purescript) [![Build Status](https://api.travis-ci.org/purescript/purescript.svg?branch=master)](http://travis-ci.org/purescript/purescript)
-[![Join the chat at https://gitter.im/purescript/purescript](https://img.shields.io/badge/gitter-chat-lightblue.svg)](https://gitter.im/purescript/purescript?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 [![Stackage LTS 2](http://stackage.org/package/purescript/badge/lts-2)](http://stackage.org/lts-2/package/purescript)
 [![Stackage LTS 3](http://stackage.org/package/purescript/badge/lts-3)](http://stackage.org/lts-3/package/purescript)
@@ -27,3 +26,4 @@ A small strongly typed programming language with expressive types that compiles 
 - [#purescript IRC @ FreeNode](http://webchat.freenode.net/?channels=purescript)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
 - [Google Group](https://groups.google.com/forum/#!forum/purescript)
+- [Gitter Channel](https://gitter.im/purescript/purescript?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
