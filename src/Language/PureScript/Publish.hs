@@ -8,10 +8,14 @@ module Language.PureScript.Publish
   , preparePackage'
   , PrepareM()
   , runPrepareM
+  , warn
+  , userError
+  , internalError
+  , otherError
   , PublishOptions(..)
   , defaultPublishOptions
   , getGitWorkingTreeStatus
-  , requireCleanWorkingTree
+  , checkCleanWorkingTree
   , getVersionFromGitTag
   , getBowerInfo
   , getModulesAndBookmarks
@@ -63,11 +67,14 @@ data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
     -- generated will refer to.
     publishGetVersion :: PrepareM (String, Version)
+  , -- | What to do when the working tree is dirty
+    publishWorkingTreeDirty :: PrepareM ()
   }
 
 defaultPublishOptions :: PublishOptions
 defaultPublishOptions = PublishOptions
   { publishGetVersion = getVersionFromGitTag
+  , publishWorkingTreeDirty = userError DirtyWorkingTree
   }
 
 -- | Attempt to retrieve package metadata from the current directory.
@@ -119,7 +126,7 @@ preparePackage' opts = do
   exists <- liftIO (doesFileExist "bower.json")
   unless exists (userError BowerJSONNotFound)
 
-  requireCleanWorkingTree
+  checkCleanWorkingTree opts
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntDecodeBowerJSON)
@@ -155,11 +162,11 @@ getGitWorkingTreeStatus = do
       then Clean
       else Dirty
 
-requireCleanWorkingTree :: PrepareM ()
-requireCleanWorkingTree = do
+checkCleanWorkingTree :: PublishOptions -> PrepareM ()
+checkCleanWorkingTree opts = do
   status <- getGitWorkingTreeStatus
   unless (status == Clean) $
-    userError DirtyWorkingTree
+    publishWorkingTreeDirty opts
 
 getVersionFromGitTag :: PrepareM (String, Version)
 getVersionFromGitTag = do
