@@ -9,11 +9,19 @@ import Options.Applicative hiding (str)
 
 import qualified Paths_purescript as Paths
 import Language.PureScript.Publish
+import Language.PureScript.Publish.ErrorsWarnings
 
 dryRun :: Parser Bool
 dryRun = switch $
      long "dry-run"
   <> help "Produce no output, and don't require a tagged version to be checked out."
+
+dryRunOptions :: PublishOptions
+dryRunOptions = defaultPublishOptions
+  { publishGetVersion = return dummyVersion
+  , publishWorkingTreeDirty = warn DirtyWorkingTree_Warn
+  }
+  where dummyVersion = ("0.0.0", Version [0,0,0] [])
 
 main :: IO ()
 main = execParser opts >>= publish
@@ -30,8 +38,7 @@ publish :: Bool -> IO ()
 publish isDryRun =
   if isDryRun
     then do
-      let dummyVersion = ("0.0.0", Version [0,0,0] [])
-      _ <- preparePackage $ defaultPublishOptions { publishGetVersion = return dummyVersion }
+      _ <- preparePackage dryRunOptions
       putStrLn "Dry run completed, no errors."
     else do
       pkg <- preparePackage defaultPublishOptions
