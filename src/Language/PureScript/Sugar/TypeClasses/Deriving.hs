@@ -107,7 +107,7 @@ mkSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> mapM mkCtorCl
     return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents))
     where
     caseResult idents =
-      App (prodConstructor (StringLiteral . runProperName $ ctorName))
+      App (prodConstructor (StringLiteral . showQualified runProperName $ Qualified (Just mn) ctorName))
         . ArrayLiteral
         $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) tys
 
@@ -121,10 +121,12 @@ mkSpineFunction mn (PositionedDeclaration _ _ d) = mkSpineFunction mn d
 mkSpineFunction _ _ = internalError "mkSpineFunction: expected DataDeclaration"
 
 mkSignatureFunction :: ModuleName -> Declaration -> [Type] -> Expr
-mkSignatureFunction _ (DataDeclaration _ _ tyArgs args) classArgs = lamNull . mkSigProd $ map mkProdClause args
+mkSignatureFunction mn (DataDeclaration _ name tyArgs args) classArgs = lamNull . mkSigProd $ map mkProdClause args
   where
   mkSigProd :: [Expr] -> Expr
-  mkSigProd = App (Constructor (Qualified (Just dataGeneric) (ProperName "SigProd"))) . ArrayLiteral
+  mkSigProd = App (App (Constructor (Qualified (Just dataGeneric) (ProperName "SigProd")))
+                       (StringLiteral (showQualified runProperName (Qualified (Just mn) name)))
+                  ) . ArrayLiteral
 
   mkSigRec :: [Expr] -> Expr
   mkSigRec = App (Constructor (Qualified (Just dataGeneric) (ProperName "SigRecord"))) . ArrayLiteral
@@ -133,7 +135,7 @@ mkSignatureFunction _ (DataDeclaration _ _ tyArgs args) classArgs = lamNull . mk
   proxy = TypeApp (TypeConstructor (Qualified (Just dataGeneric) (ProperName "Proxy")))
 
   mkProdClause :: (ProperName, [Type]) -> Expr
-  mkProdClause (ctorName, tys) = ObjectLiteral [ ("sigConstructor", StringLiteral (runProperName ctorName))
+  mkProdClause (ctorName, tys) = ObjectLiteral [ ("sigConstructor", StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName)))
                                                , ("sigValues", ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
                                                ]
 
@@ -168,7 +170,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
   mkAlternative :: (ProperName, [Type]) -> m CaseAlternative
   mkAlternative (ctorName, tys) = do
     idents <- replicateM (length tys) (fmap Ident freshName)
-    return $ CaseAlternative [ prodBinder [ StringBinder (runProperName ctorName), ArrayBinder (map VarBinder idents)]]
+    return $ CaseAlternative [ prodBinder [ StringBinder (showQualified runProperName (Qualified (Just mn) ctorName)), ArrayBinder (map VarBinder idents)]]
                . Right
                $ liftApplicative (mkJust $ Constructor (Qualified (Just mn) ctorName))
                                  (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys)
