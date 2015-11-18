@@ -170,7 +170,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
   mkAlternative :: (ProperName, [Type]) -> m CaseAlternative
   mkAlternative (ctorName, tys) = do
     idents <- replicateM (length tys) (fmap Ident freshName)
-    return $ CaseAlternative [ prodBinder [ StringBinder (runProperName ctorName), ArrayBinder (map VarBinder idents)]]
+    return $ CaseAlternative [ prodBinder [ StringBinder (showQualified runProperName (Qualified (Just mn) ctorName)), ArrayBinder (map VarBinder idents)]]
                . Right
                $ liftApplicative (mkJust $ Constructor (Qualified (Just mn) ctorName))
                                  (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys)
