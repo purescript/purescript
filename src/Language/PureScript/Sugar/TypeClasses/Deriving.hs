@@ -73,6 +73,9 @@ dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
 dataMaybe :: ModuleName
 dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
 
+typesProxy :: ModuleName
+typesProxy = ModuleName [ ProperName "Types", ProperName "Proxy" ]
+
 deriveGeneric :: (Functor m, MonadError MultipleErrors m, MonadSupply m) => ModuleName -> [Declaration] -> ProperName -> [Type] -> m [Declaration]
 deriveGeneric mn ds tyConNm args = do
   tyCon <- findTypeDecl tyConNm ds
@@ -132,7 +135,7 @@ mkSignatureFunction mn (DataDeclaration _ name tyArgs args) classArgs = lamNull 
   mkSigRec = App (Constructor (Qualified (Just dataGeneric) (ProperName "SigRecord"))) . ArrayLiteral
 
   proxy :: Type -> Type
-  proxy = TypeApp (TypeConstructor (Qualified (Just dataGeneric) (ProperName "Proxy")))
+  proxy = TypeApp (TypeConstructor (Qualified (Just typesProxy) (ProperName "Proxy")))
 
   mkProdClause :: (ProperName, [Type]) -> Expr
   mkProdClause (ctorName, tys) = ObjectLiteral [ ("sigConstructor", StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName)))
