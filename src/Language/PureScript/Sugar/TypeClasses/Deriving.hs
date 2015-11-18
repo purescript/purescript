@@ -74,7 +74,7 @@ dataMaybe :: ModuleName
 dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
 
 typesProxy :: ModuleName
-typesProxy = ModuleName [ ProperName "Types", ProperName "Proxy" ]
+typesProxy = ModuleName [ ProperName "Type", ProperName "Proxy" ]
 
 deriveGeneric :: (Functor m, MonadError MultipleErrors m, MonadSupply m) => ModuleName -> [Declaration] -> ProperName -> [Type] -> m [Declaration]
 deriveGeneric mn ds tyConNm args = do
