@@ -63,6 +63,7 @@ import Data.Traversable (for)
 import Data.Version (showVersion)
 import Data.Aeson (encode, decode)
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -70,6 +71,7 @@ import System.Directory
        (doesFileExist, getModificationTime, createDirectoryIfMissing)
 import System.FilePath ((</>), takeDirectory)
 import System.IO.Error (tryIOError)
+import System.IO.UTF8 (readUTF8File, writeUTF8File)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -123,7 +125,7 @@ data MakeActions m = MakeActions {
   -- |
   -- Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , readExterns :: ModuleName -> m (FilePath, B.ByteString)
+  , readExterns :: ModuleName -> m (FilePath, Externs)
   -- |
   -- Run the code generator for the module and write any required output files.
   --
@@ -137,7 +139,7 @@ data MakeActions m = MakeActions {
 -- |
 -- Generated code for an externs file.
 --
-type Externs = B.ByteString
+type Externs = String
 
 -- |
 -- Determines when to rebuild a module
@@ -231,7 +233,7 @@ make MakeActions{..} ms = do
                     corefn = CF.moduleToCoreFn env' mod'
                     [renamed] = renameInModules [corefn]
                     exts = moduleToExternsFile mod' env'
-                evalSupplyT nextVar $ codegen renamed env' $ encode exts
+                evalSupplyT nextVar . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
                 return exts
               markComplete (Just (warnings, exts)) Nothing
 
@@ -258,9 +260,9 @@ make MakeActions{..} ms = do
   shouldExist (Just t) = t
   shouldExist _ = internalError "make: dependency should already have been built."
 
-  decodeExterns :: B.ByteString -> Maybe ExternsFile
+  decodeExterns :: Externs -> Maybe ExternsFile
   decodeExterns bs = do
-    externs <- decode bs
+    externs <- decode (fromString bs)
     guard $ efVersion externs == showVersion Paths.version
     return externs
 
@@ -335,7 +337,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         externsFile = outputDir </> filePath </> "externs.json"
     min <$> getTimestamp jsFile <*> getTimestamp externsFile
 
-  readExterns :: ModuleName -> Make (FilePath, B.ByteString)
+  readExterns :: ModuleName -> Make (FilePath, Externs)
   readExterns mn = do
     let path = outputDir </> runModuleName mn </> "externs.json"
     (path, ) <$> readTextFile path
@@ -371,13 +373,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
 
-  readTextFile :: FilePath -> Make B.ByteString
-  readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ B.readFile path
+  readTextFile :: FilePath -> Make String
+  readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
 
-  writeTextFile :: FilePath -> B.ByteString -> Make ()
+  writeTextFile :: FilePath -> String -> Make ()
   writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
     mkdirp path
-    B.writeFile path text
+    writeUTF8File path text
     where
     mkdirp :: FilePath -> IO ()
     mkdirp = createDirectoryIfMissing True . takeDirectory
