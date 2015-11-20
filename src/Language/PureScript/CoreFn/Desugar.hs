@@ -44,7 +44,7 @@ moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
-  let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
+  let imports = nub $ mapMaybe importToCoreFn decls
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn Nothing []) decls
@@ -195,25 +195,6 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> (ModuleName, ProperName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
-
--- |
--- Find module names from qualified references to values. This is used to
--- ensure instances are imported from any module that is referenced by the
--- current module, not just from those that are imported explicitly (#667).
---
-findQualModules :: [A.Declaration] -> [ModuleName]
-findQualModules decls =
-  let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues fqBinders (const []) (const [])
-  in f `concatMap` decls
-  where
-  fqValues :: A.Expr -> [ModuleName]
-  fqValues (A.Var (Qualified (Just mn) _)) = [mn]
-  fqValues (A.Constructor (Qualified (Just mn) _)) = [mn]
-  fqValues _ = []
-
-  fqBinders :: A.Binder -> [ModuleName]
-  fqBinders (A.ConstructorBinder (Qualified (Just mn) _) _) = [mn]
-  fqBinders _ = []
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.
