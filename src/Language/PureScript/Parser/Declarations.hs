@@ -152,16 +152,9 @@ parseImportDeclaration' = do
   where
   stdImport = do
     moduleName' <- moduleName
-    suffixHiding moduleName' <|> suffixQualifyingList moduleName'
-    where
-    suffixHiding mn = do
-      reserved "hiding"
-      declType <- qualifyingList Hiding
-      return (mn, declType, Nothing)
-    suffixQualifyingList mn = do
-      declType <- qualifyingList Explicit
-      qName <- P.optionMaybe qualifiedName
-      return (mn, declType, qName)
+    declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
+    qName <- P.optionMaybe qualifiedName
+    return (moduleName', declType, qName)
   qualifiedName = reserved "as" *> moduleName
   qualImport = do
     reserved "qualified"
