@@ -57,7 +57,7 @@ usedModules :: Declaration -> [ModuleName]
 usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const []) in nub . f
   where
   forDecls :: Declaration -> [ModuleName]
-  forDecls (ImportDeclaration mn _ _) = [mn]
+  forDecls (ImportDeclaration mn _ _ _) = [mn]
   forDecls _ = []
 
   forValues :: Expr -> [ModuleName]

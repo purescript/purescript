@@ -270,9 +270,9 @@ make MakeActions{..} ms = do
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing False : decls) exps
   where
-  isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
+  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 

@@ -106,7 +106,9 @@ psciLet = Decls <$> (P.reserved "let" *> P.indented *> manyDecls)
 -- | Imports must be handled separately from other declarations, so that
 -- :show import works, for example.
 psciImport :: P.TokenParser Command
-psciImport = Import <$> P.parseImportDeclaration'
+psciImport = do
+  (mn, declType, asQ, _) <- P.parseImportDeclaration'
+  return $ Import (mn, declType, asQ)
 
 -- | Any other declaration that we don't need a 'special case' parser for
 -- (like let or import declarations).

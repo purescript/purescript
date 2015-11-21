@@ -142,7 +142,7 @@ elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' 
   fqValues (Var (Qualified (Just mn') _)) | mn' `notElem` importedModules imps = [mn']
   fqValues _ = []
   mkImport :: ModuleName -> Declaration
-  mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing
+  mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing False
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing

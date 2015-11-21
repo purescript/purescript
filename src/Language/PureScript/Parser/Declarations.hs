@@ -141,10 +141,10 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
-  (mn, declType, asQ) <- parseImportDeclaration'
-  return $ ImportDeclaration mn declType asQ
+  (mn, declType, asQ, isOldSyntax) <- parseImportDeclaration'
+  return $ ImportDeclaration mn declType asQ isOldSyntax
 
-parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName, Bool)
 parseImportDeclaration' = do
   reserved "import"
   indented
@@ -152,16 +152,9 @@ parseImportDeclaration' = do
   where
   stdImport = do
     moduleName' <- moduleName
-    suffixHiding moduleName' <|> suffixQualifyingList moduleName'
-    where
-    suffixHiding mn = do
-      reserved "hiding"
-      declType <- qualifyingList Hiding
-      return (mn, declType, Nothing)
-    suffixQualifyingList mn = do
-      declType <- qualifyingList Explicit
-      qName <- P.optionMaybe qualifiedName
-      return (mn, declType, qName)
+    declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
+    qName <- P.optionMaybe qualifiedName
+    return (moduleName', declType, qName, False)
   qualifiedName = reserved "as" *> moduleName
   qualImport = do
     reserved "qualified"
@@ -169,7 +162,7 @@ parseImportDeclaration' = do
     moduleName' <- moduleName
     declType <- qualifyingList Explicit
     qName <- qualifiedName
-    return (moduleName', declType, Just qName)
+    return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
     idents <- P.optionMaybe $ indented *> parens (commaSep parseDeclarationRef)
     return $ fromMaybe Implicit (expectedType <$> idents)

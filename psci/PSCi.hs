@@ -242,7 +242,7 @@ createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
     P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName (importDecl `map` imports) Nothing
 
 importDecl :: ImportedModule -> P.Declaration
-importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
+importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ False
 
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
