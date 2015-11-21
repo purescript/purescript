@@ -21,8 +21,9 @@ module Language.PureScript.Errors where
 import Prelude ()
 import Prelude.Compat
 
+import Data.Ord (comparing)
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub, nubBy)
+import Data.List (intercalate, transpose, nub, nubBy, sortBy)
 import Data.Function (on)
 import Data.Foldable (fold)
 
@@ -32,7 +33,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
-import Control.Arrow (first)
+import Control.Arrow (first, (&&&))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -522,12 +523,31 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
                      <> foldMap (\expr -> [ line "Relevant expression: "
                                           , indent $ prettyPrintValue valueDepth expr
                                           ]) binding
-    renderSimpleErrorMessage (TypesDoNotUnify t1 t2)
-      = paras [ line "Could not match type"
-              , indent $ typeAsBox t1
-              , line "with type"
-              , indent $ typeAsBox t2
-              ]
+    renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
+      = let (sorted1, sorted2) = sortRows u1 u2
+
+            sortRows :: Type -> Type -> (Type, Type)
+            sortRows r1@RCons{} r2@RCons{} = sortRows' (rowToList r1) (rowToList r2)
+            sortRows t1 t2 = (t1, t2)
+
+            -- Put the common labels last
+            sortRows' :: ([(String, Type)], Type) -> ([(String, Type)], Type) -> (Type, Type)
+            sortRows' (s1, r1) (s2, r2) =
+              let common :: [(String, (Type, Type))]
+                  common = sortBy (comparing fst) $ [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+
+                  sd1, sd2 :: [(String, Type)]
+                  sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+                  sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+              in ( rowFromList (sortBy (comparing fst) sd1 ++ map (fst &&& fst . snd) common, r1)
+                 , rowFromList (sortBy (comparing fst) sd2 ++ map (fst &&& snd . snd) common, r2)
+                 )
+        in paras [ line "Could not match type"
+                 , indent $ typeAsBox sorted1
+                 , line "with type"
+                 , indent $ typeAsBox sorted2
+                 ]
+
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
             , indent $ line $ prettyPrintKind k1
