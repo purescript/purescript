@@ -141,7 +141,7 @@ resolveExports env mn imps exps refs =
     go (Qualified (Just mn'') name) = fromMaybe (internalError "Missing value in resolveTypeExports") $ do
       exps' <- envModuleExports <$> mn'' `M.lookup` env
       ((_, dctors'), mnOrig) <- find (\((name', _), _) -> name == name') (exportedTypes exps')
-      let relevantDctors = mapMaybe (\(Qualified mn''' dctor) -> if mn''' == Just mnOrig then Just dctor else Nothing) dctors
+      let relevantDctors = mapMaybe (\(Qualified mn''' dctor) -> if mn''' == Just mn'' then Just dctor else Nothing) dctors
       return ((name, intersect relevantDctors dctors'), mnOrig)
     go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
