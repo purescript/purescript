@@ -153,8 +153,9 @@ data Declaration
   | FixityDeclaration Fixity String
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
+  -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)
   --
-  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName) Bool
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --

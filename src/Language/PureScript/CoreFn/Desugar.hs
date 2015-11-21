@@ -219,7 +219,7 @@ findQualModules decls =
 -- Desugars import declarations from AST to CoreFn representation.
 --
 importToCoreFn :: A.Declaration -> Maybe ModuleName
-importToCoreFn (A.ImportDeclaration name _ _) = Just name
+importToCoreFn (A.ImportDeclaration name _ _ _) = Just name
 importToCoreFn (A.PositionedDeclaration _ _ d) = importToCoreFn d
 importToCoreFn _ = Nothing
 

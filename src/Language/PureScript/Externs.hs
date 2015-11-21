@@ -173,7 +173,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   fixityDecl _ = Nothing
 
   importDecl :: Declaration -> Maybe ExternsImport
-  importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
+  importDecl (ImportDeclaration m mt qmn _) = Just (ExternsImport m mt qmn)
   importDecl (PositionedDeclaration _ _ d) = importDecl d
   importDecl _ = Nothing
 

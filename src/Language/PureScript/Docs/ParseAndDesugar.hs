@@ -108,9 +108,9 @@ fileInfoToString (FromDep _ fn) = fn
 addDefaultImport :: P.ModuleName -> P.Module -> P.Module
 addDefaultImport toImport m@(P.Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else P.Module ss coms mn (P.ImportDeclaration toImport P.Implicit Nothing : decls) exps
+  else P.Module ss coms mn (P.ImportDeclaration toImport P.Implicit Nothing False : decls) exps
   where
-  isExistingImport (P.ImportDeclaration mn' _ _) | mn' == toImport = True
+  isExistingImport (P.ImportDeclaration mn' _ _ _) | mn' == toImport = True
   isExistingImport (P.PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 

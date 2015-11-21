@@ -25,7 +25,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.List (find)
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, isNothing, fromJust)
 import Data.Foldable (traverse_)
 
 import Control.Arrow (first)
@@ -48,7 +48,8 @@ import Language.PureScript.Sugar.Names.Env
 findImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [Declaration] -> m (M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])
 findImports = foldM (go Nothing) M.empty
   where
-  go pos result (ImportDeclaration mn typ qual) = do
+  go pos result (ImportDeclaration mn typ qual isOldSyntax) = do
+    when isOldSyntax . tell . errorMessage $ DeprecatedQualifiedSyntax mn (fromJust qual)
     checkImportRefType typ
     let imp = (pos, typ, qual)
     return $ M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result

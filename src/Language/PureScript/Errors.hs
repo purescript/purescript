@@ -141,6 +141,7 @@ data SimpleErrorMessage
   | UnusedExplicitImport ModuleName [String]
   | UnusedDctorImport ProperName
   | UnusedDctorExplicitImport ProperName [ProperName]
+  | DeprecatedQualifiedSyntax ModuleName ModuleName
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -275,6 +276,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedExplicitImport{} -> "UnusedExplicitImport"
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
+  DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
 
 
 -- |
@@ -691,6 +693,10 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
     renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
       paras [ line $ "The import of type " ++ runProperName name ++ " includes the following unused data constructors:"
             , indent $ paras $ map (line .runProperName) names ]
+
+    renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
+      paras [ line $ "The import of type " ++ runModuleName name ++ " as " ++ runModuleName qualName ++ " uses the deprecated 'import qualified' syntax."
+            , line $ "This syntax form will be removed in PureScript 0.9." ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
