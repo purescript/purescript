@@ -79,7 +79,7 @@ prettyPrintRowWith open close = uncurry listToBox . toList []
 
   toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
   toList tys (RCons name ty row) = toList ((name, ty):tys) row
-  toList tys r = (tys, r)
+  toList tys r = (reverse tys, r)
 
 prettyPrintRow :: Type -> String
 prettyPrintRow = render . prettyPrintRowWith '(' ')'

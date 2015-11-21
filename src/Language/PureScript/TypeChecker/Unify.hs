@@ -163,7 +163,7 @@ unifyRows r1 r2 =
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
-  unifyRows' sd3 r3 sd4 r4 = throwError . errorMessage $ TypesDoNotUnify (rowFromList (sd3, r3)) (rowFromList (sd4, r4))
+  unifyRows' _ _ _ _ = throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
 -- Check that two types unify
