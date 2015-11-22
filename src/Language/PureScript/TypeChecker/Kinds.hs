@@ -226,7 +226,7 @@ infer' other = (, []) <$> go other
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go (Skolem v _ _) = do
+  go (Skolem v _ _ _) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
   go (TypeConstructor v) = do

@@ -105,13 +105,13 @@ unifyTypes t1 t2 = do
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
-        let sk1 = skolemize ident1 sko sc1' ty1
-        let sk2 = skolemize ident2 sko sc2' ty2
+        let sk1 = skolemize ident1 sko sc1' Nothing ty1
+        let sk2 = skolemize ident2 sko sc2' Nothing ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
-    let sk = skolemize ident sko sc ty1
+    let sk = skolemize ident sko sc Nothing ty1
     sk `unifyTypes` ty2
   unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
@@ -121,7 +121,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = return ()
+  unifyTypes' (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = return ()
   unifyTypes' (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
   unifyTypes' ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
@@ -162,7 +162,7 @@ unifyRows r1 r2 =
     solveType u2 (rowFromList (sd1, rest))
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
+  unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
   unifyRows' _ _ _ _ = throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
@@ -170,7 +170,7 @@ unifyRows r1 r2 =
 --
 unifiesWith :: Type -> Type -> Bool
 unifiesWith (TUnknown u1) (TUnknown u2) | u1 == u2 = True
-unifiesWith (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = True
+unifiesWith (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = True
 unifiesWith (TypeVar v1) (TypeVar v2) | v1 == v2 = True
 unifiesWith (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
 unifiesWith (TypeApp h1 t1) (TypeApp h2 t2) = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
@@ -187,7 +187,7 @@ unifiesWith r1@RCons{} r2@RCons{} =
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
   go [] REmpty          [] REmpty          = True
   go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
-  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) = s1 == s2
+  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
   go [] (TUnknown _)    _  _               = True
   go _  _               [] (TUnknown _)    = True
   go _  (TUnknown _)    _  (TUnknown _)    = True

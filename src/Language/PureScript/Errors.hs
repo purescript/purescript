@@ -14,6 +14,7 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.PureScript.Errors where
@@ -24,7 +25,6 @@ import Prelude.Compat
 import Data.Ord (comparing)
 import Data.Either (lefts, rights)
 import Data.List (intercalate, transpose, nub, nubBy, sortBy)
-import Data.Function (on)
 import Data.Foldable (fold)
 
 import qualified Data.Map as M
@@ -33,7 +33,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
-import Control.Arrow (first, (&&&))
+import Control.Arrow ((&&&))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -311,11 +311,16 @@ onErrorMessages f = MultipleErrors . map f . runMultipleErrors
 addHint :: ErrorMessageHint -> MultipleErrors -> MultipleErrors
 addHint hint = onErrorMessages $ \(ErrorMessage hints se) -> ErrorMessage (hint : hints) se
 
--- | The various types of things which might need to be relabelled in errors messages.
-data LabelType = TypeLabel | SkolemLabel String deriving (Show, Read, Eq, Ord)
-
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
-type UnknownMap = M.Map (LabelType, Int) Int
+data TypeMap = TypeMap
+  { umSkolemMap :: M.Map Int (String, Int, Maybe SourceSpan)
+  , umNextSkolem :: Int
+  , umUnknownMap :: M.Map Int Int
+  , umNextUnknown :: Int
+  } deriving Show
+
+defaultUnknownMap :: TypeMap
+defaultUnknownMap = TypeMap M.empty 0 M.empty 0
 
 -- | How critical the issue is
 data Level = Error | Warning deriving Show
@@ -326,55 +331,79 @@ data Level = Error | Warning deriving Show
 unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage (ErrorMessage _ se) = se
 
-replaceUnknowns :: Type -> State UnknownMap Type
+replaceUnknowns :: Type -> State TypeMap Type
 replaceUnknowns = everywhereOnTypesM replaceTypes
   where
-  lookupTable :: (LabelType, Int) -> UnknownMap -> (Int, UnknownMap)
-  lookupTable x m = case M.lookup x m of
-                      Nothing -> let i = length (filter (on (==) fst x) (M.keys m)) in (i, M.insert x i m)
-                      Just i  -> (i, m)
-
-  replaceTypes :: Type -> State UnknownMap Type
-  replaceTypes (TUnknown u) = state $ first TUnknown . lookupTable (TypeLabel, u)
-  replaceTypes (Skolem name s sko) = state $ first (flip (Skolem name) sko) . lookupTable (SkolemLabel name, s)
+  replaceTypes :: Type -> State TypeMap Type
+  replaceTypes (TUnknown u) = do
+    m <- get
+    case M.lookup u (umUnknownMap m) of
+      Nothing -> do
+        let u' = umNextUnknown m
+        put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextUnknown = u' + 1 }
+        return (TUnknown u')
+      Just u' -> return (TUnknown u')
+  replaceTypes (Skolem name s sko ss) = do
+    m <- get
+    case M.lookup s (umSkolemMap m) of
+      Nothing -> do
+        let s' = umNextSkolem m
+        put $ m { umSkolemMap = M.insert s (name, s', ss) (umSkolemMap m), umNextSkolem = s' + 1 }
+        return (Skolem name s' sko ss)
+      Just (_, s', _) -> return (Skolem name s' sko ss)
   replaceTypes other = return other
 
 onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
-    gSimple (InfiniteType t) = InfiniteType <$> f t
-    gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
-    gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
-    gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
-    gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
-    gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-    gSimple other = pure other
-    gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
-    gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
-    gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
-    gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
-    gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
-    gHint other = pure other
+  gSimple (InfiniteType t) = InfiniteType <$> f t
+  gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+  gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
+  gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
+  gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
+  gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
+  gSimple other = pure other
+
+  gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
+  gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
+  gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
+  gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
+  gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
+  gHint other = pure other
 
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State UnknownMap Box.Box
-prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State TypeMap Box.Box
+prettyPrintSingleError full level e = do
+  em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
+  um <- get
+  return (prettyPrintErrorMessage um em)
   where
 
   -- Pretty print an ErrorMessage
-  prettyPrintErrorMessage :: ErrorMessage -> Box.Box
-  prettyPrintErrorMessage (ErrorMessage hints simple) =
+  prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
+  prettyPrintErrorMessage typeMap (ErrorMessage hints simple) =
     paras $
-      [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
-      , Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
-                               , line $ "or to contribute content related to this " ++ levelText ++ "."
-                               ]
-      ]
+      foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
+      : typeInformation
+      ++ [ Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
+                                  , line $ "or to contribute content related to this " ++ levelText ++ "."
+                                  ]
+         ]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
+
+    typeInformation :: [Box.Box]
+    typeInformation = M.elems . M.mapMaybe skolemInfo . umSkolemMap $ typeMap
+      where
+      skolemInfo :: (String, Int, Maybe SourceSpan) -> Maybe Box.Box
+      skolemInfo (name, s, Just ss) =
+        Just . Box.moveDown 1 $ paras [ line $ "(" ++ name ++ show s ++ " is a rigid type variable"
+                                      , line $ "  bound at " ++ displayStartEndPos ss ++ ")"
+                                      ]
+      skolemInfo _ = Nothing
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (CannotGetFileInfo path) =
@@ -878,6 +907,7 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
   hintCategory ErrorUnifyingTypes{} = CheckHint
   hintCategory ErrorInSubsumption{} = CheckHint
   hintCategory ErrorInApplication{} = CheckHint
+  hintCategory ErrorCheckingKind{}  = CheckHint
   hintCategory PositionedError{}    = PositionHint
   hintCategory _                    = OtherHint
 
@@ -895,13 +925,13 @@ prettyPrintMultipleWarnings full = renderBox . prettyPrintMultipleWarningsBox fu
 
 -- | Pretty print warnings as a Box
 prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleWarningsBox full = flip evalState M.empty . prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
+prettyPrintMultipleWarningsBox full = flip evalState defaultUnknownMap . prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleErrorsBox full = flip evalState M.empty . prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
+prettyPrintMultipleErrorsBox full = flip evalState defaultUnknownMap . prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State UnknownMap Box.Box
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State TypeMap Box.Box
 prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
   result <- prettyPrintSingleError full level e
   return $

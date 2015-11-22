@@ -34,6 +34,7 @@ import Control.Monad ((<=<))
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.Traversals
+import Language.PureScript.AST.SourcePos
 
 -- |
 -- An identifier for the scope of a skolem variable
@@ -75,7 +76,7 @@ data Type
   -- |
   -- A skolem constant
   --
-  | Skolem String Int SkolemScope
+  | Skolem String Int SkolemScope (Maybe SourceSpan)
   -- |
   -- An empty row
   --

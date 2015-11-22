@@ -71,30 +71,30 @@ newSkolemScope = do
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
-skolemize :: String -> Int -> SkolemScope -> Type -> Type
-skolemize ident sko scope = replaceTypeVars ident (Skolem ident sko scope)
+skolemize :: String -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
+skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 
 -- |
 -- This function has one purpose - to skolemize type variables appearing in a
 -- SuperClassDictionary placeholder. These type variables are somewhat unique since they are the
 -- only example of scoped type variables.
 --
-skolemizeTypesInValue :: String -> Int -> SkolemScope -> Expr -> Expr
-skolemizeTypesInValue ident sko scope =
+skolemizeTypesInValue :: String -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
+skolemizeTypesInValue ident sko scope ss =
   let
     (_, f, _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS
   in runIdentity . f
   where
   onExpr :: [String] -> Expr -> Identity ([String], Expr)
   onExpr sco (SuperClassDictionary c ts)
-    | ident `notElem` sco = return (sco, SuperClassDictionary c (map (skolemize ident sko scope) ts))
+    | ident `notElem` sco = return (sco, SuperClassDictionary c (map (skolemize ident sko scope ss) ts))
   onExpr sco (TypedValue check val ty)
-    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ty))
+    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
   onExpr sco other = return (sco, other)
 
   onBinder :: [String] -> Binder -> Identity ([String], Binder)
   onBinder sco (TypedBinder ty b)
-    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ty) b)
+    | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ss ty) b)
   onBinder sco other = return (sco, other)
 
   peelTypeVars :: Type -> [String]
@@ -129,7 +129,7 @@ skolemEscapeCheck root@TypedValue{} =
     collectSkolems :: Type -> [SkolemScope]
     collectSkolems = nub . everythingOnTypes (++) collect
       where
-      collect (Skolem _ _ scope) = [scope]
+      collect (Skolem _ _ scope _) = [scope]
       collect _ = []
   go scos _ = (scos, [])
   findBindingScope :: SkolemScope -> Maybe Expr
