@@ -226,13 +226,13 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
 
   updateTypeName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) IsProperName
+  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TypeName
 
   updateDataConstructorName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
   updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName
 
   updateClassName  :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) IsProperName
+  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) ClassName
 
   updateValueName  :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
   updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName
