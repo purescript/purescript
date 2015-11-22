@@ -25,7 +25,11 @@ import Language.PureScript.Sugar.Names.Imports
 import qualified Language.PureScript.Constants as C
 
 -- | Imported name used in some type or expression.
-data Name = IdentName (Qualified Ident) | IsProperName (Qualified ProperName) | DctorName (Qualified ProperName)
+data Name
+  = IdentName (Qualified Ident)
+  | TypeName (Qualified ProperName)
+  | DctorName (Qualified ProperName)
+  | ClassName (Qualified ProperName)
 
 -- | Map of module name to list of imported names from that module which have been used.
 type UsedImports = M.Map ModuleName [Name]
@@ -63,6 +67,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
                   let ddiff = ctors \\ usedDctors
                   in unless (null ddiff) $ tell $ errorMessage $ UnusedDctorExplicitImport tn ddiff
                 _ -> return ()
+
             return ()
 
           _ -> return ()
@@ -102,7 +107,8 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
 
 matchName :: (ProperName -> Maybe ProperName) -> Maybe ModuleName -> Name -> Maybe String
 matchName _ qual (IdentName (Qualified q x)) | q == qual = Just $ showIdent x
-matchName _ qual (IsProperName (Qualified q x)) | q == qual = Just $ runProperName x
+matchName _ qual (TypeName (Qualified q x)) | q == qual = Just $ runProperName x
+matchName _ qual (ClassName (Qualified q x)) | q == qual = Just $ runProperName x
 matchName lookupDc qual (DctorName (Qualified q x)) | q == qual = runProperName <$> lookupDc x
 matchName _ _ _ = Nothing
 
@@ -114,6 +120,7 @@ runDeclRef :: DeclarationRef -> Maybe String
 runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
 runDeclRef (ValueRef ident) = Just $ showIdent ident
 runDeclRef (TypeRef pn _) = Just $ runProperName pn
+runDeclRef (TypeClassRef pn) = Just $ runProperName pn
 runDeclRef _ = Nothing
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName, Maybe [ProperName])
