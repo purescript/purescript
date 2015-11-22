@@ -143,6 +143,9 @@ data SimpleErrorMessage
   | UnusedDctorImport ProperName
   | UnusedDctorExplicitImport ProperName [ProperName]
   | DeprecatedQualifiedSyntax ModuleName ModuleName
+  | RedundantUnqualifiedImport ModuleName ImportDeclarationType
+  | DuplicateSelectiveImport ModuleName
+  | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -278,6 +281,9 @@ errorCode em = case unwrapErrorMessage em of
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
+  RedundantUnqualifiedImport{} -> "RedundantUnqualifiedImport"
+  DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
+  DuplicateImport{} -> "DuplicateImport"
 
 
 -- |
@@ -718,6 +724,15 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
       paras [ line $ "The import of type " ++ runModuleName name ++ " as " ++ runModuleName qualName ++ " uses the deprecated 'import qualified' syntax."
             , line $ "This syntax form will be removed in PureScript 0.9." ]
 
+    renderSimpleErrorMessage (RedundantUnqualifiedImport name imp) =
+      line $ "Import of " ++ prettyPrintImport name imp Nothing ++ " is redundant due to a whole-module import"
+
+    renderSimpleErrorMessage (DuplicateSelectiveImport name) =
+      line $ "There is an existing import of " ++ runModuleName name ++ ", consider merging the import lists"
+
+    renderSimpleErrorMessage (DuplicateImport name imp qual) =
+      line $ "Duplicate import of " ++ prettyPrintImport name imp qual
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
@@ -849,11 +864,24 @@ prettyPrintSingleError full level e = prettyPrintErrorMessage <$> onTypesInError
   -- Pretty print and export declaration
   prettyPrintExport :: DeclarationRef -> String
   prettyPrintExport (TypeRef pn _) = runProperName pn
-  prettyPrintExport (ValueRef ident) = showIdent ident
-  prettyPrintExport (TypeClassRef pn) = runProperName pn
-  prettyPrintExport (TypeInstanceRef ident) = showIdent ident
-  prettyPrintExport (ModuleRef name) = "module " ++ runModuleName name
-  prettyPrintExport (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
+  prettyPrintExport ref = prettyPrintRef ref
+
+  prettyPrintRef :: DeclarationRef -> String
+  prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
+  prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
+  prettyPrintRef (ValueRef ident) = showIdent ident
+  prettyPrintRef (TypeClassRef pn) = runProperName pn
+  prettyPrintRef (TypeInstanceRef ident) = showIdent ident
+  prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
+  prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
+
+  prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
+  prettyPrintImport mn idt qual =
+    let i = case idt of
+              Implicit -> runModuleName mn
+              Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+              Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
+    in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual
 
   -- | Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage

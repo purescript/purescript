@@ -109,7 +109,7 @@ data ImportDeclarationType
   -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
-  deriving (Show, Read, D.Data, D.Typeable)
+  deriving (Eq, Show, Read, D.Data, D.Typeable)
 
 -- |
 -- The data type of declarations
