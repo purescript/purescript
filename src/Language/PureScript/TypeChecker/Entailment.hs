@@ -147,7 +147,7 @@ entails moduleName context = solve
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
+typeHeadsAreEqual _ (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
 typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
 typeHeadsAreEqual _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual m (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m h1 h2
@@ -164,12 +164,12 @@ typeHeadsAreEqual m r1@RCons{} r2@RCons{} =
           <*> go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-  go [] REmpty          [] REmpty          = Just []
-  go [] (TUnknown _)    _  _               = Just []
-  go [] (TypeVar v1)    [] (TypeVar v2)    | v1 == v2 = Just []
-  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = Just []
-  go sd r               [] (TypeVar v)     = Just [(v, rowFromList (sd, r))]
-  go _  _               _  _               = Nothing
+  go [] REmpty            [] REmpty            = Just []
+  go [] (TUnknown _)      _  _                 = Just []
+  go [] (TypeVar v1)      [] (TypeVar v2)      | v1 == v2 = Just []
+  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = Just []
+  go sd r                 [] (TypeVar v)       = Just [(v, rowFromList (sd, r))]
+  go _  _                 _  _                 = Nothing
 typeHeadsAreEqual _ _ _ = Nothing
 
 -- |

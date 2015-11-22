@@ -55,7 +55,7 @@ subsumes' val ty1 (ForAll ident ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant
-      let sk = skolemize ident sko sco' ty2
+      let sk = skolemize ident sko sco' Nothing ty2
       subsumes val ty1 sk
     Nothing -> internalError "subsumes: unspecified skolem scope"
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
