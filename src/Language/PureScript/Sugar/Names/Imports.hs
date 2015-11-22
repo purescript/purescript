@@ -31,7 +31,7 @@ import Data.Foldable (traverse_, for_)
 import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer (MonadWriter(..), censor)
+import Control.Monad.Writer (MonadWriter(..))
 
 import qualified Data.Map as M
 
@@ -53,7 +53,7 @@ findImports = foldM (go Nothing) M.empty
     checkImportRefType typ
     let imp = (pos, typ, qual)
     return $ M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
-  go _ result (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ go (Just pos) result d
+  go _ result (PositionedDeclaration pos _ d) = warnAndRethrowWithPosition pos $ go (Just pos) result d
   go _ result _ = return result
 
   -- Ensure that classes don't appear in an `import X hiding (...)`
@@ -69,7 +69,7 @@ findImports = foldM (go Nothing) M.empty
 --
 resolveImports :: (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
-  censor (addHint (ErrorInModule currentModule)) $ do
+  warnAndRethrow (addHint (ErrorInModule currentModule)) $ do
     imports <- findImports decls
 
     for_ (M.toList imports) $ \(mn, imps) -> do
