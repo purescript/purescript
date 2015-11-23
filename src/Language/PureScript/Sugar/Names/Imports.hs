@@ -24,9 +24,9 @@ module Language.PureScript.Sugar.Names.Imports
 import Prelude ()
 import Prelude.Compat
 
-import Data.List (find)
-import Data.Maybe (fromMaybe, isNothing, fromJust)
-import Data.Foldable (traverse_)
+import Data.List (find, delete)
+import Data.Maybe (fromMaybe, isJust, isNothing, fromJust)
+import Data.Foldable (traverse_, for_)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -70,8 +70,35 @@ findImports = foldM (go Nothing) M.empty
 resolveImports :: (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
   censor (addHint (ErrorInModule currentModule)) $ do
-    scope <- M.insert currentModule [(Nothing, Implicit, Nothing)] <$> findImports decls
+    imports <- findImports decls
+
+    for_ (M.toList imports) $ \(mn, imps) -> do
+      let unqual = filter (\(_, _, q) -> isJust q) (reverse imps)
+
+      when (length imps > 1) $ for_ (selfCartesianSubset imps) $
+        \((_, t1, q1), (pos, t2, q2)) ->
+          when (t1 == t2 && q1 == q2) $
+            maybe id warnWithPosition pos $
+              tell . errorMessage $ DuplicateImport mn t2 q2
+
+      when (length unqual > 1) $
+        case find (\(_, typ, _) -> typ == Implicit) unqual of
+          Just i ->
+            for_ (delete i unqual) $ \(pos, typ, _) ->
+              maybe id warnWithPosition pos $
+                tell $ errorMessage $ RedundantUnqualifiedImport mn typ
+          Nothing ->
+            for_ (tail unqual) $ \(pos, _, _) ->
+              maybe id warnWithPosition pos $
+                tell $ errorMessage $ DuplicateSelectiveImport mn
+
+    let scope = M.insert currentModule [(Nothing, Implicit, Nothing)] imports
     foldM (resolveModuleImport currentModule env) nullImports (M.toList scope)
+
+  where
+  selfCartesianSubset :: [a] -> [(a, a)]
+  selfCartesianSubset (x : xs) = [(x, y) | y <- xs] ++ selfCartesianSubset xs
+  selfCartesianSubset [] = []
 
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport ::
