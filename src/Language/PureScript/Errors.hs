@@ -146,6 +146,7 @@ data SimpleErrorMessage
   | RedundantUnqualifiedImport ModuleName ImportDeclarationType
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
+  | IntOutOfRange Integer String Integer Integer
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -284,6 +285,7 @@ errorCode em = case unwrapErrorMessage em of
   RedundantUnqualifiedImport{} -> "RedundantUnqualifiedImport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
+  IntOutOfRange{} -> "IntOutOfRange"
 
 
 -- |
@@ -761,6 +763,10 @@ prettyPrintSingleError full level e = do
 
     renderSimpleErrorMessage (DuplicateImport name imp qual) =
       line $ "Duplicate import of " ++ prettyPrintImport name imp qual
+
+    renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
+      paras [ line $ "Integer value " ++ show value ++ " is out of range for the " ++ backend ++ " backend."
+            , line $ "Acceptable values fall within the range " ++ show lo ++ " to " ++ show hi ++ " (inclusive)." ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
