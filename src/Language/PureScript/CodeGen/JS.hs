@@ -29,7 +29,8 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.List ((\\), delete, intersect)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromMaybe)
+import qualified Data.Map as M
 import qualified Data.Traversable as T (traverse)
 
 import Control.Arrow ((&&&))
@@ -60,8 +61,11 @@ moduleToJs :: forall m. (Applicative m, Monad m, MonadReader Options m, MonadSup
            => Module Ann -> Maybe JS -> m [JS]
 moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
-    jsImports <- T.traverse importToJs . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
-    jsDecls <- mapM bindToJs decls
+    let usedNames = concatMap getNames decls
+    let mnLookup = renameImports usedNames imps
+    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ imps
+    let decls' = renameModules mnLookup decls
+    jsDecls <- mapM bindToJs decls'
     optimized <- T.traverse (T.traverse optimize) jsDecls
     comments <- not <$> asks optionsNoComments
     let strict = JSStringLiteral "use strict"
@@ -77,13 +81,66 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   where
 
   -- |
-  -- Generates Javascript code for a module import.
+  -- Extracts all declaration names from a binding group.
   --
-  importToJs :: ModuleName -> m JS
-  importToJs mn' = do
+  getNames :: Bind Ann -> [Ident]
+  getNames (NonRec ident _) = [ident]
+  getNames (Rec vals) = map fst vals
+
+  -- |
+  -- Creates alternative names for each module to ensure they don't collide
+  -- with declaration names.
+  --
+  renameImports :: [Ident] -> [ModuleName] -> M.Map ModuleName ModuleName
+  renameImports ids mns = go M.empty ids mns
+    where
+    go :: M.Map ModuleName ModuleName -> [Ident] -> [ModuleName] -> M.Map ModuleName ModuleName
+    go acc used (mn' : mns') =
+      let mni = Ident $ runModuleName mn'
+      in if mni `elem` used
+         then let newName = freshModuleName 1 mn' used
+              in go (M.insert mn' newName acc) (Ident (runModuleName newName) : used) mns'
+         else go (M.insert mn' mn' acc) (mni : used) mns'
+    go acc _ [] = acc
+
+    freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
+    freshModuleName i mn'@(ModuleName pns) used =
+      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) ++ "_" ++ show i]
+      in if Ident (runModuleName newName) `elem` used
+         then freshModuleName (i + 1) mn' used
+         else newName
+
+  -- |
+  -- Generates Javascript code for a module import, binding the required module
+  -- to the alternative
+  --
+  importToJs :: M.Map ModuleName ModuleName -> ModuleName -> m JS
+  importToJs mnLookup mn' = do
     path <- asks optionsRequirePath
+    let mnSafe = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     let moduleBody = JSApp (JSVar "require") [JSStringLiteral (maybe id (</>) path $ runModuleName mn')]
-    return $ JSVariableIntroduction (moduleNameToJs mn') (Just moduleBody)
+    return $ JSVariableIntroduction (moduleNameToJs mnSafe) (Just moduleBody)
+
+  -- |
+  -- Replaces the `ModuleName`s in the AST so that the generated code refers to
+  -- the collision-avoiding renamed module imports.
+  --
+  renameModules :: M.Map ModuleName ModuleName -> [Bind Ann] -> [Bind Ann]
+  renameModules mnLookup binds =
+    let (f, _, _) = everywhereOnValues id goExpr goBinder
+    in map f binds
+    where
+    goExpr :: Expr a -> Expr a
+    goExpr (Var ann q) = Var ann (renameQual q)
+    goExpr e = e
+    goBinder :: Binder a -> Binder a
+    goBinder (ConstructorBinder ann q1 q2 bs) = ConstructorBinder ann (renameQual q1) (renameQual q2) bs
+    goBinder b = b
+    renameQual :: Qualified a -> Qualified a
+    renameQual (Qualified (Just mn') a) =
+      let mnSafe = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
+      in Qualified (Just mnSafe) a
+    renameQual q = q
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a declaration
