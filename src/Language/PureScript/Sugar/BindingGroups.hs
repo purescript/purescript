@@ -102,20 +102,21 @@ collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
-usedIdents moduleName =
-  let (f, _, _, _, _) = everythingWithContextOnValues S.empty [] (++) def usedNamesE usedNamesB def def
-  in nub . f
+usedIdents moduleName = nub . usedIdents' S.empty . getValue
   where
-  def s _ = (s, [])
+  def _ _ = []
 
-  usedNamesE :: S.Set Ident -> Expr -> (S.Set Ident, [Ident])
-  usedNamesE scope (Var (Qualified Nothing name)) | name `S.notMember` scope = (scope, [name])
-  usedNamesE scope (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' && name `S.notMember` scope = (scope, [name])
-  usedNamesE scope (Abs (Left name) _) = (name `S.insert` scope, [])
-  usedNamesE scope _ = (scope, [])
+  getValue (ValueDeclaration _ _ [] (Right val)) = val
+  getValue ValueDeclaration{} = internalError "Binders should have been desugared"
+  getValue (PositionedDeclaration _ _ d) = getValue d
+  getValue _ = internalError "Expected ValueDeclaration"
 
-  usedNamesB :: S.Set Ident -> Binder -> (S.Set Ident, [Ident])
-  usedNamesB scope binder = (scope `S.union` S.fromList (binderNames binder), [])
+  (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
+
+  usedNamesE :: S.Set Ident -> Expr -> [Ident]
+  usedNamesE scope (Var (Qualified Nothing name)) | name `S.notMember` scope = [name]
+  usedNamesE scope (Var (Qualified (Just moduleName') name)) | moduleName == moduleName' && name `S.notMember` scope = [name]
+  usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
 usedImmediateIdents moduleName =

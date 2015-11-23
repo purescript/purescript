@@ -18,6 +18,10 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Maybe (mapMaybe)
+import Data.List (mapAccumL)
+import Data.Foldable (fold)
+import qualified Data.Set as S
+
 import Control.Monad
 import Control.Arrow ((***), (+++), second)
 
@@ -25,6 +29,7 @@ import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
 import Language.PureScript.Types
 import Language.PureScript.Traversals
+import Language.PureScript.Names
 
 everywhereOnValues :: (Declaration -> Declaration) ->
                       (Expr -> Expr) ->
@@ -388,6 +393,112 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   j' s (DoNotationBind b v) = DoNotationBind <$> h'' s b <*> g'' s v
   j' s (DoNotationLet ds) = DoNotationLet <$> traverse (f'' s) ds
   j' s (PositionedDoNotationElement pos com e1) = PositionedDoNotationElement pos com <$> j'' s e1
+
+everythingWithScope ::
+  (Monoid r) =>
+  (S.Set Ident -> Declaration -> r) ->
+  (S.Set Ident -> Expr -> r) ->
+  (S.Set Ident -> Binder -> r) ->
+  (S.Set Ident -> CaseAlternative -> r) ->
+  (S.Set Ident -> DoNotationElement -> r) ->
+  ( S.Set Ident -> Declaration       -> r
+  , S.Set Ident -> Expr              -> r
+  , S.Set Ident -> Binder            -> r
+  , S.Set Ident -> CaseAlternative   -> r
+  , S.Set Ident -> DoNotationElement -> r)
+everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
+  where
+  -- Avoid importing Data.Monoid and getting shadowed names above
+  (<>) = mappend
+
+  f'' s a = f s a <> f' s a
+
+  f' s (DataBindingGroupDeclaration ds) =
+    let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
+    in foldMap (f'' s') ds
+  f' s (ValueDeclaration name _ bs (Right val)) =
+    let s' = S.insert name s
+    in foldMap (h'' s') bs <> g'' s' val
+  f' s (ValueDeclaration name _ bs (Left gs)) =
+    let s' = S.insert name s
+        s'' = S.union s' (S.fromList (concatMap binderNames bs))
+    in foldMap (h'' s') bs <> foldMap (\(grd, val) -> g'' s'' grd <> g'' s'' val) gs
+  f' s (BindingGroupDeclaration ds) =
+    let s' = S.union s (S.fromList (map (\(name, _, _) -> name) ds))
+    in foldMap (\(_, _, val) -> g'' s' val) ds
+  f' s (TypeClassDeclaration _ _ _ ds) = foldMap (f'' s) ds
+  f' s (TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
+  f' s (PositionedDeclaration _ _ d) = f'' s d
+  f' _ _ = mempty
+
+  g'' s a = g s a <> g' s a
+
+  g' s (UnaryMinus v1) = g'' s v1
+  g' s (BinaryNoParens op v1 v2) = g' s op <> g' s v1 <> g' s v2
+  g' s (Parens v1) = g'' s v1
+  g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
+  g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
+  g' s (ArrayLiteral vs) = foldMap (g'' s) vs
+  g' s (ObjectLiteral vs) = foldMap (g'' s . snd) vs
+  g' s (ObjectConstructor vs) = foldMap (g'' s) (mapMaybe snd vs)
+  g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
+  g' s (Accessor _ v1) = g'' s v1
+  g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
+  g' s (ObjectUpdater obj vs) = foldMap (g'' s) obj <> foldMap (g'' s) (mapMaybe snd vs)
+  g' s (Abs (Left name) v1) =
+    let s' = S.insert name s
+    in g'' s' v1
+  g' s (Abs (Right b) v1) =
+    let s' = S.union (S.fromList (binderNames b)) s
+    in g'' s' v1
+  g' s (App v1 v2) = g'' s v1 <> g'' s v2
+  g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
+  g' s (Case vs alts) = foldMap (g'' s) vs <> foldMap (i'' s) alts
+  g' s (TypedValue _ v1 _) = g'' s v1
+  g' s (Let ds v1) =
+    let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
+    in foldMap (f'' s') ds <> g'' s' v1
+  g' s (Do es) = fold . snd . mapAccumL j'' s $ es
+  g' s (PositionedValue _ _ v1) = g'' s v1
+  g' _ _ = mempty
+
+  h'' s a = h s a <> h' s a
+
+  h' s (ConstructorBinder _ bs) = foldMap (h'' s) bs
+  h' s (ObjectBinder bs) = foldMap (h'' s . snd) bs
+  h' s (ArrayBinder bs) = foldMap (h'' s) bs
+  h' s (NamedBinder name b1) =
+    let s' = S.insert name s
+    in h'' s' b1
+  h' s (PositionedBinder _ _ b1) = h'' s b1
+  h' s (TypedBinder _ b1) = h'' s b1
+  h' _ _ = mempty
+
+  i'' s a = i s a <> i' s a
+
+  i' s (CaseAlternative bs (Right val)) =
+    let s' = S.union s (S.fromList (concatMap binderNames bs))
+    in foldMap (h'' s) bs <> g'' s' val
+  i' s (CaseAlternative bs (Left gs)) =
+    let s' = S.union s (S.fromList (concatMap binderNames bs))
+    in foldMap (h'' s) bs <> foldMap (\(grd, val) -> g'' s' grd <> g'' s' val) gs
+
+  j'' s a = let (s', r) = j' s a in (s', j s a <> r)
+
+  j' s (DoNotationValue v) = (s, g'' s v)
+  j' s (DoNotationBind b v) =
+    let s' = S.union (S.fromList (binderNames b)) s
+    in (s', h'' s b <> g'' s' v)
+  j' s (DoNotationLet ds) =
+    let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
+    in (s', foldMap (f'' s') ds)
+  j' s (PositionedDoNotationElement _ _ e1) = j'' s e1
+
+  getDeclIdent :: Declaration -> Maybe Ident
+  getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
+  getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
+  getDeclIdent (TypeDeclaration ident _) = Just ident
+  getDeclIdent _ = Nothing
 
 accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)

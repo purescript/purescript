@@ -14,13 +14,14 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternGuards #-}
 
 module Language.PureScript.Linter (lint, module L) where
 
 import Prelude ()
 import Prelude.Compat
 
-import Data.List (mapAccumL, nub, (\\))
+import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
 
@@ -54,43 +55,46 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   getDeclIdent _ = Nothing
 
   lintDeclaration :: Declaration -> m ()
-  lintDeclaration d =
-    let (f, _, _, _, _) = everythingWithContextOnValues moduleNames mempty mappend stepD stepE stepB def def
-
-        f' :: Declaration -> MultipleErrors
-        f' (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f' dec)
-        f' dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (f dec <> checkTypeVarsInDecl dec)
-        f' (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
-        f' dec = f dec <> checkTypeVarsInDecl dec
-
-    in tell (f' d)
+  lintDeclaration = tell . f
     where
-    def s _ = (s, mempty)
+    (warningsInDecl, _, _, _, _) = everythingWithScope stepD stepE stepB (\_ _ -> mempty) stepDo
 
-    stepD :: S.Set Ident -> Declaration -> (S.Set Ident, MultipleErrors)
-    stepD s (TypeClassDeclaration name _ _ decls) = (s, foldr go mempty decls)
+    f :: Declaration -> MultipleErrors
+    f (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f dec)
+    f dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec)
+    f (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
+    f dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec
+
+    stepD :: S.Set Ident -> Declaration -> MultipleErrors
+    stepD _ (TypeClassDeclaration name _ _ decls) = foldMap go decls
       where
-      go :: Declaration -> MultipleErrors -> MultipleErrors
-      go (PositionedDeclaration _ _ d') errs = go d' errs
-      go (TypeDeclaration op@(Op _) _) errs = errorMessage (ClassOperator name op) <> errs
-      go _ errs = errs
-    stepD s _ = (s, mempty)
+      go :: Declaration -> MultipleErrors
+      go (PositionedDeclaration _ _ d') = go d'
+      go (TypeDeclaration op@(Op _) _)  = errorMessage (ClassOperator name op)
+      go _ = mempty
+    stepD _ _ = mempty
 
-    stepE :: S.Set Ident -> Expr -> (S.Set Ident, MultipleErrors)
-    stepE s (Abs (Left name) _) = bindName s name
-    stepE s (Let ds' _) =
-      case mapAccumL bindName s (nub (mapMaybe getDeclIdent ds')) of
-        (s', es) -> (s', mconcat es)
-    stepE s _ = (s, mempty)
+    stepE :: S.Set Ident -> Expr -> MultipleErrors
+    stepE s (Abs (Left name) _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepE s (Let ds' _) = foldMap go ds'
+      where
+      go d | Just i <- getDeclIdent d
+           , i `S.member` s = errorMessage (ShadowedName i)
+           | otherwise = mempty
+    stepE _ _ = mempty
 
-    stepB :: S.Set Ident -> Binder -> (S.Set Ident, MultipleErrors)
-    stepB s (VarBinder name) = bindName s name
-    stepB s (NamedBinder name _) = bindName s name
-    stepB s (TypedBinder _ b) = stepB s b
-    stepB s _ = (s, mempty)
+    stepB :: S.Set Ident -> Binder -> MultipleErrors
+    stepB s (VarBinder name) | name `S.member` s = errorMessage (ShadowedName name)
+    stepB s (NamedBinder name _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepB _ _ = mempty
 
-    bindName :: S.Set Ident -> Ident -> (S.Set Ident, MultipleErrors)
-    bindName = bind ShadowedName
+    stepDo :: S.Set Ident -> DoNotationElement -> MultipleErrors
+    stepDo s (DoNotationLet ds') = foldMap go ds'
+      where
+      go d | Just i <- getDeclIdent d
+           , i `S.member` s = errorMessage (ShadowedName i)
+           | otherwise = mempty
+    stepDo _ _ = mempty
 
   checkTypeVarsInDecl :: Declaration -> MultipleErrors
   checkTypeVarsInDecl d = let (f, _, _, _, _) = accumTypes checkTypeVars in f d
