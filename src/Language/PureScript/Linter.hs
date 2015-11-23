@@ -57,13 +57,13 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   lintDeclaration :: Declaration -> m ()
   lintDeclaration = tell . f
     where
-    warningsInDecl = everythingWithScope stepD stepE stepB (\_ _ -> mempty) stepDo moduleNames
+    (warningsInDecl, _, _, _, _) = everythingWithScope stepD stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
     f (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f dec)
-    f dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl dec <> checkTypeVarsInDecl dec)
+    f dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec)
     f (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
-    f dec = warningsInDecl dec <> checkTypeVarsInDecl dec
+    f dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec
 
     stepD :: S.Set Ident -> Declaration -> MultipleErrors
     stepD _ (TypeClassDeclaration name _ _ decls) = foldMap go decls

@@ -401,8 +401,12 @@ everythingWithScope ::
   (S.Set Ident -> Binder -> r) ->
   (S.Set Ident -> CaseAlternative -> r) ->
   (S.Set Ident -> DoNotationElement -> r) ->
-  S.Set Ident -> Declaration -> r
-everythingWithScope f g h i j = f''
+  ( S.Set Ident -> Declaration       -> r
+  , S.Set Ident -> Expr              -> r
+  , S.Set Ident -> Binder            -> r
+  , S.Set Ident -> CaseAlternative   -> r
+  , S.Set Ident -> DoNotationElement -> r)
+everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   where
   -- Avoid importing Data.Monoid and getting shadowed names above
   (<>) = mappend
