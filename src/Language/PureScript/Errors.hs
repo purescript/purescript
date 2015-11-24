@@ -370,6 +370,15 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
+  gSimple (NoInstanceFound cl ts) = NoInstanceFound cl <$> traverse f ts
+  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
+  gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
+  gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
+  gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
+  gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
+  gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
+  gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
+
   gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
@@ -377,6 +386,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
   gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
+  gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint other = pure other
 
 -- |
@@ -392,26 +402,33 @@ prettyPrintSingleError full level e = do
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
   prettyPrintErrorMessage typeMap (ErrorMessage hints simple) =
-    paras $
-      foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
-      : typeInformation
-      ++ [ Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
-                                  , line $ "or to contribute content related to this " ++ levelText ++ "."
-                                  ]
-         ]
+    paras
+      [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
+      , Box.moveDown 1 typeInformation
+      , Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
+                               , line $ "or to contribute content related to this " ++ levelText ++ "."
+                               ]
+      ]
     where
     wikiUri :: String
     wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
 
-    typeInformation :: [Box.Box]
-    typeInformation = M.elems . M.mapMaybe skolemInfo . umSkolemMap $ typeMap
+    typeInformation :: Box.Box
+    typeInformation | not (null types) = Box.hsep 1 Box.left [ line "where", paras types]
+                    | otherwise = Box.emptyBox 0 0
       where
-      skolemInfo :: (String, Int, Maybe SourceSpan) -> Maybe Box.Box
-      skolemInfo (name, s, Just ss) =
-        Just . Box.moveDown 1 $ paras [ line $ "(" ++ name ++ show s ++ " is a rigid type variable"
-                                      , line $ "  bound at " ++ displayStartEndPos ss ++ ")"
-                                      ]
-      skolemInfo _ = Nothing
+      types :: [Box.Box]
+      types = map skolemInfo  (M.elems (umSkolemMap typeMap)) ++
+              map unknownInfo (M.elems (umUnknownMap typeMap))
+
+      skolemInfo :: (String, Int, Maybe SourceSpan) -> Box.Box
+      skolemInfo (name, s, ss) =
+        paras $
+          line (name ++ show s ++ " is a rigid type variable")
+          : foldMap (return . line . ("  bound at " ++) . displayStartEndPos) ss
+
+      unknownInfo :: Int -> Box.Box
+      unknownInfo u = line $ "_" ++ show u ++ " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (CannotGetFileInfo path) =
@@ -613,7 +630,16 @@ prettyPrintSingleError full level e = do
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
                                            ]
+            , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
+                    | any containsUnknowns ts
+                    ]
             ]
+      where
+      containsUnknowns :: Type -> Bool
+      containsUnknowns = everythingOnTypes (||) go
+        where
+        go TUnknown{} = True
+        go _ = False
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
