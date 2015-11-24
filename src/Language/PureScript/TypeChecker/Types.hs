@@ -406,9 +406,9 @@ inferBinder val (PositionedBinder pos _ binder) =
 -- change the definition of `binderRequiresMonotype`,
 -- and use `kindOfWithScopedVars`.
 inferBinder val (TypedBinder ty binder) = do
+  kind <- kindOf ty
+  checkTypeKind ty kind
   ty1 <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  kind <- kindOf ty1
-  checkTypeKind ty1 kind
   unifyTypes val ty1
   inferBinder val binder
 
