@@ -107,7 +107,7 @@ desugarImports externs modules = do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule env imps (elaborateExports exps m)
       findUnusedImports m env used
-      return $ elaborateImports imps m'
+      return m'
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that
@@ -126,23 +126,6 @@ elaborateExports exps (Module ss coms mn decls refs) =
   -- are re-exports from other modules.
   my :: (Exports -> [(a, ModuleName)]) -> [a]
   my f = fst `map` filter ((== mn) . snd) (f exps)
-
--- |
--- Add `import X ()` for any modules where there are only fully qualified references to members.
--- This ensures transitive instances are included when using a member from a module.
---
-elaborateImports :: Imports -> Module -> Module
-elaborateImports imps (Module ss coms mn decls exps) = Module ss coms mn decls' exps
-  where
-  decls' :: [Declaration]
-  decls' =
-    let (f, _, _, _, _) = everythingOnValues (++) (const []) fqValues (const []) (const []) (const [])
-    in mkImport `map` nub (f `concatMap` decls) ++ decls
-  fqValues :: Expr -> [ModuleName]
-  fqValues (Var (Qualified (Just mn') _)) | mn' `notElem` importedModules imps = [mn']
-  fqValues _ = []
-  mkImport :: ModuleName -> Declaration
-  mkImport mn' = ImportDeclaration mn' (Explicit []) Nothing False
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
@@ -171,7 +154,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl s d = return (s, d)
-  --
+
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((Just pos', bound), v)
@@ -192,7 +175,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateValue s@(pos, _) (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
-  --
+
   updateBinder :: (Maybe SourceSpan, [Ident]) -> Binder -> m ((Maybe SourceSpan, [Ident]), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((Just pos, bound), v)
@@ -204,7 +187,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
     return (s', TypedBinder t' b')
   updateBinder s v =
     return (s, v)
-  --
+
   updateCase :: (Maybe SourceSpan, [Ident]) -> CaseAlternative ->  m ((Maybe SourceSpan, [Ident]), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) =
     return ((pos, concatMap binderNames bs ++ bound), c)
