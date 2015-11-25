@@ -27,6 +27,9 @@ import Control.Monad.Writer.Strict
 import Data.List (isSuffixOf, partition)
 import Data.Version (showVersion)
 import qualified Data.Map as M
+import qualified Data.Aeson as A
+import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.UTF8 as BU8
 
 import Options.Applicative as Opts
 
@@ -40,45 +43,54 @@ import qualified Paths_purescript as Paths
 
 import Language.PureScript.Make
 
+import JSON
+
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
   , pscmForeignInput :: [FilePath]
   , pscmOutputDir    :: FilePath
   , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
+  , pscmJSONErrors   :: Bool
   }
 
 data InputOptions = InputOptions
   { ioInputFiles  :: [FilePath]
   }
 
+-- | Argumnets: verbose, use JSON, warnings, errors
+printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors verbose False warnings errors = do
+  when (P.nonEmpty warnings) $
+    hPutStrLn stderr (P.prettyPrintMultipleWarnings verbose warnings)
+  case errors of
+    Left errs -> do
+      hPutStrLn stderr (P.prettyPrintMultipleErrors verbose errs)
+      exitFailure
+    Right _ -> return ()
+printWarningsAndErrors verbose True warnings errors = do
+  hPutStrLn stderr . BU8.toString . B.toStrict . A.encode $
+    JSONResult (toJSONErrors verbose P.Warning warnings)
+               (either (toJSONErrors verbose P.Error) (const []) errors)
+  either (const exitFailure) (const (return ())) errors
+
 compile :: PSCMakeOptions -> IO ()
-compile (PSCMakeOptions inputGlob inputForeignGlob outputDir opts usePrefix) = do
-  input <- globWarningOnMisses warnFileTypeNotFound inputGlob
+compile PSCMakeOptions{..} = do
+  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
   when (null input) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
   let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
   moduleFiles <- readInput (InputOptions pursFiles)
-  inputForeign <- globWarningOnMisses warnFileTypeNotFound inputForeignGlob
+  inputForeign <- globWarningOnMisses warnFileTypeNotFound pscmForeignInput
   foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
-  case runWriterT (parseInputs moduleFiles foreignFiles) of
-    Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
-      exitFailure
-    Right ((ms, foreigns), warnings) -> do
-      when (P.nonEmpty warnings) $
-        hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings)
-      let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
-          makeActions = buildMakeActions outputDir filePathMap foreigns usePrefix
-      (e, warnings') <- runMake opts $ P.make makeActions (map snd ms)
-      when (P.nonEmpty warnings') $
-        hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.optionsVerboseErrors opts) warnings')
-      case e of
-        Left errs -> do
-          hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors opts) errs)
-          exitFailure
-        Right _ -> exitSuccess
+  (makeErrors, makeWarnings) <- runMake pscmOpts $ do
+    (ms, foreigns) <- parseInputs moduleFiles foreignFiles
+    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
+        makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
+    P.make makeActions (map snd ms)
+  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
+  exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
 warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: " ++)
@@ -161,6 +173,10 @@ noPrefix = switch $
   <> long "no-prefix"
   <> help "Do not include comment header"
 
+jsonErrors :: Parser Bool
+jsonErrors = switch $
+     long "json-errors"
+  <> help "Print errors to stderr as JSON"
 
 options :: Parser P.Options
 options = P.Options <$> noTco
@@ -177,7 +193,7 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
-
+                                <*> jsonErrors
 
 main :: IO ()
 main = execParser opts >>= compile
