@@ -8,7 +8,7 @@ import Prelude.Compat
 
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
-import Data.List ((\\), find, intersect)
+import Data.List ((\\), find, intersect, nub)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class
 import Control.Monad(unless,when)
@@ -50,7 +50,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
         in case declType of
           Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
           Explicit declrefs -> do
-            let idents = mapMaybe runDeclRef declrefs
+            let idents = nub (mapMaybe runDeclRef declrefs)
             let diff = idents \\ usedNames
             case (length diff, length idents) of
               (0, _) -> return ()

@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.PureScript.Sugar.Names.Imports
   ( resolveImports
@@ -24,9 +25,10 @@ module Language.PureScript.Sugar.Names.Imports
 import Prelude ()
 import Prelude.Compat
 
-import Data.List (find, delete)
+import Data.List (find, delete, (\\))
 import Data.Maybe (fromMaybe, isJust, isNothing, fromJust)
 import Data.Foldable (traverse_, for_)
+import Data.Traversable (for)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -64,33 +66,48 @@ findImports = foldM (go Nothing) M.empty
   checkImportRef (ModuleRef name) = throwError . errorMessage $ ImportHidingModule name
   checkImportRef _ = return ()
 
+type ImportDef = (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
+
 -- |
 -- Constructs a set of imports for a module.
 --
-resolveImports :: (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
+resolveImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> Module -> m Imports
 resolveImports env (Module _ _ currentModule decls _) =
   warnAndRethrow (addHint (ErrorInModule currentModule)) $ do
     imports <- findImports decls
 
     for_ (M.toList imports) $ \(mn, imps) -> do
-      let unqual = filter (\(_, _, q) -> isJust q) (reverse imps)
 
-      when (length imps > 1) $ for_ (selfCartesianSubset imps) $
-        \((_, t1, q1), (pos, t2, q2)) ->
-          when (t1 == t2 && q1 == q2) $
-            maybe id warnWithPosition pos $
-              tell . errorMessage $ DuplicateImport mn t2 q2
+      -- Better ordering for the warnings: the list is in last-import-first
+      -- order, but we want the first appearence of an import to be the primary,
+      -- and warnings to appear for later imports
+      let imps' = reverse imps
 
-      when (length unqual > 1) $
-        case find (\(_, typ, _) -> typ == Implicit) unqual of
+      warned <- foldM (checkDuplicateImports mn) [] (selfCartesianSubset imps')
+
+      let unqual = filter (\(_, _, q) -> isJust q) (imps' \\ warned)
+
+      warned' <- (warned ++) <$>
+        if (length unqual < 2)
+        then return []
+        else case find (\(_, typ, _) -> typ == Implicit) unqual of
           Just i ->
-            for_ (delete i unqual) $ \(pos, typ, _) ->
-              maybe id warnWithPosition pos $
-                tell $ errorMessage $ RedundantUnqualifiedImport mn typ
+            for (delete i unqual) $ \i'@(pos, typ, _) -> do
+              warn pos $ RedundantUnqualifiedImport mn typ
+              return i'
           Nothing ->
-            for_ (tail unqual) $ \(pos, _, _) ->
-              maybe id warnWithPosition pos $
-                tell $ errorMessage $ DuplicateSelectiveImport mn
+            for (tail unqual) $ \i@(pos, _, _) -> do
+              warn pos $ DuplicateSelectiveImport mn
+              return i
+
+      for_ (imps' \\ warned') $ \(pos, typ, _) ->
+        let (dupeRefs, dupeDctors) = findDuplicateRefs $ case typ of
+              Explicit refs -> refs
+              Hiding refs -> refs
+              _ -> []
+        in warnDupeRefs pos dupeRefs >> warnDupeDctors pos dupeDctors
+
+      return ()
 
     let scope = M.insert currentModule [(Nothing, Implicit, Nothing)] imports
     foldM (resolveModuleImport currentModule env) nullImports (M.toList scope)
@@ -99,6 +116,31 @@ resolveImports env (Module _ _ currentModule decls _) =
   selfCartesianSubset :: [a] -> [(a, a)]
   selfCartesianSubset (x : xs) = [(x, y) | y <- xs] ++ selfCartesianSubset xs
   selfCartesianSubset [] = []
+
+  checkDuplicateImports :: ModuleName -> [ImportDef] -> (ImportDef, ImportDef) -> m [ImportDef]
+  checkDuplicateImports mn xs ((_, t1, q1), (pos, t2, q2)) =
+    if (t1 == t2 && q1 == q2)
+    then do
+      warn pos $ DuplicateImport mn t2 q2
+      return $ (pos, t2, q2) : xs
+    else return xs
+
+  warnDupeRefs :: Maybe SourceSpan -> [DeclarationRef] -> m ()
+  warnDupeRefs pos = traverse_ $ \case
+    TypeRef name _ -> warnDupe pos $ "type " ++ runProperName name
+    ValueRef name -> warnDupe pos $ "value " ++ runIdent name
+    TypeClassRef name -> warnDupe pos $ "class " ++ runProperName name
+    ModuleRef name -> warnDupe pos $ "module " ++ runModuleName name
+    _ -> return ()
+
+  warnDupeDctors :: Maybe SourceSpan -> [ProperName] -> m ()
+  warnDupeDctors pos = traverse_ (warnDupe pos . ("data constructor " ++) . runProperName)
+
+  warnDupe :: Maybe SourceSpan -> String -> m ()
+  warnDupe pos ref = warn pos $ DuplicateImportRef ref
+
+  warn :: Maybe SourceSpan -> SimpleErrorMessage -> m ()
+  warn pos msg = maybe id warnWithPosition pos $ tell . errorMessage $ msg
 
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport ::
