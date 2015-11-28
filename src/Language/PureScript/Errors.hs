@@ -147,6 +147,7 @@ data SimpleErrorMessage
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | IntOutOfRange Integer String Integer Integer
+  | RedundantEmptyHidingImport ModuleName
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -286,6 +287,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
   IntOutOfRange{} -> "IntOutOfRange"
+  RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
 
 
 -- |
@@ -793,6 +795,9 @@ prettyPrintSingleError full level e = do
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " ++ show value ++ " is out of range for the " ++ backend ++ " backend."
             , line $ "Acceptable values fall within the range " ++ show lo ++ " to " ++ show hi ++ " (inclusive)." ]
+
+    renderSimpleErrorMessage (RedundantEmptyHidingImport mn) =
+      line $ "The import for module " ++ runModuleName mn ++ " is redundant as all members have been explicitly hidden."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
