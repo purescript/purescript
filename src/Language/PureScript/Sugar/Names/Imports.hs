@@ -58,7 +58,7 @@ findImports = foldM (go Nothing) M.empty
   go _ result (PositionedDeclaration pos _ d) = warnAndRethrowWithPosition pos $ go (Just pos) result d
   go _ result _ = return result
 
-  -- Ensure that classes don't appear in an `import X hiding (...)`
+  -- Ensure that modules don't appear in an `import X hiding (...)`
   checkImportRefType :: ImportDeclarationType -> m ()
   checkImportRefType (Hiding refs) = traverse_ checkImportRef refs
   checkImportRefType _ = return ()
@@ -171,7 +171,16 @@ resolveImport currentModule importModule exps imps impQual =
   resolveByType :: ImportDeclarationType -> m Imports
   resolveByType Implicit = importAll importExplicit
   resolveByType (Explicit explImports) = checkRefs explImports >> foldM importExplicit imps explImports
-  resolveByType (Hiding hiddenImports) = checkRefs hiddenImports >> importAll (importNonHidden hiddenImports)
+  resolveByType (Hiding hiddenImports) = do
+    checkRefs hiddenImports
+    imps' <- importAll (importNonHidden hiddenImports)
+    let isEmptyImport
+           = M.null (importedTypes imps')
+          && M.null (importedDataConstructors imps')
+          && M.null (importedTypeClasses imps')
+          && M.null (importedValues imps')
+    when isEmptyImport $ tell . errorMessage $ RedundantEmptyHidingImport importModule
+    return imps'
 
   -- Check that a 'DeclarationRef' refers to an importable symbol
   checkRefs :: [DeclarationRef] -> m ()
