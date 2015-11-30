@@ -15,6 +15,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.PureScript.Sugar.Names.Exports
   ( findExportable
@@ -29,6 +30,7 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Foldable (traverse_)
 
 import Control.Monad
+import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
 import qualified Data.Map as M
@@ -66,13 +68,30 @@ findExportable (Module _ _ mn ds _) =
 -- Resolves the exports for a module, filtering out members that have not been
 -- exported and elaborating re-exports of other modules.
 --
-resolveExports :: forall m. (Applicative m, MonadError MultipleErrors m) => Env -> ModuleName -> Imports -> Exports -> [DeclarationRef] -> m Exports
+resolveExports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> ModuleName -> Imports -> Exports -> [DeclarationRef] -> m Exports
 resolveExports env mn imps exps refs =
   rethrow (addHint (ErrorInModule mn)) $ do
     filtered <- filterModule mn exps refs
+    let (dupeRefs, dupeDctors) = findDuplicateRefs refs
+    warnDupeRefs dupeRefs
+    warnDupeDctors dupeDctors
     foldM elaborateModuleExports filtered refs
 
   where
+
+  warnDupeRefs :: [DeclarationRef] -> m ()
+  warnDupeRefs = traverse_ $ \case
+    TypeRef name _ -> warnDupe $ "type " ++ runProperName name
+    ValueRef name -> warnDupe $ "value " ++ runIdent name
+    TypeClassRef name -> warnDupe $ "class " ++ runProperName name
+    ModuleRef name -> warnDupe $ "module " ++ runModuleName name
+    _ -> return ()
+
+  warnDupeDctors :: [ProperName] -> m ()
+  warnDupeDctors = traverse_ (warnDupe . ("data constructor " ++) . runProperName)
+
+  warnDupe :: String -> m ()
+  warnDupe ref = tell . errorMessage $ DuplicateExportRef ref
 
   -- Takes the current module's imports, the accumulated list of exports, and a
   -- `DeclarationRef` for an explicit export. When the ref refers to another

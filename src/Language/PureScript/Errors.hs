@@ -146,6 +146,8 @@ data SimpleErrorMessage
   | RedundantUnqualifiedImport ModuleName ImportDeclarationType
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
+  | DuplicateImportRef String
+  | DuplicateExportRef String
   | IntOutOfRange Integer String Integer Integer
   deriving (Show)
 
@@ -285,6 +287,8 @@ errorCode em = case unwrapErrorMessage em of
   RedundantUnqualifiedImport{} -> "RedundantUnqualifiedImport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
+  DuplicateImportRef{} -> "DuplicateImportRef"
+  DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
 
 
@@ -789,6 +793,12 @@ prettyPrintSingleError full level e = do
 
     renderSimpleErrorMessage (DuplicateImport name imp qual) =
       line $ "Duplicate import of " ++ prettyPrintImport name imp qual
+
+    renderSimpleErrorMessage (DuplicateImportRef ref) =
+      line $ "Import list contains multiple references to " ++ ref
+
+    renderSimpleErrorMessage (DuplicateExportRef ref) =
+      line $ "Export list contains multiple references to " ++ ref
 
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " ++ show value ++ " is out of range for the " ++ backend ++ " backend."

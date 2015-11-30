@@ -15,6 +15,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.PureScript.AST.Declarations where
 
@@ -22,6 +23,8 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Aeson.TH
+import Data.List (nub, (\\))
+import Data.Maybe (mapMaybe)
 
 import qualified Data.Data as D
 import qualified Data.Map as M
@@ -92,6 +95,28 @@ instance Eq DeclarationRef where
 isModuleRef :: DeclarationRef -> Bool
 isModuleRef (ModuleRef _) = True
 isModuleRef _ = False
+
+-- |
+-- Finds duplicate values in a list of declaration refs. The returned values
+-- are the duplicate refs with data constructors elided, and then a separate
+-- list of duplicate data constructors.
+--
+findDuplicateRefs :: [DeclarationRef] -> ([DeclarationRef], [ProperName])
+findDuplicateRefs refs =
+  let positionless = stripPosInfo `map` refs
+      simplified = simplifyTypeRefs `map` positionless
+      dupeRefs = nub $ simplified \\ nub simplified
+      dupeCtors = concat $ flip mapMaybe positionless $ \case
+        TypeRef _ (Just dctors) ->
+          let dupes = dctors \\ nub dctors
+          in if null dupes then Nothing else Just dupes
+        _ -> Nothing
+  in (dupeRefs, dupeCtors)
+  where
+  stripPosInfo (PositionedDeclarationRef _ _ ref) = stripPosInfo ref
+  stripPosInfo other = other
+  simplifyTypeRefs (TypeRef pn _) = TypeRef pn Nothing
+  simplifyTypeRefs other = other
 
 -- |
 -- The data type which specifies type of import declaration
