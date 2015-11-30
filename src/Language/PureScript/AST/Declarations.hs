@@ -1,22 +1,11 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.AST.Declarations
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Data types for modules and declarations
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
+-- |
+-- Data types for modules and declarations
+--
 module Language.PureScript.AST.Declarations where
 
 import Prelude ()
@@ -77,6 +66,10 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
+  -- An unspecified ProperName ref. This will be replaced with a TypeClassRef
+  -- or TypeRef during name desugaring.
+  | ProperRef ProperName
+  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
@@ -87,12 +80,14 @@ instance Eq DeclarationRef where
   (ValueRef name)        == (ValueRef name')        = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
-  (ModuleRef name) == (ModuleRef name') = name == name'
+  (ModuleRef name)       == (ModuleRef name')       = name == name'
+  (ProperRef name)       == (ProperRef name')       = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
 
 isModuleRef :: DeclarationRef -> Bool
+isModuleRef (PositionedDeclarationRef _ _ r) = isModuleRef r
 isModuleRef (ModuleRef _) = True
 isModuleRef _ = False
 

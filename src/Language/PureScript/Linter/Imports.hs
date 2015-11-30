@@ -11,7 +11,7 @@ import Data.Maybe (mapMaybe)
 import Data.List ((\\), find, intersect, nub)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class
-import Control.Monad(unless,when)
+import Control.Monad (unless,when)
 import Data.Foldable (forM_)
 
 import Language.PureScript.AST.Declarations
@@ -78,10 +78,11 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
 
   -- rely on exports being elaborated by this point
   alwaysUsedModules :: [ ModuleName ]
-  alwaysUsedModules = ModuleName [ProperName C.prim] : maybe [] (mapMaybe isExport) mexports
+  alwaysUsedModules = ModuleName [ProperName C.prim] : maybe [] (mapMaybe extractModule) mexports
     where
-      isExport (ModuleRef mn) = Just mn
-      isExport _ = Nothing
+    extractModule (PositionedDeclarationRef _ _ r) = extractModule r
+    extractModule (ModuleRef mn) = Just mn
+    extractModule _ = Nothing
 
   qnameUsed :: Maybe ModuleName -> Bool
   qnameUsed (Just qn) = qn `elem` alwaysUsedModules

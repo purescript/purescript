@@ -1,16 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.Names
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -49,8 +36,9 @@ import Language.PureScript.Linter.Imports
 desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 desugarImports externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
-  env' <- foldM updateEnv env modules
-  traverse (renameInModule' env') modules
+  modules' <- traverse updateExportRefs modules
+  (modules'', env') <- foldM updateEnv ([], env) modules'
+  traverse (renameInModule' env') modules''
   where
   silence :: m a -> m a
   silence = censor (const mempty)
@@ -90,16 +78,16 @@ desugarImports externs modules = do
       toExportedValue (PositionedDeclarationRef _ _ r) = toExportedValue r
       toExportedValue _ = Nothing
 
-  updateEnv :: Env -> Module -> m Env
-  updateEnv env m@(Module ss _ mn _ refs) =
+  updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
+  updateEnv (ms, env) m@(Module ss _ mn _ refs) =
     case mn `M.lookup` env of
       Just m' -> throwError . errorMessage $ RedefinedModule mn [envModuleSourceSpan m', ss]
       Nothing -> do
         members <- findExportable m
         let env' = M.insert mn (ss, nullImports, members) env
-        imps <- resolveImports env' m
+        (m', imps) <- resolveImports env' m
         exps <- maybe (return members) (resolveExports env' mn imps members) refs
-        return $ M.insert mn (ss, imps, exps) env
+        return (m' : ms, M.insert mn (ss, imps, exps) env)
 
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
@@ -262,7 +250,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- by qualified importing). If that's not the case, then we just need to
       -- check it refers to a symbol in another module.
       (Nothing, Just mn'') -> do
-        modExports <- getExports mn''
+        modExports <- getExports env mn''
         maybe (throwError . errorMessage $ unknown qname) return (getE modExports name)
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
@@ -272,6 +260,32 @@ renameInModule env imports (Module ss coms mn decls exps) =
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
 
-  -- Gets the exports for a module, or an error message if the module doesn't exist
-  getExports :: ModuleName -> m Exports
-  getExports mn' = maybe (throwError . errorMessage $ UnknownModule mn') (return . envModuleExports) $ M.lookup mn' env
+-- |
+-- Replaces `ProperRef` export values with a `TypeRef` or `TypeClassRef`
+-- depending on what is availble within the module. Warns when a `ProperRef`
+-- desugars into a `TypeClassRef`.
+--
+updateExportRefs :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Module -> m Module
+updateExportRefs (Module ss coms mn decls exps) =
+  Module ss coms mn decls <$> traverse (traverse updateRef) exps
+  where
+
+  updateRef :: DeclarationRef -> m DeclarationRef
+  updateRef (ProperRef name)
+     | name `elem` classNames = do
+        tell . errorMessage $ DeprecatedClassExport name
+        return $ TypeClassRef name
+       -- Fall through case here - assume it's a type if it's not a class.
+       -- If it's a reference to something that doesn't actually exist it will
+       -- be picked up elsewhere
+     | otherwise = return $ TypeRef name (Just [])
+  updateRef (PositionedDeclarationRef pos com ref) =
+    warnWithPosition pos $ PositionedDeclarationRef pos com <$> updateRef ref
+  updateRef other = return other
+
+  classNames :: [ProperName]
+  classNames = mapMaybe go decls
+    where
+    go (PositionedDeclaration _ _ d) = go d
+    go (TypeClassDeclaration name _ _ _) = Just name
+    go _ = Nothing

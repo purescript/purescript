@@ -1,17 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Error
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -143,6 +129,8 @@ data SimpleErrorMessage
   | UnusedDctorImport ProperName
   | UnusedDctorExplicitImport ProperName [ProperName]
   | DeprecatedQualifiedSyntax ModuleName ModuleName
+  | DeprecatedClassImport ModuleName ProperName
+  | DeprecatedClassExport ProperName
   | RedundantUnqualifiedImport ModuleName ImportDeclarationType
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
@@ -285,6 +273,8 @@ errorCode em = case unwrapErrorMessage em of
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
+  DeprecatedClassImport{} -> "DeprecatedClassImport"
+  DeprecatedClassExport{} -> "DeprecatedClassExport"
   RedundantUnqualifiedImport{} -> "RedundantUnqualifiedImport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
@@ -787,6 +777,14 @@ prettyPrintSingleError full level e = do
       paras [ line $ "The import of type " ++ runModuleName name ++ " as " ++ runModuleName qualName ++ " uses the deprecated 'import qualified' syntax."
             , line $ "This syntax form will be removed in PureScript 0.9." ]
 
+    renderSimpleErrorMessage (DeprecatedClassImport mn name) =
+      paras [ line $ "The import of class " ++ runProperName name ++ " from " ++ runModuleName mn ++ " uses the deprecated syntax that omits the class keyword."
+            , line $ "This syntax form will be removed in PureScript 0.9." ]
+
+    renderSimpleErrorMessage (DeprecatedClassExport name) =
+      paras [ line $ "The export of class " ++ runProperName name ++ " uses the deprecated syntax that omits the class keyword."
+            , line $ "This syntax form will be removed in PureScript 0.9." ]
+
     renderSimpleErrorMessage (RedundantUnqualifiedImport name imp) =
       line $ "Import of " ++ prettyPrintImport name imp Nothing ++ " is redundant due to a whole-module import"
 
@@ -947,6 +945,7 @@ prettyPrintSingleError full level e = do
   prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
   prettyPrintRef (ValueRef ident) = showIdent ident
   prettyPrintRef (TypeClassRef pn) = runProperName pn
+  prettyPrintRef (ProperRef pn) = runProperName pn
   prettyPrintRef (TypeInstanceRef ident) = showIdent ident
   prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
   prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
