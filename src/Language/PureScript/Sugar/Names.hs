@@ -262,15 +262,12 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- by qualified importing). If that's not the case, then we just need to
       -- check it refers to a symbol in another module.
       (Nothing, Just mn'') -> do
-        when (isExplicitQualModule mn'') . throwError . errorMessage $ unknown qname
         modExports <- getExports mn''
         maybe (throwError . errorMessage $ unknown qname) return (getE modExports name)
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
       _ -> throwError . errorMessage $ unknown qname
     where
-    isExplicitQualModule :: ModuleName -> Bool
-    isExplicitQualModule = flip elem $ mapMaybe (\(Qualified q _) -> q) (M.keys imps)
     positioned err = case pos of
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
