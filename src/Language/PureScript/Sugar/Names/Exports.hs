@@ -1,16 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.Names.Exports
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -110,20 +97,31 @@ resolveExports env mn imps exps refs =
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name)) $
       throwError . errorMessage . UnknownExportModule $ name
-    let reTypes = extract isPseudo name (importedTypes imps)
-    let reDctors = extract isPseudo name (importedDataConstructors imps)
-    let reClasses = extract isPseudo name (importedTypeClasses imps)
-    let reValues = extract isPseudo name (importedValues imps)
+    reTypes <- extract isPseudo name (("type " ++) . runProperName) (importedTypes imps)
+    reDctors <- extract isPseudo name (("data constructor " ++) . runProperName) (importedDataConstructors imps)
+    reClasses <- extract isPseudo name (("class " ++) . runProperName) (importedTypeClasses imps)
+    reValues <- extract isPseudo name (("value " ++) . runIdent) (importedValues imps)
     result' <- foldM (\exps' ((tctor, dctors), mn') -> exportType exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
     result'' <- foldM (uncurry . exportTypeClass) result' (map resolveClass reClasses)
     foldM (uncurry . exportValue) result'' (map resolveValue reValues)
   elaborateModuleExports result _ = return result
 
   -- Extracts a list of values for a module based on a lookup table. If the
-  -- boolean is true the values are filtered by the qualification of the
-  extract :: Bool -> ModuleName -> M.Map (Qualified a) (Qualified a, ModuleName) -> [Qualified a]
-  extract True name = map fst . M.elems . M.filterWithKey (\k _ -> eqQual name k)
-  extract False name = map fst . M.elems . M.filter (eqQual name . fst)
+  -- boolean is true the values are filtered by the qualification
+  extract
+    :: (Ord a)
+    => Bool
+    -> ModuleName
+    -> (a -> String)
+    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> m [Qualified a]
+  extract useQual name render = fmap (map (fst . head . snd)) . go useQual . M.toList
+    where
+    go True = filterM (return . eqQual name . fst)
+    go False = filterM $ \(_, options) -> do
+      let isMatch = any (eqQual name . fst) options
+      when (length options > 1) $ checkImportConflicts render options
+      return isMatch
 
   -- Check whether a module name refers to a "pseudo module" that came into
   -- existence in an import scope due to importing one or more modules as
@@ -135,7 +133,7 @@ resolveExports env mn imps exps refs =
     -- function to either extract the keys or values. We test the keys to see if a
     -- value being re-exported belongs to a qualified module, and we test the
     -- values if that fails to see whether the value has been imported at all.
-    testQuals :: (forall a. M.Map (Qualified a) (Qualified a, ModuleName) -> [Qualified a]) -> ModuleName -> Bool
+    testQuals :: (forall a b. M.Map (Qualified a) b -> [Qualified a]) -> ModuleName -> Bool
     testQuals f mn' = any (eqQual mn') (f (importedTypes imps))
                    || any (eqQual mn') (f (importedDataConstructors imps))
                    || any (eqQual mn') (f (importedTypeClasses imps))
