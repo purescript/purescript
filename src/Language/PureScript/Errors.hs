@@ -138,6 +138,7 @@ data SimpleErrorMessage
   | DuplicateExportRef String
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
+  | ImplicitImport ModuleName [DeclarationRef]
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -282,6 +283,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
   RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
+  ImplicitImport{} -> "ImplicitImport"
 
 
 -- |
@@ -819,6 +821,11 @@ prettyPrintSingleError full level e = do
     renderSimpleErrorMessage (RedundantEmptyHidingImport mn) =
       line $ "The import for module " ++ runModuleName mn ++ " is redundant as all members have been explicitly hidden."
 
+    renderSimpleErrorMessage (ImplicitImport mn refs) =
+      paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the explicit form: "
+            , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
@@ -954,9 +961,10 @@ prettyPrintSingleError full level e = do
 
   prettyPrintRef :: DeclarationRef -> String
   prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
+  prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
   prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
   prettyPrintRef (ValueRef ident) = showIdent ident
-  prettyPrintRef (TypeClassRef pn) = runProperName pn
+  prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
   prettyPrintRef (ProperRef pn) = runProperName pn
   prettyPrintRef (TypeInstanceRef ident) = showIdent ident
   prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
@@ -965,7 +973,8 @@ prettyPrintSingleError full level e = do
   prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
   prettyPrintImport mn idt qual =
     let i = case idt of
-              Implicit -> runModuleName mn
+              Implicit True -> runModuleName mn ++ " (..)"
+              Implicit False -> runModuleName mn
               Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
               Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
     in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual

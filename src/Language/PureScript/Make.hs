@@ -266,18 +266,6 @@ make MakeActions{..} ms = do
     guard $ efVersion externs == showVersion Paths.version
     return externs
 
--- |
--- Add an import declaration for a module if it does not already explicitly import it.
---
-addDefaultImport :: ModuleName -> Module -> Module
-addDefaultImport toImport m@(Module ss coms mn decls exps)  =
-  if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing False : decls) exps
-  where
-  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
-  isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
-  isExistingImport _ = False
-
 importPrim :: Module -> Module
 importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 

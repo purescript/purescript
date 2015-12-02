@@ -171,7 +171,7 @@ getAllQualifications sho m (declName, decl) = do
   qualificationsUsing (_, importType, asQ') =
     let q = qualifyWith asQ'
     in case importType of
-          P.Implicit      -> [q]
+          P.Implicit _    -> [q]
           P.Explicit refs -> [q | referencedBy refs]
           P.Hiding refs   -> [q | not $ referencedBy refs]
 
