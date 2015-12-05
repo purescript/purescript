@@ -1,22 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Parser.Declarations
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Parsers for module definitions and declarations
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
+-- |
+-- Parsers for module definitions and declarations
+--
 module Language.PureScript.Parser.Declarations (
     parseDeclaration,
     parseModule,
@@ -170,18 +158,16 @@ parseImportDeclaration' = do
 
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
-  parseModuleRef <|>
   withSourceSpan PositionedDeclarationRef
-  (ValueRef <$> parseIdent
-    <|> do name <- properName
-           dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
-           return $ maybe (TypeClassRef name) (TypeRef name) dctors
-  )
+    $ (ValueRef <$> parseIdent)
+    <|> parseProperRef
+    <|> (TypeClassRef <$> (reserved "class" *> properName))
+    <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
   where
-  parseModuleRef :: TokenParser DeclarationRef
-  parseModuleRef = do
-    name <- indented *> reserved "module" *> moduleName
-    return $ ModuleRef name
+  parseProperRef = do
+    name <- properName
+    dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
+    return $ maybe (ProperRef name) (TypeRef name) dctors
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do

@@ -1,23 +1,11 @@
------------------------------------------------------------------------------
---
--- Module      :  PSCi
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- PureScript Compiler Interactive.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
+-- |
+-- PureScript Compiler Interactive.
+--
 module PSCi where
 
 import Prelude ()
@@ -333,11 +321,12 @@ handleShowImportedModules = do
   refsList refs = "(" ++ commaList (map showRef refs) ++ ")"
 
   showRef :: P.DeclarationRef -> String
-  showRef (P.TypeRef pn dctors) = show pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
-  showRef (P.ValueRef ident) = show ident
-  showRef (P.TypeClassRef pn) = show pn
-  showRef (P.TypeInstanceRef ident) = show ident
-  showRef (P.ModuleRef name) = "module " ++ show name
+  showRef (P.TypeRef pn dctors) = N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
+  showRef (P.ValueRef ident) = N.runIdent ident
+  showRef (P.TypeClassRef pn) = N.runProperName pn
+  showRef (P.ProperRef pn) = N.runProperName pn
+  showRef (P.TypeInstanceRef ident) = N.runIdent ident
+  showRef (P.ModuleRef name) = "module " ++ N.runModuleName name
   showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref
 
   commaList :: [String] -> String

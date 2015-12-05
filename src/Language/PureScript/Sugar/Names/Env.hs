@@ -1,16 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.Names.Env
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 
 module Language.PureScript.Sugar.Names.Env
@@ -26,6 +13,7 @@ module Language.PureScript.Sugar.Names.Env
   , exportType
   , exportTypeClass
   , exportValue
+  , getExports
   ) where
 
 import qualified Data.Map as M
@@ -189,3 +177,7 @@ addExport what name mn exports =
 --
 throwConflictError :: (MonadError MultipleErrors m) => (a -> SimpleErrorMessage) -> a -> m b
 throwConflictError conflict = throwError . errorMessage . conflict
+
+-- Gets the exports for a module, or an error message if the module doesn't exist
+getExports :: (MonadError MultipleErrors m) => Env -> ModuleName -> m Exports
+getExports env mn = maybe (throwError . errorMessage $ UnknownModule mn) (return . envModuleExports) $ M.lookup mn env
