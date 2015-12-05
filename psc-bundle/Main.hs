@@ -70,7 +70,7 @@ app Options{..} = do
   input <- for inputFiles $ \filename -> do
     js <- liftIO (readFile filename)
     mid <- guessModuleIdentifier filename
-    return (mid, js)
+    length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
