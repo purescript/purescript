@@ -115,12 +115,11 @@ resolveExports env mn imps exps refs =
     -> (a -> String)
     -> M.Map (Qualified a) [(Qualified a, ModuleName)]
     -> m [Qualified a]
-  extract useQual name render = fmap (map (fst . head . snd)) . go useQual . M.toList
+  extract useQual name render = fmap (map (fst . head . snd)) . go . M.toList
     where
-    go True = filterM (return . eqQual name . fst)
-    go False = filterM $ \(_, options) -> do
-      let isMatch = any (eqQual name . fst) options
-      when (length options > 1) $ checkImportConflicts render options
+    go = filterM $ \(name', options) -> do
+      let isMatch = if useQual then eqQual name name' else any (eqQual name . fst) options
+      when (isMatch && length options > 1) $ checkImportConflicts render options
       return isMatch
 
   -- Check whether a module name refers to a "pseudo module" that came into
