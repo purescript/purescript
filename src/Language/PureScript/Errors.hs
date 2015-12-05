@@ -774,16 +774,28 @@ prettyPrintSingleError full level e = do
             , indent $ paras $ map (line .runProperName) names ]
 
     renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
-      paras [ line $ "The import of type " ++ runModuleName name ++ " as " ++ runModuleName qualName ++ " uses the deprecated 'import qualified' syntax."
-            , line $ "This syntax form will be removed in PureScript 0.9." ]
+      paras [ line $ "Import uses the deprecated 'qualified' syntax:"
+            , indent $ line $ "import qualified " ++ runModuleName name ++ " as " ++ runModuleName qualName
+            , line "Should instead use the form:"
+            , indent $ line $ "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
+            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            ]
 
     renderSimpleErrorMessage (DeprecatedClassImport mn name) =
-      paras [ line $ "The import of class " ++ runProperName name ++ " from " ++ runModuleName mn ++ " uses the deprecated syntax that omits the class keyword."
-            , line $ "This syntax form will be removed in PureScript 0.9." ]
+      paras [ line $ "Class import from " ++ runModuleName mn ++ " uses deprecated syntax that omits the 'class' keyword:"
+            , indent $ line $ runProperName name
+            , line "Should instead use the form:"
+            , indent $ line $ "class " ++ runProperName name
+            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            ]
 
     renderSimpleErrorMessage (DeprecatedClassExport name) =
-      paras [ line $ "The export of class " ++ runProperName name ++ " uses the deprecated syntax that omits the class keyword."
-            , line $ "This syntax form will be removed in PureScript 0.9." ]
+      paras [ line $ "Class export uses deprecated syntax that omits the 'class' keyword:"
+            , indent $ line $ runProperName name
+            , line "Should instead use the form:"
+            , indent $ line $ "class " ++ runProperName name
+            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            ]
 
     renderSimpleErrorMessage (RedundantUnqualifiedImport name imp) =
       line $ "Import of " ++ prettyPrintImport name imp Nothing ++ " is redundant due to a whole-module import"
