@@ -45,7 +45,7 @@ declAsMarkdown decl@Declaration{..} = do
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
-  for_ declFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
+  for_ declFixity (\(fixity, alias) -> fixityAsMarkdown fixity alias >> spacer)
 
   for_ declComments tell'
 
@@ -68,9 +68,11 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
-fixityAsMarkdown :: P.Fixity -> Docs
-fixityAsMarkdown (P.Fixity associativity precedence) =
+fixityAsMarkdown :: P.Fixity -> Maybe String -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) alias =
+  -- TODO: link alias name to member
   tell' $ concat [ "_"
+                 , maybe "" (\i -> "alias for " ++ i ++ " - ") alias
                  , associativityStr
                  , " / precedence "
                  , show precedence

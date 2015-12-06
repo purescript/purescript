@@ -47,6 +47,7 @@ findExportable (Module _ _ mn ds _) =
   updateExports exps (TypeSynonymDeclaration tn _ _) = exportType exps tn [] mn
   updateExports exps (ExternDataDeclaration tn _) = exportType exps tn [] mn
   updateExports exps (ValueDeclaration name _ _ _) = exportValue exps name mn
+  updateExports exps (FixityDeclaration _ name (Just _)) = exportValue exps (Op name) mn
   updateExports exps (ExternDeclaration name _) = exportValue exps name mn
   updateExports exps (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ updateExports exps d
   updateExports exps _ = return exps

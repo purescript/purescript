@@ -1,21 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Linter
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | This module implements a simple linting pass on the PureScript AST.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternGuards #-}
 
+-- |
+-- This module implements a simple linting pass on the PureScript AST.
+--
 module Language.PureScript.Linter (lint, module L) where
 
 import Prelude ()
@@ -66,11 +55,12 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec
 
     stepD :: S.Set Ident -> Declaration -> MultipleErrors
-    stepD _ (TypeClassDeclaration name _ _ decls) = foldMap go decls
+    stepD _ (ValueDeclaration (Op name) _ _ _) = errorMessage (DeprecatedOperatorDecl name)
+    stepD _ (TypeClassDeclaration _ _ _ decls) = foldMap go decls
       where
       go :: Declaration -> MultipleErrors
       go (PositionedDeclaration _ _ d') = go d'
-      go (TypeDeclaration op@(Op _) _)  = errorMessage (ClassOperator name op)
+      go (TypeDeclaration (Op name) _)  = errorMessage (DeprecatedOperatorDecl name)
       go _ = mempty
     stepD _ _ = mempty
 

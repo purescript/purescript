@@ -1,17 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CoreFn.Desugar
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- | The AST -> CoreFn desugaring step
---
------------------------------------------------------------------------------
-
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Data.Function (on)
@@ -68,6 +54,9 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec name (exprToCoreFn ss com Nothing e)]
+  declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
+    let qname = Qualified (Just mn) alias
+    in [NonRec (Op name) (Var (ss, com, Nothing, getValueMeta qname) (Qualified Nothing alias))]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> (name, exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
