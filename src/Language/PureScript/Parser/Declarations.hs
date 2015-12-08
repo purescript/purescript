@@ -349,11 +349,11 @@ parseConstructor :: TokenParser Expr
 parseConstructor = Constructor <$> C.parseQualified C.properName
 
 parseCase :: TokenParser Expr
-parseCase = Case <$> P.between (P.try (reserved "case")) (C.indented *> reserved "of") (return <$> parseValue)
+parseCase = Case <$> P.between (P.try (reserved "case")) (C.indented *> reserved "of") (commaSep1 parseValue)
                  <*> (C.indented *> C.mark (P.many1 (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: TokenParser CaseAlternative
-parseCaseAlternative = CaseAlternative <$> (return <$> parseBinder)
+parseCaseAlternative = CaseAlternative <$> (commaSep1 parseBinder)
                                        <*> (Left <$> (C.indented *>
                                                         P.many1 ((,) <$> parseGuard
                                                                      <*> (indented *> rarrow *> parseValue)

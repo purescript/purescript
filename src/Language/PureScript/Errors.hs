@@ -139,6 +139,7 @@ data SimpleErrorMessage
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
   | ImplicitImport ModuleName [DeclarationRef]
+  | CaseBinderLengthDiffers Int [Binder]
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -309,6 +310,7 @@ errorCode em = case unwrapErrorMessage em of
   IntOutOfRange{} -> "IntOutOfRange"
   RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
   ImplicitImport{} -> "ImplicitImport"
+  CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
 
 -- |
 -- A stack trace for an error
@@ -859,6 +861,11 @@ prettyPrintSingleError full level e = do
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the explicit form: "
             , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
             ]
+
+    renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
+      paras $ [ line $ "Binder list length differs in case alternative:"
+              , indent $ line $ intercalate ", " $ fmap prettyPrintBinderAtom bs
+              , line $ "Expecting " ++ show l ++ " binder" ++ (if l == 1 then "" else "s") ++ "." ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

@@ -26,8 +26,8 @@ import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.Crash
-import Data.Maybe (catMaybes)
-import Data.List (nub, groupBy)
+import Data.Maybe (catMaybes, mapMaybe)
+import Data.List (nub, groupBy, foldl1')
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
@@ -51,14 +51,42 @@ isLeft (Right _) = False
 desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
   rethrow (addHint (ErrorInModule name)) $
-    Module ss coms name <$> (desugarCases <=< desugarAbs $ ds) <*> pure exps
+    Module ss coms name <$> (desugarCases <=< desugarAbs <=< validateCases $ ds) <*> pure exps
 
-desugarAbs :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+-- |
+-- Validates that case head and binder lengths match.
+--
+validateCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+validateCases = flip parU f
+  where
+  (f, _, _) = everywhereOnValuesM return validate return
+
+  validate :: Expr -> m Expr
+  validate c@(Case vs alts) = do
+    let l = length vs
+        alts' = filter ((l /=) . length . caseAlternativeBinders) alts
+    unless (null alts') $
+      throwError . MultipleErrors $ fmap (altError l) (caseAlternativeBinders <$> alts')
+    return c
+  validate other = return other
+
+  altError :: Int -> [Binder] -> ErrorMessage
+  altError l bs = withPosition pos $ ErrorMessage [] $ CaseBinderLengthDiffers l bs
+    where
+    pos = foldl1' widenSpan (mapMaybe positionedBinder bs)
+
+    widenSpan (SourceSpan n start end) (SourceSpan _ start' end') =
+      SourceSpan n (min start start') (max end end')
+
+    positionedBinder (PositionedBinder p _ _) = Just p
+    positionedBinder _ = Nothing
+
+desugarAbs :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
 
-  replace :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Expr -> m Expr
+  replace :: Expr -> m Expr
   replace (Abs (Right binder) val) = do
     ident <- Ident <$> freshName
     return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
@@ -67,10 +95,10 @@ desugarAbs = flip parU f
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+desugarCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
-    desugarRest :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+    desugarRest :: [Declaration] -> m [Declaration]
     desugarRest (TypeInstanceDeclaration name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
