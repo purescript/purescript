@@ -19,9 +19,11 @@ import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Aeson as A
 import Data.Aeson.BetterErrors
+import Data.Version
 
 import Main
 import Language.PureScript.Docs
+import Language.PureScript.Publish
 
 pkgName = "purescript-prelude"
 packageUrl = "https://github.com/purescript/" ++ pkgName
@@ -50,11 +52,17 @@ bowerInstall =
   pushd packageDir $
     readProcess "bower" ["install"] "" >>= putStr
 
+testRunOptions :: PublishOptions
+testRunOptions = defaultPublishOptions
+  { publishGetVersion = return testVersion
+  }
+  where testVersion = ("v999.0.0", Version [999,0,0] [])
+
 getPackage :: IO UploadedPackage
 getPackage = do
   clonePackage
   bowerInstall
-  pushd packageDir preparePackage
+  pushd packageDir $ preparePackage testRunOptions
 
 data TestResult
   = ParseFailed String
