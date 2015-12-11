@@ -141,11 +141,11 @@ getPSCiState = do
     Left err ->
       print err >> exitFailure
     Right modules ->
-      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
+      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit True, Nothing)]
       in  return (PSCiState [] imports modules foreigns [] [])
 
 controlMonadSTasST :: ImportedModule
-controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
+controlMonadSTasST = (s "Control.Monad.ST", P.Implicit True, Just (s "ST"))
   where
   s = P.moduleNameFromString
 

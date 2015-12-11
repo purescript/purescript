@@ -315,10 +315,11 @@ handleShowImportedModules = do
       Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
       Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
 
-  showDeclType P.Implicit = ""
+  showDeclType (P.Implicit True) = " (..)"
+  showDeclType (P.Implicit False) = ""
   showDeclType (P.Explicit refs) = refsList refs
-  showDeclType (P.Hiding refs) = "hiding " ++ refsList refs
-  refsList refs = "(" ++ commaList (map showRef refs) ++ ")"
+  showDeclType (P.Hiding refs) = " hiding " ++ refsList refs
+  refsList refs = " (" ++ commaList (map showRef refs) ++ ")"
 
   showRef :: P.DeclarationRef -> String
   showRef (P.TypeRef pn dctors) = N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"

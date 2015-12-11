@@ -16,6 +16,7 @@ import Data.Foldable (forM_)
 
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.Crash
 import Language.PureScript.Names as P
 
 import Language.PureScript.Errors
@@ -30,6 +31,19 @@ data Name
   | TypeName (Qualified ProperName)
   | DctorName (Qualified ProperName)
   | ClassName (Qualified ProperName)
+  deriving (Eq)
+
+getIdentName :: Name -> Maybe Ident
+getIdentName (IdentName (Qualified _ name)) = Just name
+getIdentName _ = Nothing
+
+getTypeName :: Name -> Maybe ProperName
+getTypeName (TypeName (Qualified _ name)) = Just name
+getTypeName _ = Nothing
+
+getClassName :: Name -> Maybe ProperName
+getClassName (ClassName (Qualified _ name)) = Just name
+getClassName _ = Nothing
 
 -- | Map of module name to list of imported names from that module which have been used.
 type UsedImports = M.Map ModuleName [Name]
@@ -44,11 +58,21 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` alwaysUsedModules) $
     forM_ decls $ \(ss, declType, qualifierName) ->
       censor (onErrorMessages $ addModuleLocError ss) $ unless (qnameUsed qualifierName) $
-        let names = sugarNames mni ++ M.findWithDefault [] mni usedImps
+        let names = nub $ sugarNames mni ++ M.findWithDefault [] mni usedImps
             usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) names
             usedDctors = mapMaybe (matchDctor qualifierName) names
         in case declType of
-          Implicit -> when (null usedNames) $ tell $ errorMessage $ UnusedImport mni
+          Implicit _ | null usedNames -> tell $ errorMessage $ UnusedImport mni
+          Implicit False ->
+            let classRefs = TypeClassRef <$> mapMaybe getClassName names
+                valueRefs = ValueRef <$> mapMaybe getIdentName names
+                types = mapMaybe getTypeName names
+                typesWithDctors = reconstructTypeRefs mni usedDctors
+                typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
+                typesRefs
+                  = map (flip TypeRef (Just [])) typesWithoutDctors
+                  ++ map (\(ty, ds) -> TypeRef ty (Just ds)) (M.toList typesWithDctors)
+            in tell $ errorMessage $ ImplicitImport mni (classRefs ++ typesRefs ++ valueRefs)
           Explicit declrefs -> do
             let idents = nub (mapMaybe runDeclRef declrefs)
             let diff = idents \\ usedNames
@@ -75,6 +99,20 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   sugarNames :: ModuleName -> [ Name ]
   sugarNames (ModuleName [ProperName n]) | n == C.prelude = [ IdentName $ Qualified Nothing (Ident C.bind) ]
   sugarNames _ = []
+
+  reconstructTypeRefs :: ModuleName -> [ProperName] -> M.Map ProperName [ProperName]
+  reconstructTypeRefs mni = foldr accumDctors M.empty
+    where
+    accumDctors dctor = M.alter (Just . maybe [dctor] (dctor :)) (findTypeForDctor mni dctor)
+
+  findTypeForDctor :: ModuleName -> ProperName -> ProperName
+  findTypeForDctor mn dctor =
+    case mn `M.lookup` env of
+      Just (_, _, exps) ->
+        case find (elem dctor . snd . fst) (exportedTypes exps) of
+          Just ((ty, _), _) -> ty
+          Nothing -> internalError $ "missing type for data constructor " ++ runProperName dctor ++ " in findTypeForDctor"
+      Nothing -> internalError $ "missing module " ++ runModuleName mn  ++ " in findTypeForDctor"
 
   -- rely on exports being elaborated by this point
   alwaysUsedModules :: [ ModuleName ]
@@ -121,7 +159,7 @@ runDeclRef :: DeclarationRef -> Maybe String
 runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
 runDeclRef (ValueRef ident) = Just $ showIdent ident
 runDeclRef (TypeRef pn _) = Just $ runProperName pn
-runDeclRef (TypeClassRef pn) = Just $ runProperName pn
+runDeclRef (TypeClassRef pn) = Just $ "class " ++ runProperName pn
 runDeclRef _ = Nothing
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName, Maybe [ProperName])

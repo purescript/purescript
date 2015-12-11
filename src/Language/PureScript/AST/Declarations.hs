@@ -42,6 +42,18 @@ getModuleName :: Module -> ModuleName
 getModuleName (Module _ _ name _ _) = name
 
 -- |
+-- Add an import declaration for a module if it does not already explicitly import it.
+--
+addDefaultImport :: ModuleName -> Module -> Module
+addDefaultImport toImport m@(Module ss coms mn decls exps)  =
+  if isExistingImport `any` decls || mn == toImport then m
+  else Module ss coms mn (ImportDeclaration toImport (Implicit True) Nothing False : decls) exps
+  where
+  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
+  isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
+  isExistingImport _ = False
+
+-- |
 -- An item in a list of explicit imports or exports
 --
 data DeclarationRef
@@ -118,9 +130,11 @@ findDuplicateRefs refs =
 --
 data ImportDeclarationType
   -- |
-  -- An import with no explicit list: `import M`
+  -- An import with no explicit list: `import M`. The boolean signifies whether
+  -- the import was imported with `(..)` or not. Without `(..)` a warning is
+  -- raised for each member implicitly imported.
   --
-  = Implicit
+  = Implicit Bool
   -- |
   -- An import with an explicit list of references to import: `import M (foo)`
   --
@@ -130,6 +144,10 @@ data ImportDeclarationType
   --
   | Hiding [DeclarationRef]
   deriving (Eq, Show, Read, D.Data, D.Typeable)
+
+isImplicit :: ImportDeclarationType -> Bool
+isImplicit (Implicit _) = True
+isImplicit _ = False
 
 -- |
 -- The data type of declarations
