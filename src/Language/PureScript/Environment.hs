@@ -66,7 +66,7 @@ data Environment = Environment {
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty M.empty
+initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses
 
 -- |
 -- The visibility of a name in scope
@@ -236,17 +236,32 @@ function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
 -- |
--- The primitive types in the external javascript environment with their associated kinds.
+-- The primitive types in the external javascript environment with their
+-- associated kinds. There is also a pseudo `Partial` type that corresponds to
+-- the class with the same name.
 --
 primTypes :: M.Map (Qualified ProperName) (Kind, TypeKind)
-primTypes = M.fromList [ (primName "Function" , (FunKind Star (FunKind Star Star), ExternData))
-                       , (primName "Array"    , (FunKind Star Star, ExternData))
-                       , (primName "Object"   , (FunKind (Row Star) Star, ExternData))
-                       , (primName "String"   , (Star, ExternData))
-                       , (primName "Char"     , (Star, ExternData))
-                       , (primName "Number"   , (Star, ExternData))
-                       , (primName "Int"      , (Star, ExternData))
-                       , (primName "Boolean"  , (Star, ExternData)) ]
+primTypes =
+  M.fromList
+    [ (primName "Function", (FunKind Star (FunKind Star Star), ExternData))
+    , (primName "Array", (FunKind Star Star, ExternData))
+    , (primName "Object", (FunKind (Row Star) Star, ExternData))
+    , (primName "String", (Star, ExternData))
+    , (primName "Char", (Star, ExternData))
+    , (primName "Number", (Star, ExternData))
+    , (primName "Int", (Star, ExternData))
+    , (primName "Boolean", (Star, ExternData))
+    , (primName "Partial", (Star, ExternData))
+    ]
+
+-- |
+-- The primitive class map. This just contains to `Partial` class, used as a
+-- kind of magic constraint for partial functions.
+--
+primClasses :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
+primClasses =
+  M.fromList
+    [ (primName "Partial", ([], [], [])) ]
 
 -- |
 -- Finds information about data constructors from the current environment.

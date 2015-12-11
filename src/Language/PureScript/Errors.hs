@@ -118,6 +118,7 @@ data SimpleErrorMessage
   | UnusedTypeVar String
   | WildcardInferredType Type
   | MissingTypeDeclaration Ident Type
+  | NotPartial
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -262,6 +263,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
+  NotPartial{} -> "NotPartial"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -744,12 +746,17 @@ prettyPrintSingleError full level e = do
             , line $ "The inferred type of " ++ showIdent ident ++ " was:"
             , indent $ typeAsBox ty
             ]
+    renderSimpleErrorMessage NotPartial =
+      line "Value has unnecessary Partial constraint."
     renderSimpleErrorMessage (NotExhaustivePattern bs b) =
       paras $ [ line "A case expression could not be determined to cover all inputs."
               , line "The following additional cases are required to cover all inputs:\n"
-              , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
-              ] ++
-              [ line "..." | not b ]
+              , indent $ paras $
+                  [ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs)) ]
+                  ++ [ line "..." | not b ]
+              , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
+              , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
+              ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))

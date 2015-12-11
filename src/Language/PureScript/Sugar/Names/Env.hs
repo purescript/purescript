@@ -16,6 +16,7 @@ module Language.PureScript.Sugar.Names.Env
   , getExports
   ) where
 
+import Data.Maybe (fromJust)
 import qualified Data.Map as M
 
 import Control.Monad
@@ -116,9 +117,10 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] []
+primExports = Exports (mkTypeEntry `map` M.keys primTypes) (mkClassEntry `map` M.keys primClasses) []
   where
-  mkTypeEntry (Qualified _ name) = ((name, []), ModuleName [ProperName "Prim"])
+  mkTypeEntry (Qualified mn name) = ((name, []), fromJust mn)
+  mkClassEntry (Qualified mn name) = (name, fromJust mn)
 
 -- | Environment which only contains the Prim module.
 primEnv :: Env
