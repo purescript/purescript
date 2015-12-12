@@ -159,7 +159,7 @@ runDeclRef :: DeclarationRef -> Maybe String
 runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
 runDeclRef (ValueRef ident) = Just $ showIdent ident
 runDeclRef (TypeRef pn _) = Just $ runProperName pn
-runDeclRef (TypeClassRef pn) = Just $ "class " ++ runProperName pn
+runDeclRef (TypeClassRef pn) = Just $ runProperName pn
 runDeclRef _ = Nothing
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName, Maybe [ProperName])
