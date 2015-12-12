@@ -17,17 +17,6 @@ import Language.PureScript.Environment
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
--- TODO: remove these deprecation warnings in 0.8
-parseArray :: TokenParser Type
-parseArray = do
-  _ <- squares $ return tyArray
-  featureWasRemoved "Array notation is no longer supported. Use Array instead of []."
-
-parseArrayOf :: TokenParser Type
-parseArrayOf = do
-  _ <- squares $ TypeApp tyArray <$> parseType
-  featureWasRemoved "Array notation is no longer supported. Use Array _ instead of [_]."
-
 parseFunction :: TokenParser Type
 parseFunction = parens $ rarrow >> return tyFunction
 
@@ -56,8 +45,6 @@ parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> id
 parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice (map P.try
             [ parseConstrainedType
-            , parseArray
-            , parseArrayOf
             , parseFunction
             , parseObject
             , parseTypeWildcard

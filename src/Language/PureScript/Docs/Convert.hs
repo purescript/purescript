@@ -93,7 +93,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 -- fixity declarations.
 --
 -- TODO: This may no longer be necessary after issue 806 is resolved, hopefully
--- in 0.8.
+-- in 0.9.
 addDefaultFixity :: Declaration -> Declaration
 addDefaultFixity decl@Declaration{..}
   | isOp declTitle && isNothing declFixity =

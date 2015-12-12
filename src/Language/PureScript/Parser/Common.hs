@@ -27,11 +27,6 @@ import Language.PureScript.Names
 
 import qualified Text.Parsec as P
 
-featureWasRemoved :: String -> TokenParser a
-featureWasRemoved err = do
-  pos <- P.getPosition
-  error $ "It looks like you are trying to use a feature from a previous version of the compiler:\n" ++ err ++ "\nat " ++ show pos
-
 properName :: TokenParser ProperName
 properName = ProperName <$> uname
 
