@@ -1,18 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Parser.Types
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Parsers for types
---
------------------------------------------------------------------------------
-
 module Language.PureScript.Parser.Types (
     parseType,
     parsePolyType,
@@ -70,7 +55,8 @@ parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> id
 --
 parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice (map P.try
-            [ parseArray
+            [ parseConstrainedType
+            , parseArray
             , parseArrayOf
             , parseFunction
             , parseObject
@@ -79,21 +65,23 @@ parseTypeAtom = indented *> P.choice (map P.try
             , parseTypeConstructor
             , parseForAll
             , parens parseRow
-            , parseConstrainedType
             , parens parsePolyType
             ])
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- parens . commaSep1 $ do
-    className <- parseQualified properName
-    indented
-    ty <- P.many parseTypeAtom
-    return (className, ty)
+  constraints <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
   _ <- rfatArrow
   indented
   ty <- parseType
   return $ ConstrainedType constraints ty
+  where
+  parseConstraint = do
+    className <- parseQualified properName
+    indented
+    ty <- P.many parseTypeAtom
+    return (className, ty)
+
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"

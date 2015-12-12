@@ -33,6 +33,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Types
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
@@ -174,9 +175,9 @@ parseDeclarationRef =
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do
   reserved "class"
-  implies <- P.option [] $ do
+  implies <- P.option [] $ P.try $ do
     indented
-    implies <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
+    implies <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
     lfatArrow
     return implies
   className <- indented *> properName
@@ -185,13 +186,17 @@ parseTypeClassDeclaration = do
     indented *> reserved "where"
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
+  where
+
+parseConstraint :: TokenParser Constraint
+parseConstraint = (,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do
   reserved "instance"
   name <- parseIdent <* indented <* doubleColon
-  deps <- P.optionMaybe $ do
-    deps <- parens (commaSep1 ((,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)))
+  deps <- P.optionMaybe $ P.try $ do
+    deps <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
     indented
     rfatArrow
     return deps
