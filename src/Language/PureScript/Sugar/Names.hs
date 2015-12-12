@@ -50,7 +50,7 @@ desugarImports externs modules = do
         ss = internalModuleSourceSpan "<Externs>"
         env' = M.insert efModuleName (ss, nullImports, members) env
         fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, mt, qmn)])
-    imps <- foldM (resolveModuleImport efModuleName env') nullImports (map fromEFImport efImports)
+    imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
     exps <- resolveExports env' efModuleName imps members efExports
     return $ M.insert efModuleName (ss, imps, exps) env
     where
@@ -197,16 +197,16 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
 
   updateTypeName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TypeName
+  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TypeName (("type " ++) . runProperName)
 
   updateDataConstructorName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName
+  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName (("data constructor " ++) . runProperName)
 
   updateClassName  :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) ClassName
+  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) ClassName (("class " ++) . runProperName)
 
   updateValueName  :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
-  updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName
+  updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName (("value " ++) . runIdent)
 
   -- Used when performing an update to qualify values and classes with their
   -- module of original definition.
@@ -226,25 +226,30 @@ renameInModule env imports (Module ss coms mn decls exps) =
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names
   -- (e.g. M.Map -> Data.Map.Map).
-  update :: (Ord a) => (Qualified a -> SimpleErrorMessage)
-                       -> M.Map (Qualified a) (Qualified a, ModuleName)
-                       -> (Exports -> a -> Maybe (Qualified a))
-                       -> (Qualified a -> Name)
-                       -> Qualified a
-                       -> Maybe SourceSpan
-                       -> m (Qualified a)
-  update unknown imps getE toName qname@(Qualified mn' name) pos = positioned $
+  update
+    :: (Ord a, Show a)
+    => (Qualified a -> SimpleErrorMessage)
+    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> (Exports -> a -> Maybe (Qualified a))
+    -> (Qualified a -> Name)
+    -> (a -> String)
+    -> Qualified a
+    -> Maybe SourceSpan
+    -> m (Qualified a)
+  update unknown imps getE toName render qname@(Qualified mn' name) pos = positioned $
     case (M.lookup qname imps, mn') of
+
       -- We found the name in our imports, so we return the name for it,
       -- qualifying with the name of the module it was originally defined in
       -- rather than the module we're importing from, to handle the case of
-      -- re-exports.
-      (Just (qn, mnOrig), _) -> do
-        case qn of
-          Qualified (Just mnNew) _ ->
-            modify $ \result -> M.insert mnNew (maybe [toName qname] (toName qname :) (mnNew `M.lookup` result)) result
-          _ -> return ()
+      -- re-exports. If there are multiple options for the name to resolve to
+      -- in scope, we throw an error.
+      (Just options, _) -> do
+        checkImportConflicts render options
+        let (Qualified (Just mnNew) _, mnOrig) = head options
+        modify $ \result -> M.insert mnNew (maybe [toName qname] (toName qname :) (mnNew `M.lookup` result)) result
         return $ Qualified (Just mnOrig) name
+
       -- If the name wasn't found in our imports but was qualified then we need
       -- to check whether it's a failed import from a "pseudo" module (created
       -- by qualified importing). If that's not the case, then we just need to
@@ -252,9 +257,11 @@ renameInModule env imports (Module ss coms mn decls exps) =
       (Nothing, Just mn'') -> do
         modExports <- getExports env mn''
         maybe (throwError . errorMessage $ unknown qname) return (getE modExports name)
+
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
       _ -> throwError . errorMessage $ unknown qname
+
     where
     positioned err = case pos of
       Nothing -> err

@@ -67,8 +67,7 @@ data SimpleErrorMessage
   | UnknownExportModule ModuleName
   | UnknownImportDataConstructor ModuleName ProperName ProperName
   | UnknownExportDataConstructor ProperName ProperName
-  | ConflictingImport String ModuleName
-  | ConflictingImports String ModuleName ModuleName
+  | ScopeConflict String [ModuleName]
   | ConflictingTypeDecls ProperName
   | ConflictingCtorDecls ProperName
   | TypeConflictsWithClass ProperName
@@ -212,8 +211,7 @@ errorCode em = case unwrapErrorMessage em of
   UnknownExportModule{} -> "UnknownExportModule"
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
   UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
-  ConflictingImport{} -> "ConflictingImport"
-  ConflictingImports{} -> "ConflictingImports"
+  ScopeConflict{} -> "ScopeConflict"
   ConflictingTypeDecls{} -> "ConflictingTypeDecls"
   ConflictingCtorDecls{} -> "ConflictingCtorDecls"
   TypeConflictsWithClass{} -> "TypeConflictsWithClass"
@@ -524,13 +522,10 @@ prettyPrintSingleError full level e = do
       line $ "Module " ++ runModuleName mn ++ " does not export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon
     renderSimpleErrorMessage (UnknownExportDataConstructor tcon dcon) =
       line $ "Cannot export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon ++ ", as it has not been declared."
-    renderSimpleErrorMessage (ConflictingImport nm mn) =
-      paras [ line $ "Cannot declare " ++ show nm ++ ", since another declaration of that name was imported from module " ++ runModuleName mn
-            , line $ "Consider hiding " ++ show nm ++ " when importing " ++ runModuleName mn ++ ":"
-            , indent . line $ "import " ++ runModuleName mn ++ " hiding (" ++ nm ++ ")"
+    renderSimpleErrorMessage (ScopeConflict nm ms) =
+      paras [ line $ "Conflicting definitions are in scope for " ++ nm ++ " from the following modules:"
+            , indent $ paras $ map (line . runModuleName) ms
             ]
-    renderSimpleErrorMessage (ConflictingImports nm m1 m2) =
-      line $ "Conflicting imports for " ++ nm ++ " from modules " ++ runModuleName m1 ++ " and " ++ runModuleName m2
     renderSimpleErrorMessage (ConflictingTypeDecls nm) =
       line $ "Conflicting type declarations for " ++ runProperName nm
     renderSimpleErrorMessage (ConflictingCtorDecls nm) =
