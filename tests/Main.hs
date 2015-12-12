@@ -68,6 +68,7 @@ import qualified System.FilePath.Glob as Glob
 import Text.Parsec (ParseError)
 
 import TestsSetup
+import TestPscPublish
 
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
@@ -171,6 +172,11 @@ assertDoesNotCompile inputFiles foreigns = do
 
 main :: IO ()
 main = do
+  testCompiler
+  testPscPublish
+
+testCompiler :: IO ()
+testCompiler = do
   fetchSupportCode
   cwd <- getCurrentDirectory
 
@@ -202,6 +208,10 @@ main = do
         let fp' = fromMaybe fp $ stripPrefix (failing ++ [pathSeparator]) fp
         in putStrLn $ fp' ++ ": " ++ err
       exitFailure
+
+testPscPublish :: IO ()
+testPscPublish = do
+  testPackage "tests/support/prelude"
 
 supportModules :: [String]
 supportModules =
