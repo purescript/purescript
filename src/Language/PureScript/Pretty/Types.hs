@@ -121,20 +121,26 @@ constrained = mkPattern match
   match _ = Nothing
 
 matchTypeAtom :: Pattern () Type Box
-matchTypeAtom = typeLiterals <+> fmap ((`before` text ")") . (text "(" <>)) matchType
+matchTypeAtom = typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) matchType
 
 matchType :: Pattern () Type Box
 matchType = buildPrettyPrinter operators matchTypeAtom
   where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> f `beforeWithSpace` x ]
-                  , [ AssocR appliedFunction $ \arg ret -> (arg <> text " ") `before` (text "-> " <> ret)
-                    ]
+    OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+                  , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text "-> " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
-                  , [ Wrap forall_ $ \idents ty -> text ("forall " ++ unwords idents ++ ". ") <> ty ]
-                  , [ Wrap kinded $ \k ty -> ty `before` text (" :: " ++ prettyPrintKind k) ]
+                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text ("forall " ++ unwords idents ++ ".")) ty ]
+                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ prettyPrintKind k)) ]
                   ]
+
+  -- If both boxes span a single line, keep them on the same line, or else
+  -- use the specified function to modify the second box, then combine vertically.
+  keepSingleLinesOr :: (Box -> Box) -> Box -> Box -> Box
+  keepSingleLinesOr f b1 b2
+    | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
+    | otherwise = hcat top [ b1, text " ", b2]
 
 forall_ :: Pattern () Type ([String], Type)
 forall_ = mkPattern match

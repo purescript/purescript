@@ -160,6 +160,7 @@ prettyPrintBinderAtom (ArrayBinder bs) =
   ++ " ]"
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident ++ "@" ++ prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
+prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom b = parens (prettyPrintBinder b)
 
 -- |
