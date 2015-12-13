@@ -185,12 +185,15 @@ library
     ghc-options: -Wall -O2
 
 executable psc
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
+    build-depends: base >=4 && <5, base-compat >=0.6.0,
+                   containers -any, directory -any, filepath -any,
                    mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
-                   time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8
+                   time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
+                   aeson >= 0.8 && < 0.11, bytestring -any, utf8-string >= 1 && < 2
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
+    other-modules: JSON
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
