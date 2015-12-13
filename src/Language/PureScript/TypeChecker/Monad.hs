@@ -57,14 +57,13 @@ data CheckState = CheckState
   , checkNextKind :: Int                    -- ^ The next kind unification variable
   , checkNextSkolem :: Int                  -- ^ The next skolem variable
   , checkNextSkolemScope :: Int             -- ^ The next skolem scope constant
-  , checkNextDictName :: Int                -- ^ The next type class dictionary name
   , checkCurrentModule :: Maybe ModuleName  -- ^ The current module
   , checkSubstitution :: Substitution       -- ^ The current substitution
   }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 0 0 Nothing emptySubstitution
+emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution
 
 -- | Unification variables
 type Unknown = Int
@@ -201,13 +200,6 @@ runCheck' env check = fmap (second checkEnv) $ runStateT check (emptyCheckState 
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()
 guardWith e False = throwError e
-
--- | Generate new type class dictionary name
-freshDictionaryName :: (Functor m, MonadState CheckState m) => m Int
-freshDictionaryName = do
-  n <- checkNextDictName <$> get
-  modify $ \s -> s { checkNextDictName = succ (checkNextDictName s) }
-  return n
 
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
 liftUnify ::

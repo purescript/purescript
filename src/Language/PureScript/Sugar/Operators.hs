@@ -178,6 +178,6 @@ desugarOperatorSections (Module ss coms mn ds exts) = Module ss coms mn <$> trav
   goExpr :: Expr -> m Expr
   goExpr (OperatorSection op (Left val)) = return $ App op val
   goExpr (OperatorSection op (Right val)) = do
-    arg <- Ident <$> freshName
+    arg <- freshIdent'
     return $ Abs (Left arg) $ App (App op (Var (Qualified Nothing arg))) val
   goExpr other = return other

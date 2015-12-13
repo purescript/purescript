@@ -1,22 +1,9 @@
------------------------------------------------------------------------------
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Renamer
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Renaming pass that prevents shadowing of local identifiers.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Renaming pass that prevents shadowing of local identifiers.
+--
 module Language.PureScript.Renamer (renameInModules) where
 
 import Prelude ()
@@ -25,6 +12,7 @@ import Prelude.Compat
 import Control.Monad.State
 
 import Data.List (find)
+import Data.Maybe (fromJust, fromMaybe)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -76,19 +64,31 @@ newScope x = do
 -- unique name is generated and stored.
 --
 updateScope :: Ident -> Rename Ident
-updateScope i@(Ident name) | name == C.__unused = return i
-updateScope name = do
-  scope <- get
-  name' <- if name `S.member` rsUsedNames scope
-             then do
-               let newNames = [ Ident (runIdent name ++ "_" ++ show (i :: Int)) | i <- [1..] ]
-                   Just newName = find (`S.notMember` rsUsedNames scope) newNames
-               return newName
-             else return name
-  modify $ \s -> s { rsBoundNames = M.insert name name' (rsBoundNames s)
-                   , rsUsedNames  = S.insert name' (rsUsedNames s)
-                   }
-  return name'
+updateScope ident =
+  case ident of
+    Ident name
+      | name == C.__unused -> return ident
+      | last name == '\'' -> go ident $ Ident $ init name ++ "ʹ" -- '\x02b9'
+    GenIdent name _ -> go ident $ Ident (fromMaybe "v" name)
+    _ -> go ident ident
+  where
+  go :: Ident -> Ident -> Rename Ident
+  go keyName baseName = do
+    scope <- get
+    let usedNames = rsUsedNames scope
+        name' =
+          if baseName `S.member` usedNames
+          then getNewName usedNames baseName
+          else baseName
+    modify $ \s -> s { rsBoundNames = M.insert keyName name' (rsBoundNames s)
+                     , rsUsedNames  = S.insert name' (rsUsedNames s)
+                     }
+    return name'
+  getNewName :: S.Set Ident -> Ident -> Ident
+  getNewName usedNames name =
+    fromJust $ find
+      (`S.notMember` usedNames)
+      [ Ident (runIdent name ++ show (i :: Int)) | i <- [1..] ]
 
 -- |
 -- Finds the new name to use for an ident.
