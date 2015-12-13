@@ -1,22 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- The top-level type checker, which checks all declarations in a module.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+-- |
+-- The top-level type checker, which checks all declarations in a module.
+--
 module Language.PureScript.TypeChecker (
     module T,
     typeCheckModule
@@ -196,7 +184,7 @@ typeCheckAll :: forall m.
   [DeclarationRef] ->
   [Declaration] ->
   m [Declaration]
-typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkOrphanFixities ds
+typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration dtype name args dctors) = do
@@ -290,13 +278,16 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkOrphanFixities d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
 
-  checkOrphanFixities :: Declaration -> m ()
-  checkOrphanFixities (FixityDeclaration _ name) = do
+  checkFixities :: Declaration -> m ()
+  checkFixities (FixityDeclaration _ name (Just alias)) = do
+    ty <- lookupVariable moduleName (Qualified (Just moduleName) alias)
+    addValue moduleName (Op name) ty Public
+  checkFixities (FixityDeclaration _ name _) = do
     env <- getEnv
     guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
-  checkOrphanFixities (PositionedDeclaration pos _ d) =
-    warnAndRethrowWithPosition pos $ checkOrphanFixities d
-  checkOrphanFixities _ = return ()
+  checkFixities (PositionedDeclaration pos _ d) =
+    warnAndRethrowWithPosition pos $ checkFixities d
+  checkFixities _ = return ()
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do
@@ -355,6 +346,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
+    checkNonAliasesAreExported e
   return $ Module ss coms mn decls' (Just exps)
   where
 
@@ -429,3 +421,17 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     extractMemberName (TypeDeclaration memberName _) = memberName
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
+
+  checkNonAliasesAreExported :: DeclarationRef -> m ()
+  checkNonAliasesAreExported dr@(ValueRef (Op name)) =
+    case listToMaybe (mapMaybe getAlias decls) of
+      Just alias ->
+        when (not $ any (== ValueRef alias) exps) $
+          throwError . errorMessage $ TransitiveExportError dr [ValueRef alias]
+      _ -> return ()
+    where
+    getAlias :: Declaration -> Maybe Ident
+    getAlias (PositionedDeclaration _ _ d) = getAlias d
+    getAlias (FixityDeclaration _ name' alias) | name == name' = alias
+    getAlias _ = Nothing
+  checkNonAliasesAreExported _ = return ()

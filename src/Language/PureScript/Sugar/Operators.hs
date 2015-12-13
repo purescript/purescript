@@ -1,13 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.Operators
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
+
 -- |
 -- This module implements the desugaring pass which reapplies binary operators based
 -- on their fixity data and removes explicit parentheses.
@@ -15,13 +10,6 @@
 -- The value parser ignores fixity data when parsing binary operator applications, so
 -- it is necessary to reorder them here.
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Language.PureScript.Sugar.Operators (
   rebracket,
   removeSignedLiterals,
@@ -44,6 +32,8 @@ import Control.Monad.Supply.Class
 import Data.Function (on)
 import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
+import Data.Maybe (mapMaybe, fromMaybe)
+import qualified Data.Map as M
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P
@@ -57,9 +47,24 @@ import qualified Language.PureScript.Constants as C
 rebracket :: (Applicative m, MonadError MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 rebracket externs ms = do
   let fixities = concatMap externsFixities externs ++ concatMap collectFixities ms
-  ensureNoDuplicates $ map (\(i, pos, _) -> (i, pos)) fixities
-  let opTable = customOperatorTable $ map (\(i, _, f) -> (i, f)) fixities
-  traverse (rebracketModule opTable) ms
+  ensureNoDuplicates $ map (\(i, pos, _, _) -> (i, pos)) fixities
+  let opTable = customOperatorTable $ map (\(i, _, f, _) -> (i, f)) fixities
+  ms' <- traverse (rebracketModule opTable) ms
+  let aliased = M.fromList (mapMaybe makeLookupEntry fixities)
+  return $ renameAliasedOperators aliased `map` ms'
+
+  where
+
+  makeLookupEntry :: (Qualified Ident, SourceSpan, Fixity, Maybe Ident) -> Maybe (Qualified Ident, Qualified Ident)
+  makeLookupEntry (qname@(Qualified qual _), _, _, Just alias) = Just (qname, Qualified qual alias)
+  makeLookupEntry _ = Nothing
+
+  renameAliasedOperators :: M.Map (Qualified Ident) (Qualified Ident) -> Module -> Module
+  renameAliasedOperators aliased (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
+    where
+    (f', _, _) = everywhereOnValues id go id
+    go (Var name) = Var $ fromMaybe name (name `M.lookup` aliased)
+    go other = other
 
 removeSignedLiterals :: Module -> Module
 removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
@@ -82,17 +87,18 @@ removeParens =
   go (Parens val) = val
   go val = val
 
-externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity)]
+externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
 externsFixities ExternsFile{..} =
-  [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec)
-  | ExternsFixity assoc prec op <- efFixities
+  [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec, alias)
+  | ExternsFixity assoc prec op alias <- efFixities
   ]
 
-collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity)]
+collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
 collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
-  collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity)]
-  collect (PositionedDeclaration pos _ (FixityDeclaration fixity name)) = [(Qualified (Just moduleName) (Op name), pos, fixity)]
+  collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
+  collect (PositionedDeclaration pos _ (FixityDeclaration fixity name alias)) =
+    [(Qualified (Just moduleName) (Op name), pos, fixity, alias)]
   collect FixityDeclaration{} = internalError "Fixity without srcpos info"
   collect _ = []
 

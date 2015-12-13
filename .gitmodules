@@ -1,0 +1,3 @@
+[submodule "tests/support/prelude"]
+	path = tests/support/prelude
+	url = https://github.com/purescript/purescript-prelude

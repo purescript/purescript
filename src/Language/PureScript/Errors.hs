@@ -127,6 +127,7 @@ data SimpleErrorMessage
   | UnusedExplicitImport ModuleName [String]
   | UnusedDctorImport ProperName
   | UnusedDctorExplicitImport ProperName [ProperName]
+  | DeprecatedOperatorDecl String
   | DeprecatedQualifiedSyntax ModuleName ModuleName
   | DeprecatedClassImport ModuleName ProperName
   | DeprecatedClassExport ProperName
@@ -271,6 +272,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedExplicitImport{} -> "UnusedExplicitImport"
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
+  DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
   DeprecatedClassImport{} -> "DeprecatedClassImport"
   DeprecatedClassExport{} -> "DeprecatedClassExport"
@@ -712,8 +714,9 @@ prettyPrintSingleError full level e = do
             , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form."
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
-      paras $ line ("An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: ")
-              : map (line . prettyPrintExport) ys
+      paras [ line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: "
+            , indent $ paras $ map (line . prettyPrintExport) ys
+            ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name '" ++ showIdent nm ++ "' was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
@@ -769,6 +772,13 @@ prettyPrintSingleError full level e = do
     renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
       paras [ line $ "The import of type " ++ runProperName name ++ " includes the following unused data constructors:"
             , indent $ paras $ map (line .runProperName) names ]
+
+    renderSimpleErrorMessage (DeprecatedOperatorDecl name) =
+      paras [ line $ "The operator (" ++ name ++ ") was declared as a value rather than an alias for a named function."
+            , line "Operator aliases are declared by using a fixity declaration, for example:"
+            , indent $ line $ "infixl 9 someFunction as " ++ name
+            , line $ "Support for value-declared operators will be removed in PureScript 0.9."
+            ]
 
     renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
       paras [ line $ "Import uses the deprecated 'qualified' syntax:"

@@ -1,22 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Externs
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- This module generates code for \"externs\" files, i.e. files containing only foreign import declarations.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- |
+-- This module generates code for \"externs\" files, i.e. files containing only foreign import declarations.
+--
 module Language.PureScript.Externs
   ( ExternsFile(..)
   , ExternsImport(..)
@@ -84,6 +72,8 @@ data ExternsFixity = ExternsFixity
   , efPrecedence :: Precedence
   -- | The operator symbol
   , efOperator :: String
+  -- | The value the operator is an alias for
+  , efAlias :: Maybe Ident
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
@@ -163,7 +153,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efDeclarations  = concatMap toExternsDeclaration efExports
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
-  fixityDecl (FixityDeclaration (Fixity assoc prec) op) = fmap (const (ExternsFixity assoc prec op)) (find exportsOp exps)
+  fixityDecl (FixityDeclaration (Fixity assoc prec) op alias) = fmap (const (ExternsFixity assoc prec op alias)) (find exportsOp exps)
     where
     exportsOp :: DeclarationRef -> Bool
     exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r

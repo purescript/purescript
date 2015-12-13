@@ -11,6 +11,9 @@ module Language.PureScript.Docs.Convert
   , collectBookmarks
   ) where
 
+import Prelude ()
+import Prelude.Compat
+
 import Control.Monad
 import Control.Category ((>>>))
 import Data.Either
@@ -68,7 +71,7 @@ type IntermediateDeclaration
 -- with their associativity and precedence.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
-  | AugmentFixity P.Fixity
+  | AugmentFixity P.Fixity (Maybe P.Ident)
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -86,8 +89,8 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     case a of
       AugmentChild child ->
         d { declChildren = declChildren d ++ [child] }
-      AugmentFixity fixity ->
-        d { declFixity = Just fixity }
+      AugmentFixity fixity alias ->
+        d { declFixity = Just (fixity, P.runIdent <$> alias) }
 
 -- | Add the default operator fixity for operators which do not have associated
 -- fixity declarations.
@@ -97,7 +100,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 addDefaultFixity :: Declaration -> Declaration
 addDefaultFixity decl@Declaration{..}
   | isOp declTitle && isNothing declFixity =
-        decl { declFixity = Just defaultFixity }
+        decl { declFixity = Just (defaultFixity, Nothing) }
   | otherwise =
         decl
   where
@@ -113,7 +116,7 @@ getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (P.runProper
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration name _ _ _)      = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.FixityDeclaration _ name)             = Just ("(" ++ name ++ ")")
+getDeclarationTitle (P.FixityDeclaration _ name _)           = Just ("(" ++ name ++ ")")
 getDeclarationTitle (P.PositionedDeclaration _ _ d)          = getDeclarationTitle d
 getDeclarationTitle _                                        = Nothing
 
@@ -170,8 +173,8 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
   classApp = foldl P.TypeApp (P.TypeConstructor className) tys
-convertDeclaration (P.FixityDeclaration fixity _) title =
-  Just (Left ([title], AugmentFixity fixity))
+convertDeclaration (P.FixityDeclaration fixity _ alias) title =
+  Just (Left ([title], AugmentFixity fixity alias))
 convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
   fmap (addComments . addSourceSpan) (convertDeclaration d' title)
   where

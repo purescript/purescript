@@ -84,7 +84,7 @@ data Declaration = Declaration
   , declComments   :: Maybe String
   , declSourceSpan :: Maybe P.SourceSpan
   , declChildren   :: [ChildDeclaration]
-  , declFixity     :: Maybe P.Fixity
+  , declFixity     :: Maybe (P.Fixity, Maybe String)
   , declInfo       :: DeclarationInfo
   }
   deriving (Show, Eq, Ord)
@@ -307,9 +307,12 @@ asDeclaration =
               <*> key "fixity" (perhaps asFixity)
               <*> key "info" asDeclarationInfo
 
-asFixity :: Parse PackageError P.Fixity
-asFixity = P.Fixity <$> key "associativity" asAssociativity
-                    <*> key "precedence" asIntegral
+asFixity :: Parse PackageError (P.Fixity, Maybe String)
+asFixity = do
+  fixity <- P.Fixity <$> key "associativity" asAssociativity
+                     <*> key "precedence" asIntegral
+  alias <- keyMay "alias" asString
+  return (fixity, alias)
 
 parseAssociativity :: String -> Maybe P.Associativity
 parseAssociativity str = case str of
