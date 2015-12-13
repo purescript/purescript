@@ -409,7 +409,7 @@ prettyPrintSingleError full level e = do
       ]
     where
     wikiUri :: String
-    wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
+    wikiUri = "https://github.com/purescript/purescript/blob/master/docs/errors/Error-Code-" ++ errorCode e ++ ".md"
 
     typeInformation :: Box.Box
     typeInformation | not (null types) = Box.hsep 1 Box.left [ line "where", paras types]
