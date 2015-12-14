@@ -19,10 +19,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.PureScript.Linter.Exhaustive
-  ( checkExhaustive
-  , checkExhaustiveModule
-  ) where
+module Language.PureScript.Linter.Exhaustive (checkExhaustiveModule) where
 
 import Prelude ()
 import Prelude.Compat
@@ -48,7 +45,7 @@ import Language.PureScript.Errors
 
 -- | There are two modes of failure for the redudancy check:
 --
--- 1. Exhaustivity was incomeplete due to too many cases, so we couldn't determine redundancy.
+-- 1. Exhaustivity was incomplete due to too many cases, so we couldn't determine redundancy.
 -- 2. We didn't attempt to determine redundancy for a binder, e.g. an integer binder.
 --
 -- We want to warn the user in the first case.
@@ -239,8 +236,8 @@ missingAlternative env mn ca uncovered
 -- it partitions that set with the new uncovered cases, until it consumes the whole set of clauses.
 -- Then, returns the uncovered set of case alternatives.
 --
-checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Environment -> ModuleName -> Int -> [CaseAlternative] -> m ()
-checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Bool -> Environment -> ModuleName -> Int -> [CaseAlternative] -> m ()
+checkExhaustive hasConstraint env mn numArgs cas = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedudancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
@@ -258,13 +255,13 @@ checkExhaustive env mn numArgs cas = makeResult . first nub $ foldl' step ([init
 
   makeResult :: ([[Binder]], (Either RedudancyError Bool, [[Binder]])) -> m ()
   makeResult (bss, (rr, bss')) =
-    do unless (null bss) tellExhaustive
+    do unless (hasConstraint || null bss) tellNonExhaustive
        unless (null bss') tellRedundant
        case rr of
-         Left Incomplete -> tellIncomplete
+         Left Incomplete -> unless hasConstraint tellIncomplete
          _ -> return ()
     where
-    tellExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
+    tellNonExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
     tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
     tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
 
@@ -279,29 +276,43 @@ checkExhaustiveDecls env mn = mapM_ onDecl
     where
     convert :: (Ident, NameKind, Expr) -> Declaration
     convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
-  onDecl (ValueDeclaration name _ _ (Right e)) = censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (ValueDeclaration name _ _ (Right e)) = censor (addHint (ErrorInValueDeclaration name)) (onExpr False e)
   onDecl (PositionedDeclaration pos _ dec) = censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl _ = return ()
 
-  onExpr :: Expr -> m ()
-  onExpr (UnaryMinus e) = onExpr e
-  onExpr (ArrayLiteral es) = mapM_ onExpr es
-  onExpr (ObjectLiteral es) = mapM_ (onExpr . snd) es
-  onExpr (TypeClassDictionaryConstructorApp _ e) = onExpr e
-  onExpr (Accessor _ e) = onExpr e
-  onExpr (ObjectUpdate o es) = onExpr o >> mapM_ (onExpr . snd) es
-  onExpr (Abs _ e) = onExpr e
-  onExpr (App e1 e2) = onExpr e1 >> onExpr e2
-  onExpr (IfThenElse e1 e2 e3) = onExpr e1 >> onExpr e2 >> onExpr e3
-  onExpr (Case es cas) = checkExhaustive env mn (length es) cas >> mapM_ onExpr es >> mapM_ onCaseAlternative cas
-  onExpr (TypedValue _ e _) = onExpr e
-  onExpr (Let ds e) = mapM_ onDecl ds >> onExpr e
-  onExpr (PositionedValue pos _ e) = censor (addHint (PositionedError pos)) (onExpr e)
-  onExpr _ = return ()
+  onExpr :: Bool -> Expr -> m ()
+  onExpr isP (UnaryMinus e) = onExpr isP e
+  onExpr isP (ArrayLiteral es) = mapM_ (onExpr isP) es
+  onExpr isP (ObjectLiteral es) = mapM_ (onExpr isP . snd) es
+  onExpr isP (TypeClassDictionaryConstructorApp _ e) = onExpr isP e
+  onExpr isP (Accessor _ e) = onExpr isP e
+  onExpr isP (ObjectUpdate o es) = onExpr isP o >> mapM_ (onExpr isP . snd) es
+  onExpr isP (Abs _ e) = onExpr isP e
+  onExpr isP (App e1 e2) = onExpr isP e1 >> onExpr isP e2
+  onExpr isP (IfThenElse e1 e2 e3) = onExpr isP e1 >> onExpr isP e2 >> onExpr isP e3
+  onExpr isP (Case es cas) = checkExhaustive isP env mn (length es) cas >> mapM_ (onExpr isP) es >> mapM_ (onCaseAlternative isP) cas
+  onExpr isP (TypedValue _ e ty) = onExpr (isP || hasPartialConstraint ty) e
+  onExpr isP (Let ds e) = mapM_ onDecl ds >> onExpr isP e
+  onExpr isP (PositionedValue pos _ e) = censor (addHint (PositionedError pos)) (onExpr isP e)
+  onExpr _ _ = return ()
 
-  onCaseAlternative :: CaseAlternative -> m ()
-  onCaseAlternative (CaseAlternative _ (Left es)) = mapM_ (\(e, g) -> onExpr e >> onExpr g) es
-  onCaseAlternative (CaseAlternative _ (Right e)) = onExpr e
+  onCaseAlternative :: Bool -> CaseAlternative -> m ()
+  onCaseAlternative isP (CaseAlternative _ (Left es)) = mapM_ (\(e, g) -> onExpr isP e >> onExpr isP g) es
+  onCaseAlternative isP (CaseAlternative _ (Right e)) = onExpr isP e
+
+  hasPartialConstraint :: Type -> Bool
+  hasPartialConstraint (ConstrainedType cs _) = any (go . fst) cs
+    where
+    go :: Qualified ProperName -> Bool
+    go qname
+      | qname == partialClass = True
+      | otherwise =
+          case qname `M.lookup` typeClasses env of
+            Just ([], _, cs') -> any (go . fst) cs'
+            _ -> False
+    partialClass :: Qualified ProperName
+    partialClass = primName "Partial"
+  hasPartialConstraint _ = False
 
 -- |
 -- Exhaustivity checking over a single module
