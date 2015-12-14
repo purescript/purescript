@@ -33,10 +33,11 @@ parseBang :: TokenParser Kind
 parseBang = const Bang <$> symbol' "!"
 
 parseTypeAtom :: TokenParser Kind
-parseTypeAtom = indented *> P.choice (map P.try
+parseTypeAtom = indented *> P.choice
             [ parseStar
             , parseBang
-            , parens parseKind ])
+            , parens parseKind
+            ]
 -- |
 -- Parse a kind
 --
@@ -44,4 +45,4 @@ parseKind :: TokenParser Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
   operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
-              , [ P.Infix (P.try rarrow >> return FunKind) P.AssocRight ] ]
+              , [ P.Infix (rarrow >> return FunKind) P.AssocRight ] ]
