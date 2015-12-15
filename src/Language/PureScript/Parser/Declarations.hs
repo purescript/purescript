@@ -106,9 +106,6 @@ parseExternDeclaration = P.try (reserved "foreign") *> indented *> reserved "imp
    (ExternDataDeclaration <$> (P.try (reserved "data") *> indented *> properName)
                           <*> (indented *> doubleColon *> parseKind)
    <|> (do ident <- parseIdent
-           -- TODO: add a wiki page link with migration info
-           -- TODO: remove this deprecation warning in 0.8
-           _ <- P.optional $ stringLiteral *> featureWasRemoved "Inline foreign string literals are no longer supported."
            ty <- indented *> doubleColon *> noWildcards parsePolyType
            return $ ExternDeclaration ident ty))
 
@@ -525,10 +522,8 @@ parseIdentifierAndBinder =
 -- Parse a binder
 --
 parseBinder :: TokenParser Binder
-parseBinder = withSourceSpan PositionedBinder (P.buildExpressionParser operators (buildPostfixParser postfixTable parseBinderAtom))
+parseBinder = withSourceSpan PositionedBinder (buildPostfixParser postfixTable parseBinderAtom)
   where
-  -- TODO: remove this deprecation warning in 0.8
-  operators = [ [ P.Infix (P.try $ C.indented *> colon *> featureWasRemoved "Cons binders are no longer supported. Consider using purescript-lists or purescript-sequences instead.") P.AssocRight ] ]
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (P.try (indented *> doubleColon) *> parseType)
                  ]
