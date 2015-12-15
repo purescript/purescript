@@ -1,23 +1,12 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.Common
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Common code generation utility functions
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.CodeGen.JS.Common where
 
 import Data.Char
 import Data.List (intercalate)
 
+import Language.PureScript.Crash
 import Language.PureScript.Names
 
 -- |
@@ -33,6 +22,7 @@ identToJs :: Ident -> String
 identToJs (Ident name) | nameIsJsReserved name = "$$" ++ name
 identToJs (Ident name) = concatMap identCharToString name
 identToJs (Op op) = concatMap identCharToString op
+identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 
 -- |
 -- Test if a string is a valid JS identifier without escaping.

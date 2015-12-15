@@ -1,17 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.ObjectWildcards
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -44,10 +30,10 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   desugarExpr (ObjectConstructor ps) = wrapLambda ObjectLiteral ps
   desugarExpr (ObjectUpdater (Just obj) ps) = wrapLambda (ObjectUpdate obj) ps
   desugarExpr (ObjectUpdater Nothing ps) = do
-    obj <- Ident <$> freshName
+    obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (Var (Qualified Nothing obj))) ps
   desugarExpr (ObjectGetter prop) = do
-    arg <- Ident <$> freshName
+    arg <- freshIdent'
     return $ Abs (Left arg) (Accessor prop (Var (Qualified Nothing arg)))
   desugarExpr e = return e
 
@@ -63,5 +49,5 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   mkProp :: (String, Maybe Expr) -> m (Maybe Ident, (String, Expr))
   mkProp (name, Just e) = return (Nothing, (name, e))
   mkProp (name, Nothing) = do
-    arg <- Ident <$> freshName
+    arg <- freshIdent'
     return (Just arg, (name, Var (Qualified Nothing arg)))

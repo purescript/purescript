@@ -25,6 +25,7 @@ import Data.Foldable (for_, traverse_)
 import qualified Data.Map as M
 
 import Control.Monad (when, unless, void, forM, forM_)
+import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -179,7 +180,7 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --  * Process module imports
 --
 typeCheckAll :: forall m.
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   ModuleName ->
   [DeclarationRef] ->
   [Declaration] ->
@@ -335,7 +336,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
 -- required by exported members are also exported.
 --
 typeCheckModule :: forall m.
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Module ->
   m Module
 typeCheckModule (Module _ _ _ _ Nothing) = internalError "exports should have been elaborated"

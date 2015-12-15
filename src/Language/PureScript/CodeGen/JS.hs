@@ -1,23 +1,11 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- This module generates code in the simplified Javascript intermediate representation from Purescript code
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- This module generates code in the simplified Javascript intermediate representation from Purescript code
+--
 module Language.PureScript.CodeGen.JS
   ( module AST
   , module Common
@@ -180,6 +168,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   accessor :: Ident -> JS -> JS
   accessor (Ident prop) = accessorString prop
   accessor (Op op) = JSIndexer (JSStringLiteral op)
+  accessor (GenIdent _ _) = internalError "GenIdent in accessor"
 
   accessorString :: String -> JS -> JS
   accessorString prop | identNeedsEscaping prop = JSIndexer (JSStringLiteral prop)

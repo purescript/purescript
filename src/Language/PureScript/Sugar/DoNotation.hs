@@ -1,22 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.DoNotation
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- |
 -- This module implements the desugaring pass which replaces do-notation statements with
 -- appropriate calls to bind from the Prelude.Monad type class.
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Language.PureScript.Sugar.DoNotation (
     desugarDoModule
 ) where
@@ -68,7 +56,7 @@ desugarDo d =
     return $ App (App bind val) (Abs (Left ident) rest')
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
-    ident <- Ident <$> freshName
+    ident <- freshIdent'
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do

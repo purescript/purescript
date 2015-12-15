@@ -1,22 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CaseDeclarations
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- |
 -- This module implements the desugaring pass which replaces top-level binders with
 -- case expressions.
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Language.PureScript.Sugar.CaseDeclarations (
     desugarCases,
     desugarCasesModule
@@ -88,7 +76,7 @@ desugarAbs = flip parU f
 
   replace :: Expr -> m Expr
   replace (Abs (Right binder) val) = do
-    ident <- Ident <$> freshName
+    ident <- freshIdent'
     return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
   replace other = return other
 
@@ -136,7 +124,7 @@ toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = 
   isVarBinder _ = False
 
   fromVarBinder :: Binder -> m Ident
-  fromVarBinder NullBinder = Ident <$> freshName
+  fromVarBinder NullBinder = freshIdent'
   fromVarBinder (VarBinder name) = return name
   fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
   fromVarBinder (TypedBinder _ b) = fromVarBinder b
@@ -165,7 +153,7 @@ makeCaseDeclaration ident alternatives = do
       argNames = map join $ foldl1 resolveNames namedArgs
   args <- if allUnique (catMaybes argNames)
             then mapM argName argNames
-            else replicateM (length argNames) (Ident <$> freshName)
+            else replicateM (length argNames) freshIdent'
   let vars = map (Var . Qualified Nothing) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
       value = foldr (Abs . Left) (Case vars binders) args
@@ -190,9 +178,7 @@ makeCaseDeclaration ident alternatives = do
 
   argName :: Maybe Ident -> m Ident
   argName (Just name) = return name
-  argName _ = do
-    name <- freshName
-    return (Ident name)
+  argName _ = freshIdent'
 
   -- Combine two lists of potential names from two case alternatives
   -- by zipping correspoding columns.

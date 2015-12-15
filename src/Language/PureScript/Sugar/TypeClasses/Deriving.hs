@@ -1,18 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar.TypeClasses.Deriving
--- Copyright   :  (c) Gershom Bazerman 2015
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- This module implements the generic deriving elaboration that takes place during desugaring.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -20,6 +5,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- This module implements the generic deriving elaboration that takes place during desugaring.
+--
 module Language.PureScript.Sugar.TypeClasses.Deriving (
     deriveInstances
 ) where
@@ -32,7 +20,7 @@ import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
 import Control.Monad (replicateM)
-import Control.Monad.Supply.Class (MonadSupply, freshName)
+import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Language.PureScript.Crash
@@ -106,7 +94,7 @@ mkSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> mapM mkCtorCl
 
   mkCtorClause :: (ProperName, [Type]) -> m CaseAlternative
   mkCtorClause (ctorName, tys) = do
-    idents <- replicateM (length tys) (fmap Ident freshName)
+    idents <- replicateM (length tys) freshIdent'
     return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents))
     where
     caseResult idents =
@@ -172,7 +160,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
 
   mkAlternative :: (ProperName, [Type]) -> m CaseAlternative
   mkAlternative (ctorName, tys) = do
-    idents <- replicateM (length tys) (fmap Ident freshName)
+    idents <- replicateM (length tys) freshIdent'
     return $ CaseAlternative [ prodBinder [ StringBinder (showQualified runProperName (Qualified (Just mn) ctorName)), ArrayBinder (map VarBinder idents)]]
                . Right
                $ liftApplicative (mkJust $ Constructor (Qualified (Just mn) ctorName))

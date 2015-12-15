@@ -1,24 +1,15 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Names
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Data types for names
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
 
+-- |
+-- Data types for names
+--
 module Language.PureScript.Names where
+
+import Control.Monad (liftM)
+import Control.Monad.Supply.Class
 
 import Data.List
 import Data.Data
@@ -38,15 +29,27 @@ data Ident
   -- |
   -- A symbolic name for an infix operator
   --
-  | Op String deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | Op String
+  -- |
+  -- A generated name for an identifier
+  --
+  | GenIdent (Maybe String) Integer deriving (Show, Read, Eq, Ord, Data, Typeable)
 
 runIdent :: Ident -> String
 runIdent (Ident i) = i
 runIdent (Op op) = op
+runIdent (GenIdent Nothing n) = "$" ++ show n
+runIdent (GenIdent (Just name) n) = "$" ++ name ++ show n
 
 showIdent :: Ident -> String
-showIdent (Ident i) = i
 showIdent (Op op) = '(' : op ++ ")"
+showIdent i = runIdent i
+
+freshIdent :: (MonadSupply m) => String -> m Ident
+freshIdent name = liftM (GenIdent (Just name)) fresh
+
+freshIdent' :: (MonadSupply m) => m Ident
+freshIdent' = liftM (GenIdent Nothing) fresh
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
