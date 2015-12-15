@@ -18,7 +18,7 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
 parseFunction :: TokenParser Type
-parseFunction = parens $ rarrow >> return tyFunction
+parseFunction = parens rarrow >> return tyFunction
 
 parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyObject <$> parseRow
@@ -36,24 +36,25 @@ parseTypeConstructor :: TokenParser Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: TokenParser Type
-parseForAll = mkForAll <$> (P.try (reserved "forall") *> P.many1 (indented *> identifier) <* indented <* dot)
+parseForAll = mkForAll <$> (reserved "forall" *> P.many1 (indented *> identifier) <* indented <* dot)
                        <*> parseType
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor
 --
 parseTypeAtom :: TokenParser Type
-parseTypeAtom = indented *> P.choice (map P.try
-            [ parseConstrainedType
-            , parseFunction
+parseTypeAtom = indented *> P.choice
+            [ P.try parseConstrainedType
+            , P.try parseFunction
             , parseObject
             , parseTypeWildcard
+            , parseForAll
             , parseTypeVariable
             , parseTypeConstructor
-            , parseForAll
-            , parens parseRow
+            -- This try is needed due to some unfortunate ambiguities between rows and kinded types
+            , P.try (parens parseRow)
             , parens parsePolyType
-            ])
+            ]
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
@@ -74,8 +75,9 @@ parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
-              , [ P.Infix (rarrow >> return function) P.AssocRight ] ]
-  postfixTable = [ \t -> KindedType t <$> (P.try (indented *> doubleColon) *> parseKind)
+              , [ P.Infix (rarrow >> return function) P.AssocRight ]
+              ]
+  postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
                  ]
 
 -- |
