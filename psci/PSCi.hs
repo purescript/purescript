@@ -129,7 +129,7 @@ loadAllImportedModules = do
   modulesOrFirstError <- psciIO $ loadAllModules files
   case modulesOrFirstError of
     Left errs -> printErrors errs
-    Right modules -> PSCI . lift . modify $ \st -> st { psciLoadedModules = modules }
+    Right modules -> PSCI . lift . modify $ updateModules modules
 
 -- |
 -- Expands tilde in path.
@@ -249,11 +249,12 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
-make PSCiState{..} ms = P.make actions' (map snd (psciLoadedModules ++ ms))
+make st@PSCiState{..} ms = P.make actions' (map snd (loadedModules ++ ms))
   where
-  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (psciLoadedModules ++ ms)
+  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (loadedModules ++ ms)
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
   actions' = actions { P.progress = const (return ()) }
+  loadedModules = psciLoadedModules st
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
@@ -294,7 +295,7 @@ handleDecls ds = do
 --
 handleShowLoadedModules :: PSCI ()
 handleShowLoadedModules = do
-  PSCiState { psciLoadedModules = loadedModules } <- PSCI $ lift get
+  loadedModules <- PSCI $ lift $ gets psciLoadedModules
   psciIO $ readModules loadedModules >>= putStrLn
   return ()
   where readModules = return . unlines . sort . nub . map toModuleName
@@ -547,11 +548,11 @@ handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
     Right foreigns -> PSCI . lift $ modify (updateForeignFiles foreigns)
 handleCommand ResetState = do
   files <- psciImportedFilenames <$> PSCI (lift get)
-  PSCI . lift . modify $ \st -> st
-    { psciImportedFilenames   = files
-    , psciImportedModules     = []
-    , psciLetBindings         = []
-    }
+  PSCI . lift . modify $ \st ->
+    (foldl (flip updateImportedFiles) st files)
+      { psciImportedModules     = []
+      , psciLetBindings         = []
+      }
   loadAllImportedModules
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
@@ -614,7 +615,7 @@ loop PSCiOptions{..} = do
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (PSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (mkPSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (traverse_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules
