@@ -1,0 +1,2 @@
+curl https://api.github.com/repos/purescript/purescript/pulls?state=closed\&per_page=100 \
+  | jq -r '.[] | ("- " + .title + " (@" + .user.login + ")")'
