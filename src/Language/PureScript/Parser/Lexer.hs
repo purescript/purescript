@@ -67,13 +67,13 @@ module Language.PureScript.Parser.Lexer
   , natural
   , reservedPsNames
   , reservedTypeNames
-  , opChars
+  , isSymbolChar
   )
   where
 
 import Prelude hiding (lex)
 
-import Data.Char (isSpace)
+import Data.Char (isSpace, isAscii, isSymbol)
 
 import Control.Monad (void, guard)
 import Data.Functor.Identity
@@ -233,7 +233,7 @@ parseToken = P.choice
   uidentLetter = P.alphaNum <|> P.char '_'
 
   symbolChar :: P.Parsec String u Char
-  symbolChar = P.oneOf opChars
+  symbolChar = P.satisfy isSymbolChar
 
   parseCharLiteral :: P.Parsec String u Char
   parseCharLiteral = PT.charLiteral tokenParser
@@ -516,5 +516,5 @@ reservedTypeNames = [ "forall", "where" ]
 -- |
 -- The characters allowed for use in operators
 --
-opChars :: [Char]
-opChars = ":!#$%&*+./<=>?@\\^|-~"
+isSymbolChar :: Char -> Bool
+isSymbolChar c = (c `elem` ":!#$%&*+./<=>?@\\^|-~") || (not (isAscii c) && isSymbol c)

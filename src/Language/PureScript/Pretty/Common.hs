@@ -18,7 +18,7 @@ module Language.PureScript.Pretty.Common where
 import Control.Monad.State
 import Data.List (intercalate)
 
-import Language.PureScript.Parser.Lexer (reservedPsNames, opChars)
+import Language.PureScript.Parser.Lexer (reservedPsNames, isSymbolChar)
 
 import Text.PrettyPrint.Boxes
 
@@ -68,7 +68,7 @@ prettyPrintMany f xs = do
 --
 prettyPrintObjectKey :: String -> String
 prettyPrintObjectKey s | s `elem` reservedPsNames = show s
-                       | any (`elem` opChars) s = show s
+                       | any isSymbolChar s = show s
                        | otherwise = s
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
