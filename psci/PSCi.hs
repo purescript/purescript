@@ -547,7 +547,6 @@ handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
     Left err -> PSCI $ outputStrLn $ P.prettyPrintMultipleErrors False err
     Right foreigns -> PSCI . lift $ modify (updateForeignFiles foreigns)
 handleCommand ResetState = do
-  files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st ->
     st { psciImportedModules = []
        , psciLetBindings     = []
