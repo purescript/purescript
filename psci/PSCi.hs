@@ -202,7 +202,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     trace = P.Var (P.Qualified (Just supportModuleName) (P.Ident "eval"))
     mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
     itDecl = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
-    mainDecl = P.ValueDeclaration (P.Ident "main") P.Public [] $ Right mainValue
+    mainDecl = P.ValueDeclaration (P.Ident "$main") P.Public [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
   in
     P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
@@ -267,7 +267,7 @@ handleDeclaration val = do
   case e of
     Left errs -> printErrors errs
     Right _ -> do
-      psciIO $ writeFile indexFile "require('$PSCI').main();"
+      psciIO $ writeFile indexFile "require('$PSCI')['$main']();"
       process <- psciIO findNodeProcess
       result  <- psciIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
       case result of
