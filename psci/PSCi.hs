@@ -258,10 +258,10 @@ make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
   allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
 
 -- |
--- Takes a value declaration and evaluates it with the current state.
+-- Takes a value expression and evaluates it with the current state.
 --
-handleDeclaration :: P.Expr -> PSCI ()
-handleDeclaration val = do
+handleExpression :: P.Expr -> PSCI ()
+handleExpression val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
   let nodeArgs = psciNodeFlags st ++ [indexFile]
@@ -530,7 +530,7 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
 -- Performs an action for each meta-command given, and also for expressions.
 --
 handleCommand :: Command -> PSCI ()
-handleCommand (Expression val) = handleDeclaration val
+handleCommand (Expression val) = handleExpression val
 handleCommand ShowHelp = PSCI $ outputStrLn helpMessage
 handleCommand (Import im) = handleImport im
 handleCommand (Decls l) = handleDecls l
