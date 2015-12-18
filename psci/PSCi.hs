@@ -113,12 +113,12 @@ loadModule filename = do
 -- |
 -- Load all modules.
 --
-loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(Either P.RebuildPolicy FilePath, P.Module)])
+loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
     content <- readFile filename
-    return (Right filename, content)
-  return $ P.parseModulesFromFiles (either (const "") id) filesAndContent
+    return (filename, content)
+  return $ P.parseModulesFromFiles id filesAndContent
 
 -- |
 -- Load all modules, updating the application state
@@ -248,13 +248,14 @@ makeIO f io = do
   e <- liftIO $ tryIOError io
   either (throwError . P.singleError . f) return e
 
-make :: PSCiState -> [(Either P.RebuildPolicy FilePath, P.Module)] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map snd (loadedModules ++ ms))
+make :: PSCiState -> [P.Module] -> P.Make P.Environment
+make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
   where
-  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` (loadedModules ++ ms)
+  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
   actions' = actions { P.progress = const (return ()) }
   loadedModules = psciLoadedModules st
+  allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
 
 -- |
 -- Takes a value declaration and evaluates it with the current state.
@@ -264,7 +265,7 @@ handleDeclaration val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule True st val
   let nodeArgs = psciNodeFlags st ++ [indexFile]
-  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, supportModule), (Left P.RebuildAlways, m)]
+  e <- psciIO . runMake $ make st [supportModule, m]
   case e of
     Left errs -> printErrors errs
     Right _ -> do
@@ -285,7 +286,7 @@ handleDecls ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.ObjectLiteral [])
-  e <- psciIO . runMake $ make st' [(Left P.RebuildAlways, m)]
+  e <- psciIO . runMake $ make st' [m]
   case e of
     Left err -> printErrors err
     Right _ -> PSCI $ lift (put st')
@@ -341,7 +342,7 @@ handleImport :: ImportedModule -> PSCI ()
 handleImport im = do
    st <- updateImportedModules im <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
-   e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
+   e <- psciIO . runMake $ make st [m]
    case e of
      Left errs -> printErrors errs
      Right _  -> do
@@ -355,7 +356,7 @@ handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf val = do
   st <- PSCI $ lift get
   let m = createTemporaryModule False st val
-  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
+  e <- psciIO . runMake $ make st [m]
   case e of
     Left errs -> printErrors errs
     Right env' ->
@@ -492,7 +493,7 @@ handleKindOf typ = do
   st <- PSCI $ lift get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ make st [(Left P.RebuildAlways, m)]
+  e <- psciIO . runMake $ make st [m]
   case e of
     Left errs -> printErrors errs
     Right env' ->
@@ -534,11 +535,10 @@ handleCommand ShowHelp = PSCI $ outputStrLn helpMessage
 handleCommand (Import im) = handleImport im
 handleCommand (Decls l) = handleDecls l
 handleCommand (LoadFile filePath) = whenFileExists filePath $ \absPath -> do
-  PSCI . lift $ modify (updateImportedFiles absPath)
   m <- psciIO $ loadModule absPath
   case m of
     Left err -> PSCI $ outputStrLn err
-    Right mods -> PSCI . lift $ modify (updateModules (map ((,) (Right absPath)) mods))
+    Right mods -> PSCI . lift $ modify (updateModules (map (absPath,) mods))
 handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
   foreignsOrError <- psciIO . runMake $ do
     foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readFile absPath)
@@ -549,10 +549,9 @@ handleCommand (LoadForeign filePath) = whenFileExists filePath $ \absPath -> do
 handleCommand ResetState = do
   files <- psciImportedFilenames <$> PSCI (lift get)
   PSCI . lift . modify $ \st ->
-    (foldl (flip updateImportedFiles) st files)
-      { psciImportedModules     = []
-      , psciLetBindings         = []
-      }
+    st { psciImportedModules = []
+       , psciLetBindings     = []
+       }
   loadAllImportedModules
 handleCommand (TypeOf val) = handleTypeOf val
 handleCommand (KindOf typ) = handleKindOf typ
@@ -615,7 +614,7 @@ loop PSCiOptions{..} = do
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (mkPSCiState inputFiles [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (mkPSCiState [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (traverse_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules
