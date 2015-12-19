@@ -10,7 +10,6 @@ module Language.PureScript.CodeGen.JS
   ( module AST
   , module Common
   , moduleToJs
-  , mainCall
   ) where
 
 import Prelude ()
@@ -19,10 +18,11 @@ import Prelude.Compat
 import Data.List ((\\), delete, intersect)
 import Data.Maybe (isNothing, fromMaybe)
 import qualified Data.Map as M
-import qualified Data.Traversable as T (traverse)
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 import Control.Arrow ((&&&))
-import Control.Monad (replicateM, forM)
+import Control.Monad (replicateM, forM, void)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
@@ -45,8 +45,12 @@ import System.FilePath.Posix ((</>))
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs :: forall m. (Applicative m, Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
-           => Module Ann -> Maybe JS -> m [JS]
+moduleToJs
+  :: forall m
+   . (Applicative m, Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
+  => Module Ann
+  -> Maybe JS
+  -> m [JS]
 moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
@@ -55,6 +59,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- T.traverse (T.traverse optimize) jsDecls
+    F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let strict = JSStringLiteral "use strict"
     let header = if comments && not (null coms) then JSComment coms strict else strict
@@ -256,12 +261,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   iife v exprs = JSApp (JSFunction Nothing [] (JSBlock $ exprs ++ [JSReturn $ JSVar v])) []
 
   literalToValueJS :: Literal (Expr Ann) -> m JS
-  literalToValueJS (NumericLiteral (Left i)) =
-    let minInt = -2147483648
-        maxInt = 2147483647
-    in if i < minInt || i > maxInt
-       then throwError . errorMessage $ IntOutOfRange i "JavaScript" minInt maxInt
-       else return $ JSNumericLiteral (Left i)
+  literalToValueJS (NumericLiteral (Left i)) = return $ JSNumericLiteral (Left i)
   literalToValueJS (NumericLiteral (Right n)) = return $ JSNumericLiteral (Right n)
   literalToValueJS (StringLiteral s) = return $ JSStringLiteral s
   literalToValueJS (CharLiteral c) = return $ JSStringLiteral [c]
@@ -414,5 +414,22 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       js <- binderToJs elVar done'' binder
       return (JSVariableIntroduction elVar (Just (JSIndexer (JSNumericLiteral (Left index)) (JSVar varName))) : js)
 
-mainCall :: ModuleName -> String -> JS
-mainCall mmi ns = JSApp (JSAccessor C.main (JSAccessor (moduleNameToJs mmi) (JSVar ns))) []
+  -- Check that all integers fall within the valid int range for JavaScript.
+  checkIntegers :: JS -> m ()
+  checkIntegers = void . everywhereOnJSTopDownM go
+    where
+    go :: JS -> m JS
+    go (JSUnary Negate (JSNumericLiteral (Left i))) =
+      -- Move the negation inside the literal; since this is a top-down
+      -- traversal doing this replacement will stop the next case from raising
+      -- the error when attempting to use -2147483648, as if left unrewritten
+      -- the value is `JSUnary Negate (JSNumericLiteral (Left 2147483648))`, and
+      -- 2147483648 is larger than the maximum allowed int.
+      return $ JSNumericLiteral (Left (-i))
+    go js@(JSNumericLiteral (Left i)) =
+      let minInt = -2147483648
+          maxInt = 2147483647
+      in if i < minInt || i > maxInt
+         then throwError . errorMessage $ IntOutOfRange i "JavaScript" minInt maxInt
+         else return js
+    go other = return other
