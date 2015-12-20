@@ -53,7 +53,7 @@ toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErro
 toJSONError :: Bool -> P.Level -> P.ErrorMessage -> JSONError
 toJSONError verbose level e =
   JSONError (toErrorPosition <$> sspan)
-            (P.renderBox (P.prettyPrintSingleError' verbose level (P.stripModuleAndSpan e)))
+            (P.renderBox (P.prettyPrintSingleError verbose level (P.stripModuleAndSpan e)))
             (P.errorCode e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)

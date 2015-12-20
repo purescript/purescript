@@ -412,14 +412,11 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint other = pure other
 
-prettyPrintSingleError' :: Bool -> Level -> ErrorMessage ->Box.Box
-prettyPrintSingleError' full level = flip evalState defaultUnknownMap . prettyPrintSingleError full level
-
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> State TypeMap Box.Box
-prettyPrintSingleError full level e = do
+prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> Box.Box
+prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -1061,22 +1058,21 @@ prettyPrintMultipleWarnings full = renderBox . prettyPrintMultipleWarningsBox fu
 
 -- | Pretty print warnings as a Box
 prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleWarningsBox full = flip evalState defaultUnknownMap . prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
+prettyPrintMultipleWarningsBox full = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleErrorsBox full = flip evalState defaultUnknownMap . prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
+prettyPrintMultipleErrorsBox full = prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> State TypeMap Box.Box
-prettyPrintMultipleErrorsWith level intro _ full  (MultipleErrors [e]) = do
-  result <- prettyPrintSingleError full level e
-  return $
-    Box.vcat Box.left [ Box.text intro
-                      , result
-                      ]
-prettyPrintMultipleErrorsWith level _ intro full  (MultipleErrors es) = do
-  result <- forM es $ prettyPrintSingleError full level
-  return $ Box.vsep 1 Box.left $ concat $ zipWith withIntro [1 :: Int ..] result
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
+  let result = prettyPrintSingleError full level e
+  in Box.vcat Box.left [ Box.text intro
+                       , result
+                       ]
+prettyPrintMultipleErrorsWith level _ intro full (MultipleErrors es) =
+  let result = map (prettyPrintSingleError full level) es
+  in Box.vsep 1 Box.left $ concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
                     , Box.moveRight 2 err
