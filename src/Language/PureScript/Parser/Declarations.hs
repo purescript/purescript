@@ -151,9 +151,7 @@ parseImportDeclaration' = do
     qName <- qualifiedName
     return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
-    declType <- P.optionMaybe
-        $ P.try (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
-      <|> (const (Implicit True) <$> (indented *> parens (symbol' "..")))
+    declType <- P.optionMaybe (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
     return $ fromMaybe (Implicit False) declType
 
 parseDeclarationRef :: TokenParser DeclarationRef
