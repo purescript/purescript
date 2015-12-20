@@ -324,8 +324,8 @@ parseIdentifierAndValue =
     return (name, b)
   <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
-  rest = C.indented *> colon *>  C.indented *>  val
-  val = (underscore *> pure Nothing) <|> (Just <$> parseValue)
+  rest = C.indented *> colon *> C.indented *> val
+  val = P.try (Just <$> parseValue) <|> (underscore *> pure Nothing)
 
 parseAbs :: TokenParser Expr
 parseAbs = do
