@@ -66,9 +66,7 @@ newScope x = do
 updateScope :: Ident -> Rename Ident
 updateScope ident =
   case ident of
-    Ident name
-      | name == C.__unused -> return ident
-      | last name == '\'' -> go ident $ Ident $ init name ++ "ʹ" -- '\x02b9'
+    Ident name | name == C.__unused -> return ident
     GenIdent name _ -> go ident $ Ident (fromMaybe "v" name)
     _ -> go ident ident
   where
