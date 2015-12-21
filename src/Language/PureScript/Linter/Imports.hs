@@ -62,8 +62,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
             usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) names
             usedDctors = mapMaybe (matchDctor qualifierName) names
         in case declType of
-          Implicit _ | null usedNames -> tell $ errorMessage $ UnusedImport mni
-          Implicit False ->
+          Implicit ->
             let classRefs = TypeClassRef <$> mapMaybe getClassName names
                 valueRefs = ValueRef <$> mapMaybe getIdentName names
                 types = mapMaybe getTypeName names

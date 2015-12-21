@@ -317,7 +317,7 @@ handleShowImportedModules = do
       Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
       Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
 
-  showDeclType (P.Implicit _) = ""
+  showDeclType P.Implicit = ""
   showDeclType (P.Explicit refs) = refsList refs
   showDeclType (P.Hiding refs) = " hiding " ++ refsList refs
   refsList refs = " (" ++ commaList (map showRef refs) ++ ")"
