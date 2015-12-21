@@ -58,7 +58,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   forM_ (M.toAscList imps) $ \(mni, decls) -> unless (mni `elem` alwaysUsedModules) $
     forM_ decls $ \(ss, declType, qualifierName) ->
       censor (onErrorMessages $ addModuleLocError ss) $ unless (qnameUsed qualifierName) $
-        let names = nub $ sugarNames mni ++ M.findWithDefault [] mni usedImps
+        let names = nub $ M.findWithDefault [] mni usedImps
             usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) names
             usedDctors = mapMaybe (matchDctor qualifierName) names
         in case declType of
@@ -95,10 +95,6 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
 
           _ -> return ()
   where
-  sugarNames :: ModuleName -> [ Name ]
-  sugarNames (ModuleName [ProperName n]) | n == C.prelude = [ IdentName $ Qualified Nothing (Ident C.bind) ]
-  sugarNames _ = []
-
   reconstructTypeRefs :: ModuleName -> [ProperName] -> M.Map ProperName [ProperName]
   reconstructTypeRefs mni = foldr accumDctors M.empty
     where
