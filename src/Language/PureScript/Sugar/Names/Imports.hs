@@ -98,7 +98,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
 
       return ()
 
-    let scope = M.insert currentModule [(Nothing, Implicit True, Nothing)] imports
+    let scope = M.insert currentModule [(Nothing, Implicit, Nothing)] imports
     resolved <- foldM (resolveModuleImport env) nullImports (M.toList scope)
     return (Module ss coms currentModule decls' exps, resolved)
 
@@ -138,7 +138,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
   updateImportRef (ImportDeclaration mn typ qual isOldSyntax) = do
     modExports <- getExports env mn
     typ' <- case typ of
-      Implicit b -> return $ Implicit b
+      Implicit -> return Implicit
       Explicit refs -> Explicit <$> updateProperRef mn modExports `traverse` refs
       Hiding refs -> Hiding <$> updateProperRef mn modExports `traverse` refs
     return $ ImportDeclaration mn typ' qual isOldSyntax
@@ -191,7 +191,7 @@ resolveImport importModule exps imps impQual = resolveByType
   where
 
   resolveByType :: ImportDeclarationType -> m Imports
-  resolveByType (Implicit _) = importAll importExplicit
+  resolveByType Implicit = importAll importExplicit
   resolveByType (Explicit refs) = checkRefs False refs >> foldM importExplicit imps refs
   resolveByType (Hiding refs) = do
     imps' <- checkRefs True refs >> importAll (importNonHidden refs)

@@ -1011,8 +1011,7 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
   prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
   prettyPrintImport mn idt qual =
     let i = case idt of
-              Implicit True -> runModuleName mn ++ " (..)"
-              Implicit False -> runModuleName mn
+              Implicit -> runModuleName mn
               Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
               Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
     in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual
