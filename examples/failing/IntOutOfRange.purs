@@ -3,4 +3,4 @@
 module Main where
 
 n :: Int
-n = 35028715023
+n = 2147483648
