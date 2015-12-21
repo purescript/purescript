@@ -281,7 +281,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
 
   checkFixities :: Declaration -> m ()
   checkFixities (FixityDeclaration _ name (Just alias)) = do
-    ty <- lookupVariable moduleName (Qualified (Just moduleName) alias)
+    ty <- lookupVariable moduleName alias
     addValue moduleName (Op name) ty Public
   checkFixities (FixityDeclaration _ name _) = do
     env <- getEnv
@@ -433,6 +433,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     where
     getAlias :: Declaration -> Maybe Ident
     getAlias (PositionedDeclaration _ _ d) = getAlias d
-    getAlias (FixityDeclaration _ name' alias) | name == name' = alias
+    getAlias (FixityDeclaration _ name' (Just (Qualified (Just mn') alias)))
+      | mn == mn' && name == name' = Just alias
     getAlias _ = Nothing
   checkNonAliasesAreExported _ = return ()

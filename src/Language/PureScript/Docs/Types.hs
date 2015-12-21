@@ -84,7 +84,7 @@ data Declaration = Declaration
   , declComments   :: Maybe String
   , declSourceSpan :: Maybe P.SourceSpan
   , declChildren   :: [ChildDeclaration]
-  , declFixity     :: Maybe (P.Fixity, Maybe String)
+  , declFixity     :: Maybe P.Fixity -- TODO: remove in 0.9
   , declInfo       :: DeclarationInfo
   }
   deriving (Show, Eq, Ord)
@@ -126,6 +126,12 @@ data DeclarationInfo
   -- members are represented as child declarations.
   --
   | TypeClassDeclaration [(String, Maybe P.Kind)] [P.Constraint]
+
+  -- |
+  -- An operator alias declaration, with the member the alias is for and the
+  -- operator's fixity.
+  --
+  | AliasDeclaration (P.Qualified P.Ident) P.Fixity
   deriving (Show, Eq, Ord)
 
 declInfoToString :: DeclarationInfo -> String
@@ -134,6 +140,7 @@ declInfoToString (DataDeclaration _ _) = "data"
 declInfoToString (ExternDataDeclaration _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _) = "typeClass"
+declInfoToString (AliasDeclaration _ _) = "alias"
 
 data ChildDeclaration = ChildDeclaration
   { cdeclTitle      :: String
@@ -307,12 +314,10 @@ asDeclaration =
               <*> key "fixity" (perhaps asFixity)
               <*> key "info" asDeclarationInfo
 
-asFixity :: Parse PackageError (P.Fixity, Maybe String)
-asFixity = do
-  fixity <- P.Fixity <$> key "associativity" asAssociativity
-                     <*> key "precedence" asIntegral
-  alias <- keyMay "alias" asString
-  return (fixity, alias)
+asFixity :: Parse PackageError P.Fixity
+asFixity =
+  P.Fixity <$> key "associativity" asAssociativity
+           <*> key "precedence" asIntegral
 
 parseAssociativity :: String -> Maybe P.Associativity
 parseAssociativity str = case str of
@@ -341,6 +346,9 @@ asDeclarationInfo = do
     "typeClass" ->
       TypeClassDeclaration <$> key "arguments" asTypeArguments
                            <*> key "superclasses" (eachInArray asConstraint)
+    "alias" ->
+      AliasDeclaration <$> key "for" asQualifiedIdent
+                       <*> key "fixity" asFixity
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -393,6 +401,9 @@ asConstraint = (,) <$> nth 0 asQualifiedProperName
 
 asQualifiedProperName :: Parse e (P.Qualified P.ProperName)
 asQualifiedProperName = fromAesonParser
+
+asQualifiedIdent :: Parse e (P.Qualified P.Ident)
+asQualifiedIdent = fromAesonParser
 
 asBookmarks :: Parse BowerError [Bookmark]
 asBookmarks = eachInArray asBookmark
@@ -478,6 +489,7 @@ instance A.ToJSON DeclarationInfo where
       ExternDataDeclaration kind -> ["kind" .= kind]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super -> ["arguments" .= args, "superclasses" .= super]
+      AliasDeclaration for fixity -> ["for" .= for, "fixity" .= fixity]
 
 instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props

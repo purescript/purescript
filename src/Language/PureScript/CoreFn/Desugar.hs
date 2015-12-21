@@ -55,8 +55,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
-    let qname = Qualified (Just mn) alias
-    in [NonRec (Op name) (Var (ss, com, Nothing, getValueMeta qname) (Qualified Nothing alias))]
+    [NonRec (Op name) (Var (ss, com, Nothing, getValueMeta alias) alias)]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> (name, exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
@@ -197,6 +196,7 @@ findQualModules decls =
   where
   fqDecls :: A.Declaration -> [ModuleName]
   fqDecls (A.TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
+  fqDecls (A.FixityDeclaration _ _ (Just (Qualified (Just mn) _))) = [mn]
   fqDecls _ = []
 
   fqValues :: A.Expr -> [ModuleName]

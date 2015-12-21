@@ -31,21 +31,22 @@ moduleAsMarkdown Module{..} = do
   headerLevel 2 $ "Module " ++ modName
   spacer
   for_ modComments tell'
-  mapM_ declAsMarkdown modDeclarations
+  mapM_ (declAsMarkdown modName) modDeclarations
   spacer
 
-declAsMarkdown :: Declaration -> Docs
-declAsMarkdown decl@Declaration{..} = do
+declAsMarkdown :: String -> Declaration -> Docs
+declAsMarkdown mn decl@Declaration{..} = do
+  let options = defaultRenderTypeOptions { currentModule = Just (P.moduleNameFromString mn) }
   headerLevel 4 (ticks declTitle)
   spacer
 
   let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
-    tell' (codeToString $ Render.renderDeclaration decl)
+    tell' (codeToString $ Render.renderDeclarationWithOptions options decl)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
-  for_ declFixity (\(fixity, alias) -> fixityAsMarkdown fixity alias >> spacer)
+  for_ declFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
 
   for_ declComments tell'
 
@@ -68,11 +69,9 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
-fixityAsMarkdown :: P.Fixity -> Maybe String -> Docs
-fixityAsMarkdown (P.Fixity associativity precedence) alias =
-  -- TODO: link alias name to member
+fixityAsMarkdown :: P.Fixity -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) =
   tell' $ concat [ "_"
-                 , maybe "" (\i -> "alias for " ++ i ++ " - ") alias
                  , associativityStr
                  , " / precedence "
                  , show precedence

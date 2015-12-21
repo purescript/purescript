@@ -61,8 +61,19 @@ renderDeclarationWithOptions opts Declaration{..} =
 
       isTypeClassMember (ChildTypeClassMember _) = True
       isTypeClassMember _ = False
+    AliasDeclaration for (P.Fixity associativity precedence) ->
+      [ keywordFixity associativity
+      , syntax $ show precedence
+      , ident $ P.showQualified P.runIdent $ dequalifyCurrentModule for
+      , keyword "as"
+      , ident . tail . init $ declTitle
+      ]
+
   where
   renderType' = renderTypeWithOptions opts
+  dequalifyCurrentModule (P.Qualified mn a)
+    | mn == currentModule opts = P.Qualified Nothing a
+    | otherwise = P.Qualified mn a
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
