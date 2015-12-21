@@ -7,7 +7,7 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified Data.Map as M
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, isNothing)
 import Data.List ((\\), find, intersect, nub)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class
@@ -62,7 +62,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
             usedNames = mapMaybe (matchName (typeForDCtor mni) qualifierName) names
             usedDctors = mapMaybe (matchDctor qualifierName) names
         in case declType of
-          Implicit ->
+          Implicit | isNothing qualifierName ->
             let classRefs = TypeClassRef <$> mapMaybe getClassName names
                 valueRefs = ValueRef <$> mapMaybe getIdentName names
                 types = mapMaybe getTypeName names
