@@ -23,6 +23,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..))
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -168,7 +169,10 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
   go :: Imports -> (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName) -> m Imports
   go ie' (pos, typ, impQual) = do
     modExports <- positioned $ maybe (throwError . errorMessage $ UnknownModule mn) (return . envModuleExports) $ mn `M.lookup` env
-    let ie'' = ie' { importedModules = mn : importedModules ie' }
+    let virtualModules = importedVirtualModules ie'
+        ie'' = ie' { importedModules = S.insert mn (importedModules ie')
+                   , importedVirtualModules = maybe virtualModules (`S.insert` virtualModules) impQual
+                   }
     positioned $ resolveImport mn modExports ie'' impQual typ
     where
     positioned err = case pos of
