@@ -30,7 +30,7 @@ import Control.Monad.Base (MonadBase(..))
 import Control.Monad.Trans.Control (MonadBaseControl(..))
 
 -- | A replacement for WriterT IO which uses mutable references.
-data Logger w a = Logger { runLogger :: IORef w -> IO a }
+newtype Logger w a = Logger { runLogger :: IORef w -> IO a }
 
 -- | Run a Logger computation, starting with an empty log.
 runLogger' :: (Monoid w) => Logger w a -> IO (a, w)
