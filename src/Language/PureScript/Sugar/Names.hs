@@ -16,6 +16,7 @@ import Control.Monad.Writer (MonadWriter(..), censor)
 import Control.Monad.State.Lazy
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -257,17 +258,21 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- by qualified importing). If that's not the case, then we just need to
       -- check it refers to a symbol in another module.
       (Nothing, Just mn'') -> do
-        modExports <- getExports env mn''
-        maybe (throwError . errorMessage $ unknown qname) return (getE modExports name)
+        case M.lookup mn'' env of
+          Nothing
+            | mn'' `S.member` importedVirtualModules imports -> throwUnknown
+            | otherwise -> throwError . errorMessage $ UnknownModule mn''
+          Just env' -> maybe throwUnknown return (getE (envModuleExports env') name)
 
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
-      _ -> throwError . errorMessage $ unknown qname
+      _ -> throwUnknown
 
     where
     positioned err = case pos of
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
+    throwUnknown = throwError . errorMessage $ unknown qname
 
 -- |
 -- Replaces `ProperRef` export values with a `TypeRef` or `TypeClassRef`

@@ -22,6 +22,7 @@ import Data.Function (on)
 import Data.List (groupBy, sortBy, nub)
 import Data.Maybe (fromJust)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -54,16 +55,21 @@ data Imports = Imports
   --
   , importedValues :: M.Map (Qualified Ident) [(Qualified Ident, ModuleName)]
   -- |
-  -- The list of modules that have been imported into the current scope.
+  -- The modules that have been imported into the current scope.
   --
-  , importedModules :: [ModuleName]
+  , importedModules :: S.Set ModuleName
+  -- |
+  -- The names of "virtual" modules that come into existence when "import as"
+  -- is used.
+  --
+  , importedVirtualModules :: S.Set ModuleName
   } deriving (Show, Read)
 
 -- |
 -- An empty 'Imports' value.
 --
 nullImports :: Imports
-nullImports = Imports M.empty M.empty M.empty M.empty []
+nullImports = Imports M.empty M.empty M.empty M.empty S.empty S.empty
 
 -- |
 -- The exported declarations from a module.
