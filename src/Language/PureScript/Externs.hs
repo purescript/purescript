@@ -73,7 +73,7 @@ data ExternsFixity = ExternsFixity
   -- | The operator symbol
   , efOperator :: String
   -- | The value the operator is an alias for
-  , efAlias :: Maybe Ident
+  , efAlias :: Maybe (Qualified Ident)
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file

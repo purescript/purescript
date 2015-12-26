@@ -9,7 +9,7 @@ module Language.PureScript.Docs.RenderedCode.Render (
     defaultRenderTypeOptions,
     renderTypeWithOptions
 ) where
-  
+
 import Prelude ()
 import Prelude.Compat
 
@@ -172,10 +172,15 @@ renderType = renderTypeWithOptions defaultRenderTypeOptions
 
 data RenderTypeOptions = RenderTypeOptions
   { prettyPrintObjects :: Bool
+  , currentModule :: Maybe ModuleName
   }
 
 defaultRenderTypeOptions :: RenderTypeOptions
-defaultRenderTypeOptions = RenderTypeOptions { prettyPrintObjects = True }
+defaultRenderTypeOptions =
+  RenderTypeOptions
+    { prettyPrintObjects = True
+    , currentModule = Nothing
+    }
 
 renderTypeWithOptions :: RenderTypeOptions -> Type -> RenderedCode
 renderTypeWithOptions opts =

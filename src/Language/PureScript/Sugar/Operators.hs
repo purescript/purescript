@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- This module implements the desugaring pass which reapplies binary operators based
@@ -55,9 +56,8 @@ rebracket externs ms = do
 
   where
 
-  makeLookupEntry :: (Qualified Ident, SourceSpan, Fixity, Maybe Ident) -> Maybe (Qualified Ident, Qualified Ident)
-  makeLookupEntry (qname@(Qualified qual _), _, _, Just alias) = Just (qname, Qualified qual alias)
-  makeLookupEntry _ = Nothing
+  makeLookupEntry :: (Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident)) -> Maybe (Qualified Ident, Qualified Ident)
+  makeLookupEntry (qname, _, _, alias) = (qname, ) <$> alias
 
   renameAliasedOperators :: M.Map (Qualified Ident) (Qualified Ident) -> Module -> Module
   renameAliasedOperators aliased (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
@@ -87,16 +87,16 @@ removeParens =
   go (Parens val) = val
   go val = val
 
-externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
+externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
 externsFixities ExternsFile{..} =
-  [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec, alias)
-  | ExternsFixity assoc prec op alias <- efFixities
-  ]
+   [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec, alias)
+   | ExternsFixity assoc prec op alias <- efFixities
+   ]
 
-collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
+collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
 collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
-  collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity, Maybe Ident)]
+  collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
   collect (PositionedDeclaration pos _ (FixityDeclaration fixity name alias)) =
     [(Qualified (Just moduleName) (Op name), pos, fixity, alias)]
   collect FixityDeclaration{} = internalError "Fixity without srcpos info"

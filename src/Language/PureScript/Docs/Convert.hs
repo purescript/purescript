@@ -71,7 +71,7 @@ type IntermediateDeclaration
 -- with their associativity and precedence.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
-  | AugmentFixity P.Fixity (Maybe P.Ident)
+  | AugmentFixity P.Fixity
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -89,8 +89,8 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     case a of
       AugmentChild child ->
         d { declChildren = declChildren d ++ [child] }
-      AugmentFixity fixity alias ->
-        d { declFixity = Just (fixity, P.runIdent <$> alias) }
+      AugmentFixity fixity ->
+        d { declFixity = Just fixity }
 
 -- | Add the default operator fixity for operators which do not have associated
 -- fixity declarations.
@@ -100,7 +100,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 addDefaultFixity :: Declaration -> Declaration
 addDefaultFixity decl@Declaration{..}
   | isOp declTitle && isNothing declFixity =
-        decl { declFixity = Just (defaultFixity, Nothing) }
+        decl { declFixity = Just defaultFixity }
   | otherwise =
         decl
   where
@@ -173,8 +173,10 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
   classApp = foldl P.TypeApp (P.TypeConstructor className) tys
-convertDeclaration (P.FixityDeclaration fixity _ alias) title =
-  Just (Left ([title], AugmentFixity fixity alias))
+convertDeclaration (P.FixityDeclaration fixity _ Nothing) title =
+  Just (Left ([title], AugmentFixity fixity))
+convertDeclaration (P.FixityDeclaration fixity _ (Just alias)) title =
+  Just $ Right $ (mkDeclaration title (AliasDeclaration alias fixity)) { declFixity = Just fixity }
 convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
   fmap (addComments . addSourceSpan) (convertDeclaration d' title)
   where

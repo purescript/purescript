@@ -141,6 +141,8 @@ renameInModule env imports (Module ss coms mn decls exps) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (FixityDeclaration fx name alias) =
+    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse (`updateValueName` pos) alias)
   updateDecl s d = return (s, d)
 
   updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)

@@ -28,6 +28,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordClass
  , keywordInstance
  , keywordWhere
+ , keywordFixity
  ) where
 
 import Prelude ()
@@ -189,3 +190,8 @@ keywordInstance = keyword "instance"
 
 keywordWhere :: RenderedCode
 keywordWhere = keyword "where"
+
+keywordFixity :: P.Associativity -> RenderedCode
+keywordFixity P.Infixl = keyword "infixl"
+keywordFixity P.Infixr = keyword "infixr"
+keywordFixity P.Infix = keyword "infix"

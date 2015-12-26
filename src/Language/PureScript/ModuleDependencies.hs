@@ -58,6 +58,7 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
   where
   forDecls :: Declaration -> [ModuleName]
   forDecls (ImportDeclaration mn _ _ _) = [mn]
+  forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _))) = [mn]
   forDecls _ = []
 
   forValues :: Expr -> [ModuleName]

@@ -13,10 +13,7 @@ import Control.Monad.Supply.Class
 
 import Data.List
 import Data.Data
-import Data.List.Split (splitOn)
 import Data.Aeson.TH
-import qualified Data.Aeson as A
-import qualified Data.Text as T
 
 -- |
 -- Names for value identifiers
@@ -81,19 +78,6 @@ showQualified :: (a -> String) -> Qualified a -> String
 showQualified f (Qualified Nothing a) = f a
 showQualified f (Qualified (Just name) a) = runModuleName name ++ "." ++ f a
 
-instance (a ~ ProperName) => A.ToJSON (Qualified a) where
-  toJSON = A.toJSON . showQualified runProperName
-
-instance (a ~ ProperName) => A.FromJSON (Qualified a) where
-  parseJSON =
-    A.withText "Qualified ProperName" $ \str ->
-      return $ case reverse (splitOn "." (T.unpack str)) of
-        [name]      -> Qualified Nothing (ProperName name)
-        (name:rest) -> Qualified (Just (reconstructModuleName rest)) (ProperName name)
-        _           -> Qualified Nothing (ProperName "")
-    where
-    reconstructModuleName = moduleNameFromString . intercalate "." . reverse
-
 -- |
 -- Provide a default module name, if a name is unqualified
 --
@@ -118,6 +102,7 @@ isUnqualified :: Qualified a -> Bool
 isUnqualified (Qualified Nothing _) = True
 isUnqualified _ = False
 
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ProperName)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)
