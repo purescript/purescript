@@ -33,7 +33,6 @@ import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBower
 import qualified Web.Bower.PackageMeta as Bower
 
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as D
 
 import Language.PureScript.Publish.BoxesHelpers
 
@@ -61,7 +60,7 @@ data UserError
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
   | MissingDependencies (NonEmpty PackageName)
-  | ParseAndDesugarError D.ParseDesugarError
+  | CompileError P.MultipleErrors
   | DirtyWorkingTree
   deriving (Show)
 
@@ -188,19 +187,9 @@ displayUserError e = case e of
         [ "Please install ", them, " first, by running `bower install`."
         ])
       ]
-  ParseAndDesugarError (D.ParseError err) ->
+  CompileError err ->
     vcat
-      [ para "Parse error:"
-      , indented (P.prettyPrintMultipleErrorsBox False err)
-      ]
-  ParseAndDesugarError (D.SortModulesError err) ->
-    vcat
-      [ para "Error in sortModules:"
-      , indented (P.prettyPrintMultipleErrorsBox False err)
-      ]
-  ParseAndDesugarError (D.DesugarError err) ->
-    vcat
-      [ para "Error while desugaring:"
+      [ para "Compile error:"
       , indented (P.prettyPrintMultipleErrorsBox False err)
       ]
   DirtyWorkingTree ->
