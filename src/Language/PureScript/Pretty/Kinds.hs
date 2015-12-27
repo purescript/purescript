@@ -32,6 +32,7 @@ typeLiterals = mkPattern match
   match Star = Just "*"
   match Bang = Just "!"
   match (KUnknown u) = Just $ 'u' : show u
+  match (KindVar var) = Just var
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)
