@@ -147,7 +147,7 @@ getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
   liftIO (D.parseAndDesugar inputFiles depsFiles renderModules)
-    >>= either (userError . ParseAndDesugarError) return
+    >>= either (userError . CompileError) return
   where
   renderModules bookmarks modules =
     return (bookmarks, map D.convertModule modules)

@@ -70,13 +70,7 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Markdown -> do
       e <- D.parseAndDesugar input [] (\_ ms -> return ms)
       case e of
-        Left (D.ParseError err) -> do
-          hPutStrLn stderr $ show err
-          exitFailure
-        Left (D.SortModulesError err) -> do
-          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
-          exitFailure
-        Left (D.DesugarError err) -> do
+        Left err -> do
           hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
           exitFailure
         Right ms' ->

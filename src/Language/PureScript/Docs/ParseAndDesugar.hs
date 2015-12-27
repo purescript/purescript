@@ -2,7 +2,6 @@
 
 module Language.PureScript.Docs.ParseAndDesugar
   ( parseAndDesugar
-  , ParseDesugarError(..)
   ) where
 
 import Prelude ()
@@ -24,12 +23,6 @@ import qualified Language.PureScript.Constants as C
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Convert (collectBookmarks)
 
-data ParseDesugarError
-  = ParseError P.MultipleErrors
-  | SortModulesError P.MultipleErrors
-  | DesugarError P.MultipleErrors
-  deriving (Show)
-
 -- |
 -- Given:
 --
@@ -50,7 +43,7 @@ parseAndDesugar ::
   [FilePath]
   -> [(PackageName, FilePath)]
   -> ([Bookmark] -> [P.Module] -> IO a)
-  -> IO (Either ParseDesugarError a)
+  -> IO (Either P.MultipleErrors a)
 parseAndDesugar inputFiles depsFiles callback = do
   inputFiles' <- traverse (parseAs Local) inputFiles
   depsFiles'  <- traverse (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
@@ -63,15 +56,15 @@ parseAndDesugar inputFiles depsFiles callback = do
 
 parseFiles ::
   [(FileInfo, FilePath)]
-  -> ExceptT ParseDesugarError IO [(FileInfo, P.Module)]
+  -> ExceptT P.MultipleErrors IO [(FileInfo, P.Module)]
 parseFiles =
-  throwLeft ParseError . P.parseModulesFromFiles fileInfoToString
+  throwLeft . P.parseModulesFromFiles fileInfoToString
 
 sortModules ::
   [P.Module]
-  -> ExceptT ParseDesugarError IO [P.Module]
+  -> ExceptT P.MultipleErrors IO [P.Module]
 sortModules =
-  fmap fst . throwLeft SortModulesError . sortModules' . map importPrim
+  fmap fst . throwLeft . sortModules' . map importPrim
   where
   sortModules' :: [P.Module] -> Either P.MultipleErrors ([P.Module], P.ModuleGraph)
   sortModules' = P.sortModules
@@ -79,9 +72,9 @@ sortModules =
 desugarWithBookmarks ::
   [(FileInfo, P.Module)]
   -> [P.Module]
-  -> ExceptT ParseDesugarError IO ([Bookmark], [P.Module])
+  -> ExceptT P.MultipleErrors IO ([Bookmark], [P.Module])
 desugarWithBookmarks msInfo msSorted =  do
-  msDesugared <- throwLeft DesugarError (desugar msSorted)
+  msDesugared <- throwLeft (desugar msSorted)
 
   let msDeps = getDepsModuleNames (map (\(fp, m) -> (,m) <$> fp) msInfo)
       msPackages = map (addPackage msDeps) msDesugared
@@ -89,8 +82,8 @@ desugarWithBookmarks msInfo msSorted =  do
 
   return (bookmarks, takeLocals msPackages)
 
-throwLeft :: (MonadError e m) => (l -> e) -> Either l r -> m r
-throwLeft f = either (throwError . f) return
+throwLeft :: (MonadError l m) => Either l r -> m r
+throwLeft = either throwError return
 
 -- | Specifies whether a PureScript source file is considered as:
 --
