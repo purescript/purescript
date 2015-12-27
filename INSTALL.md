@@ -27,7 +27,7 @@ GHC 7.6.1 or newer is required to compile from source. The easiest way is to
 use stack:
 
 ```
-$ stack install purescript
+$ stack install --resolver lts purescript
 ```
 
 This will then copy the compiler and utilities into `~/.local/bin`.
