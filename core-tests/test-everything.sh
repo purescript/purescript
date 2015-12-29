@@ -18,9 +18,7 @@ if [ "$force_reinstall" = "true" ] && [ -d "bower_components" ]; then
   rm -r bower_components
 fi
 
-npm install bower
-
-node_modules/.bin/bower i \
+bower i \
         purescript-prelude \
         purescript-eff \
         purescript-st \
@@ -75,3 +73,7 @@ fi
 ../dist/build/psc/psc tests/*/*.purs \
                       'bower_components/purescript-*/src/**/*.purs' \
                 --ffi 'bower_components/purescript-*/src/**/*.js'
+
+../dist/build/psc-docs/psc-docs tests/*/*.purs \
+                      'bower_components/purescript-*/src/**/*.purs' \
+                      > full-core-docs.md

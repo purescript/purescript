@@ -30,6 +30,7 @@
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TransitiveExportError
+--
 
 module Main (main) where
 
@@ -39,6 +40,7 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.Docs as Docs
 
 import Data.Char (isSpace)
 import Data.Maybe (mapMaybe, fromMaybe)
@@ -69,6 +71,7 @@ import Text.Parsec (ParseError)
 
 import TestsSetup
 import TestPscPublish
+import qualified TestDocs
 
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
@@ -176,6 +179,8 @@ main = do
   testCompiler
   heading "psc-publish test suite"
   testPscPublish
+  heading "Documentation test suite"
+  TestDocs.main
 
   where
   heading msg = do
@@ -211,7 +216,7 @@ testCompiler = do
       assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
 
   if null failures
-    then exitSuccess
+    then pure ()
     else do
       putStrLn "Failures:"
       forM_ failures $ \(fp, err) ->
@@ -222,6 +227,7 @@ testCompiler = do
 testPscPublish :: IO ()
 testPscPublish = do
   testPackage "tests/support/prelude"
+
 
 supportModules :: [String]
 supportModules =

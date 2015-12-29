@@ -16,3 +16,5 @@ tmp/
 .stack-work/
 tests/support/flattened/
 output
+examples/docs/docs/
+core-tests/full-core-docs.md
