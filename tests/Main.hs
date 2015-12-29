@@ -201,7 +201,7 @@ testCompiler = do
       assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns
 
   if null failures
-    then exitSuccess
+    then pure unit
     else do
       putStrLn "Failures:"
       forM_ failures $ \(fp, err) ->
