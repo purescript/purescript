@@ -146,11 +146,18 @@ preparePackage' opts = do
 getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  liftIO (D.parseAndDesugar inputFiles depsFiles renderModules)
-    >>= either (userError . CompileError) return
+  (modules', bookmarks) <- parseAndDesugar inputFiles depsFiles
+
+  return (bookmarks, map D.convertModule modules')
+
   where
-  renderModules bookmarks modules =
-    return (bookmarks, map D.convertModule modules)
+  parseAndDesugar inputFiles depsFiles = do
+    r <- liftIO . runExceptT $ D.parseAndDesugar inputFiles depsFiles
+    case r of
+      Right r' ->
+        return r'
+      Left err ->
+        userError (CompileError err)
 
 data TreeStatus = Clean | Dirty deriving (Show, Read, Eq, Ord, Enum)
 

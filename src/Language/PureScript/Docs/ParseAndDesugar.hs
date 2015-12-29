@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Language.PureScript.Docs.ParseAndDesugar
   ( parseAndDesugar
@@ -11,7 +12,6 @@ import qualified Data.Map as M
 import Control.Arrow (first)
 import Control.Monad
 
-import Control.Monad.Trans.Except
 import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
@@ -29,40 +29,40 @@ import Language.PureScript.Docs.Convert (collectBookmarks)
 --    * A list of local source files
 --    * A list of source files from external dependencies, together with their
 --      package names
---    * A callback, taking a list of bookmarks, and a list of desugared modules
 --
 -- This function does the following:
 --
 --    * Parse all of the input and dependency source files
---    * Partially desugar all of the resulting modules
+--    * Partially desugar all of the resulting modules (just enough for
+--      producing documentation from them)
 --    * Collect a list of bookmarks from the whole set of source files
 --    * Collect a list of desugared modules from just the input source files (not
 --      dependencies)
---    * Call the callback with the bookmarks and desugared module list.
+--    * Return the desugared modules and the bookmarks.
 parseAndDesugar ::
+  (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> ([Bookmark] -> [P.Module] -> IO a)
-  -> IO (Either P.MultipleErrors a)
-parseAndDesugar inputFiles depsFiles callback = do
+  -> m ([P.Module], [Bookmark])
+parseAndDesugar inputFiles depsFiles = do
   inputFiles' <- traverse (parseAs Local) inputFiles
   depsFiles'  <- traverse (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
 
-  runExceptT $ do
-    ms         <- parseFiles (inputFiles' ++ depsFiles')
-    ms'        <- sortModules (map snd ms)
-    (bs, ms'') <- desugarWithBookmarks ms ms'
-    liftIO $ callback bs ms''
+  ms  <- parseFiles (inputFiles' ++ depsFiles')
+  ms' <- sortModules (map snd ms)
+  desugarWithBookmarks ms ms'
 
 parseFiles ::
+  (MonadError P.MultipleErrors m, MonadIO m) =>
   [(FileInfo, FilePath)]
-  -> ExceptT P.MultipleErrors IO [(FileInfo, P.Module)]
+  -> m [(FileInfo, P.Module)]
 parseFiles =
   throwLeft . P.parseModulesFromFiles fileInfoToString
 
 sortModules ::
+  (Functor m, MonadError P.MultipleErrors m, MonadIO m) =>
   [P.Module]
-  -> ExceptT P.MultipleErrors IO [P.Module]
+  -> m [P.Module]
 sortModules =
   fmap fst . throwLeft . sortModules' . map importPrim
   where
@@ -70,9 +70,10 @@ sortModules =
   sortModules' = P.sortModules
 
 desugarWithBookmarks ::
+  (MonadError P.MultipleErrors m, MonadIO m) =>
   [(FileInfo, P.Module)]
   -> [P.Module]
-  -> ExceptT P.MultipleErrors IO ([Bookmark], [P.Module])
+  -> m ([P.Module], [Bookmark])
 desugarWithBookmarks msInfo msSorted =  do
   msDesugared <- throwLeft (desugar msSorted)
 
@@ -80,7 +81,7 @@ desugarWithBookmarks msInfo msSorted =  do
       msPackages = map (addPackage msDeps) msDesugared
       bookmarks = concatMap collectBookmarks msPackages
 
-  return (bookmarks, takeLocals msPackages)
+  return (takeLocals msPackages, bookmarks)
 
 throwLeft :: (MonadError l m) => Either l r -> m r
 throwLeft = either throwError return
@@ -101,18 +102,24 @@ fileInfoToString (FromDep _ fn) = fn
 importPrim :: P.Module -> P.Module
 importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 
-desugar :: [P.Module] -> Either P.MultipleErrors [P.Module]
+desugar ::
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  [P.Module]
+  -> m [P.Module]
 desugar = P.evalSupplyT 0 . desugar'
   where
-  desugar' :: [P.Module] -> P.SupplyT (Either P.MultipleErrors) [P.Module]
-  desugar' = traverse P.desugarDoModule >=> P.desugarCasesModule >=> ignoreWarnings . P.desugarImports []
+  desugar' =
+    traverse P.desugarDoModule
+      >=> P.desugarCasesModule
+      >=> ignoreWarnings . P.desugarImports []
+
   ignoreWarnings m = liftM fst (runWriterT m)
 
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input' = (,) input' <$> readFile input'
 
-parseAs :: (FilePath -> a) -> FilePath -> IO (a, String)
-parseAs g = fmap (first g) . parseFile
+parseAs :: (Functor m, MonadIO m) => (FilePath -> a) -> FilePath -> m (a, String)
+parseAs g = fmap (first g) . liftIO . parseFile
 
 getDepsModuleNames :: [InPackage (FilePath, P.Module)] -> M.Map P.ModuleName PackageName
 getDepsModuleNames = foldl go M.empty

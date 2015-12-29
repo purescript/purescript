@@ -220,7 +220,8 @@ executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any,
                    split -any, ansi-wl-pprint -any, directory -any,
-                   filepath -any, Glob -any
+                   filepath -any, Glob -any, transformers -any,
+                   transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs

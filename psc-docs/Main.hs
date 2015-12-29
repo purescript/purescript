@@ -16,6 +16,7 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Control.Monad.Writer
@@ -68,12 +69,12 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      e <- D.parseAndDesugar input [] (\_ ms -> return ms)
+      e <- liftIO . runExceptT $ D.parseAndDesugar input []
       case e of
         Left err -> do
           hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
           exitFailure
-        Right ms' ->
+        Right (ms', _) ->
           case output of
             EverythingToStdOut ->
               putStrLn (D.renderModulesAsMarkdown ms')
