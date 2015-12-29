@@ -146,7 +146,7 @@ preparePackage' opts = do
 getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  (modules', bookmarks) <- parseAndDesugar inputFiles depsFiles
+  (modules', bookmarks, _) <- parseAndDesugar inputFiles depsFiles
 
   return (bookmarks, map D.convertModule modules')
 

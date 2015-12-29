@@ -74,7 +74,7 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
         Left err -> do
           hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
           exitFailure
-        Right (ms', _) ->
+        Right (ms', _, _) ->
           case output of
             EverythingToStdOut ->
               putStrLn (D.renderModulesAsMarkdown ms')

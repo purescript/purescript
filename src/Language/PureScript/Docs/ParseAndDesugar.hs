@@ -38,12 +38,13 @@ import Language.PureScript.Docs.Convert (collectBookmarks)
 --    * Collect a list of bookmarks from the whole set of source files
 --    * Collect a list of desugared modules from just the input source files (not
 --      dependencies)
---    * Return the desugared modules and the bookmarks.
+--    * Return the desugared modules, the bookmarks, and the imports/exports
+--      Env (which is needed for producing documentation).
 parseAndDesugar ::
   (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> m ([P.Module], [Bookmark])
+  -> m ([P.Module], [Bookmark], P.Env)
 parseAndDesugar inputFiles depsFiles = do
   inputFiles' <- traverse (parseAs Local) inputFiles
   depsFiles'  <- traverse (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
@@ -73,15 +74,15 @@ desugarWithBookmarks ::
   (MonadError P.MultipleErrors m, MonadIO m) =>
   [(FileInfo, P.Module)]
   -> [P.Module]
-  -> m ([P.Module], [Bookmark])
+  -> m ([P.Module], [Bookmark], P.Env)
 desugarWithBookmarks msInfo msSorted =  do
-  msDesugared <- throwLeft (desugar msSorted)
+  (env, msDesugared) <- throwLeft (desugar msSorted)
 
   let msDeps = getDepsModuleNames (map (\(fp, m) -> (,m) <$> fp) msInfo)
       msPackages = map (addPackage msDeps) msDesugared
       bookmarks = concatMap collectBookmarks msPackages
 
-  return (takeLocals msPackages, bookmarks)
+  return (takeLocals msPackages, bookmarks, env)
 
 throwLeft :: (MonadError l m) => Either l r -> m r
 throwLeft = either throwError return
@@ -105,13 +106,13 @@ importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 desugar ::
   (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
   [P.Module]
-  -> m [P.Module]
+  -> m (P.Env, [P.Module])
 desugar = P.evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
       >=> P.desugarCasesModule
-      >=> ignoreWarnings . P.desugarImports []
+      >=> ignoreWarnings . P.desugarImportsWithEnv []
 
   ignoreWarnings m = liftM fst (runWriterT m)
 
