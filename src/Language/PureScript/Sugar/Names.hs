@@ -1,8 +1,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
-module Language.PureScript.Sugar.Names (desugarImports) where
+module Language.PureScript.Sugar.Names
+  ( desugarImports
+  , desugarImportsWithEnv
+  , Env
+  , Imports(..)
+  , Exports(..)
+  ) where
 
 import Prelude ()
 import Prelude.Compat
@@ -35,11 +42,20 @@ import Language.PureScript.Linter.Imports
 -- modules should be topologically sorted beforehand.
 --
 desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
-desugarImports externs modules = do
+desugarImports externs modules =
+  fmap snd (desugarImportsWithEnv externs modules)
+
+desugarImportsWithEnv
+  :: forall m
+  . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [ExternsFile]
+  -> [Module]
+  -> m (Env, [Module])
+desugarImportsWithEnv externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
   modules' <- traverse updateExportRefs modules
   (modules'', env') <- foldM updateEnv ([], env) modules'
-  traverse (renameInModule' env') modules''
+  (env',) <$> traverse (renameInModule' env') modules''
   where
   silence :: m a -> m a
   silence = censor (const mempty)
