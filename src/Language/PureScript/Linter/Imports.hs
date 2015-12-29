@@ -83,13 +83,14 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
             -- If we've not already warned a type is unused, check its data constructors
             forM_ (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
               let allCtors = dctorsForType mni tn
-              when (runProperName tn `elem` usedNames) $ case (c, null $ usedDctors `intersect` allCtors) of
-                (Nothing, True) -> tell $ errorMessage $ UnusedDctorImport tn
-                (Just (_:_), True) -> tell $ errorMessage $ UnusedDctorImport tn
-                (Just ctors, _) ->
-                  let ddiff = ctors \\ usedDctors
+              when (runProperName tn `elem` usedNames) $ case (c, usedDctors `intersect` allCtors) of
+                (_, []) ->
+                  tell $ errorMessage $ UnusedDctorImport tn
+                (Nothing, usedDctors') ->
+                  tell $ errorMessage $ ImplicitDctorImport tn usedDctors'
+                (Just ctors, usedDctors') ->
+                  let ddiff = ctors \\ usedDctors'
                   in unless (null ddiff) $ tell $ errorMessage $ UnusedDctorExplicitImport tn ddiff
-                _ -> return ()
 
             return ()
 
