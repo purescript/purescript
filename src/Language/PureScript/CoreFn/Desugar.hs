@@ -242,7 +242,7 @@ exportToCoreFn _ = []
 -- is a function that accepts the superclass instances and member
 -- implementations and returns a record for the instance dictionary.
 --
-mkTypeClassConstructor :: Maybe SourceSpan -> [Comment] -> [Constraint] -> [A.Declaration] -> Expr Ann
+mkTypeClassConstructor :: Maybe SourceSpan -> [Comment] -> [(Qualified ProperName, [Type])] -> [A.Declaration] -> Expr Ann
 mkTypeClassConstructor ss com [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor ss com supers members =
   let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers

@@ -50,12 +50,9 @@ typeLiterals = mkPattern match
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match _ = Nothing
 
-constraintsAsBox :: [(Qualified ProperName, [Type])] -> Box -> Box
-constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> ty
-constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> ty)
-
-constraintAsBox :: Qualified ProperName -> [Type] -> Box
-constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)
+constraintsAsBox :: [Constraint] -> Box -> Box
+constraintsAsBox [con] ty = typeAsBox con <> text " => " <> ty
+constraintsAsBox xs ty = vcat left (zipWith (\i con -> text (if i == 0 then "( " else ", ") <> typeAsBox con) [0 :: Int ..] xs) `before` (text ") => " <> ty)
 
 -- |
 -- Generate a pretty-printed string representing a Row

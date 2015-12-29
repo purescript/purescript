@@ -51,10 +51,7 @@ typeLiterals = mkPattern match
             , renderType ty
             ]
     where
-    constraints = mintersperse (syntax "," <> sp) (map renderDep deps)
-    renderDep (pn, tys) =
-        let instApp = foldl TypeApp (TypeConstructor pn) tys
-        in  renderType instApp
+    constraints = mintersperse (syntax "," <> sp) (map renderType deps)
   match REmpty =
     Just (syntax "()")
   match row@RCons{} =

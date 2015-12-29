@@ -83,14 +83,13 @@ typeInstanceConstituents :: Declaration -> [Qualified ProperName]
 typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _) =
   className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
-
   fromConstraint (name, tys') = name : concatMap fromType tys'
   fromType = everythingOnTypes (++) go
 
   -- Note that type synonyms are disallowed in instance declarations, so
   -- we don't need to handle them here.
   go (TypeConstructor n) = [n]
-  go (ConstrainedType cs _) = concatMap fromConstraint cs
+  go (ConstrainedType cs _) = concatMap fromType cs
   go _ = []
 
 typeInstanceConstituents (PositionedDeclaration _ _ d) = typeInstanceConstituents d

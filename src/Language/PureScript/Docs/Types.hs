@@ -125,7 +125,7 @@ data DeclarationInfo
   -- A type class, with its type arguments and its superclasses. Instances and
   -- members are represented as child declarations.
   --
-  | TypeClassDeclaration [(String, Maybe P.Kind)] [P.Constraint]
+  | TypeClassDeclaration [(String, Maybe P.Kind)] [(P.Qualified P.ProperName, [P.Type])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -154,7 +154,7 @@ data ChildDeclarationInfo
   -- |
   -- A type instance declaration, with its dependencies and its type.
   --
-  = ChildInstance [P.Constraint] P.Type
+  = ChildInstance [(P.Qualified P.ProperName, [P.Type])] P.Type
 
   -- |
   -- A data constructor, with its type arguments.
@@ -395,7 +395,7 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asConstraint :: Parse PackageError P.Constraint
+asConstraint :: Parse PackageError (P.Qualified P.ProperName, [P.Type])
 asConstraint = (,) <$> nth 0 asQualifiedProperName
                    <*> nth 1 (eachInArray asType)
 

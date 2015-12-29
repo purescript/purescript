@@ -183,7 +183,7 @@ parseTypeClassDeclaration = do
   return $ TypeClassDeclaration className idents implies members
   where
 
-parseConstraint :: TokenParser Constraint
+parseConstraint :: TokenParser (Qualified ProperName, [Type])
 parseConstraint = (,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)

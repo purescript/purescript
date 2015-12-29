@@ -301,15 +301,16 @@ checkExhaustiveDecls env mn = mapM_ onDecl
   onCaseAlternative isP (CaseAlternative _ (Right e)) = onExpr isP e
 
   hasPartialConstraint :: Type -> Bool
-  hasPartialConstraint (ConstrainedType cs _) = any (go . fst) cs
+  hasPartialConstraint (ConstrainedType cs _) = any go cs
     where
-    go :: Qualified ProperName -> Bool
-    go qname
+    go :: Type -> Bool
+    go (TypeConstructor qname)
       | qname == partialClass = True
       | otherwise =
-          case qname `M.lookup` typeClasses env of
-            Just ([], _, cs') -> any (go . fst) cs'
+          case TypeConstructor qname `M.lookup` typeClasses env of
+            Just ([], _, cs') -> any (go . TypeConstructor . fst) cs'
             _ -> False
+    go _ = False
     partialClass :: Qualified ProperName
     partialClass = primName "Partial"
   hasPartialConstraint _ = False

@@ -47,7 +47,7 @@ import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
 
-type MemberMap = M.Map (ModuleName, ProperName) ([(String, Maybe Kind)], [Constraint], [Declaration])
+type MemberMap = M.Map (ModuleName, ProperName) ([(String, Maybe Kind)], [(Qualified ProperName, [Type])], [Declaration])
 
 type Desugar = StateT MemberMap
 
@@ -61,7 +61,7 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   initialState :: MemberMap
   initialState = M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
 
-  fromExternsDecl :: ModuleName -> ExternsDeclaration -> Maybe ((ModuleName, ProperName), ([(String, Maybe Kind)], [Constraint], [Declaration]))
+  fromExternsDecl :: ModuleName -> ExternsDeclaration -> Maybe ((ModuleName, ProperName), ([(String, Maybe Kind)], [(Qualified ProperName, [Type])], [Declaration]))
   fromExternsDecl mn (EDClass name args members implies) = Just ((mn, name), (args, implies, map (uncurry TypeDeclaration) members))
   fromExternsDecl _ _ = Nothing
 
@@ -218,7 +218,7 @@ memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ _ d) = memberToNameAndType d
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [Constraint] -> [Declaration] -> Declaration
+typeClassDictionaryDeclaration :: ProperName -> [(String, Maybe Kind)] -> [(Qualified ProperName, [Type])] -> [Declaration] -> Declaration
 typeClassDictionaryDeclaration name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
         [ function unit (foldl TypeApp (TypeConstructor superclass) tyArgs)
@@ -233,7 +233,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   let className = Qualified (Just mn) name
   in ValueDeclaration ident Private [] $ Right $
       TypedValue False (TypeClassDictionaryAccessor className ident) $
-      moveQuantifiersToFront (quantify (ConstrainedType [(className, map (TypeVar . fst) args)] ty))
+      moveQuantifiersToFront (quantify (ConstrainedType [foldl TypeApp (TypeConstructor className) (map (TypeVar . fst) args)] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
   PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
@@ -241,7 +241,7 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration
 unit :: Type
 unit = TypeApp tyObject REmpty
 
-typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [Constraint] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
+typeInstanceDictionaryDeclaration :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> ModuleName -> [(Qualified ProperName, [Type])] -> Qualified ProperName -> [Type] -> [Declaration] -> Desugar m Declaration
 typeInstanceDictionaryDeclaration name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
@@ -267,14 +267,15 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- The type is an object type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is an object literal.
       let superclasses = superClassDictionaryNames implies `zip`
-            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
+            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary (toConstraint (superclass, tyArgs)))
             | (superclass, suTyArgs) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             ]
 
-      let props = ObjectLiteral (members ++ superclasses)
+          props = ObjectLiteral (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor className) tys
-          constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
+          toConstraint (hd, tys') = foldl TypeApp (TypeConstructor hd) tys'
+          constrainedTy = quantify (if null deps then dictTy else ConstrainedType (map toConstraint deps) dictTy)
           dict = TypeClassDictionaryConstructorApp className props
           result = ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))
       return result
@@ -302,8 +303,8 @@ typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
 typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
 typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration in type class definition"
 
-superClassDictionaryNames :: [Constraint] -> [String]
+superClassDictionaryNames :: [a] -> [String]
 superClassDictionaryNames supers =
-  [ C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer)
-  | (index, (pn, _)) <- zip [0..] supers
+  [ C.__superclass_ ++ show (index :: Integer)
+  | (index, _) <- zip [0..] supers
   ]

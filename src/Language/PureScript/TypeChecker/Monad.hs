@@ -108,14 +108,14 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries ::
   (Functor m, MonadState CheckState m) =>
-  m (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+  m (M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries ::
   (Functor m, MonadState CheckState m) =>
   Maybe ModuleName ->
-  m (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  m (M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- | Temporarily bind a collection of names to local variables

@@ -28,12 +28,10 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
-import Control.Arrow (second)
 import Control.Monad ((<=<))
 
 import Language.PureScript.Names
 import Language.PureScript.Kinds
-import Language.PureScript.Traversals
 import Language.PureScript.AST.SourcePos
 
 -- |
@@ -106,7 +104,7 @@ data Type
 -- |
 -- A typeclass constraint
 --
-type Constraint = (Qualified ProperName, [Type])
+type Constraint = Type
 
 $(A.deriveJSON A.defaultOptions ''Type)
 
@@ -163,7 +161,7 @@ replaceAllTypeVars = go []
     where
     keys = map fst m
     usedVars = concatMap (usedTypeVariables . snd) m
-  go bs m (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs m)) cs) (go bs m t)
+  go bs m (ConstrainedType cs t) = ConstrainedType (map (go bs m) cs) (go bs m t)
   go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
   go bs m (KindedType t k) = KindedType (go bs m t) k
   go _  _ ty = ty
@@ -183,6 +181,11 @@ usedTypeVariables = nub . everythingOnTypes (++) go
   go (TypeVar v) = [v]
   go _ = []
 
+-- | Separate any type applications from a type.
+stripTypeArguments :: [Type] -> Type -> (Type, [Type])
+stripTypeArguments args (TypeApp t1 t2) = stripTypeArguments (t2 : args) t1
+stripTypeArguments args other = (other, reverse args)
+
 -- |
 -- Collect all free type variables appearing in a type
 --
@@ -193,7 +196,7 @@ freeTypeVariables = nub . go []
   go bound (TypeVar v) | v `notElem` bound = [v]
   go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
   go bound (ForAll v t _) = go (v : bound) t
-  go bound (ConstrainedType cs t) = concatMap (concatMap (go bound) . snd) cs ++ go bound t
+  go bound (ConstrainedType cs t) = concatMap (go bound) cs ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
   go bound (KindedType t _) = go bound t
   go _ _ = []
@@ -230,16 +233,14 @@ containsWildcards = everythingOnTypes (||) go
   go TypeWildcard = True
   go _ = False
 
---
--- Traversals
---
+-- * Traversals
 
 everywhereOnTypes :: (Type -> Type) -> Type -> Type
 everywhereOnTypes f = go
   where
   go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
   go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
-  go (ConstrainedType cs ty) = f (ConstrainedType (map (fmap (map go)) cs) (go ty))
+  go (ConstrainedType cs ty) = f (ConstrainedType (map go cs) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
   go (KindedType ty k) = f (KindedType (go ty) k)
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
@@ -252,7 +253,7 @@ everywhereOnTypesTopDown f = go . f
   where
   go (TypeApp t1 t2) = TypeApp (go (f t1)) (go (f t2))
   go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
-  go (ConstrainedType cs ty) = ConstrainedType (map (fmap (map (go . f))) cs) (go (f ty))
+  go (ConstrainedType cs ty) = ConstrainedType (map (go . f) cs) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
   go (KindedType ty k) = KindedType (go (f ty)) k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
@@ -265,7 +266,7 @@ everywhereOnTypesM f = go
   where
   go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
   go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
-  go (ConstrainedType cs ty) = (ConstrainedType <$> mapM (sndM (mapM go)) cs <*> go ty) >>= f
+  go (ConstrainedType cs ty) = (ConstrainedType <$> mapM go cs <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
@@ -278,7 +279,7 @@ everywhereOnTypesTopDownM f = go <=< f
   where
   go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
-  go (ConstrainedType cs ty) = ConstrainedType <$> mapM (sndM (mapM (go <=< f))) cs <*> (f ty >>= go)
+  go (ConstrainedType cs ty) = ConstrainedType <$> mapM (go <=< f) cs <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
@@ -291,7 +292,7 @@ everythingOnTypes (<>) f = go
   where
   go t@(TypeApp t1 t2) = f t <> go t1 <> go t2
   go t@(ForAll _ ty _) = f t <> go ty
-  go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go $ concatMap snd cs) <> go ty
+  go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go cs) <> go ty
   go t@(RCons _ ty rest) = f t <> go ty <> go rest
   go t@(KindedType ty _) = f t <> go ty
   go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
@@ -305,7 +306,7 @@ everythingWithContextOnTypes s0 r0 (<>) f = go' s0
   go' s t = let (s', r) = f s t in r <> go s' t
   go s (TypeApp t1 t2) = go' s t1 <> go' s t2
   go s (ForAll _ ty _) = go' s ty
-  go s (ConstrainedType cs ty) = foldl (<>) r0 (map (go' s) $ concatMap snd cs) <> go' s ty
+  go s (ConstrainedType cs ty) = foldl (<>) r0 (map (go' s) cs) <> go' s ty
   go s (RCons _ ty rest) = go' s ty <> go' s rest
   go s (KindedType ty _) = go' s ty
   go s (PrettyPrintFunction t1 t2) = go' s t1 <> go' s t2

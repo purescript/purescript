@@ -90,9 +90,9 @@ data SimpleErrorMessage
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
-  | OverlappingInstances (Qualified ProperName) [Type] [Qualified Ident]
-  | NoInstanceFound (Qualified ProperName) [Type]
-  | PossiblyInfiniteInstance (Qualified ProperName) [Type]
+  | OverlappingInstances Constraint [Qualified Ident]
+  | NoInstanceFound Constraint
+  | PossiblyInfiniteInstance Constraint
   | CannotDerive (Qualified ProperName) [Type]
   | CannotFindDerivingType ProperName
   | DuplicateLabel String (Maybe Expr)
@@ -393,9 +393,9 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound cl ts) = NoInstanceFound cl <$> traverse f ts
-  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
-  gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
+  gSimple (NoInstanceFound con) = NoInstanceFound <$> f con
+  gSimple (OverlappingInstances con insts) = OverlappingInstances <$> f con <*> pure insts
+  gSimple (PossiblyInfiniteInstance con) = PossiblyInfiniteInstance <$> f con
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
@@ -634,24 +634,20 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
             , line "with type"
             , indent $ typeAsBox t2
             ]
-    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances con (d : ds)) =
       paras [ line "Overlapping type class instances found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox con
             , line "The following instances were found:"
             , indent $ paras (line (showQualified showIdent d ++ " (chosen)") : map (line . showQualified showIdent) ds)
             , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound nm ts) =
+    renderSimpleErrorMessage (NoInstanceFound con) =
       paras [ line "No type class instance was found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox con
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | any containsUnknowns ts
+                    | containsUnknowns con
                     ]
             ]
       where
@@ -660,11 +656,9 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
+    renderSimpleErrorMessage (PossiblyInfiniteInstance con) =
       paras [ line "Type class instance for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox con
             , line "is possibly infinite."
             ]
     renderSimpleErrorMessage (CannotDerive nm ts) =

@@ -29,13 +29,13 @@ data TypeClassDictionaryInScope
     -- | The identifier with which the dictionary can be accessed at runtime
       tcdName :: Qualified Ident
     -- | How to obtain this instance via superclass relationships
-    , tcdPath :: [(Qualified ProperName, Integer)]
-    -- | The name of the type class to which this type class instance applies
-    , tcdClassName :: Qualified ProperName
+    , tcdPath :: [Integer]
+    -- | The type of the type class to which this type class instance applies
+    , tcdClassName :: Type
     -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [Type]
     -- | Type class dependencies which must be satisfied to construct this dictionary
-    , tcdDependencies :: Maybe [Constraint]
+    , tcdDependencies :: Maybe [(Qualified ProperName, [Type])]
     } deriving (Show, Read, Data, Typeable)
 
 -- |
@@ -58,5 +58,5 @@ data DictionaryValue
   -- |
   -- A subclass dictionary
   --
-  | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
+  | SubclassDictionaryValue DictionaryValue Integer
   deriving (Show, Read, Ord, Eq)

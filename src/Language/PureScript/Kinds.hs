@@ -27,29 +27,19 @@ import qualified Data.Aeson.TH as A
 -- The data type of kinds
 --
 data Kind
-  -- |
-  -- Unification variable of type Kind
-  --
+  -- | Unification variable of type Kind
   = KUnknown Int
-  -- |
-  -- A named kind variable
-  --
+  -- | A named kind variable
   | KindVar String
-  -- |
-  -- The kind of types
-  --
+  -- | The kind of types
   | Star
-  -- |
-  -- The kind of effects
-  --
+  -- | The kind of effects
   | Bang
-  -- |
-  -- Kinds for labelled, unordered rows without duplicates
-  --
+  -- | The kind of constraints
+  | ConstraintKind
+  -- | Kinds for labelled, unordered rows without duplicates
   | Row Kind
-  -- |
-  -- Function kinds
-  --
+  -- | Function kinds
   | FunKind Kind Kind deriving (Show, Read, Eq, Ord, Data, Typeable)
 
 $(A.deriveJSON A.defaultOptions ''Kind)

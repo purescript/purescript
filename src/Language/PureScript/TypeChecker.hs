@@ -114,12 +114,12 @@ addTypeClass ::
   ModuleName ->
   ProperName ->
   [(String, Maybe Kind)] ->
-  [Constraint] ->
+  [(Qualified ProperName, [Type])] ->
   [Declaration] ->
   m ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (TypeConstructor (Qualified (Just moduleName) pn)) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
   toPair (PositionedDeclaration _ _ d) = toPair d
@@ -128,7 +128,7 @@ addTypeClass moduleName pn args implies ds =
 addTypeClassDictionaries ::
   (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Maybe ModuleName ->
-  M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope) ->
+  M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope) ->
   m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
@@ -273,8 +273,8 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . snd
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] (TypeConstructor className) tys (Just deps)
+    addTypeClassDictionaries (Just moduleName) . M.singleton (TypeConstructor className) $ M.singleton (tcdName dict) dict
     return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
@@ -401,10 +401,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . fst) cs
+      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass) cs
       go _ = []
-    extractCurrentModuleClass :: Qualified ProperName -> Maybe ProperName
-    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
+    extractCurrentModuleClass :: Type -> Maybe ProperName
+    extractCurrentModuleClass (TypeConstructor (Qualified (Just mn') name)) | mn == mn' = Just name
     extractCurrentModuleClass _ = Nothing
 
   checkClassMembersAreExported :: DeclarationRef -> m ()

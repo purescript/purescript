@@ -82,7 +82,7 @@ renderChildDeclarationWithOptions :: RenderTypeOptions -> ChildDeclaration -> Re
 renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of
     ChildInstance constraints ty ->
-      maybeToList (renderConstraints constraints) ++ [ renderType' ty ]
+      maybeToList (renderConstraints (map (\(pn, tys) -> foldl P.TypeApp (P.TypeConstructor pn) tys) constraints)) ++ [ renderType' ty ]
     ChildDataConstructor args ->
       [ renderType' typeApp' ]
       where
@@ -104,10 +104,10 @@ renderConstraintWithOptions :: RenderTypeOptions -> (P.Qualified P.ProperName, [
 renderConstraintWithOptions opts (pn, tys) =
   renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor pn) tys
 
-renderConstraints :: [P.Constraint] -> Maybe RenderedCode
+renderConstraints :: [P.Type] -> Maybe RenderedCode
 renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
 
-renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint] -> Maybe RenderedCode
+renderConstraintsWithOptions :: RenderTypeOptions -> [P.Type] -> Maybe RenderedCode
 renderConstraintsWithOptions opts constraints
   | null constraints = Nothing
   | otherwise = Just $
@@ -117,7 +117,7 @@ renderConstraintsWithOptions opts constraints
   where
   renderedConstraints =
     mintersperse (syntax "," <> sp)
-                 (map (renderConstraintWithOptions opts) constraints)
+                 (map (renderTypeWithOptions opts) constraints)
 
 notQualified :: String -> P.Qualified P.ProperName
 notQualified = P.Qualified Nothing . P.ProperName
