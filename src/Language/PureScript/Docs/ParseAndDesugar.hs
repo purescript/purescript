@@ -33,18 +33,18 @@ import Language.PureScript.Docs.Convert (collectBookmarks)
 -- This function does the following:
 --
 --    * Parse all of the input and dependency source files
+--    * Associate each dependency module with its package name, thereby
+--      distinguishing these from local modules
 --    * Partially desugar all of the resulting modules (just enough for
 --      producing documentation from them)
 --    * Collect a list of bookmarks from the whole set of source files
---    * Collect a list of desugared modules from just the input source files (not
---      dependencies)
 --    * Return the desugared modules, the bookmarks, and the imports/exports
 --      Env (which is needed for producing documentation).
 parseAndDesugar ::
   (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> m ([P.Module], [Bookmark], P.Env)
+  -> m ([InPackage P.Module], [Bookmark], P.Env)
 parseAndDesugar inputFiles depsFiles = do
   inputFiles' <- traverse (parseAs Local) inputFiles
   depsFiles'  <- traverse (\(pkgName, f) -> parseAs (FromDep pkgName) f) depsFiles
@@ -74,7 +74,7 @@ desugarWithBookmarks ::
   (MonadError P.MultipleErrors m, MonadIO m) =>
   [(FileInfo, P.Module)]
   -> [P.Module]
-  -> m ([P.Module], [Bookmark], P.Env)
+  -> m ([InPackage P.Module], [Bookmark], P.Env)
 desugarWithBookmarks msInfo msSorted =  do
   (env, msDesugared) <- throwLeft (desugar msSorted)
 
@@ -82,7 +82,7 @@ desugarWithBookmarks msInfo msSorted =  do
       msPackages = map (addPackage msDeps) msDesugared
       bookmarks = concatMap collectBookmarks msPackages
 
-  return (takeLocals msPackages, bookmarks, env)
+  return (msPackages, bookmarks, env)
 
 throwLeft :: (MonadError l m) => Either l r -> m r
 throwLeft = either throwError return

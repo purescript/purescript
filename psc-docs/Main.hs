@@ -69,55 +69,68 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      e <- liftIO . runExceptT $ D.parseAndDesugar input []
-      case e of
-        Left err -> do
-          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
-          exitFailure
-        Right (ms', _, _) ->
-          case output of
-            EverythingToStdOut ->
-              putStrLn (D.renderModulesAsMarkdown ms')
-            ToStdOut names -> do
-              let (ms, missing) = takeModulesByName ms' names
-              guardMissing missing
-              putStrLn (D.renderModulesAsMarkdown ms)
-            ToFiles names -> do
-              let (ms, missing) = takeModulesByName' ms' names
-              guardMissing missing
-              let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms
-              forM_ ms'' $ \grp -> do
-                let fp = fst (head grp)
-                createDirectoryIfMissing True (takeDirectory fp)
-                writeFile fp (D.renderModulesAsMarkdown $ snd `map` grp)
+      ms <- runExceptT (D.parseAndDesugar input []
+                           >>= ((\(ms, _, env) -> D.convertModulesInPackage env ms)))
+               >>= successOrExit
+
+      case output of
+        EverythingToStdOut ->
+          putStrLn (D.runDocs (D.modulesAsMarkdown ms))
+        ToStdOut names -> do
+          let (ms', missing) = takeByName ms (map P.runModuleName names)
+          guardMissing missing
+          putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
+        ToFiles names -> do
+          let (ms', missing) = takeByName' ms (map (first P.runModuleName) names)
+          guardMissing missing
+
+          let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms'
+          forM_ ms'' $ \grp -> do
+            let fp = fst (head grp)
+            createDirectoryIfMissing True (takeDirectory fp)
+            writeFile fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
+
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ show mn ++ "\"")
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ mn ++ "\"")
     exitFailure
   guardMissing mns = do
     hPutStrLn stderr "psc-docs: error: unknown modules:"
     forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ show mn)
+      hPutStrLn stderr ("  * " ++ mn)
     exitFailure
+
+  successOrExit :: Either P.MultipleErrors a -> IO a
+  successOrExit act =
+    case act of
+      Right x ->
+        return x
+      Left err -> do
+        hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
+        exitFailure
+
+  takeByName = takeModulesByName D.modName
+  takeByName' = takeModulesByName' D.modName
 
 -- |
 -- Given a list of module names and a list of modules, return a list of modules
 -- whose names appeared in the given name list, together with a list of names
 -- for which no module could be found in the module list.
 --
-takeModulesByName :: [P.Module] -> [P.ModuleName] -> ([P.Module], [P.ModuleName])
-takeModulesByName modules names =
-  first (map fst) (takeModulesByName' modules (map (,()) names))
+takeModulesByName :: (Eq n) => (m -> n) -> [m] -> [n] -> ([m], [n])
+takeModulesByName getModuleName modules names =
+  first (map fst) (takeModulesByName' getModuleName modules (map (,()) names))
 
 -- |
--- Like takeModulesByName but also keeps some extra data with the module.
+-- Like takeModulesByName, but also keeps some extra information with each
+-- module.
 --
-takeModulesByName' :: [P.Module] -> [(P.ModuleName, a)] -> ([(P.Module, a)], [P.ModuleName])
-takeModulesByName' modules = foldl go ([], [])
+takeModulesByName' :: (Eq n) => (m -> n) -> [m] -> [(n, a)] -> ([(m, a)], [n])
+takeModulesByName' getModuleName modules = foldl go ([], [])
   where
   go (ms, missing) (name, x) =
-    case find ((== name) . P.getModuleName) modules of
+    case find ((== name) . getModuleName) modules of
       Just m  -> ((m, x) : ms, missing)
       Nothing -> (ms, name : missing)
 

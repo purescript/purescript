@@ -76,6 +76,8 @@ data Module = Module
   { modName         :: String
   , modComments     :: Maybe String
   , modDeclarations :: [Declaration]
+  -- Re-exported values from other modules
+  , modReExports    :: [(P.ModuleName, [Declaration])]
   }
   deriving (Show, Eq, Ord)
 
@@ -142,6 +144,37 @@ declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
 
+isTypeClass :: Declaration -> Bool
+isTypeClass Declaration{..} =
+  case declInfo of
+    TypeClassDeclaration{} -> True
+    _ -> False
+
+isValue :: Declaration -> Bool
+isValue Declaration{..} =
+  case declInfo of
+    ValueDeclaration{} -> True
+    _ -> False
+
+isType :: Declaration ->  Bool
+isType Declaration{..} =
+  case declInfo of
+    TypeSynonymDeclaration{} -> True
+    DataDeclaration{} -> True
+    ExternDataDeclaration{} -> True
+    _ -> False
+
+isAlias :: Declaration -> Bool
+isAlias Declaration{..} =
+  case declInfo of
+    AliasDeclaration{} -> True
+    _ -> False
+
+-- | Discard any children which do not satisfy the given predicate.
+filterChildren :: (ChildDeclaration -> Bool) -> Declaration -> Declaration
+filterChildren p decl =
+  decl { declChildren = filter p (declChildren decl) }
+
 data ChildDeclaration = ChildDeclaration
   { cdeclTitle      :: String
   , cdeclComments   :: Maybe String
@@ -173,6 +206,18 @@ childDeclInfoToString :: ChildDeclarationInfo -> String
 childDeclInfoToString (ChildInstance _ _)      = "instance"
 childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
 childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
+
+isTypeClassMember :: ChildDeclaration -> Bool
+isTypeClassMember ChildDeclaration{..} =
+  case cdeclInfo of
+    ChildTypeClassMember{} -> True
+    _ -> False
+
+isDataConstructor :: ChildDeclaration -> Bool
+isDataConstructor ChildDeclaration{..} =
+  case cdeclInfo of
+    ChildDataConstructor{} -> True
+    _ -> False
 
 newtype GithubUser
   = GithubUser { runGithubUser :: String }
@@ -304,6 +349,7 @@ asModule =
   Module <$> key "name" asString
          <*> key "comments" (perhaps asString)
          <*> key "declarations" (eachInArray asDeclaration)
+         <*> key "reExports" (eachInArray asReExport)
 
 asDeclaration :: Parse PackageError Declaration
 asDeclaration =
@@ -313,6 +359,19 @@ asDeclaration =
               <*> key "children" (eachInArray asChildDeclaration)
               <*> key "fixity" (perhaps asFixity)
               <*> key "info" asDeclarationInfo
+
+asReExport :: Parse PackageError (P.ModuleName, [Declaration])
+asReExport =
+  (,) <$> key "moduleName" fromAesonParser
+      <*> key "declarations" (eachInArray asDeclaration)
+
+asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
+asInPackage inner =
+  build <$> key "package" (perhaps (withString parsePackageName))
+        <*> key "item" inner
+  where
+  build Nothing = Local
+  build (Just pn) = FromDep pn
 
 asFixity :: Parse PackageError P.Fixity
 asFixity =
@@ -410,12 +469,8 @@ asBookmarks = eachInArray asBookmark
 
 asBookmark :: Parse BowerError Bookmark
 asBookmark =
-  build <$> key "package" (perhaps (withString parsePackageName))
-        <*> key "item" ((,) <$> nth 0 (P.moduleNameFromString <$> asString)
-                            <*> nth 1 asString)
-  where
-  build Nothing = Local
-  build (Just pn) = FromDep pn
+  asInPackage ((,) <$> nth 0 (P.moduleNameFromString <$> asString)
+                   <*> nth 1 asString)
 
 asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
 asResolvedDependencies =
@@ -460,7 +515,12 @@ instance A.ToJSON Module where
     A.object [ "name"         .= modName
              , "comments"     .= modComments
              , "declarations" .= modDeclarations
+             , "reExports"    .= map toObj modReExports
              ]
+    where
+    toObj (mn, decls) = A.object [ "moduleName" .= mn
+                                 , "declarations" .= decls
+                                 ]
 
 instance A.ToJSON Declaration where
   toJSON Declaration{..} =
