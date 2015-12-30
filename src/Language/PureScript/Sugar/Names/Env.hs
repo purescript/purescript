@@ -41,15 +41,15 @@ data Imports = Imports
   -- |
   -- Local names for types within a module mapped to to their qualified names
   --
-    importedTypes :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+    importedTypes :: M.Map (Qualified (ProperName 'TypeName)) [(Qualified (ProperName 'TypeName), ModuleName)]
   -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --
-  , importedDataConstructors :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+  , importedDataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) [(Qualified (ProperName 'ConstructorName), ModuleName)]
   -- |
   -- Local names for classes within a module mapped to to their qualified names
   --
-  , importedTypeClasses :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+  , importedTypeClasses :: M.Map (Qualified (ProperName 'ClassName)) [(Qualified (ProperName 'ClassName), ModuleName)]
   -- |
   -- Local names for values within a module mapped to to their qualified names
   --
@@ -80,12 +80,12 @@ data Exports = Exports
   -- The types exported from each module along with the module they originally
   -- came from.
   --
-    exportedTypes :: [((ProperName, [ProperName]), ModuleName)]
+    exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
   -- |
   -- The classes exported from each module along with the module they originally
   -- came from.
   --
-  , exportedTypeClasses :: [(ProperName, ModuleName)]
+  , exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
   -- |
   -- The values exported from each module along with the module they originally
   -- came from.
@@ -143,29 +143,28 @@ primEnv = M.singleton
 -- Safely adds a type and its data constructors to some exports, returning an
 -- error if a conflict occurs.
 --
-exportType :: (MonadError MultipleErrors m) => Exports -> ProperName -> [ProperName] -> ModuleName -> m Exports
+exportType :: (MonadError MultipleErrors m) => Exports -> ProperName 'TypeName -> [ProperName 'ConstructorName] -> ModuleName -> m Exports
 exportType exps name dctors mn = do
   let exTypes' = exportedTypes exps
   let exTypes = filter ((/= mn) . snd) exTypes'
   let exDctors = (snd . fst) `concatMap` exTypes
   let exClasses = exportedTypeClasses exps
-
   when (any ((== name) . fst . fst) exTypes) $ throwConflictError ConflictingTypeDecls name
-  when (any ((== name) . fst) exClasses) $ throwConflictError TypeConflictsWithClass name
+  when (any ((== coerceProperName name) . fst) exClasses) $ throwConflictError TypeConflictsWithClass name
   forM_ dctors $ \dctor -> do
     when (dctor `elem` exDctors) $ throwConflictError ConflictingCtorDecls dctor
-    when (any ((== dctor) . fst) exClasses) $ throwConflictError CtorConflictsWithClass dctor
+    when (any ((== coerceProperName dctor) . fst) exClasses) $ throwConflictError CtorConflictsWithClass dctor
   return $ exps { exportedTypes = nub $ ((name, dctors), mn) : exTypes' }
 
 -- |
 -- Safely adds a class to some exports, returning an error if a conflict occurs.
 --
-exportTypeClass :: (MonadError MultipleErrors m) => Exports -> ProperName -> ModuleName -> m Exports
+exportTypeClass :: (MonadError MultipleErrors m) => Exports -> ProperName 'ClassName -> ModuleName -> m Exports
 exportTypeClass exps name mn = do
   let exTypes = exportedTypes exps
   let exDctors = (snd . fst) `concatMap` exTypes
-  when (any ((== name) . fst . fst) exTypes) $ throwConflictError ClassConflictsWithType name
-  when (name `elem` exDctors) $ throwConflictError ClassConflictsWithCtor name
+  when (any ((== coerceProperName name) . fst . fst) exTypes) $ throwConflictError ClassConflictsWithType name
+  when (coerceProperName name `elem` exDctors) $ throwConflictError ClassConflictsWithCtor name
   classes <- addExport DuplicateClassExport name mn (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
 

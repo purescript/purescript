@@ -1,17 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeClassDictionaries
--- Copyright   :  (c) 2014 Phil Freeman
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Language.PureScript.TypeClassDictionaries where
@@ -29,9 +15,9 @@ data TypeClassDictionaryInScope
     -- | The identifier with which the dictionary can be accessed at runtime
       tcdName :: Qualified Ident
     -- | How to obtain this instance via superclass relationships
-    , tcdPath :: [(Qualified ProperName, Integer)]
+    , tcdPath :: [(Qualified (ProperName 'ClassName), Integer)]
     -- | The name of the type class to which this type class instance applies
-    , tcdClassName :: Qualified ProperName
+    , tcdClassName :: Qualified (ProperName 'ClassName)
     -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [Type]
     -- | Type class dependencies which must be satisfied to construct this dictionary
@@ -58,5 +44,5 @@ data DictionaryValue
   -- |
   -- A subclass dictionary
   --
-  | SubclassDictionaryValue DictionaryValue (Qualified ProperName) Integer
+  | SubclassDictionaryValue DictionaryValue (Qualified (ProperName 'ClassName)) Integer
   deriving (Show, Read, Ord, Eq)

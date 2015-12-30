@@ -172,7 +172,7 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
-  classApp = foldl P.TypeApp (P.TypeConstructor className) tys
+  classApp = foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.FixityDeclaration fixity _ Nothing) title =
   Just (Left ([title], AugmentFixity fixity))
 convertDeclaration (P.FixityDeclaration fixity _ (Just alias)) title =

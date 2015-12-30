@@ -53,63 +53,63 @@ data SimpleErrorMessage
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownModule ModuleName
-  | UnknownType (Qualified ProperName)
-  | UnknownTypeClass (Qualified ProperName)
+  | UnknownType (Qualified (ProperName 'TypeName))
+  | UnknownTypeClass (Qualified (ProperName 'ClassName))
   | UnknownValue (Qualified Ident)
-  | UnknownDataConstructor (Qualified ProperName) (Maybe (Qualified ProperName))
-  | UnknownTypeConstructor (Qualified ProperName)
-  | UnknownImportType ModuleName ProperName
-  | UnknownExportType ProperName
-  | UnknownImportTypeClass ModuleName ProperName
-  | UnknownExportTypeClass ProperName
+  | UnknownDataConstructor (Qualified (ProperName 'ConstructorName)) (Maybe (Qualified (ProperName 'ConstructorName)))
+  | UnknownTypeConstructor (Qualified (ProperName 'TypeName))
+  | UnknownImportType ModuleName (ProperName 'TypeName)
+  | UnknownExportType (ProperName 'TypeName)
+  | UnknownImportTypeClass ModuleName (ProperName 'ClassName)
+  | UnknownExportTypeClass (ProperName 'ClassName)
   | UnknownImportValue ModuleName Ident
   | UnknownExportValue Ident
   | UnknownExportModule ModuleName
-  | UnknownImportDataConstructor ModuleName ProperName ProperName
-  | UnknownExportDataConstructor ProperName ProperName
+  | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
+  | UnknownExportDataConstructor (ProperName 'TypeName) (ProperName 'ConstructorName)
   | ScopeConflict String [ModuleName]
-  | ConflictingTypeDecls ProperName
-  | ConflictingCtorDecls ProperName
-  | TypeConflictsWithClass ProperName
-  | CtorConflictsWithClass ProperName
-  | ClassConflictsWithType ProperName
-  | ClassConflictsWithCtor ProperName
+  | ConflictingTypeDecls (ProperName 'TypeName)
+  | ConflictingCtorDecls (ProperName 'ConstructorName)
+  | TypeConflictsWithClass (ProperName 'TypeName)
+  | CtorConflictsWithClass (ProperName 'ConstructorName)
+  | ClassConflictsWithType (ProperName 'ClassName)
+  | ClassConflictsWithCtor (ProperName 'ClassName)
   | DuplicateModuleName ModuleName
-  | DuplicateClassExport ProperName
+  | DuplicateClassExport (ProperName 'ClassName)
   | DuplicateValueExport Ident
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym (Maybe ProperName)
+  | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
   | CycleInModules [ModuleName]
   | NameIsUndefined Ident
-  | UndefinedTypeVariable ProperName
-  | PartiallyAppliedSynonym (Qualified ProperName)
+  | UndefinedTypeVariable (ProperName 'TypeName)
+  | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem (Maybe Expr)
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
-  | OverlappingInstances (Qualified ProperName) [Type] [Qualified Ident]
-  | NoInstanceFound (Qualified ProperName) [Type]
-  | PossiblyInfiniteInstance (Qualified ProperName) [Type]
-  | CannotDerive (Qualified ProperName) [Type]
-  | CannotFindDerivingType ProperName
+  | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
+  | NoInstanceFound (Qualified (ProperName 'ClassName)) [Type]
+  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
+  | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
+  | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel String (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
-  | ExtraneousClassMember Ident (Qualified ProperName)
+  | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
   | ExpectedType Type Kind
-  | IncorrectConstructorArity (Qualified ProperName)
+  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing String
   | AdditionalProperty String
   | CannotApplyFunction Type Expr
   | TypeSynonymInstance
-  | OrphanInstance Ident (Qualified ProperName) [Type]
-  | InvalidNewtype ProperName
+  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
+  | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | ShadowedName Ident
@@ -120,17 +120,17 @@ data SimpleErrorMessage
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
-  | ClassOperator ProperName Ident
-  | MisleadingEmptyTypeImport ModuleName ProperName
+  | ClassOperator (ProperName 'ClassName) Ident
+  | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
   | UnusedExplicitImport ModuleName [String]
-  | UnusedDctorImport ProperName
-  | UnusedDctorExplicitImport ProperName [ProperName]
+  | UnusedDctorImport (ProperName 'TypeName)
+  | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | DeprecatedOperatorDecl String
   | DeprecatedQualifiedSyntax ModuleName ModuleName
-  | DeprecatedClassImport ModuleName ProperName
-  | DeprecatedClassExport ProperName
+  | DeprecatedClassImport ModuleName (ProperName 'ClassName)
+  | DeprecatedClassExport (ProperName 'ClassName)
   | RedundantUnqualifiedImport ModuleName ImportDeclarationType
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
@@ -139,7 +139,7 @@ data SimpleErrorMessage
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
   | ImplicitImport ModuleName [DeclarationRef]
-  | ImplicitDctorImport ProperName [ProperName]
+  | ImplicitDctorImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | CaseBinderLengthDiffers Int [Binder]
   deriving (Show)
 
@@ -148,7 +148,7 @@ data ErrorMessageHint
   = ErrorUnifyingTypes Type Type
   | ErrorInExpression Expr
   | ErrorInModule ModuleName
-  | ErrorInInstance (Qualified ProperName) [Type]
+  | ErrorInInstance (Qualified (ProperName 'ClassName)) [Type]
   | ErrorInSubsumption Type Type
   | ErrorCheckingAccessor Expr String
   | ErrorCheckingType Expr Type
@@ -156,11 +156,11 @@ data ErrorMessageHint
   | ErrorCheckingGuard
   | ErrorInferringType Expr
   | ErrorInApplication Expr Type Expr
-  | ErrorInDataConstructor ProperName
-  | ErrorInTypeConstructor ProperName
+  | ErrorInDataConstructor (ProperName 'ConstructorName)
+  | ErrorInTypeConstructor (ProperName 'TypeName)
   | ErrorInBindingGroup [Ident]
   | ErrorInDataBindingGroup
-  | ErrorInTypeSynonym ProperName
+  | ErrorInTypeSynonym (ProperName 'TypeName)
   | ErrorInValueDeclaration Ident
   | ErrorInTypeDeclaration Ident
   | ErrorInForeignImport Ident
@@ -1010,7 +1010,7 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
   prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
   prettyPrintRef (ValueRef ident) = showIdent ident
   prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
-  prettyPrintRef (ProperRef pn) = runProperName pn
+  prettyPrintRef (ProperRef name) = name
   prettyPrintRef (TypeInstanceRef ident) = showIdent ident
   prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
   prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref

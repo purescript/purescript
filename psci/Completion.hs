@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 module Completion where
 
 import Prelude ()
@@ -184,10 +186,10 @@ getAllImportsOf = asks . allImportsOf
 nubOnFst :: Eq a => [(a, b)] -> [(a, b)]
 nubOnFst = nubBy ((==) `on` fst)
 
-typeDecls :: P.Module -> [(N.ProperName, P.Declaration)]
+typeDecls :: P.Module -> [(N.ProperName 'N.TypeName, P.Declaration)]
 typeDecls = mapMaybe getTypeName . filter P.isDataDecl . P.exportedDeclarations
   where
-  getTypeName :: P.Declaration -> Maybe (N.ProperName, P.Declaration)
+  getTypeName :: P.Declaration -> Maybe (N.ProperName 'N.TypeName, P.Declaration)
   getTypeName d@(P.TypeSynonymDeclaration name _ _) = Just (name, d)
   getTypeName d@(P.DataDeclaration _ name _ _) = Just (name, d)
   getTypeName (P.PositionedDeclaration _ _ d) = getTypeName d
@@ -204,10 +206,10 @@ identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
   getDeclNames (P.PositionedDeclaration _ _ d) = getDeclNames d
   getDeclNames _ = []
 
-dctorNames :: P.Module -> [(N.ProperName, P.Declaration)]
+dctorNames :: P.Module -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
 dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   where
-  go :: P.Declaration -> [(N.ProperName, P.Declaration)]
+  go :: P.Declaration -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
   go decl@(P.DataDeclaration _ _ _ ctors) = map (\n -> (n, decl)) (map fst ctors)
   go (P.PositionedDeclaration _ _ d) = go d
   go _ = []

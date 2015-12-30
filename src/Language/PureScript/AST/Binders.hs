@@ -1,19 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.AST.Binders
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Case binders
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
+-- |
+-- Case binders
+--
 module Language.PureScript.AST.Binders where
 
 import qualified Data.Data as D
@@ -54,7 +43,7 @@ data Binder
   -- |
   -- A binder which matches a data constructor
   --
-  | ConstructorBinder (Qualified ProperName) [Binder]
+  | ConstructorBinder (Qualified (ProperName 'ConstructorName)) [Binder]
   -- |
   -- A binder which matches a record and binds its properties
   --

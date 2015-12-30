@@ -178,6 +178,8 @@ library
                      Control.Monad.Supply.Class
 
                      System.IO.UTF8
+
+    extensions:      DataKinds
     exposed: True
     buildable: True
     hs-source-dirs: src

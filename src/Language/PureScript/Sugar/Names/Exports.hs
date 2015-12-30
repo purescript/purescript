@@ -75,7 +75,7 @@ resolveExports env mn imps exps refs =
     ModuleRef name -> warnDupe $ "module " ++ runModuleName name
     _ -> return ()
 
-  warnDupeDctors :: [ProperName] -> m ()
+  warnDupeDctors :: [ProperName 'ConstructorName] -> m ()
   warnDupeDctors = traverse_ (warnDupe . ("data constructor " ++) . runProperName)
 
   warnDupe :: String -> m ()
@@ -151,10 +151,15 @@ resolveExports env mn imps exps refs =
 
   -- Constructs a list of types with their data constructors and the original
   -- module they were defined in from a list of type and data constructor names.
-  resolveTypeExports :: [Qualified ProperName] -> [Qualified ProperName] -> [((ProperName, [ProperName]), ModuleName)]
+  resolveTypeExports
+    :: [Qualified (ProperName 'TypeName)]
+    -> [Qualified (ProperName 'ConstructorName)]
+    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
   resolveTypeExports tctors dctors = map go tctors
     where
-    go :: Qualified ProperName -> ((ProperName, [ProperName]), ModuleName)
+    go
+      :: Qualified (ProperName 'TypeName)
+      -> ((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)
     go (Qualified (Just mn'') name) = fromMaybe (internalError "Missing value in resolveTypeExports") $ do
       exps' <- envModuleExports <$> mn'' `M.lookup` env
       ((_, dctors'), mnOrig) <- find (\((name', _), _) -> name == name') (exportedTypes exps')
@@ -165,7 +170,7 @@ resolveExports env mn imps exps refs =
 
   -- Looks up an imported class and re-qualifies it with the original module it
   -- came from.
-  resolveClass :: Qualified ProperName -> (ProperName, ModuleName)
+  resolveClass :: Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ModuleName)
   resolveClass className = splitQual $ fromMaybe (internalError "Missing value in resolveClass") $
     resolve exportedTypeClasses className
 
@@ -192,7 +197,13 @@ resolveExports env mn imps exps refs =
 -- Filters the full list of exportable values, types, and classes for a module
 -- based on a list of export declaration references.
 --
-filterModule :: forall m. (Applicative m, MonadError MultipleErrors m) => ModuleName -> Exports -> [DeclarationRef] -> m Exports
+filterModule
+  :: forall m
+   . (Applicative m, MonadError MultipleErrors m)
+  => ModuleName
+  -> Exports
+  -> [DeclarationRef]
+  -> m Exports
 filterModule mn exps refs = do
   types <- foldM (filterTypes $ exportedTypes exps) [] refs
   values <- foldM (filterValues $ exportedValues exps) [] refs
@@ -206,7 +217,11 @@ filterModule mn exps refs = do
   -- explicit export. When the ref refers to a type in the list of exportable
   -- values, the type and specified data constructors are included in the
   -- result.
-  filterTypes :: [((ProperName, [ProperName]), ModuleName)] -> [((ProperName, [ProperName]), ModuleName)] -> DeclarationRef -> m [((ProperName, [ProperName]), ModuleName)]
+  filterTypes
+    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> DeclarationRef
+    -> m [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
   filterTypes exps' result (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos $ filterTypes exps' result r
   filterTypes exps' result (TypeRef name expDcons) =
@@ -221,7 +236,11 @@ filterModule mn exps refs = do
   -- Ensures a data constructor is exportable for a given type. Takes a type
   -- name, a list of exportable data constructors for the type, and the name of
   -- the data constructor to check.
-  checkDcon :: ProperName -> [ProperName] -> ProperName -> m ()
+  checkDcon
+    :: ProperName 'TypeName
+    -> [ProperName 'ConstructorName]
+    -> ProperName 'ConstructorName
+    -> m ()
   checkDcon tcon exps' name =
     unless (name `elem` exps') $
       throwError . errorMessage $ UnknownExportDataConstructor tcon name
@@ -230,7 +249,11 @@ filterModule mn exps refs = do
   -- filtered exports, and a `DeclarationRef` for an explicit export. When the
   -- ref refers to a class in the list of exportable classes, the class is
   -- included in the result.
-  filterClasses :: [(ProperName, ModuleName)] -> [(ProperName, ModuleName)] -> DeclarationRef -> m [(ProperName, ModuleName)]
+  filterClasses
+    :: [(ProperName 'ClassName, ModuleName)]
+    -> [(ProperName 'ClassName, ModuleName)]
+    -> DeclarationRef
+    -> m [(ProperName 'ClassName, ModuleName)]
   filterClasses exps' result (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos $ filterClasses exps' result r
   filterClasses exps' result (TypeClassRef name) =

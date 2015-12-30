@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE KindSignatures #-}
 
 -- |
 -- Data types for names
@@ -13,6 +14,7 @@ import Control.Monad.Supply.Class
 
 import Data.List
 import Data.Data
+import Data.Aeson
 import Data.Aeson.TH
 
 -- |
@@ -51,12 +53,32 @@ freshIdent' = liftM (GenIdent Nothing) fresh
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
-newtype ProperName = ProperName { runProperName :: String } deriving (Show, Read, Eq, Ord, Data, Typeable)
+newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: String }
+  deriving (Show, Read, Eq, Ord, Data, Typeable)
+
+instance ToJSON (ProperName a) where
+  toJSON = toJSON . runProperName
+
+instance FromJSON (ProperName a) where
+  parseJSON = fmap ProperName . parseJSON
+
+-- |
+-- The closed set of proper name types.
+--
+data ProperNameType = TypeName | ConstructorName | ClassName | Namespace
+
+-- |
+-- Coerces a ProperName from one ProperNameType to another. This should be used
+-- with care, and is primarily used to convert ClassNames into TypeNames after
+-- classes have been desugared.
+--
+coerceProperName :: ProperName a -> ProperName b
+coerceProperName = ProperName . runProperName
 
 -- |
 -- Module names
 --
-newtype ModuleName = ModuleName [ProperName] deriving (Show, Read, Eq, Ord, Data, Typeable)
+newtype ModuleName = ModuleName [ProperName 'Namespace] deriving (Show, Read, Eq, Ord, Data, Typeable)
 
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
@@ -98,11 +120,23 @@ disqualify (Qualified _ a) = a
 -- |
 -- Checks whether a qualified value is actually qualified with a module reference
 --
+isQualified :: Qualified a -> Bool
+isQualified (Qualified Nothing _) = False
+isQualified _ = True
+
+-- |
+-- Checks whether a qualified value is not actually qualified with a module reference
+--
 isUnqualified :: Qualified a -> Bool
-isUnqualified (Qualified Nothing _) = True
-isUnqualified _ = False
+isUnqualified = not . isQualified
+
+-- |
+-- Checks whether a qualified value is qualified with a particular module
+--
+isQualifiedWith :: ModuleName -> Qualified a -> Bool
+isQualifiedWith mn (Qualified (Just mn') _) = mn == mn'
+isQualifiedWith _ _ = False
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ProperName)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)

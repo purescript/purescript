@@ -60,7 +60,7 @@ data DeclarationRef
   -- |
   -- A type constructor with data constructors
   --
-  = TypeRef ProperName (Maybe [ProperName])
+  = TypeRef (ProperName 'TypeName) (Maybe [ProperName 'ConstructorName])
   -- |
   -- A value
   --
@@ -68,7 +68,7 @@ data DeclarationRef
   -- |
   -- A type class
   --
-  | TypeClassRef ProperName
+  | TypeClassRef (ProperName 'ClassName)
     -- |
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
@@ -80,7 +80,7 @@ data DeclarationRef
   -- |
   -- An unspecified ProperName ref. This will be replaced with a TypeClassRef
   -- or TypeRef during name desugaring.
-  | ProperRef ProperName
+  | ProperRef String
   -- |
   -- A declaration reference with source position information
   --
@@ -108,7 +108,7 @@ isModuleRef _ = False
 -- are the duplicate refs with data constructors elided, and then a separate
 -- list of duplicate data constructors.
 --
-findDuplicateRefs :: [DeclarationRef] -> ([DeclarationRef], [ProperName])
+findDuplicateRefs :: [DeclarationRef] -> ([DeclarationRef], [ProperName 'ConstructorName])
 findDuplicateRefs refs =
   let positionless = stripPosInfo `map` refs
       simplified = simplifyTypeRefs `map` positionless
@@ -154,7 +154,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType ProperName [(String, Maybe Kind)] [(ProperName, [Type])]
+  = DataDeclaration DataDeclType (ProperName 'TypeName) [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -162,7 +162,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration ProperName [(String, Maybe Kind)] Type
+  | TypeSynonymDeclaration (ProperName 'TypeName) [(String, Maybe Kind)] Type
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -182,7 +182,7 @@ data Declaration
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration ProperName Kind
+  | ExternDataDeclaration (ProperName 'TypeName) Kind
   -- |
   -- A fixity declaration (fixity data, operator name, value the operator is an alias for)
   --
@@ -195,12 +195,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [Constraint] [Declaration]
+  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] TypeInstanceBody
+  | TypeInstanceDeclaration Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
   -- |
   -- A declaration with source position information
   --
@@ -390,7 +390,7 @@ data Expr
   -- |
   -- A data constructor
   --
-  | Constructor (Qualified ProperName)
+  | Constructor (Qualified (ProperName 'ConstructorName))
   -- |
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
@@ -412,7 +412,7 @@ data Expr
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified ProperName) Expr
+  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
@@ -420,15 +420,15 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Constraint (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+  | TypeClassDictionary Constraint (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
-  | TypeClassDictionaryAccessor (Qualified ProperName) Ident
+  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | SuperClassDictionary (Qualified ProperName) [Type]
+  | SuperClassDictionary (Qualified (ProperName 'ClassName)) [Type]
   -- |
   -- A value with source position information
   --

@@ -1,20 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Parser.Common
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleContexts #-}
+
 -- |
 -- Constants, and utility functions to be used when parsing
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Parser.Common where
 
 import Control.Applicative
@@ -27,7 +15,7 @@ import Language.PureScript.Names
 
 import qualified Text.Parsec as P
 
-properName :: TokenParser ProperName
+properName :: TokenParser (ProperName a)
 properName = ProperName <$> uname
 
 -- |

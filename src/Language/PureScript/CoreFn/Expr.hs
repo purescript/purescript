@@ -1,20 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CoreFn.Expr
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- | The core functional representation
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+-- |
+-- The core functional representation
+--
 module Language.PureScript.CoreFn.Expr where
 
 import Control.Arrow ((***))
@@ -36,7 +25,7 @@ data Expr a
   -- |
   -- A data constructor (type name, constructor name, field names)
   --
-  | Constructor a ProperName ProperName [Ident]
+  | Constructor a (ProperName 'TypeName) (ProperName 'ConstructorName) [Ident]
   -- |
   -- A record property accessor
   --

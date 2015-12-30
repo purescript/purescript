@@ -399,7 +399,7 @@ asConstraint :: Parse PackageError P.Constraint
 asConstraint = (,) <$> nth 0 asQualifiedProperName
                    <*> nth 1 (eachInArray asType)
 
-asQualifiedProperName :: Parse e (P.Qualified P.ProperName)
+asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
 
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
