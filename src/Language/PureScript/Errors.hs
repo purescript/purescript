@@ -139,6 +139,7 @@ data SimpleErrorMessage
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
   | ImplicitImport ModuleName [DeclarationRef]
+  | ImplicitDctorImport ProperName [ProperName]
   | CaseBinderLengthDiffers Int [Binder]
   deriving (Show)
 
@@ -310,6 +311,7 @@ errorCode em = case unwrapErrorMessage em of
   IntOutOfRange{} -> "IntOutOfRange"
   RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
   ImplicitImport{} -> "ImplicitImport"
+  ImplicitDctorImport{} -> "ImplicitDctorImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
 
 -- |
@@ -857,6 +859,11 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
     renderSimpleErrorMessage (ImplicitImport mn refs) =
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the explicit form: "
             , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            ]
+
+    renderSimpleErrorMessage (ImplicitDctorImport ty ctors) =
+      paras [ line $ "Import of type " ++ runProperName ty ++ " has unspecified data constructors, consider using the explicit form: "
+            , indent $ line $ runProperName ty ++ " (" ++ intercalate ", " (map runProperName ctors) ++ ")"
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
