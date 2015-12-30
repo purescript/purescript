@@ -24,11 +24,15 @@ module Language.PureScript.TypeChecker.Kinds (
     kindOf,
     kindOfWithScopedVars,
     kindsOf,
-    kindsOfAll
+    kindsOfAll,
+    checkTypeKind
 ) where
 
 import Prelude ()
 import Prelude.Compat
+
+import Data.Maybe (fromMaybe)
+import Data.List (nub, sort)
 
 import qualified Data.Map as M
 
@@ -82,6 +86,24 @@ occursCheck u k = void $ everywhereOnKindsM go k
   go (KUnknown u') | u == u' = throwError . errorMessage . InfiniteKind $ k
   go other = return other
 
+-- | Compute a list of all kind variables appearing in a kind
+varsInKind :: Kind -> [String]
+varsInKind k = everythingOnKinds (.) go k []
+  where
+  go :: Kind -> [String] -> [String]
+  go (KindVar var) = (var :)
+  go _ = id
+
+-- | Replace kind variables with fresh unification variables
+replaceKindVarsWithUnknowns :: (Functor m, Applicative m, MonadState CheckState m) => Kind -> m Kind
+replaceKindVarsWithUnknowns k = do
+  let vars = sort . nub . varsInKind $ k
+  sub <- M.fromList . zip vars <$> replicateM (length vars) freshKind
+  let rename :: Kind -> Kind
+      rename (KindVar var) = fromMaybe (internalError "replaceKindVarsWithUnknowns: kind var is not in map") $ M.lookup var sub
+      rename other = other
+  return $ everywhereOnKinds rename k
+
 -- | Unify two kinds
 unifyKinds :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Kind -> Kind -> m ()
 unifyKinds k1 k2 = do
@@ -93,10 +115,11 @@ unifyKinds k1 k2 = do
   go k (KUnknown u) = solveKind u k
   go Star Star = return ()
   go Bang Bang = return ()
-  go (Row k1') (Row k2') = go k1' k2'
+  go (Row k1') (Row k2') = unifyKinds k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
-    go k1' k3
-    go k2' k4
+    unifyKinds k1' k3
+    unifyKinds k2' k4
+  go (KindVar v1) (KindVar v2) | v1 == v2 = return ()
   go k1' k2' = throwError . errorMessage $ KindsDoNotUnify k1' k2'
 
 -- | Infer the kind of a single type
@@ -115,8 +138,8 @@ kindOfWithScopedVars ty =
   rethrow (addHint (ErrorCheckingKind ty)) $
     fmap tidyUp . liftUnify $ infer ty
   where
-  tidyUp ((k, args), sub) = ( starIfUnknown (substituteKind sub k)
-                            , map (second (starIfUnknown . substituteKind sub)) args
+  tidyUp ((k, args), sub) = ( varIfUnknown (substituteKind sub k)
+                            , map (second (varIfUnknown . substituteKind sub)) args
                             )
 
 -- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
@@ -131,22 +154,12 @@ kindsOf ::
 kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- freshKind
   kargs <- replicateM (length args) freshKind
-  rest <- zipWithM freshKindVar args kargs
+  rest <- zipWithM unifyKindAnnotation args kargs
   let dict = (name, tyCon) : rest
   bindLocalTypeVariables moduleName dict $
     solveTypes isData ts kargs tyCon
   where
-  tidyUp (k, sub) = starIfUnknown $ substituteKind sub k
-
-freshKindVar ::
-  (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) =>
-  (String, Maybe Kind) ->
-  Kind ->
-  m (ProperName, Kind)
-freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
-freshKindVar (arg, Just kind') kind = do
-  unifyKinds kind kind'
-  return (ProperName arg, kind')
+  tidyUp (k, sub) = varIfUnknown $ substituteKind sub k
 
 -- | Simultaneously infer the kinds of several mutually recursive type constructors
 kindsOfAll ::
@@ -164,17 +177,17 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
     bindLocalTypeVariables moduleName dict' $ do
       data_ks <- zipWithM (\tyCon (_, args, ts) -> do
         kargs <- replicateM (length args) freshKind
-        argDict <- zipWithM freshKindVar args kargs
+        argDict <- zipWithM unifyKindAnnotation args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes True ts kargs tyCon) tyCons tys
       syn_ks <- zipWithM (\synVar (_, args, ty) -> do
         kargs <- replicateM (length args) freshKind
-        argDict <- zipWithM freshKindVar args kargs
+        argDict <- zipWithM unifyKindAnnotation args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes False [ty] kargs synVar) synVars syns
       return (syn_ks, data_ks)
   where
-  tidyUp ((ks1, ks2), sub) = (map (starIfUnknown . substituteKind sub) ks1, map (starIfUnknown . substituteKind sub) ks2)
+  tidyUp ((ks1, ks2), sub) = (map (varIfUnknown . substituteKind sub) ks1, map (varIfUnknown . substituteKind sub) ks2)
 
 -- | Solve the set of kind constraints associated with the data constructors for a type constructor
 solveTypes :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Bool -> [Type] -> [Kind] -> Kind -> m Kind
@@ -187,12 +200,34 @@ solveTypes isData ts kargs tyCon = do
     unifyKinds tyCon (foldr FunKind (head ks) kargs)
   return tyCon
 
--- | Default all unknown kinds to the Star kind of types
-starIfUnknown :: Kind -> Kind
-starIfUnknown (KUnknown _) = Star
-starIfUnknown (Row k) = Row (starIfUnknown k)
-starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
-starIfUnknown k = k
+-- | Replace unsolved unification variables with named kind variables
+varIfUnknown :: Kind -> Kind
+varIfUnknown = everywhereOnKinds kindToVar
+  where
+  kindToVar :: Kind -> Kind
+  kindToVar (KUnknown u) = KindVar ('k' : show u)
+  kindToVar other = other
+
+-- | Unify a kind annotation with the corresponding kind variable if necessary.
+unifyKindAnnotation ::
+  (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) =>
+  (String, Maybe Kind) ->
+  Kind ->
+  m (ProperName, Kind)
+unifyKindAnnotation (arg, Nothing) kind = return (ProperName arg, kind)
+unifyKindAnnotation (arg, Just kind') kind = do
+  unifyKinds kind kind'
+  return (ProperName arg, kind')
+
+-- | Check the kind of a type, failing if it is not of kind *.
+checkTypeKind ::
+  (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState CheckState m) =>
+  Type ->
+  Kind ->
+  m ()
+checkTypeKind ty kind = void . rethrow (const (errorMessage (ExpectedType ty kind))) . liftUnify $ do
+  kind' <- replaceKindVarsWithUnknowns kind
+  unifyKinds kind' Star
 
 -- | Infer a kind for a type
 infer :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Type -> m (Kind, [(String, Kind)])
@@ -233,7 +268,7 @@ infer' other = (, []) <$> go other
     env <- getEnv
     case M.lookup v (types env) of
       Nothing -> throwError . errorMessage $ UnknownTypeConstructor v
-      Just (kind, _) -> return kind
+      Just (kind, _) -> replaceKindVarsWithUnknowns kind
   go (TypeApp t1 t2) = do
     k0 <- freshKind
     k1 <- go t1

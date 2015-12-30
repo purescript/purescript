@@ -32,6 +32,10 @@ data Kind
   --
   = KUnknown Int
   -- |
+  -- A named kind variable
+  --
+  | KindVar String
+  -- |
   -- The kind of types
   --
   | Star

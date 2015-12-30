@@ -44,7 +44,6 @@ import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Entailment
@@ -178,14 +177,6 @@ replaceTypeClassDictionaries mn =
   where
   go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
   go other = return other
-
--- | Check the kind of a type, failing if it is not of kind *.
-checkTypeKind ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m) =>
-  Type ->
-  Kind ->
-  m ()
-checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
 
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
 -- or TypeClassDictionary values.
