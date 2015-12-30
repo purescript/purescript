@@ -60,6 +60,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 <http://opensource.org/licenses/MIT>.
 - [@soupi](https://github.com/soupi) (Gil Mizrahi) My existing contributions and all future contributions until further notice are Copyright Gil Mizrahi, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@tfausak](https://github.com/tfausak) (Taylor Fausak) My existing contributions and all future contributions until further notice are Copyright Taylor Fausak, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- [@user471](https://github.com/user471) My existing contributions and all future contributions until further notice are Copyright user471, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 
