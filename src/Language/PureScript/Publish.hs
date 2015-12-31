@@ -41,7 +41,6 @@ import qualified Data.Text.Lazy.Encoding as TL
 
 import Control.Category ((>>>))
 import Control.Arrow ((***))
-import Control.Applicative ((<|>))
 import Control.Exception (catch, try)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.Except
@@ -197,8 +196,7 @@ getBowerInfo = either (userError . BadRepositoryField) return . tryExtract
         maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
 
 extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
-extractGithub =
-  matchUrl
+extractGithub = stripGitHubPrefixes
    >>> fmap (splitOn "/")
    >=> takeTwo
    >>> fmap (D.GithubUser *** (D.GithubRepo . dropDotGit))
@@ -208,14 +206,19 @@ extractGithub =
   takeTwo [x, y] = Just (x, y)
   takeTwo _ = Nothing
 
+  stripGitHubPrefixes :: String -> Maybe String
+  stripGitHubPrefixes = stripPrefixes [ "git://github.com/"
+                                      , "https://github.com/"
+                                      , "git@github.com:"
+                                      ]
+
+  stripPrefixes :: [String] -> String -> Maybe String
+  stripPrefixes prefixes str = msum $ (`stripPrefix` str) <$> prefixes
+
   dropDotGit :: String -> String
   dropDotGit str
     | ".git" `isSuffixOf` str = take (length str - 4) str
     | otherwise = str
-
-  matchUrl :: String -> Maybe String
-  matchUrl str =
-    stripPrefix "git@github.com:" str <|> stripPrefix "git://github.com/" str
 
 readProcess' :: String -> [String] -> String -> PrepareM String
 readProcess' prog args stdin = do
