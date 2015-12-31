@@ -84,7 +84,7 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
             forM_ (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
               let allCtors = dctorsForType mni tn
               when (runProperName tn `elem` usedNames) $ case (c, usedDctors `intersect` allCtors) of
-                (_, []) ->
+                (_, []) | c /= Just [] ->
                   tell $ errorMessage $ UnusedDctorImport tn
                 (Nothing, usedDctors') ->
                   tell $ errorMessage $ ImplicitDctorImport tn usedDctors'
