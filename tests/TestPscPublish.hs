@@ -60,6 +60,6 @@ testPackage dir = do
     case r of
       Pass _ -> pure ()
       other -> do
-        hPutStrLn stderr ("psc-publish tests failed on " ++ dir ++ ":")
-        hPutStrLn stderr (show other)
+        putStrLn ("psc-publish tests failed on " ++ dir ++ ":")
+        putStrLn (show other)
         exitFailure
