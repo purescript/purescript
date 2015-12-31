@@ -1,8 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.TypeClassDictionaries where
-
-import Data.Data
 
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -22,7 +18,8 @@ data TypeClassDictionaryInScope
     , tcdInstanceTypes :: [Type]
     -- | Type class dependencies which must be satisfied to construct this dictionary
     , tcdDependencies :: Maybe [Constraint]
-    } deriving (Show, Read, Data, Typeable)
+    }
+    deriving (Show, Read)
 
 -- |
 -- A simplified representation of expressions which are used to represent type

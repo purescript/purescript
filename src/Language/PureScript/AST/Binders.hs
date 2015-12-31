@@ -1,11 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 -- |
 -- Case binders
 --
 module Language.PureScript.AST.Binders where
-
-import qualified Data.Data as D
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
@@ -63,7 +59,8 @@ data Binder
   -- |
   -- A binder with a type annotation
   --
-  | TypedBinder Type Binder deriving (Show, Read, Eq, D.Data, D.Typeable)
+  | TypedBinder Type Binder
+  deriving (Show, Read, Eq)
 
 -- |
 -- Collect all names introduced in binders in an expression

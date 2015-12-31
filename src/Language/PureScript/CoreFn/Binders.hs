@@ -1,12 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 
 -- |
 -- The core functional representation for binders
 --
 module Language.PureScript.CoreFn.Binders where
-
-import qualified Data.Data as D
 
 import Language.PureScript.CoreFn.Literals
 import Language.PureScript.Names
@@ -34,4 +31,5 @@ data Binder a
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder a Ident (Binder a) deriving (Show, Read, D.Data, D.Typeable, Functor)
+  | NamedBinder a Ident (Binder a)
+  deriving (Show, Read, Functor)

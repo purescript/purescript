@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE EmptyDataDecls #-}
@@ -13,7 +12,6 @@ import Control.Monad (liftM)
 import Control.Monad.Supply.Class
 
 import Data.List
-import Data.Data
 import Data.Aeson
 import Data.Aeson.TH
 
@@ -32,7 +30,8 @@ data Ident
   -- |
   -- A generated name for an identifier
   --
-  | GenIdent (Maybe String) Integer deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | GenIdent (Maybe String) Integer
+  deriving (Show, Read, Eq, Ord)
 
 runIdent :: Ident -> String
 runIdent (Ident i) = i
@@ -54,7 +53,7 @@ freshIdent' = liftM (GenIdent Nothing) fresh
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: String }
-  deriving (Show, Read, Eq, Ord, Data, Typeable)
+  deriving (Show, Read, Eq, Ord)
 
 instance ToJSON (ProperName a) where
   toJSON = toJSON . runProperName
@@ -78,7 +77,8 @@ coerceProperName = ProperName . runProperName
 -- |
 -- Module names
 --
-newtype ModuleName = ModuleName [ProperName 'Namespace] deriving (Show, Read, Eq, Ord, Data, Typeable)
+newtype ModuleName = ModuleName [ProperName 'Namespace]
+  deriving (Show, Read, Eq, Ord)
 
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
@@ -94,7 +94,8 @@ moduleNameFromString = ModuleName . splitProperNames
 -- |
 -- A qualified name, i.e. a name with an optional module name
 --
-data Qualified a = Qualified (Maybe ModuleName) a deriving (Show, Read, Eq, Ord, Data, Typeable, Functor)
+data Qualified a = Qualified (Maybe ModuleName) a
+  deriving (Show, Read, Eq, Ord, Functor)
 
 showQualified :: (a -> String) -> Qualified a -> String
 showQualified f (Qualified Nothing a) = f a

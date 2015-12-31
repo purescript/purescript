@@ -1,10 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Environment where
 
-import Data.Data
 import Data.Maybe (fromMaybe)
 import Data.Aeson.TH
 import qualified Data.Map as M
@@ -84,7 +82,8 @@ data NameKind
   -- |
   -- A name for member introduced by foreign import
   --
-  | External deriving (Show, Read, Eq, Data, Typeable)
+  | External
+  deriving (Show, Read, Eq)
 
 -- |
 -- The kinds of a type
@@ -110,7 +109,7 @@ data TypeKind
   -- A scoped type variable
   --
   | ScopedTypeVar
-   deriving (Show, Read, Eq, Data, Typeable)
+  deriving (Show, Read, Eq)
 
 -- |
 -- The type ('data' or 'newtype') of a data type declaration
@@ -123,7 +122,8 @@ data DataDeclType
   -- |
   -- A newtype constructor
   --
-  | Newtype deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | Newtype
+  deriving (Show, Read, Eq, Ord)
 
 showDataDeclType :: DataDeclType -> String
 showDataDeclType Data = "data"
