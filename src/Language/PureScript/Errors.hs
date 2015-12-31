@@ -414,11 +414,16 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint other = pure other
 
+
+wikiUri :: ErrorMessage -> String
+wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
+
+
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> Level -> ErrorMessage -> Box.Box
-prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError :: Bool -> Level -> Bool -> ErrorMessage -> Box.Box
+prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -427,17 +432,16 @@ prettyPrintSingleError full level e = flip evalState defaultUnknownMap $ do
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
   prettyPrintErrorMessage typeMap (ErrorMessage hints simple) =
-    paras
+    paras $
       [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
       , Box.moveDown 1 typeInformation
-      , Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri ++ " for more information, "
-                               , line $ "or to contribute content related to this " ++ levelText ++ "."
-                               ]
+      ] ++
+      [ Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri e ++ " for more information, "
+                                 , line $ "or to contribute content related to this " ++ levelText ++ "."
+                                 ]
+        | showWiki
       ]
     where
-    wikiUri :: String
-    wikiUri = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
-
     typeInformation :: Box.Box
     typeInformation | not (null types) = Box.hsep 1 Box.left [ line "where", paras types]
                     | otherwise = Box.emptyBox 0 0
@@ -1072,12 +1076,12 @@ prettyPrintMultipleErrorsBox full = prettyPrintMultipleErrorsWith Error "Error f
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> Box.Box
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
-  let result = prettyPrintSingleError full level e
+  let result = prettyPrintSingleError full level True e
   in Box.vcat Box.left [ Box.text intro
                        , result
                        ]
 prettyPrintMultipleErrorsWith level _ intro full (MultipleErrors es) =
-  let result = map (prettyPrintSingleError full level) es
+  let result = map (prettyPrintSingleError full level True) es
   in Box.vsep 1 Box.left $ concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")

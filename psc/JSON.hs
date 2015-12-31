@@ -34,6 +34,7 @@ data JSONError = JSONError
   { position :: Maybe ErrorPosition
   , message :: String
   , errorCode :: String
+  , errorLink :: String
   , filename :: Maybe String
   , moduleName :: Maybe String
   }
@@ -53,8 +54,9 @@ toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErro
 toJSONError :: Bool -> P.Level -> P.ErrorMessage -> JSONError
 toJSONError verbose level e =
   JSONError (toErrorPosition <$> sspan)
-            (P.renderBox (P.prettyPrintSingleError verbose level (P.stripModuleAndSpan e)))
+            (P.renderBox (P.prettyPrintSingleError verbose level False (P.stripModuleAndSpan e)))
             (P.errorCode e)
+            (P.wikiUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
   where
