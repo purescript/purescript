@@ -172,8 +172,18 @@ assertDoesNotCompile inputFiles foreigns = do
 
 main :: IO ()
 main = do
+  heading "Main compiler test suite"
   testCompiler
+  heading "psc-publish test suite"
   testPscPublish
+
+  where
+  heading msg = do
+    putStrLn ""
+    putStrLn $ replicate 79 '#'
+    putStrLn $ "# " ++ msg
+    putStrLn $ replicate 79 '#'
+    putStrLn ""
 
 testCompiler :: IO ()
 testCompiler = do
