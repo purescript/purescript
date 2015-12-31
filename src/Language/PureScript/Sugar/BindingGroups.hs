@@ -29,7 +29,7 @@ import Prelude.Compat
 
 import Data.Graph
 import Data.List (nub, intersect)
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (isJust)
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -137,10 +137,6 @@ usedProperNames moduleName =
   in nub . f
   where
   usedNames :: Type -> [ProperName]
-  usedNames (ConstrainedType constraints _) = flip mapMaybe constraints $ \qual ->
-    case qual of
-      (Qualified (Just moduleName') name, _) | moduleName == moduleName' -> Just name
-      _ -> Nothing
   usedNames (TypeConstructor (Qualified (Just moduleName') name)) | moduleName == moduleName' = [name]
   usedNames _ = []
 

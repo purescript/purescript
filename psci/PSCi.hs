@@ -371,7 +371,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
   PSCI $
     -- get relevant components of a module from environment
     let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
-        moduleTypeClasses = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typeClasses
+        moduleTypeClasses = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . map (\(P.TypeConstructor pn) -> pn) . M.keys) typeClasses
         moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
 
   in
@@ -391,10 +391,10 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showNameType (mIdent, Just (mType, _, _)) = Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
-        findTypeClass :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint]))
-        findTypeClass envTypeClasses name = (name, M.lookup name envTypeClasses)
+        findTypeClass :: M.Map P.Type ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [(P.Qualified P.ProperName, [P.Type])]) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [(P.Qualified P.ProperName, [P.Type])]))
+        findTypeClass envTypeClasses name = (name, M.lookup (P.TypeConstructor name) envTypeClasses)
 
-        showTypeClass :: (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])) -> Maybe Box.Box
+        showTypeClass :: (P.Qualified P.ProperName, Maybe ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [(P.Qualified P.ProperName, [P.Type])])) -> Maybe Box.Box
         showTypeClass (_, Nothing) = Nothing
         showTypeClass (P.Qualified _ name, Just (vars, body, constrs)) =
             let constraints =
@@ -421,7 +421,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
         findType :: M.Map (P.Qualified P.ProperName) (P.Kind, P.TypeKind) -> P.Qualified P.ProperName -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
 
-        showType :: M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [P.Constraint])
+        showType :: M.Map P.Type ([(String, Maybe P.Kind)], [(P.Ident, P.Type)], [(P.Qualified P.ProperName, [P.Type])])
                  -> M.Map (P.Qualified P.ProperName) (P.DataDeclType, P.ProperName, P.Type, [P.Ident])
                  -> M.Map (P.Qualified P.ProperName) ([(String, Maybe P.Kind)], P.Type)
                  -> (P.Qualified P.ProperName, Maybe (P.Kind, P.TypeKind))
@@ -429,7 +429,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
         showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
             (Just (_, P.TypeSynonym), Just (typevars, dtType)) ->
-                if M.member n typeClassesEnv
+                if M.member (P.TypeConstructor n) typeClassesEnv
                 then
                   Nothing
                 else

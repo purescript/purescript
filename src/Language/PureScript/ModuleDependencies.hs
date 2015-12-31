@@ -23,7 +23,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (nub)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -69,7 +69,6 @@ usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (
 
   forTypes :: Type -> [ModuleName]
   forTypes (TypeConstructor (Qualified (Just mn) _)) = [mn]
-  forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
   forTypes _ = []
 
 -- |

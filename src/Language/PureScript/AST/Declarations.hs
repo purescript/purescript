@@ -195,12 +195,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [Constraint] [Declaration]
+  | TypeClassDeclaration ProperName [(String, Maybe Kind)] [(Qualified ProperName, [Type])] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint] (Qualified ProperName) [Type] TypeInstanceBody
+  | TypeInstanceDeclaration Ident [(Qualified ProperName, [Type])] (Qualified ProperName) [Type] TypeInstanceBody
   -- |
   -- A declaration with source position information
   --
@@ -420,7 +420,7 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Constraint (M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+  | TypeClassDictionary Constraint (M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
@@ -428,7 +428,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | SuperClassDictionary (Qualified ProperName) [Type]
+  | SuperClassDictionary Constraint
   -- |
   -- A value with source position information
   --

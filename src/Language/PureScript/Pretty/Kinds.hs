@@ -31,6 +31,7 @@ typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Bang = Just "!"
+  match ConstraintKind = Just "Constraint"
   match (KUnknown u) = Just $ 'u' : show u
   match (KindVar var) = Just var
   match _ = Nothing

@@ -58,24 +58,18 @@ parseTypeAtom = indented *> P.choice
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+  constraints <- parens (commaSep1 parseType)
   _ <- rfatArrow
   indented
   ty <- parseType
   return $ ConstrainedType constraints ty
-  where
-  parseConstraint = do
-    className <- parseQualified properName
-    indented
-    ty <- P.many parseTypeAtom
-    return (className, ty)
-
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
+              , [ P.Infix (rfatArrow >> return (ConstrainedType . return)) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
                  ]

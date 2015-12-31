@@ -27,10 +27,13 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
 parseStar :: TokenParser Kind
-parseStar = const Star <$> symbol' "*"
+parseStar = const Star <$> (symbol' "*" P.<|> uname' "Type")
 
 parseBang :: TokenParser Kind
-parseBang = const Bang <$> symbol' "!"
+parseBang = const Bang <$> (symbol' "!" P.<|> uname' "Effect")
+
+parseConstraint :: TokenParser Kind
+parseConstraint = const ConstraintKind <$> (symbol' "?" P.<|> uname' "Constraint")
 
 parseKindVar :: TokenParser Kind
 parseKindVar = KindVar <$> lname
@@ -39,6 +42,7 @@ parseTypeAtom :: TokenParser Kind
 parseTypeAtom = indented *> P.choice
             [ parseStar
             , parseBang
+            , parseConstraint
             , parseKindVar
             , parens parseKind
             ]
@@ -48,5 +52,5 @@ parseTypeAtom = indented *> P.choice
 parseKind :: TokenParser Kind
 parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
   where
-  operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
+  operators = [ [ P.Prefix ((symbol' "#" P.<|> uname' "Row") >> return Row) ]
               , [ P.Infix (rarrow >> return FunKind) P.AssocRight ] ]
