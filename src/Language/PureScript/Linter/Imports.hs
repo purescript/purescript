@@ -86,11 +86,10 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
               when (runProperName tn `elem` usedNames) $ case (c, usedDctors `intersect` allCtors) of
                 (_, []) | c /= Just [] ->
                   tell $ errorMessage $ UnusedDctorImport tn
-                (Nothing, usedDctors') ->
-                  tell $ errorMessage $ ImplicitDctorImport tn usedDctors'
                 (Just ctors, usedDctors') ->
                   let ddiff = ctors \\ usedDctors'
                   in unless (null ddiff) $ tell $ errorMessage $ UnusedDctorExplicitImport tn ddiff
+                _ -> return ()
 
             return ()
 
