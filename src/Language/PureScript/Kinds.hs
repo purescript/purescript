@@ -1,18 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Kinds
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Kinds where
@@ -20,7 +5,6 @@ module Language.PureScript.Kinds where
 import Prelude ()
 import Prelude.Compat
 
-import Data.Data
 import qualified Data.Aeson.TH as A
 
 -- |
@@ -46,7 +30,8 @@ data Kind
   -- |
   -- Function kinds
   --
-  | FunKind Kind Kind deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | FunKind Kind Kind
+  deriving (Show, Read, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)
 

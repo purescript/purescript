@@ -1,24 +1,10 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Entailment
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Type class entailment
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Language.PureScript.TypeChecker.Entailment (
-    entails
-) where
+-- |
+-- Type class entailment
+--
+module Language.PureScript.TypeChecker.Entailment (entails) where
 
 import Prelude ()
 import Prelude.Compat
@@ -46,15 +32,16 @@ import qualified Language.PureScript.Constants as C
 -- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 --
-entails :: forall m.
-  (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope)) ->
-  Constraint ->
-  m Expr
+entails
+  :: forall m
+   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  -> Constraint
+  -> m Expr
 entails moduleName context = solve
   where
-    forClassName :: Qualified ProperName -> [Type] -> [TypeClassDictionaryInScope]
+    forClassName :: Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
     forClassName cn@(Qualified (Just mn) _) tys = concatMap (findDicts cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
     forClassName _ _ = internalError "forClassName: expected qualified class name"
 
@@ -64,7 +51,7 @@ entails moduleName context = solve
     ctorModules (TypeApp ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: Qualified ProperName -> Maybe ModuleName -> [TypeClassDictionaryInScope]
+    findDicts :: Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
     solve :: Constraint -> m Expr
@@ -72,7 +59,7 @@ entails moduleName context = solve
       dict <- go 0 className tys
       return $ dictionaryValueToValue dict
       where
-      go :: Int -> Qualified ProperName -> [Type] -> m DictionaryValue
+      go :: Int -> Qualified (ProperName 'ClassName) -> [Type] -> m DictionaryValue
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
         let instances = do

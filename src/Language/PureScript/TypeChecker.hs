@@ -39,15 +39,15 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 
-addDataType ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  DataDeclType ->
-  ProperName ->
-  [(String, Maybe Kind)] ->
-  [(ProperName, [Type])] ->
-  Kind ->
-  m ()
+addDataType
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> DataDeclType
+  -> ProperName 'TypeName
+  -> [(String, Maybe Kind)]
+  -> [(ProperName 'ConstructorName, [Type])]
+  -> Kind
+  -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
@@ -55,15 +55,15 @@ addDataType moduleName dtype name args dctors ctorKind = do
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
-addDataConstructor ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  DataDeclType ->
-  ProperName ->
-  [String] ->
-  ProperName ->
-  [Type] ->
-  m ()
+addDataConstructor
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> DataDeclType
+  -> ProperName 'TypeName
+  -> [String]
+  -> ProperName 'ConstructorName
+  -> [Type]
+  -> m ()
 addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
   traverse_ checkTypeSynonyms tys
@@ -73,50 +73,50 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
-addTypeSynonym ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  ProperName ->
-  [(String, Maybe Kind)] ->
-  Type ->
-  Kind ->
-  m ()
+addTypeSynonym
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> ProperName 'TypeName
+  -> [(String, Maybe Kind)]
+  -> Type
+  -> Kind
+  -> m ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   checkTypeSynonyms ty
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
-valueIsNotDefined ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  Ident ->
-  m ()
+valueIsNotDefined
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> Ident
+  -> m ()
 valueIsNotDefined moduleName name = do
   env <- getEnv
   case M.lookup (moduleName, name) (names env) of
     Just _ -> throwError . errorMessage $ RedefinedIdent name
     Nothing -> return ()
 
-addValue ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  Ident ->
-  Type ->
-  NameKind ->
-  m ()
+addValue
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> Ident
+  -> Type
+  -> NameKind
+  -> m ()
 addValue moduleName name ty nameKind = do
   env <- getEnv
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
-addTypeClass ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  ProperName ->
-  [(String, Maybe Kind)] ->
-  [Constraint] ->
-  [Declaration] ->
-  m ()
+addTypeClass
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> ProperName 'ClassName
+  -> [(String, Maybe Kind)]
+  -> [Constraint]
+  -> [Declaration]
+  -> m ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
@@ -125,30 +125,30 @@ addTypeClass moduleName pn args implies ds =
   toPair (PositionedDeclaration _ _ d) = toPair d
   toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
-addTypeClassDictionaries ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Maybe ModuleName ->
-  M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope) ->
-  m ()
+addTypeClassDictionaries
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Maybe ModuleName
+  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+  -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
   where insertState st = M.insertWith (M.unionWith M.union) mn entries (typeClassDictionaries . checkEnv $ st)
 
-checkDuplicateTypeArguments ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  [String] ->
-  m ()
+checkDuplicateTypeArguments
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [String]
+  -> m ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   throwError . errorMessage $ DuplicateTypeArgument dup
   where
   firstDup :: Maybe String
   firstDup = listToMaybe $ args \\ nub args
 
-checkTypeClassInstance ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  Type ->
-  m ()
+checkTypeClassInstance
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> Type
+  -> m ()
 checkTypeClassInstance _ (TypeVar _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
@@ -160,10 +160,10 @@ checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
 -- |
 -- Check that type synonyms are fully-applied in a type
 --
-checkTypeSynonyms ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Type ->
-  m ()
+checkTypeSynonyms
+  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Type
+  -> m ()
 checkTypeSynonyms = void . replaceAllTypeSynonyms
 
 -- |
@@ -179,12 +179,13 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 --  * Process module imports
 --
-typeCheckAll :: forall m.
-  (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  [DeclarationRef] ->
-  [Declaration] ->
-  m [Declaration]
+typeCheckAll
+  :: forall m
+   . (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> [DeclarationRef]
+  -> [Declaration]
+  -> m [Declaration]
 typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
   where
   go :: Declaration -> m Declaration
@@ -197,7 +198,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration dtype name args dctors
     where
-    checkNewtype :: [(ProperName, [Type])] -> m ()
+    checkNewtype :: [(ProperName 'ConstructorName, [Type])] -> m ()
     checkNewtype [(_, [_])] = return ()
     checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype name
     checkNewtype _ = throwError . errorMessage $ InvalidNewtype name
@@ -308,7 +309,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
       | otherwise = firstDuplicate xs
     firstDuplicate _ = Nothing
 
-  checkOrphanInstance :: Ident -> Qualified ProperName -> [Type] -> m ()
+  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> m ()
   checkOrphanInstance dictName className@(Qualified (Just mn') _) tys'
     | moduleName == mn' || any checkType tys' = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
@@ -335,10 +336,11 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
 -- Type check an entire module and ensure all types and classes defined within the module that are
 -- required by exported members are also exported.
 --
-typeCheckModule :: forall m.
-  (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Module ->
-  m Module
+typeCheckModule
+  :: forall m
+   . (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Module
+  -> m Module
 typeCheckModule (Module _ _ _ _ Nothing) = internalError "exports should have been elaborated"
 typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint (ErrorInModule mn)) $ do
   modify (\s -> s { checkCurrentModule = Just mn })
@@ -403,7 +405,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
       where
       go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . fst) cs
       go _ = []
-    extractCurrentModuleClass :: Qualified ProperName -> Maybe ProperName
+    extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> Maybe (ProperName 'ClassName)
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
     extractCurrentModuleClass _ = Nothing
 

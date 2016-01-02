@@ -468,11 +468,12 @@ check val ty = rethrow (addHint (ErrorCheckingType val ty)) $ check' val ty
 -- |
 -- Check the type of a value
 --
-check' :: forall m.
-  (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  m Expr
+check'
+  :: forall m
+   . (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> Type
+  -> m Expr
 check' val (ForAll ident ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
@@ -492,7 +493,11 @@ check' val t@(ConstrainedType constraints ty) = do
   where
   -- | Add a dictionary for the constraint to the scope, and dictionaries
   -- for all implied superclass instances.
-  newDictionaries :: [(Qualified ProperName, Integer)] -> Qualified Ident -> (Qualified ProperName, [Type]) -> m [TypeClassDictionaryInScope]
+  newDictionaries
+    :: [(Qualified (ProperName 'ClassName), Integer)]
+    -> Qualified Ident
+    -> (Qualified (ProperName 'ClassName), [Type])
+    -> m [TypeClassDictionaryInScope]
   newDictionaries path name (className, instanceTy) = do
     tcs <- gets (typeClasses . checkEnv)
     let (args, _, superclasses) = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs

@@ -28,21 +28,21 @@ import qualified Language.PureScript.Constants as C
 -- | Imported name used in some type or expression.
 data Name
   = IdentName (Qualified Ident)
-  | TypeName (Qualified ProperName)
-  | DctorName (Qualified ProperName)
-  | ClassName (Qualified ProperName)
+  | TyName (Qualified (ProperName 'TypeName))
+  | DctorName (Qualified (ProperName 'ConstructorName))
+  | TyClassName (Qualified (ProperName 'ClassName))
   deriving (Eq)
 
 getIdentName :: Name -> Maybe Ident
 getIdentName (IdentName (Qualified _ name)) = Just name
 getIdentName _ = Nothing
 
-getTypeName :: Name -> Maybe ProperName
-getTypeName (TypeName (Qualified _ name)) = Just name
+getTypeName :: Name -> Maybe (ProperName 'TypeName)
+getTypeName (TyName (Qualified _ name)) = Just name
 getTypeName _ = Nothing
 
-getClassName :: Name -> Maybe ProperName
-getClassName (ClassName (Qualified _ name)) = Just name
+getClassName :: Name -> Maybe (ProperName 'ClassName)
+getClassName (TyClassName (Qualified _ name)) = Just name
 getClassName _ = Nothing
 
 -- | Map of module name to list of imported names from that module which have been used.
@@ -96,12 +96,12 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
 
           _ -> return ()
   where
-  reconstructTypeRefs :: ModuleName -> [ProperName] -> M.Map ProperName [ProperName]
+  reconstructTypeRefs :: ModuleName -> [ProperName 'ConstructorName] -> M.Map (ProperName 'TypeName) [ProperName 'ConstructorName]
   reconstructTypeRefs mni = foldr accumDctors M.empty
     where
     accumDctors dctor = M.alter (Just . maybe [dctor] (dctor :)) (findTypeForDctor mni dctor)
 
-  findTypeForDctor :: ModuleName -> ProperName -> ProperName
+  findTypeForDctor :: ModuleName -> ProperName 'ConstructorName -> ProperName 'TypeName
   findTypeForDctor mn dctor =
     case mn `M.lookup` env of
       Just (_, _, exps) ->
@@ -122,17 +122,17 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
   qnameUsed (Just qn) = qn `elem` alwaysUsedModules
   qnameUsed Nothing = False
 
-  dtys :: ModuleName -> [((ProperName, [ProperName]), ModuleName)]
+  dtys :: ModuleName -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
   dtys mn = maybe [] exportedTypes $ envModuleExports <$> mn `M.lookup` env
 
-  dctorsForType :: ModuleName -> ProperName -> [ProperName]
+  dctorsForType :: ModuleName -> ProperName 'TypeName -> [ProperName 'ConstructorName]
   dctorsForType mn tn =
     maybe [] getDctors (find matches $ dtys mn)
     where
       matches ((ty, _),_) = ty == tn
       getDctors ((_,ctors),_) = ctors
 
-  typeForDCtor :: ModuleName -> ProperName -> Maybe ProperName
+  typeForDCtor :: ModuleName -> ProperName 'ConstructorName -> Maybe (ProperName 'TypeName)
   typeForDCtor mn pn =
     getTy <$> find matches (dtys mn)
     where
@@ -140,14 +140,18 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
       getTy ((ty, _), _) = ty
 
 
-matchName :: (ProperName -> Maybe ProperName) -> Maybe ModuleName -> Name -> Maybe String
+matchName
+  :: (ProperName 'ConstructorName -> Maybe (ProperName 'TypeName))
+  -> Maybe ModuleName
+  -> Name
+  -> Maybe String
 matchName _ qual (IdentName (Qualified q x)) | q == qual = Just $ showIdent x
-matchName _ qual (TypeName (Qualified q x)) | q == qual = Just $ runProperName x
-matchName _ qual (ClassName (Qualified q x)) | q == qual = Just $ runProperName x
+matchName _ qual (TyName (Qualified q x)) | q == qual = Just $ runProperName x
+matchName _ qual (TyClassName (Qualified q x)) | q == qual = Just $ runProperName x
 matchName lookupDc qual (DctorName (Qualified q x)) | q == qual = runProperName <$> lookupDc x
 matchName _ _ _ = Nothing
 
-matchDctor :: Maybe ModuleName -> Name -> Maybe ProperName
+matchDctor :: Maybe ModuleName -> Name -> Maybe (ProperName 'ConstructorName)
 matchDctor qual (DctorName (Qualified q x)) | q == qual = Just x
 matchDctor _ _ = Nothing
 
@@ -158,7 +162,7 @@ runDeclRef (TypeRef pn _) = Just $ runProperName pn
 runDeclRef (TypeClassRef pn) = Just $ runProperName pn
 runDeclRef _ = Nothing
 
-getTypeRef :: DeclarationRef -> Maybe (ProperName, Maybe [ProperName])
+getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
 getTypeRef (PositionedDeclarationRef _ _ ref) = getTypeRef ref
 getTypeRef (TypeRef pn x) = Just (pn, x)
 getTypeRef _ = Nothing

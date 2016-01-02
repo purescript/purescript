@@ -1,28 +1,15 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.AST.SourcePos
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Source position information
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Source position information
+--
 module Language.PureScript.AST.SourcePos where
 
 import Prelude ()
 import Prelude.Compat
 
-import qualified Data.Data as D
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 
@@ -38,7 +25,7 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)
+  } deriving (Show, Read, Eq, Ord)
 
 displaySourcePos :: SourcePos -> String
 displaySourcePos sp =
@@ -66,7 +53,7 @@ data SourceSpan = SourceSpan
     -- End of the span
     --
   , spanEnd :: SourcePos
-  } deriving (Show, Read, Eq, Ord, D.Data, D.Typeable)
+  } deriving (Show, Read, Eq, Ord)
 
 displayStartEndPos :: SourceSpan -> String
 displayStartEndPos sp =

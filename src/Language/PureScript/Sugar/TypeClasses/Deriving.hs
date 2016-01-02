@@ -8,9 +8,7 @@
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
 --
-module Language.PureScript.Sugar.TypeClasses.Deriving (
-    deriveInstances
-) where
+module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
 import Prelude ()
 import Prelude.Compat
@@ -32,12 +30,20 @@ import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
 -- | Elaborates deriving instance declarations by code generation.
-deriveInstances ::  (Functor m, Applicative m, MonadError MultipleErrors m, MonadSupply m) => Module -> m Module
+deriveInstances
+  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadSupply m)
+  => Module
+  -> m Module
 deriveInstances (Module ss coms mn ds exts) = Module ss coms mn <$> mapM (deriveInstance mn ds) ds <*> pure exts
 
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration,
 -- elaborates that into an instance declaration via code generation.
-deriveInstance :: (Functor m, MonadError MultipleErrors m, MonadSupply m) => ModuleName -> [Declaration] -> Declaration -> m Declaration
+deriveInstance
+  :: (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> Declaration
+  -> m Declaration
 deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] DerivedInstance)
   | className == Qualified (Just dataGeneric) (ProperName C.generic)
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
@@ -48,7 +54,7 @@ deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
 deriveInstance _  _  e = return e
 
-unwrapTypeConstructor :: Type -> Maybe (Qualified ProperName, [Type])
+unwrapTypeConstructor :: Type -> Maybe (Qualified (ProperName 'TypeName), [Type])
 unwrapTypeConstructor (TypeConstructor tyCon) = Just (tyCon, [])
 unwrapTypeConstructor (TypeApp ty arg) = do
   (tyCon, args) <- unwrapTypeConstructor ty
@@ -64,7 +70,13 @@ dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
 typesProxy :: ModuleName
 typesProxy = ModuleName [ ProperName "Type", ProperName "Proxy" ]
 
-deriveGeneric :: (Functor m, MonadError MultipleErrors m, MonadSupply m) => ModuleName -> [Declaration] -> ProperName -> [Type] -> m [Declaration]
+deriveGeneric
+  :: (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> [Type]
+  -> m [Declaration]
 deriveGeneric mn ds tyConNm args = do
   tyCon <- findTypeDecl tyConNm ds
   toSpine <- mkSpineFunction mn tyCon
@@ -75,7 +87,11 @@ deriveGeneric mn ds tyConNm args = do
          , ValueDeclaration (Ident C.toSignature) Public [] (Right toSignature)
          ]
 
-findTypeDecl :: (Functor m, MonadError MultipleErrors m) => ProperName -> [Declaration] -> m Declaration
+findTypeDecl
+  :: (Functor m, MonadError MultipleErrors m)
+  => ProperName 'TypeName
+  -> [Declaration]
+  -> m Declaration
 findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType tyConNm) return . find isTypeDecl
   where
   isTypeDecl :: Declaration -> Bool
@@ -92,7 +108,7 @@ mkSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> mapM mkCtorCl
   recordConstructor :: Expr -> Expr
   recordConstructor = App (Constructor (Qualified (Just dataGeneric) (ProperName "SRecord")))
 
-  mkCtorClause :: (ProperName, [Type]) -> m CaseAlternative
+  mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
   mkCtorClause (ctorName, tys) = do
     idents <- replicateM (length tys) freshIdent'
     return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents))
@@ -125,10 +141,12 @@ mkSignatureFunction mn (DataDeclaration _ name tyArgs args) classArgs = lamNull 
   proxy :: Type -> Type
   proxy = TypeApp (TypeConstructor (Qualified (Just typesProxy) (ProperName "Proxy")))
 
-  mkProdClause :: (ProperName, [Type]) -> Expr
-  mkProdClause (ctorName, tys) = ObjectLiteral [ ("sigConstructor", StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName)))
-                                               , ("sigValues", ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
-                                               ]
+  mkProdClause :: (ProperName 'ConstructorName, [Type]) -> Expr
+  mkProdClause (ctorName, tys) =
+    ObjectLiteral
+      [ ("sigConstructor", StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName)))
+      , ("sigValues", ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
+      ]
 
   mkProductSignature :: Type -> Expr
   mkProductSignature r | Just rec <- objectType r =
@@ -158,7 +176,7 @@ mkFromSpineFunction mn (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch
   recordBinder :: [Binder] -> Binder
   recordBinder = ConstructorBinder (Qualified (Just dataGeneric) (ProperName "SRecord"))
 
-  mkAlternative :: (ProperName, [Type]) -> m CaseAlternative
+  mkAlternative :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
   mkAlternative (ctorName, tys) = do
     idents <- replicateM (length tys) freshIdent'
     return $ CaseAlternative [ prodBinder [ StringBinder (showQualified runProperName (Qualified (Just mn) ctorName)), ArrayBinder (map VarBinder idents)]]

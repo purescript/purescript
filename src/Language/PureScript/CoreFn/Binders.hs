@@ -1,23 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CoreFn.Binders
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- | The core functional representation for binders
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+-- |
+-- The core functional representation for binders
+--
 module Language.PureScript.CoreFn.Binders where
-
-import qualified Data.Data as D
 
 import Language.PureScript.CoreFn.Literals
 import Language.PureScript.Names
@@ -39,10 +25,11 @@ data Binder a
   --
   | VarBinder a Ident
   -- |
-  -- A binder which matches a data constructor (type name, constructor name, binders)
+  -- A binder which matches a data constructor
   --
-  | ConstructorBinder a (Qualified ProperName) (Qualified ProperName) [Binder a]
+  | ConstructorBinder a (Qualified (ProperName 'TypeName)) (Qualified (ProperName 'ConstructorName)) [Binder a]
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder a Ident (Binder a) deriving (Show, Read, D.Data, D.Typeable, Functor)
+  | NamedBinder a Ident (Binder a)
+  deriving (Show, Read, Functor)

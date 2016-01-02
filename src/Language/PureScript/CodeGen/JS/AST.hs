@@ -1,27 +1,12 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.AST
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Data types for the intermediate simplified-Javascript AST
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Language.PureScript.CodeGen.JS.AST where
 
 import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.Identity
-import Data.Data
 
 import Language.PureScript.Comments
 import Language.PureScript.Traversals
@@ -49,7 +34,8 @@ data UnaryOperator
   -- |
   -- Constructor
   --
-  | JSNew deriving (Show, Read, Eq, Data, Typeable)
+  | JSNew
+  deriving (Show, Read, Eq)
 
 -- |
 -- Built-in binary operators
@@ -130,7 +116,8 @@ data BinaryOperator
   -- |
   -- Bitwise right shift with zero-fill
   --
-  | ZeroFillShiftRight deriving (Show, Read, Eq, Data, Typeable)
+  | ZeroFillShiftRight
+  deriving (Show, Read, Eq)
 
 -- |
 -- Data type for simplified Javascript expressions
@@ -251,7 +238,8 @@ data JS
   -- |
   -- Commented Javascript
   --
-  | JSComment [Comment] JS deriving (Show, Read, Eq, Data, Typeable)
+  | JSComment [Comment] JS
+  deriving (Show, Read, Eq)
 
 --
 -- Traversals

@@ -1,24 +1,12 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Exhaustive
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- | Module for exhaustivity checking over pattern matching definitions
--- | The algorithm analyses the clauses of a definition one by one from top
--- | to bottom, where in each step it has the cases already missing (uncovered),
--- | and it generates the new set of missing cases.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Module for exhaustivity checking over pattern matching definitions
+-- The algorithm analyses the clauses of a definition one by one from top
+-- to bottom, where in each step it has the cases already missing (uncovered),
+-- and it generates the new set of missing cases.
+--
 module Language.PureScript.Linter.Exhaustive (checkExhaustiveModule) where
 
 import Prelude ()
@@ -54,7 +42,11 @@ data RedudancyError = Incomplete | Unknown
 -- |
 -- Qualifies a propername from a given qualified propername and a default module name
 --
-qualifyName :: a -> ModuleName -> Qualified a -> Qualified a
+qualifyName
+  :: (ProperName a)
+  -> ModuleName
+  -> Qualified (ProperName b)
+  -> Qualified (ProperName a)
 qualifyName n defmn qn = Qualified (Just mn) n
   where
   (mn, _) = qualify defmn qn
@@ -65,31 +57,28 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
 --        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> Qualified ProperName -> [(ProperName, [Type])]
+getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [Type])]
 getConstructors env defmn n = extractConstructors lnte
   where
-  qpn :: Qualified ProperName
-  qpn = getConsDataName n
 
-  getConsDataName :: Qualified ProperName -> Qualified ProperName
-  getConsDataName con = qualifyName nm defmn con
-    where
-    nm = case getConsInfo con of
-           Nothing -> error $ "Constructor " ++ showQualified runProperName con ++ " not in the scope of the current environment in getConsDataName."
-           Just (_, pm, _, _) -> pm
-
-  getConsInfo :: Qualified ProperName -> Maybe (DataDeclType, ProperName, Type, [Ident])
-  getConsInfo con = M.lookup con dce
-    where
-    dce :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type, [Ident])
-    dce = dataConstructors env
+  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
+  extractConstructors (Just (_, DataType _ pt)) = pt
+  extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
   lnte :: Maybe (Kind, TypeKind)
   lnte = M.lookup qpn (types env)
 
-  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName, [Type])]
-  extractConstructors (Just (_, DataType _ pt)) = pt
-  extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
+  qpn :: Qualified (ProperName 'TypeName)
+  qpn = getConsDataName n
+
+  getConsDataName :: Qualified (ProperName 'ConstructorName) -> Qualified (ProperName 'TypeName)
+  getConsDataName con =
+    case getConsInfo con of
+      Nothing -> internalError $ "Constructor " ++ showQualified runProperName con ++ " not in the scope of the current environment in getConsDataName."
+      Just (_, pm, _, _) -> qualifyName pm defmn con
+
+  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type, [Ident])
+  getConsInfo con = M.lookup con (dataConstructors env)
 
 -- |
 -- Replicates a wildcard binder
@@ -303,14 +292,14 @@ checkExhaustiveDecls env mn = mapM_ onDecl
   hasPartialConstraint :: Type -> Bool
   hasPartialConstraint (ConstrainedType cs _) = any (go . fst) cs
     where
-    go :: Qualified ProperName -> Bool
+    go :: Qualified (ProperName 'ClassName) -> Bool
     go qname
       | qname == partialClass = True
       | otherwise =
           case qname `M.lookup` typeClasses env of
             Just ([], _, cs') -> any (go . fst) cs'
             _ -> False
-    partialClass :: Qualified ProperName
+    partialClass :: Qualified (ProperName 'ClassName)
     partialClass = primName "Partial"
   hasPartialConstraint _ = False
 

@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds #-}
 
 module Main where
 
@@ -38,7 +39,7 @@ data HierarchyOptions = HierarchyOptions
   , hierarchyOutput :: Maybe FilePath
   }
 
-newtype SuperMap = SuperMap { unSuperMap :: Either P.ProperName (P.ProperName, P.ProperName) }
+newtype SuperMap = SuperMap { unSuperMap :: Either (P.ProperName 'P.ClassName) ((P.ProperName 'P.ClassName), (P.ProperName 'P.ClassName)) }
   deriving Eq
 
 instance Show SuperMap where

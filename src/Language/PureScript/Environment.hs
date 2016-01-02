@@ -1,24 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Environment
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Environment where
 
-import Data.Data
 import Data.Maybe (fromMaybe)
 import Data.Aeson.TH
 import qualified Data.Map as M
@@ -43,23 +27,23 @@ data Environment = Environment {
   -- |
   -- Type names currently in scope
   --
-  , types :: M.Map (Qualified ProperName) (Kind, TypeKind)
+  , types :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
   -- |
   -- Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , dataConstructors :: M.Map (Qualified ProperName) (DataDeclType, ProperName, Type, [Ident])
+  , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, Type, [Ident])
   -- |
   -- Type synonyms currently in scope
   --
-  , typeSynonyms :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], Type)
+  , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(String, Maybe Kind)], Type)
   -- |
   -- Available type class dictionaries
   --
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified ProperName) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -- |
   -- Type classes
   --
-  , typeClasses :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
+  , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
   } deriving (Show, Read)
 
 -- |
@@ -98,7 +82,8 @@ data NameKind
   -- |
   -- A name for member introduced by foreign import
   --
-  | External deriving (Show, Read, Eq, Data, Typeable)
+  | External
+  deriving (Show, Read, Eq)
 
 -- |
 -- The kinds of a type
@@ -107,7 +92,7 @@ data TypeKind
   -- |
   -- Data type
   --
-  = DataType [(String, Maybe Kind)] [(ProperName, [Type])]
+  = DataType [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- Type synonym
   --
@@ -124,7 +109,7 @@ data TypeKind
   -- A scoped type variable
   --
   | ScopedTypeVar
-   deriving (Show, Read, Eq, Data, Typeable)
+  deriving (Show, Read, Eq)
 
 -- |
 -- The type ('data' or 'newtype') of a data type declaration
@@ -137,7 +122,8 @@ data DataDeclType
   -- |
   -- A newtype constructor
   --
-  | Newtype deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | Newtype
+  deriving (Show, Read, Eq, Ord)
 
 showDataDeclType :: DataDeclType -> String
 showDataDeclType Data = "data"
@@ -156,7 +142,7 @@ instance A.FromJSON DataDeclType where
 -- |
 -- Construct a ProperName in the Prim module
 --
-primName :: String -> Qualified ProperName
+primName :: String -> Qualified (ProperName a)
 primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
 -- |
@@ -240,7 +226,7 @@ function t1 = TypeApp (TypeApp tyFunction t1)
 -- associated kinds. There is also a pseudo `Partial` type that corresponds to
 -- the class with the same name.
 --
-primTypes :: M.Map (Qualified ProperName) (Kind, TypeKind)
+primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
   M.fromList
     [ (primName "Function", (FunKind Star (FunKind Star Star), ExternData))
@@ -258,7 +244,7 @@ primTypes =
 -- The primitive class map. This just contains to `Partial` class, used as a
 -- kind of magic constraint for partial functions.
 --
-primClasses :: M.Map (Qualified ProperName) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
+primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
 primClasses =
   M.fromList
     [ (primName "Partial", ([], [], [])) ]
@@ -266,14 +252,14 @@ primClasses =
 -- |
 -- Finds information about data constructors from the current environment.
 --
-lookupConstructor :: Environment -> Qualified ProperName -> (DataDeclType, ProperName, Type, [Ident])
+lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, Type, [Ident])
 lookupConstructor env ctor =
   fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
 -- |
 -- Checks whether a data constructor is for a newtype.
 --
-isNewtypeConstructor :: Environment -> Qualified ProperName -> Bool
+isNewtypeConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> Bool
 isNewtypeConstructor e ctor = case lookupConstructor e ctor of
   (Newtype, _, _, _) -> True
   (Data, _, _, _) -> False

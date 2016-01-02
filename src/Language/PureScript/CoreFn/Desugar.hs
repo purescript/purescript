@@ -170,7 +170,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- |
   -- Gets metadata for data constructors.
   --
-  getConstructorMeta :: Qualified ProperName -> Meta
+  getConstructorMeta :: Qualified (ProperName 'ConstructorName) -> Meta
   getConstructorMeta ctor =
     case lookupConstructor env ctor of
       (Newtype, _, _, _) -> IsNewtype
@@ -178,9 +178,15 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
         let constructorType = if numConstructors (ctor, dc) == 1 then ProductType else SumType
         in IsConstructor constructorType fields
     where
-    numConstructors :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> Int
+
+    numConstructors
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      -> Int
     numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
-    typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> (ModuleName, ProperName)
+
+    typeConstructor
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      -> (ModuleName, ProperName 'TypeName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
 
@@ -255,5 +261,5 @@ mkTypeClassConstructor ss com supers members =
 -- |
 -- Converts a ProperName to an Ident.
 --
-properToIdent :: ProperName -> Ident
+properToIdent :: ProperName a -> Ident
 properToIdent = Ident . runProperName

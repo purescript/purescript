@@ -124,7 +124,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
     ModuleRef name -> warnDupe pos $ "module " ++ runModuleName name
     _ -> return ()
 
-  warnDupeDctors :: Maybe SourceSpan -> [ProperName] -> m ()
+  warnDupeDctors :: Maybe SourceSpan -> [ProperName 'ConstructorName] -> m ()
   warnDupeDctors pos = traverse_ (warnDupe pos . ("data constructor " ++) . runProperName)
 
   warnDupe :: Maybe SourceSpan -> String -> m ()
@@ -147,11 +147,11 @@ resolveImports env (Module ss coms currentModule decls exps) =
 
   updateProperRef :: ModuleName -> Exports -> DeclarationRef -> m DeclarationRef
   updateProperRef importModule modExports (ProperRef name) =
-    if name `elem` (fst `map` exportedTypeClasses modExports)
+    if ProperName name `elem` (fst `map` exportedTypeClasses modExports)
     then do
-      tell . errorMessage $ DeprecatedClassImport importModule name
-      return $ TypeClassRef name
-    else return $ TypeRef name (Just [])
+      tell . errorMessage $ DeprecatedClassImport importModule (ProperName name)
+      return . TypeClassRef $ ProperName name
+    else return $ TypeRef (ProperName name) (Just [])
   updateProperRef importModule modExports (PositionedDeclarationRef pos com ref) =
     PositionedDeclarationRef pos com <$> updateProperRef importModule modExports ref
   updateProperRef _ _ other = return other
@@ -226,13 +226,22 @@ resolveImport importModule exps imps impQual = resolveByType
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
-  checkImportExists :: (Eq a) => (ModuleName -> a -> SimpleErrorMessage) -> [a] -> a -> m ()
+  checkImportExists
+    :: Eq a
+    => (ModuleName -> a -> SimpleErrorMessage)
+    -> [a]
+    -> a
+    -> m ()
   checkImportExists unknown exports item =
     when (item `notElem` exports) $ throwError . errorMessage $ unknown importModule item
 
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
-  checkDctorExists :: ProperName -> [ProperName] -> ProperName -> m ()
+  checkDctorExists
+    :: ProperName 'TypeName
+    -> [ProperName 'ConstructorName]
+    -> ProperName 'ConstructorName
+    -> m ()
   checkDctorExists tcon = checkImportExists (flip UnknownImportDataConstructor tcon)
 
   importNonHidden :: [DeclarationRef] -> Imports -> DeclarationRef -> m Imports
@@ -268,9 +277,9 @@ resolveImport importModule exps imps impQual = resolveByType
     return $ imp { importedValues = values' }
   importExplicit imp (TypeRef name dctors) = do
     let types' = updateImports (importedTypes imp) (first fst `map` exportedTypes exps) name
-    let exportedDctors :: [(ProperName, ModuleName)]
+    let exportedDctors :: [(ProperName 'ConstructorName, ModuleName)]
         exportedDctors = allExportedDataConstructors name
-        dctorNames :: [ProperName]
+        dctorNames :: [ProperName 'ConstructorName]
         dctorNames = fst `map` exportedDctors
     maybe (return ()) (traverse_ $ checkDctorExists name dctorNames) dctors
     when (null dctorNames && isNothing dctors) . tell . errorMessage $ MisleadingEmptyTypeImport importModule name
@@ -282,7 +291,7 @@ resolveImport importModule exps imps impQual = resolveByType
   importExplicit _ _ = internalError "Invalid argument to importExplicit"
 
   -- Find all exported data constructors for a given type
-  allExportedDataConstructors :: ProperName -> [(ProperName, ModuleName)]
+  allExportedDataConstructors :: ProperName 'TypeName -> [(ProperName 'ConstructorName, ModuleName)]
   allExportedDataConstructors name =
     case find ((== name) . fst . fst) (exportedTypes exps) of
       Nothing -> internalError "Invalid state in allExportedDataConstructors"
