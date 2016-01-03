@@ -71,7 +71,12 @@ findUnusedImports (Module _ _ _ mdecls mexports) env usedImps = do
                 typesRefs
                   = map (flip TypeRef (Just [])) typesWithoutDctors
                   ++ map (\(ty, ds) -> TypeRef ty (Just ds)) (M.toList typesWithDctors)
-            in tell $ errorMessage $ ImplicitImport mni (classRefs ++ typesRefs ++ valueRefs)
+                allRefs = classRefs ++ typesRefs ++ valueRefs
+            in tell $ errorMessage $
+                if null allRefs
+                then UnusedImport mni
+                else ImplicitImport mni allRefs
+          Explicit [] -> tell $ errorMessage $ UnusedImport mni
           Explicit declrefs -> do
             let idents = nub (mapMaybe runDeclRef declrefs)
             let diff = idents \\ usedNames
