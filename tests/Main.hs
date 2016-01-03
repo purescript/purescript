@@ -177,10 +177,10 @@ main :: IO ()
 main = do
   heading "Main compiler test suite"
   testCompiler
-  heading "psc-publish test suite"
-  testPscPublish
   heading "Documentation test suite"
   TestDocs.main
+  -- heading "psc-publish test suite"
+  -- testPscPublish
 
   where
   heading msg = do
