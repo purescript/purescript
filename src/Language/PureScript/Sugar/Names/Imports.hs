@@ -135,7 +135,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
 
   updateImportRef :: Declaration -> m Declaration
   updateImportRef (PositionedDeclaration pos com d) =
-    warnWithPosition pos $ PositionedDeclaration pos com <$> updateImportRef d
+    warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> updateImportRef d
   updateImportRef (ImportDeclaration mn typ qual isOldSyntax) = do
     modExports <- getExports env mn
     typ' <- case typ of
