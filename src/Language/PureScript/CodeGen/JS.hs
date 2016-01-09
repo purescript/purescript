@@ -90,7 +90,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     go :: M.Map ModuleName ModuleName -> [Ident] -> [ModuleName] -> M.Map ModuleName ModuleName
     go acc used (mn' : mns') =
       let mni = Ident $ runModuleName mn'
-      in if mni `elem` used
+      in if mn' /= mn && mni `elem` used
          then let newName = freshModuleName 1 mn' used
               in go (M.insert mn' newName acc) (Ident (runModuleName newName) : used) mns'
          else go (M.insert mn' mn' acc) (mni : used) mns'
