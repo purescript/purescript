@@ -76,13 +76,13 @@ printWarningsAndErrors verbose True warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
-  when (null input) $ do
+  input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
+  when (null input && not pscmJSONErrors) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
   let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
   moduleFiles <- readInput (InputOptions pursFiles)
-  inputForeign <- globWarningOnMisses warnFileTypeNotFound pscmForeignInput
+  inputForeign <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmForeignInput
   foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     (ms, foreigns) <- parseInputs moduleFiles foreignFiles
