@@ -138,7 +138,9 @@ data SimpleErrorMessage
   | DuplicateExportRef String
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
+  | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
+  | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
   deriving (Show)
 
@@ -309,7 +311,9 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
   RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
+  ImplicitQualifiedImport{} -> "ImplicitQualifiedImport"
   ImplicitImport{} -> "ImplicitImport"
+  HidingImport{} -> "HidingImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
 
 -- |
@@ -856,8 +860,19 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (RedundantEmptyHidingImport mn) =
       line $ "The import for module " ++ runModuleName mn ++ " is redundant as all members have been explicitly hidden."
 
+    renderSimpleErrorMessage (ImplicitQualifiedImport importedModule asModule refs) =
+      paras [ line $ "Module " ++ runModuleName importedModule ++ " was imported as " ++ runModuleName asModule ++ " with unspecified imports."
+            , line $ "As there are multiple modules being imported as " ++ runModuleName asModule ++ ", consider using the explicit form:"
+            , indent $ line $ "import " ++ runModuleName importedModule ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ") as " ++ runModuleName asModule
+            ]
+
     renderSimpleErrorMessage (ImplicitImport mn refs) =
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the explicit form: "
+            , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            ]
+
+    renderSimpleErrorMessage (HidingImport mn refs) =
+      paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the inclusive form: "
             , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
             ]
 

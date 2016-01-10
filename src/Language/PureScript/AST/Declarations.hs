@@ -146,6 +146,10 @@ isImplicit :: ImportDeclarationType -> Bool
 isImplicit Implicit = True
 isImplicit _ = False
 
+isExplicit :: ImportDeclarationType -> Bool
+isExplicit (Explicit _) = True
+isExplicit _ = False
+
 -- |
 -- The data type of declarations
 --
