@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.PureScript.Errors where
@@ -9,6 +8,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Ord (comparing)
+import Data.Char (isSpace)
 import Data.Either (lefts, rights)
 import Data.List (intercalate, transpose, nub, nubBy, sortBy)
 import Data.Foldable (fold)
@@ -412,10 +412,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint other = pure other
 
-
 wikiUri :: ErrorMessage -> String
 wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
-
 
 -- |
 -- Pretty print a single error, simplifying if necessary
@@ -432,17 +430,17 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
   prettyPrintErrorMessage typeMap (ErrorMessage hints simple) =
     paras $
       [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
-      , Box.moveDown 1 typeInformation
       ] ++
+      maybe [] (return . Box.moveDown 1) typeInformation ++
       [ Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri e ++ " for more information, "
                                  , line $ "or to contribute content related to this " ++ levelText ++ "."
                                  ]
-        | showWiki
+      | showWiki
       ]
     where
-    typeInformation :: Box.Box
-    typeInformation | not (null types) = Box.hsep 1 Box.left [ line "where", paras types]
-                    | otherwise = Box.emptyBox 0 0
+    typeInformation :: Maybe Box.Box
+    typeInformation | not (null types) = Just $ Box.hsep 1 Box.left [ line "where", paras types ]
+                    | otherwise = Nothing
       where
       types :: [Box.Box]
       types = map skolemInfo  (M.elems (umSkolemMap typeMap)) ++
@@ -1026,7 +1024,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     where
     -- Take the last instance of each "hint category"
     simplifyHints :: [ErrorMessageHint] -> [ErrorMessageHint]
-    simplifyHints = reverse . nubBy categoriesEqual . reverse
+    simplifyHints = reverse . nubBy categoriesEqual . stripRedudantHints simple . reverse
 
     -- Don't remove hints in the "other" category
     categoriesEqual :: ErrorMessageHint -> ErrorMessageHint -> Bool
@@ -1035,6 +1033,30 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
         (OtherHint, _) -> False
         (_, OtherHint) -> False
         (c1, c2) -> c1 == c2
+
+    -- | See https://github.com/purescript/purescript/issues/1802
+    stripRedudantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
+    stripRedudantHints CannotApplyFunction{} = stripFirst isApplicationHint
+      where
+      isApplicationHint ErrorInApplication{} = True
+      isApplicationHint _ = False
+    stripRedudantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
+      where
+      isCheckHint ErrorCheckingType{} = True
+      isCheckHint _ = False
+    stripRedudantHints TypesDoNotUnify{} = stripFirst isUnifyHint
+      where
+      isUnifyHint ErrorUnifyingTypes{} = True
+      isUnifyHint _ = False
+    stripRedudantHints _ = id
+
+    stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]
+    stripFirst p (PositionedError pos : hs) = PositionedError pos : stripFirst p hs
+    stripFirst p (ErrorInModule mn    : hs) = ErrorInModule mn    : stripFirst p hs
+    stripFirst p (hint                : hs)
+      | p hint = hs
+      | otherwise = hint : hs
+    stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
   hintCategory ErrorCheckingType{}  = ExprHint
@@ -1137,9 +1159,15 @@ line :: String -> Box.Box
 line = Box.text
 
 renderBox :: Box.Box -> String
-renderBox = unlines . map trimEnd . lines . Box.render
+renderBox = unlines
+            . map (dropWhileEnd isSpace)
+            . dropWhile whiteSpace
+            . dropWhileEnd whiteSpace
+            . lines
+            . Box.render
   where
-  trimEnd = reverse . dropWhile (== ' ') . reverse
+  dropWhileEnd p = reverse . dropWhile p . reverse
+  whiteSpace = all isSpace
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
