@@ -92,12 +92,12 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ show mn ++ "\"")
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ P.runModuleName mn ++ "\"")
     exitFailure
   guardMissing mns = do
     hPutStrLn stderr "psc-docs: error: unknown modules:"
     forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ show mn)
+      hPutStrLn stderr ("  * " ++ P.runModuleName mn)
     exitFailure
 
 -- |
