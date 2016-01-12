@@ -20,6 +20,9 @@ tested-with: GHC==7.8
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
+                  , examples/docs/bower_components/purescript-prelude/src/*.purs
+                  , examples/docs/bower.json
+                  , examples/docs/src/*.purs
                   , tests/support/setup.js
                   , tests/support/package.json
                   , tests/support/bower.json
@@ -159,6 +162,8 @@ library
 
                      Language.PureScript.Docs
                      Language.PureScript.Docs.Convert
+                     Language.PureScript.Docs.Convert.Single
+                     Language.PureScript.Docs.Convert.ReExports
                      Language.PureScript.Docs.Render
                      Language.PureScript.Docs.Types
                      Language.PureScript.Docs.RenderedCode
@@ -220,7 +225,8 @@ executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
                    optparse-applicative >= 0.10.0, process -any, mtl -any,
                    split -any, ansi-wl-pprint -any, directory -any,
-                   filepath -any, Glob -any
+                   filepath -any, Glob -any, transformers -any,
+                   transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc-docs
@@ -272,6 +278,7 @@ test-suite tests
     main-is: Main.hs
     other-modules: TestsSetup
                    TestPscPublish
+                   TestDocs
     buildable: True
     hs-source-dirs: tests tests/common
 

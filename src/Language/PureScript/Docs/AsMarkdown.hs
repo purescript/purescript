@@ -1,10 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module Language.PureScript.Docs.AsMarkdown (
-  renderModulesAsMarkdown
-) where
+module Language.PureScript.Docs.AsMarkdown
+  ( renderModulesAsMarkdown
+  , Docs
+  , runDocs
+  , modulesAsMarkdown
+  ) where
 
-import Control.Monad.Writer hiding (First)
+import Prelude ()
+import Prelude.Compat
+
+import Control.Monad (unless, zipWithM_)
+import Control.Monad.Writer (Writer, tell, execWriter)
+import Control.Monad.Error.Class (MonadError)
 import Data.Foldable (for_)
 import Data.List (partition)
 
@@ -19,9 +28,14 @@ import qualified Language.PureScript.Docs.Render as Render
 -- Take a list of modules and render them all in order, returning a single
 -- Markdown-formatted String.
 --
-renderModulesAsMarkdown :: [P.Module] -> String
-renderModulesAsMarkdown =
-  runDocs . modulesAsMarkdown . map Convert.convertModule
+renderModulesAsMarkdown ::
+  (Functor m, Applicative m,
+  MonadError P.MultipleErrors m) =>
+  P.Env ->
+  [P.Module] ->
+  m String
+renderModulesAsMarkdown env =
+  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules env
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
@@ -33,6 +47,11 @@ moduleAsMarkdown Module{..} = do
   for_ modComments tell'
   mapM_ (declAsMarkdown modName) modDeclarations
   spacer
+  for_ modReExports $ \(mn, decls) -> do
+    let modName' = P.runModuleName mn
+    headerLevel 3 $ "Re-exported from " ++ modName' ++ ":"
+    spacer
+    mapM_ (declAsMarkdown modName') decls
 
 declAsMarkdown :: String -> Declaration -> Docs
 declAsMarkdown mn decl@Declaration{..} = do

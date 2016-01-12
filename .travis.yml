@@ -57,6 +57,8 @@ install:
   # Snapshot state of the sandbox now, so we don't need to make new one for test install
   - rm -rf ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
   - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
+  # Install bower globally (for psc-docs/psc-publish tests)
+  - npm install -g bower
 script:
   - ./travis/configure.sh
   - cabal build --ghc-options="-Werror"

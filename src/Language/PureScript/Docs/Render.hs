@@ -49,7 +49,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       [ keywordClass ]
       ++ maybeToList superclasses
       ++ [renderType' (typeApp declTitle args)]
-      ++ [keywordWhere | any (isTypeClassMember . cdeclInfo) declChildren]
+      ++ [keywordWhere | any isTypeClassMember declChildren]
 
       where
       superclasses
@@ -58,9 +58,6 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
-
-      isTypeClassMember (ChildTypeClassMember _) = True
-      isTypeClassMember _ = False
     AliasDeclaration for (P.Fixity associativity precedence) ->
       [ keywordFixity associativity
       , syntax $ show precedence

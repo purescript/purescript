@@ -1,0 +1,19 @@
+{
+  "name": "docs-test-package",
+  "version": "1.0.0",
+  "moduleType": [
+    "node"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/not-real/not-a-real-repo.git"
+  },
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+  }
+}
