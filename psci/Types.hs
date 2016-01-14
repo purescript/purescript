@@ -51,11 +51,11 @@ mkPSCiState :: [ImportedModule]
             -> [P.Declaration]
             -> [String]
             -> PSCiState
-mkPSCiState imported loaded foreign lets nodeFlags =
+mkPSCiState imported loaded foreigns lets nodeFlags =
   (initialPSCiState
     |> each imported updateImportedModules
     |> updateModules loaded)
-    { psciForeignFiles = foreign
+    { psciForeignFiles = foreigns
     , psciLetBindings = lets
     , psciNodeFlags = nodeFlags
     }
