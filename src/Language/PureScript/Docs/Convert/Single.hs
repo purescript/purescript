@@ -11,6 +11,7 @@ module Language.PureScript.Docs.Convert.Single
 
 import Prelude ()
 import Prelude.Compat
+import Data.Maybe (catMaybes)
 
 import Control.Monad
 import Control.Category ((>>>))
@@ -200,21 +201,22 @@ convertDeclaration _ _ = Nothing
 convertComments :: [P.Comment] -> Maybe String
 convertComments cs = do
   let raw = concatMap toLines cs
-  guard (all hasPipe raw && not (null raw))
-  return (go raw)
-  where
-  go = unlines . map stripPipes
+  let docs = catMaybes (map stripPipe raw)
+  guard (not (null docs))
+  pure (unlines docs)
 
+  where
   toLines (P.LineComment s) = [s]
   toLines (P.BlockComment s) = lines s
 
-  hasPipe s = case dropWhile (== ' ') s of { ('|':_) -> True; _ -> False }
-
-  stripPipes = dropPipe . dropWhile (== ' ')
-
-  dropPipe ('|':' ':s) = s
-  dropPipe ('|':s) = s
-  dropPipe s = s
+  stripPipe s' =
+    case dropWhile (== ' ') s' of
+      ('|':' ':s) ->
+        Just s
+      ('|':s) ->
+        Just s
+      _ ->
+        Nothing
 
 -- | Go through a PureScript module and extract a list of Bookmarks; references
 -- to data types or values, to be used as a kind of index. These are used for
