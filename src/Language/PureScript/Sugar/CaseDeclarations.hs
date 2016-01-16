@@ -150,7 +150,7 @@ toTuple _ = internalError "Not a value declaration"
 makeCaseDeclaration :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
-      argNames = map join $ foldl1 resolveNames namedArgs
+      argNames = foldl1 resolveNames namedArgs
   args <- if allUnique (catMaybes argNames)
             then mapM argName argNames
             else replicateM (length argNames) freshIdent'
@@ -160,14 +160,11 @@ makeCaseDeclaration ident alternatives = do
   return $ ValueDeclaration ident Public [] (Right value)
   where
   -- We will construct a table of potential names.
-  -- VarBinders will become Just (Just _) which is a potential name.
-  -- NullBinder will become Just Nothing, which indicates that we may
+  -- VarBinders will become Just _ which is a potential name.
+  -- Everything else becomes Nothing, which indicates that we
   -- have to generate a name.
-  -- Everything else becomes Nothing, which indicates that we definitely
-  -- have to generate a name.
-  findName :: Binder -> Maybe (Maybe Ident)
-  findName NullBinder = Just Nothing
-  findName (VarBinder name) = Just (Just name)
+  findName :: Binder -> Maybe Ident
+  findName (VarBinder name) = Just name
   findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 
@@ -182,19 +179,13 @@ makeCaseDeclaration ident alternatives = do
 
   -- Combine two lists of potential names from two case alternatives
   -- by zipping correspoding columns.
-  resolveNames :: [Maybe (Maybe Ident)] ->
-                  [Maybe (Maybe Ident)] ->
-                  [Maybe (Maybe Ident)]
+  resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
   resolveNames = zipWith resolveName
 
   -- Resolve a pair of names. VarBinder beats NullBinder, and everything
   -- else results in Nothing.
-  resolveName :: Maybe (Maybe Ident) ->
-                 Maybe (Maybe Ident) ->
-                 Maybe (Maybe Ident)
-  resolveName (Just (Just a)) (Just (Just b))
-    | a == b = Just (Just a)
+  resolveName :: Maybe Ident -> Maybe Ident -> Maybe Ident
+  resolveName (Just a) (Just b)
+    | a == b = Just a
     | otherwise = Nothing
-  resolveName (Just Nothing) a = a
-  resolveName a (Just Nothing) = a
   resolveName _ _ = Nothing
