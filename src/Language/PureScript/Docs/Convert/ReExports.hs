@@ -159,11 +159,19 @@ findImport ::
   (name, P.ModuleName) ->
   m (P.ModuleName, name)
 findImport imps (name, orig) =
-  case filter (\(qual, mn) -> P.disqualify qual == name && mn == orig) imps of
-    [(P.Qualified (Just importedFrom) _, _)] ->
-      pure (importedFrom, name)
-    other ->
-      internalErrorInModule ("findImport: unexpected result: " ++ show other)
+  let
+    matches (qual, mn) = P.disqualify qual == name && mn == orig
+    matching = filter matches imps
+    getQualified (P.Qualified mname _) = mname
+  in
+    case mapMaybe (getQualified . fst) matching of
+      -- A value can occur more than once if it is imported twice (eg, if it is
+      -- exported by A, re-exported from A by B, and C imports it from both A
+      -- and B). In this case, we just take its first appearance.
+      (importedFrom:_) ->
+        pure (importedFrom, name)
+      [] ->
+        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
 lookupValueDeclaration ::
   (Applicative m,
