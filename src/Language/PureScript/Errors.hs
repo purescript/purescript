@@ -124,7 +124,7 @@ data SimpleErrorMessage
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
-  | UnusedExplicitImport ModuleName [String]
+  | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorImport (ProperName 'TypeName)
   | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | DeprecatedOperatorDecl String
@@ -178,6 +178,8 @@ data HintCategory
   deriving (Show, Eq)
 
 data ErrorMessage = ErrorMessage [ErrorMessageHint] SimpleErrorMessage deriving (Show)
+
+newtype ErrorSuggestion = ErrorSuggestion String
 
 -- | Get the source span for an error
 errorSpan :: ErrorMessage -> Maybe SourceSpan
@@ -418,6 +420,40 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
 
 wikiUri :: ErrorMessage -> String
 wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
+
+-- TODO Other possible suggestions:
+-- WildcardInferredType - source span not small enough
+-- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
+-- DeprecatedClassExport, DeprecatedClassImport,  would want to replace smaller span?
+errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
+errorSuggestion err = case err of
+  UnusedImport{} -> emptySuggestion
+  RedundantEmptyHidingImport{} -> emptySuggestion
+  DuplicateImport{} -> emptySuggestion
+  RedundantUnqualifiedImport{} -> emptySuggestion
+  DeprecatedQualifiedSyntax name qualName -> suggest $
+    "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
+  UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
+  ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+  _ -> Nothing
+
+  where
+    emptySuggestion = Just $ ErrorSuggestion ""
+    suggest = Just . ErrorSuggestion
+
+    importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> String
+    importSuggestion mn refs qual =
+      "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")" ++ qstr qual
+
+    qstr :: Maybe ModuleName -> String
+    qstr (Just mn) = " as " ++ runModuleName mn
+    qstr Nothing = ""
+
+showSuggestion :: SimpleErrorMessage -> String
+showSuggestion suggestion = case errorSuggestion suggestion of
+  Just (ErrorSuggestion x) -> x
+  _ -> ""
 
 -- |
 -- Pretty print a single error, simplifying if necessary
@@ -796,9 +832,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (UnusedImport name) =
       line $ "The import of module " ++ runModuleName name ++ " is redundant"
 
-    renderSimpleErrorMessage (UnusedExplicitImport name names) =
-      paras [ line $ "The import of module " ++ runModuleName name ++ " contains the following unused references:"
-            , indent $ paras $ map line names ]
+    renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
+      paras [ line $ "The import of module " ++ runModuleName mn ++ " contains the following unused references:"
+            , indent $ paras $ map line names
+            , line $ "It could be replaced with:"
+            , indent $ line $ showSuggestion msg ]
 
     renderSimpleErrorMessage (UnusedDctorImport name) =
       line $ "The import of type " ++ runProperName name ++ " includes data constructors but only the type is used"
@@ -860,15 +898,15 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (RedundantEmptyHidingImport mn) =
       line $ "The import for module " ++ runModuleName mn ++ " is redundant as all members have been explicitly hidden."
 
-    renderSimpleErrorMessage (ImplicitQualifiedImport importedModule asModule refs) =
+    renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " ++ runModuleName importedModule ++ " was imported as " ++ runModuleName asModule ++ " with unspecified imports."
             , line $ "As there are multiple modules being imported as " ++ runModuleName asModule ++ ", consider using the explicit form:"
-            , indent $ line $ "import " ++ runModuleName importedModule ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ") as " ++ runModuleName asModule
+            , indent $ line $ showSuggestion msg
             ]
 
-    renderSimpleErrorMessage (ImplicitImport mn refs) =
+    renderSimpleErrorMessage msg@(ImplicitImport mn _) =
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the explicit form: "
-            , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            , indent $ line $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage (HidingImport mn refs) =
@@ -1009,30 +1047,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
   paras :: [Box.Box] -> Box.Box
   paras = Box.vcat Box.left
 
-  -- Pretty print and export declaration
-  prettyPrintExport :: DeclarationRef -> String
-  prettyPrintExport (TypeRef pn _) = runProperName pn
-  prettyPrintExport ref = prettyPrintRef ref
-
-  prettyPrintRef :: DeclarationRef -> String
-  prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
-  prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
-  prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
-  prettyPrintRef (ValueRef ident) = showIdent ident
-  prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
-  prettyPrintRef (ProperRef name) = name
-  prettyPrintRef (TypeInstanceRef ident) = showIdent ident
-  prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
-  prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
-
-  prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
-  prettyPrintImport mn idt qual =
-    let i = case idt of
-              Implicit -> runModuleName mn
-              Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
-              Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
-    in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual
-
   -- | Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage
   simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (simplifyHints hints) simple
@@ -1083,6 +1097,30 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
   hintCategory ErrorCheckingKind{}  = CheckHint
   hintCategory PositionedError{}    = PositionHint
   hintCategory _                    = OtherHint
+
+-- Pretty print and export declaration
+prettyPrintExport :: DeclarationRef -> String
+prettyPrintExport (TypeRef pn _) = runProperName pn
+prettyPrintExport ref = prettyPrintRef ref
+
+prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
+prettyPrintImport mn idt qual =
+  let i = case idt of
+            Implicit -> runModuleName mn
+            Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
+  in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual
+
+prettyPrintRef :: DeclarationRef -> String
+prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
+prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
+prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
+prettyPrintRef (ValueRef ident) = showIdent ident
+prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
+prettyPrintRef (ProperRef name) = name
+prettyPrintRef (TypeInstanceRef ident) = showIdent ident
+prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
+prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 
 -- |
 -- Pretty print multiple errors

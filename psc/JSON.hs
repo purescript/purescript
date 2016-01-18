@@ -30,6 +30,8 @@ data ErrorPosition = ErrorPosition
   , endColumn :: Int
   }
 
+data ErrorSuggestion = ErrorSuggestion { replacement :: String }
+
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
   , message :: String
@@ -37,6 +39,7 @@ data JSONError = JSONError
   , errorLink :: String
   , filename :: Maybe String
   , moduleName :: Maybe String
+  , suggestion :: Maybe ErrorSuggestion
   }
 
 data JSONResult = JSONResult
@@ -47,6 +50,8 @@ data JSONResult = JSONResult
 $(A.deriveJSON A.defaultOptions ''ErrorPosition)
 $(A.deriveJSON A.defaultOptions ''JSONError)
 $(A.deriveJSON A.defaultOptions ''JSONResult)
+$(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
+
 
 toJSONErrors :: Bool -> P.Level -> P.MultipleErrors -> [JSONError]
 toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErrors
@@ -59,6 +64,7 @@ toJSONError verbose level e =
             (P.wikiUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
+            (toSuggestion <$> (P.errorSuggestion $ P.unwrapErrorMessage e))
   where
   sspan :: Maybe P.SourceSpan
   sspan = P.errorSpan e
@@ -69,3 +75,6 @@ toJSONError verbose level e =
                   (P.sourcePosColumn (P.spanStart ss))
                   (P.sourcePosLine   (P.spanEnd   ss))
                   (P.sourcePosColumn (P.spanEnd   ss))
+  toSuggestion :: P.ErrorSuggestion -> ErrorSuggestion
+-- TODO: Adding a newline because source spans chomp everything up to the next character
+  toSuggestion (P.ErrorSuggestion s) = ErrorSuggestion $ if null s then s else s ++ "\n"

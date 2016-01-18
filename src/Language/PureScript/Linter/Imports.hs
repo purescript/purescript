@@ -185,10 +185,9 @@ lintImportDecl env mni qualifierName names declType =
     :: (ModuleName -> [DeclarationRef] -> SimpleErrorMessage)
     -> m ()
   checkImplicit warning =
-    let allRefs = findUsedRefs env mni qualifierName names
-    in if null allRefs
-       then unused
-       else tell $ errorMessage $ warning mni allRefs
+    if null allRefs
+    then unused
+    else tell $ errorMessage $ warning mni allRefs
 
   checkExplicit
     :: [DeclarationRef]
@@ -201,7 +200,7 @@ lintImportDecl env mni qualifierName names declType =
     case (length diff, length idents) of
       (0, _) -> return ()
       (n, m) | n == m -> unused
-      _ -> tell $ errorMessage $ UnusedExplicitImport mni diff
+      _ -> tell $ errorMessage $ UnusedExplicitImport mni diff qualifierName allRefs
 
     -- If we've not already warned a type is unused, check its data constructors
     forM_ (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
@@ -217,6 +216,9 @@ lintImportDecl env mni qualifierName names declType =
 
   unused :: m ()
   unused = tell $ errorMessage $ UnusedImport mni
+
+  allRefs :: [DeclarationRef]
+  allRefs = findUsedRefs env mni qualifierName names
 
   dtys
     :: ModuleName
