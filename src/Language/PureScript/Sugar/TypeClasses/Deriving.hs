@@ -17,6 +17,7 @@ import Data.List (foldl', find, sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
+import Control.Arrow (second)
 import Control.Monad (replicateM)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Error.Class (MonadError(..))
@@ -55,11 +56,13 @@ deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration p
 deriveInstance _  _  e = return e
 
 unwrapTypeConstructor :: Type -> Maybe (Qualified (ProperName 'TypeName), [Type])
-unwrapTypeConstructor (TypeConstructor tyCon) = Just (tyCon, [])
-unwrapTypeConstructor (TypeApp ty arg) = do
-  (tyCon, args) <- unwrapTypeConstructor ty
-  return (tyCon, arg : args)
-unwrapTypeConstructor _ = Nothing
+unwrapTypeConstructor = fmap (second reverse) . go
+  where
+  go (TypeConstructor tyCon) = Just (tyCon, [])
+  go (TypeApp ty arg) = do
+    (tyCon, args) <- go ty
+    return (tyCon, arg : args)
+  go _ = Nothing
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
