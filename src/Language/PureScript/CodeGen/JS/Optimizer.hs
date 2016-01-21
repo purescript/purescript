@@ -1,13 +1,5 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleContexts #-}
+
 -- |
 -- This module optimizes code in the simplified-Javascript intermediate representation.
 --
@@ -29,13 +21,7 @@
 --
 --  * Inlining primitive Javascript operators
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-
-module Language.PureScript.CodeGen.JS.Optimizer (
-    optimize
-) where
+module Language.PureScript.CodeGen.JS.Optimizer (optimize) where
 
 import Prelude ()
 import Prelude.Compat
@@ -79,7 +65,9 @@ optimize' js = do
     , inlineVariables
     , inlineValues
     , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
+    , inlineOperator (C.dataFunction, C.apply) $ \f x -> JSApp f [x]
     , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
+    , inlineOperator (C.dataFunction, C.applyFlipped) $ \x f -> JSApp f [x]
     , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip JSIndexer
     , inlineCommonOperators ]) js
 

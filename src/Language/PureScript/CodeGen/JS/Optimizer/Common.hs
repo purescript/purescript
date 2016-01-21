@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Common
--- Copyright   :  (c) Phil Freeman 2013-14
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Common functions used by the various optimizer phases
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
 import Data.Maybe (fromMaybe)
@@ -76,3 +64,18 @@ isUpdated var1 = everythingOnJS (||) check
 removeFromBlock :: ([JS] -> [JS]) -> JS -> JS
 removeFromBlock go (JSBlock sts) = JSBlock (go sts)
 removeFromBlock _  js = js
+
+isFn :: (String, String) -> JS -> Bool
+isFn (moduleName, fnName) (JSAccessor x (JSVar y)) = x == fnName && y == moduleName
+isFn (moduleName, fnName) (JSIndexer (JSStringLiteral x) (JSVar y)) = x == fnName && y == moduleName
+isFn _ _ = False
+
+isFn' :: [(String, String)] -> JS -> Bool
+isFn' xs js = any (`isFn` js) xs
+
+isDict :: (String, String) -> JS -> Bool
+isDict (moduleName, dictName) (JSAccessor x (JSVar y)) = x == dictName && y == moduleName
+isDict _ _ = False
+
+isDict' :: [(String, String)] -> JS -> Bool
+isDict' xs js = any (`isDict` js) xs
