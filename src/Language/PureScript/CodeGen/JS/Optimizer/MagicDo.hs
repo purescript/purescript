@@ -1,29 +1,14 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer.MagicDo
--- Copyright   :  (c) Phil Freeman 2013-14
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- This module implements the "Magic Do" optimization, which inlines calls to return
 -- and bind for the Eff monad, as well as some of its actions.
 --
------------------------------------------------------------------------------
-
-module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (
-  magicDo
-) where
+module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (magicDo) where
 
 import Data.List (nub)
 import Data.Maybe (fromJust, isJust)
 
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Names
+import Language.PureScript.CodeGen.JS.Optimizer.Common
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
 
@@ -54,9 +39,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   fnName = "__do"
   -- Desugar monomorphic calls to >>= and return for the Eff monad
   convert :: JS -> JS
-  -- Desugar return
-  convert (JSApp (JSApp ret [val]) []) | isReturn ret = val
-  -- Desugar pure
+  -- Desugar pure & return
   convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
   -- Desugar >>
   convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind =
@@ -72,33 +55,19 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
     JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn $ JSObjectLiteral []])) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
-  isBind (JSApp bindPoly [effDict]) | isBindPoly bindPoly && isEffDict C.bindEffDictionary effDict = True
+  isBind (JSApp fn [dict]) | isDict (C.eff, C.bindEffDictionary) dict && isBindPoly fn = True
   isBind _ = False
-  -- Check if an expression represents a monomorphic call to return for the Eff monad
-  isReturn (JSApp retPoly [effDict]) | isRetPoly retPoly && isEffDict C.monadEffDictionary effDict = True
-  isReturn _ = False
-  -- Check if an expression represents a monomorphic call to pure for the Eff applicative
-  isPure (JSApp purePoly [effDict]) | isPurePoly purePoly && isEffDict C.applicativeEffDictionary effDict = True
+  -- Check if an expression represents a monomorphic call to pure or return for the Eff applicative
+  isPure (JSApp fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly (JSAccessor prop (JSVar prelude)) = prelude == C.prelude && (prop `elem` map identToJs [Ident C.bind, Op (C.>>=)])
-  isBindPoly (JSIndexer (JSStringLiteral bind) (JSVar prelude)) = prelude == C.prelude && (bind `elem` [C.bind, (C.>>=)])
-  isBindPoly _ = False
-  -- Check if an expression represents the polymorphic return function
-  isRetPoly (JSAccessor returnEscaped (JSVar prelude)) = prelude == C.prelude && returnEscaped == C.returnEscaped
-  isRetPoly (JSIndexer (JSStringLiteral return') (JSVar prelude)) = prelude == C.prelude && return' == C.return
-  isRetPoly _ = False
-  -- Check if an expression represents the polymorphic pure function
-  isPurePoly (JSAccessor pure' (JSVar prelude)) = prelude == C.prelude && pure' == C.pure'
-  isPurePoly (JSIndexer (JSStringLiteral pure') (JSVar prelude)) = prelude == C.prelude && pure' == C.pure'
-  isPurePoly _ = False
-  -- Check if an expression represents a function in the Ef module
+  isBindPoly = isFn' [(C.prelude, C.bind), (C.prelude, (C.>>=)), (C.controlBind, C.bind)]
+  -- Check if an expression represents the polymorphic pure or return function
+  isPurePoly = isFn' [(C.prelude, C.pure'), (C.prelude, C.return), (C.controlApplicative, C.pure')]
+  -- Check if an expression represents a function in the Eff module
   isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
-  -- Check if an expression represents the Monad Eff dictionary
-  isEffDict name (JSVar ident) | ident == name = True
-  isEffDict name (JSAccessor prop (JSVar eff)) = eff == C.eff && prop == name
-  isEffDict _ _ = False
+
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
   undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body

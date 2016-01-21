@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Constants
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Various constants which refer to things in the Prelude
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.Constants where
 
 -- Operators
@@ -20,8 +8,14 @@ module Language.PureScript.Constants where
 ($) :: String
 ($) = "$"
 
+apply :: String
+apply = "apply"
+
 (#) :: String
 (#) = "#"
+
+applyFlipped :: String
+applyFlipped = "applyFlipped"
 
 (<>) :: String
 (<>) = "<>"
@@ -29,50 +23,92 @@ module Language.PureScript.Constants where
 (++) :: String
 (++) = "++"
 
+append :: String
+append = "append"
+
 (>>=) :: String
 (>>=) = ">>="
+
+bind :: String
+bind = "bind"
 
 (+) :: String
 (+) = "+"
 
+add :: String
+add = "add"
+
 (-) :: String
 (-) = "-"
+
+sub :: String
+sub = "sub"
 
 (*) :: String
 (*) = "*"
 
+mul :: String
+mul = "mul"
+
 (/) :: String
 (/) = "/"
+
+div :: String
+div = "div"
 
 (%) :: String
 (%) = "%"
 
+mod :: String
+mod = "mod"
+
 (<) :: String
 (<) = "<"
+
+lessThan :: String
+lessThan = "lessThan"
 
 (>) :: String
 (>) = ">"
 
+greaterThan :: String
+greaterThan = "greaterThan"
+
 (<=) :: String
 (<=) = "<="
+
+lessThanOrEq :: String
+lessThanOrEq = "lessThanOrEq"
 
 (>=) :: String
 (>=) = ">="
 
+greaterThanOrEq :: String
+greaterThanOrEq = "greaterThanOrEq"
+
 (==) :: String
 (==) = "=="
+
+eq :: String
+eq = "eq"
 
 (/=) :: String
 (/=) = "/="
 
+notEq :: String
+notEq = "notEq"
+
 (&&) :: String
 (&&) = "&&"
+
+conj :: String
+conj = "conj"
 
 (||) :: String
 (||) = "||"
 
-bind :: String
-bind = "bind"
+disj :: String
+disj = "disj"
 
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
@@ -92,6 +128,12 @@ unsafeIndex = "unsafeIndex"
 compose :: String
 compose = "compose"
 
+(>>>) :: String
+(>>>) = ">>>"
+
+composeFlipped :: String
+composeFlipped = "composeFlipped"
+
 -- Functions
 
 negate :: String
@@ -99,15 +141,6 @@ negate = "negate"
 
 not :: String
 not = "not"
-
-conj :: String
-conj = "conj"
-
-disj :: String
-disj = "disj"
-
-mod :: String
-mod = "mod"
 
 shl :: String
 shl = "shl"
@@ -211,11 +244,20 @@ moduloSemiringNumber = "moduloSemiringNumber"
 moduloSemiringInt :: String
 moduloSemiringInt = "moduloSemiringInt"
 
+ordBoolean :: String
+ordBoolean = "ordBoolean"
+
 ordNumber :: String
 ordNumber = "ordNumber"
 
 ordInt :: String
 ordInt = "ordInt"
+
+ordString :: String
+ordString = "ordString"
+
+ordChar :: String
+ordChar = "ordChar"
 
 eqNumber :: String
 eqNumber = "eqNumber"
@@ -225,6 +267,9 @@ eqInt = "eqInt"
 
 eqString :: String
 eqString = "eqString"
+
+eqChar :: String
+eqChar = "eqChar"
 
 eqBoolean :: String
 eqBoolean = "eqBoolean"
@@ -284,6 +329,39 @@ eff = "Control_Monad_Eff"
 
 st :: String
 st = "Control_Monad_ST"
+
+controlApplicative :: String
+controlApplicative = "Control_Applicative"
+
+controlSemigroupoid :: String
+controlSemigroupoid = "Control_Semigroupoid"
+
+controlBind :: String
+controlBind = "Control_Bind"
+
+dataBounded :: String
+dataBounded = "Data_Bounded"
+
+dataSemigroup :: String
+dataSemigroup = "Data_Semigroup"
+
+dataModuloSemiring :: String
+dataModuloSemiring = "Data_ModuloSemiring"
+
+dataBooleanAlgebra :: String
+dataBooleanAlgebra = "Data_BooleanAlgebra"
+
+dataEq :: String
+dataEq = "Data_Eq"
+
+dataOrd :: String
+dataOrd = "Data_Ord"
+
+dataSemiring :: String
+dataSemiring = "Data_Semiring"
+
+dataRing :: String
+dataRing = "Data_Ring"
 
 dataFunction :: String
 dataFunction = "Data_Function"
