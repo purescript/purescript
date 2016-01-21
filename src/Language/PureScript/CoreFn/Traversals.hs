@@ -40,6 +40,7 @@ everywhereOnValues f g h = (f', g', h')
 
   h' (LiteralBinder a b) = h (LiteralBinder a (handleLiteral h' b))
   h' (NamedBinder a name b) = h (NamedBinder a name (h' b))
+  h' (ConstructorBinder a q1 q2 bs) = h (ConstructorBinder a q1 q2 (map h' bs))
   h' b = h b
 
   handleCaseAlternative ca =
