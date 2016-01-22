@@ -14,7 +14,7 @@ import Prelude.Compat
 
 import Data.Foldable (traverse_)
 import Data.Maybe (mapMaybe)
-import Data.List (intersperse, intercalate, nub, sort)
+import Data.List (intersperse, intercalate, nub, sort, find)
 import Data.Tuple (swap)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -486,9 +486,22 @@ handleBrowse moduleName = do
   case env of
     Left errs -> printErrors errs
     Right env' ->
-      if moduleName `notElem` (nub . map ((\ (P.Module _ _ modName _ _ ) -> modName) . snd)) (psciLoadedModules st)
-        then PSCI $ outputStrLn $ "Module '" ++ N.runModuleName moduleName ++ "' is not valid."
-        else printModuleSignatures moduleName env'
+      if isModInEnv moduleName st
+        then printModuleSignatures moduleName env'
+        else case lookupUnQualifiedModName moduleName st of
+          Just unQualifiedName ->
+            if isModInEnv unQualifiedName st
+              then printModuleSignatures unQualifiedName env'
+              else failNotInEnv moduleName
+          Nothing ->
+            failNotInEnv moduleName
+  where
+    isModInEnv modName =
+        any ((== modName) . P.getModuleName . snd) . psciLoadedModules
+    failNotInEnv modName =
+        PSCI $ outputStrLn $ "Module '" ++ N.runModuleName modName ++ "' is not valid."
+    lookupUnQualifiedModName quaModName st =
+        (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
 
 -- | Pretty-print errors
 printErrors :: P.MultipleErrors -> PSCI ()
