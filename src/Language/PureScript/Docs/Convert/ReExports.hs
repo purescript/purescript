@@ -13,6 +13,8 @@ import Prelude.Compat
 import Control.Monad
 import Control.Monad.Trans.State.Strict (execState)
 import Control.Monad.State.Class (MonadState, gets, modify)
+import Control.Monad.Trans.Reader (runReaderT)
+import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Arrow ((&&&), first, second)
 import Data.Either
 import Data.Maybe (mapMaybe)
@@ -76,9 +78,12 @@ getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
       internalError ("Module missing: " ++ P.runModuleName mn)
-    Just (_, imports, exports) ->
-      let notLocal = (/= mn) . fst
-      in filter notLocal <$> collectDeclarations imports exports
+    Just (_, imports, exports) -> do
+      allExports <- runReaderT (collectDeclarations imports exports) mn
+      pure (filter notLocal allExports)
+
+  where
+  notLocal = (/= mn) . fst
 
 -- |
 -- Assemble a list of declarations re-exported from a particular module, based
@@ -100,7 +105,9 @@ getReExports env mn =
 --      class members are listed.
 --
 collectDeclarations ::
-  (Functor m, Applicative m, MonadState (Map P.ModuleName Module) m) =>
+  (Functor m, Applicative m,
+  MonadState (Map P.ModuleName Module) m,
+  MonadReader P.ModuleName m) =>
   P.Imports ->
   P.Exports ->
   m [(P.ModuleName, [Declaration])]
@@ -109,7 +116,7 @@ collectDeclarations imports exports = do
   typeClasses    <- collect lookupTypeClassDeclaration impTCs   expTCs
   types          <- collect lookupTypeDeclaration      impTypes expTypes
 
-  let (vals, classes) = handleTypeClassMembers valsAndMembers typeClasses
+  (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
   let filteredClasses = filterTypeClassMembers (map fst expVals) classes
@@ -117,9 +124,9 @@ collectDeclarations imports exports = do
   pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals]))
 
   where
-  collect lookup' imps exps =
-    Map.fromListWith (<>) <$> traverse (uncurry lookup')
-                                       (map (findImport imps) exps)
+  collect lookup' imps exps = do
+    imps' <- traverse (findImport imps) exps
+    Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
 
   expVals = P.exportedValues exports
   impVals = concat (Map.elems (P.importedValues imports))
@@ -147,19 +154,29 @@ collectDeclarations imports exports = do
 -- instantiate @name@ as both 'P.Ident' and 'P.ProperName'.
 --
 findImport ::
-  (Show name, Eq name) =>
+  (Show name, Eq name, Applicative m, MonadReader P.ModuleName m) =>
   [(P.Qualified name, P.ModuleName)] ->
   (name, P.ModuleName) ->
-  (P.ModuleName, name)
+  m (P.ModuleName, name)
 findImport imps (name, orig) =
-  case filter (\(qual, mn) -> P.disqualify qual == name && mn == orig) imps of
-    [(P.Qualified (Just importedFrom) _, _)] ->
-      (importedFrom, name)
-    other ->
-      internalError ("findImport: unexpected result: " ++ show other)
+  let
+    matches (qual, mn) = P.disqualify qual == name && mn == orig
+    matching = filter matches imps
+    getQualified (P.Qualified mname _) = mname
+  in
+    case mapMaybe (getQualified . fst) matching of
+      -- A value can occur more than once if it is imported twice (eg, if it is
+      -- exported by A, re-exported from A by B, and C imports it from both A
+      -- and B). In this case, we just take its first appearance.
+      (importedFrom:_) ->
+        pure (importedFrom, name)
+      [] ->
+        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
 lookupValueDeclaration ::
-  (MonadState (Map P.ModuleName Module) m, Applicative m) =>
+  (Applicative m,
+  MonadState (Map P.ModuleName Module) m,
+  MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
   m (P.ModuleName, [Either (String, P.Constraint, ChildDeclaration) Declaration])
@@ -170,7 +187,7 @@ lookupValueDeclaration importedFrom ident = do
       filter (\d -> declTitle d == P.showIdent ident
                     && (isValue d || isAlias d)) decls
     errOther other =
-      internalError
+      internalErrorInModule
         ("lookupValueDeclaration: unexpected result:\n" ++
           "other: " ++ show other ++ "\n" ++
           "ident: " ++ show ident ++ "\n" ++
@@ -216,7 +233,9 @@ lookupValueDeclaration importedFrom ident = do
 -- are only included in the output if they are listed in the arguments.
 --
 lookupTypeDeclaration ::
-  (MonadState (Map P.ModuleName Module) m, Applicative m) =>
+  (Applicative m,
+  MonadState (Map P.ModuleName Module) m,
+  MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.ProperName 'P.TypeName ->
   m (P.ModuleName, [Declaration])
@@ -228,11 +247,13 @@ lookupTypeDeclaration importedFrom ty = do
     [d] ->
       pure (importedFrom, [d])
     other ->
-      internalError
+      internalErrorInModule
         ("lookupTypeDeclaration: unexpected result: " ++ show other)
 
 lookupTypeClassDeclaration ::
-  (MonadState (Map P.ModuleName Module) m, Applicative m) =>
+  (Applicative m,
+  MonadState (Map P.ModuleName Module) m,
+  MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.ProperName 'P.ClassName ->
   m (P.ModuleName, [Declaration])
@@ -246,15 +267,18 @@ lookupTypeClassDeclaration importedFrom tyClass = do
     [d] ->
       pure (importedFrom, [d])
     other ->
-      internalError ("lookupTypeClassDeclaration: unexpected result: "
-                    ++ (unlines . map show) other)
+      internalErrorInModule
+        ("lookupTypeClassDeclaration: unexpected result: "
+         ++ (unlines . map show) other)
 
 -- |
 -- Get the full list of declarations for a particular module out of the
 -- state, or raise an internal error if it is not there.
 --
 lookupModuleDeclarations ::
-  (Applicative m, MonadState (Map P.ModuleName Module) m) =>
+  (Applicative m,
+  MonadState (Map P.ModuleName Module) m,
+  MonadReader P.ModuleName m) =>
   String ->
   P.ModuleName ->
   m [Declaration]
@@ -262,15 +286,18 @@ lookupModuleDeclarations definedIn moduleName = do
   mmdl <- gets (Map.lookup moduleName)
   case mmdl of
     Nothing ->
-      internalError (definedIn ++ ": module missing: "
-                    ++ P.runModuleName moduleName)
+      internalErrorInModule
+        (definedIn ++ ": module missing: "
+         ++ P.runModuleName moduleName)
     Just mdl ->
       pure (allDeclarations mdl)
 
 handleTypeClassMembers ::
+  (Functor m, Applicative m,
+  MonadReader P.ModuleName m) =>
   Map P.ModuleName [Either (String, P.Constraint, ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
-  (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
+  m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
   let
     moduleEnvs =
@@ -279,8 +306,8 @@ handleTypeClassMembers valsAndMembers typeClasses =
         (fmap typeClassesToEnv typeClasses)
   in
     moduleEnvs
-      |> fmap handleEnv
-      |> splitMap
+      |> traverse handleEnv
+      |> fmap splitMap
 
 valsAndMembersToEnv ::
   [Either (String, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
@@ -336,11 +363,15 @@ instance Monoid TypeClassEnv where
 --
 -- Returns a tuple of (values, type classes).
 --
-handleEnv :: TypeClassEnv -> ([Declaration], [Declaration])
+handleEnv ::
+  (Functor m, Applicative m,
+  MonadReader P.ModuleName m) =>
+  TypeClassEnv ->
+  m ([Declaration], [Declaration])
 handleEnv TypeClassEnv{..} =
   envUnhandledMembers
-    |> foldl go (envValues, mkMap envTypeClasses)
-    |> second Map.elems
+    |> foldM go (envValues, mkMap envTypeClasses)
+    |> fmap (second Map.elems)
 
   where
   mkMap =
@@ -351,14 +382,15 @@ handleEnv TypeClassEnv{..} =
       Just _ ->
         -- Leave the state unchanged; if the type class is there, the child
         -- will be too.
-        (values, tcs)
-      Nothing ->
-        (promoteChild constraint childDecl : values, tcs)
+        pure (values, tcs)
+      Nothing -> do
+        c <- promoteChild constraint childDecl
+        pure (c : values, tcs)
 
   promoteChild constraint ChildDeclaration{..} =
     case cdeclInfo of
       ChildTypeClassMember typ ->
-        Declaration
+        pure $ Declaration
           { declTitle      = cdeclTitle
           , declComments   = cdeclComments
           , declSourceSpan = cdeclSourceSpan
@@ -367,7 +399,7 @@ handleEnv TypeClassEnv{..} =
           , declInfo       = ValueDeclaration (addConstraint constraint typ)
           }
       _ ->
-        internalError
+        internalErrorInModule
           ("handleEnv: Bad child declaration passed to promoteChild: "
           ++ cdeclTitle)
 
@@ -428,6 +460,16 @@ x |> f = f x
 
 internalError :: String -> a
 internalError = P.internalError . ("Docs.Convert.ReExports: " ++)
+
+internalErrorInModule ::
+  (MonadReader P.ModuleName m) =>
+  String ->
+  m a
+internalErrorInModule msg = do
+  mn <- ask
+  internalError
+    ("while collecting re-exports for module: " ++ P.runModuleName mn ++
+     ", " ++ msg)
 
 -- |
 -- If the provided Declaration is a TypeClassDeclaration, construct an
