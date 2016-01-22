@@ -23,7 +23,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (nub)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -54,22 +54,24 @@ sortModules ms = do
 -- Calculate a list of used modules based on explicit imports and qualified names
 --
 usedModules :: Declaration -> [ModuleName]
-usedModules = let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const []) in nub . f
+usedModules d =
+  let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const [])
+      (g, _, _, _, _) = accumTypes (everythingOnTypes (++) forTypes)
+  in nub (f d ++ g d)
   where
   forDecls :: Declaration -> [ModuleName]
   forDecls (ImportDeclaration mn _ _ _) = [mn]
   forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _))) = [mn]
+  forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
   forDecls _ = []
 
   forValues :: Expr -> [ModuleName]
   forValues (Var (Qualified (Just mn) _)) = [mn]
   forValues (Constructor (Qualified (Just mn) _)) = [mn]
-  forValues (TypedValue _ _ ty) = forTypes ty
   forValues _ = []
 
   forTypes :: Type -> [ModuleName]
   forTypes (TypeConstructor (Qualified (Just mn) _)) = [mn]
-  forTypes (ConstrainedType cs _) = mapMaybe (\(Qualified mn _, _) -> mn) cs
   forTypes _ = []
 
 -- |
