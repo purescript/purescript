@@ -185,10 +185,15 @@ parsePositionedToken = P.try $ do
 parseToken :: P.Parsec String u Token
 parseToken = P.choice
   [ P.try $ P.string "<-" *> P.notFollowedBy symbolChar *> pure LArrow
+  , P.try $ P.string "←"  *> P.notFollowedBy symbolChar *> pure LArrow
   , P.try $ P.string "<=" *> P.notFollowedBy symbolChar *> pure LFatArrow
+  , P.try $ P.string "⇐"  *> P.notFollowedBy symbolChar *> pure LFatArrow
   , P.try $ P.string "->" *> P.notFollowedBy symbolChar *> pure RArrow
+  , P.try $ P.string "→"  *> P.notFollowedBy symbolChar *> pure RArrow
   , P.try $ P.string "=>" *> P.notFollowedBy symbolChar *> pure RFatArrow
+  , P.try $ P.string "⇒"  *> P.notFollowedBy symbolChar *> pure RFatArrow
   , P.try $ P.string "::" *> P.notFollowedBy symbolChar *> pure DoubleColon
+  , P.try $ P.string "∷"  *> P.notFollowedBy symbolChar *> pure DoubleColon
   , P.try $ P.char '('    *> pure LParen
   , P.try $ P.char ')'    *> pure RParen
   , P.try $ P.char '{'    *> pure LBrace
@@ -411,6 +416,7 @@ reserved :: String -> TokenParser ()
 reserved s = token go P.<?> show s
   where
   go (LName s') | s == s' = Just ()
+  go (Symbol s') | s == s' = Just ()
   go _ = Nothing
 
 uname :: TokenParser String
