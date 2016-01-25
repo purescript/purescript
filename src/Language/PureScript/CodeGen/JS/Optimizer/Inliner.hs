@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   ( inlineVariables
-  , inlineValues
+  , inlineCommonValues
   , inlineOperator
   , inlineCommonOperators
   , inlineFnComposition
@@ -77,8 +77,8 @@ inlineVariables = everywhereOnJS $ removeFromBlock go
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
-inlineValues :: JS -> JS
-inlineValues = everywhereOnJS convert
+inlineCommonValues :: JS -> JS
+inlineCommonValues = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp fn [dict])
