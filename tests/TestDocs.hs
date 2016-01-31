@@ -226,6 +226,15 @@ testCases =
   , ("NewOperators",
       [ ShouldBeDocumented (n "NewOperators2") "(>>>)" []
       ])
+
+  , ("InferredTypes",
+      [ ShouldBeDocumented (n "InferredTypes") "foo" []
+      , ShouldBeDocumented (n "InferredTypes") "bar" []
+      ])
+
+  , ("ToplevelCase",
+      [ ShouldBeDocumented (n "ToplevelCase") "foo" []
+      ])
   ]
 
   where
