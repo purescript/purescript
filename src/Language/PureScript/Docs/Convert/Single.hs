@@ -109,7 +109,7 @@ addDefaultFixity decl@Declaration{..}
   defaultFixity = P.Fixity P.Infixl (-1)
 
 getDeclarationTitle :: P.Declaration -> Maybe String
-getDeclarationTitle (P.TypeDeclaration name _)               = Just (P.showIdent name)
+getDeclarationTitle (P.ValueDeclaration name _ _ _)          = Just (P.showIdent name)
 getDeclarationTitle (P.ExternDeclaration name _)             = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (P.runProperName name)
@@ -135,10 +135,10 @@ basicDeclaration :: String -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration title info = Just $ Right $ mkDeclaration title info
 
 convertDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
-convertDeclaration (P.TypeDeclaration _ ty) title =
+convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
   basicDeclaration title (ValueDeclaration ty)
-convertDeclaration (P.ExternDeclaration _ ty) title =
-  basicDeclaration title (ValueDeclaration ty)
+convertDeclaration (P.ValueDeclaration _ _ _ _) title =
+  P.internalError ("Should have been desugared: " ++ title)
 convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where

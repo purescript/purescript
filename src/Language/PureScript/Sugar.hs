@@ -14,8 +14,9 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 
-module Language.PureScript.Sugar (desugar, module S) where
+module Language.PureScript.Sugar (desugar, desugarWithEnv, module S) where
 
 import Prelude ()
 import Prelude.Compat
@@ -65,14 +66,25 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 desugar :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 desugar externs =
+  fmap snd . desugarWithEnv externs
+
+-- |
+-- A variant of `desugar` which also returns the imports/exports Env.
+--
+desugarWithEnv :: (Applicative m, MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m (Env, [Module])
+desugarWithEnv externs =
   map removeSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarOperatorSections
     >=> traverse desugarDoModule
     >=> desugarCasesModule
     >=> desugarTypeDeclarationsModule
-    >=> desugarImports externs
-    >=> rebracket externs
-    >=> traverse deriveInstances
-    >=> desugarTypeClasses externs
-    >=> createBindingGroupsModule
+    >=> desugarImportsWithEnv externs
+    >=> withSecond
+        (   rebracket externs
+        >=> traverse deriveInstances
+        >=> desugarTypeClasses externs
+        >=> createBindingGroupsModule
+        )
+  where
+  withSecond f (x, y) = (x,) <$> f y
