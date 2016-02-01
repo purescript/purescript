@@ -139,6 +139,8 @@ convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) titl
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration (P.ValueDeclaration _ _ _ _) title =
   P.internalError ("Should have been desugared: " ++ title)
+convertDeclaration (P.ExternDeclaration _ ty) title =
+  basicDeclaration title (ValueDeclaration ty)
 convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where

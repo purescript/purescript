@@ -235,6 +235,10 @@ testCases =
   , ("ToplevelCase",
       [ ShouldBeDocumented (n "ToplevelCase") "foo" []
       ])
+
+  , ("ForeignImports",
+      [ ShouldBeDocumented (n "ForeignImports") "unsafeCoerce" []
+      ])
   ]
 
   where
