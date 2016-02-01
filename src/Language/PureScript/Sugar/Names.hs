@@ -17,6 +17,7 @@ import Prelude.Compat
 import Data.List (find, nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 
+import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)
@@ -54,7 +55,7 @@ desugarImportsWithEnv
 desugarImportsWithEnv externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
   modules' <- traverse updateExportRefs modules
-  (modules'', env') <- foldM updateEnv ([], env) modules'
+  (modules'', env') <- first reverse <$> foldM updateEnv ([], env) modules'
   (env',) <$> traverse (renameInModule' env') modules''
   where
   silence :: m a -> m a

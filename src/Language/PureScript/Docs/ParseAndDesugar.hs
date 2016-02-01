@@ -10,9 +10,11 @@ import Prelude.Compat
 
 import qualified Data.Map as M
 import Control.Arrow (first)
+import Control.Category ((>>>))
 import Control.Monad
 
 import Control.Monad.Writer.Strict (runWriterT)
+import Control.Monad.State (evalStateT)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 
@@ -35,8 +37,7 @@ import Language.PureScript.Docs.Convert (collectBookmarks)
 --    * Parse all of the input and dependency source files
 --    * Associate each dependency module with its package name, thereby
 --      distinguishing these from local modules
---    * Partially desugar all of the resulting modules (just enough for
---      producing documentation from them)
+--    * Desugar and typecheck all of the resulting modules
 --    * Collect a list of bookmarks from the whole set of source files
 --    * Return the desugared modules, the bookmarks, and the imports/exports
 --      Env (which is needed for producing documentation).
@@ -91,9 +92,10 @@ throwLeft = either throwError return
 --
 -- 1) with the `Local` constructor, a target source file, i.e., we want to see
 --    its modules in the output
--- 2) with the `FromDep` constructor, a dependencies source file, i.e. we do
---    not want its modules in the output; it is there to enable desugaring, and
---    to ensure that links between modules are constructed correctly.
+-- 2) with the `FromDep` constructor, a dependencies source file, i.e. we might
+--    not want its modules in the output, but in either case, it is needed to
+--    enable desugaring, and to ensure that links between modules are
+--    constructed correctly.
 type FileInfo = InPackage FilePath
 
 fileInfoToString :: FileInfo -> FilePath
@@ -107,14 +109,15 @@ desugar ::
   (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
   [P.Module]
   -> m (P.Env, [P.Module])
-desugar = P.evalSupplyT 0 . desugar'
+desugar =
+  (P.desugarWithEnv [] >=> typeCheck)
+   >>> P.evalSupplyT 0
+   >>> ignoreWarnings
   where
-  desugar' =
-    traverse P.desugarDoModule
-      >=> P.desugarCasesModule
-      >=> ignoreWarnings . P.desugarImportsWithEnv []
-
-  ignoreWarnings m = liftM fst (runWriterT m)
+  ignoreWarnings = fmap fst . runWriterT
+  typeCheck (env, ms) =
+    (env,) <$> evalStateT (traverse P.typeCheckModule ms)
+                          (P.emptyCheckState P.initEnvironment)
 
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input' = (,) input' <$> readFile input'
