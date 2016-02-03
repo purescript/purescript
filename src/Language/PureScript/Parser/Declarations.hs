@@ -312,18 +312,17 @@ parseArrayLiteral :: TokenParser Expr
 parseArrayLiteral = ArrayLiteral <$> squares (commaSep parseValue)
 
 parseObjectLiteral :: TokenParser Expr
-parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
+parseObjectLiteral = ObjectLiteral <$> braces (commaSep parseIdentifierAndValue)
 
-parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
+parseIdentifierAndValue :: TokenParser (String, Expr)
 parseIdentifierAndValue =
   do
     name <- C.indented *> lname
-    b <- P.option (Just $ Var $ Qualified Nothing (Ident name)) rest
+    b <- P.option (Var $ Qualified Nothing (Ident name)) rest
     return (name, b)
   <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
-  rest = C.indented *> colon *> C.indented *> val
-  val = P.try (Just <$> parseValue) <|> (underscore *> pure Nothing)
+  rest = C.indented *> colon *> C.indented *> parseValue
 
 parseAbs :: TokenParser Expr
 parseAbs = do
@@ -373,13 +372,13 @@ parseLet = do
 
 parseValueAtom :: TokenParser Expr
 parseValueAtom = P.choice
-                 [ parseNumericLiteral
+                 [ parseAnonymousArgument
+                 , parseNumericLiteral
                  , parseCharLiteral
                  , parseStringLiteral
                  , parseBooleanLiteral
                  , parseArrayLiteral
                  , P.try parseObjectLiteral
-                 , P.try parseObjectGetter
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -387,10 +386,8 @@ parseValueAtom = P.choice
                  , parseIfThenElse
                  , parseDo
                  , parseLet
-                 , P.try $ Parens <$> parens parseValue
+                 , P.try $ parens parseValue
                  , parseOperatorSection
-                 -- TODO: combine this with parseObjectGetter
-                 , parseObjectUpdaterWildcard
                  ]
 
 -- |
@@ -406,11 +403,11 @@ parseOperatorSection = parens $ left <|> right
   right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
   left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
-parsePropertyUpdate :: TokenParser (String, Maybe Expr)
+parsePropertyUpdate :: TokenParser (String, Expr)
 parsePropertyUpdate = do
   name <- lname <|> stringLiteral
   _ <- C.indented *> equals
-  value <- C.indented *> (underscore *> pure Nothing) <|> (Just <$> parseValue)
+  value <- C.indented *> parseValue
   return (name, value)
 
 parseAccessor :: Expr -> TokenParser Expr
@@ -436,15 +433,12 @@ parseDoNotationElement = P.choice
             , DoNotationValue <$> parseValue
             ]
 
-parseObjectGetter :: TokenParser Expr
-parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
-
 -- | Expressions including indexers and record updates
 indexersAndAccessors :: TokenParser Expr
 indexersAndAccessors = C.buildPostfixParser postfixTable parseValueAtom
   where
   postfixTable = [ parseAccessor
-                 , P.try . parseUpdaterBody . Just
+                 , P.try . parseUpdaterBody
                  ]
 
 -- |
@@ -466,11 +460,11 @@ parseValue = withSourceSpan PositionedValue
                 ]
               ]
 
-parseUpdaterBody :: Maybe Expr -> TokenParser Expr
-parseUpdaterBody v = ObjectUpdater v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
+parseUpdaterBody :: Expr -> TokenParser Expr
+parseUpdaterBody v = ObjectUpdate v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
 
-parseObjectUpdaterWildcard :: TokenParser Expr
-parseObjectUpdaterWildcard = underscore *> C.indented *> parseUpdaterBody Nothing
+parseAnonymousArgument :: TokenParser Expr
+parseAnonymousArgument = underscore *> pure AnonymousArgument
 
 parseStringBinder :: TokenParser Binder
 parseStringBinder = StringBinder <$> stringLiteral

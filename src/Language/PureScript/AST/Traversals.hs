@@ -23,7 +23,7 @@ import Data.Foldable (fold)
 import qualified Data.Set as S
 
 import Control.Monad
-import Control.Arrow ((***), (+++), second)
+import Control.Arrow ((***), (+++))
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
@@ -49,16 +49,13 @@ everywhereOnValues f g h = (f', g', h')
   g' :: Expr -> Expr
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens (g' op) (g' v1) (g' v2))
-  g' (Parens v) = g (Parens (g' v))
   g' (OperatorSection op (Left v)) = g (OperatorSection (g' op) (Left $ g' v))
   g' (OperatorSection op (Right v)) = g (OperatorSection (g' op) (Right $ g' v))
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
   g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
-  g' (ObjectConstructor vs) = g (ObjectConstructor (map (second (fmap g')) vs))
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
-  g' (ObjectUpdater obj vs) = g (ObjectUpdater (fmap g' obj) (map (second (fmap g')) vs))
   g' (Abs name v) = g (Abs name (g' v))
   g' (App v1 v2) = g (App (g' v1) (g' v2))
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
@@ -107,16 +104,13 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
-  g' (Parens v) = Parens <$> (g v >>= g')
   g' (OperatorSection op (Left v)) = OperatorSection <$> (g op >>= g') <*> (Left <$> (g v >>= g'))
   g' (OperatorSection op (Right v)) = OperatorSection <$> (g op >>= g') <*> (Right <$> (g v >>= g'))
   g' (ArrayLiteral vs) = ArrayLiteral <$> traverse (g' <=< g) vs
   g' (ObjectLiteral vs) = ObjectLiteral <$> traverse (sndM (g' <=< g)) vs
-  g' (ObjectConstructor vs) = ObjectConstructor <$> traverse (sndM $ maybeM (g' <=< g)) vs
   g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
-  g' (ObjectUpdater obj vs) = ObjectUpdater <$> (maybeM g obj >>= maybeM g') <*> traverse (sndM $ maybeM (g' <=< g)) vs
   g' (Abs name v) = Abs name <$> (g v >>= g')
   g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
@@ -160,16 +154,13 @@ everywhereOnValuesM f g h = (f', g', h')
 
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens <$> g' op <*> g' v1 <*> g' v2) >>= g
-  g' (Parens v) = (Parens <$> g' v) >>= g
   g' (OperatorSection op (Left v)) = (OperatorSection <$> g' op <*> (Left <$> g' v)) >>= g
   g' (OperatorSection op (Right v)) = (OperatorSection <$> g' op <*> (Right <$> g' v)) >>= g
   g' (ArrayLiteral vs) = (ArrayLiteral <$> traverse g' vs) >>= g
   g' (ObjectLiteral vs) = (ObjectLiteral <$> traverse (sndM g') vs) >>= g
-  g' (ObjectConstructor vs) = (ObjectConstructor <$> traverse (sndM $ maybeM g') vs) >>= g
   g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
-  g' (ObjectUpdater obj vs) = (ObjectUpdater <$> maybeM g' obj <*> traverse (sndM $ maybeM g') vs) >>= g
   g' (Abs name v) = (Abs name <$> g' v) >>= g
   g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
@@ -216,16 +207,13 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
 
   g' v@(UnaryMinus v1) = g v <> g' v1
   g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
-  g' v@(Parens v1) = g v <> g' v1
   g' v@(OperatorSection op (Left v1)) = g v <> g' op <> g' v1
   g' v@(OperatorSection op (Right v1)) = g v <> g' op <> g' v1
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
   g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
-  g' v@(ObjectConstructor vs) = foldl (<>) (g v) (map g' (mapMaybe snd vs))
   g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
-  g' v@(ObjectUpdater obj vs) = foldl (<>) (maybe (g v) (\x -> g v <> g' x) obj) (map g' (mapMaybe snd vs))
   g' v@(Abs _ v1) = g v <> g' v1
   g' v@(App v1 v2) = g v <> g' v1 <> g' v2
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
@@ -283,16 +271,13 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
-  g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
   g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
-  g' s (ObjectConstructor vs) = foldl (<>) r0 (map (g'' s) (mapMaybe snd vs))
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
-  g' s (ObjectUpdater obj vs) = foldl (<>) (maybe r0 (g'' s) obj) (map (g'' s) (mapMaybe snd vs))
   g' s (Abs _ v1) = g'' s v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
@@ -353,16 +338,13 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens <$> g'' s op <*> g'' s v1 <*> g'' s v2
-  g' s (Parens v) = Parens <$> g'' s v
   g' s (OperatorSection op (Left v)) = OperatorSection <$> g'' s op <*> (Left <$> g'' s v)
   g' s (OperatorSection op (Right v)) = OperatorSection <$> g'' s op <*> (Right <$> g'' s v)
   g' s (ArrayLiteral vs) = ArrayLiteral <$> traverse (g'' s) vs
   g' s (ObjectLiteral vs) = ObjectLiteral <$> traverse (sndM (g'' s)) vs
-  g' s (ObjectConstructor vs) = ObjectConstructor <$> traverse (sndM $ maybeM (g'' s)) vs
   g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
-  g' s (ObjectUpdater obj vs) = ObjectUpdater <$> maybeM (g'' s) obj <*> traverse (sndM $ maybeM (g'' s)) vs
   g' s (Abs name v) = Abs name <$> g'' s v
   g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
@@ -435,16 +417,13 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
 
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g' s op <> g' s v1 <> g' s v2
-  g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (ArrayLiteral vs) = foldMap (g'' s) vs
   g' s (ObjectLiteral vs) = foldMap (g'' s . snd) vs
-  g' s (ObjectConstructor vs) = foldMap (g'' s) (mapMaybe snd vs)
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
-  g' s (ObjectUpdater obj vs) = foldMap (g'' s) obj <> foldMap (g'' s) (mapMaybe snd vs)
   g' s (Abs (Left name) v1) =
     let s' = S.insert name s
     in g'' s' v1

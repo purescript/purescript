@@ -142,6 +142,7 @@ data SimpleErrorMessage
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
+  | IncorrectAnonymousArgument
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -317,6 +318,7 @@ errorCode em = case unwrapErrorMessage em of
   ImplicitImport{} -> "ImplicitImport"
   HidingImport{} -> "HidingImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
+  IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
 
 -- |
 -- A stack trace for an error
@@ -798,7 +800,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " ++ runProperName name ++ "(..) from " ++ runModuleName mn ++ " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
-      paras [ line $ "'hiding' imports cannot be used to hide modules."
+      paras [ line "'hiding' imports cannot be used to hide modules."
             , line $ "An attempt was made to hide the import of " ++ runModuleName name
             ]
     renderSimpleErrorMessage (WildcardInferredType ty) =
@@ -812,14 +814,14 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (NotExhaustivePattern bs b) =
-      paras $ [ line "A case expression could not be determined to cover all inputs."
-              , line "The following additional cases are required to cover all inputs:\n"
-              , indent $ paras $
-                  [ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs)) ]
-                  ++ [ line "..." | not b ]
-              , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
-              , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
-              ]
+      paras [ line "A case expression could not be determined to cover all inputs."
+            , line "The following additional cases are required to cover all inputs:\n"
+            , indent $ paras $
+                [ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs)) ]
+                ++ [ line "..." | not b ]
+            , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
+            , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
+            ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
@@ -835,7 +837,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " ++ runModuleName mn ++ " contains the following unused references:"
             , indent $ paras $ map line names
-            , line $ "It could be replaced with:"
+            , line "It could be replaced with:"
             , indent $ line $ showSuggestion msg ]
 
     renderSimpleErrorMessage (UnusedDctorImport name) =
@@ -849,15 +851,15 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "The operator (" ++ name ++ ") was declared as a value rather than an alias for a named function."
             , line "Operator aliases are declared by using a fixity declaration, for example:"
             , indent $ line $ "infixl 9 someFunction as " ++ name
-            , line $ "Support for value-declared operators will be removed in PureScript 0.9."
+            , line "Support for value-declared operators will be removed in PureScript 0.9."
             ]
 
     renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
-      paras [ line $ "Import uses the deprecated 'qualified' syntax:"
+      paras [ line "Import uses the deprecated 'qualified' syntax:"
             , indent $ line $ "import qualified " ++ runModuleName name ++ " as " ++ runModuleName qualName
             , line "Should instead use the form:"
             , indent $ line $ "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
-            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            , line "The deprecated syntax will be removed in PureScript 0.9."
             ]
 
     renderSimpleErrorMessage (DeprecatedClassImport mn name) =
@@ -865,15 +867,15 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ line $ runProperName name
             , line "Should instead use the form:"
             , indent $ line $ "class " ++ runProperName name
-            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            , line "The deprecated syntax will be removed in PureScript 0.9."
             ]
 
     renderSimpleErrorMessage (DeprecatedClassExport name) =
-      paras [ line $ "Class export uses deprecated syntax that omits the 'class' keyword:"
+      paras [ line "Class export uses deprecated syntax that omits the 'class' keyword:"
             , indent $ line $ runProperName name
             , line "Should instead use the form:"
             , indent $ line $ "class " ++ runProperName name
-            , line $ "The deprecated syntax will be removed in PureScript 0.9."
+            , line "The deprecated syntax will be removed in PureScript 0.9."
             ]
 
     renderSimpleErrorMessage (RedundantUnqualifiedImport name imp) =
@@ -915,9 +917,13 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
-      paras $ [ line $ "Binder list length differs in case alternative:"
-              , indent $ line $ intercalate ", " $ fmap prettyPrintBinderAtom bs
-              , line $ "Expecting " ++ show l ++ " binder" ++ (if l == 1 then "" else "s") ++ "." ]
+      paras [ line "Binder list length differs in case alternative:"
+            , indent $ line $ intercalate ", " $ fmap prettyPrintBinderAtom bs
+            , line $ "Expecting " ++ show l ++ " binder" ++ (if l == 1 then "" else "s") ++ "."
+            ]
+
+    renderSimpleErrorMessage IncorrectAnonymousArgument =
+      line "An anonymous function argument appears in an invalid context."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
