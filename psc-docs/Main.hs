@@ -69,19 +69,19 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      ms <- runExceptT (D.parseAndDesugar input []
-                           >>= ((\(ms, _, env) -> D.convertModulesInPackage env ms)))
+      ms <- runExceptT (D.parseAndBookmark input []
+                           >>= (fst >>> D.convertModulesInPackage))
                >>= successOrExit
 
       case output of
         EverythingToStdOut ->
           putStrLn (D.runDocs (D.modulesAsMarkdown ms))
         ToStdOut names -> do
-          let (ms', missing) = takeByName ms (map P.runModuleName names)
+          let (ms', missing) = takeByName ms names
           guardMissing missing
           putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
         ToFiles names -> do
-          let (ms', missing) = takeByName' ms (map (first P.runModuleName) names)
+          let (ms', missing) = takeByName' ms names
           guardMissing missing
 
           let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms'
@@ -93,12 +93,12 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ mn ++ "\"")
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ P.runModuleName mn ++ "\"")
     exitFailure
   guardMissing mns = do
     hPutStrLn stderr "psc-docs: error: unknown modules:"
     forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ mn)
+      hPutStrLn stderr ("  * " ++ P.runModuleName mn)
     exitFailure
 
   successOrExit :: Either P.MultipleErrors a -> IO a

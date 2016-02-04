@@ -16,12 +16,17 @@ module Language.PureScript.Docs.Convert
 import Prelude ()
 import Prelude.Compat
 
-import Control.Monad.Error.Class (MonadError)
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), second)
 import Control.Category ((>>>))
+import Control.Monad
+import Control.Monad.State (runStateT)
+import Control.Monad.Writer.Strict (runWriterT)
+import Control.Monad.Error.Class (MonadError)
 import qualified Data.Map as Map
 
+import Text.Parsec (eof)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Constants as C
 
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
@@ -33,18 +38,17 @@ import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 -- documentation.
 --
 convertModulesInPackage ::
-  (Functor m, MonadError P.MultipleErrors m) =>
-  P.Env ->
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
   [InPackage P.Module] ->
   m [Module]
-convertModulesInPackage env modules =
+convertModulesInPackage modules =
   go modules
   where
   localNames =
-    map (P.runModuleName . P.getModuleName) (takeLocals modules)
+    map P.getModuleName (takeLocals modules)
   go =
     map ignorePackage
-     >>> convertModules env
+     >>> convertModules
      >>> fmap (filter ((`elem` localNames) . modName))
 
 -- |
@@ -53,35 +57,140 @@ convertModulesInPackage env modules =
 -- imports/exports information about the list of modules, which is needed for
 -- documenting re-exports.
 --
--- Preconditions:
+-- Note that the whole module dependency graph must be included in the list; if
+-- some modules import things from other modules, then those modules must also
+-- be included.
 --
---     * If any module in the list re-exports documentation from other
---     modules, those modules must also be included in the list.
---     * The modules passed must have had names desugared and re-exports
---     elaborated first.
---
--- If either of these are not satisfied, an internal error will be thrown. To
--- avoid this, it is recommended to use
--- Language.PureScript.Docs.ParseAndDesugar to construct the inputs to this
--- function.
+-- For value declarations, if explicit type signatures are omitted, or a
+-- wildcard type is used, then we typecheck the modules and use the inferred
+-- types.
 --
 convertModules ::
-  (Functor m, MonadError P.MultipleErrors m) =>
-  P.Env ->
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m [Module]
-convertModules env =
-  P.sortModules >>> fmap (convertSorted env . fst)
+convertModules =
+  P.sortModules
+    >>> fmap (fst >>> map importPrim)
+    >=> convertSorted
+
+importPrim :: P.Module -> P.Module
+importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 
 -- |
 -- Convert a sorted list of modules.
 --
-convertSorted :: P.Env -> [P.Module] -> [Module]
-convertSorted env modules =
-  let
-    traversalOrder =
-      map P.getModuleName modules
-    moduleMap =
-      Map.fromList $ map (P.getModuleName &&& convertSingleModule) modules
-  in
-    Map.elems (updateReExports env traversalOrder moduleMap)
+convertSorted ::
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  [P.Module] ->
+  m [Module]
+convertSorted modules = do
+  (env, convertedModules) <- second (map convertSingleModule) <$> partiallyDesugar modules
+
+  modulesWithTypes <- typeCheckIfNecessary modules convertedModules
+  let moduleMap = Map.fromList (map (modName &&& id) modulesWithTypes)
+
+  let traversalOrder = map P.getModuleName modules
+  pure (Map.elems (updateReExports env traversalOrder moduleMap))
+
+-- |
+-- If any exported value declarations have either wildcard type signatures, or
+-- none at all, then typecheck in order to fill them in with the inferred
+-- types.
+--
+typeCheckIfNecessary ::
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  [P.Module] ->
+  [Module] ->
+  m [Module]
+typeCheckIfNecessary modules convertedModules =
+  if any hasWildcards convertedModules
+    then go
+    else pure convertedModules
+
+  where
+  hasWildcards =
+     any ((==) (ValueDeclaration P.TypeWildcard) . declInfo) . modDeclarations
+
+  go = do
+    checkEnv <- snd <$> typeCheck modules
+    pure (map (insertValueTypes checkEnv) convertedModules)
+
+-- |
+-- Typechecks all the modules together. Also returns the final 'P.Environment',
+-- which is useful for adding in inferred types where explicit declarations
+-- were not provided.
+--
+typeCheck ::
+  (Functor m, MonadError P.MultipleErrors m) =>
+  [P.Module] ->
+  m ([P.Module], P.Environment)
+typeCheck =
+  (P.desugar [] >=> check)
+  >>> fmap (second P.checkEnv)
+  >>> P.evalSupplyT 0
+  >>> ignoreWarnings
+
+  where
+  check ms =
+    runStateT
+      (traverse P.typeCheckModule ms)
+      (P.emptyCheckState P.initEnvironment)
+
+  ignoreWarnings =
+    fmap fst . runWriterT
+
+-- |
+-- Updates all the types of the ValueDeclarations inside the module based on
+-- their types inside the given Environment.
+--
+insertValueTypes ::
+  P.Environment -> Module -> Module
+insertValueTypes env m =
+  m { modDeclarations = map go (modDeclarations m) }
+  where
+  go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard }) =
+    let
+      ident = parseIdent (declTitle d)
+      ty = lookupName ident
+    in
+      d { declInfo = ValueDeclaration ty }
+  go other =
+    other
+
+  parseIdent =
+    either (err . ("failed to parse Ident: " ++)) id . runParser P.parseIdent
+
+  lookupName name =
+    let key = (modName m, name)
+    in case Map.lookup key (P.names env) of
+      Just (ty, _, _) ->
+        ty
+      Nothing ->
+        err ("name not found: " ++ show key)
+
+  err msg =
+    P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
+
+runParser :: P.TokenParser a -> String -> Either String a
+runParser p s = either (Left . show) Right $ do
+  ts <- P.lex "" s
+  P.runTokenParser "" (p <* eof) ts
+
+-- |
+-- Partially desugar modules so that they are suitable for extracting
+-- documentation information from.
+--
+partiallyDesugar ::
+  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  [P.Module]
+  -> m (P.Env, [P.Module])
+partiallyDesugar = P.evalSupplyT 0 . desugar'
+  where
+  desugar' =
+    traverse P.desugarDoModule
+      >=> P.desugarCasesModule
+      >=> P.desugarTypeDeclarationsModule
+      >=> ignoreWarnings . P.desugarImportsWithEnv []
+
+  ignoreWarnings = fmap fst . runWriterT

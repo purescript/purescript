@@ -14,6 +14,7 @@ import Control.Applicative
 import Control.Arrow
 import Data.Maybe (fromMaybe)
 import Data.List ((\\))
+import Data.Monoid
 import Data.Foldable
 import Data.Traversable
 import System.Exit
@@ -36,8 +37,8 @@ main :: IO ()
 main = do
   TestPscPublish.pushd "examples/docs" $ do
     Docs.Package{..} <- Publish.preparePackage publishOpts
-    forM_ testCases $ \(mn, pragmas) ->
-      let mdl = takeJust ("module not found in docs: " ++ mn)
+    forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
+      let mdl = takeJust ("module not found in docs: " ++ P.runModuleName mn)
                          (find ((==) mn . Docs.modName) pkgModules)
       in forM_ pragmas (flip runAssertionIO mdl)
 
@@ -56,7 +57,15 @@ data Assertion
   -- | Assert that a particular declaration has a particular type class
   -- constraint.
   | ShouldBeConstrained P.ModuleName String String
+  -- | Assert that a particular value declaration exists, and its type
+  -- satisfies the given predicate.
+  | ValueShouldHaveTypeSignature P.ModuleName String (ShowFn (P.Type -> Bool))
   deriving (Show)
+
+newtype ShowFn a = ShowFn a
+
+instance Show (ShowFn a) where
+  show _ = "<function>"
 
 data AssertionFailure
   -- | A declaration was not documented, but should have been
@@ -72,6 +81,11 @@ data AssertionFailure
   -- | A declaration had the wrong "type" (ie, value, type, type class)
   -- Fields: declaration title, expected "type", actual "type".
   | WrongDeclarationType P.ModuleName String String String
+  -- | A value declaration had the wrong type (in the sense of "type
+  -- checking"), eg, because the inferred type was used when the explicit type
+  -- should have been.
+  -- Fields: module name, declaration name, actual type.
+  | ValueDeclarationWrongType P.ModuleName String P.Type
   deriving (Show)
 
 data AssertionResult
@@ -121,9 +135,24 @@ runAssertion assertion Docs.Module{..} =
               Fail (WrongDeclarationType mn decl "value"
                      (Docs.declInfoToString declInfo))
 
+    ValueShouldHaveTypeSignature mn decl (ShowFn tyPredicate) ->
+      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn decl)
+        Just Docs.Declaration{..} ->
+          case declInfo of
+            Docs.ValueDeclaration ty ->
+              if tyPredicate ty
+                then Pass
+                else Fail
+                  (ValueDeclarationWrongType mn decl ty)
+            _ ->
+              Fail (WrongDeclarationType mn decl "value"
+                     (Docs.declInfoToString declInfo))
+
   where
   declarationsFor mn =
-    if P.runModuleName mn == modName
+    if mn == modName
       then modDeclarations
       else fromMaybe [] (lookup mn modReExports)
 
@@ -149,7 +178,7 @@ checkConstrained ty tyClass =
 
 runAssertionIO :: Assertion -> Docs.Module -> IO ()
 runAssertionIO assertion mdl = do
-  putStrLn ("In " ++ Docs.modName mdl ++ ": " ++ show assertion)
+  putStrLn ("In " ++ P.runModuleName (Docs.modName mdl) ++ ": " ++ show assertion)
   case runAssertion assertion mdl of
     Pass -> pure ()
     fail -> do
@@ -226,7 +255,19 @@ testCases =
   , ("NewOperators",
       [ ShouldBeDocumented (n "NewOperators2") "(>>>)" []
       ])
+
+  , ("ExplicitTypeSignatures",
+      [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (ShowFn (hasTypeVar "something"))
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn ((==) P.tyInt))
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn ((==) P.tyNumber))
+      ])
   ]
 
   where
   n = P.moduleNameFromString
+
+  hasTypeVar varName =
+    getAny . P.everythingOnTypes (<>) (Any . isVar varName)
+
+  isVar varName (P.TypeVar name) | varName == name = True
+  isVar _ _ = False

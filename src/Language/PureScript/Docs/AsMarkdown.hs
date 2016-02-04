@@ -31,31 +31,29 @@ import qualified Language.PureScript.Docs.Render as Render
 renderModulesAsMarkdown ::
   (Functor m, Applicative m,
   MonadError P.MultipleErrors m) =>
-  P.Env ->
   [P.Module] ->
   m String
-renderModulesAsMarkdown env =
-  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules env
+renderModulesAsMarkdown =
+  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
-  headerLevel 2 $ "Module " ++ modName
+  headerLevel 2 $ "Module " ++ P.runModuleName modName
   spacer
   for_ modComments tell'
   mapM_ (declAsMarkdown modName) modDeclarations
   spacer
   for_ modReExports $ \(mn, decls) -> do
-    let modName' = P.runModuleName mn
-    headerLevel 3 $ "Re-exported from " ++ modName' ++ ":"
+    headerLevel 3 $ "Re-exported from " ++ P.runModuleName mn ++ ":"
     spacer
-    mapM_ (declAsMarkdown modName') decls
+    mapM_ (declAsMarkdown mn) decls
 
-declAsMarkdown :: String -> Declaration -> Docs
+declAsMarkdown :: P.ModuleName -> Declaration -> Docs
 declAsMarkdown mn decl@Declaration{..} = do
-  let options = defaultRenderTypeOptions { currentModule = Just (P.moduleNameFromString mn) }
+  let options = defaultRenderTypeOptions { currentModule = Just mn }
   headerLevel 4 (ticks declTitle)
   spacer
 
