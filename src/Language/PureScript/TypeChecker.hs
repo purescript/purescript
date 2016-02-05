@@ -230,14 +230,14 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration name args ty
-  go (TypeDeclaration{}) = internalError "Type declarations should have been removed"
+  go TypeDeclaration{} = internalError "Type declarations should have been removed"
   go (ValueDeclaration name nameKind [] (Right val)) =
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
       [(_, (val', ty))] <- typesOf moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
-  go (ValueDeclaration{}) = internalError "Binders were not desugared"
+  go ValueDeclaration{} = internalError "Binders were not desugared"
   go (BindingGroupDeclaration vals) =
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       for_ (map (\(ident, _, _) -> ident) vals) $ \name ->
@@ -264,8 +264,8 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })
     return d
-  go (d@(FixityDeclaration{})) = return d
-  go (d@(ImportDeclaration{})) = return d
+  go (d@FixityDeclaration{}) = return d
+  go (d@ImportDeclaration{}) = return d
   go (d@(TypeClassDeclaration pn args implies tys)) = do
     addTypeClass moduleName pn args implies tys
     return d
@@ -429,7 +429,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
   checkNonAliasesAreExported dr@(ValueRef (Op name)) =
     case listToMaybe (mapMaybe getAlias decls) of
       Just alias ->
-        when (not $ any (== ValueRef alias) exps) $
+        unless (ValueRef alias `elem` exps) $
           throwError . errorMessage $ TransitiveExportError dr [ValueRef alias]
       _ -> return ()
     where
