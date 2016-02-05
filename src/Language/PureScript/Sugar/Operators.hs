@@ -77,7 +77,15 @@ removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds)
 rebracketModule :: (Applicative m, MonadError MultipleErrors m) => [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> m Module
 rebracketModule opTable (Module ss coms mn ds exts) =
   let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
-  in Module ss coms mn <$> parU ds f <*> pure exts
+  in Module ss coms mn <$> (map removeParens <$> parU ds f) <*> pure exts
+
+removeParens :: Declaration -> Declaration
+removeParens =
+  let (f, _, _) = everywhereOnValues id go id
+  in f
+  where
+  go (Parens val) = val
+  go val = val
 
 externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
 externsFixities ExternsFile{..} =

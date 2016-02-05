@@ -386,7 +386,7 @@ parseValueAtom = P.choice
                  , parseIfThenElse
                  , parseDo
                  , parseLet
-                 , P.try $ parens parseValue
+                 , P.try $ Parens <$> parens parseValue
                  , parseOperatorSection
                  ]
 

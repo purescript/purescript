@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.ObjectWildcards (
@@ -30,8 +31,13 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
 
   desugarExpr :: Expr -> m Expr
   desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
-  desugarExpr (BinaryNoParens op val u) | isAnonymousArgument u = return $ OperatorSection op (Left val)
-  desugarExpr (BinaryNoParens op u val) | isAnonymousArgument u = return $ OperatorSection op (Right val)
+  desugarExpr (Parens b)
+    | b' <- stripPositionInfo b
+    , BinaryNoParens op val u <- b'
+    , isAnonymousArgument u = return $ OperatorSection op (Left val)
+    | b' <- stripPositionInfo b
+    , BinaryNoParens op u val <- b'
+    , isAnonymousArgument u = return $ OperatorSection op (Right val)
   desugarExpr (ObjectLiteral ps) = wrapLambda ObjectLiteral ps
   desugarExpr (ObjectUpdate u ps) | isAnonymousArgument u = do
     obj <- freshIdent'
@@ -50,6 +56,10 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
        else do
         (args', ps') <- unzip <$> mapM mkProp ps
         return $ foldr (Abs . Left) (mkVal ps') (catMaybes args')
+
+  stripPositionInfo :: Expr -> Expr
+  stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
+  stripPositionInfo e = e
 
   isAnonymousArgument :: Expr -> Bool
   isAnonymousArgument AnonymousArgument = True

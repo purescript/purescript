@@ -49,6 +49,7 @@ everywhereOnValues f g h = (f', g', h')
   g' :: Expr -> Expr
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens (g' op) (g' v1) (g' v2))
+  g' (Parens v) = g (Parens (g' v))
   g' (OperatorSection op (Left v)) = g (OperatorSection (g' op) (Left $ g' v))
   g' (OperatorSection op (Right v)) = g (OperatorSection (g' op) (Right $ g' v))
   g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
@@ -104,6 +105,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (Parens v) = Parens <$> (g v >>= g')
   g' (OperatorSection op (Left v)) = OperatorSection <$> (g op >>= g') <*> (Left <$> (g v >>= g'))
   g' (OperatorSection op (Right v)) = OperatorSection <$> (g op >>= g') <*> (Right <$> (g v >>= g'))
   g' (ArrayLiteral vs) = ArrayLiteral <$> traverse (g' <=< g) vs
@@ -154,6 +156,7 @@ everywhereOnValuesM f g h = (f', g', h')
 
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens <$> g' op <*> g' v1 <*> g' v2) >>= g
+  g' (Parens v) = (Parens <$> g' v) >>= g
   g' (OperatorSection op (Left v)) = (OperatorSection <$> g' op <*> (Left <$> g' v)) >>= g
   g' (OperatorSection op (Right v)) = (OperatorSection <$> g' op <*> (Right <$> g' v)) >>= g
   g' (ArrayLiteral vs) = (ArrayLiteral <$> traverse g' vs) >>= g
@@ -207,6 +210,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
 
   g' v@(UnaryMinus v1) = g v <> g' v1
   g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
+  g' v@(Parens v1) = g v <> g' v1
   g' v@(OperatorSection op (Left v1)) = g v <> g' op <> g' v1
   g' v@(OperatorSection op (Right v1)) = g v <> g' op <> g' v1
   g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
@@ -271,6 +275,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
+  g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
@@ -338,6 +343,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens <$> g'' s op <*> g'' s v1 <*> g'' s v2
+  g' s (Parens v) = Parens <$> g'' s v
   g' s (OperatorSection op (Left v)) = OperatorSection <$> g'' s op <*> (Left <$> g'' s v)
   g' s (OperatorSection op (Right v)) = OperatorSection <$> g'' s op <*> (Right <$> g'' s v)
   g' s (ArrayLiteral vs) = ArrayLiteral <$> traverse (g'' s) vs
@@ -417,6 +423,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
 
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g' s op <> g' s v1 <> g' s v2
+  g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (ArrayLiteral vs) = foldMap (g'' s) vs

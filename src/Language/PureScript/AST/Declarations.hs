@@ -334,6 +334,14 @@ data Expr
   --
   | BinaryNoParens Expr Expr Expr
   -- |
+  -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
+  -- will be removed.
+  --
+  -- Note: although it seems this constructor is not used, it _is_ useful, since it prevents
+  -- certain traversals from matching.
+  --
+  | Parens Expr
+  -- |
   -- Operator section. This will be removed during desugaring and replaced with a partially applied
   -- operator or lambda to flip the arguments.
   --
