@@ -50,10 +50,14 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn ds tyCon args
-  | className == Qualified (Just (ModuleName [ ProperName "Prelude" ])) eq
+  | className == Qualified (Just (ModuleName [ ProperName "Prelude" ])) (ProperName "Eq")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn ds tyCon
+  | className == Qualified (Just (ModuleName [ ProperName "Prelude" ])) (ProperName "Ord")
+  , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
 deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
   = throwError . errorMessage $ CannotDerive className tys
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
@@ -76,9 +80,6 @@ dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
 
 typesProxy :: ModuleName
 typesProxy = ModuleName [ ProperName "Type", ProperName "Proxy" ]
-
-eq :: ProperName 'ClassName
-eq = ProperName "Eq"
 
 deriveGeneric
   :: forall m. (Functor m, MonadError MultipleErrors m, MonadSupply m)
@@ -264,6 +265,62 @@ deriveEq mn ds tyConNm = do
       . map (\(str, typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
       $ decomposeRec rec
     toEqTest l r _ = preludeEq l r
+
+deriveOrd ::
+  forall m. (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> m [Declaration]
+deriveOrd mn ds tyConNm = do
+  tyCon <- findTypeDecl tyConNm ds
+  compareFun <- mkCompareFunction tyCon
+  return [ ValueDeclaration (Ident C.compare) Public [] (Right compareFun) ]
+  where
+    mkCompareFunction :: Declaration -> m Expr
+    mkCompareFunction (DataDeclaration _ _ _ args) = lamCase2 "$x" "$y" <$> (concat <$> mapM mkCtorClauses args)
+    mkCompareFunction (PositionedDeclaration _ _ d) = mkCompareFunction d
+    mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
+
+    preludeCtor :: String -> Expr
+    preludeCtor = Constructor . Qualified (Just (ModuleName [ProperName C.prelude])) . ProperName
+
+    preludeAppend :: Expr -> Expr -> Expr
+    preludeAppend = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.append)))
+
+    preludeCompare :: Expr -> Expr -> Expr
+    preludeCompare = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.compare)))
+
+    mkCtorClauses :: (ProperName 'ConstructorName, [Type]) -> m [CaseAlternative]
+    mkCtorClauses (ctorName, tys) = do
+      [identsL, identsR] <- replicateM 2 (replicateM (length tys) freshIdent')
+      let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
+      return [ CaseAlternative [ caseBinder identsL
+                               , caseBinder identsR
+                               ]
+                               (Right (appendAll tests))
+             , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                               , NullBinder
+                               ]
+                               (Right (preludeCtor "LT"))
+             , CaseAlternative [ NullBinder
+                               , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                               ]
+                               (Right (preludeCtor "GT"))
+             ]
+      where
+      caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
+
+    appendAll :: [Expr] -> Expr
+    appendAll [] = preludeCtor "EQ"
+    appendAll xs = foldl1 preludeAppend xs
+
+    toOrdering :: Expr -> Expr -> Type -> Expr
+    toOrdering l r ty | Just rec <- objectType ty =
+      appendAll
+      . map (\(str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+      $ decomposeRec rec
+    toOrdering l r _ = preludeCompare l r
 
 findTypeDecl
   :: (Functor m, MonadError MultipleErrors m)
