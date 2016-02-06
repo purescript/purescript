@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Types where
+module PSCi.Types where
 
 import Control.Arrow (second)
 import Data.Map (Map)

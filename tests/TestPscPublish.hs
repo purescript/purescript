@@ -20,13 +20,11 @@ import Data.Version
 import Language.PureScript.Docs
 import Language.PureScript.Publish
 
-pushd :: forall a. FilePath -> IO a -> IO a
-pushd dir act = do
-  original <- getCurrentDirectory
-  setCurrentDirectory dir
-  result <- try act :: IO (Either IOException a)
-  setCurrentDirectory original
-  either throwIO return result
+import TestUtils
+
+main :: IO ()
+main = do
+  testPackage "tests/support/prelude"
 
 data TestResult
   = ParseFailed String
@@ -48,6 +46,7 @@ roundTrip pkg =
 testRunOptions :: PublishOptions
 testRunOptions = defaultPublishOptions
   { publishGetVersion = return testVersion
+  , publishWorkingTreeDirty = return ()
   }
   where testVersion = ("v999.0.0", Version [999,0,0] [])
 
@@ -58,7 +57,9 @@ testPackage dir = do
   pushd dir $ do
     r <- roundTrip <$> preparePackage testRunOptions
     case r of
-      Pass _ -> pure ()
+      Pass _ -> do
+        putStrLn ("psc-publish test passed for: " ++ dir)
+        pure ()
       other -> do
         putStrLn ("psc-publish tests failed on " ++ dir ++ ":")
         putStrLn (show other)

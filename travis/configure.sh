@@ -8,7 +8,7 @@ then
   configure_flags="--disable-optimization $configure_flags"
 fi
 
-if [ -n "$COVERAGE_SUITE" ]
+if [ "$COVERAGE" = "true" ]
 then
   configure_flags="--enable-coverage $configure_flags"
 fi

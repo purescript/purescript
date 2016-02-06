@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module Main where
+module TestPsci where
 
 import Prelude ()
 import Prelude.Compat
@@ -24,14 +24,11 @@ import Test.HUnit
 import qualified Language.PureScript as P
 
 import PSCi
-import Completion
-import Types
-
-import TestsSetup
+import PSCi.Completion
+import PSCi.Types
 
 main :: IO ()
 main = do
-  fetchSupportCode
   Counts{..} <- runTestTT allTests
   when (errors + failures > 0) exitFailure
 
@@ -65,8 +62,8 @@ completionTestData =
   , ("import qualified Control.Monad.Eff.", map ("import qualified Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
   -- :load, :module should complete file paths
-  , (":l psci/tests/data/", [":l psci/tests/data/Sample.purs"])
-  , (":module psci/tests/data/", [":module psci/tests/data/Sample.purs"])
+  , (":l tests/support/psci/", [":l tests/support/psci/Sample.purs"])
+  , (":module tests/support/psci/", [":module tests/support/psci/Sample.purs"])
 
   -- :quit, :help, :reset should not complete
   , (":help ", [])

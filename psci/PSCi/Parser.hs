@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Parser
+module PSCi.Parser
   ( parseCommand
   ) where
 
@@ -28,8 +28,8 @@ import Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import Language.PureScript.Parser.Common (mark, same)
 
-import qualified Directive as D
-import Types
+import qualified PSCi.Directive as D
+import PSCi.Types
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
