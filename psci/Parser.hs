@@ -98,10 +98,12 @@ psciExpression = Expression <$> P.parseValue
 -- we actually want the normal @let@.
 --
 psciLet :: P.TokenParser Command
-psciLet = Decls <$> (P.reserved "let" *> P.indented *> manyDecls)
+psciLet = Decls <$> (optionalLet *> manyDecls)
   where
   manyDecls :: P.TokenParser [P.Declaration]
   manyDecls = mark (many1 (same *> P.parseLocalDeclaration))
+
+  optionalLet = optional (P.reserved "let" *> P.indented)
 
 -- | Imports must be handled separately from other declarations, so that
 -- :show import works, for example.
