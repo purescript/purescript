@@ -1,5 +1,5 @@
 flags: {}
 packages:
 - '.'
-extra-deps:
+extra-deps: []
 resolver: lts-3.6
