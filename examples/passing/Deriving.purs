@@ -3,6 +3,12 @@ module Main where
 import Prelude
 import Test.Assert
 
+data V
+
+derive instance eqV :: Eq V
+
+derive instance ordV :: Ord V
+
 data X = X Int | Y String
 
 derive instance eqX :: Eq X

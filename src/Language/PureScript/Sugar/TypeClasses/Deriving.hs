@@ -251,7 +251,9 @@ deriveEq mn ds tyConNm = do
     preludeEq = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.eq)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
-    addCatch = (++ [catchAll])
+    addCatch xs
+      | length xs /= 1 = xs ++ [catchAll]
+      | otherwise = xs -- Avoid redundant case
       where
       catchAll = CaseAlternative [NullBinder, NullBinder] (Right (BooleanLiteral False))
 
@@ -290,7 +292,7 @@ deriveOrd mn ds tyConNm = do
     mkCompareFunction (DataDeclaration _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (concat <$> mapM mkCtorClauses (splitLast args))
+      lamCase2 x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
     mkCompareFunction (PositionedDeclaration _ _ d) = mkCompareFunction d
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
 
@@ -298,6 +300,13 @@ deriveOrd mn ds tyConNm = do
     splitLast [] = []
     splitLast [x] = [(x, True)]
     splitLast (x : xs) = (x, False) : splitLast xs
+
+    addCatch :: [CaseAlternative] -> [CaseAlternative]
+    addCatch xs
+      | null xs = [catchAll] -- No type constructors
+      | otherwise = xs
+      where
+      catchAll = CaseAlternative [NullBinder, NullBinder] (Right (preludeCtor "EQ"))
 
     preludeCtor :: String -> Expr
     preludeCtor = Constructor . Qualified (Just (ModuleName [ProperName C.prelude])) . ProperName
