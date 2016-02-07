@@ -290,9 +290,14 @@ deriveOrd mn ds tyConNm = do
     mkCompareFunction (DataDeclaration _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (concat <$> mapM mkCtorClauses args)
+      lamCase2 x y <$> (concat <$> mapM mkCtorClauses (splitLast args))
     mkCompareFunction (PositionedDeclaration _ _ d) = mkCompareFunction d
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
+
+    splitLast :: [a] -> [(a, Bool)]
+    splitLast [] = []
+    splitLast [x] = [(x, True)]
+    splitLast (x : xs) = (x, False) : splitLast xs
 
     preludeCtor :: String -> Expr
     preludeCtor = Constructor . Qualified (Just (ModuleName [ProperName C.prelude])) . ProperName
@@ -300,24 +305,27 @@ deriveOrd mn ds tyConNm = do
     preludeCompare :: Expr -> Expr -> Expr
     preludeCompare = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.compare)))
 
-    mkCtorClauses :: (ProperName 'ConstructorName, [Type]) -> m [CaseAlternative]
-    mkCtorClauses (ctorName, tys) = do
+    mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
+    mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
-      return [ CaseAlternative [ caseBinder identsL
+          extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                                                  , NullBinder
+                                                  ]
+                                                  (Right (preludeCtor "LT"))
+                                , CaseAlternative [ NullBinder
+                                                  , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                                                  ]
+                                                  (Right (preludeCtor "GT"))
+                                ]
+                 | otherwise = []
+      return $ CaseAlternative [ caseBinder identsL
                                , caseBinder identsR
                                ]
                                (Right (appendAll tests))
-             , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
-                               , NullBinder
-                               ]
-                               (Right (preludeCtor "LT"))
-             , CaseAlternative [ NullBinder
-                               , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
-                               ]
-                               (Right (preludeCtor "GT"))
-             ]
+             : extras
+
       where
       caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
 
