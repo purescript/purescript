@@ -99,7 +99,9 @@ deriveGeneric mn ds tyConNm dargs = do
          ]
   where
     mkSpineFunction :: Declaration -> m Expr
-    mkSpineFunction (DataDeclaration _ _ _ args) = lamCase "$x" <$> mapM mkCtorClause args
+    mkSpineFunction (DataDeclaration _ _ _ args) = do
+      x <- freshIdent'
+      lamCase x <$> mapM mkCtorClause args
       where
       prodConstructor :: Expr -> Expr
       prodConstructor = App (Constructor (Qualified (Just dataGeneric) (ProperName "SProd")))
@@ -122,7 +124,7 @@ deriveGeneric mn ds tyConNm dargs = do
           lamNull . recordConstructor . ArrayLiteral .
               map (\(str,typ) -> ObjectLiteral [("recLabel", StringLiteral str), ("recValue", toSpineFun (Accessor str i) typ)])
               $ decomposeRec rec
-      toSpineFun i _ = lamNull $ App (mkGenVar C.toSpine) i
+      toSpineFun i _ = lamNull $ App (mkGenVar (Ident C.toSpine)) i
     mkSpineFunction (PositionedDeclaration _ _ d) = mkSpineFunction d
     mkSpineFunction _ = internalError "mkSpineFunction: expected DataDeclaration"
 
@@ -154,14 +156,16 @@ deriveGeneric mn ds tyConNm dargs = do
                                                ]
                                | (str, typ) <- decomposeRec rec
                                ]
-      mkProductSignature typ = lamNull $ App (mkGenVar C.toSignature)
-                               (TypedValue False (mkGenVar "anyProxy") (proxy typ))
+      mkProductSignature typ = lamNull $ App (mkGenVar (Ident C.toSignature))
+                               (TypedValue False (mkGenVar (Ident "anyProxy")) (proxy typ))
       instantiate = replaceAllTypeVars (zipWith (\(arg, _) ty -> (arg, ty)) tyArgs classArgs)
     mkSignatureFunction (PositionedDeclaration _ _ d) classArgs = mkSignatureFunction d classArgs
     mkSignatureFunction _ _ = internalError "mkSignatureFunction: expected DataDeclaration"
 
     mkFromSpineFunction :: Declaration -> m Expr
-    mkFromSpineFunction (DataDeclaration _ _ _ args) = lamCase "$x" <$> (addCatch <$> mapM mkAlternative args)
+    mkFromSpineFunction (DataDeclaration _ _ _ args) = do
+      x <- freshIdent'
+      lamCase x <$> (addCatch <$> mapM mkAlternative args)
       where
       mkJust :: Expr -> Expr
       mkJust = App (Constructor (Qualified (Just dataMaybe) (ProperName "Just")))
@@ -188,36 +192,37 @@ deriveGeneric mn ds tyConNm dargs = do
         where
         catchAll = CaseAlternative [NullBinder] (Right mkNothing)
 
+      fromSpineFun :: Expr -> Type -> Expr
       fromSpineFun e r
         | Just rec <- objectType r
-        = App (lamCase "r" [ mkRecCase (decomposeRec rec)
-                           , CaseAlternative [NullBinder] (Right mkNothing)
-                           ])
-              (App e (mkPrelVar "unit"))
+        = App (lamCase (Ident "r") [ mkRecCase (decomposeRec rec)
+                                   , CaseAlternative [NullBinder] (Right mkNothing)
+                                   ])
+              (App e (mkPrelVar (Ident "unit")))
+      fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e (mkPrelVar (Ident "unit")))
 
-      fromSpineFun e _ = App (mkGenVar C.fromSpine) (App e (mkPrelVar "unit"))
-
+      mkRecCase :: [(String, Type)] -> CaseAlternative
       mkRecCase rs = CaseAlternative [ recordBinder [ ArrayBinder (map (VarBinder . Ident . fst) rs)
                                                     ]
                                      ]
                        . Right
-                       $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar x)) y) rs)
+                       $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
 
       mkRecFun :: [(String, Type)] -> Expr
-      mkRecFun xs = mkJust $ foldr lam recLiteral (map fst xs)
-         where recLiteral = ObjectLiteral $ map (\(s,_) -> (s,mkVar s)) xs
+      mkRecFun xs = mkJust $ foldr lam recLiteral (map (Ident . fst) xs)
+         where recLiteral = ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"
 
     -- Helpers
 
     liftApplicative :: Expr -> [Expr] -> Expr
-    liftApplicative = foldl' (\x e -> App (App (mkPrelVar "apply") x) e)
+    liftApplicative = foldl' (\x e -> App (App (mkPrelVar (Ident "apply")) x) e)
 
-    mkPrelVar :: String -> Expr
+    mkPrelVar :: Ident -> Expr
     mkPrelVar = mkVarMn (Just (ModuleName [ProperName C.prelude]))
 
-    mkGenVar :: String -> Expr
+    mkGenVar :: Ident -> Expr
     mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
 
 deriveEq ::
@@ -232,7 +237,10 @@ deriveEq mn ds tyConNm = do
   return [ ValueDeclaration (Ident C.eq) Public [] (Right eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
-    mkEqFunction (DataDeclaration _ _ _ args) = lamCase2 "$x" "$y" <$> (addCatch <$> mapM mkCtorClause args)
+    mkEqFunction (DataDeclaration _ _ _ args) = do
+      x <- freshIdent "x"
+      y <- freshIdent "y"
+      lamCase2 x y <$> (addCatch <$> mapM mkCtorClause args)
     mkEqFunction (PositionedDeclaration _ _ d) = mkEqFunction d
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
@@ -249,7 +257,8 @@ deriveEq mn ds tyConNm = do
 
     mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
-      [identsL, identsR] <- replicateM 2 (replicateM (length tys) freshIdent')
+      identsL <- replicateM (length tys) (freshIdent "l")
+      identsR <- replicateM (length tys) (freshIdent "r")
       let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (Right (conjAll tests))
       where
@@ -278,22 +287,23 @@ deriveOrd mn ds tyConNm = do
   return [ ValueDeclaration (Ident C.compare) Public [] (Right compareFun) ]
   where
     mkCompareFunction :: Declaration -> m Expr
-    mkCompareFunction (DataDeclaration _ _ _ args) = lamCase2 "$x" "$y" <$> (concat <$> mapM mkCtorClauses args)
+    mkCompareFunction (DataDeclaration _ _ _ args) = do
+      x <- freshIdent "x"
+      y <- freshIdent "y"
+      lamCase2 x y <$> (concat <$> mapM mkCtorClauses args)
     mkCompareFunction (PositionedDeclaration _ _ d) = mkCompareFunction d
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
 
     preludeCtor :: String -> Expr
     preludeCtor = Constructor . Qualified (Just (ModuleName [ProperName C.prelude])) . ProperName
 
-    preludeAppend :: Expr -> Expr -> Expr
-    preludeAppend = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.append)))
-
     preludeCompare :: Expr -> Expr -> Expr
     preludeCompare = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.compare)))
 
     mkCtorClauses :: (ProperName 'ConstructorName, [Type]) -> m [CaseAlternative]
     mkCtorClauses (ctorName, tys) = do
-      [identsL, identsR] <- replicateM 2 (replicateM (length tys) freshIdent')
+      identsL <- replicateM (length tys) (freshIdent "l")
+      identsR <- replicateM (length tys) (freshIdent "r")
       let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
       return [ CaseAlternative [ caseBinder identsL
                                , caseBinder identsR
@@ -313,7 +323,14 @@ deriveOrd mn ds tyConNm = do
 
     appendAll :: [Expr] -> Expr
     appendAll [] = preludeCtor "EQ"
-    appendAll xs = foldl1 preludeAppend xs
+    appendAll [x] = x
+    appendAll (x : xs) = Case [x] [ CaseAlternative [ ConstructorBinder (Qualified (Just (ModuleName [ProperName C.prelude])) (ProperName "LT")) [] ]
+                                                    (Right (preludeCtor "LT"))
+                                  , CaseAlternative [ ConstructorBinder (Qualified (Just (ModuleName [ProperName C.prelude])) (ProperName "GT")) [] ]
+                                                    (Right (preludeCtor "GT"))
+                                  , CaseAlternative [ NullBinder ]
+                                                    (Right (appendAll xs))
+                                  ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
     toOrdering l r ty | Just rec <- objectType ty =
@@ -334,22 +351,22 @@ findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType
   isTypeDecl (PositionedDeclaration _ _ d) = isTypeDecl d
   isTypeDecl _ = False
 
-lam :: String -> Expr -> Expr
-lam s = Abs (Left (Ident s))
+lam :: Ident -> Expr -> Expr
+lam = Abs . Left
 
 lamNull :: Expr -> Expr
-lamNull = lam "$q"
+lamNull = lam (Ident "$q") -- TODO: use GenIdent
 
-lamCase :: String -> [CaseAlternative] -> Expr
+lamCase :: Ident -> [CaseAlternative] -> Expr
 lamCase s = lam s . Case [mkVar s]
 
-lamCase2 :: String -> String -> [CaseAlternative] -> Expr
+lamCase2 :: Ident -> Ident -> [CaseAlternative] -> Expr
 lamCase2 s t = lam s . lam t . Case [mkVar s, mkVar t]
 
-mkVarMn :: Maybe ModuleName -> String -> Expr
-mkVarMn mn s = Var (Qualified mn (Ident s))
+mkVarMn :: Maybe ModuleName -> Ident -> Expr
+mkVarMn mn = Var . Qualified mn
 
-mkVar :: String -> Expr
+mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
 
 objectType :: Type -> Maybe Type
