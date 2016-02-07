@@ -27,7 +27,13 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/package.json
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
-                  , psci/tests/data/Sample.purs
+                  , tests/support/flattened/*.purs
+                  , tests/support/flattened/*.js
+                  , tests/support/psci/*.purs
+                  , tests/support/prelude/bower.json
+                  , tests/support/prelude/src/*.purs
+                  , tests/support/prelude/src/*.js
+                  , tests/support/prelude/LICENSE
                   , stack.yaml
                   , stack-lts-2.yaml
                   , stack-lts-3.yaml
@@ -213,12 +219,12 @@ executable psci
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci psci/main
-    other-modules: Types
-                   Parser
-                   Directive
-                   Completion
-                   PSCi
-                   IO
+    other-modules: PSCi
+                   PSCi.Types
+                   PSCi.Parser
+                   PSCi.Directive
+                   PSCi.Completion
+                   PSCi.IO
     ghc-options: -Wall -O2
 
 executable psc-docs
@@ -273,24 +279,15 @@ test-suite tests
                    filepath -any, mtl -any, parsec -any, purescript -any,
                    transformers -any, process -any, transformers-compat -any, time -any,
                    Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
-                   base-compat -any
-    type: exitcode-stdio-1.0
-    main-is: Main.hs
-    other-modules: TestsSetup
-                   TestPscPublish
-                   TestDocs
-    buildable: True
-    hs-source-dirs: tests tests/common
-
-test-suite psci-tests
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any,
-                   haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, HUnit -any, time -any,
-                   Glob -any, base-compat >=0.6.0, boxes >= 0.1.4 && < 0.2.0
-    type: exitcode-stdio-1.0
-    main-is: Main.hs
-    other-modules: TestsSetup
-    buildable: True
-    hs-source-dirs: psci psci/tests tests/common
+                   base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
+                   boxes -any, HUnit -any
     ghc-options: -Wall
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    other-modules: TestUtils
+                   TestCompiler
+                   TestDocs
+                   TestPscPublish
+                   TestPsci
+    buildable: True
+    hs-source-dirs: tests psci

@@ -44,11 +44,11 @@ import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
 import qualified Paths_purescript as Paths
 
-import qualified Directive as D
-import Completion (completion)
-import IO (mkdirp)
-import Parser (parseCommand)
-import Types
+import qualified PSCi.Directive as D
+import PSCi.Completion (completion)
+import PSCi.IO (mkdirp)
+import PSCi.Parser (parseCommand)
+import PSCi.Types
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName

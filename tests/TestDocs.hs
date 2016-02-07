@@ -9,21 +9,17 @@ import Prelude.Compat
 
 import Data.Version (Version(..))
 
-import Control.Monad hiding (forM_)
-import Control.Applicative
-import Control.Arrow
+import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
 import Data.List ((\\))
 import Data.Foldable
-import Data.Traversable
 import System.Exit
-import qualified Text.Parsec as Parsec
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as Docs
 import qualified Language.PureScript.Publish as Publish
 
-import qualified TestPscPublish
+import TestUtils
 
 publishOpts :: Publish.PublishOptions
 publishOpts = Publish.defaultPublishOptions
@@ -34,7 +30,7 @@ publishOpts = Publish.defaultPublishOptions
 
 main :: IO ()
 main = do
-  TestPscPublish.pushd "examples/docs" $ do
+  pushd "examples/docs" $ do
     Docs.Package{..} <- Publish.preparePackage publishOpts
     forM_ testCases $ \(mn, pragmas) ->
       let mdl = takeJust ("module not found in docs: " ++ mn)
@@ -132,6 +128,7 @@ runAssertion assertion Docs.Module{..} =
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
 
+checkConstrained :: P.Type -> String -> Bool
 checkConstrained ty tyClass =
   -- Note that we don't recurse on ConstrainedType if none of the constraints
   -- match; this is by design, as constraints should be moved to the front
@@ -152,8 +149,8 @@ runAssertionIO assertion mdl = do
   putStrLn ("In " ++ Docs.modName mdl ++ ": " ++ show assertion)
   case runAssertion assertion mdl of
     Pass -> pure ()
-    fail -> do
-      putStrLn (show fail)
+    Fail reason -> do
+      putStrLn ("Failed: " <> show reason)
       exitFailure
 
 testCases :: [(String, [Assertion])]

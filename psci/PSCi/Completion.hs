@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Completion where
+module PSCi.Completion where
 
 import Prelude ()
 import Prelude.Compat
@@ -19,8 +19,8 @@ import System.Console.Haskeline
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
 
-import qualified Directive as D
-import Types
+import qualified PSCi.Directive as D
+import PSCi.Types
 
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO

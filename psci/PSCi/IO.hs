@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module IO where
+module PSCi.IO where
 
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
