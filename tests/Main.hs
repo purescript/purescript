@@ -25,6 +25,7 @@ import qualified TestCompiler
 import qualified TestPscPublish
 import qualified TestDocs
 import qualified TestPsci
+import qualified TestPscIde
 
 main :: IO ()
 main = do
@@ -36,6 +37,8 @@ main = do
   TestPscPublish.main
   heading "psci test suite"
   TestPsci.main
+  heading "psc-ide test suite"
+  TestPscIde.main
 
   where
   heading msg = do
