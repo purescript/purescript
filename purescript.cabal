@@ -206,7 +206,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules: JSON
+    other-modules: JSON, Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
@@ -225,6 +225,11 @@ executable psci
                    PSCi.Directive
                    PSCi.Completion
                    PSCi.IO
+                   PSCi.Message
+                   PSCi.Option
+                   PSCi.Module
+                   PSCi.Printer
+                   Paths_purescript
     ghc-options: -Wall -O2
 
 executable psc-docs
@@ -234,6 +239,7 @@ executable psc-docs
                    filepath -any, Glob -any, transformers -any,
                    transformers-compat -any
     main-is: Main.hs
+    other-modules: Paths_purescript
     buildable: True
     hs-source-dirs: psc-docs
     other-modules: Ctags
@@ -244,6 +250,7 @@ executable psc-docs
 executable psc-publish
     build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
     main-is: Main.hs
+    other-modules: Paths_purescript
     buildable: True
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
@@ -253,6 +260,7 @@ executable psc-hierarchy
                    process -any, mtl -any, parsec -any, filepath -any, directory -any,
                    Glob -any
     main-is: Main.hs
+    other-modules: Paths_purescript
     buildable: True
     hs-source-dirs: hierarchy
     other-modules:
@@ -260,7 +268,7 @@ executable psc-hierarchy
 
 executable psc-bundle
   main-is:             Main.hs
-  other-modules:
+  other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
                        purescript -any,
