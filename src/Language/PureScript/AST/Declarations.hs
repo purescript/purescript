@@ -189,7 +189,7 @@ data Declaration
   -- |
   -- A fixity declaration (fixity data, operator name, value the operator is an alias for)
   --
-  | FixityDeclaration Fixity String (Maybe (Qualified Ident))
+  | FixityDeclaration Fixity String (Maybe (Either (Qualified Ident) (Qualified (ProperName 'ConstructorName))))
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)

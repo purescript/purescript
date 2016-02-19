@@ -61,7 +61,11 @@ renderDeclarationWithOptions opts Declaration{..} =
     AliasDeclaration for (P.Fixity associativity precedence) ->
       [ keywordFixity associativity
       , syntax $ show precedence
-      , ident $ P.showQualified P.runIdent $ dequalifyCurrentModule for
+      , ident $
+          either
+            (P.showQualified P.runIdent . dequalifyCurrentModule)
+            (P.showQualified P.runProperName . dequalifyCurrentModule)
+            for
       , keyword "as"
       , ident . tail . init $ declTitle
       ]

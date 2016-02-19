@@ -19,7 +19,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Synonyms as T
 
 import Data.Maybe
-import Data.List (nub, (\\), sort, group)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Foldable (for_, traverse_)
 
 import qualified Data.Map as M
@@ -30,14 +30,14 @@ import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Language.PureScript.Crash
-import Language.PureScript.Types
-import Language.PureScript.Names
-import Language.PureScript.Kinds
 import Language.PureScript.AST
-import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
 
 addDataType
   :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -281,9 +281,14 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
 
   checkFixities :: Declaration -> m ()
-  checkFixities (FixityDeclaration _ name (Just alias)) = do
+  checkFixities (FixityDeclaration _ name (Just (Left alias))) = do
     ty <- lookupVariable moduleName alias
     addValue moduleName (Op name) ty Public
+  checkFixities (FixityDeclaration _ name (Just (Right alias))) = do
+    env <- getEnv
+    case M.lookup alias (dataConstructors env) of
+      Nothing -> throwError . errorMessage $ UnknownDataConstructor alias Nothing
+      Just (_, _, ty, _) -> addValue moduleName (Op name) ty Public
   checkFixities (FixityDeclaration _ name _) = do
     env <- getEnv
     guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
@@ -349,7 +354,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     checkTypesAreExported e
     checkClassMembersAreExported e
     checkClassesAreExported e
-    checkNonAliasesAreExported e
+    checkNonAliasesAreExported (exportedDataConstructors exps) e
   return $ Module ss coms mn decls' (Just exps)
   where
 
@@ -374,7 +379,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
   checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
   checkExport dr extract ty = case filter (not . exported) (extract ty) of
     [] -> return ()
-    hidden -> throwError . errorMessage $ TransitiveExportError dr hidden
+    hidden -> throwError . errorMessage $ TransitiveExportError dr (nubBy nubEq hidden)
     where
     exported e = any (exports e) exps
     exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
@@ -383,6 +388,11 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
     exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
     exports _ _ = False
+    -- We avoid Eq for `nub`bing as the dctor part of `TypeRef` evaluates to
+    -- `error` for the values generated here (we don't need them anyway)
+    nubEq (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
+    nubEq r1 r2 = r1 == r2
+
 
   -- Check that all the type constructors defined in the current module that appear in member types
   -- have also been exported from the module
@@ -425,17 +435,30 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
 
-  checkNonAliasesAreExported :: DeclarationRef -> m ()
-  checkNonAliasesAreExported dr@(ValueRef (Op name)) =
+  checkNonAliasesAreExported :: [ProperName 'ConstructorName] -> DeclarationRef -> m ()
+  checkNonAliasesAreExported exportedDctors dr@(ValueRef (Op name)) =
     case listToMaybe (mapMaybe getAlias decls) of
-      Just alias ->
-        unless (ValueRef alias `elem` exps) $
-          throwError . errorMessage $ TransitiveExportError dr [ValueRef alias]
+      Just (Left ident) ->
+        unless (ValueRef ident `elem` exps) $
+          throwError . errorMessage $ TransitiveExportError dr [ValueRef ident]
+      Just (Right ctor) ->
+        unless (ctor `elem` exportedDctors) $
+          throwError . errorMessage $ TransitiveDctorExportError dr ctor
       _ -> return ()
     where
-    getAlias :: Declaration -> Maybe Ident
+    getAlias :: Declaration -> Maybe (Either Ident (ProperName 'ConstructorName))
     getAlias (PositionedDeclaration _ _ d) = getAlias d
-    getAlias (FixityDeclaration _ name' (Just (Qualified (Just mn') alias)))
-      | mn == mn' && name == name' = Just alias
+    getAlias (FixityDeclaration _ name' (Just alias)) | name == name' =
+      case alias of
+        Left (Qualified (Just mn') ident) | mn == mn' -> Just (Left ident)
+        Right (Qualified (Just mn') ctor) | mn == mn' -> Just (Right ctor)
+        _ -> Nothing
     getAlias _ = Nothing
-  checkNonAliasesAreExported _ = return ()
+  checkNonAliasesAreExported _ _ = return ()
+
+  exportedDataConstructors :: [DeclarationRef] -> [ProperName 'ConstructorName]
+  exportedDataConstructors = foldMap extractCtor
+    where
+    extractCtor :: DeclarationRef -> [ProperName 'ConstructorName]
+    extractCtor (TypeRef _ (Just ctors)) = ctors
+    extractCtor _ = []
