@@ -29,7 +29,7 @@ import Language.PureScript.Docs.Types
 --
 convertSingleModule :: P.Module -> Module
 convertSingleModule m@(P.Module _ coms moduleName  _ _) =
-  Module (P.runModuleName moduleName) comments (declarations m) []
+  Module moduleName comments (declarations m) []
   where
   comments = convertComments coms
   declarations =
@@ -109,7 +109,7 @@ addDefaultFixity decl@Declaration{..}
   defaultFixity = P.Fixity P.Infixl (-1)
 
 getDeclarationTitle :: P.Declaration -> Maybe String
-getDeclarationTitle (P.TypeDeclaration name _)               = Just (P.showIdent name)
+getDeclarationTitle (P.ValueDeclaration name _ _ _)          = Just (P.showIdent name)
 getDeclarationTitle (P.ExternDeclaration name _)             = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (P.runProperName name)
@@ -135,8 +135,12 @@ basicDeclaration :: String -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration title info = Just $ Right $ mkDeclaration title info
 
 convertDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
-convertDeclaration (P.TypeDeclaration _ ty) title =
+convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
   basicDeclaration title (ValueDeclaration ty)
+convertDeclaration (P.ValueDeclaration _ _ _ _) title =
+  -- If no explicit type declaration was provided, insert a wildcard, so that
+  -- the actual type will be added during type checking.
+  basicDeclaration title (ValueDeclaration P.TypeWildcard)
 convertDeclaration (P.ExternDeclaration _ ty) title =
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration (P.DataDeclaration dtype _ args ctors) title =

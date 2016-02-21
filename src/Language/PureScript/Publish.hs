@@ -146,15 +146,15 @@ preparePackage' opts = do
 getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  (modules', bookmarks, env) <- parseAndDesugar inputFiles depsFiles
+  (modules', bookmarks) <- parseAndBookmark inputFiles depsFiles
 
-  case runExcept (D.convertModulesInPackage env modules') of
+  case runExcept (D.convertModulesInPackage modules') of
     Right modules -> return (bookmarks, modules)
     Left err -> userError (CompileError err)
 
   where
-  parseAndDesugar inputFiles depsFiles = do
-    r <- liftIO . runExceptT $ D.parseAndDesugar inputFiles depsFiles
+  parseAndBookmark inputFiles depsFiles = do
+    r <- liftIO . runExceptT $ D.parseAndBookmark inputFiles depsFiles
     case r of
       Right r' ->
         return r'

@@ -176,7 +176,7 @@ library
                      Language.PureScript.Docs.RenderedCode.Types
                      Language.PureScript.Docs.RenderedCode.Render
                      Language.PureScript.Docs.AsMarkdown
-                     Language.PureScript.Docs.ParseAndDesugar
+                     Language.PureScript.Docs.ParseAndBookmark
                      Language.PureScript.Docs.Utils.MonoidExtras
 
                      Language.PureScript.Publish

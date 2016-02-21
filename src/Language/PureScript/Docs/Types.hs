@@ -73,7 +73,7 @@ packageName :: Package a -> PackageName
 packageName = bowerName . pkgMeta
 
 data Module = Module
-  { modName         :: String
+  { modName         :: P.ModuleName
   , modComments     :: Maybe String
   , modDeclarations :: [Declaration]
   -- Re-exported values from other modules
@@ -346,7 +346,7 @@ parseVersion' str =
 
 asModule :: Parse PackageError Module
 asModule =
-  Module <$> key "name" asString
+  Module <$> key "name" (P.moduleNameFromString <$> asString)
          <*> key "comments" (perhaps asString)
          <*> key "declarations" (eachInArray asDeclaration)
          <*> key "reExports" (eachInArray asReExport)
@@ -512,7 +512,7 @@ instance A.ToJSON NotYetKnown where
 
 instance A.ToJSON Module where
   toJSON Module{..} =
-    A.object [ "name"         .= modName
+    A.object [ "name"         .= P.runModuleName modName
              , "comments"     .= modComments
              , "declarations" .= modDeclarations
              , "reExports"    .= map toObj modReExports
