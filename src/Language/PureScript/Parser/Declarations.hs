@@ -374,7 +374,7 @@ parseLet = do
   return $ Let ds result
 
 parseValueAtom :: TokenParser Expr
-parseValueAtom = P.choice
+parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  [ parseAnonymousArgument
                  , parseNumericLiteral
                  , parseCharLiteral

@@ -24,8 +24,7 @@ data Meta
   -- |
   -- The contained reference is for a foreign member
   --
-  | IsForeign
-  deriving (Show, Read)
+  | IsForeign deriving (Show, Read, Eq)
 
 -- |
 -- Data constructor metadata
@@ -38,5 +37,4 @@ data ConstructorType
   -- |
   -- The constructor is for a type with multiple construcors
   --
-  | SumType
-  deriving (Show, Read)
+  | SumType deriving (Show, Read, Eq)

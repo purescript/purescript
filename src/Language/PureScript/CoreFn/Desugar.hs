@@ -1,5 +1,9 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
+import Prelude ()
+import Prelude.Compat
+
+
 import Data.Function (on)
 import Data.List (sort, sortBy, nub)
 import Data.Maybe (mapMaybe)
@@ -30,38 +34,52 @@ moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
-  let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
+  let imports = mapMaybe importToCoreFn decls ++ findQualModules decls
+      imports' = nub $ filter (keepImp imports) imports-- TODO could be more efficient
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn Nothing []) decls
-  in Module coms mn imports exps' externs decls'
+  in Module coms mn imports' exps' externs decls'
 
   where
+
+  -- Remove duplicate imports favoring the one containing sourcespan info
+  keepImp :: [(Ann, ModuleName)] -> (Ann, ModuleName) -> Bool
+  keepImp imps (a, i) = hasSS a || not (any hasDup imps)
+    where
+      hasDup (a', i') = i == i' && hasSS a'
+
+  hasSS :: Ann -> Bool
+  hasSS (Just _, _, _, _) = True
+  hasSS _ = False
+
+  ssA :: Maybe SourceSpan -> Ann
+  ssA ss = (ss, [], Nothing, Nothing)
 
   -- |
   -- Desugars member declarations from AST to CoreFn representation.
   --
   declToCoreFn :: Maybe SourceSpan -> [Comment] -> A.Declaration -> [Bind Ann]
   declToCoreFn ss com (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
-    [NonRec (properToIdent ctor) $
+    [NonRec (ssA ss) (properToIdent ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var nullAnn $ Qualified Nothing (Ident "x"))]
   declToCoreFn _ _ d@(A.DataDeclaration Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn ss com (A.DataDeclaration Data tyName _ ctors) =
     flip map ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
-    [NonRec name (exprToCoreFn ss com Nothing e)]
+    [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
     let meta = either getValueMeta (Just . getConstructorMeta) alias
         alias' = either id (fmap properToIdent) alias
-    in [NonRec (Op name) (Var (ss, com, Nothing, meta) alias')]
+    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) alias')]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
-    [Rec $ map (\(name, _, e) -> (name, exprToCoreFn ss [] Nothing e)) ds]
+    [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
-    [NonRec (properToIdent name) $ mkTypeClassConstructor ss com supers members]
+    [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor ss com supers members]
   declToCoreFn _  com (A.PositionedDeclaration ss com1 d) =
     declToCoreFn (Just ss) (com ++ com1) d
   declToCoreFn _ _ _ = []
@@ -203,35 +221,36 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
 -- ensure instances are imported from any module that is referenced by the
 -- current module, not just from those that are imported explicitly (#667).
 --
-findQualModules :: [A.Declaration] -> [ModuleName]
+findQualModules :: [A.Declaration] -> [(Ann, ModuleName)]
 findQualModules decls =
   let (f, _, _, _, _) = everythingOnValues (++) fqDecls fqValues fqBinders (const []) (const [])
   in f `concatMap` decls
   where
-  fqDecls :: A.Declaration -> [ModuleName]
+  fqDecls :: A.Declaration -> [(Ann, ModuleName)]
   fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual q
   fqDecls (A.FixityDeclaration _ _ (Just eq)) = either getQual getQual eq
   fqDecls _ = []
 
-  fqValues :: A.Expr -> [ModuleName]
+  fqValues :: A.Expr -> [(Ann, ModuleName)]
   fqValues (A.Var q) = getQual q
   fqValues (A.Constructor q) = getQual q
   fqValues _ = []
 
-  fqBinders :: A.Binder -> [ModuleName]
+  fqBinders :: A.Binder -> [(Ann, ModuleName)]
   fqBinders (A.ConstructorBinder q _) = getQual q
   fqBinders _ = []
 
-  getQual :: Qualified a -> [ModuleName]
-  getQual (Qualified (Just mn) _) = [mn]
+  getQual :: Qualified a -> [(Ann, ModuleName)]
+  getQual (Qualified (Just mn) _) = [(nullAnn, mn)]
   getQual _ = []
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.
 --
-importToCoreFn :: A.Declaration -> Maybe ModuleName
-importToCoreFn (A.ImportDeclaration name _ _ _) = Just name
-importToCoreFn (A.PositionedDeclaration _ _ d) = importToCoreFn d
+importToCoreFn :: A.Declaration -> Maybe (Ann, ModuleName)
+importToCoreFn (A.ImportDeclaration name _ _ _) = Just (nullAnn, name)
+importToCoreFn (A.PositionedDeclaration ss _ d) =
+  ((,) (Just ss, [], Nothing, Nothing) . snd) <$> importToCoreFn d
 importToCoreFn _ = Nothing
 
 -- |

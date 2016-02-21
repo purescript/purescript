@@ -40,46 +40,46 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Desugar monomorphic calls to >>= and return for the Eff monad
   convert :: JS -> JS
   -- Desugar pure & return
-  convert (JSApp (JSApp pure' [val]) []) | isPure pure' = val
+  convert (JSApp _ (JSApp _ pure' [val]) []) | isPure pure' = val
   -- Desugar >>
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [] (JSBlock js)]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock (JSApp m [] : map applyReturns js )
+  convert (JSApp _ (JSApp _ bind [m]) [JSFunction s1 Nothing [] (JSBlock s2 js)]) | isBind bind =
+    JSFunction s1 (Just fnName) [] $ JSBlock s2 (JSApp s2 m [] : map applyReturns js )
   -- Desugar >>=
-  convert (JSApp (JSApp bind [m]) [JSFunction Nothing [arg] (JSBlock js)]) | isBind bind =
-    JSFunction (Just fnName) [] $ JSBlock (JSVariableIntroduction arg (Just (JSApp m [])) : map applyReturns js)
+  convert (JSApp _ (JSApp _ bind [m]) [JSFunction s1 Nothing [arg] (JSBlock s2 js)]) | isBind bind =
+    JSFunction s1 (Just fnName) [] $ JSBlock s2 (JSVariableIntroduction s2 arg (Just (JSApp s2 m [])) : map applyReturns js)
   -- Desugar untilE
-  convert (JSApp (JSApp f [arg]) []) | isEffFunc C.untilE f =
-    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSUnary Not (JSApp arg [])) (JSBlock []), JSReturn $ JSObjectLiteral []])) []
+  convert (JSApp s1 (JSApp _ f [arg]) []) | isEffFunc C.untilE f =
+    JSApp s1 (JSFunction s1 Nothing [] (JSBlock s1 [ JSWhile s1 (JSUnary s1 Not (JSApp s1 arg [])) (JSBlock s1 []), JSReturn s1 $ JSObjectLiteral s1 []])) []
   -- Desugar whileE
-  convert (JSApp (JSApp (JSApp f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
-    JSApp (JSFunction Nothing [] (JSBlock [ JSWhile (JSApp arg1 []) (JSBlock [ JSApp arg2 [] ]), JSReturn $ JSObjectLiteral []])) []
+  convert (JSApp _ (JSApp _ (JSApp s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
+    JSApp s1 (JSFunction s1 Nothing [] (JSBlock s1 [ JSWhile s1 (JSApp s1 arg1 []) (JSBlock s1 [ JSApp s1 arg2 [] ]), JSReturn s1 $ JSObjectLiteral s1 []])) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
-  isBind (JSApp fn [dict]) | isDict (C.eff, C.bindEffDictionary) dict && isBindPoly fn = True
+  isBind (JSApp _ fn [dict]) | isDict (C.eff, C.bindEffDictionary) dict && isBindPoly fn = True
   isBind _ = False
   -- Check if an expression represents a monomorphic call to pure or return for the Eff applicative
-  isPure (JSApp fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
+  isPure (JSApp _ fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
   isBindPoly = isFn' [(C.prelude, C.bind), (C.prelude, (C.>>=)), (C.controlBind, C.bind)]
   -- Check if an expression represents the polymorphic pure or return function
   isPurePoly = isFn' [(C.prelude, C.pure'), (C.prelude, C.return), (C.controlApplicative, C.pure')]
   -- Check if an expression represents a function in the Eff module
-  isEffFunc name (JSAccessor name' (JSVar eff)) = eff == C.eff && name == name'
+  isEffFunc name (JSAccessor _ name' (JSVar _ eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
 
   -- Remove __do function applications which remain after desugaring
   undo :: JS -> JS
-  undo (JSReturn (JSApp (JSFunction (Just ident) [] body) [])) | ident == fnName = body
+  undo (JSReturn _ (JSApp _ (JSFunction _ (Just ident) [] body) [])) | ident == fnName = body
   undo other = other
 
   applyReturns :: JS -> JS
-  applyReturns (JSReturn ret) = JSReturn (JSApp ret [])
-  applyReturns (JSBlock jss) = JSBlock (map applyReturns jss)
-  applyReturns (JSWhile cond js) = JSWhile cond (applyReturns js)
-  applyReturns (JSFor v lo hi js) = JSFor v lo hi (applyReturns js)
-  applyReturns (JSForIn v xs js) = JSForIn v xs (applyReturns js)
-  applyReturns (JSIfElse cond t f) = JSIfElse cond (applyReturns t) (applyReturns `fmap` f)
+  applyReturns (JSReturn ss ret) = JSReturn ss (JSApp ss ret [])
+  applyReturns (JSBlock ss jss) = JSBlock ss (map applyReturns jss)
+  applyReturns (JSWhile ss cond js) = JSWhile ss cond (applyReturns js)
+  applyReturns (JSFor ss v lo hi js) = JSFor ss v lo hi (applyReturns js)
+  applyReturns (JSForIn ss v xs js) = JSForIn ss v xs (applyReturns js)
+  applyReturns (JSIfElse ss cond t f) = JSIfElse ss cond (applyReturns t) (applyReturns `fmap` f)
   applyReturns other = other
 
 -- |
@@ -91,7 +91,7 @@ inlineST = everywhereOnJS convertBlock
   -- Look for runST blocks and inline the STRefs there.
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
-  convertBlock (JSApp f [arg]) | isSTFunc C.runST f =
+  convertBlock (JSApp _ f [arg]) | isSTFunc C.runST f =
     let refs = nub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
@@ -101,34 +101,34 @@ inlineST = everywhereOnJS convertBlock
   -- Convert a block in a safe way, preserving object wrappers of references,
   -- or in a more aggressive way, turning wrappers into local variables depending on the
   -- agg(ressive) parameter.
-  convert agg (JSApp f [arg]) | isSTFunc C.newSTRef f =
-   JSFunction Nothing [] (JSBlock [JSReturn $ if agg then arg else JSObjectLiteral [(C.stRefValue, arg)]])
-  convert agg (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f =
-    if agg then ref else JSAccessor C.stRefValue ref
-  convert agg (JSApp (JSApp (JSApp f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =
-    if agg then JSAssignment ref arg else JSAssignment (JSAccessor C.stRefValue ref) arg
-  convert agg (JSApp (JSApp (JSApp f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
-    if agg then JSAssignment ref (JSApp func [ref]) else  JSAssignment (JSAccessor C.stRefValue ref) (JSApp func [JSAccessor C.stRefValue ref])
+  convert agg (JSApp s1 f [arg]) | isSTFunc C.newSTRef f =
+   JSFunction s1 Nothing [] (JSBlock s1 [JSReturn s1 $ if agg then arg else JSObjectLiteral s1 [(C.stRefValue, arg)]])
+  convert agg (JSApp _ (JSApp s1 f [ref]) []) | isSTFunc C.readSTRef f =
+    if agg then ref else JSAccessor s1 C.stRefValue ref
+  convert agg (JSApp _ (JSApp _ (JSApp s1 f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =
+    if agg then JSAssignment s1 ref arg else JSAssignment s1 (JSAccessor s1 C.stRefValue ref) arg
+  convert agg (JSApp _ (JSApp _ (JSApp s1 f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
+    if agg then JSAssignment s1 ref (JSApp s1 func [ref]) else JSAssignment s1 (JSAccessor s1 C.stRefValue ref) (JSApp s1 func [JSAccessor s1 C.stRefValue ref])
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (JSAccessor name' (JSVar st)) = st == C.st && name == name'
+  isSTFunc name (JSAccessor _ name' (JSVar _ st)) = st == C.st && name == name'
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everythingOnJS (++) isSTRef
     where
-    isSTRef (JSVariableIntroduction ident (Just (JSApp (JSApp f [_]) []))) | isSTFunc C.newSTRef f = [ident]
+    isSTRef (JSVariableIntroduction _ ident (Just (JSApp _ (JSApp _ f [_]) []))) | isSTFunc C.newSTRef f = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
   findAllSTUsagesIn = everythingOnJS (++) isSTUsage
     where
-    isSTUsage (JSApp (JSApp f [ref]) []) | isSTFunc C.readSTRef f = [ref]
-    isSTUsage (JSApp (JSApp (JSApp f [ref]) [_]) []) | isSTFunc C.writeSTRef f || isSTFunc C.modifySTRef f = [ref]
+    isSTUsage (JSApp _ (JSApp _ f [ref]) []) | isSTFunc C.readSTRef f = [ref]
+    isSTUsage (JSApp _ (JSApp _ (JSApp _ f [ref]) [_]) []) | isSTFunc C.writeSTRef f || isSTFunc C.modifySTRef f = [ref]
     isSTUsage _ = []
   -- Find all uses of a variable
   appearingIn ref = everythingOnJS (++) isVar
     where
-    isVar e@(JSVar v) | v == ref = [e]
+    isVar e@(JSVar _ v) | v == ref = [e]
     isVar _ = []
   -- Convert a JS value to a String if it is a JSVar
-  toVar (JSVar v) = Just v
+  toVar (JSVar _ v) = Just v
   toVar _ = Nothing

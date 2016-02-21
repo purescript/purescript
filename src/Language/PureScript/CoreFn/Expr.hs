@@ -60,12 +60,11 @@ data Bind a
   -- |
   -- Non-recursive binding for a single value
   --
-  = NonRec Ident (Expr a)
+  = NonRec a Ident (Expr a)
   -- |
   -- Mutually recursive binding group for several values
   --
-  | Rec [(Ident, Expr a)]
-  deriving (Show, Read, Functor)
+  | Rec [((a, Ident), Expr a)] deriving (Show, Read, Functor)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -84,8 +83,7 @@ data CaseAlternative a = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: Either [(Guard a, Expr a)] (Expr a)
-  }
-  deriving (Show, Read)
+  } deriving (Show, Read)
 
 instance Functor CaseAlternative where
 

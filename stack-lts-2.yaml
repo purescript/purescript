@@ -6,4 +6,5 @@ extra-deps:
 - bower-json-0.7.0.0
 - boxes-0.1.4
 - pattern-arrows-0.0.2
+- sourcemap-0.1.6
 resolver: lts-2.22
