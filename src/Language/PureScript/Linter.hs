@@ -71,6 +71,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       go d | Just i <- getDeclIdent d
            , i `S.member` s = errorMessage (ShadowedName i)
            | otherwise = mempty
+    stepE _ (OperatorSection op val) = errorMessage $ DeprecatedOperatorSection op val
     stepE _ _ = mempty
 
     stepB :: S.Set Ident -> Binder -> MultipleErrors

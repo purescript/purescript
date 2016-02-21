@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.ObjectWildcards (
@@ -8,12 +9,11 @@ module Language.PureScript.Sugar.ObjectWildcards (
 import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Data.List (partition)
-import Data.Maybe (isJust, fromJust, catMaybes)
+import Data.Maybe (catMaybes)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
@@ -24,30 +24,51 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   where
 
   desugarDecl :: Declaration -> m Declaration
-  (desugarDecl, _, _) = everywhereOnValuesM return desugarExpr return
+  desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
+  desugarDecl other = f other
+    where
+    (f, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
   desugarExpr :: Expr -> m Expr
-  desugarExpr (ObjectConstructor ps) = wrapLambda ObjectLiteral ps
-  desugarExpr (ObjectUpdater (Just obj) ps) = wrapLambda (ObjectUpdate obj) ps
-  desugarExpr (ObjectUpdater Nothing ps) = do
+  desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
+  desugarExpr (Parens b)
+    | b' <- stripPositionInfo b
+    , BinaryNoParens op val u <- b'
+    , isAnonymousArgument u = return $ OperatorSection op (Left val)
+    | b' <- stripPositionInfo b
+    , BinaryNoParens op u val <- b'
+    , isAnonymousArgument u = return $ OperatorSection op (Right val)
+  desugarExpr (ObjectLiteral ps) = wrapLambda ObjectLiteral ps
+  desugarExpr (ObjectUpdate u ps) | isAnonymousArgument u = do
     obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (Var (Qualified Nothing obj))) ps
-  desugarExpr (ObjectGetter prop) = do
+  desugarExpr (ObjectUpdate obj ps) = wrapLambda (ObjectUpdate obj) ps
+  desugarExpr (Accessor prop u) | isAnonymousArgument u = do
     arg <- freshIdent'
     return $ Abs (Left arg) (Accessor prop (Var (Qualified Nothing arg)))
   desugarExpr e = return e
 
-  wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Maybe Expr)] -> m Expr
+  wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Expr)] -> m Expr
   wrapLambda mkVal ps =
-    let (props, args) = partition (isJust . snd) ps
+    let (args, props) = partition (isAnonymousArgument . snd) ps
     in if null args
-       then return . mkVal $ second fromJust `map` props
+       then return $ mkVal props
        else do
         (args', ps') <- unzip <$> mapM mkProp ps
         return $ foldr (Abs . Left) (mkVal ps') (catMaybes args')
 
-  mkProp :: (String, Maybe Expr) -> m (Maybe Ident, (String, Expr))
-  mkProp (name, Just e) = return (Nothing, (name, e))
-  mkProp (name, Nothing) = do
-    arg <- freshIdent'
-    return (Just arg, (name, Var (Qualified Nothing arg)))
+  stripPositionInfo :: Expr -> Expr
+  stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
+  stripPositionInfo e = e
+
+  isAnonymousArgument :: Expr -> Bool
+  isAnonymousArgument AnonymousArgument = True
+  isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
+  isAnonymousArgument _ = False
+
+  mkProp :: (String, Expr) -> m (Maybe Ident, (String, Expr))
+  mkProp (name, e)
+    | isAnonymousArgument e = do
+      arg <- freshIdent'
+      return (Just arg, (name, Var (Qualified Nothing arg)))
+    | otherwise = return (Nothing, (name, e))

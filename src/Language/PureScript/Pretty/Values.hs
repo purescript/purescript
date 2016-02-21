@@ -57,7 +57,6 @@ prettyPrintValue d (IfThenElse cond th el) =
                             ])
 prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> text ("." ++ show prop)
 prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> prettyPrintValue (d - 1) val) ps
-prettyPrintValue d (ObjectUpdater o ps) = maybe (text "_") (prettyPrintValueAtom (d - 1)) o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> maybe (text "_") (prettyPrintValue (d - 1)) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : showIdent arg ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
@@ -86,8 +85,7 @@ prettyPrintValueAtom _ (BooleanLiteral True) = text "true"
 prettyPrintValueAtom _ (BooleanLiteral False) = text "false"
 prettyPrintValueAtom d (ArrayLiteral xs) = list '[' ']' (prettyPrintValue (d - 1)) xs
 prettyPrintValueAtom d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ second Just `map` ps
-prettyPrintValueAtom d (ObjectConstructor ps) = prettyPrintObject (d - 1) ps
-prettyPrintValueAtom _ (ObjectGetter prop) = text $ "_." ++ show prop
+prettyPrintValueAtom _ AnonymousArgument = text "_"
 prettyPrintValueAtom _ (Constructor name) = text $ runProperName (disqualify name)
 prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
 prettyPrintValueAtom d (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue (d - 1) op) `beforeWithSpace` prettyPrintValue (d - 1) val) `before` text ")"
