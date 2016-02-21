@@ -15,6 +15,9 @@
 
 module PSCi.Types where
 
+import Prelude ()
+import Prelude.Compat
+
 import Control.Arrow (second)
 import Data.Map (Map)
 import qualified Data.Map as Map

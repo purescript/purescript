@@ -65,6 +65,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@codedmart](https://github.com/codedmart) (Brandon Martin) My existing contributions and all future contributions until further notice are Copyright Brandon Martin, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@passy](https://github.com/passy) (Pascal Hartig) My existing contributions and all future contributions until further notice are Copyright Pascal Hartig, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@DavidLindbom](https://github.com/DavidLindbom) (David Lindbom) My existing contributions and all future contributions until further notice are Copyright David Lindbom, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- [@izgzhen](https://github.com/izgzhen) (Zhen Zhang) My existing contributions and all future contributions until further notice are Copyright Zhen Zhang, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 

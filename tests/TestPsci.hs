@@ -23,7 +23,7 @@ import Test.HUnit
 
 import qualified Language.PureScript as P
 
-import PSCi
+import PSCi.Module (loadAllModules)
 import PSCi.Completion
 import PSCi.Types
 
