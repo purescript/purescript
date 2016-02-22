@@ -69,6 +69,8 @@ everywhereOnValues f g h = (f', g', h')
 
   h' :: Binder -> Binder
   h' (ConstructorBinder ctor bs) = h (ConstructorBinder ctor (map h' bs))
+  h' (BinaryNoParensBinder b1 b2 b3) = h (BinaryNoParensBinder (h' b1) (h' b2) (h' b3))
+  h' (ParensInBinder b) = h (ParensInBinder (h' b))
   h' (ObjectBinder bs) = h (ObjectBinder (map (fmap h') bs))
   h' (ArrayBinder bs) = h (ArrayBinder (map h' bs))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
@@ -124,6 +126,8 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' other = g other
 
   h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> traverse (h' <=< h) bs
+  h' (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> (h b1 >>= h') <*> (h b2 >>= h') <*> (h b3 >>= h')
+  h' (ParensInBinder b) = ParensInBinder <$> (h b >>= h')
   h' (ObjectBinder bs) = ObjectBinder <$> traverse (sndM (h' <=< h)) bs
   h' (ArrayBinder bs) = ArrayBinder <$> traverse (h' <=< h) bs
   h' (NamedBinder name b) = NamedBinder name <$> (h b >>= h')
@@ -175,6 +179,8 @@ everywhereOnValuesM f g h = (f', g', h')
   g' other = g other
 
   h' (ConstructorBinder ctor bs) = (ConstructorBinder ctor <$> traverse h' bs) >>= h
+  h' (BinaryNoParensBinder b1 b2 b3) = (BinaryNoParensBinder <$> h' b1 <*> h' b2 <*> h' b3) >>= h
+  h' (ParensInBinder b) = (ParensInBinder <$> h' b) >>= h
   h' (ObjectBinder bs) = (ObjectBinder <$> traverse (sndM h') bs) >>= h
   h' (ArrayBinder bs) = (ArrayBinder <$> traverse h' bs) >>= h
   h' (NamedBinder name b) = (NamedBinder name <$> h' b) >>= h
@@ -229,6 +235,8 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v = g v
 
   h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
+  h' b@(BinaryNoParensBinder b1 b2 b3) = h b <> h' b1 <> h' b2 <> h' b3
+  h' b@(ParensInBinder b1) = h b <> h' b1
   h' b@(ObjectBinder bs) = foldl (<>) (h b) (map (h' . snd) bs)
   h' b@(ArrayBinder bs) = foldl (<>) (h b) (map h' bs)
   h' b@(NamedBinder _ b1) = h b <> h' b1
@@ -296,6 +304,8 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   h'' s b = let (s', r) = h s b in r <> h' s' b
 
   h' s (ConstructorBinder _ bs) = foldl (<>) r0 (map (h'' s) bs)
+  h' s (BinaryNoParensBinder b1 b2 b3) = h'' s b1 <> h'' s b2 <> h'' s b3
+  h' s (ParensInBinder b) = h'' s b
   h' s (ObjectBinder bs) = foldl (<>) r0 (map (h'' s . snd) bs)
   h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (NamedBinder _ b1) = h'' s b1
@@ -364,6 +374,8 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   h'' s = uncurry h' <=< h s
 
   h' s (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> traverse (h'' s) bs
+  h' s (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> h'' s b1 <*> h'' s b2 <*> h'' s b3
+  h' s (ParensInBinder b) = ParensInBinder <$> h'' s b
   h' s (ObjectBinder bs) = ObjectBinder <$> traverse (sndM (h'' s)) bs
   h' s (ArrayBinder bs) = ArrayBinder <$> traverse (h'' s) bs
   h' s (NamedBinder name b) = NamedBinder name <$> h'' s b
@@ -451,11 +463,11 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   h'' s a = h s a <> h' s a
 
   h' s (ConstructorBinder _ bs) = foldMap (h'' s) bs
+  h' s (BinaryNoParensBinder b1 b2 b3) = foldMap (h'' s) [b1, b2, b3]
+  h' s (ParensInBinder b) = h'' s b
   h' s (ObjectBinder bs) = foldMap (h'' s . snd) bs
   h' s (ArrayBinder bs) = foldMap (h'' s) bs
-  h' s (NamedBinder name b1) =
-    let s' = S.insert name s
-    in h'' s' b1
+  h' s (NamedBinder name b1) = h'' (S.insert name s) b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
   h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = mempty

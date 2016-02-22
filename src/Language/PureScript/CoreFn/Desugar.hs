@@ -55,7 +55,9 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
-    [NonRec (Op name) (Var (ss, com, Nothing, getValueMeta alias) alias)]
+    let meta = either getValueMeta (Just . getConstructorMeta) alias
+        alias' = either id (fmap properToIdent) alias
+    in [NonRec (Op name) (Var (ss, com, Nothing, meta) alias')]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> (name, exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
@@ -157,6 +159,12 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     binderToCoreFn (Just ss) (com ++ com1) b
   binderToCoreFn ss com (A.TypedBinder _ b) =
     binderToCoreFn ss com b
+  binderToCoreFn _ _ A.OpBinder{} =
+    internalError "OpBinder should have been desugared before binderToCoreFn"
+  binderToCoreFn _ _ A.BinaryNoParensBinder{} =
+    internalError "BinaryNoParensBinder should have been desugared before binderToCoreFn"
+  binderToCoreFn _ _ A.ParensInBinder{} =
+    internalError "ParensInBinder should have been desugared before binderToCoreFn"
 
   -- |
   -- Gets metadata for values.
@@ -201,18 +209,22 @@ findQualModules decls =
   in f `concatMap` decls
   where
   fqDecls :: A.Declaration -> [ModuleName]
-  fqDecls (A.TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
-  fqDecls (A.FixityDeclaration _ _ (Just (Qualified (Just mn) _))) = [mn]
+  fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual q
+  fqDecls (A.FixityDeclaration _ _ (Just eq)) = either getQual getQual eq
   fqDecls _ = []
 
   fqValues :: A.Expr -> [ModuleName]
-  fqValues (A.Var (Qualified (Just mn) _)) = [mn]
-  fqValues (A.Constructor (Qualified (Just mn) _)) = [mn]
+  fqValues (A.Var q) = getQual q
+  fqValues (A.Constructor q) = getQual q
   fqValues _ = []
 
   fqBinders :: A.Binder -> [ModuleName]
-  fqBinders (A.ConstructorBinder (Qualified (Just mn) _) _) = [mn]
+  fqBinders (A.ConstructorBinder q _) = getQual q
   fqBinders _ = []
+
+  getQual :: Qualified a -> [ModuleName]
+  getQual (Qualified (Just mn) _) = [mn]
+  getQual _ = []
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.

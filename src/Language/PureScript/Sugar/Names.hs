@@ -169,7 +169,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (FixityDeclaration fx name alias) =
-    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse (`updateValueName` pos) alias)
+    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse (eitherM (`updateValueName` pos) (`updateDataConstructorName` pos)) alias)
   updateDecl s d = return (s, d)
 
   updateValue
@@ -204,6 +204,8 @@ renameInModule env imports (Module ss coms mn decls exps) =
     return ((Just pos, bound), v)
   updateBinder s@(pos, _) (ConstructorBinder name b) =
     (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder s@(pos, _) (OpBinder name) =
+    (,) s <$> (OpBinder <$> updateValueName name pos)
   updateBinder s (TypedBinder t b) = do
     (s'@ (span', _), b') <- updateBinder s b
     t' <- updateTypesEverywhere span' t

@@ -113,6 +113,7 @@ data SimpleErrorMessage
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
+  | TransitiveDctorExportError DeclarationRef (ProperName 'ConstructorName)
   | ShadowedName Ident
   | ShadowedTypeVar String
   | UnusedTypeVar String
@@ -145,6 +146,7 @@ data SimpleErrorMessage
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
+  | InvalidOperatorInBinder Ident Ident
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -290,6 +292,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidNewtype{} -> "InvalidNewtype"
   InvalidInstanceHead{} -> "InvalidInstanceHead"
   TransitiveExportError{} -> "TransitiveExportError"
+  TransitiveDctorExportError{} -> "TransitiveDctorExportError"
   ShadowedName{} -> "ShadowedName"
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
@@ -322,6 +325,7 @@ errorCode em = case unwrapErrorMessage em of
   HidingImport{} -> "HidingImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
   IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
+  InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
 
 -- |
 -- A stack trace for an error
@@ -789,6 +793,10 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "An export for " ++ prettyPrintExport x ++ " requires the following to also be exported: "
             , indent $ paras $ map (line . prettyPrintExport) ys
             ]
+    renderSimpleErrorMessage (TransitiveDctorExportError x ctor) =
+      paras [ line $ "An export for " ++ prettyPrintExport x ++ " requires the following data constructor to also be exported: "
+            , indent $ line $ runProperName ctor
+            ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name '" ++ showIdent nm ++ "' was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
@@ -951,6 +959,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
 
     renderSimpleErrorMessage IncorrectAnonymousArgument =
       line "An anonymous function argument appears in an invalid context."
+
+    renderSimpleErrorMessage (InvalidOperatorInBinder op fn) =
+      paras $ [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
+              , line "Only aliases for data constructors may be used in patterns."
+              ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

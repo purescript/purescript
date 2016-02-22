@@ -20,51 +20,92 @@ module Language.PureScript.Sugar.Operators (
 import Prelude ()
 import Prelude.Compat
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Errors
-import Language.PureScript.Names
 import Language.PureScript.Externs
+import Language.PureScript.Names
+import Language.PureScript.Sugar.Operators.Binders
+import Language.PureScript.Sugar.Operators.Expr
+import Language.PureScript.Traversals (defS)
 
-import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Data.Function (on)
-import Data.Functor.Identity
 import Data.List (groupBy, sortBy)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Pos as P
-import qualified Text.Parsec.Expr as P
-
 import qualified Language.PureScript.Constants as C
+
+-- TODO: in 0.9 operators names can have their own type rather than being in a sum with `Ident`, and `AliasName` no longer needs to be optional
+
+-- |
+-- An operator associated with its declaration position, fixity, and the name
+-- of the function or data constructor it is an alias for.
+--
+type FixityRecord = (Qualified Ident, SourceSpan, Fixity, Maybe AliasName)
+
+-- |
+-- An operator can be an alias for a function or a data constructor.
+--
+type AliasName = Either (Qualified Ident) (Qualified (ProperName 'ConstructorName))
 
 -- |
 -- Remove explicit parentheses and reorder binary operator applications
 --
-rebracket :: (Applicative m, MonadError MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+rebracket
+  :: forall m
+   . (Applicative m, MonadError MultipleErrors m)
+  => [ExternsFile]
+  -> [Module]
+  -> m [Module]
 rebracket externs ms = do
   let fixities = concatMap externsFixities externs ++ concatMap collectFixities ms
   ensureNoDuplicates $ map (\(i, pos, _, _) -> (i, pos)) fixities
   let opTable = customOperatorTable $ map (\(i, _, f, _) -> (i, f)) fixities
   ms' <- traverse (rebracketModule opTable) ms
   let aliased = M.fromList (mapMaybe makeLookupEntry fixities)
-  return $ renameAliasedOperators aliased `map` ms'
+  mapM (renameAliasedOperators aliased) ms'
 
   where
 
-  makeLookupEntry :: (Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident)) -> Maybe (Qualified Ident, Qualified Ident)
+  makeLookupEntry :: FixityRecord -> Maybe (Qualified Ident, AliasName)
   makeLookupEntry (qname, _, _, alias) = (qname, ) <$> alias
 
-  renameAliasedOperators :: M.Map (Qualified Ident) (Qualified Ident) -> Module -> Module
-  renameAliasedOperators aliased (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
+  renameAliasedOperators :: M.Map (Qualified Ident) AliasName -> Module -> m Module
+  renameAliasedOperators aliased (Module ss coms mn ds exts) =
+    Module ss coms mn <$> mapM f' ds <*> pure exts
     where
-    (f', _, _) = everywhereOnValues id go id
-    go (Var name) = Var $ fromMaybe name (name `M.lookup` aliased)
-    go other = other
+    (f', _, _, _, _) = everywhereWithContextOnValuesM Nothing goDecl goExpr goBinder defS defS
+
+    goDecl :: Maybe SourceSpan -> Declaration -> m (Maybe SourceSpan, Declaration)
+    goDecl _ d@(PositionedDeclaration pos _ _) = return (Just pos, d)
+    goDecl pos other = return (pos, other)
+
+    goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
+    goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
+    goExpr pos (Var name) = return (pos, case name `M.lookup` aliased of
+      Just (Left alias) -> Var alias
+      Just (Right alias) -> Constructor alias
+      Nothing -> Var name)
+    goExpr pos other = return (pos, other)
+
+    goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
+    goBinder _ b@(PositionedBinder pos _ _) = return (Just pos, b)
+    goBinder pos (BinaryNoParensBinder (OpBinder name) lhs rhs) = case name `M.lookup` aliased of
+      Just (Left alias) ->
+        maybe id rethrowWithPosition pos $
+          throwError . errorMessage $ InvalidOperatorInBinder (disqualify name) (disqualify alias)
+      Just (Right alias) ->
+        return (pos, ConstructorBinder alias [lhs, rhs])
+      Nothing ->
+        maybe id rethrowWithPosition pos $
+          throwError . errorMessage $ UnknownValue name
+    goBinder _ (BinaryNoParensBinder _ _ _) =
+      internalError "BinaryNoParensBinder has no OpBinder"
+    goBinder pos other = return (pos, other)
 
 removeSignedLiterals :: Module -> Module
 removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds) exts
@@ -74,35 +115,46 @@ removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds)
   go (UnaryMinus val) = App (Var (Qualified Nothing (Ident C.negate))) val
   go other = other
 
-rebracketModule :: (Applicative m, MonadError MultipleErrors m) => [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Module -> m Module
+rebracketModule
+  :: (Applicative m, MonadError MultipleErrors m)
+  => [[(Qualified Ident, Associativity)]]
+  -> Module
+  -> m Module
 rebracketModule opTable (Module ss coms mn ds exts) =
-  let (f, _, _) = everywhereOnValuesTopDownM return (matchOperators opTable) return
+  let (f, _, _) = everywhereOnValuesTopDownM return (matchExprOperators opTable) (matchBinderOperators opTable)
   in Module ss coms mn <$> (map removeParens <$> parU ds f) <*> pure exts
 
 removeParens :: Declaration -> Declaration
 removeParens =
-  let (f, _, _) = everywhereOnValues id go id
+  let (f, _, _) = everywhereOnValues id goExpr goBinder
   in f
   where
-  go (Parens val) = val
-  go val = val
+  goExpr (Parens val) = val
+  goExpr val = val
+  goBinder (ParensInBinder b) = b
+  goBinder b = b
 
-externsFixities :: ExternsFile -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
+externsFixities
+  :: ExternsFile
+  -> [FixityRecord]
 externsFixities ExternsFile{..} =
    [ (Qualified (Just efModuleName) (Op op), internalModuleSourceSpan "", Fixity assoc prec, alias)
    | ExternsFixity assoc prec op alias <- efFixities
    ]
 
-collectFixities :: Module -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
+collectFixities :: Module -> [FixityRecord]
 collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
-  collect :: Declaration -> [(Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Ident))]
+  collect :: Declaration -> [FixityRecord]
   collect (PositionedDeclaration pos _ (FixityDeclaration fixity name alias)) =
     [(Qualified (Just moduleName) (Op name), pos, fixity, alias)]
   collect FixityDeclaration{} = internalError "Fixity without srcpos info"
   collect _ = []
 
-ensureNoDuplicates :: (MonadError MultipleErrors m) => [(Qualified Ident, SourceSpan)] -> m ()
+ensureNoDuplicates
+  :: MonadError MultipleErrors m
+  => [(Qualified Ident, SourceSpan)]
+  -> m ()
 ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
   where
   go [] = return ()
@@ -113,63 +165,24 @@ ensureNoDuplicates m = go $ sortBy (compare `on` fst) m
         throwError . errorMessage $ MultipleFixities name
   go (_ : rest) = go rest
 
-customOperatorTable :: [(Qualified Ident, Fixity)] -> [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]]
+customOperatorTable
+  :: [(Qualified Ident, Fixity)]
+  -> [[(Qualified Ident, Associativity)]]
 customOperatorTable fixities =
   let
-    applyUserOp ident t1 = App (App (Var ident) t1)
-    userOps = map (\(name, Fixity a p) -> (name, applyUserOp name, p, a)) fixities
-    sorted = sortBy (flip compare `on` (\(_, _, p, _) -> p)) userOps
-    groups = groupBy ((==) `on` (\(_, _, p, _) -> p)) sorted
+    userOps = map (\(name, Fixity a p) -> (name, p, a)) fixities
+    sorted = sortBy (flip compare `on` (\(_, p, _) -> p)) userOps
+    groups = groupBy ((==) `on` (\(_, p, _) -> p)) sorted
   in
-    map (map (\(name, f, _, a) -> (name, f, a))) groups
+    map (map (\(name, _, a) -> (name, a))) groups
 
-type Chain = [Either Expr Expr]
-
-matchOperators :: forall m. (MonadError MultipleErrors m) => [[(Qualified Ident, Expr -> Expr -> Expr, Associativity)]] -> Expr -> m Expr
-matchOperators ops = parseChains
-  where
-  parseChains :: Expr -> m Expr
-  parseChains b@BinaryNoParens{} = bracketChain (extendChain b)
-  parseChains other = return other
-  extendChain :: Expr -> Chain
-  extendChain (BinaryNoParens op l r) = Left l : Right op : extendChain r
-  extendChain other = [Left other]
-  bracketChain :: Chain -> m Expr
-  bracketChain = either (\_ -> internalError "matchOperators: cannot reorder operators") return . P.parse (P.buildExpressionParser opTable parseValue <* P.eof) "operator expression"
-  opTable = [P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft]
-            : map (map (\(name, f, a) -> P.Infix (P.try (matchOp name) >> return f) (toAssoc a))) ops
-            ++ [[ P.Infix (P.try (parseOp >>= \ident -> return (\t1 t2 -> App (App (Var ident) t1) t2))) P.AssocLeft ]]
-
-toAssoc :: Associativity -> P.Assoc
-toAssoc Infixl = P.AssocLeft
-toAssoc Infixr = P.AssocRight
-toAssoc Infix  = P.AssocNone
-
-token :: (P.Stream s Identity t) => (t -> Maybe a) -> P.Parsec s u a
-token = P.token (const "") (const (P.initialPos ""))
-
-parseValue :: P.Parsec Chain () Expr
-parseValue = token (either Just (const Nothing)) P.<?> "expression"
-
-parseOp :: P.Parsec Chain () (Qualified Ident)
-parseOp = token (either (const Nothing) fromOp) P.<?> "operator"
-  where
-  fromOp (Var q@(Qualified _ (Op _))) = Just q
-  fromOp _ = Nothing
-
-parseTicks :: P.Parsec Chain () Expr
-parseTicks = token (either (const Nothing) fromOther) P.<?> "infix function"
-  where
-  fromOther (Var (Qualified _ (Op _))) = Nothing
-  fromOther v = Just v
-
-matchOp :: Qualified Ident -> P.Parsec Chain () ()
-matchOp op = do
-  ident <- parseOp
-  guard $ ident == op
-
-desugarOperatorSections :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
-desugarOperatorSections (Module ss coms mn ds exts) = Module ss coms mn <$> traverse goDecl ds <*> pure exts
+desugarOperatorSections
+  :: forall m
+   . (Applicative m, MonadSupply m, MonadError MultipleErrors m)
+  => Module
+  -> m Module
+desugarOperatorSections (Module ss coms mn ds exts) =
+  Module ss coms mn <$> traverse goDecl ds <*> pure exts
   where
 
   goDecl :: Declaration -> m Declaration

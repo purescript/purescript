@@ -400,6 +400,12 @@ inferBinder val (TypedBinder ty binder) = do
   ty1 <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   unifyTypes val ty1
   inferBinder val binder
+inferBinder _ OpBinder{} =
+  internalError "OpBinder should have been desugared before inferBinder"
+inferBinder _ BinaryNoParensBinder{} =
+  internalError "BinaryNoParensBinder should have been desugared before inferBinder"
+inferBinder _ ParensInBinder{} =
+  internalError "ParensInBinder should have been desugared before inferBinder"
 
 -- | Returns true if a binder requires its argument type to be a monotype.
 -- | If this is the case, we need to instantiate any polymorphic types before checking binders.

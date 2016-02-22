@@ -61,7 +61,8 @@ usedModules d =
   where
   forDecls :: Declaration -> [ModuleName]
   forDecls (ImportDeclaration mn _ _ _) = [mn]
-  forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _))) = [mn]
+  forDecls (FixityDeclaration _ _ (Just (Left (Qualified (Just mn) _)))) = [mn]
+  forDecls (FixityDeclaration _ _ (Just (Right (Qualified (Just mn) _)))) = [mn]
   forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
   forDecls _ = []
 

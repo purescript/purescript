@@ -41,6 +41,24 @@ data Binder
   --
   | ConstructorBinder (Qualified (ProperName 'ConstructorName)) [Binder]
   -- |
+  -- A operator alias binder. During the rebracketing phase of desugaring,
+  -- this data constructor will be removed.
+  --
+  | OpBinder (Qualified Ident)
+  -- |
+  -- Binary operator application. During the rebracketing phase of desugaring,
+  -- this data constructor will be removed.
+  --
+  | BinaryNoParensBinder Binder Binder Binder
+  -- |
+  -- Explicit parentheses. During the rebracketing phase of desugaring, this
+  -- data constructor will be removed.
+  --
+  -- Note: although it seems this constructor is not used, it _is_ useful,
+  -- since it prevents certain traversals from matching.
+  --
+  | ParensInBinder Binder
+  -- |
   -- A binder which matches a record and binds its properties
   --
   | ObjectBinder [(String, Binder)]
@@ -70,6 +88,8 @@ binderNames = go []
   where
   go ns (VarBinder name) = name : ns
   go ns (ConstructorBinder _ bs) = foldl go ns bs
+  go ns (BinaryNoParensBinder b1 b2 b3) = foldl go ns [b1, b2, b3]
+  go ns (ParensInBinder b) = go ns b
   go ns (ObjectBinder bs) = foldl go ns (map snd bs)
   go ns (ArrayBinder bs) = foldl go ns bs
   go ns (NamedBinder name b) = go (name : ns) b

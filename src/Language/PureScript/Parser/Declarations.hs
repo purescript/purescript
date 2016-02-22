@@ -122,9 +122,12 @@ parseFixityDeclaration :: TokenParser Declaration
 parseFixityDeclaration = do
   fixity <- parseFixity
   indented
-  alias <- P.optionMaybe $ parseQualified (Ident <$> identifier) <* reserved "as"
+  alias <- P.optionMaybe $ aliased <* reserved "as"
   name <- symbol
   return $ FixityDeclaration fixity name alias
+  where
+  aliased = (Left <$> parseQualified (Ident <$> identifier))
+        <|> (Right <$> parseQualified (ProperName <$> uname))
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
@@ -519,8 +522,19 @@ parseIdentifierAndBinder =
 -- Parse a binder
 --
 parseBinder :: TokenParser Binder
-parseBinder = withSourceSpan PositionedBinder (buildPostfixParser postfixTable parseBinderAtom)
+parseBinder =
+  withSourceSpan
+    PositionedBinder
+    ( P.buildExpressionParser operators
+    . buildPostfixParser postfixTable
+    $ parseBinderAtom
+    )
   where
+  operators =
+    [ [ P.Infix (P.try (C.indented *> parseOpBinder P.<?> "binder operator") >>= \op ->
+          return (BinaryNoParensBinder op)) P.AssocRight
+      ]
+    ]
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
                  ]
@@ -535,8 +549,11 @@ parseBinder = withSourceSpan PositionedBinder (buildPostfixParser postfixTable p
                     , parseConstructorBinder
                     , parseObjectBinder
                     , parseArrayBinder
-                    , parens parseBinder
+                    , ParensInBinder <$> parens parseBinder
                     ] P.<?> "binder"
+
+  parseOpBinder :: TokenParser Binder
+  parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
 
 -- |
 -- Parse a binder as it would appear in a top level declaration
@@ -552,7 +569,7 @@ parseBinderNoParens = P.choice
                       , parseNullaryConstructorBinder
                       , parseObjectBinder
                       , parseArrayBinder
-                      , parens parseBinder
+                      , ParensInBinder <$> parens parseBinder
                       ] P.<?> "binder"
 
 -- |
