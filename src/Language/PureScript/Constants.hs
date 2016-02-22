@@ -98,6 +98,9 @@ eq = "eq"
 notEq :: String
 notEq = "notEq"
 
+compare :: String
+compare = "compare"
+
 (&&) :: String
 (&&) = "&&"
 
