@@ -12,7 +12,6 @@ import Data.Version (Version(..))
 import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
 import Data.List ((\\))
-import Data.Monoid
 import Data.Foldable
 import System.Exit
 
