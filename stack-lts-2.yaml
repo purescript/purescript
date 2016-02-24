@@ -7,4 +7,5 @@ extra-deps:
 - boxes-0.1.4
 - pattern-arrows-0.0.2
 - sourcemap-0.1.6
+- fsnotify-0.2.1
 resolver: lts-2.22

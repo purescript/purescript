@@ -14,7 +14,8 @@ Homepage: http://www.purescript.org/
 author: Phil Freeman <paf31@cantab.net>,
         Gary Burgess <gary.burgess@gmail.com>,
         Hardy Jones <jones3.hardy@gmail.com>,
-        Harry Garrood <harry@garrood.me>
+        Harry Garrood <harry@garrood.me>,
+        Christoph Hegemann <christoph.hegemann1337@gmail.com>
 
 tested-with: GHC==7.8.4, GHC==7.10.3, GHC==8.0.1
 
@@ -80,7 +81,15 @@ library
                    safe >= 0.3.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
                    parallel >= 3.2 && < 3.3,
-                   sourcemap >= 0.1.6
+                   sourcemap >= 0.1.6,
+                   stm >= 0.2.4.0,
+                   regex-tdfa -any,
+                   edit-distance -any,
+                   fsnotify >= 0.2.1,
+                   monad-logger >= 0.3 && < 0.4,
+                   pipes >= 4.0.0 && < 4.2.0 ,
+                   pipes-http -any,
+                   http-types -any
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -188,6 +197,22 @@ library
                      Language.PureScript.Publish.ErrorsWarnings
                      Language.PureScript.Publish.BoxesHelpers
 
+                     Language.PureScript.Ide
+                     Language.PureScript.Ide.Command
+                     Language.PureScript.Ide.Externs
+                     Language.PureScript.Ide.Error
+                     Language.PureScript.Ide.CodecJSON
+                     Language.PureScript.Ide.Pursuit
+                     Language.PureScript.Ide.Completion
+                     Language.PureScript.Ide.Matcher
+                     Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Types
+                     Language.PureScript.Ide.State
+                     Language.PureScript.Ide.CaseSplit
+                     Language.PureScript.Ide.SourceFile
+                     Language.PureScript.Ide.Watcher
+                     Language.PureScript.Ide.Reexports
+
                      Control.Monad.Logger
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
@@ -286,13 +311,46 @@ executable psc-bundle
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
+executable psc-ide-server
+  main-is:             Main.hs
+  other-modules:
+  other-extensions:
+  build-depends:       base >=4 && <5
+                     , purescript -any
+                     , directory -any
+                     , filepath -any
+                     , monad-logger -any
+                     , mtl -any
+                     , transformers -any
+                     , transformers-compat -any
+                     , network -any
+                     , optparse-applicative >= 0.10.0
+                     , stm -any
+                     , text -any
+                     , base-compat >=0.6.0
+  ghc-options:         -Wall -O2 -threaded
+  hs-source-dirs:      psc-ide-server
+
+executable psc-ide-client
+  main-is:             Main.hs
+  other-modules:
+  other-extensions:
+  build-depends:       base >=4 && <5
+                     , mtl -any
+                     , text -any
+                     , optparse-applicative >= 0.10.0
+                     , network -any
+                     , base-compat >=0.6.0
+  ghc-options:         -Wall -O2
+  hs-source-dirs:      psc-ide-client
+
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
                    filepath -any, mtl -any, parsec -any, purescript -any,
                    transformers -any, process -any, transformers-compat -any, time -any,
                    Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
                    base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
-                   boxes -any, HUnit -any
+                   boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
@@ -301,5 +359,7 @@ test-suite tests
                    TestDocs
                    TestPscPublish
                    TestPsci
+                   TestPscIde
+                   PscIdeSpec
     buildable: True
     hs-source-dirs: tests psci
