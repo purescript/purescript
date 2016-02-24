@@ -29,42 +29,42 @@ import qualified Language.PureScript.Constants as C
 -- Needs to be: { 0..toFixed(10); }
 -- Probably needs to be fixed in pretty-printer instead.
 shouldInline :: JS -> Bool
-shouldInline (JSVar _) = True
-shouldInline (JSNumericLiteral _) = True
-shouldInline (JSStringLiteral _) = True
-shouldInline (JSBooleanLiteral _) = True
-shouldInline (JSAccessor _ val) = shouldInline val
-shouldInline (JSIndexer index val) = shouldInline index && shouldInline val
+shouldInline (JSVar _ _) = True
+shouldInline (JSNumericLiteral _ _) = True
+shouldInline (JSStringLiteral _ _) = True
+shouldInline (JSBooleanLiteral _ _) = True
+shouldInline (JSAccessor _ _ val) = shouldInline val
+shouldInline (JSIndexer _ index val) = shouldInline index && shouldInline val
 shouldInline _ = False
 
 etaConvert :: JS -> JS
 etaConvert = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSBlock [JSReturn (JSApp (JSFunction Nothing idents block@(JSBlock body)) args)])
+  convert (JSBlock ss [JSReturn _ (JSApp _ (JSFunction _ Nothing idents block@(JSBlock _ body)) args)])
     | all shouldInline args &&
-      not (any (`isRebound` block) (map JSVar idents)) &&
+      not (any (`isRebound` block) (map (JSVar Nothing) idents)) &&
       not (any (`isRebound` block) args)
-      = JSBlock (map (replaceIdents (zip idents args)) body)
-  convert (JSFunction Nothing [] (JSBlock [JSReturn (JSApp fn [])])) = fn
+      = JSBlock ss (map (replaceIdents (zip idents args)) body)
+  convert (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ (JSApp _ fn [])])) = fn
   convert js = js
 
 unThunk :: JS -> JS
 unThunk = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSBlock []) = JSBlock []
-  convert (JSBlock jss) =
+  convert (JSBlock ss []) = JSBlock ss []
+  convert (JSBlock ss jss) =
     case last jss of
-      JSReturn (JSApp (JSFunction Nothing [] (JSBlock body)) []) -> JSBlock $ init jss ++ body
-      _ -> JSBlock jss
+      JSReturn _ (JSApp _ (JSFunction _ Nothing [] (JSBlock _ body)) []) -> JSBlock ss $ init jss ++ body
+      _ -> JSBlock ss jss
   convert js = js
 
 evaluateIifes :: JS -> JS
 evaluateIifes = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSApp (JSFunction Nothing [] (JSBlock [JSReturn ret])) []) = ret
+  convert (JSApp _ (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ ret])) []) = ret
   convert js = js
 
 inlineVariables :: JS -> JS
@@ -72,7 +72,7 @@ inlineVariables = everywhereOnJS $ removeFromBlock go
   where
   go :: [JS] -> [JS]
   go [] = []
-  go (JSVariableIntroduction var (Just js) : sts)
+  go (JSVariableIntroduction _ var (Just js) : sts)
     | shouldInline js && not (any (isReassigned var) sts) && not (any (isRebound js) sts) && not (any (isUpdated var) sts) =
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
@@ -81,16 +81,16 @@ inlineCommonValues :: JS -> JS
 inlineCommonValues = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSApp fn [dict])
-    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnZero fn = JSNumericLiteral (Left 0)
-    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnOne fn = JSNumericLiteral (Left 1)
-    | isDict' boundedBoolean dict && isFn' fnBottom fn = JSBooleanLiteral False
-    | isDict' boundedBoolean dict && isFn' fnTop fn = JSBooleanLiteral True
-  convert (JSApp (JSApp (JSApp fn [dict]) [x]) [y])
-    | isDict' semiringInt dict && isFn' fnAdd fn = intOp Add x y
-    | isDict' semiringInt dict && isFn' fnMultiply fn = intOp Multiply x y
-    | isDict' moduloSemiringInt dict && isFn' fnDivide fn = intOp Divide x y
-    | isDict' ringInt dict && isFn' fnSubtract fn = intOp Subtract x y
+  convert (JSApp ss fn [dict])
+    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnZero fn = JSNumericLiteral ss (Left 0)
+    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnOne fn = JSNumericLiteral ss (Left 1)
+    | isDict' boundedBoolean dict && isFn' fnBottom fn = JSBooleanLiteral ss False
+    | isDict' boundedBoolean dict && isFn' fnTop fn = JSBooleanLiteral ss True
+  convert (JSApp ss (JSApp _ (JSApp _ fn [dict]) [x]) [y])
+    | isDict' semiringInt dict && isFn' fnAdd fn = intOp ss Add x y
+    | isDict' semiringInt dict && isFn' fnMultiply fn = intOp ss Multiply x y
+    | isDict' moduloSemiringInt dict && isFn' fnDivide fn = intOp ss Divide x y
+    | isDict' ringInt dict && isFn' fnSubtract fn = intOp ss Subtract x y
   convert other = other
   fnZero = [(C.prelude, C.zero), (C.dataSemiring, C.zero)]
   fnOne = [(C.prelude, C.one), (C.dataSemiring, C.one)]
@@ -100,16 +100,16 @@ inlineCommonValues = everywhereOnJS convert
   fnDivide = [(C.prelude, (C./)), (C.prelude, (C.div)), (C.dataModuloSemiring, C.div)]
   fnMultiply = [(C.prelude, (C.*)), (C.prelude, (C.mul)), (C.dataSemiring, (C.*)), (C.dataSemiring, (C.mul))]
   fnSubtract = [(C.prelude, (C.-)), (C.prelude, C.sub), (C.dataRing, C.sub)]
-  intOp op x y = JSBinary BitwiseOr (JSBinary op x y) (JSNumericLiteral (Left 0))
+  intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
 inlineOperator (m, op) f = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSApp (JSApp op' [x]) [y]) | isOp op' = f x y
+  convert (JSApp _ (JSApp _ op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor longForm (JSVar m')) = m == m' && longForm == identToJs (Op op)
-  isOp (JSIndexer (JSStringLiteral op') (JSVar m')) = m == m' && op == op'
+  isOp (JSAccessor _ longForm (JSVar _ m')) = m == m' && longForm == identToJs (Op op)
+  isOp (JSIndexer _ (JSStringLiteral _ op') (JSVar _ m')) = m == m' && op == op'
   isOp _ = False
 
 inlineCommonOperators :: JS -> JS
@@ -177,49 +177,49 @@ inlineCommonOperators = applyAll $
   binary dict fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) | isDict' dict dict' && isFn' fns fn = JSBinary op x y
+    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict' dict dict' && isFn' fns fn = JSBinary ss op x y
     convert other = other
   binary' :: String -> String -> BinaryOperator -> JS -> JS
   binary' moduleName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary op x y
+    convert (JSApp ss (JSApp _ fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary ss op x y
     convert other = other
   unary :: [(String, String)] -> [(String, String)] -> UnaryOperator -> JS -> JS
   unary dicts fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp (JSApp fn [dict']) [x]) | isDict' dicts dict' && isFn' fns fn = JSUnary op x
+    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict' dicts dict' && isFn' fns fn = JSUnary ss op x
     convert other = other
   unary' :: String -> String -> UnaryOperator -> JS -> JS
   unary' moduleName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp fn [x]) | isFn (moduleName, fnName) fn = JSUnary op x
+    convert (JSApp ss fn [x]) | isFn (moduleName, fnName) fn = JSUnary ss op x
     convert other = other
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp mkFnN [JSFunction Nothing [_] (JSBlock js)]) | isNFn C.mkFn 0 mkFnN =
-      JSFunction Nothing [] (JSBlock js)
+    convert (JSApp _ mkFnN [JSFunction s1 Nothing [_] (JSBlock s2 js)]) | isNFn C.mkFn 0 mkFnN =
+      JSFunction s1 Nothing [] (JSBlock s2 js)
     convert other = other
   mkFn n = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert orig@(JSApp mkFnN [fn]) | isNFn C.mkFn n mkFnN =
+    convert orig@(JSApp ss mkFnN [fn]) | isNFn C.mkFn n mkFnN =
       case collectArgs n [] fn of
-        Just (args, js) -> JSFunction Nothing args (JSBlock js)
+        Just (args, js) -> JSFunction ss Nothing args (JSBlock ss js)
         Nothing -> orig
     convert other = other
     collectArgs :: Int -> [String] -> JS -> Maybe ([String], [JS])
-    collectArgs 1 acc (JSFunction Nothing [oneArg] (JSBlock js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
-    collectArgs m acc (JSFunction Nothing [oneArg] (JSBlock [JSReturn ret])) = collectArgs (m - 1) (oneArg : acc) ret
+    collectArgs 1 acc (JSFunction _ Nothing [oneArg] (JSBlock _ js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
+    collectArgs m acc (JSFunction _ Nothing [oneArg] (JSBlock _ [JSReturn _ ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 
   isNFn :: String -> Int -> JS -> Bool
-  isNFn prefix n (JSVar name) = name == (prefix ++ show n)
-  isNFn prefix n (JSAccessor name (JSVar dataFunction)) | dataFunction == C.dataFunction = name == (prefix ++ show n)
+  isNFn prefix n (JSVar _ name) = name == (prefix ++ show n)
+  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunction)) | dataFunction == C.dataFunction = name == (prefix ++ show n)
   isNFn _ _ _ = False
 
   runFn :: Int -> JS -> JS
@@ -229,8 +229,8 @@ inlineCommonOperators = applyAll $
     convert js = fromMaybe js $ go n [] js
 
     go :: Int -> [JS] -> JS -> Maybe JS
-    go 0 acc (JSApp runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp fn acc)
-    go m acc (JSApp lhs [arg]) = go (m - 1) (arg : acc) lhs
+    go 0 acc (JSApp ss runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp ss fn acc)
+    go m acc (JSApp _ lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
 -- (f <<< g $ x) = f (g x)
@@ -239,16 +239,16 @@ inlineFnComposition :: (Applicative m, MonadSupply m) => JS -> m JS
 inlineFnComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS
-  convert (JSApp (JSApp (JSApp (JSApp fn [dict']) [x]) [y]) [z])
-    | isFnCompose dict' fn = return $ JSApp x [JSApp y [z]]
-    | isFnComposeFlipped dict' fn = return $ JSApp y [JSApp x [z]]
-  convert (JSApp (JSApp (JSApp fn [dict']) [x]) [y])
+  convert (JSApp s1 (JSApp s2 (JSApp _ (JSApp _ fn [dict']) [x]) [y]) [z])
+    | isFnCompose dict' fn = return $ JSApp s1 x [JSApp s2 y [z]]
+    | isFnComposeFlipped dict' fn = return $ JSApp s2 y [JSApp s1 x [z]]
+  convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y])
     | isFnCompose dict' fn = do
         arg <- freshName
-        return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp x [JSApp y [JSVar arg]]])
+        return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing x [JSApp Nothing y [JSVar Nothing arg]]])
     | isFnComposeFlipped dict' fn = do
         arg <- freshName
-        return $ JSFunction Nothing [arg] (JSBlock [JSReturn $ JSApp y [JSApp x [JSVar arg]]])
+        return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing y [JSApp Nothing x [JSVar Nothing arg]]])
   convert other = return other
   isFnCompose :: JS -> JS -> Bool
   isFnCompose dict' fn = isDict' semigroupoidFn dict' && isFn' fnCompose fn

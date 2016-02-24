@@ -105,8 +105,8 @@ lookupIdent name = do
 findDeclIdents :: [Bind Ann] -> [Ident]
 findDeclIdents = concatMap go
   where
-  go (NonRec ident _) = [ident]
-  go (Rec ds) = map fst ds
+  go (NonRec _ ident _) = [ident]
+  go (Rec ds) = map (snd . fst) ds
 
 -- |
 -- Renames within each declaration in a module.
@@ -128,19 +128,19 @@ renameInModules = map go
 -- another in the current scope.
 --
 renameInDecl :: Bool -> Bind Ann -> Rename (Bind Ann)
-renameInDecl isTopLevel (NonRec name val) = do
+renameInDecl isTopLevel (NonRec a name val) = do
   name' <- if isTopLevel then return name else updateScope name
-  NonRec name' <$> renameInValue val
+  NonRec a name' <$> renameInValue val
 renameInDecl isTopLevel (Rec ds) = do
   ds' <- traverse updateNames ds
   Rec <$> traverse updateValues ds'
   where
-  updateNames :: (Ident, Expr Ann) -> Rename (Ident, Expr Ann)
-  updateNames (name, val) = do
+  updateNames :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
+  updateNames ((a, name), val) = do
     name' <- if isTopLevel then return name else updateScope name
-    return (name', val)
-  updateValues :: (Ident, Expr Ann) -> Rename (Ident, Expr Ann)
-  updateValues (name, val) = (,) name <$> renameInValue val
+    return ((a, name'), val)
+  updateValues :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
+  updateValues (aname, val) = (,) aname <$> renameInValue val
 
 -- |
 -- Renames within a value.

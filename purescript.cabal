@@ -79,7 +79,8 @@ library
                    process >= 1.2.0 && < 1.5,
                    safe >= 0.3.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
-                   parallel >= 3.2 && < 3.3
+                   parallel >= 3.2 && < 3.3,
+                   sourcemap >= 0.1.6
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST

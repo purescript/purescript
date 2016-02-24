@@ -26,7 +26,7 @@ everywhereOnValues :: (Bind a -> Bind a) ->
                       (Bind a -> Bind a, Expr a -> Expr a, Binder a -> Binder a)
 everywhereOnValues f g h = (f', g', h')
   where
-  f' (NonRec name e) = f (NonRec name (g' e))
+  f' (NonRec a name e) = f (NonRec a name (g' e))
   f' (Rec es) = f (Rec (map (second g') es))
 
   g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
@@ -61,7 +61,7 @@ everythingOnValues :: (r -> r -> r) ->
                       (Bind a -> r, Expr a -> r, Binder a -> r, CaseAlternative a -> r)
 everythingOnValues (<>) f g h i = (f', g', h', i')
   where
-  f' b@(NonRec _ e) = f b <> g' e
+  f' b@(NonRec _ _ e) = f b <> g' e
   f' b@(Rec es) = foldl (<>) (f b) (map (g' . snd) es)
 
   g' v@(Literal _ l) = foldl (<>) (g v) (map g' (extractLiteral l))

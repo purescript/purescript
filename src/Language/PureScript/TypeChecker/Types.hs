@@ -297,7 +297,9 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
-infer' (PositionedValue pos _ val) = warnAndRethrowWithPosition pos $ infer' val
+infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
+  TypedValue t v ty <- infer' val
+  return $ TypedValue t (PositionedValue pos c v) ty
 infer' _ = internalError "Invalid argument to infer"
 
 inferLetBinding ::
@@ -623,8 +625,9 @@ check' val kt@(KindedType ty kind) = do
   checkTypeKind ty kind
   val' <- check' val ty
   return $ TypedValue True val' kt
-check' (PositionedValue pos _ val) ty =
-  warnAndRethrowWithPosition pos $ check' val ty
+check' (PositionedValue pos c val) ty = warnAndRethrowWithPosition pos $ do
+  TypedValue t v ty' <- check' val ty
+  return $ TypedValue t (PositionedValue pos c v) ty'
 check' val ty = do
   TypedValue _ val' ty' <- infer val
   mt <- subsumes (Just val') ty' ty

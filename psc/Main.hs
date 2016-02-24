@@ -177,6 +177,11 @@ jsonErrors :: Parser Bool
 jsonErrors = switch $
      long "json-errors"
   <> help "Print errors to stderr as JSON"
+sourceMaps :: Parser Bool
+sourceMaps = switch $
+     long "source-maps"
+  <> help "Generate source maps"
+
 
 options :: Parser P.Options
 options = P.Options <$> noTco
@@ -186,6 +191,7 @@ options = P.Options <$> noTco
                     <*> verboseErrors
                     <*> (not <$> comments)
                     <*> requirePath
+                    <*> sourceMaps
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

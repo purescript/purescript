@@ -1,5 +1,6 @@
 flags: {}
 packages:
 - '.'
-extra-deps: []
+extra-deps:
+- sourcemap-0.1.6
 resolver: lts-3.6

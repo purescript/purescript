@@ -53,11 +53,11 @@ optimize' js = do
   opts <- ask
   js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
     [ inlineCommonValues
-    , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
-    , inlineOperator (C.dataFunction, C.apply) $ \f x -> JSApp f [x]
-    , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
-    , inlineOperator (C.dataFunction, C.applyFlipped) $ \x f -> JSApp f [x]
-    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip JSIndexer
+    , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp Nothing f [x]
+    , inlineOperator (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
+    , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp Nothing f [x]
+    , inlineOperator (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
+    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip (JSIndexer Nothing)
     , inlineCommonOperators
     ]) js
   untilFixedPoint (return . tidyUp) . tco opts . magicDo opts $ js'

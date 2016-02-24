@@ -19,8 +19,6 @@ module Language.PureScript.Pretty.Values (
     prettyPrintBinderAtom
 ) where
 
-import Data.List (intercalate)
-
 import Control.Arrow (second)
 
 import Language.PureScript.Crash
