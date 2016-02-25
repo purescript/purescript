@@ -12,12 +12,15 @@ matrix:
     - env: GHCVER=7.10.1 CABALVER=1.22 DEPLOY=yes
       compiler: ": #GHC 7.10.1"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 CABALVER=1.22 STACKAGE=lts=3.6 RUNSDISTTESTS=YES
-      compiler: ": #GHC 7.10.2 lts-3.6"
+    - env: GHCVER=7.10.2 CABALVER=1.22 STACKAGE=lts-3.22 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.2 lts-3.22"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 CABALVER=1.22 STACKAGE=nightly-2015-09-29
-      compiler: ": #GHC 7.10.2 nightly-2015-09-29"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=lts-5.4 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.3 lts-5.4"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=nightly-2016-02-25
+      compiler: ": #GHC 7.10.3 nightly-2016-02-25"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
     - env: GHCVER=7.10.3 CABALVER=1.22
       compiler: ": #GHC 7.10.3"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
