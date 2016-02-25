@@ -57,7 +57,7 @@ import SourceMap
 
 import System.Directory
        (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory, makeRelative, splitPath)
+import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
 import System.IO.Error (tryIOError)
 import System.IO.UTF8 (readUTF8File, writeUTF8File)
 
@@ -351,7 +351,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." </>) ".." !! length (splitPath outputDir)
+    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
                       ((SMap file _ _):_) -> Just $ pathToDir </> makeRelative dir file
                       _ -> Nothing
