@@ -155,16 +155,16 @@ collectDeclarations imports exports = do
 --
 findImport ::
   (Show name, Eq name, Applicative m, MonadReader P.ModuleName m) =>
-  [(P.Qualified name, P.ModuleName)] ->
+  [P.ImportRecord name] ->
   (name, P.ModuleName) ->
   m (P.ModuleName, name)
 findImport imps (name, orig) =
   let
-    matches (qual, mn) = P.disqualify qual == name && mn == orig
+    matches (P.ImportRecord qual mn _) = P.disqualify qual == name && mn == orig
     matching = filter matches imps
     getQualified (P.Qualified mname _) = mname
   in
-    case mapMaybe (getQualified . fst) matching of
+    case mapMaybe (getQualified . P.importName) matching of
       -- A value can occur more than once if it is imported twice (eg, if it is
       -- exported by A, re-exported from A by B, and C imports it from both A
       -- and B). In this case, we just take its first appearance.

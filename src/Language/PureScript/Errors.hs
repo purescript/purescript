@@ -69,6 +69,7 @@ data SimpleErrorMessage
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
   | UnknownExportDataConstructor (ProperName 'TypeName) (ProperName 'ConstructorName)
   | ScopeConflict String [ModuleName]
+  | ScopeShadowing String (Maybe ModuleName) [ModuleName]
   | ConflictingTypeDecls (ProperName 'TypeName)
   | ConflictingCtorDecls (ProperName 'ConstructorName)
   | TypeConflictsWithClass (ProperName 'TypeName)
@@ -248,6 +249,7 @@ errorCode em = case unwrapErrorMessage em of
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
   UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
   ScopeConflict{} -> "ScopeConflict"
+  ScopeShadowing{} -> "ScopeShadowing"
   ConflictingTypeDecls{} -> "ConflictingTypeDecls"
   ConflictingCtorDecls{} -> "ConflictingCtorDecls"
   TypeConflictsWithClass{} -> "TypeConflictsWithClass"
@@ -603,6 +605,13 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (ScopeConflict nm ms) =
       paras [ line $ "Conflicting definitions are in scope for " ++ nm ++ " from the following modules:"
             , indent $ paras $ map (line . runModuleName) ms
+            ]
+    renderSimpleErrorMessage (ScopeShadowing nm exmn ms) =
+      paras [ line $ "Shadowed definitions are in scope for " ++ nm ++ " from the following open imports:"
+            , indent $ paras $ map (line . ("import " ++) . runModuleName) ms
+            , line $ "These will be ignored and the " ++ case exmn of
+                Just exmn' -> "declaration from " ++ runModuleName exmn' ++ " will be used."
+                Nothing -> "local declaration will be used."
             ]
     renderSimpleErrorMessage (ConflictingTypeDecls nm) =
       line $ "Conflicting type declarations for " ++ runProperName nm

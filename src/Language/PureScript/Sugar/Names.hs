@@ -7,6 +7,8 @@ module Language.PureScript.Sugar.Names
   ( desugarImports
   , desugarImportsWithEnv
   , Env
+  , ImportRecord(..)
+  , ImportProvenance(..)
   , Imports(..)
   , Exports(..)
   ) where
@@ -67,7 +69,7 @@ desugarImportsWithEnv externs modules = do
     let members = Exports{..}
         ss = internalModuleSourceSpan "<Externs>"
         env' = M.insert efModuleName (ss, nullImports, members) env
-        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, mt, qmn)])
+        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, Just mt, qmn)])
     imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
     exps <- resolveExports env' efModuleName imps members efExports
     return $ M.insert efModuleName (ss, imps, exps) env
@@ -284,7 +286,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   update
     :: (Ord a, Show a)
     => (Qualified a -> SimpleErrorMessage)
-    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> M.Map (Qualified a) [ImportRecord a]
     -> (Exports -> a -> Maybe (Qualified a))
     -> (Qualified a -> Name)
     -> (a -> String)
@@ -300,8 +302,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
       (Just options, _) -> do
-        checkImportConflicts render options
-        let (Qualified (Just mnNew) _, mnOrig) = head options
+        (mnNew, mnOrig) <- checkImportConflicts mn render options
         modify $ \result -> M.insert mnNew (maybe [toName qname] (toName qname :) (mnNew `M.lookup` result)) result
         return $ Qualified (Just mnOrig) name
 
