@@ -22,6 +22,7 @@ import Control.Arrow (second)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Language.PureScript as P
+import Data.Maybe (isNothing)
 
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
@@ -121,12 +122,17 @@ updateModules modules st =
 
 -- |
 -- Updates the state to have more let bindings.
+-- Replaces ValueDeclarations if they have the same identifier.
 --
 updateLets :: [P.Declaration] -> PSCiState -> PSCiState
-updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
-
+updateLets ds st = st { psciLetBindings = keptBindings ++ ds }
+  where keptBindings = filter shouldKeep (psciLetBindings st)
+        shouldKeep decl = let ident = valueDeclarationIdent decl in isNothing ident || ident `notElem` map valueDeclarationIdent ds
+        valueDeclarationIdent (P.PositionedDeclaration _ _ v) = valueDeclarationIdent v
+        valueDeclarationIdent (P.ValueDeclaration ident _ _ _) = Just ident
+        valueDeclarationIdent _ = Nothing
 -- |
--- Updates the state to have more let bindings.
+-- Updates the state to have more foreign files.
 --
 updateForeignFiles :: Map P.ModuleName FilePath -> PSCiState -> PSCiState
 updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `Map.union` fs }
