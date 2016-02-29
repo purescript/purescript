@@ -57,6 +57,7 @@ prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> tex
 prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> prettyPrintValue (d - 1) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : showIdent arg ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
+prettyPrintValue d (Abs (Right arg) val) = text ('\\' : prettyPrintBinder arg ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
   text (runProperName (disqualify className) ++ " ") <> prettyPrintValueAtom (d - 1) ps
 prettyPrintValue d (Case values binders) =
@@ -70,9 +71,24 @@ prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
 prettyPrintValue _ (TypeClassDictionary (name, tys) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
 prettyPrintValue _ (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
+prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
+    text "#dict-accessor " <> text (runProperName (disqualify className)) <> text "." <> text (showIdent ident) <> text ">"
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
-prettyPrintValue d expr = prettyPrintValueAtom d expr
+prettyPrintValue d expr@NumericLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@StringLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@CharLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@BooleanLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@ArrayLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@ObjectLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@OperatorSection{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@ObjectGetter{} = prettyPrintValueAtom d expr
 
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
@@ -88,8 +104,16 @@ prettyPrintValueAtom _ (Constructor name) = text $ runProperName (disqualify nam
 prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
 prettyPrintValueAtom d (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue (d - 1) op) `beforeWithSpace` prettyPrintValue (d - 1) val) `before` text ")"
 prettyPrintValueAtom d (OperatorSection op (Left val)) = ((text "(" <> prettyPrintValue (d - 1) val) `beforeWithSpace` prettyPrintValue (d - 1) op) `before` text ")"
+prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
+  prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
+  where
+  printOp (Var (Qualified _ (Op opName))) = text opName
+  printOp expr = text "`" <> prettyPrintValue (d - 1) expr <> text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
+prettyPrintValueAtom d (Parens expr) = (text "(" <> prettyPrintValue d expr) `before` text ")"
+prettyPrintValueAtom d (UnaryMinus expr) = text "(-" <> prettyPrintValue d expr <> text ")"
+prettyPrintValueAtom _ (ObjectGetter field) = text "_." <> text field
 prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` text ")"
 
 prettyPrintDeclaration :: Int -> Declaration -> Box
@@ -143,6 +167,7 @@ prettyPrintBinderAtom (BooleanBinder True) = "true"
 prettyPrintBinderAtom (BooleanBinder False) = "false"
 prettyPrintBinderAtom (VarBinder ident) = showIdent ident
 prettyPrintBinderAtom (ConstructorBinder ctor []) = runProperName (disqualify ctor)
+prettyPrintBinderAtom b@ConstructorBinder{} = parens (prettyPrintBinder b)
 prettyPrintBinderAtom (ObjectBinder bs) =
   "{ "
   ++ intercalate ", " (map prettyPrintObjectPropertyBinder bs)
@@ -157,7 +182,10 @@ prettyPrintBinderAtom (ArrayBinder bs) =
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident ++ "@" ++ prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
-prettyPrintBinderAtom b = parens (prettyPrintBinder b)
+prettyPrintBinderAtom (OpBinder op) = showIdent (disqualify op)
+prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
+  prettyPrintBinderAtom b1 ++ " " ++ prettyPrintBinderAtom op ++ " " ++ prettyPrintBinderAtom b2
+prettyPrintBinderAtom (ParensInBinder b) = parens (prettyPrintBinder b)
 
 -- |
 -- Generate a pretty-printed string representing a Binder
