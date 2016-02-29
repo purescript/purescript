@@ -17,8 +17,8 @@ strip ../dist/build/psci/psci.exe
 strip ../dist/build/psc-docs/psc-docs.exe
 strip ../dist/build/psc-publish/psc-publish.exe
 strip ../dist/build/psc-bundle/psc-bundle.exe
-strip ../dist/build/psc-ide-server/psc-ide-server
-strip ../dist/build/psc-ide-client/psc-ide-client
+strip ../dist/build/psc-ide-server/psc-ide-server.exe
+strip ../dist/build/psc-ide-client/psc-ide-client.exe
 
 # Copy files to staging directory
 cp ../dist/build/psc/psc.exe                       build/purescript/
