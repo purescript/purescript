@@ -16,25 +16,25 @@ pushd ${SCRIPTPATH} > /dev/null
 mkdir -p build/purescript/
 
 # Strip the binaries
-strip ../dist/build/psc/psc
-strip ../dist/build/psci/psci
-strip ../dist/build/psc-docs/psc-docs
-strip ../dist/build/psc-publish/psc-publish
-strip ../dist/build/psc-bundle/psc-bundle
-strip ../dist/build/psc-ide-server/psc-ide-server
-strip ../dist/build/psc-ide-client/psc-ide-client
+strip ~/.local/bin/psc
+strip ~/.local/bin/psci
+strip ~/.local/bin/psc-docs
+strip ~/.local/bin/psc-publish
+strip ~/.local/bin/psc-bundle
+strip ~/.local/bin/psc-ide-server
+strip ~/.local/bin/psc-ide-client
 
 # Copy files to staging directory
-cp ../dist/build/psc/psc                       build/purescript/
-cp ../dist/build/psci/psci                     build/purescript/
-cp ../dist/build/psc-docs/psc-docs             build/purescript/
-cp ../dist/build/psc-publish/psc-publish       build/purescript/
-cp ../dist/build/psc-bundle/psc-bundle         build/purescript/
-cp ../dist/build/psc-ide-server/psc-ide-server build/purescript/
-cp ../dist/build/psc-ide-client/psc-ide-client build/purescript/
-cp README                                      build/purescript/
-cp ../LICENSE                                  build/purescript/
-cp ../INSTALL.md                               build/purescript/
+cp ~/.local/bin/psc            build/purescript/
+cp ~/.local/bin/psci           build/purescript/
+cp ~/.local/bin/psc-docs       build/purescript/
+cp ~/.local/bin/psc-publish    build/purescript/
+cp ~/.local/bin/psc-bundle     build/purescript/
+cp ~/.local/bin/psc-ide-server build/purescript/
+cp ~/.local/bin/psc-ide-client build/purescript/
+cp README                      build/purescript/
+cp ../LICENSE                  build/purescript/
+cp ../INSTALL.md               build/purescript/
 
 # Make the binary bundle
 pushd build > /dev/null
