@@ -17,6 +17,7 @@ import Control.Monad.Writer.Class
 import Data.Foldable (forM_)
 import Data.List ((\\), find, intersect, nub)
 import Data.Maybe (mapMaybe)
+import Data.Monoid (Sum(..))
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
@@ -78,6 +79,8 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
 
   let scope = maybe nullImports (\(_, imps, _) -> imps) (M.lookup mn env)
       usedImps' = foldr (elaborateUsed scope) usedImps exportedModules
+      numImplicitImports = getSum $ foldMap (Sum . countImplicitImports) mdecls
+      allowImplicit = numImplicitImports == 1
 
   imps <- M.toAscList <$> findImports mdecls
 
@@ -86,7 +89,7 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
       forM_ decls $ \(ss, declType, qualifierName) ->
         censor (onErrorMessages $ addModuleLocError ss) $ do
           let names = nub $ M.findWithDefault [] mni usedImps'
-          lintImportDecl env mni qualifierName names declType
+          lintImportDecl env mni qualifierName names declType allowImplicit
 
   forM_ (M.toAscList (byQual imps)) $ \(mnq, entries) -> do
     let mnis = nub $ map (\(_, _, mni) -> mni) entries
@@ -102,6 +105,11 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
   return ()
 
   where
+
+  countImplicitImports :: Declaration -> Int
+  countImplicitImports (ImportDeclaration mn' Implicit _ _) | not (isPrim mn') = 1
+  countImplicitImports (PositionedDeclaration _ _ d) = countImplicitImports d
+  countImplicitImports _ = 0
 
   -- Checks whether a module is the Prim module - used to suppress any checks
   -- made, as Prim is always implicitly imported.
@@ -148,13 +156,13 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
   extractByQual
     :: (Eq a)
     => ModuleName
-    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> M.Map (Qualified a) [ImportRecord a]
     -> (Qualified a -> Name)
     -> [(ModuleName, Name)]
   extractByQual k m toName = mapMaybe go (M.toList m)
     where
     go (q@(Qualified mnq _), is) | isUnqualified q || isQualifiedWith k q =
-      case fst (head is) of
+      case importName (head is) of
         Qualified (Just mn') name -> Just (mn', toName $ Qualified mnq name)
         _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing
@@ -167,11 +175,12 @@ lintImportDecl
   -> Maybe ModuleName
   -> [Name]
   -> ImportDeclarationType
+  -> Bool
   -> m ()
-lintImportDecl env mni qualifierName names declType =
+lintImportDecl env mni qualifierName names declType allowImplicit =
   case declType of
     Implicit -> case qualifierName of
-      Nothing -> checkImplicit ImplicitImport
+      Nothing -> unless allowImplicit (checkImplicit ImplicitImport)
       Just q ->
         let usedModuleNames = mapMaybe extractQualName names
         in unless (q `elem` usedModuleNames) unused

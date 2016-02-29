@@ -2,7 +2,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.Names.Env
-  ( Imports(..)
+  ( ImportRecord(..)
+  , ImportProvenance(..)
+  , Imports(..)
   , nullImports
   , Exports(..)
   , nullExports
@@ -19,19 +21,44 @@ module Language.PureScript.Sugar.Names.Env
   ) where
 
 import Data.Function (on)
-import Data.List (groupBy, sortBy, nub)
+import Data.List (groupBy, sortBy, nub, delete)
 import Data.Maybe (fromJust)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+
+-- |
+-- The details for an import: the name of the thing that is being imported
+-- (`A.x` if importing from `A`), the module that the thing was originally
+-- defined in (for re-export resolution), and the import provenance (see below).
+--
+data ImportRecord a =
+  ImportRecord
+    { importName :: Qualified a
+    , importSourceModule :: ModuleName
+    , importProvenance :: ImportProvenance
+    }
+    deriving (Eq, Ord, Show, Read)
+
+-- |
+-- Used to track how an import was introduced into scope. This allows us to
+-- handle the one-open-import special case that allows a name conflict to become
+-- a warning rather than being an unresolvable situation.
+--
+data ImportProvenance
+  = FromImplicit
+  | FromExplicit
+  | Local
+  deriving (Eq, Ord, Show, Read)
 
 -- |
 -- The imported declarations for a module, including the module's own members.
@@ -41,19 +68,19 @@ data Imports = Imports
   -- |
   -- Local names for types within a module mapped to to their qualified names
   --
-    importedTypes :: M.Map (Qualified (ProperName 'TypeName)) [(Qualified (ProperName 'TypeName), ModuleName)]
+    importedTypes :: M.Map (Qualified (ProperName 'TypeName)) [ImportRecord (ProperName 'TypeName)]
   -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --
-  , importedDataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) [(Qualified (ProperName 'ConstructorName), ModuleName)]
+  , importedDataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) [ImportRecord (ProperName 'ConstructorName)]
   -- |
   -- Local names for classes within a module mapped to to their qualified names
   --
-  , importedTypeClasses :: M.Map (Qualified (ProperName 'ClassName)) [(Qualified (ProperName 'ClassName), ModuleName)]
+  , importedTypeClasses :: M.Map (Qualified (ProperName 'ClassName)) [ImportRecord (ProperName 'ClassName)]
   -- |
   -- Local names for values within a module mapped to to their qualified names
   --
-  , importedValues :: M.Map (Qualified Ident) [(Qualified Ident, ModuleName)]
+  , importedValues :: M.Map (Qualified Ident) [ImportRecord Ident]
   -- |
   -- The modules that have been imported into the current scope.
   --
@@ -202,16 +229,29 @@ getExports env mn = maybe (throwError . errorMessage $ UnknownModule mn) (return
 --
 checkImportConflicts
   :: forall m a
-   . (MonadError MultipleErrors m, Ord a)
-  => (a -> String)
-  -> [(Qualified a, ModuleName)]
-  -> m ()
-checkImportConflicts render xs =
-  let byOrig = groupBy ((==) `on` snd) . sortBy (compare `on` snd) $ xs
+   . (Show a, MonadError MultipleErrors m, MonadWriter MultipleErrors m, Ord a)
+  => ModuleName
+  -> (a -> String)
+  -> [ImportRecord a]
+  -> m (ModuleName, ModuleName)
+checkImportConflicts currentModule render xs =
+  let
+    byOrig = sortBy (compare `on` importSourceModule) xs
+    groups = groupBy ((==) `on` importSourceModule) byOrig
+    nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
+    name = render' (importName . head $ xs)
+    conflictModules = map (getQual . importName . head) groups
   in
-    if length byOrig > 1
-    then throwError . errorMessage $ ScopeConflict (render' (fst . head $ xs)) (map (getQual . fst . head) byOrig)
-    else return ()
+    if length groups > 1
+    then case nonImplicit of
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig _] -> do
+        let warningModule = if mnNew == currentModule then Nothing else Just mnNew
+        tell . errorMessage $ ScopeShadowing name warningModule $ delete mnNew conflictModules
+        return (mnNew, mnOrig)
+      _ -> throwError . errorMessage $ ScopeConflict name conflictModules
+    else
+      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ = head byOrig
+      in return (mnNew, mnOrig)
   where
   getQual :: Qualified a -> ModuleName
   getQual (Qualified (Just mn) _) = mn

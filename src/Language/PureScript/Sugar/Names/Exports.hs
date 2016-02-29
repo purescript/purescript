@@ -110,17 +110,17 @@ resolveExports env mn imps exps refs =
   -- Extracts a list of values for a module based on a lookup table. If the
   -- boolean is true the values are filtered by the qualification
   extract
-    :: (Ord a)
+    :: (Show a, Ord a)
     => Bool
     -> ModuleName
     -> (a -> String)
-    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> M.Map (Qualified a) [ImportRecord a]
     -> m [Qualified a]
-  extract useQual name render = fmap (map (fst . head . snd)) . go . M.toList
+  extract useQual name render = fmap (map (importName . head . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
-      let isMatch = if useQual then eqQual name name' else any (eqQual name . fst) options
-      when (isMatch && length options > 1) $ checkImportConflicts render options
+      let isMatch = if useQual then eqQual name name' else any (eqQual name . importName) options
+      when (isMatch && length options > 1) $ void $ checkImportConflicts mn render options
       return isMatch
 
   -- Check whether a module name refers to a "pseudo module" that came into
