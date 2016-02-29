@@ -201,9 +201,11 @@ isExhaustiveGuard :: Either [(Guard, Expr)] Expr -> Bool
 isExhaustiveGuard (Left gs) = not . null $ filter (\(g, _) -> isOtherwise g) gs
   where
   isOtherwise :: Expr -> Bool
-  isOtherwise (TypedValue _ (BooleanLiteral True) _) = True
-  isOtherwise (TypedValue _ (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) _) = True
-  isOtherwise (TypedValue _ (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) _) = True
+  isOtherwise (BooleanLiteral True) = True
+  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
+  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
+  isOtherwise (TypedValue _ e _) = isOtherwise e
+  isOtherwise (PositionedValue _ _ e) = isOtherwise e
   isOtherwise _ = False
 isExhaustiveGuard (Right _) = True
 
