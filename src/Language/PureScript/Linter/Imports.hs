@@ -79,8 +79,8 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
 
   let scope = maybe nullImports (\(_, imps, _) -> imps) (M.lookup mn env)
       usedImps' = foldr (elaborateUsed scope) usedImps exportedModules
-      numImplicitImports = getSum $ foldMap (Sum . countImplicitImports) mdecls
-      allowImplicit = numImplicitImports == 1
+      numOpenImports = getSum $ foldMap (Sum . countOpenImports) mdecls
+      allowImplicit = numOpenImports == 1
 
   imps <- M.toAscList <$> findImports mdecls
 
@@ -106,10 +106,11 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
 
   where
 
-  countImplicitImports :: Declaration -> Int
-  countImplicitImports (ImportDeclaration mn' Implicit _ _) | not (isPrim mn') = 1
-  countImplicitImports (PositionedDeclaration _ _ d) = countImplicitImports d
-  countImplicitImports _ = 0
+  countOpenImports :: Declaration -> Int
+  countOpenImports (ImportDeclaration mn' Implicit Nothing _) | not (isPrim mn') = 1
+  countOpenImports (ImportDeclaration mn' (Hiding _) Nothing _) | not (isPrim mn') = 1
+  countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
+  countOpenImports _ = 0
 
   -- Checks whether a module is the Prim module - used to suppress any checks
   -- made, as Prim is always implicitly imported.
