@@ -26,6 +26,10 @@ extra-source-files: examples/passing/*.purs
                   , examples/docs/src/*.purs
                   , tests/support/setup.js
                   , tests/support/package.json
+                  , tests/support/prelude/bower.json
+                  , tests/support/prelude/src/*.purs
+                  , tests/support/prelude/src/*.js
+                  , tests/support/prelude/LICENSE
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
                   , tests/support/flattened/*.purs
