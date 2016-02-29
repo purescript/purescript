@@ -1,5 +1,5 @@
 name: purescript
-version: 0.8.0.0
+version: 0.8.1.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -31,10 +31,6 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
-                  , tests/support/prelude/bower.json
-                  , tests/support/prelude/src/*.purs
-                  , tests/support/prelude/src/*.js
-                  , tests/support/prelude/LICENSE
                   , stack.yaml
                   , stack-lts-2.yaml
                   , stack-lts-3.yaml
