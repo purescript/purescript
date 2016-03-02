@@ -39,6 +39,7 @@ import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
+import Control.Monad.Trans.Writer (WriterT(..))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -74,13 +75,16 @@ typesOf moduleName vals = do
 
   forM tys $ \(ident, (val, ty)) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
-    val' <- replaceTypeClassDictionaries moduleName val
+    (val', unsolved) <- replaceTypeClassDictionaries moduleName val
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    return (ident, (val', varIfUnknown ty))
+    return (ident, (foldr (Abs . Left) val' (map fst unsolved), varIfUnknown (constrain unsolved ty)))
   where
+  -- | Generalize over any unsolved constraints
+  constrain [] = id
+  constrain cs = ConstrainedType (map snd cs)
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (substituteType sub) val, substituteType sub ty))) ts
   -- Replace all the wildcards types with their inferred types
@@ -168,16 +172,16 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m) =>
   ModuleName ->
   Expr ->
-  m Expr
+  m (Expr, [(Ident, Constraint)])
 replaceTypeClassDictionaries mn =
-  let (_, f, _) = everywhereOnValuesTopDownM return go return
-  in f
+  let (_, f, _) =  everywhereOnValuesTopDownM return (WriterT . go) return
+  in runWriterT . f
   where
   go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
-  go other = return other
+  go other = return (other, [])
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::

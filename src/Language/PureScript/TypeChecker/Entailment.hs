@@ -18,6 +18,7 @@ import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
+import Control.Monad.Supply.Class (MonadSupply(..))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -34,11 +35,11 @@ import qualified Language.PureScript.Constants as C
 --
 entails
   :: forall m
-   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => ModuleName
   -> M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -> Constraint
-  -> m Expr
+  -> m (Expr, [(Ident, Constraint)])
 entails moduleName context = solve
   where
     forClassName :: Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
@@ -54,12 +55,12 @@ entails moduleName context = solve
     findDicts :: Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup context
 
-    solve :: Constraint -> m Expr
+    solve :: Constraint -> m (Expr, [(Ident, Constraint)])
     solve (className, tys) = do
-      dict <- go 0 className tys
-      return $ dictionaryValueToValue dict
+      (dict, unsolved) <- go 0 className tys
+      return (dictionaryValueToValue dict, unsolved)
       where
-      go :: Int -> Qualified (ProperName 'ClassName) -> [Type] -> m DictionaryValue
+      go :: Int -> Qualified (ProperName 'ClassName) -> [Type] -> m (DictionaryValue, [(Ident, Constraint)])
       go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work className' tys' = do
         let instances = do
@@ -67,21 +68,33 @@ entails moduleName context = solve
               -- Make sure the type unifies with the type in the type instance definition
               subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
               return (subst, tcd)
-        (subst, tcd) <- unique instances
-        -- Solve any necessary subgoals
-        args <- solveSubgoals subst (tcdDependencies tcd)
-        return $ foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
-                       (mkDictionary (tcdName tcd) args)
-                       (tcdPath tcd)
+        solution <- unique instances
+        case solution of
+          Left (subst, tcd) -> do
+            -- Solve any necessary subgoals
+            (args, unsolved) <- solveSubgoals subst (tcdDependencies tcd)
+            let match = foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
+                              (mkDictionary (tcdName tcd) args)
+                              (tcdPath tcd)
+            return (match, unsolved)
+          Right unsolved@(Qualified _ (ProperName unsolvedClassName), _) -> do
+            ident <- freshIdent ("dict" ++ unsolvedClassName)
+            return (LocalDictionaryValue (Qualified Nothing ident), [(ident, unsolved)])
         where
 
-        unique :: [(a, TypeClassDictionaryInScope)] -> m (a, TypeClassDictionaryInScope)
-        unique [] = throwError . errorMessage $ NoInstanceFound className' tys'
-        unique [a] = return a
+        unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
+        unique [] | all canBeGeneralized tys' = return $ Right (className, tys)
+                  | otherwise = throwError . errorMessage $ NoInstanceFound className' tys'
+        unique [a] = return $ Left a
         unique tcds | pairwise overlapping (map snd tcds) = do
                         tell . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
-                        return (head tcds)
-                    | otherwise = return (minimumBy (compare `on` length . tcdPath . snd) tcds)
+                        return $ Left (head tcds)
+                    | otherwise = return $ Left (minimumBy (compare `on` length . tcdPath . snd) tcds)
+
+        canBeGeneralized :: Type -> Bool
+        canBeGeneralized TUnknown{} = True
+        canBeGeneralized Skolem{} = True
+        canBeGeneralized _ = False
 
         -- |
         -- Check if two dictionaries are overlapping
@@ -98,11 +111,12 @@ entails moduleName context = solve
         -- Create dictionaries for subgoals which still need to be solved by calling go recursively
         -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
         -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> m (Maybe [DictionaryValue])
-        solveSubgoals _ Nothing = return Nothing
+        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> m (Maybe [DictionaryValue], [(Ident, Constraint)])
+        solveSubgoals _ Nothing = return (Nothing, [])
         solveSubgoals subst (Just subgoals) = do
-          dict <- traverse (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
-          return $ Just dict
+          zipped <- traverse (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
+          let (dicts, unsolved) = unzip zipped
+          return (Just dicts, concat unsolved)
 
         -- Make a dictionary from subgoal dictionaries by applying the correct function
         mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
