@@ -214,7 +214,7 @@ handleDecls :: [P.Declaration] -> PSCI ()
 handleDecls ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
-  let m = createTemporaryModule False st' (P.ObjectLiteral [])
+  let m = createTemporaryModule False st' (P.Literal (P.ObjectLiteral []))
   e <- psciIO . runMake $ make st' [m]
   case e of
     Left err -> PSCI $ printErrors err

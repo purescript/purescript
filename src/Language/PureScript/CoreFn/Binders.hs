@@ -5,7 +5,7 @@
 --
 module Language.PureScript.CoreFn.Binders where
 
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 import Language.PureScript.Names
 
 -- |

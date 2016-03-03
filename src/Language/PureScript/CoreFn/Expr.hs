@@ -8,7 +8,7 @@ module Language.PureScript.CoreFn.Expr where
 import Control.Arrow ((***))
 
 import Language.PureScript.CoreFn.Binders
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 import Language.PureScript.Names
 
 -- |
