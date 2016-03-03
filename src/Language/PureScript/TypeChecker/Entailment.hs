@@ -36,11 +36,12 @@ import qualified Language.PureScript.Constants as C
 entails
   :: forall m
    . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => Bool
+  -> ModuleName
   -> M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -> Constraint
   -> m (Expr, [(Ident, Constraint)])
-entails moduleName context = solve
+entails shouldGeneralize moduleName context = solve
   where
     forClassName :: Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
     forClassName cn@(Qualified (Just mn) _) tys = concatMap (findDicts cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
@@ -83,7 +84,7 @@ entails moduleName context = solve
         where
 
         unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
-        unique [] | all canBeGeneralized tys' = return $ Right (className, tys)
+        unique [] | shouldGeneralize && all canBeGeneralized tys' = return $ Right (className, tys)
                   | otherwise = throwError . errorMessage $ NoInstanceFound className' tys'
         unique [a] = return $ Left a
         unique tcds | pairwise overlapping (map snd tcds) = do

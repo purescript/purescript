@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- This module implements the type checker
@@ -71,22 +72,22 @@ typesOf moduleName vals = do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
     ds2 <- forM untyped $ \e -> typeForBindingGroupElement True e dict untypedDict
-    return $ ds1 ++ ds2
+    return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
 
-  forM tys $ \(ident, (val, ty)) -> do
+  forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
-    (val', unsolved) <- replaceTypeClassDictionaries moduleName val
+    (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    return (ident, (foldr (Abs . Left) val' (map fst unsolved), varIfUnknown (constrain unsolved ty)))
+    return (ident, (foldr (Abs . Left . fst) val' unsolved, varIfUnknown (constrain unsolved ty)))
   where
   -- | Generalize over any unsolved constraints
   constrain [] = id
   constrain cs = ConstrainedType (map snd cs)
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-  tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (substituteType sub) val, substituteType sub ty))) ts
+  tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints . WildcardInferredType $ substituteType sub ty
   replace sub (ErrorMessage hints (MissingTypeDeclaration name ty)) = ErrorMessage hints $ MissingTypeDeclaration name (varIfUnknown (substituteType sub ty))
@@ -173,14 +174,15 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries ::
   (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m) =>
+  Bool ->
   ModuleName ->
   Expr ->
   m (Expr, [(Ident, Constraint)])
-replaceTypeClassDictionaries mn =
+replaceTypeClassDictionaries shouldGeneralize mn =
   let (_, f, _) =  everywhereOnValuesTopDownM return (WriterT . go) return
   in runWriterT . f
   where
-  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
+  go (TypeClassDictionary constraint dicts) = entails shouldGeneralize mn dicts constraint
   go other = return (other, [])
 
 -- | Check the kind of a type, failing if it is not of kind *.
