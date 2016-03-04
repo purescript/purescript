@@ -1,9 +1,13 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console
 
--- Here, we should simplify the context so that only one Eq
+shout = log <<< (<> "!") <<< show
+
+-- Here, we should simplify the context so that only one Show
 -- constraint is added.
-usesEqTwice x = if x == x then x == x else false
+usesShowTwice true = shout
+usesShowTwice false = print
 
-main = Control.Monad.Eff.Console.log "Done"
+main = usesShowTwice true "Done"

@@ -40,7 +40,6 @@ import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.Trans.Writer (WriterT(..))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -180,20 +179,6 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
   g (TypeClassDictionary (nm, tys) sco) = TypeClassDictionary (nm, map f tys) sco
   g other = other
-
--- | Replace type class dictionary placeholders with inferred type class dictionaries
-replaceTypeClassDictionaries ::
-  (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m) =>
-  Bool ->
-  ModuleName ->
-  Expr ->
-  m (Expr, [(Ident, Constraint)])
-replaceTypeClassDictionaries shouldGeneralize mn =
-  let (_, f, _) =  everywhereOnValuesTopDownM return (WriterT . go) return
-  in runWriterT . f
-  where
-  go (TypeClassDictionary constraint dicts) = entails shouldGeneralize mn dicts constraint
-  go other = return (other, [])
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
