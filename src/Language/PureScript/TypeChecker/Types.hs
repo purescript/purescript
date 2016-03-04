@@ -71,16 +71,19 @@ typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-    ds2 <- forM untyped $ \e -> typeForBindingGroupElement True e dict untypedDict
+    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
     return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
 
   forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
     let unsolvedTypeVars = nub $ unknownsInType ty
+    -- Generalize and constrain the type
+    let generalized = generalize unsolved ty
     -- Make sure any unsolved type constraints only use type variables which appear
     -- unknown in the inferred type.
-    when shouldGeneralize $
+    when shouldGeneralize $ do
+      tell . errorMessage $ MissingTypeDeclaration ident generalized
       forM_ unsolved $ \(_, (className, classTys)) -> do
         let constraintTypeVars = nub $ foldMap unknownsInType classTys
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
@@ -89,16 +92,17 @@ typesOf moduleName vals = do
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    return (ident, (foldr (Abs . Left . fst) val' unsolved, varIfUnknown (constrain unsolved ty)))
+    return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
   where
-  -- | Generalize over any unsolved constraints
+  -- | Generalize type vars using forall and add inferred constraints
+  generalize unsolved = varIfUnknown . constrain unsolved
+  -- | Add any unsolved constraints
   constrain [] = id
   constrain cs = ConstrainedType (map snd cs)
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints . WildcardInferredType $ substituteType sub ty
-  replace sub (ErrorMessage hints (MissingTypeDeclaration name ty)) = ErrorMessage hints $ MissingTypeDeclaration name (varIfUnknown (substituteType sub ty))
   replace _ em = em
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
@@ -151,16 +155,14 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
 
 typeForBindingGroupElement ::
   (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Bool ->
   (Ident, Expr) ->
   TypeData ->
   UntypedData ->
   m (Ident, (Expr, Type))
-typeForBindingGroupElement warn (ident, val) dict untypedDict = do
+typeForBindingGroupElement (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
   unifyTypes ty $ fromMaybe (internalError "name not found in dictionary") (lookup ident untypedDict)
-  when warn . tell . errorMessage $ MissingTypeDeclaration ident ty
   return (ident, (TypedValue True val' ty, ty))
 
 -- | Check if a value contains a type annotation
@@ -343,7 +345,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-  ds2' <- forM untyped $ \e -> typeForBindingGroupElement False e dict untypedDict
+  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
   let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
   bindNames dict $ do
     makeBindingGroupVisible
