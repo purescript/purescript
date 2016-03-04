@@ -77,6 +77,14 @@ typesOf moduleName vals = do
   forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
+    let unsolvedTypeVars = nub $ unknownsInType ty
+    -- Make sure any unsolved type constraints only use type variables which appear
+    -- unknown in the inferred type.
+    when shouldGeneralize $
+      forM_ unsolved $ \(_, (className, classTys)) -> do
+        let constraintTypeVars = nub $ foldMap unknownsInType classTys
+        when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
+          throwError . errorMessage $ NoInstanceFound className classTys
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
