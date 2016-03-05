@@ -342,8 +342,7 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- Operator section. This will be removed during desugaring and replaced with a partially applied
-  -- operator or lambda to flip the arguments.
+  -- Operator section. This will be removed during desugaring and replaced with lambda.
   --
   | OperatorSection Expr (Either Expr Expr)
   -- |
