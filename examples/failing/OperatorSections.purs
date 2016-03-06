@@ -5,3 +5,4 @@ import Prelude
 
 main = do
   (true `not` _)
+
