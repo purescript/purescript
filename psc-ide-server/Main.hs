@@ -87,7 +87,7 @@ main = do
         (PortNumber . fromIntegral <$>
          option auto (long "port" <> short 'p' <> value (4242 :: Integer))) <*>
         switch (long "debug")
-    opts = info (version <*> parser) mempty
+    opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
       (long "version" <> help "Show the version number")

@@ -5,7 +5,6 @@ import           Prelude             ()
 import           Prelude.Compat
 
 import           Control.Exception
-import           Data.Maybe          (fromMaybe)
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import qualified Data.Text.IO        as T
@@ -18,19 +17,19 @@ import           System.IO
 import qualified Paths_purescript    as Paths
 
 data Options = Options
-    { optionsPort :: Maybe Int
-    }
+  { optionsPort :: PortID
+  }
 
 main :: IO ()
 main = do
     Options port <- execParser opts
-    let port' = PortNumber . fromIntegral $ fromMaybe 4242 port
-    client port'
+    client port
   where
     parser =
         Options <$>
-          optional (option auto (long "port" <> short 'p'))
-    opts = info (version <*> parser) mempty
+        (PortNumber . fromIntegral <$>
+         option auto (long "port" <> short 'p' <> value (4242 :: Integer)))
+    opts = info (version <*> helper <*> parser) mempty
     version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
 
 client :: PortID -> IO ()
