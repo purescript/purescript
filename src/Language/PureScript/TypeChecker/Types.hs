@@ -217,22 +217,22 @@ infer' ::
   (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Expr ->
   m Expr
-infer' v@(NumericLiteral (Left _)) = return $ TypedValue True v tyInt
-infer' v@(NumericLiteral (Right _)) = return $ TypedValue True v tyNumber
-infer' v@(StringLiteral _) = return $ TypedValue True v tyString
-infer' v@(CharLiteral _) = return $ TypedValue True v tyChar
-infer' v@(BooleanLiteral _) = return $ TypedValue True v tyBoolean
-infer' (ArrayLiteral vals) = do
+infer' v@(Literal (NumericLiteral (Left _))) = return $ TypedValue True v tyInt
+infer' v@(Literal (NumericLiteral (Right _))) = return $ TypedValue True v tyNumber
+infer' v@(Literal (StringLiteral _)) = return $ TypedValue True v tyString
+infer' v@(Literal (CharLiteral _)) = return $ TypedValue True v tyChar
+infer' v@(Literal (BooleanLiteral _)) = return $ TypedValue True v tyBoolean
+infer' (Literal (ArrayLiteral vals)) = do
   ts <- traverse infer vals
   els <- freshType
   forM_ ts $ \(TypedValue _ _ t) -> unifyTypes els t
-  return $ TypedValue True (ArrayLiteral ts) (TypeApp tyArray els)
-infer' (ObjectLiteral ps) = do
+  return $ TypedValue True (Literal (ArrayLiteral ts)) (TypeApp tyArray els)
+infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
   ts <- traverse (infer . snd) ps
   let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
       ty = TypeApp tyObject $ rowFromList (fields, REmpty)
-  return $ TypedValue True (ObjectLiteral (zip (map fst ps) ts)) ty
+  return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
@@ -346,11 +346,11 @@ inferBinder :: forall m.
   Binder ->
   m (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
-inferBinder val (StringBinder _) = unifyTypes val tyString >> return M.empty
-inferBinder val (CharBinder _) = unifyTypes val tyChar >> return M.empty
-inferBinder val (NumberBinder (Left _)) = unifyTypes val tyInt >> return M.empty
-inferBinder val (NumberBinder (Right _)) = unifyTypes val tyNumber >> return M.empty
-inferBinder val (BooleanBinder _) = unifyTypes val tyBoolean >> return M.empty
+inferBinder val (LiteralBinder (StringLiteral _)) = unifyTypes val tyString >> return M.empty
+inferBinder val (LiteralBinder (CharLiteral _)) = unifyTypes val tyChar >> return M.empty
+inferBinder val (LiteralBinder (NumericLiteral (Left _))) = unifyTypes val tyInt >> return M.empty
+inferBinder val (LiteralBinder (NumericLiteral (Right _))) = unifyTypes val tyNumber >> return M.empty
+inferBinder val (LiteralBinder (BooleanLiteral _)) = unifyTypes val tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
   env <- getEnv
@@ -369,7 +369,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
     where
     go args (TypeApp (TypeApp fn arg) ret) | fn == tyFunction = go (arg : args) ret
     go args ret = (args, ret)
-inferBinder val (ObjectBinder props) = do
+inferBinder val (LiteralBinder (ObjectLiteral props)) = do
   row <- freshType
   rest <- freshType
   m1 <- inferRowProperties row rest props
@@ -383,7 +383,7 @@ inferBinder val (ObjectBinder props) = do
     m1 <- inferBinder propTy binder
     m2 <- inferRowProperties nrow (RCons name propTy row) binders
     return $ m1 `M.union` m2
-inferBinder val (ArrayBinder binders) = do
+inferBinder val (LiteralBinder (ArrayLiteral binders)) = do
   el <- freshType
   m1 <- M.unions <$> traverse (inferBinder el) binders
   unifyTypes val (TypeApp tyArray el)
@@ -524,19 +524,19 @@ check' val u@(TUnknown _) = do
   (val'', ty') <- instantiatePolyTypeWithUnknowns val' ty
   unifyTypes ty' u
   return $ TypedValue True val'' ty'
-check' v@(NumericLiteral (Left _)) t | t == tyInt =
+check' v@(Literal (NumericLiteral (Left _))) t | t == tyInt =
   return $ TypedValue True v t
-check' v@(NumericLiteral (Right _)) t | t == tyNumber =
+check' v@(Literal (NumericLiteral (Right _))) t | t == tyNumber =
   return $ TypedValue True v t
-check' v@(StringLiteral _) t | t == tyString =
+check' v@(Literal (StringLiteral _)) t | t == tyString =
   return $ TypedValue True v t
-check' v@(CharLiteral _) t | t == tyChar =
+check' v@(Literal (CharLiteral _)) t | t == tyChar =
   return $ TypedValue True v t
-check' v@(BooleanLiteral _) t | t == tyBoolean =
+check' v@(Literal (BooleanLiteral _)) t | t == tyBoolean =
   return $ TypedValue True v t
-check' (ArrayLiteral vals) t@(TypeApp a ty) = do
+check' (Literal (ArrayLiteral vals)) t@(TypeApp a ty) = do
   unifyTypes a tyArray
-  array <- ArrayLiteral <$> forM vals (`check` ty)
+  array <- Literal . ArrayLiteral <$> forM vals (`check` ty)
   return $ TypedValue True array t
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
   unifyTypes t tyFunction
@@ -587,10 +587,10 @@ check' (IfThenElse cond th el) ty = do
   th' <- check th ty
   el' <- check el ty
   return $ TypedValue True (IfThenElse cond' th' el') ty
-check' e@(ObjectLiteral ps) t@(TypeApp obj row) | obj == tyObject = do
+check' e@(Literal (ObjectLiteral ps)) t@(TypeApp obj row) | obj == tyObject = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
-  return $ TypedValue True (ObjectLiteral ps') t
+  return $ TypedValue True (Literal (ObjectLiteral ps')) t
 check' (TypeClassDictionaryConstructorApp name ps) t = do
   ps' <- check' ps t
   return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t

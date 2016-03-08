@@ -1,24 +1,13 @@
------------------------------------------------------------------------------
+-- |
+-- CoreFn traversal helpers
 --
--- Module      :  Language.PureScript.CoreFn.Traversals
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- | CoreFn traversal helpers
---
------------------------------------------------------------------------------
-
 module Language.PureScript.CoreFn.Traversals where
 
 import Control.Arrow (second, (***), (+++))
 
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

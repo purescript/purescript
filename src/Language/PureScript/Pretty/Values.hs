@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.Values
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Pretty printer for values
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.Pretty.Values (
     prettyPrintValue,
     prettyPrintBinder,
@@ -75,12 +63,7 @@ prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (runProperName (disqualify className)) <> text "." <> text (showIdent ident) <> text ">"
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
-prettyPrintValue d expr@NumericLiteral{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@StringLiteral{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@CharLiteral{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@BooleanLiteral{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@ArrayLiteral{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@ObjectLiteral{} = prettyPrintValueAtom d expr
+prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
@@ -92,13 +75,7 @@ prettyPrintValue d expr@ObjectGetter{} = prettyPrintValueAtom d expr
 
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
-prettyPrintValueAtom _ (NumericLiteral n) = text $ either show show n
-prettyPrintValueAtom _ (StringLiteral s) = text $ show s
-prettyPrintValueAtom _ (CharLiteral c) = text $ show c
-prettyPrintValueAtom _ (BooleanLiteral True) = text "true"
-prettyPrintValueAtom _ (BooleanLiteral False) = text "false"
-prettyPrintValueAtom d (ArrayLiteral xs) = list '[' ']' (prettyPrintValue (d - 1)) xs
-prettyPrintValueAtom d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ second Just `map` ps
+prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
 prettyPrintValueAtom _ (Constructor name) = text $ runProperName (disqualify name)
 prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
@@ -115,6 +92,15 @@ prettyPrintValueAtom d (Parens expr) = (text "(" <> prettyPrintValue d expr) `be
 prettyPrintValueAtom d (UnaryMinus expr) = text "(-" <> prettyPrintValue d expr <> text ")"
 prettyPrintValueAtom _ (ObjectGetter field) = text "_." <> text field
 prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` text ")"
+
+prettyPrintLiteralValue :: Int -> Literal Expr -> Box
+prettyPrintLiteralValue _ (NumericLiteral n) = text $ either show show n
+prettyPrintLiteralValue _ (StringLiteral s) = text $ show s
+prettyPrintLiteralValue _ (CharLiteral c) = text $ show c
+prettyPrintLiteralValue _ (BooleanLiteral True) = text "true"
+prettyPrintLiteralValue _ (BooleanLiteral False) = text "false"
+prettyPrintLiteralValue d (ArrayLiteral xs) = list '[' ']' (prettyPrintValue (d - 1)) xs
+prettyPrintLiteralValue d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ second Just `map` ps
 
 prettyPrintDeclaration :: Int -> Declaration -> Box
 prettyPrintDeclaration d _ | d < 0 = ellipsis
@@ -160,25 +146,10 @@ prettyPrintDoNotationElement d (PositionedDoNotationElement _ _ el) = prettyPrin
 
 prettyPrintBinderAtom :: Binder -> String
 prettyPrintBinderAtom NullBinder = "_"
-prettyPrintBinderAtom (StringBinder str) = show str
-prettyPrintBinderAtom (CharBinder c) = show c
-prettyPrintBinderAtom (NumberBinder num) = either show show num
-prettyPrintBinderAtom (BooleanBinder True) = "true"
-prettyPrintBinderAtom (BooleanBinder False) = "false"
+prettyPrintBinderAtom (LiteralBinder l) = prettyPrintLiteralBinder l
 prettyPrintBinderAtom (VarBinder ident) = showIdent ident
 prettyPrintBinderAtom (ConstructorBinder ctor []) = runProperName (disqualify ctor)
 prettyPrintBinderAtom b@ConstructorBinder{} = parens (prettyPrintBinder b)
-prettyPrintBinderAtom (ObjectBinder bs) =
-  "{ "
-  ++ intercalate ", " (map prettyPrintObjectPropertyBinder bs)
-  ++ " }"
-  where
-  prettyPrintObjectPropertyBinder :: (String, Binder) -> String
-  prettyPrintObjectPropertyBinder (key, binder) = prettyPrintObjectKey key ++ ": " ++ prettyPrintBinder binder
-prettyPrintBinderAtom (ArrayBinder bs) =
-  "[ "
-  ++ intercalate ", " (map prettyPrintBinder bs)
-  ++ " ]"
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident ++ "@" ++ prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
@@ -186,6 +157,24 @@ prettyPrintBinderAtom (OpBinder op) = showIdent (disqualify op)
 prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
   prettyPrintBinderAtom b1 ++ " " ++ prettyPrintBinderAtom op ++ " " ++ prettyPrintBinderAtom b2
 prettyPrintBinderAtom (ParensInBinder b) = parens (prettyPrintBinder b)
+
+prettyPrintLiteralBinder :: Literal Binder -> String
+prettyPrintLiteralBinder (StringLiteral str) = show str
+prettyPrintLiteralBinder (CharLiteral c) = show c
+prettyPrintLiteralBinder (NumericLiteral num) = either show show num
+prettyPrintLiteralBinder (BooleanLiteral True) = "true"
+prettyPrintLiteralBinder (BooleanLiteral False) = "false"
+prettyPrintLiteralBinder (ObjectLiteral bs) =
+  "{ "
+  ++ intercalate ", " (map prettyPrintObjectPropertyBinder bs)
+  ++ " }"
+  where
+  prettyPrintObjectPropertyBinder :: (String, Binder) -> String
+  prettyPrintObjectPropertyBinder (key, binder) = prettyPrintObjectKey key ++ ": " ++ prettyPrintBinder binder
+prettyPrintLiteralBinder (ArrayLiteral bs) =
+  "[ "
+  ++ intercalate ", " (map prettyPrintBinder bs)
+  ++ " ]"
 
 -- |
 -- Generate a pretty-printed string representing a Binder

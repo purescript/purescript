@@ -299,23 +299,23 @@ parseModules = mark (P.many (same *> parseModule)) <* P.eof
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)
 
-parseNumericLiteral :: TokenParser Expr
+parseNumericLiteral :: TokenParser (Literal a)
 parseNumericLiteral = NumericLiteral <$> number
 
-parseCharLiteral :: TokenParser Expr
+parseCharLiteral :: TokenParser (Literal a)
 parseCharLiteral = CharLiteral <$> charLiteral
 
-parseStringLiteral :: TokenParser Expr
+parseStringLiteral :: TokenParser (Literal a)
 parseStringLiteral = StringLiteral <$> stringLiteral
 
-parseBooleanLiteral :: TokenParser Expr
+parseBooleanLiteral :: TokenParser (Literal a)
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
-parseArrayLiteral :: TokenParser Expr
-parseArrayLiteral = ArrayLiteral <$> squares (commaSep parseValue)
+parseArrayLiteral :: TokenParser a -> TokenParser (Literal a)
+parseArrayLiteral p = ArrayLiteral <$> squares (commaSep p)
 
-parseObjectLiteral :: TokenParser Expr
-parseObjectLiteral = ObjectLiteral <$> braces (commaSep parseIdentifierAndValue)
+parseObjectLiteral :: TokenParser (String, a) -> TokenParser (Literal a)
+parseObjectLiteral p = ObjectLiteral <$> braces (commaSep p)
 
 parseIdentifierAndValue :: TokenParser (String, Expr)
 parseIdentifierAndValue =
@@ -376,12 +376,12 @@ parseLet = do
 parseValueAtom :: TokenParser Expr
 parseValueAtom = P.choice
                  [ parseAnonymousArgument
-                 , parseNumericLiteral
-                 , parseCharLiteral
-                 , parseStringLiteral
-                 , parseBooleanLiteral
-                 , parseArrayLiteral
-                 , P.try parseObjectLiteral
+                 , Literal <$> parseNumericLiteral
+                 , Literal <$> parseCharLiteral
+                 , Literal <$> parseStringLiteral
+                 , Literal <$> parseBooleanLiteral
+                 , Literal <$> parseArrayLiteral parseValue
+                 , Literal <$> P.try (parseObjectLiteral parseIdentifierAndValue)
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -469,17 +469,8 @@ parseUpdaterBody v = ObjectUpdate v <$> (C.indented *> braces (commaSep1 (C.inde
 parseAnonymousArgument :: TokenParser Expr
 parseAnonymousArgument = underscore *> pure AnonymousArgument
 
-parseStringBinder :: TokenParser Binder
-parseStringBinder = StringBinder <$> stringLiteral
-
-parseCharBinder :: TokenParser Binder
-parseCharBinder = CharBinder <$> charLiteral
-
-parseBooleanBinder :: TokenParser Binder
-parseBooleanBinder = BooleanBinder <$> booleanLiteral
-
-parseNumberBinder :: TokenParser Binder
-parseNumberBinder = NumberBinder <$> (sign <*> number)
+parseNumberLiteral :: TokenParser Binder
+parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
   where
   sign :: TokenParser (Either Integer Double -> Either Integer Double)
   sign = (symbol' "-" >> return (negate +++ negate))
@@ -492,11 +483,11 @@ parseNullaryConstructorBinder = ConstructorBinder <$> C.parseQualified C.properN
 parseConstructorBinder :: TokenParser Binder
 parseConstructorBinder = ConstructorBinder <$> C.parseQualified C.properName <*> many (C.indented *> parseBinderNoParens)
 
-parseObjectBinder :: TokenParser Binder
-parseObjectBinder = ObjectBinder <$> braces (commaSep (C.indented *> parseIdentifierAndBinder))
+parseObjectBinder:: TokenParser Binder
+parseObjectBinder= LiteralBinder <$> parseObjectLiteral (C.indented *> parseIdentifierAndBinder)
 
 parseArrayBinder :: TokenParser Binder
-parseArrayBinder = squares $ ArrayBinder <$> commaSep (C.indented *> parseBinder)
+parseArrayBinder = LiteralBinder <$> parseArrayLiteral (C.indented *> parseBinder)
 
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = do
@@ -541,10 +532,10 @@ parseBinder =
   parseBinderAtom :: TokenParser Binder
   parseBinderAtom = P.choice
                     [ parseNullBinder
-                    , parseCharBinder
-                    , parseStringBinder
-                    , parseBooleanBinder
-                    , parseNumberBinder
+                    , LiteralBinder <$> parseCharLiteral
+                    , LiteralBinder <$> parseStringLiteral
+                    , LiteralBinder <$> parseBooleanLiteral
+                    , parseNumberLiteral
                     , parseVarOrNamedBinder
                     , parseConstructorBinder
                     , parseObjectBinder
@@ -561,10 +552,10 @@ parseBinder =
 parseBinderNoParens :: TokenParser Binder
 parseBinderNoParens = P.choice
                       [ parseNullBinder
-                      , parseCharBinder
-                      , parseStringBinder
-                      , parseBooleanBinder
-                      , parseNumberBinder
+                      , LiteralBinder <$> parseCharLiteral
+                      , LiteralBinder <$> parseStringLiteral
+                      , LiteralBinder <$> parseBooleanLiteral
+                      , parseNumberLiteral
                       , parseVarOrNamedBinder
                       , parseNullaryConstructorBinder
                       , parseObjectBinder

@@ -24,6 +24,7 @@ import Control.Monad.Writer.Class
 
 import Language.PureScript.Crash
 import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Names as P
@@ -119,12 +120,12 @@ missingCasesSingle env mn NullBinder cb@(ConstructorBinder con _) =
 missingCasesSingle env mn cb@(ConstructorBinder con bs) (ConstructorBinder con' bs')
   | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder con) bs'', pr)
   | otherwise = ([cb], return False)
-missingCasesSingle env mn NullBinder (ObjectBinder bs) =
-  (map (ObjectBinder . zip (map fst bs)) allMisses, pr)
+missingCasesSingle env mn NullBinder (LiteralBinder (ObjectLiteral bs)) =
+  (map (LiteralBinder . ObjectLiteral . zip (map fst bs)) allMisses, pr)
   where
   (allMisses, pr) = missingCasesMultiple env mn (initialize $ length bs) (map snd bs)
-missingCasesSingle env mn (ObjectBinder bs) (ObjectBinder bs') =
-  (map (ObjectBinder . zip sortedNames) allMisses, pr)
+missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (ObjectLiteral bs')) =
+  (map (LiteralBinder . ObjectLiteral . zip sortedNames) allMisses, pr)
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
@@ -141,10 +142,10 @@ missingCasesSingle env mn (ObjectBinder bs) (ObjectBinder bs') =
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder (BooleanBinder b) = ([BooleanBinder $ not b], return True)
-missingCasesSingle _ _ (BooleanBinder bl) (BooleanBinder br)
+missingCasesSingle _ _ NullBinder (LiteralBinder (BooleanLiteral b)) = ([LiteralBinder . BooleanLiteral $ not b], return True)
+missingCasesSingle _ _ (LiteralBinder (BooleanLiteral bl)) (LiteralBinder (BooleanLiteral br))
   | bl == br = ([], return True)
-  | otherwise = ([BooleanBinder bl], return False)
+  | otherwise = ([LiteralBinder $ BooleanLiteral bl], return False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle env mn b (TypedBinder _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle _ _ b _ = ([b], Left Unknown)
@@ -201,7 +202,7 @@ isExhaustiveGuard :: Either [(Guard, Expr)] Expr -> Bool
 isExhaustiveGuard (Left gs) = not . null $ filter (\(g, _) -> isOtherwise g) gs
   where
   isOtherwise :: Expr -> Bool
-  isOtherwise (BooleanLiteral True) = True
+  isOtherwise (Literal (BooleanLiteral True)) = True
   isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
   isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
   isOtherwise (TypedValue _ e _) = isOtherwise e
@@ -274,8 +275,8 @@ checkExhaustiveDecls env mn = mapM_ onDecl
 
   onExpr :: Bool -> Expr -> m ()
   onExpr isP (UnaryMinus e) = onExpr isP e
-  onExpr isP (ArrayLiteral es) = mapM_ (onExpr isP) es
-  onExpr isP (ObjectLiteral es) = mapM_ (onExpr isP . snd) es
+  onExpr isP (Literal (ArrayLiteral es)) = mapM_ (onExpr isP) es
+  onExpr isP (Literal (ObjectLiteral es)) = mapM_ (onExpr isP . snd) es
   onExpr isP (TypeClassDictionaryConstructorApp _ e) = onExpr isP e
   onExpr isP (Accessor _ e) = onExpr isP e
   onExpr isP (ObjectUpdate o es) = onExpr isP o >> mapM_ (onExpr isP . snd) es

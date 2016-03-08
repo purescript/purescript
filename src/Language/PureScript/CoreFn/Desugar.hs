@@ -17,7 +17,7 @@ import Language.PureScript.AST.Traversals
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
@@ -88,18 +88,8 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- Desugars expressions from AST to CoreFn representation.
   --
   exprToCoreFn :: Maybe SourceSpan -> [Comment] -> Maybe Type -> A.Expr -> Expr Ann
-  exprToCoreFn ss com ty (A.NumericLiteral v) =
-    Literal (ss, com, ty, Nothing) (NumericLiteral v)
-  exprToCoreFn ss com ty (A.StringLiteral v) =
-    Literal (ss, com, ty, Nothing) (StringLiteral v)
-  exprToCoreFn ss com ty (A.CharLiteral v) =
-    Literal (ss, com, ty, Nothing) (CharLiteral v)
-  exprToCoreFn ss com ty (A.BooleanLiteral v) =
-    Literal (ss, com, ty, Nothing) (BooleanLiteral v)
-  exprToCoreFn ss com ty (A.ArrayLiteral vs) =
-    Literal (ss, com, ty, Nothing) (ArrayLiteral $ map (exprToCoreFn ss [] Nothing) vs)
-  exprToCoreFn ss com ty (A.ObjectLiteral vs) =
-    Literal (ss, com, ty, Nothing) (ObjectLiteral $ map (second (exprToCoreFn ss [] Nothing)) vs)
+  exprToCoreFn ss com ty (A.Literal lit) =
+    Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
   exprToCoreFn ss com ty (A.Accessor name v) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.ObjectUpdate obj vs) =
@@ -126,7 +116,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap (declToCoreFn ss []) ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.ObjectLiteral vs) _)) =
+  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.Literal (A.ObjectLiteral vs)) _)) =
     let args = map (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
@@ -152,25 +142,15 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- Desugars case binders from AST to CoreFn representation.
   --
   binderToCoreFn :: Maybe SourceSpan -> [Comment] -> A.Binder -> Binder Ann
+  binderToCoreFn ss com (A.LiteralBinder lit) =
+    LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
   binderToCoreFn ss com (A.NullBinder) =
     NullBinder (ss, com, Nothing, Nothing)
-  binderToCoreFn ss com (A.BooleanBinder b) =
-    LiteralBinder (ss, com, Nothing, Nothing) (BooleanLiteral b)
-  binderToCoreFn ss com (A.StringBinder s) =
-    LiteralBinder (ss, com, Nothing, Nothing) (StringLiteral s)
-  binderToCoreFn ss com (A.CharBinder c) =
-    LiteralBinder (ss, com, Nothing, Nothing) (CharLiteral c)
-  binderToCoreFn ss com (A.NumberBinder n) =
-    LiteralBinder (ss, com, Nothing, Nothing) (NumericLiteral n)
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
     let (_, tctor, _, _) = lookupConstructor env dctor
     in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.ObjectBinder bs) =
-    LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
-  binderToCoreFn ss com (A.ArrayBinder bs) =
-    LiteralBinder (ss, com, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
