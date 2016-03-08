@@ -17,7 +17,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Harry Garrood <harry@garrood.me>,
         Christoph Hegemann <christoph.hegemann1337@gmail.com>
 
-tested-with: GHC==7.10.1, GHC==7.10.2, GHC==7.10.3
+tested-with: GHC==7.10.1, GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
@@ -36,8 +36,7 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
                   , stack.yaml
-                  , stack-lts-2.yaml
-                  , stack-lts-3.yaml
+                  , stack-lts-5.yaml
                   , stack-nightly.yaml
                   , README.md
                   , INSTALL.md
