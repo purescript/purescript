@@ -96,6 +96,7 @@ library
                      Language.PureScript.AST.Binders
                      Language.PureScript.AST.Declarations
                      Language.PureScript.AST.Operators
+                     Language.PureScript.AST.Literals
                      Language.PureScript.AST.SourcePos
                      Language.PureScript.AST.Traversals
                      Language.PureScript.AST.Exported
@@ -119,7 +120,6 @@ library
                      Language.PureScript.CoreFn.Binders
                      Language.PureScript.CoreFn.Desugar
                      Language.PureScript.CoreFn.Expr
-                     Language.PureScript.CoreFn.Literals
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals

@@ -19,6 +19,7 @@ import qualified Data.Map as M
 import Control.Monad.Identity
 
 import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Operators
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Types
@@ -309,21 +310,9 @@ type Guard = Expr
 --
 data Expr
   -- |
-  -- A numeric literal
+  -- A literal value
   --
-  = NumericLiteral (Either Integer Double)
-  -- |
-  -- A string literal
-  --
-  | StringLiteral String
-  -- |
-  -- A character literal
-  --
-  | CharLiteral Char
-  -- |
-  -- A boolean literal
-  --
-  | BooleanLiteral Bool
+  = Literal (Literal Expr)
   -- |
   -- A prefix -, will be desugared
   --
@@ -346,14 +335,6 @@ data Expr
   -- operator or lambda to flip the arguments.
   --
   | OperatorSection Expr (Either Expr Expr)
-  -- |
-  -- An array literal
-  --
-  | ArrayLiteral [Expr]
-  -- |
-  -- An object literal
-  --
-  | ObjectLiteral [(String, Expr)]
   -- |
   -- An object property getter (e.g. `_.x`). This will be removed during
   -- desugaring and expanded into a lambda that reads a property from an object.
