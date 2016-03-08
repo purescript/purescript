@@ -17,7 +17,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Harry Garrood <harry@garrood.me>,
         Christoph Hegemann <christoph.hegemann1337@gmail.com>
 
-tested-with: GHC==7.8.4, GHC==7.10.3, GHC==8.0.1
+tested-with: GHC==7.10.1, GHC==7.10.2, GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
@@ -49,7 +49,7 @@ source-repository head
     location: https://github.com/purescript/purescript.git
 
 library
-    build-depends: base >=4.6 && <5,
+    build-depends: base >=4.8 && <5,
                    base-compat >=0.6.0,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
