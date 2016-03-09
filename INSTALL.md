@@ -6,8 +6,8 @@ alternatively Stack Overflow.
 
 ## Using prebuilt binaries
 
-The prebuilt binaries are compiled with GHC 7.10.1, and therefore they should
-run on any operating system supported by GHC 7.10.1, such as:
+The prebuilt binaries are compiled with GHC 7.10.3, and therefore they should
+run on any operating system supported by GHC 7.10.3, such as:
 
 * Windows 2000 or later,
 * OS X 10.7 or later,
