@@ -80,7 +80,7 @@ loop PSCiOptions{..} = do
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
-          flip evalStateT (mkPSCiState [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+          flip evalStateT (mkPSCiState [] modules foreigns M.empty [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
             outputStrLn prologueMessage
             traverse_ (traverse_ (runPSCI . handleCommand)) config
             modules' <- lift $ gets psciLoadedModules
@@ -175,7 +175,8 @@ handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath
 handleCommand ResetState = do
   PSCI . lift . modify $ \st ->
     st { psciImportedModules = []
-       , psciLetBindings     = []
+       , psciValueDeclarations = M.empty
+       , psciDeclarations = []
        }
   loadAllImportedModules
 handleCommand (TypeOf val) = handleTypeOf val
@@ -213,7 +214,7 @@ handleExpression val = do
 handleDecls :: [P.Declaration] -> PSCI ()
 handleDecls ds = do
   st <- PSCI $ lift get
-  let st' = updateLets ds st
+  let st' = updateDeclarationBindings ds st
   let m = createTemporaryModule False st' (P.Literal (P.ObjectLiteral []))
   e <- psciIO . runMake $ make st' [m]
   case e of

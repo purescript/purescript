@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 -----------------------------------------------------------------------------
 --
 -- Module      :  Types
@@ -22,7 +24,8 @@ import Control.Arrow (second)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Language.PureScript as P
-import Data.Maybe (isNothing)
+import qualified Data.List as L
+import qualified Data.Bifunctor as B
 
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
@@ -41,26 +44,29 @@ data PSCiState = PSCiState
   { psciImportedModules     :: [ImportedModule]
   , _psciLoadedModules      :: Map FilePath [P.Module]
   , psciForeignFiles        :: Map P.ModuleName FilePath
-  , psciLetBindings         :: [P.Declaration]
+  , psciValueDeclarations   :: Map P.Ident P.Declaration
+  , psciDeclarations        :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }
 
 initialPSCiState :: PSCiState
 initialPSCiState =
-  PSCiState [] Map.empty Map.empty [] []
+  PSCiState [] Map.empty Map.empty Map.empty [] []
 
 mkPSCiState :: [ImportedModule]
             -> [(FilePath, P.Module)]
             -> Map P.ModuleName FilePath
+            -> Map P.Ident P.Declaration
             -> [P.Declaration]
             -> [String]
             -> PSCiState
-mkPSCiState imported loaded foreigns lets nodeFlags =
+mkPSCiState imported loaded foreigns valueBindings decls nodeFlags =
   (initialPSCiState
     |> each imported updateImportedModules
     |> updateModules loaded)
     { psciForeignFiles = foreigns
-    , psciLetBindings = lets
+    , psciValueDeclarations = valueBindings
+    , psciDeclarations = decls
     , psciNodeFlags = nodeFlags
     }
   where
@@ -119,18 +125,15 @@ updateModules modules st =
   st { _psciLoadedModules = Map.union (go modules) (_psciLoadedModules st) }
   where
   go = Map.fromListWith (++) . map (second (:[]))
-
 -- |
--- Updates the state to have more let bindings.
--- Replaces ValueDeclarations if they have the same identifier.
+-- Updates the state to have more bindings.
 --
-updateLets :: [P.Declaration] -> PSCiState -> PSCiState
-updateLets ds st = st { psciLetBindings = keptBindings ++ ds }
-  where keptBindings = filter shouldKeep (psciLetBindings st)
-        shouldKeep decl = let ident = valueDeclarationIdent decl in isNothing ident || ident `notElem` map valueDeclarationIdent ds
-        valueDeclarationIdent (P.PositionedDeclaration _ _ v) = valueDeclarationIdent v
-        valueDeclarationIdent (P.ValueDeclaration ident _ _ _) = Just ident
-        valueDeclarationIdent _ = Nothing
+updateDeclarationBindings :: [P.Declaration] -> PSCiState -> PSCiState
+updateDeclarationBindings ds st = st { psciValueDeclarations = valueDeclarations `Map.union` psciValueDeclarations st, psciDeclarations = psciDeclarations st ++ otherDeclarations }
+  where (valueDeclarations, otherDeclarations) = B.first (Map.fromList . map (\d -> (identFor d, d))) . L.partition P.isValueDecl $ ds
+        identFor (P.ValueDeclaration i _ _ _) = i
+        identFor (P.PositionedDeclaration _ _ x) = identFor x
+        identFor _ = error "this should not have happened"
 -- |
 -- Updates the state to have more foreign files.
 --

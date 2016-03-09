@@ -8,6 +8,8 @@ import PSCi.Types
 import System.FilePath (pathSeparator)
 import Control.Monad
 
+import qualified Data.Map as M
+
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName
 supportModuleName = P.ModuleName [P.ProperName "$PSCI", P.ProperName "Support"]
@@ -63,7 +65,7 @@ loadAllModules files = do
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
+createTemporaryModule exec PSCiState{psciImportedModules = imports, psciValueDeclarations = valueDecls, psciDeclarations = otherDecls} val =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     trace = P.Var (P.Qualified (Just supportModuleName) (P.Ident "eval"))
@@ -71,20 +73,22 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     itDecl = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
     mainDecl = P.ValueDeclaration (P.Ident "$main") P.Public [] $ Right mainValue
     decls = if exec then [itDecl, mainDecl] else [itDecl]
+    valueDeclsList = map snd . M.toList $ valueDecls
   in
-    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ decls ++ valueDeclsList ++ otherDecls) Nothing
 
 
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
+createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciValueDeclarations = valueDecls, psciDeclarations = otherDecls} typ =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
+    valueDeclsList = map snd . M.toList $ valueDecls
   in
-    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ valueDeclsList ++ [itDecl] ++ otherDecls) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
