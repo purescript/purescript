@@ -10,9 +10,9 @@ import qualified Control.Exception             as E
 import           Data.Aeson
 import           Data.ByteString               (ByteString)
 import           Data.ByteString.Lazy          (fromStrict)
-import Data.Foldable (toList)
+import           Data.Foldable                 (toList)
+import           Data.Maybe                    (mapMaybe)
 import           Data.Monoid                   ((<>))
-import           Data.Maybe                   (mapMaybe)
 import           Data.String
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
@@ -33,12 +33,12 @@ queryPursuit q = do
         }
   m <- newManager tlsManagerSettings
   withHTTP req m $ \resp ->
-    P.fold (\x a -> x <> a) "" id $ responseBody resp
+    P.fold (<>) "" id $ responseBody resp
 
 
 handler :: HttpException -> IO [a]
-handler StatusCodeException{} = return []
-handler _ = return []
+handler StatusCodeException{} = pure []
+handler _ = pure []
 
 searchPursuitForDeclarations :: Text -> IO [PursuitResponse]
 searchPursuitForDeclarations query =
@@ -54,12 +54,12 @@ searchPursuitForDeclarations query =
 
 findPackagesForModuleIdent :: Text -> IO [PursuitResponse]
 findPackagesForModuleIdent query =
-    (do r <- queryPursuit query
-        let results' = decode (fromStrict r) :: Maybe Array
-        case results' of
-          Nothing -> pure []
-          Just results -> pure (mapMaybe isModuleResponse (map fromJSON (toList results)))) `E.catch`
-    handler
+  (do r <- queryPursuit query
+      let results' = decode (fromStrict r) :: Maybe Array
+      case results' of
+        Nothing -> pure []
+        Just results -> pure (mapMaybe isModuleResponse (map fromJSON (toList results)))) `E.catch`
+  handler
   where
     isModuleResponse (Success a@ModuleResponse{}) = Just a
     isModuleResponse _ = Nothing
