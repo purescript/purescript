@@ -76,8 +76,8 @@ flexMatch pattern = mapMaybe (flexRate pattern)
 
 flexRate :: Text -> Completion -> Maybe ScoredCompletion
 flexRate pattern c@(Completion (_,ident,_)) = do
-    score <- flexScore pattern ident
-    return (c, score)
+  score <- flexScore pattern ident
+  return (c, score)
 
 -- FlexMatching ala Sublime.
 -- Borrowed from: http://cdewaka.com/2013/06/fuzzy-pattern-matching-in-haskell/
@@ -88,13 +88,13 @@ flexRate pattern c@(Completion (_,ident,_)) = do
 flexScore :: Text -> DeclIdent -> Maybe Double
 flexScore "" _ = Nothing
 flexScore pat str =
-    case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
-        (-1,0) -> Nothing
-        (start,len) -> Just $ calcScore start (start + len)
+  case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
+    (-1,0) -> Nothing
+    (start,len) -> Just $ calcScore start (start + len)
   where
     Just (first,pattern) = T.uncons pat
     -- This just interleaves the search string with .*
     -- abcd -> a.*b.*c.*d
     pat' = first `T.cons` T.concatMap (T.snoc ".*") pattern
     calcScore start end =
-        100.0 / fromIntegral ((1 + start) * (end - start + 1))
+      100.0 / fromIntegral ((1 + start) * (end - start + 1))

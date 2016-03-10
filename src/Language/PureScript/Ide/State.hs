@@ -73,8 +73,8 @@ insertModule externsFile = do
 
 insertModule' :: TVar PscIdeState -> ExternsFile -> STM ()
 insertModule' st ef = do
-    modifyTVar (st) $ \x ->
+    modifyTVar st $ \x ->
       x { externsFiles = M.insert (efModuleName ef) ef (externsFiles x)
-          , pscStateModules = let (mn, decls ) = convertExterns ef
-                              in M.insert mn decls (pscStateModules x)
+        , pscStateModules = let (mn, decls) = convertExterns ef
+                            in M.insert mn decls (pscStateModules x)
         }
