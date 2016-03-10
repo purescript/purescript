@@ -91,7 +91,7 @@ everywhereOnValues f g h = (f', g', h')
 
 everywhereOnValuesTopDownM
   :: forall m
-   . (Functor m, Applicative m, Monad m)
+   . (Monad m)
   => (Declaration -> m Declaration)
   -> (Expr -> m Expr)
   -> (Binder -> m Binder)
@@ -160,7 +160,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
 everywhereOnValuesM
   :: forall m
-   . (Functor m, Applicative m, Monad m)
+   . (Monad m)
   => (Declaration -> m Declaration)
   -> (Expr -> m Expr)
   -> (Binder -> m Binder)
@@ -389,7 +389,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
 everywhereWithContextOnValuesM
   :: forall m s
-   . (Functor m, Applicative m, Monad m)
+   . (Monad m)
   => s
   -> (s -> Declaration       -> m (s, Declaration))
   -> (s -> Expr              -> m (s, Expr))

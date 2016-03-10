@@ -51,7 +51,7 @@ data Options = Options
   } deriving Show
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
-guessModuleIdentifier :: (Applicative m, MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
+guessModuleIdentifier :: (MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
 guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
   where
   guessModuleType "index.js" = pure Regular
@@ -61,7 +61,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
 -- | The main application function.
 -- This function parses the input files, performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-app :: (Applicative m, MonadError ErrorMessage m, MonadIO m) => Options -> m String
+app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m String
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do

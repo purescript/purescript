@@ -38,7 +38,7 @@ import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 -- documentation.
 --
 convertModulesInPackage ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [InPackage P.Module] ->
   m [Module]
 convertModulesInPackage modules =
@@ -66,7 +66,7 @@ convertModulesInPackage modules =
 -- types.
 --
 convertModules ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m [Module]
 convertModules =
@@ -81,7 +81,7 @@ importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 -- Convert a sorted list of modules.
 --
 convertSorted ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m [Module]
 convertSorted modules = do
@@ -99,7 +99,7 @@ convertSorted modules = do
 -- types.
 --
 typeCheckIfNecessary ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   [Module] ->
   m [Module]
@@ -122,7 +122,7 @@ typeCheckIfNecessary modules convertedModules =
 -- were not provided.
 --
 typeCheck ::
-  (Functor m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m ([P.Module], P.Environment)
 typeCheck =
@@ -182,7 +182,7 @@ runParser p s = either (Left . show) Right $ do
 -- documentation information from.
 --
 partiallyDesugar ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module]
   -> m (P.Env, [P.Module])
 partiallyDesugar = P.evalSupplyT 0 . desugar'

@@ -261,7 +261,7 @@ checkExhaustive hasConstraint env mn numArgs cas = makeResult . first nub $ fold
 -- |
 -- Exhaustivity checking over a list of declarations
 --
-checkExhaustiveDecls :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> ModuleName -> [Declaration] -> m ()
+checkExhaustiveDecls :: forall m. MonadWriter MultipleErrors m => Environment -> ModuleName -> [Declaration] -> m ()
 checkExhaustiveDecls env mn = mapM_ onDecl
   where
   onDecl :: Declaration -> m ()
@@ -310,5 +310,5 @@ checkExhaustiveDecls env mn = mapM_ onDecl
 -- |
 -- Exhaustivity checking over a single module
 --
-checkExhaustiveModule :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Environment -> Module -> m ()
+checkExhaustiveModule :: forall m. MonadWriter MultipleErrors m => Environment -> Module -> m ()
 checkExhaustiveModule env (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds

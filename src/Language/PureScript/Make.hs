@@ -145,7 +145,7 @@ data RebuildPolicy
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Functor m, Applicative m, Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
      -> m Environment

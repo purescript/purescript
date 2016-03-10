@@ -1283,7 +1283,7 @@ renderBox = unlines
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
 
-reifyErrors :: (Functor m, MonadError e m) => m a -> m (Either e a)
+reifyErrors :: (MonadError e m) => m a -> m (Either e a)
 reifyErrors ma = catchError (fmap Right ma) (return . Left)
 
 reflectErrors :: (MonadError e m) => m (Either e a) -> m a
@@ -1310,13 +1310,13 @@ withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : h
 -- |
 -- Collect errors in in parallel
 --
-parU :: (MonadError MultipleErrors m, Functor m) => [a] -> (a -> m b) -> m [b]
+parU :: (MonadError MultipleErrors m) => [a] -> (a -> m b) -> m [b]
 parU xs f = forM xs (withError . f) >>= collectErrors
   where
-  withError :: (MonadError MultipleErrors m, Functor m) => m a -> m (Either MultipleErrors a)
+  withError :: (MonadError MultipleErrors m) => m a -> m (Either MultipleErrors a)
   withError u = catchError (Right <$> u) (return . Left)
 
-  collectErrors :: (MonadError MultipleErrors m, Functor m) => [Either MultipleErrors a] -> m [a]
+  collectErrors :: (MonadError MultipleErrors m) => [Either MultipleErrors a] -> m [a]
   collectErrors es = case lefts es of
     [] -> return $ rights es
     errs -> throwError $ fold errs

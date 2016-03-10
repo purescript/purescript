@@ -45,7 +45,7 @@ type Desugar = StateT MemberMap
 -- instance dictionary expressions.
 --
 desugarTypeClasses
-  :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m)
+  :: (MonadSupply m, MonadError MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m [Module]
@@ -62,7 +62,7 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   fromExternsDecl _ _ = Nothing
 
 desugarModule
-  :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m)
+  :: (MonadSupply m, MonadError MultipleErrors m)
   => Module
   -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
@@ -171,7 +171,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   };
 -}
 desugarDecl
-  :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m)
+  :: (MonadSupply m, MonadError MultipleErrors m)
   => ModuleName
   -> [DeclarationRef]
   -> Declaration
@@ -259,7 +259,7 @@ unit = TypeApp tyObject REmpty
 
 typeInstanceDictionaryDeclaration
   :: forall m
-   . (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m)
+   . (MonadSupply m, MonadError MultipleErrors m)
   => Ident
   -> ModuleName
   -> [Constraint]

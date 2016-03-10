@@ -35,7 +35,7 @@ import Language.PureScript.Types
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
 createBindingGroupsModule
-  :: (Functor m, Applicative m, MonadError MultipleErrors m)
+  :: (MonadError MultipleErrors m)
   => [Module]
   -> m [Module]
 createBindingGroupsModule =
@@ -52,7 +52,7 @@ collapseBindingGroupsModule =
 
 createBindingGroups
   :: forall m
-   . (Functor m, Applicative m, MonadError MultipleErrors m)
+   . (MonadError MultipleErrors m)
   => ModuleName
   -> [Declaration]
   -> m [Declaration]
@@ -171,7 +171,7 @@ getTypeName _ = internalError "Expected DataDeclaration"
 --
 toBindingGroup
   :: forall m
-   . (Functor m, MonadError MultipleErrors m)
+   . (MonadError MultipleErrors m)
    => ModuleName
    -> SCC Declaration
    -> m Declaration

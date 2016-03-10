@@ -39,11 +39,11 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 
 -- | Check that one type subsumes another, rethrowing errors to provide a better error message
-subsumes :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Maybe Expr -> Type -> Type -> m (Maybe Expr)
+subsumes :: (MonadError MultipleErrors m, MonadState CheckState m) => Maybe Expr -> Type -> Type -> m (Maybe Expr)
 subsumes val ty1 ty2 = rethrow (addHint (ErrorInSubsumption ty1 ty2)) $ subsumes' val ty1 ty2
 
 -- | Check tahat one type subsumes another
-subsumes' :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) =>
+subsumes' :: (MonadError MultipleErrors m, MonadState CheckState m) =>
   Maybe Expr ->
   Type ->
   Type ->

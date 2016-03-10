@@ -70,7 +70,7 @@ type UsedImports = M.Map ModuleName [Name]
 --
 lintImports
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Module
   -> Env
   -> UsedImports
@@ -170,7 +170,7 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
 
 lintImportDecl
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Env
   -> ModuleName
   -> Maybe ModuleName

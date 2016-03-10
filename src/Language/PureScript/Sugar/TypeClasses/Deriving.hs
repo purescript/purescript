@@ -32,7 +32,7 @@ import qualified Language.PureScript.Constants as C
 
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadSupply m)
+  :: (MonadError MultipleErrors m, MonadSupply m)
   => Module
   -> m Module
 deriveInstances (Module ss coms mn ds exts) = Module ss coms mn <$> mapM (deriveInstance mn ds) ds <*> pure exts
@@ -40,7 +40,7 @@ deriveInstances (Module ss coms mn ds exts) = Module ss coms mn <$> mapM (derive
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration,
 -- elaborates that into an instance declaration via code generation.
 deriveInstance
-  :: (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  :: (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
   -> [Declaration]
   -> Declaration
@@ -82,7 +82,7 @@ typesProxy :: ModuleName
 typesProxy = ModuleName [ ProperName "Type", ProperName "Proxy" ]
 
 deriveGeneric
-  :: forall m. (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  :: forall m. (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
   -> [Declaration]
   -> ProperName 'TypeName
@@ -246,7 +246,7 @@ deriveGeneric mn ds tyConNm dargs = do
     mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
 
 deriveEq ::
-  forall m. (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  forall m. (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
   -> [Declaration]
   -> ProperName 'TypeName
@@ -298,7 +298,7 @@ deriveEq mn ds tyConNm = do
     toEqTest l r _ = preludeEq l r
 
 deriveOrd ::
-  forall m. (Functor m, MonadError MultipleErrors m, MonadSupply m)
+  forall m. (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
   -> [Declaration]
   -> ProperName 'TypeName
@@ -377,7 +377,7 @@ deriveOrd mn ds tyConNm = do
     toOrdering l r _ = preludeCompare l r
 
 findTypeDecl
-  :: (Functor m, MonadError MultipleErrors m)
+  :: (MonadError MultipleErrors m)
   => ProperName 'TypeName
   -> [Declaration]
   -> m Declaration
