@@ -57,7 +57,7 @@ replaceAllTypeSynonyms' env = everywhereOnTypesTopDownM try
   go c args (TypeApp f arg) = go (c + 1) (arg : args) f
   go _ _ _ = return Nothing
 
-replaceAllTypeSynonyms :: (e ~ MultipleErrors, Functor m, Monad m, MonadState CheckState m, MonadError e m) => Type -> m Type
+replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' env d

@@ -43,7 +43,7 @@ freshKind = do
 
 -- | Update the substitution to solve a kind constraint
 solveKind
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Int
   -> Kind
   -> m ()
@@ -68,7 +68,7 @@ substituteKind sub = everywhereOnKinds go
 
 -- | Make sure that an unknown does not occur in a kind
 occursCheck
-  :: (Functor m, Applicative m, MonadError MultipleErrors m)
+  :: (MonadError MultipleErrors m)
   => Int
   -> Kind
   -> m ()
@@ -80,7 +80,7 @@ occursCheck u k = void $ everywhereOnKindsM go k
 
 -- | Unify two kinds
 unifyKinds
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Kind
   -> Kind
   -> m ()
@@ -101,14 +101,14 @@ unifyKinds k1 k2 = do
 
 -- | Infer the kind of a single type
 kindOf
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
   => Type
   -> m Kind
 kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars ::
-  (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m) =>
+  (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m) =>
   Type ->
   m (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
@@ -121,7 +121,7 @@ kindOfWithScopedVars ty =
 
 -- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 kindsOf
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
@@ -139,7 +139,7 @@ kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tidyUp (k, sub) = starIfUnknown $ substituteKind sub k
 
 freshKindVar
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => (String, Maybe Kind)
   -> Kind
   -> m (ProperName 'TypeName, Kind)
@@ -150,7 +150,7 @@ freshKindVar (arg, Just kind') kind = do
 
 -- | Simultaneously infer the kinds of several mutually recursive type constructors
 kindsOfAll
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], Type)]
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], [Type])]
@@ -178,7 +178,7 @@ kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
 
 -- | Solve the set of kind constraints associated with the data constructors for a type constructor
 solveTypes
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
   -> [Type]
   -> [Kind]
@@ -202,14 +202,14 @@ starIfUnknown k = k
 
 -- | Infer a kind for a type
 infer
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m (Kind, [(String, Kind)])
 infer ty = rethrow (addHint (ErrorCheckingKind ty)) $ infer' ty
 
 infer'
   :: forall m
-   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m)
+   . (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m (Kind, [(String, Kind)])
 infer' (ForAll ident ty _) = do

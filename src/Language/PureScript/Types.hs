@@ -248,7 +248,7 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
   go other = f other
 
-everywhereOnTypesM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesM f = go
   where
   go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
@@ -261,7 +261,7 @@ everywhereOnTypesM f = go
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
   go other = f other
 
-everywhereOnTypesTopDownM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesTopDownM f = go <=< f
   where
   go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)

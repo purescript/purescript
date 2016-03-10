@@ -29,8 +29,7 @@ import qualified Language.PureScript.Docs.Render as Render
 -- Markdown-formatted String.
 --
 renderModulesAsMarkdown ::
-  (Functor m, Applicative m,
-  MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m String
 renderModulesAsMarkdown =

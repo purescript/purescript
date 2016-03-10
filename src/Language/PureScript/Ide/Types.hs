@@ -79,7 +79,7 @@ data PscIdeEnvironment =
   , envConfiguration :: Configuration
   }
 
-type PscIde m = (Applicative m, MonadIO m, MonadReader PscIdeEnvironment m)
+type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 
 data PscIdeState =
   PscIdeState

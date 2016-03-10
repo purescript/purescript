@@ -40,7 +40,7 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
 addDataType
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
@@ -56,7 +56,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
       addDataConstructor moduleName dtype name (map fst args) dctor tys
 
 addDataConstructor
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
@@ -74,7 +74,7 @@ addDataConstructor moduleName dtype name args dctor tys = do
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
   -> [(String, Maybe Kind)]
@@ -88,7 +88,7 @@ addTypeSynonym moduleName name args ty kind = do
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
 valueIsNotDefined
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Ident
   -> m ()
@@ -99,7 +99,7 @@ valueIsNotDefined moduleName name = do
     Nothing -> return ()
 
 addValue
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Ident
   -> Type
@@ -110,7 +110,7 @@ addValue moduleName name ty nameKind = do
   putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
 
 addTypeClass
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> ProperName 'ClassName
   -> [(String, Maybe Kind)]
@@ -126,7 +126,7 @@ addTypeClass moduleName pn args implies ds =
   toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
   -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
   -> m ()
@@ -135,7 +135,7 @@ addTypeClassDictionaries mn entries =
   where insertState st = M.insertWith (M.unionWith M.union) mn entries (typeClassDictionaries . checkEnv $ st)
 
 checkDuplicateTypeArguments
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [String]
   -> m ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
@@ -145,7 +145,7 @@ checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   firstDup = listToMaybe $ args \\ nub args
 
 checkTypeClassInstance
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Type
   -> m ()
@@ -161,7 +161,7 @@ checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
 -- Check that type synonyms are fully-applied in a type
 --
 checkTypeSynonyms
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Type
   -> m ()
 checkTypeSynonyms = void . replaceAllTypeSynonyms
@@ -181,7 +181,7 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 typeCheckAll
   :: forall m
-   . (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> [DeclarationRef]
   -> [Declaration]
@@ -343,7 +343,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
 --
 typeCheckModule
   :: forall m
-   . (Functor m, Applicative m, MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Module
   -> m Module
 typeCheckModule (Module _ _ _ _ Nothing) = internalError "exports should have been elaborated"

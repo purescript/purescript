@@ -34,7 +34,7 @@ import qualified Language.PureScript.Constants as C
 --
 entails
   :: forall m
-   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -> Constraint

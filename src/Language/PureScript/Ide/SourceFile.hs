@@ -3,8 +3,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 module Language.PureScript.Ide.SourceFile where
 
-import           Prelude                              ()
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
@@ -22,7 +21,7 @@ import qualified Language.PureScript.Names            as N
 import qualified Language.PureScript.Parser           as P
 import           System.Directory
 
-parseModuleFromFile :: (Applicative m, MonadIO m, MonadError PscIdeError m) =>
+parseModuleFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                        FilePath -> m D.Module
 parseModuleFromFile fp = do
   exists <- liftIO (doesFileExist fp)
@@ -46,7 +45,7 @@ getImports (D.Module _ _ _ declarations _) =
     isImport (D.PositionedDeclaration _ _ (i@D.ImportDeclaration{})) = Just i
     isImport _ = Nothing
 
-getImportsForFile :: (Applicative m, MonadIO m, MonadError PscIdeError m) =>
+getImportsForFile :: (MonadIO m, MonadError PscIdeError m) =>
                      FilePath -> m [ModuleImport]
 getImportsForFile fp = do
   module' <- parseModuleFromFile fp

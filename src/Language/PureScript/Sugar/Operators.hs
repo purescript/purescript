@@ -57,7 +57,7 @@ type AliasName = Either (Qualified Ident) (Qualified (ProperName 'ConstructorNam
 --
 rebracket
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m)
+   . (MonadError MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m [Module]
@@ -116,7 +116,7 @@ removeSignedLiterals (Module ss coms mn ds exts) = Module ss coms mn (map f' ds)
   go other = other
 
 rebracketModule
-  :: (Applicative m, MonadError MultipleErrors m)
+  :: (MonadError MultipleErrors m)
   => [[(Qualified Ident, Associativity)]]
   -> Module
   -> m Module
@@ -178,7 +178,7 @@ customOperatorTable fixities =
 
 desugarOperatorSections
   :: forall m
-   . (Applicative m, MonadSupply m, MonadError MultipleErrors m)
+   . (MonadSupply m, MonadError MultipleErrors m)
   => Module
   -> m Module
 desugarOperatorSections (Module ss coms mn ds exts) =

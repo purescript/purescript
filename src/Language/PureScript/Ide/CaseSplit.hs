@@ -78,7 +78,7 @@ findTypeDeclaration' t ExternsFile{..} =
             EDType tn _ _ -> tn == t
             _ -> False) efDeclarations
 
-splitTypeConstructor :: (Applicative m, MonadError PscIdeError m) =>
+splitTypeConstructor :: (MonadError PscIdeError m) =>
                         Type -> m (ProperName 'TypeName, [Type])
 splitTypeConstructor = go []
   where

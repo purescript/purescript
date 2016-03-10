@@ -209,7 +209,7 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSNode -> m Module
+toModule :: forall m. (MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSNode -> m Module
 toModule requirePath mids mid top
   | JSSourceElementsTop ns <- node top = Module mid <$> traverse toModuleElement ns
   | otherwise = err InvalidTopLevel
@@ -533,7 +533,7 @@ codeGen optionsMainModule optionsNamespace ms = renderToString (NN (JSSourceElem
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-bundle :: (Applicative m, MonadError ErrorMessage m)
+bundle :: (MonadError ErrorMessage m)
        => [(ModuleIdentifier, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.

@@ -74,12 +74,12 @@ findType :: (PscIde m, MonadLogger m) =>
 findType search filters =
   CompletionResult . getExactMatches search filters <$> getAllModulesWithReexports
 
-findPursuitCompletions :: (Applicative m, MonadIO m, MonadLogger m) =>
+findPursuitCompletions :: (MonadIO m, MonadLogger m) =>
                           PursuitQuery -> m Success
 findPursuitCompletions (PursuitQuery q) =
   PursuitResult <$> liftIO (searchPursuitForDeclarations q)
 
-findPursuitPackages :: (Applicative m, MonadIO m, MonadLogger m) =>
+findPursuitPackages :: (MonadIO m, MonadLogger m) =>
                        PursuitQuery -> m Success
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
@@ -118,7 +118,7 @@ caseSplit l b e csa t = do
 addClause :: Text -> CS.WildcardAnnotations -> Success
 addClause t wca = MultilineTextResult (CS.addClause t wca)
 
-importsForFile :: (Applicative m, MonadIO m, MonadLogger m, MonadError PscIdeError m) =>
+importsForFile :: (MonadIO m, MonadLogger m, MonadError PscIdeError m) =>
                   FilePath -> m Success
 importsForFile fp = do
   imports <- getImportsForFile fp
