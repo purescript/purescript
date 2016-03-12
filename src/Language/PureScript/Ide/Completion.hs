@@ -24,12 +24,12 @@ getExactMatches search filters modules =
 
 completionsFromModules :: [Module] -> [Completion]
 completionsFromModules = foldMap completionFromModule
-    where
-        completionFromModule :: Module -> [Completion]
-        completionFromModule (moduleIdent, decls) = mapMaybe (completionFromDecl moduleIdent) decls
+  where
+    completionFromModule :: Module -> [Completion]
+    completionFromModule (moduleIdent, decls) = mapMaybe (completionFromDecl moduleIdent) decls
 
 completionFromDecl :: ModuleIdent -> ExternDecl -> Maybe Completion
 completionFromDecl mi (FunctionDecl name type') = Just (Completion (mi, name, type'))
 completionFromDecl mi (DataDecl name kind)      = Just (Completion (mi, name, kind))
-completionFromDecl _ (ModuleDecl name _)        = Just (Completion ("module", name, "module"))
+completionFromDecl _  (ModuleDecl name _)       = Just (Completion ("module", name, "module"))
 completionFromDecl _ _                          = Nothing

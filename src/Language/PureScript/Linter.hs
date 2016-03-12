@@ -29,7 +29,7 @@ import Language.PureScript.Linter.Imports as L
 -- | Lint the PureScript AST.
 -- |
 -- | Right now, this pass only performs a shadowing check.
-lint :: forall m. (Applicative m, MonadWriter MultipleErrors m) => Module -> m ()
+lint :: forall m. (MonadWriter MultipleErrors m) => Module -> m ()
 lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
   moduleNames :: S.Set Ident

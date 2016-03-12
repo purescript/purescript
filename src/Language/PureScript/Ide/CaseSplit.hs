@@ -60,15 +60,6 @@ caseSplit q = do
   let appliedCtors = map (\(n, ts) -> (n, map applyTypeVars ts)) ctors
   pure appliedCtors
 
-{- ["EDType {
-     edTypeName = ProperName {runProperName = \"Either\"}
-   , edTypeKind = FunKind Star (FunKind Star Star)
-   , edTypeDeclarationKind =
-       DataType [(\"a\",Just Star),(\"b\",Just Star)]
-                [(ProperName {runProperName = \"Left\"},[TypeVar \"a\"])
-                ,(ProperName {runProperName = \"Right\"},[TypeVar \"b\"])]}"]
--}
-
 findTypeDeclaration :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                          ProperName 'TypeName -> m ExternsDeclaration
 findTypeDeclaration q = do
@@ -87,7 +78,7 @@ findTypeDeclaration' t ExternsFile{..} =
             EDType tn _ _ -> tn == t
             _ -> False) efDeclarations
 
-splitTypeConstructor :: (Applicative m, MonadError PscIdeError m) =>
+splitTypeConstructor :: (MonadError PscIdeError m) =>
                         Type -> m (ProperName 'TypeName, [Type])
 splitTypeConstructor = go []
   where

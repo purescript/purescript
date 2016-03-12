@@ -34,7 +34,7 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Names            as N
 import qualified Language.PureScript.Pretty           as PP
 
-readExternFile :: (Applicative m, MonadIO m, MonadError PscIdeError m) =>
+readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m PE.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeT <$> T.readFile fp)

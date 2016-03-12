@@ -41,7 +41,7 @@ combineContexts = M.unionWith (M.unionWith M.union)
 
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries
-  :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
+  :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> ModuleName
   -> Expr
@@ -59,7 +59,7 @@ replaceTypeClassDictionaries shouldGeneralize mn =
 --
 entails
   :: forall m
-   . (Functor m, Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> ModuleName
   -> Context

@@ -261,7 +261,7 @@ parseModule = do
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
-parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m, Functor m) =>
+parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m) =>
                                      (k -> FilePath) -> [(k, String)] -> m [(k, Module)]
 parseModulesFromFiles toFilePath input = do
   modules <- flip parU id $ map wrapError $ inParallel $ flip map input $ \(k, content) -> do

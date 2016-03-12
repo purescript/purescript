@@ -27,7 +27,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
 import Control.Monad.Writer
 
-newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a } 
+newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r)
 
 runSupplyT :: Integer -> SupplyT m a -> m (a, Integer)

@@ -33,21 +33,26 @@ type Type        = Text
 data Fixity = Infix | Infixl | Infixr deriving(Show, Eq, Ord)
 
 data ExternDecl
-    = FunctionDecl { functionName :: DeclIdent
-                   , functionType :: Type
-                   }
-    | FixityDeclaration Fixity
-                        Int
-                        DeclIdent
-    | Dependency { dependencyModule :: ModuleIdent
-                 , dependencyNames  :: [Text]
-                 , dependencyAlias  :: Maybe Text
-                 }
-    | ModuleDecl ModuleIdent
-                 [DeclIdent]
-    | DataDecl DeclIdent
-               Text
-    | Export ModuleIdent
+    -- | A function/value declaration
+    = FunctionDecl
+        DeclIdent -- The functions name
+        Type      -- The functions type
+    | FixityDeclaration Fixity Int DeclIdent
+    -- | A Dependency onto another Module
+    | Dependency
+        ModuleIdent  -- name of the dependency
+        [Text]       -- explicit imports
+        (Maybe Text) -- An eventual qualifier
+
+    -- | A module declaration
+    | ModuleDecl
+        ModuleIdent -- The modules name
+        [DeclIdent] -- The exported identifiers
+    -- | A data/newtype declaration
+    | DataDecl DeclIdent -- The type name
+               Text      -- The "type"
+    -- | An exported module
+    | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 
 instance ToJSON ExternDecl where
@@ -63,22 +68,22 @@ instance ToJSON ExternDecl where
 type Module = (ModuleIdent, [ExternDecl])
 
 data Configuration =
-  Configuration {
-    confOutputPath :: FilePath
+  Configuration
+  { confOutputPath :: FilePath
   , confDebug      :: Bool
   }
 
 data PscIdeEnvironment =
-  PscIdeEnvironment {
-    envStateVar      :: TVar PscIdeState
+  PscIdeEnvironment
+  { envStateVar      :: TVar PscIdeState
   , envConfiguration :: Configuration
   }
 
-type PscIde m = (Applicative m, MonadIO m, MonadReader PscIdeEnvironment m)
+type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 
 data PscIdeState =
-  PscIdeState {
-    pscStateModules :: M.Map Text [ExternDecl]
+  PscIdeState
+  { pscStateModules :: M.Map Text [ExternDecl]
   , externsFiles    :: M.Map ModuleName ExternsFile
   } deriving Show
 
@@ -90,29 +95,32 @@ newtype Completion =
     deriving (Show,Eq)
 
 data ModuleImport =
-  ModuleImport {
-    importModuleName :: ModuleIdent
+  ModuleImport
+  { importModuleName :: ModuleIdent
   , importType       :: D.ImportDeclarationType
   , importQualifier  :: Maybe Text
   } deriving(Show)
 
 instance Eq ModuleImport where
-  mi1 == mi2 = importModuleName mi1 == importModuleName mi2
-               && importQualifier mi1 == importQualifier mi2
+  mi1 == mi2 =
+    importModuleName mi1 == importModuleName mi2
+    && importQualifier mi1 == importQualifier mi2
 
 instance ToJSON ModuleImport where
   toJSON (ModuleImport mn D.Implicit qualifier) =
-    object $  ["module" .= mn
-              , "importType" .= ("implicit" :: Text)
-              ] ++ fmap (\x -> "qualifier" .= x) (maybeToList qualifier)
+    object $ [ "module" .= mn
+             , "importType" .= ("implicit" :: Text)
+             ] ++ fmap (\x -> "qualifier" .= x) (maybeToList qualifier)
   toJSON (ModuleImport mn (D.Explicit refs) _) =
-    object ["module" .= mn
+    object [ "module" .= mn
            , "importType" .= ("explicit" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)]
+           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+           ]
   toJSON (ModuleImport mn (D.Hiding refs) _) =
-    object ["module" .= mn
+    object [ "module" .= mn
            , "importType" .= ("hiding" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)]
+           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+           ]
 
 identifierFromDeclarationRef :: D.DeclarationRef -> String
 identifierFromDeclarationRef (D.TypeRef name _) = N.runProperName name
@@ -121,16 +129,16 @@ identifierFromDeclarationRef (D.TypeClassRef name) = N.runProperName name
 identifierFromDeclarationRef _ = ""
 
 instance FromJSON Completion where
-    parseJSON (Object o) = do
-        m <- o .: "module"
-        d <- o .: "identifier"
-        t <- o .: "type"
-        return $ Completion (m, d, t)
-    parseJSON _ = mzero
+  parseJSON (Object o) = do
+    m <- o .: "module"
+    d <- o .: "identifier"
+    t <- o .: "type"
+    pure (Completion (m, d, t))
+  parseJSON _ = mzero
 
 instance ToJSON Completion where
-    toJSON (Completion (m,d,t)) =
-        object ["module" .= m, "identifier" .= d, "type" .= t]
+  toJSON (Completion (m,d,t)) =
+    object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data Success =
   CompletionResult [Completion]
@@ -161,23 +169,22 @@ data PursuitSearchType = Package | Identifier
 
 instance FromJSON PursuitSearchType where
   parseJSON (String t) = case t of
-    "package"    -> return Package
-    "completion" -> return Identifier
+    "package"    -> pure Package
+    "completion" -> pure Identifier
     _            -> mzero
   parseJSON _ = mzero
 
 instance FromJSON PursuitQuery where
-  parseJSON o = fmap PursuitQuery (parseJSON o)
+  parseJSON o = PursuitQuery <$> (parseJSON o)
 
-data PursuitResponse
-    = ModuleResponse { moduleResponseName    :: Text
-                     , moduleResponsePackage :: Text}
-    | DeclarationResponse { declarationResponseType    :: Text
-                          , declarationResponseModule  :: Text
-                          , declarationResponseIdent   :: Text
-                          , declarationResponsePackage :: Text
-                          }
-    deriving (Show,Eq)
+data PursuitResponse =
+  -- | A Pursuit Response for a module. Consists of the modules name and the
+  -- package it belongs to
+  ModuleResponse ModuleIdent Text
+  -- | A Pursuit Response for a declaration. Consist of the declarations type,
+  -- module, name and package
+  | DeclarationResponse Type ModuleIdent DeclIdent Text
+  deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where
   parseJSON (Object o) = do
@@ -186,22 +193,12 @@ instance FromJSON PursuitResponse where
     (type' :: String) <- info .: "type"
     case type' of
       "module" -> do
-          name <- info .: "module"
-          return
-              ModuleResponse
-              { moduleResponseName = name
-              , moduleResponsePackage = package
-              }
+        name <- info .: "module"
+        pure (ModuleResponse name package)
       "declaration" -> do
-          moduleName <- info .: "module"
-          Right (ident, declType) <- typeParse <$> o .: "text"
-          return
-              DeclarationResponse
-              { declarationResponseType = declType
-              , declarationResponseModule = moduleName
-              , declarationResponseIdent = ident
-              , declarationResponsePackage = package
-              }
+        moduleName <- info .: "module"
+        Right (ident, declType) <- typeParse <$> o .: "text"
+        pure (DeclarationResponse declType moduleName ident package)
       _ -> mzero
   parseJSON _ = mzero
 
@@ -217,7 +214,7 @@ typeParse t = case parse parseType "" t of
       _ <- string "::"
       spaces
       type' <- many1 anyChar
-      return (unpack name, type')
+      pure (unpack name, type')
 
 identifier :: Parser Text
 identifier = do
@@ -227,14 +224,15 @@ identifier = do
     between (char '(') (char ')') (many1 (noneOf ", )")) <|>
     many1 (noneOf ", )")
   spaces
-  return (pack ident)
+  pure (pack ident)
 
 instance ToJSON PursuitResponse where
-  toJSON ModuleResponse{..} =
-    object ["module" .= moduleResponseName, "package" .= moduleResponsePackage]
-  toJSON DeclarationResponse{..} =
+  toJSON (ModuleResponse name package) =
+    object ["module" .= name, "package" .= package]
+  toJSON (DeclarationResponse module' ident type' package) =
     object
-      [ "module"  .= declarationResponseModule
-      , "ident"   .= declarationResponseIdent
-      , "type"    .= declarationResponseType
-      , "package" .= declarationResponsePackage]
+      [ "module"  .= module'
+      , "ident"   .= ident
+      , "type"    .= type'
+      , "package" .= package
+      ]

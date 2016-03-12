@@ -47,7 +47,7 @@ import System.FilePath.Posix ((</>))
 --
 moduleToJs
   :: forall m
-   . (Applicative m, Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
+   . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe JS
   -> m [JS]

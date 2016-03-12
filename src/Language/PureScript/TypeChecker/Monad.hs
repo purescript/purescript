@@ -84,7 +84,7 @@ bindTypes newNames action = do
 
 -- | Temporarily bind a collection of names to types
 withScopedTypeVars
-  :: (Functor m, Applicative m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
   -> [(String, Kind)]
   -> m a
@@ -112,20 +112,20 @@ withTypeClassDictionaries entries action = do
 
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
-  :: (Functor m, MonadState CheckState m)
+  :: (MonadState CheckState m)
   => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
-  :: (Functor m, MonadState CheckState m)
+  :: (MonadState CheckState m)
   => Maybe ModuleName
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
-  :: (Functor m, MonadState CheckState m)
+  :: (MonadState CheckState m)
   => ModuleName
   -> [(Ident, Type, NameVisibility)]
   -> m a
@@ -135,7 +135,7 @@ bindLocalVariables moduleName bindings =
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
-  :: (Functor m, MonadState CheckState m)
+  :: (MonadState CheckState m)
   => ModuleName
   -> [(ProperName 'TypeName, Kind)]
   -> m a
@@ -144,15 +144,15 @@ bindLocalTypeVariables moduleName bindings =
   bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
 
 -- | Update the visibility of all names to Defined
-makeBindingGroupVisible :: (Functor m, MonadState CheckState m) => m ()
+makeBindingGroupVisible :: (MonadState CheckState m) => m ()
 makeBindingGroupVisible = modifyEnv $ \e -> e { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names e) }
 
 -- | Update the visibility of all names to Defined in the scope of the provided action
-withBindingGroupVisible :: (Functor m, MonadState CheckState m) => m a -> m a
+withBindingGroupVisible :: (MonadState CheckState m) => m a -> m a
 withBindingGroupVisible action = preservingNames $ makeBindingGroupVisible >> action
 
 -- | Perform an action while preserving the names from the @Environment@.
-preservingNames :: (Functor m, MonadState CheckState m) => m a -> m a
+preservingNames :: (MonadState CheckState m) => m a -> m a
 preservingNames action = do
   orig <- gets (names . checkEnv)
   a <- action
@@ -161,7 +161,7 @@ preservingNames action = do
 
 -- | Lookup the type of a value by name in the @Environment@
 lookupVariable
-  :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m)
+  :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified Ident
   -> m Type
@@ -173,7 +173,7 @@ lookupVariable currentModule (Qualified moduleName var) = do
 
 -- | Lookup the visibility of a value by name in the @Environment@
 getVisibility
-  :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m)
+  :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified Ident
   -> m NameVisibility
@@ -185,7 +185,7 @@ getVisibility currentModule (Qualified moduleName var) = do
 
 -- | Assert that a name is visible
 checkVisibility
-  :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m)
+  :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified Ident
   -> m ()
@@ -197,7 +197,7 @@ checkVisibility currentModule name@(Qualified _ var) = do
 
 -- | Lookup the kind of a type by name in the @Environment@
 lookupTypeVariable
-  :: (e ~ MultipleErrors, Functor m, MonadState CheckState m, MonadError e m)
+  :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified (ProperName 'TypeName)
   -> m Kind
@@ -208,7 +208,7 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
     Just (k, _) -> return k
 
 -- | Get the current @Environment@
-getEnv :: (Functor m, MonadState CheckState m) => m Environment
+getEnv :: (MonadState CheckState m) => m Environment
 getEnv = checkEnv <$> get
 
 -- | Update the @Environment@
@@ -234,14 +234,14 @@ guardWith e False = throwError e
 
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
 liftUnify ::
-  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
+  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   m a ->
   m (a, Substitution)
 liftUnify = liftUnifyWarnings (const id)
 
 -- | Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
 liftUnifyWarnings ::
-  (Functor m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
+  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   (Substitution -> ErrorMessage -> ErrorMessage) ->
   m a ->
   m (a, Substitution)

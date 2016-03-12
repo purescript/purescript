@@ -36,7 +36,7 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
 -- | Ensure rows do not contain duplicate labels
-checkDuplicateLabels :: forall m. (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
+checkDuplicateLabels :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
 checkDuplicateLabels =
   let (_, f, _) = everywhereOnValuesM def go def
   in void . f

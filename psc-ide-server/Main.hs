@@ -124,7 +124,7 @@ startServer port env = withSocketsDo $ do
           liftIO (hClose h)
 
 
-acceptCommand :: (Applicative m, MonadIO m, MonadLogger m, MonadError T.Text m)
+acceptCommand :: (MonadIO m, MonadLogger m, MonadError T.Text m)
                  => Socket -> m (T.Text, Handle)
 acceptCommand sock = do
   h <- acceptConnection

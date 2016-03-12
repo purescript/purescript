@@ -347,7 +347,7 @@ everywhereOnJS f = go
 everywhereOnJSTopDown :: (JS -> JS) -> JS -> JS
 everywhereOnJSTopDown f = runIdentity . everywhereOnJSTopDownM (Identity . f)
 
-everywhereOnJSTopDownM :: (Applicative m, Monad m) => (JS -> m JS) -> JS -> m JS
+everywhereOnJSTopDownM :: (Monad m) => (JS -> m JS) -> JS -> m JS
 everywhereOnJSTopDownM f = f >=> go
   where
   f' = f >=> go

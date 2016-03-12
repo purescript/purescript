@@ -42,7 +42,7 @@ everywhereOnKinds f = go
   go (FunKind k1 k2) = f (FunKind (go k1) (go k2))
   go other = f other
 
-everywhereOnKindsM :: (Functor m, Applicative m, Monad m) => (Kind -> m Kind) -> Kind -> m Kind
+everywhereOnKindsM :: Monad m => (Kind -> m Kind) -> Kind -> m Kind
 everywhereOnKindsM f = go
   where
   go (Row k1) = (Row <$> go k1) >>= f

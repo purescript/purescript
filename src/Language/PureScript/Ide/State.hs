@@ -25,38 +25,38 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Names
 
-getPscIdeState :: (PscIde m, Functor m) =>
+getPscIdeState :: (PscIde m) =>
                   m (M.Map ModuleIdent [ExternDecl])
 getPscIdeState = do
   stateVar <- envStateVar <$> ask
   liftIO $ pscStateModules <$> readTVarIO stateVar
 
-getExternFiles :: (PscIde m, Functor m) =>
+getExternFiles :: (PscIde m) =>
                   m (M.Map ModuleName ExternsFile)
 getExternFiles = do
   stateVar <- envStateVar <$> ask
   liftIO (externsFiles <$> readTVarIO stateVar)
 
-getAllDecls :: (PscIde m, Functor m) => m [ExternDecl]
+getAllDecls :: (PscIde m) => m [ExternDecl]
 getAllDecls = concat <$> getPscIdeState
 
-getAllModules :: (PscIde m, Functor m) => m [Module]
+getAllModules :: (PscIde m) => m [Module]
 getAllModules = M.toList <$> getPscIdeState
 
-getAllModulesWithReexports :: (PscIde m, MonadLogger m, Applicative m) =>
+getAllModulesWithReexports :: (PscIde m, MonadLogger m) =>
                               m [Module]
 getAllModulesWithReexports = do
   mis <- M.keys <$> getPscIdeState
   ms  <- traverse getModuleWithReexports mis
   pure (catMaybes ms)
 
-getModule :: (PscIde m, MonadLogger m, Applicative m) =>
+getModule :: (PscIde m, MonadLogger m) =>
              ModuleIdent -> m (Maybe Module)
 getModule m = do
   modules <- getPscIdeState
   pure ((m,) <$> M.lookup m modules)
 
-getModuleWithReexports :: (PscIde m, MonadLogger m, Applicative m) =>
+getModuleWithReexports :: (PscIde m, MonadLogger m) =>
                           ModuleIdent -> m (Maybe Module)
 getModuleWithReexports mi = do
   m <- getModule mi
@@ -73,8 +73,8 @@ insertModule externsFile = do
 
 insertModule' :: TVar PscIdeState -> ExternsFile -> STM ()
 insertModule' st ef = do
-    modifyTVar (st) $ \x ->
+    modifyTVar st $ \x ->
       x { externsFiles = M.insert (efModuleName ef) ef (externsFiles x)
-          , pscStateModules = let (mn, decls ) = convertExterns ef
-                              in M.insert mn decls (pscStateModules x)
+        , pscStateModules = let (mn, decls) = convertExterns ef
+                            in M.insert mn decls (pscStateModules x)
         }

@@ -36,7 +36,7 @@ import qualified Text.Parsec as PS
 
 type ForeignJS = String
 
-parseForeignModulesFromFiles :: (Functor m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+parseForeignModulesFromFiles :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
                              => [(FilePath, ForeignJS)]
                              -> m (M.Map ModuleName FilePath)
 parseForeignModulesFromFiles files = do

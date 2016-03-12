@@ -37,7 +37,7 @@ import Language.PureScript.Sugar.Names.Env
 --
 findImports
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [Declaration]
   -> m (M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])
 findImports = foldM (go Nothing) M.empty
@@ -56,7 +56,7 @@ type ImportDef = (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
 --
 resolveImports
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Env
   -> Module
   -> m (Module, Imports)
@@ -160,7 +160,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Env
   -> Imports
   -> (ModuleName, [(Maybe SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)])
@@ -187,7 +187,7 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
 --
 resolveImport
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Exports
   -> Imports

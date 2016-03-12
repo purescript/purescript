@@ -17,7 +17,7 @@ author: Phil Freeman <paf31@cantab.net>,
         Harry Garrood <harry@garrood.me>,
         Christoph Hegemann <christoph.hegemann1337@gmail.com>
 
-tested-with: GHC==7.8.4, GHC==7.10.3, GHC==8.0.1
+tested-with: GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
@@ -36,8 +36,7 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
                   , stack.yaml
-                  , stack-lts-2.yaml
-                  , stack-lts-3.yaml
+                  , stack-lts-5.yaml
                   , stack-nightly.yaml
                   , README.md
                   , INSTALL.md
@@ -49,7 +48,7 @@ source-repository head
     location: https://github.com/purescript/purescript.git
 
 library
-    build-depends: base >=4.6 && <5,
+    build-depends: base >=4.8 && <5,
                    base-compat >=0.6.0,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
@@ -229,7 +228,7 @@ library
 executable psc
     build-depends: base >=4 && <5, base-compat >=0.6.0,
                    containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any, purescript -any,
+                   mtl -any, optparse-applicative >= 0.12.1, parsec -any, purescript -any,
                    time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
                    aeson >= 0.8 && < 0.12, bytestring -any, utf8-string >= 1 && < 2
     main-is: Main.hs
@@ -240,7 +239,7 @@ executable psc
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.10.0, parsec -any,
+                   mtl -any, optparse-applicative >= 0.12.1, parsec -any,
                    haskeline >= 0.7.0.0, purescript -any, transformers -any,
                    transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
                    boxes >= 0.1.4 && < 0.2.0
@@ -263,7 +262,7 @@ executable psci
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.10.0, process -any, mtl -any,
+                   optparse-applicative >= 0.12.1, process -any, mtl -any,
                    split -any, ansi-wl-pprint -any, directory -any,
                    filepath -any, Glob -any, transformers -any,
                    transformers-compat -any
@@ -285,7 +284,7 @@ executable psc-publish
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
-    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.10.0,
+    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
                    process -any, mtl -any, parsec -any, filepath -any, directory -any,
                    Glob -any
     main-is: Main.hs
@@ -306,7 +305,7 @@ executable psc-bundle
                        mtl -any,
                        transformers -any,
                        transformers-compat -any,
-                       optparse-applicative >= 0.10.0,
+                       optparse-applicative >= 0.12.1,
                        Glob -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
@@ -324,7 +323,7 @@ executable psc-ide-server
                      , transformers -any
                      , transformers-compat -any
                      , network -any
-                     , optparse-applicative >= 0.10.0
+                     , optparse-applicative >= 0.12.1
                      , stm -any
                      , text -any
                      , base-compat >=0.6.0
@@ -338,7 +337,7 @@ executable psc-ide-client
   build-depends:       base >=4 && <5
                      , mtl -any
                      , text -any
-                     , optparse-applicative >= 0.10.0
+                     , optparse-applicative >= 0.12.1
                      , network -any
                      , base-compat >=0.6.0
   ghc-options:         -Wall -O2

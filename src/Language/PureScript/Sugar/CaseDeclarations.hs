@@ -36,7 +36,7 @@ isLeft (Right _) = False
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
+desugarCasesModule :: (MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
   rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> (desugarCases <=< desugarAbs <=< validateCases $ ds) <*> pure exps
@@ -44,7 +44,7 @@ desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
 -- |
 -- Validates that case head and binder lengths match.
 --
-validateCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+validateCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 validateCases = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return validate return
@@ -69,7 +69,7 @@ validateCases = flip parU f
     positionedBinder (PositionedBinder p _ _) = Just p
     positionedBinder _ = Nothing
 
-desugarAbs :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+desugarAbs :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
@@ -83,7 +83,7 @@ desugarAbs = flip parU f
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+desugarCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> m [Declaration]
@@ -109,7 +109,7 @@ inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: forall m. (Functor m, Applicative m, Monad m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
@@ -147,7 +147,7 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
       argNames = foldl1 resolveNames namedArgs

@@ -235,7 +235,7 @@ inlineCommonOperators = applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: (Applicative m, MonadSupply m) => JS -> m JS
+inlineFnComposition :: (MonadSupply m) => JS -> m JS
 inlineFnComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS

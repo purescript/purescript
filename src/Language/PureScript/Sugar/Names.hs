@@ -44,13 +44,13 @@ import Language.PureScript.Linter.Imports
 -- Replaces all local names with qualified names within a list of modules. The
 -- modules should be topologically sorted beforehand.
 --
-desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugarImports :: forall m. (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
 desugarImports externs modules =
   fmap snd (desugarImportsWithEnv externs modules)
 
 desugarImportsWithEnv
   :: forall m
-  . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m (Env, [Module])
@@ -141,7 +141,7 @@ elaborateExports exps (Module ss coms mn decls refs) =
 --
 renameInModule
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m)
   => Env
   -> Imports
   -> Module
@@ -334,7 +334,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
 --
 updateExportRefs
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
    => Module
    -> m Module
 updateExportRefs (Module ss coms mn decls exps) =
