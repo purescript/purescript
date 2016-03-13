@@ -281,10 +281,10 @@ infer' (Case vals binders) = do
   return $ TypedValue True (Case vals' binders') ret
 infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
-  v2@(TypedValue _ _ t2) <- infer th
-  v3@(TypedValue _ _ t3) <- infer el
-  (v2', v3', t) <- meet v2 v3 t2 t3
-  return $ TypedValue True (IfThenElse cond' v2' v3') t
+  th'@(TypedValue _ _ thTy) <- infer th
+  el'@(TypedValue _ _ elTy) <- infer el
+  unifyTypes thTy elTy
+  return $ TypedValue True (IfThenElse cond' th' el') thTy
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
@@ -720,25 +720,6 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
 checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
-
--- | Compute the meet of two types, i.e. the most general type which both types subsume.
--- TODO: is this really needed?
-meet ::
-  (MonadState CheckState m, MonadError MultipleErrors m) =>
-  Expr ->
-  Expr ->
-  Type ->
-  Type ->
-  m (Expr, Expr, Type)
-meet e1 e2 (ForAll ident t1 _) t2 = do
-  t1' <- replaceVarWithUnknown ident t1
-  meet e1 e2 t1' t2
-meet e1 e2 t1 (ForAll ident t2 _) = do
-  t2' <- replaceVarWithUnknown ident t2
-  meet e1 e2 t1 t2'
-meet e1 e2 t1 t2 = do
-  unifyTypes t1 t2
-  return (e1, e2, t1)
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
