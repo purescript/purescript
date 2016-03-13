@@ -190,7 +190,7 @@ displayUserError e = case e of
   CompileError err ->
     vcat
       [ para "Compile error:"
-      , indented (P.prettyPrintMultipleErrorsBox False err)
+      , indented (vcat (P.prettyPrintMultipleErrorsBox False err))
       ]
   DirtyWorkingTree ->
     para (
