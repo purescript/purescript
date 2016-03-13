@@ -12,6 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module JSON where
@@ -19,6 +20,8 @@ module JSON where
 import Prelude ()
 import Prelude.Compat
 
+import Data.Aeson ((.=))
+import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
 import qualified Language.PureScript as P
@@ -42,16 +45,24 @@ data JSONError = JSONError
   , suggestion :: Maybe ErrorSuggestion
   }
 
+-- These accessors are par
+data JSONWarnings
+  = JSONWarningSummary Int
+  | JSONWarnings [JSONError]
+
+instance A.ToJSON JSONWarnings where
+  toJSON (JSONWarningSummary n) = A.object ["count" .= n]
+  toJSON (JSONWarnings w) = A.toJSON w
+
 data JSONResult = JSONResult
-  { warnings :: [JSONError]
+  { warnings :: JSONWarnings
   , errors :: [JSONError]
   }
 
-$(A.deriveJSON A.defaultOptions ''ErrorPosition)
-$(A.deriveJSON A.defaultOptions ''JSONError)
-$(A.deriveJSON A.defaultOptions ''JSONResult)
-$(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
-
+$(A.deriveToJSON A.defaultOptions ''ErrorPosition)
+$(A.deriveToJSON A.defaultOptions ''JSONError)
+$(A.deriveToJSON A.defaultOptions ''JSONResult)
+$(A.deriveToJSON A.defaultOptions ''ErrorSuggestion)
 
 toJSONErrors :: Bool -> P.Level -> P.MultipleErrors -> [JSONError]
 toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErrors

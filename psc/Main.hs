@@ -24,6 +24,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Strict
 
+import Data.Bool (bool)
 import Data.List (isSuffixOf, partition)
 import Data.Version (showVersion)
 import qualified Data.Map as M
@@ -46,12 +47,13 @@ import Language.PureScript.Make
 import JSON
 
 data PSCMakeOptions = PSCMakeOptions
-  { pscmInput        :: [FilePath]
-  , pscmForeignInput :: [FilePath]
-  , pscmOutputDir    :: FilePath
-  , pscmOpts         :: P.Options
-  , pscmUsePrefix    :: Bool
-  , pscmJSONErrors   :: Bool
+  { pscmInput             :: [FilePath]
+  , pscmForeignInput      :: [FilePath]
+  , pscmOutputDir         :: FilePath
+  , pscmOpts              :: P.Options
+  , pscmUsePrefix         :: Bool
+  , pscmJSONErrors        :: Bool
+  , pscmSummarizeWarnings :: Bool
   }
 
 data InputOptions = InputOptions
@@ -59,23 +61,30 @@ data InputOptions = InputOptions
   }
 
 -- | Argumnets: verbose, use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
-printWarningsAndErrors verbose False warnings errors = do
+printWarningsAndErrors :: PSCMakeOptions -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors PSCMakeOptions{ pscmJSONErrors = False, .. } warnings errors = do
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings verbose warnings)
+    hPutStrLn stderr $
+      if pscmSummarizeWarnings
+        then (<> " warnings were discarded.") . show . length . P.runMultipleErrors $ warnings
+        else P.prettyPrintMultipleWarnings (P.optionsVerboseErrors pscmOpts) warnings
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors verbose errs)
+      hPutStrLn stderr (P.prettyPrintMultipleErrors (P.optionsVerboseErrors pscmOpts) errs)
       exitFailure
     Right _ -> return ()
-printWarningsAndErrors verbose True warnings errors = do
+printWarningsAndErrors PSCMakeOptions{..} warnings errors = do
   hPutStrLn stderr . BU8.toString . B.toStrict . A.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
+    JSONResult (bool (JSONWarnings . toJSONErrors (P.optionsVerboseErrors pscmOpts) P.Warning)
+                     (JSONWarningSummary . length . P.runMultipleErrors)
+                     pscmSummarizeWarnings
+                     warnings
+               )
+               (either (toJSONErrors (P.optionsVerboseErrors pscmOpts) P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
-compile PSCMakeOptions{..} = do
+compile opts@PSCMakeOptions{..} = do
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
     hPutStrLn stderr "psc: No input files."
@@ -89,7 +98,7 @@ compile PSCMakeOptions{..} = do
     let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
         makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
-  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
+  printWarningsAndErrors opts makeWarnings makeErrors
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
@@ -177,11 +186,16 @@ jsonErrors :: Parser Bool
 jsonErrors = switch $
      long "json-errors"
   <> help "Print errors to stderr as JSON"
+
+summarizeWarnings :: Parser Bool
+summarizeWarnings = switch $
+     long "summarize-warnings"
+  <> help "Display a count of warnings instead of all warning information"
+
 sourceMaps :: Parser Bool
 sourceMaps = switch $
      long "source-maps"
   <> help "Generate source maps"
-
 
 options :: Parser P.Options
 options = P.Options <$> noTco
@@ -200,6 +214,7 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> options
                                 <*> (not <$> noPrefix)
                                 <*> jsonErrors
+                                <*> summarizeWarnings
 
 main :: IO ()
 main = execParser opts >>= compile
