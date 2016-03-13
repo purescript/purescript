@@ -1,26 +1,14 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.Types
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Pretty printer for Types
 --
------------------------------------------------------------------------------
-
-module Language.PureScript.Pretty.Types (
-    typeAsBox,
-    prettyPrintType,
-    typeAtomAsBox,
-    prettyPrintTypeAtom,
-    prettyPrintRowWith,
-    prettyPrintRow
-) where
+module Language.PureScript.Pretty.Types
+  ( typeAsBox
+  , prettyPrintType
+  , typeAtomAsBox
+  , prettyPrintTypeAtom
+  , prettyPrintRowWith
+  , prettyPrintRow
+  ) where
 
 import Data.Maybe (fromMaybe)
 
@@ -50,11 +38,11 @@ typeLiterals = mkPattern match
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match _ = Nothing
 
-constraintsAsBox :: [(Qualified ProperName, [Type])] -> Box -> Box
+constraintsAsBox :: [Constraint] -> Box -> Box
 constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> ty
 constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> ty)
 
-constraintAsBox :: Qualified ProperName -> [Type] -> Box
+constraintAsBox :: Qualified (ProperName a) -> [Type] -> Box
 constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)
 
 -- |

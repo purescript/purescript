@@ -9,7 +9,7 @@ module Language.PureScript.Docs.RenderedCode.Render (
     defaultRenderTypeOptions,
     renderTypeWithOptions
 ) where
-  
+
 import Prelude ()
 import Prelude.Compat
 
@@ -52,9 +52,10 @@ typeLiterals = mkPattern match
             ]
     where
     constraints = mintersperse (syntax "," <> sp) (map renderDep deps)
+    renderDep :: Constraint -> RenderedCode
     renderDep (pn, tys) =
-        let instApp = foldl TypeApp (TypeConstructor pn) tys
-        in  renderType instApp
+      let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
+      in  renderType instApp
   match REmpty =
     Just (syntax "()")
   match row@RCons{} =
@@ -172,10 +173,15 @@ renderType = renderTypeWithOptions defaultRenderTypeOptions
 
 data RenderTypeOptions = RenderTypeOptions
   { prettyPrintObjects :: Bool
+  , currentModule :: Maybe ModuleName
   }
 
 defaultRenderTypeOptions :: RenderTypeOptions
-defaultRenderTypeOptions = RenderTypeOptions { prettyPrintObjects = True }
+defaultRenderTypeOptions =
+  RenderTypeOptions
+    { prettyPrintObjects = True
+    , currentModule = Nothing
+    }
 
 renderTypeWithOptions :: RenderTypeOptions -> Type -> RenderedCode
 renderTypeWithOptions opts =

@@ -1,10 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module Language.PureScript.Docs.AsMarkdown (
-  renderModulesAsMarkdown
-) where
+module Language.PureScript.Docs.AsMarkdown
+  ( renderModulesAsMarkdown
+  , Docs
+  , runDocs
+  , modulesAsMarkdown
+  ) where
 
-import Control.Monad.Writer hiding (First)
+import Prelude ()
+import Prelude.Compat
+
+import Control.Monad (unless, zipWithM_)
+import Control.Monad.Writer (Writer, tell, execWriter)
+import Control.Monad.Error.Class (MonadError)
 import Data.Foldable (for_)
 import Data.List (partition)
 
@@ -19,33 +28,41 @@ import qualified Language.PureScript.Docs.Render as Render
 -- Take a list of modules and render them all in order, returning a single
 -- Markdown-formatted String.
 --
-renderModulesAsMarkdown :: [P.Module] -> String
+renderModulesAsMarkdown ::
+  (MonadError P.MultipleErrors m) =>
+  [P.Module] ->
+  m String
 renderModulesAsMarkdown =
-  runDocs . modulesAsMarkdown . map Convert.convertModule
+  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
-  headerLevel 2 $ "Module " ++ modName
+  headerLevel 2 $ "Module " ++ P.runModuleName modName
   spacer
   for_ modComments tell'
-  mapM_ declAsMarkdown modDeclarations
+  mapM_ (declAsMarkdown modName) modDeclarations
   spacer
+  for_ modReExports $ \(mn, decls) -> do
+    headerLevel 3 $ "Re-exported from " ++ P.runModuleName mn ++ ":"
+    spacer
+    mapM_ (declAsMarkdown mn) decls
 
-declAsMarkdown :: Declaration -> Docs
-declAsMarkdown decl@Declaration{..} = do
+declAsMarkdown :: P.ModuleName -> Declaration -> Docs
+declAsMarkdown mn decl@Declaration{..} = do
+  let options = defaultRenderTypeOptions { currentModule = Just mn }
   headerLevel 4 (ticks declTitle)
   spacer
 
   let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
-    tell' (codeToString $ Render.renderDeclaration decl)
+    tell' (codeToString $ Render.renderDeclarationWithOptions options decl)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 
-  for_ declFixity (\(fixity, alias) -> fixityAsMarkdown fixity alias >> spacer)
+  for_ declFixity (\fixity -> fixityAsMarkdown fixity >> spacer)
 
   for_ declComments tell'
 
@@ -68,11 +85,9 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x) = x
   elemAsMarkdown Space       = " "
 
-fixityAsMarkdown :: P.Fixity -> Maybe String -> Docs
-fixityAsMarkdown (P.Fixity associativity precedence) alias =
-  -- TODO: link alias name to member
+fixityAsMarkdown :: P.Fixity -> Docs
+fixityAsMarkdown (P.Fixity associativity precedence) =
   tell' $ concat [ "_"
-                 , maybe "" (\i -> "alias for " ++ i ++ " - ") alias
                  , associativityStr
                  , " / precedence "
                  , show precedence

@@ -73,9 +73,11 @@ packageName :: Package a -> PackageName
 packageName = bowerName . pkgMeta
 
 data Module = Module
-  { modName         :: String
+  { modName         :: P.ModuleName
   , modComments     :: Maybe String
   , modDeclarations :: [Declaration]
+  -- Re-exported values from other modules
+  , modReExports    :: [(P.ModuleName, [Declaration])]
   }
   deriving (Show, Eq, Ord)
 
@@ -84,7 +86,7 @@ data Declaration = Declaration
   , declComments   :: Maybe String
   , declSourceSpan :: Maybe P.SourceSpan
   , declChildren   :: [ChildDeclaration]
-  , declFixity     :: Maybe (P.Fixity, Maybe String)
+  , declFixity     :: Maybe P.Fixity -- TODO: remove in 0.9
   , declInfo       :: DeclarationInfo
   }
   deriving (Show, Eq, Ord)
@@ -126,6 +128,12 @@ data DeclarationInfo
   -- members are represented as child declarations.
   --
   | TypeClassDeclaration [(String, Maybe P.Kind)] [P.Constraint]
+
+  -- |
+  -- An operator alias declaration, with the member the alias is for and the
+  -- operator's fixity.
+  --
+  | AliasDeclaration (Either (P.Qualified P.Ident) (P.Qualified (P.ProperName 'P.ConstructorName))) P.Fixity
   deriving (Show, Eq, Ord)
 
 declInfoToString :: DeclarationInfo -> String
@@ -134,6 +142,38 @@ declInfoToString (DataDeclaration _ _) = "data"
 declInfoToString (ExternDataDeclaration _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _) = "typeClass"
+declInfoToString (AliasDeclaration _ _) = "alias"
+
+isTypeClass :: Declaration -> Bool
+isTypeClass Declaration{..} =
+  case declInfo of
+    TypeClassDeclaration{} -> True
+    _ -> False
+
+isValue :: Declaration -> Bool
+isValue Declaration{..} =
+  case declInfo of
+    ValueDeclaration{} -> True
+    _ -> False
+
+isType :: Declaration ->  Bool
+isType Declaration{..} =
+  case declInfo of
+    TypeSynonymDeclaration{} -> True
+    DataDeclaration{} -> True
+    ExternDataDeclaration{} -> True
+    _ -> False
+
+isAlias :: Declaration -> Bool
+isAlias Declaration{..} =
+  case declInfo of
+    AliasDeclaration{} -> True
+    _ -> False
+
+-- | Discard any children which do not satisfy the given predicate.
+filterChildren :: (ChildDeclaration -> Bool) -> Declaration -> Declaration
+filterChildren p decl =
+  decl { declChildren = filter p (declChildren decl) }
 
 data ChildDeclaration = ChildDeclaration
   { cdeclTitle      :: String
@@ -166,6 +206,18 @@ childDeclInfoToString :: ChildDeclarationInfo -> String
 childDeclInfoToString (ChildInstance _ _)      = "instance"
 childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
 childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
+
+isTypeClassMember :: ChildDeclaration -> Bool
+isTypeClassMember ChildDeclaration{..} =
+  case cdeclInfo of
+    ChildTypeClassMember{} -> True
+    _ -> False
+
+isDataConstructor :: ChildDeclaration -> Bool
+isDataConstructor ChildDeclaration{..} =
+  case cdeclInfo of
+    ChildDataConstructor{} -> True
+    _ -> False
 
 newtype GithubUser
   = GithubUser { runGithubUser :: String }
@@ -294,9 +346,10 @@ parseVersion' str =
 
 asModule :: Parse PackageError Module
 asModule =
-  Module <$> key "name" asString
+  Module <$> key "name" (P.moduleNameFromString <$> asString)
          <*> key "comments" (perhaps asString)
          <*> key "declarations" (eachInArray asDeclaration)
+         <*> key "reExports" (eachInArray asReExport)
 
 asDeclaration :: Parse PackageError Declaration
 asDeclaration =
@@ -307,12 +360,23 @@ asDeclaration =
               <*> key "fixity" (perhaps asFixity)
               <*> key "info" asDeclarationInfo
 
-asFixity :: Parse PackageError (P.Fixity, Maybe String)
-asFixity = do
-  fixity <- P.Fixity <$> key "associativity" asAssociativity
-                     <*> key "precedence" asIntegral
-  alias <- keyMay "alias" asString
-  return (fixity, alias)
+asReExport :: Parse PackageError (P.ModuleName, [Declaration])
+asReExport =
+  (,) <$> key "moduleName" fromAesonParser
+      <*> key "declarations" (eachInArray asDeclaration)
+
+asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
+asInPackage inner =
+  build <$> key "package" (perhaps (withString parsePackageName))
+        <*> key "item" inner
+  where
+  build Nothing = Local
+  build (Just pn) = FromDep pn
+
+asFixity :: Parse PackageError P.Fixity
+asFixity =
+  P.Fixity <$> key "associativity" asAssociativity
+           <*> key "precedence" asIntegral
 
 parseAssociativity :: String -> Maybe P.Associativity
 parseAssociativity str = case str of
@@ -341,8 +405,14 @@ asDeclarationInfo = do
     "typeClass" ->
       TypeClassDeclaration <$> key "arguments" asTypeArguments
                            <*> key "superclasses" (eachInArray asConstraint)
+    "alias" ->
+      AliasDeclaration <$> key "for" asAliasFor
+                       <*> key "fixity" asFixity
     other ->
       throwCustomError (InvalidDeclarationType other)
+
+asAliasFor :: Parse e (Either (P.Qualified P.Ident) (P.Qualified (P.ProperName 'P.ConstructorName)))
+asAliasFor = fromAesonParser
 
 asTypeArguments :: Parse PackageError [(String, Maybe P.Kind)]
 asTypeArguments = eachInArray asTypeArgument
@@ -391,20 +461,19 @@ asConstraint :: Parse PackageError P.Constraint
 asConstraint = (,) <$> nth 0 asQualifiedProperName
                    <*> nth 1 (eachInArray asType)
 
-asQualifiedProperName :: Parse e (P.Qualified P.ProperName)
+asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
+
+asQualifiedIdent :: Parse e (P.Qualified P.Ident)
+asQualifiedIdent = fromAesonParser
 
 asBookmarks :: Parse BowerError [Bookmark]
 asBookmarks = eachInArray asBookmark
 
 asBookmark :: Parse BowerError Bookmark
 asBookmark =
-  build <$> key "package" (perhaps (withString parsePackageName))
-        <*> key "item" ((,) <$> nth 0 (P.moduleNameFromString <$> asString)
-                            <*> nth 1 asString)
-  where
-  build Nothing = Local
-  build (Just pn) = FromDep pn
+  asInPackage ((,) <$> nth 0 (P.moduleNameFromString <$> asString)
+                   <*> nth 1 asString)
 
 asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
 asResolvedDependencies =
@@ -446,10 +515,15 @@ instance A.ToJSON NotYetKnown where
 
 instance A.ToJSON Module where
   toJSON Module{..} =
-    A.object [ "name"         .= modName
+    A.object [ "name"         .= P.runModuleName modName
              , "comments"     .= modComments
              , "declarations" .= modDeclarations
+             , "reExports"    .= map toObj modReExports
              ]
+    where
+    toObj (mn, decls) = A.object [ "moduleName" .= mn
+                                 , "declarations" .= decls
+                                 ]
 
 instance A.ToJSON Declaration where
   toJSON Declaration{..} =
@@ -478,6 +552,7 @@ instance A.ToJSON DeclarationInfo where
       ExternDataDeclaration kind -> ["kind" .= kind]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super -> ["arguments" .= args, "superclasses" .= super]
+      AliasDeclaration for fixity -> ["for" .= for, "fixity" .= fixity]
 
 instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props

@@ -1,36 +1,21 @@
 language: c
-sudo: false
+dist: trusty
+sudo: required
 matrix:
   include:
-    - env: GHCVER=7.8.4 COVERAGE_SUITE=tests
-      compiler: ": #GHC 7.8.4 - tests"
-      # ^ HACK before https://github.com/travis-ci/travis-ci/issues/4393 is resolved
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.8.4 COVERAGE_SUITE=psci-tests
-      compiler: ": #GHC 7.8.4 - psci-tests"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.8.4 STACKAGE=lts-2.22
-      compiler: ": #GHC 7.8.4 - lts-2.22-1"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.6.3
-      compiler: ": #GHC 7.6.3"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.6.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.1 DEPLOY=yes
-      compiler: ": #GHC 7.10.1"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 STACKAGE=lts=3.6 RUNSDISTTESTS=YES
-      compiler: ": #GHC 7.10.2 lts-3.6"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.2 STACKAGE=nightly-2015-09-29
-      compiler: ": #GHC 7.10.2 nightly-2015-09-29"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.3
+    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=lts-5.4 RUNSDISTTESTS=YES
+      compiler: ": #GHC 7.10.3 lts-5.4"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=nightly-2016-02-25
+      compiler: ": #GHC 7.10.3 nightly-2016-02-25"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.3 CABALVER=1.22 DEPLOY=yes
       compiler: ": #GHC 7.10.3"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
 before_install:
   - unset CC
   - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
-  - export PATH="/opt/cabal/1.22/bin:$PATH"
+  - export PATH="/opt/cabal/$CABALVER/bin:$PATH"
   - export PATH="$HOME/.cabal/bin:$PATH"
   - export PATH="/opt/happy/1.19.5/bin:/$PATH"
   - export PATH="/opt/alex/3.1.4/bin:/$PATH"
@@ -51,12 +36,14 @@ install:
   - mkdir -p .cabal-sandbox
   - cabal sandbox init --sandbox .cabal-sandbox
   # Download stackage cabal.config, not sure whether filtering is necessary
-  - if [ -n "$STACKAGE" ]; then curl http://www.stackage.org/$STACKAGE/cabal.config | grep -v purescript > cabal.config; fi
+  - if [ -n "$STACKAGE" ]; then curl https://www.stackage.org/$STACKAGE/cabal.config | egrep -v 'purescript|sourcemap' > cabal.config; fi
   - cabal install --only-dependencies --enable-tests
   - cabal install hpc-coveralls
   # Snapshot state of the sandbox now, so we don't need to make new one for test install
   - rm -rf ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
   - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
+  # Install bower globally (for psc-docs/psc-publish tests)
+  - npm install -g bower
 script:
   - ./travis/configure.sh
   - cabal build --ghc-options="-Werror"

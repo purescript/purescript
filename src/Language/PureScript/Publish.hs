@@ -146,11 +146,20 @@ preparePackage' opts = do
 getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
 getModulesAndBookmarks = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  liftIO (D.parseAndDesugar inputFiles depsFiles renderModules)
-    >>= either (userError . ParseAndDesugarError) return
+  (modules', bookmarks) <- parseAndBookmark inputFiles depsFiles
+
+  case runExcept (D.convertModulesInPackage modules') of
+    Right modules -> return (bookmarks, modules)
+    Left err -> userError (CompileError err)
+
   where
-  renderModules bookmarks modules =
-    return (bookmarks, map D.convertModule modules)
+  parseAndBookmark inputFiles depsFiles = do
+    r <- liftIO . runExceptT $ D.parseAndBookmark inputFiles depsFiles
+    case r of
+      Right r' ->
+        return r'
+      Left err ->
+        userError (CompileError err)
 
 data TreeStatus = Clean | Dirty deriving (Show, Read, Eq, Ord, Enum)
 
@@ -196,8 +205,7 @@ getBowerInfo = either (userError . BadRepositoryField) return . tryExtract
         maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
 
 extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
-extractGithub =
-  stripPrefix "git://github.com/"
+extractGithub = stripGitHubPrefixes
    >>> fmap (splitOn "/")
    >=> takeTwo
    >>> fmap (D.GithubUser *** (D.GithubRepo . dropDotGit))
@@ -206,6 +214,15 @@ extractGithub =
   takeTwo :: [a] -> Maybe (a, a)
   takeTwo [x, y] = Just (x, y)
   takeTwo _ = Nothing
+
+  stripGitHubPrefixes :: String -> Maybe String
+  stripGitHubPrefixes = stripPrefixes [ "git://github.com/"
+                                      , "https://github.com/"
+                                      , "git@github.com:"
+                                      ]
+
+  stripPrefixes :: [String] -> String -> Maybe String
+  stripPrefixes prefixes str = msum $ (`stripPrefix` str) <$> prefixes
 
   dropDotGit :: String -> String
   dropDotGit str

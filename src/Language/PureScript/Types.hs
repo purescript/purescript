@@ -1,28 +1,14 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Types
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
--- Data types for types
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- |
+-- Data types for types
+--
 module Language.PureScript.Types where
 
 import Prelude ()
 import Prelude.Compat
 
-import Data.Data
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
@@ -39,7 +25,8 @@ import Language.PureScript.AST.SourcePos
 -- |
 -- An identifier for the scope of a skolem variable
 --
-newtype SkolemScope = SkolemScope { runSkolemScope :: Int } deriving (Show, Read, Eq, Ord, Data, Typeable, A.ToJSON, A.FromJSON)
+newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
+  deriving (Show, Read, Eq, Ord, A.ToJSON, A.FromJSON)
 
 -- |
 -- The type of types
@@ -60,7 +47,7 @@ data Type
   -- |
   -- A type constructor
   --
-  | TypeConstructor (Qualified ProperName)
+  | TypeConstructor (Qualified (ProperName 'TypeName))
   -- |
   -- A type application
   --
@@ -101,12 +88,13 @@ data Type
   -- |
   -- A placeholder used in pretty printing
   --
-  | PrettyPrintForAll [String] Type deriving (Show, Read,Eq, Ord, Data, Typeable)
+  | PrettyPrintForAll [String] Type
+  deriving (Show, Read, Eq, Ord)
 
 -- |
 -- A typeclass constraint
 --
-type Constraint = (Qualified ProperName, [Type])
+type Constraint = (Qualified (ProperName 'ClassName), [Type])
 
 $(A.deriveJSON A.defaultOptions ''Type)
 
@@ -260,7 +248,7 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
   go other = f other
 
-everywhereOnTypesM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesM f = go
   where
   go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
@@ -273,7 +261,7 @@ everywhereOnTypesM f = go
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
   go other = f other
 
-everywhereOnTypesTopDownM :: (Functor m, Applicative m, Monad m) => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesTopDownM f = go <=< f
   where
   go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)

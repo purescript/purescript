@@ -1,9 +1,0 @@
-flags: {}
-packages:
-- '.'
-extra-deps:
-- aeson-better-errors-0.8.0
-- bower-json-0.7.0.0
-- boxes-0.1.4
-- pattern-arrows-0.0.2
-resolver: lts-2.22

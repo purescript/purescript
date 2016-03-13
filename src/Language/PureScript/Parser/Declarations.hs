@@ -122,9 +122,12 @@ parseFixityDeclaration :: TokenParser Declaration
 parseFixityDeclaration = do
   fixity <- parseFixity
   indented
-  alias <- P.optionMaybe $ (Ident <$> identifier) <* reserved "as"
+  alias <- P.optionMaybe $ aliased <* reserved "as"
   name <- symbol
   return $ FixityDeclaration fixity name alias
+  where
+  aliased = (Left <$> parseQualified (Ident <$> identifier))
+        <|> (Right <$> parseQualified (ProperName <$> uname))
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
@@ -151,10 +154,8 @@ parseImportDeclaration' = do
     qName <- qualifiedName
     return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
-    declType <- P.optionMaybe
-        $ P.try (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
-      <|> (const (Implicit True) <$> (indented *> parens (symbol' "..")))
-    return $ fromMaybe (Implicit False) declType
+    declType <- P.optionMaybe (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
+    return $ fromMaybe Implicit declType
 
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
@@ -167,7 +168,7 @@ parseDeclarationRef =
   parseProperRef = do
     name <- properName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
-    return $ maybe (ProperRef name) (TypeRef name) dctors
+    return $ maybe (ProperRef (runProperName name)) (TypeRef name) dctors
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do
@@ -259,7 +260,7 @@ parseModule = do
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
-parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m, Functor m) =>
+parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m) =>
                                      (k -> FilePath) -> [(k, String)] -> m [(k, Module)]
 parseModulesFromFiles toFilePath input = do
   modules <- flip parU id $ map wrapError $ inParallel $ flip map input $ \(k, content) -> do
@@ -298,34 +299,33 @@ parseModules = mark (P.many (same *> parseModule)) <* P.eof
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)
 
-parseNumericLiteral :: TokenParser Expr
+parseNumericLiteral :: TokenParser (Literal a)
 parseNumericLiteral = NumericLiteral <$> number
 
-parseCharLiteral :: TokenParser Expr
+parseCharLiteral :: TokenParser (Literal a)
 parseCharLiteral = CharLiteral <$> charLiteral
 
-parseStringLiteral :: TokenParser Expr
+parseStringLiteral :: TokenParser (Literal a)
 parseStringLiteral = StringLiteral <$> stringLiteral
 
-parseBooleanLiteral :: TokenParser Expr
+parseBooleanLiteral :: TokenParser (Literal a)
 parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 
-parseArrayLiteral :: TokenParser Expr
-parseArrayLiteral = ArrayLiteral <$> squares (commaSep parseValue)
+parseArrayLiteral :: TokenParser a -> TokenParser (Literal a)
+parseArrayLiteral p = ArrayLiteral <$> squares (commaSep p)
 
-parseObjectLiteral :: TokenParser Expr
-parseObjectLiteral = ObjectConstructor <$> braces (commaSep parseIdentifierAndValue)
+parseObjectLiteral :: TokenParser (String, a) -> TokenParser (Literal a)
+parseObjectLiteral p = ObjectLiteral <$> braces (commaSep p)
 
-parseIdentifierAndValue :: TokenParser (String, Maybe Expr)
+parseIdentifierAndValue :: TokenParser (String, Expr)
 parseIdentifierAndValue =
   do
     name <- C.indented *> lname
-    b <- P.option (Just $ Var $ Qualified Nothing (Ident name)) rest
+    b <- P.option (Var $ Qualified Nothing (Ident name)) rest
     return (name, b)
   <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
-  rest = C.indented *> colon *>  C.indented *>  val
-  val = (underscore *> pure Nothing) <|> (Just <$> parseValue)
+  rest = C.indented *> colon *> C.indented *> parseValue
 
 parseAbs :: TokenParser Expr
 parseAbs = do
@@ -375,13 +375,13 @@ parseLet = do
 
 parseValueAtom :: TokenParser Expr
 parseValueAtom = P.choice
-                 [ parseNumericLiteral
-                 , parseCharLiteral
-                 , parseStringLiteral
-                 , parseBooleanLiteral
-                 , parseArrayLiteral
-                 , P.try parseObjectLiteral
-                 , P.try parseObjectGetter
+                 [ parseAnonymousArgument
+                 , Literal <$> parseNumericLiteral
+                 , Literal <$> parseCharLiteral
+                 , Literal <$> parseStringLiteral
+                 , Literal <$> parseBooleanLiteral
+                 , Literal <$> parseArrayLiteral parseValue
+                 , Literal <$> P.try (parseObjectLiteral parseIdentifierAndValue)
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -391,8 +391,6 @@ parseValueAtom = P.choice
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
                  , parseOperatorSection
-                 -- TODO: combine this with parseObjectGetter
-                 , parseObjectUpdaterWildcard
                  ]
 
 -- |
@@ -408,11 +406,11 @@ parseOperatorSection = parens $ left <|> right
   right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
   left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
-parsePropertyUpdate :: TokenParser (String, Maybe Expr)
+parsePropertyUpdate :: TokenParser (String, Expr)
 parsePropertyUpdate = do
   name <- lname <|> stringLiteral
   _ <- C.indented *> equals
-  value <- C.indented *> (underscore *> pure Nothing) <|> (Just <$> parseValue)
+  value <- C.indented *> parseValue
   return (name, value)
 
 parseAccessor :: Expr -> TokenParser Expr
@@ -438,15 +436,12 @@ parseDoNotationElement = P.choice
             , DoNotationValue <$> parseValue
             ]
 
-parseObjectGetter :: TokenParser Expr
-parseObjectGetter = ObjectGetter <$> (underscore *> C.indented *> dot *> C.indented *> (lname <|> stringLiteral))
-
 -- | Expressions including indexers and record updates
 indexersAndAccessors :: TokenParser Expr
 indexersAndAccessors = C.buildPostfixParser postfixTable parseValueAtom
   where
   postfixTable = [ parseAccessor
-                 , P.try . parseUpdaterBody . Just
+                 , P.try . parseUpdaterBody
                  ]
 
 -- |
@@ -468,23 +463,14 @@ parseValue = withSourceSpan PositionedValue
                 ]
               ]
 
-parseUpdaterBody :: Maybe Expr -> TokenParser Expr
-parseUpdaterBody v = ObjectUpdater v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
+parseUpdaterBody :: Expr -> TokenParser Expr
+parseUpdaterBody v = ObjectUpdate v <$> (C.indented *> braces (commaSep1 (C.indented *> parsePropertyUpdate)))
 
-parseObjectUpdaterWildcard :: TokenParser Expr
-parseObjectUpdaterWildcard = underscore *> C.indented *> parseUpdaterBody Nothing
+parseAnonymousArgument :: TokenParser Expr
+parseAnonymousArgument = underscore *> pure AnonymousArgument
 
-parseStringBinder :: TokenParser Binder
-parseStringBinder = StringBinder <$> stringLiteral
-
-parseCharBinder :: TokenParser Binder
-parseCharBinder = CharBinder <$> charLiteral
-
-parseBooleanBinder :: TokenParser Binder
-parseBooleanBinder = BooleanBinder <$> booleanLiteral
-
-parseNumberBinder :: TokenParser Binder
-parseNumberBinder = NumberBinder <$> (sign <*> number)
+parseNumberLiteral :: TokenParser Binder
+parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
   where
   sign :: TokenParser (Either Integer Double -> Either Integer Double)
   sign = (symbol' "-" >> return (negate +++ negate))
@@ -497,11 +483,11 @@ parseNullaryConstructorBinder = ConstructorBinder <$> C.parseQualified C.properN
 parseConstructorBinder :: TokenParser Binder
 parseConstructorBinder = ConstructorBinder <$> C.parseQualified C.properName <*> many (C.indented *> parseBinderNoParens)
 
-parseObjectBinder :: TokenParser Binder
-parseObjectBinder = ObjectBinder <$> braces (commaSep (C.indented *> parseIdentifierAndBinder))
+parseObjectBinder:: TokenParser Binder
+parseObjectBinder= LiteralBinder <$> parseObjectLiteral (C.indented *> parseIdentifierAndBinder)
 
 parseArrayBinder :: TokenParser Binder
-parseArrayBinder = squares $ ArrayBinder <$> commaSep (C.indented *> parseBinder)
+parseArrayBinder = LiteralBinder <$> parseArrayLiteral (C.indented *> parseBinder)
 
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = do
@@ -527,24 +513,38 @@ parseIdentifierAndBinder =
 -- Parse a binder
 --
 parseBinder :: TokenParser Binder
-parseBinder = withSourceSpan PositionedBinder (buildPostfixParser postfixTable parseBinderAtom)
+parseBinder =
+  withSourceSpan
+    PositionedBinder
+    ( P.buildExpressionParser operators
+    . buildPostfixParser postfixTable
+    $ parseBinderAtom
+    )
   where
+  operators =
+    [ [ P.Infix (P.try (C.indented *> parseOpBinder P.<?> "binder operator") >>= \op ->
+          return (BinaryNoParensBinder op)) P.AssocRight
+      ]
+    ]
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
                  ]
   parseBinderAtom :: TokenParser Binder
   parseBinderAtom = P.choice
                     [ parseNullBinder
-                    , parseCharBinder
-                    , parseStringBinder
-                    , parseBooleanBinder
-                    , parseNumberBinder
+                    , LiteralBinder <$> parseCharLiteral
+                    , LiteralBinder <$> parseStringLiteral
+                    , LiteralBinder <$> parseBooleanLiteral
+                    , parseNumberLiteral
                     , parseVarOrNamedBinder
                     , parseConstructorBinder
                     , parseObjectBinder
                     , parseArrayBinder
-                    , parens parseBinder
+                    , ParensInBinder <$> parens parseBinder
                     ] P.<?> "binder"
+
+  parseOpBinder :: TokenParser Binder
+  parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
 
 -- |
 -- Parse a binder as it would appear in a top level declaration
@@ -552,15 +552,15 @@ parseBinder = withSourceSpan PositionedBinder (buildPostfixParser postfixTable p
 parseBinderNoParens :: TokenParser Binder
 parseBinderNoParens = P.choice
                       [ parseNullBinder
-                      , parseCharBinder
-                      , parseStringBinder
-                      , parseBooleanBinder
-                      , parseNumberBinder
+                      , LiteralBinder <$> parseCharLiteral
+                      , LiteralBinder <$> parseStringLiteral
+                      , LiteralBinder <$> parseBooleanLiteral
+                      , parseNumberLiteral
                       , parseVarOrNamedBinder
                       , parseNullaryConstructorBinder
                       , parseObjectBinder
                       , parseArrayBinder
-                      , parens parseBinder
+                      , ParensInBinder <$> parens parseBinder
                       ] P.<?> "binder"
 
 -- |

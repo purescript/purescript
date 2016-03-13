@@ -41,9 +41,12 @@ data Options = Options {
     -- |
     -- The path to prepend to require statements
   , optionsRequirePath :: Maybe FilePath
+    -- |
+    -- Generate soure maps
+  , optionsSourceMaps :: Bool
   } deriving Show
 
 -- |
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False False False Nothing
+defaultOptions = Options False False Nothing False False False Nothing False

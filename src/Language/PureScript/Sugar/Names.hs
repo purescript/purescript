@@ -1,8 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
-module Language.PureScript.Sugar.Names (desugarImports) where
+module Language.PureScript.Sugar.Names
+  ( desugarImports
+  , desugarImportsWithEnv
+  , Env
+  , ImportRecord(..)
+  , ImportProvenance(..)
+  , Imports(..)
+  , Exports(..)
+  ) where
 
 import Prelude ()
 import Prelude.Compat
@@ -10,12 +19,14 @@ import Prelude.Compat
 import Data.List (find, nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 
+import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..), censor)
 import Control.Monad.State.Lazy
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -33,12 +44,21 @@ import Language.PureScript.Linter.Imports
 -- Replaces all local names with qualified names within a list of modules. The
 -- modules should be topologically sorted beforehand.
 --
-desugarImports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
-desugarImports externs modules = do
+desugarImports :: forall m. (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugarImports externs modules =
+  fmap snd (desugarImportsWithEnv externs modules)
+
+desugarImportsWithEnv
+  :: forall m
+  . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [ExternsFile]
+  -> [Module]
+  -> m (Env, [Module])
+desugarImportsWithEnv externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
   modules' <- traverse updateExportRefs modules
-  (modules'', env') <- foldM updateEnv ([], env) modules'
-  traverse (renameInModule' env') modules''
+  (modules'', env') <- first reverse <$> foldM updateEnv ([], env) modules'
+  (env',) <$> traverse (renameInModule' env') modules''
   where
   silence :: m a -> m a
   silence = censor (const mempty)
@@ -49,23 +69,23 @@ desugarImports externs modules = do
     let members = Exports{..}
         ss = internalModuleSourceSpan "<Externs>"
         env' = M.insert efModuleName (ss, nullImports, members) env
-        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, mt, qmn)])
+        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, Just mt, qmn)])
     imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
     exps <- resolveExports env' efModuleName imps members efExports
     return $ M.insert efModuleName (ss, imps, exps) env
     where
 
-    exportedTypes :: [((ProperName, [ProperName]), ModuleName)]
+    exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
     exportedTypes = mapMaybe toExportedType efExports
       where
       toExportedType (TypeRef tyCon dctors) = Just ((tyCon, fromMaybe (mapMaybe forTyCon efDeclarations) dctors), efModuleName)
         where
-        forTyCon :: ExternsDeclaration -> Maybe ProperName
+        forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
         forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
         forTyCon _ = Nothing
       toExportedType (PositionedDeclarationRef _ _ r) = toExportedType r
       toExportedType _ = Nothing
-    exportedTypeClasses :: [(ProperName, ModuleName)]
+    exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
     exportedTypeClasses = mapMaybe toExportedTypeClass efExports
       where
       toExportedTypeClass (TypeClassRef className) = Just (className, efModuleName)
@@ -94,7 +114,7 @@ desugarImports externs modules = do
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule env imps (elaborateExports exps m)
-      findUnusedImports m env used
+      lintImports m env used
       return m'
 
 -- |
@@ -119,14 +139,23 @@ elaborateExports exps (Module ss coms mn decls refs) =
 -- Replaces all local names with qualified names within a module and checks that all existing
 -- qualified names are valid.
 --
-renameInModule :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m) => Env -> Imports -> Module -> m Module
+renameInModule
+  :: forall m
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m)
+  => Env
+  -> Imports
+  -> Module
+  -> m Module
 renameInModule env imports (Module ss coms mn decls exps) =
   Module ss coms mn <$> parU decls go <*> pure exps
   where
 
   (go, _, _, _, _) = everywhereWithContextOnValuesM (Nothing, []) updateDecl updateValue updateBinder updateCase defS
 
-  updateDecl :: (Maybe SourceSpan, [Ident]) -> Declaration -> m ((Maybe SourceSpan, [Ident]), Declaration)
+  updateDecl
+    :: (Maybe SourceSpan, [Ident])
+    -> Declaration
+    -> m ((Maybe SourceSpan, [Ident]), Declaration)
   updateDecl (_, bound) d@(PositionedDeclaration pos _ _) =
     return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
@@ -141,9 +170,14 @@ renameInModule env imports (Module ss coms mn decls exps) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (FixityDeclaration fx name alias) =
+    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse (eitherM (`updateValueName` pos) (`updateDataConstructorName` pos)) alias)
   updateDecl s d = return (s, d)
 
-  updateValue :: (Maybe SourceSpan, [Ident]) -> Expr -> m ((Maybe SourceSpan, [Ident]), Expr)
+  updateValue
+    :: (Maybe SourceSpan, [Ident])
+    -> Expr
+    -> m ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((Just pos', bound), v)
   updateValue (pos, bound) (Abs (Left arg) val') =
@@ -164,11 +198,16 @@ renameInModule env imports (Module ss coms mn decls exps) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
 
-  updateBinder :: (Maybe SourceSpan, [Ident]) -> Binder -> m ((Maybe SourceSpan, [Ident]), Binder)
+  updateBinder
+    :: (Maybe SourceSpan, [Ident])
+    -> Binder
+    -> m ((Maybe SourceSpan, [Ident]), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((Just pos, bound), v)
   updateBinder s@(pos, _) (ConstructorBinder name b) =
     (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder s@(pos, _) (OpBinder name) =
+    (,) s <$> (OpBinder <$> updateValueName name pos)
   updateBinder s (TypedBinder t b) = do
     (s'@ (span', _), b') <- updateBinder s b
     t' <- updateTypesEverywhere span' t
@@ -176,7 +215,10 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateBinder s v =
     return (s, v)
 
-  updateCase :: (Maybe SourceSpan, [Ident]) -> CaseAlternative ->  m ((Maybe SourceSpan, [Ident]), CaseAlternative)
+  updateCase
+    :: (Maybe SourceSpan, [Ident])
+    -> CaseAlternative
+    -> m ((Maybe SourceSpan, [Ident]), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) =
     return ((pos, concatMap binderNames bs ++ bound), c)
 
@@ -196,16 +238,25 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
   updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
 
-  updateTypeName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TypeName (("type " ++) . runProperName)
+  updateTypeName
+    :: Qualified (ProperName 'TypeName)
+    -> Maybe SourceSpan
+    -> m (Qualified (ProperName 'TypeName))
+  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TyName (("type " ++) . runProperName)
 
-  updateDataConstructorName :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
+  updateDataConstructorName
+    :: Qualified (ProperName 'ConstructorName)
+    -> Maybe SourceSpan
+    -> m (Qualified (ProperName 'ConstructorName))
   updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName (("data constructor " ++) . runProperName)
 
-  updateClassName  :: Qualified ProperName -> Maybe SourceSpan -> m (Qualified ProperName)
-  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) ClassName (("class " ++) . runProperName)
+  updateClassName
+    :: Qualified (ProperName 'ClassName)
+    -> Maybe SourceSpan
+    -> m (Qualified (ProperName 'ClassName))
+  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) TyClassName (("class " ++) . runProperName)
 
-  updateValueName  :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
+  updateValueName :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
   updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName (("value " ++) . runIdent)
 
   -- Used when performing an update to qualify values and classes with their
@@ -215,12 +266,18 @@ renameInModule env imports (Module ss coms mn decls exps) =
 
   -- Used when performing an update to qualify types with their module of
   -- original definition.
-  resolveType :: [((ProperName, [ProperName]), ModuleName)] -> ProperName -> Maybe (Qualified ProperName)
+  resolveType
+    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> ProperName 'TypeName
+    -> Maybe (Qualified (ProperName 'TypeName))
   resolveType tys name = mkQualified name . snd <$> find ((== name) . fst . fst) tys
 
   -- Used when performing an update to qualify data constructors with their
   -- module of original definition.
-  resolveDctor :: [((ProperName, [ProperName]), ModuleName)] -> ProperName -> Maybe (Qualified ProperName)
+  resolveDctor
+    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> ProperName 'ConstructorName
+    -> Maybe (Qualified (ProperName 'ConstructorName))
   resolveDctor tys name = mkQualified name . snd <$> find (elem name . snd . fst) tys
 
   -- Update names so unqualified references become qualified, and locally
@@ -229,7 +286,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   update
     :: (Ord a, Show a)
     => (Qualified a -> SimpleErrorMessage)
-    -> M.Map (Qualified a) [(Qualified a, ModuleName)]
+    -> M.Map (Qualified a) [ImportRecord a]
     -> (Exports -> a -> Maybe (Qualified a))
     -> (Qualified a -> Name)
     -> (a -> String)
@@ -245,8 +302,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
       (Just options, _) -> do
-        checkImportConflicts render options
-        let (Qualified (Just mnNew) _, mnOrig) = head options
+        (mnNew, mnOrig) <- checkImportConflicts mn render options
         modify $ \result -> M.insert mnNew (maybe [toName qname] (toName qname :) (mnNew `M.lookup` result)) result
         return $ Qualified (Just mnOrig) name
 
@@ -255,42 +311,50 @@ renameInModule env imports (Module ss coms mn decls exps) =
       -- by qualified importing). If that's not the case, then we just need to
       -- check it refers to a symbol in another module.
       (Nothing, Just mn'') -> do
-        modExports <- getExports env mn''
-        maybe (throwError . errorMessage $ unknown qname) return (getE modExports name)
+        case M.lookup mn'' env of
+          Nothing
+            | mn'' `S.member` importedVirtualModules imports -> throwUnknown
+            | otherwise -> throwError . errorMessage $ UnknownModule mn''
+          Just env' -> maybe throwUnknown return (getE (envModuleExports env') name)
 
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
-      _ -> throwError . errorMessage $ unknown qname
+      _ -> throwUnknown
 
     where
     positioned err = case pos of
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
+    throwUnknown = throwError . errorMessage $ unknown qname
 
 -- |
 -- Replaces `ProperRef` export values with a `TypeRef` or `TypeClassRef`
 -- depending on what is availble within the module. Warns when a `ProperRef`
 -- desugars into a `TypeClassRef`.
 --
-updateExportRefs :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Module -> m Module
+updateExportRefs
+  :: forall m
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   => Module
+   -> m Module
 updateExportRefs (Module ss coms mn decls exps) =
   Module ss coms mn decls <$> traverse (traverse updateRef) exps
   where
 
   updateRef :: DeclarationRef -> m DeclarationRef
   updateRef (ProperRef name)
-     | name `elem` classNames = do
-        tell . errorMessage $ DeprecatedClassExport name
-        return $ TypeClassRef name
+     | ProperName name `elem` classNames = do
+        tell . errorMessage . DeprecatedClassExport $ ProperName name
+        return . TypeClassRef $ ProperName name
        -- Fall through case here - assume it's a type if it's not a class.
        -- If it's a reference to something that doesn't actually exist it will
        -- be picked up elsewhere
-     | otherwise = return $ TypeRef name (Just [])
+     | otherwise = return $ TypeRef (ProperName name) (Just [])
   updateRef (PositionedDeclarationRef pos com ref) =
     warnWithPosition pos $ PositionedDeclarationRef pos com <$> updateRef ref
   updateRef other = return other
 
-  classNames :: [ProperName]
+  classNames :: [ProperName 'ClassName]
   classNames = mapMaybe go decls
     where
     go (PositionedDeclaration _ _ d) = go d

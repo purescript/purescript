@@ -2,7 +2,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Sugar.Names.Env
-  ( Imports(..)
+  ( ImportRecord(..)
+  , ImportProvenance(..)
+  , Imports(..)
   , nullImports
   , Exports(..)
   , nullExports
@@ -19,18 +21,44 @@ module Language.PureScript.Sugar.Names.Env
   ) where
 
 import Data.Function (on)
-import Data.List (groupBy, sortBy, nub)
+import Data.List (groupBy, sortBy, nub, delete)
 import Data.Maybe (fromJust)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+
+-- |
+-- The details for an import: the name of the thing that is being imported
+-- (`A.x` if importing from `A`), the module that the thing was originally
+-- defined in (for re-export resolution), and the import provenance (see below).
+--
+data ImportRecord a =
+  ImportRecord
+    { importName :: Qualified a
+    , importSourceModule :: ModuleName
+    , importProvenance :: ImportProvenance
+    }
+    deriving (Eq, Ord, Show, Read)
+
+-- |
+-- Used to track how an import was introduced into scope. This allows us to
+-- handle the one-open-import special case that allows a name conflict to become
+-- a warning rather than being an unresolvable situation.
+--
+data ImportProvenance
+  = FromImplicit
+  | FromExplicit
+  | Local
+  deriving (Eq, Ord, Show, Read)
 
 -- |
 -- The imported declarations for a module, including the module's own members.
@@ -40,30 +68,35 @@ data Imports = Imports
   -- |
   -- Local names for types within a module mapped to to their qualified names
   --
-    importedTypes :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+    importedTypes :: M.Map (Qualified (ProperName 'TypeName)) [ImportRecord (ProperName 'TypeName)]
   -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --
-  , importedDataConstructors :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+  , importedDataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) [ImportRecord (ProperName 'ConstructorName)]
   -- |
   -- Local names for classes within a module mapped to to their qualified names
   --
-  , importedTypeClasses :: M.Map (Qualified ProperName) [(Qualified ProperName, ModuleName)]
+  , importedTypeClasses :: M.Map (Qualified (ProperName 'ClassName)) [ImportRecord (ProperName 'ClassName)]
   -- |
   -- Local names for values within a module mapped to to their qualified names
   --
-  , importedValues :: M.Map (Qualified Ident) [(Qualified Ident, ModuleName)]
+  , importedValues :: M.Map (Qualified Ident) [ImportRecord Ident]
   -- |
-  -- The list of modules that have been imported into the current scope.
+  -- The modules that have been imported into the current scope.
   --
-  , importedModules :: [ModuleName]
+  , importedModules :: S.Set ModuleName
+  -- |
+  -- The names of "virtual" modules that come into existence when "import as"
+  -- is used.
+  --
+  , importedVirtualModules :: S.Set ModuleName
   } deriving (Show, Read)
 
 -- |
 -- An empty 'Imports' value.
 --
 nullImports :: Imports
-nullImports = Imports M.empty M.empty M.empty M.empty []
+nullImports = Imports M.empty M.empty M.empty M.empty S.empty S.empty
 
 -- |
 -- The exported declarations from a module.
@@ -74,12 +107,12 @@ data Exports = Exports
   -- The types exported from each module along with the module they originally
   -- came from.
   --
-    exportedTypes :: [((ProperName, [ProperName]), ModuleName)]
+    exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
   -- |
   -- The classes exported from each module along with the module they originally
   -- came from.
   --
-  , exportedTypeClasses :: [(ProperName, ModuleName)]
+  , exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
   -- |
   -- The values exported from each module along with the module they originally
   -- came from.
@@ -137,29 +170,28 @@ primEnv = M.singleton
 -- Safely adds a type and its data constructors to some exports, returning an
 -- error if a conflict occurs.
 --
-exportType :: (MonadError MultipleErrors m) => Exports -> ProperName -> [ProperName] -> ModuleName -> m Exports
+exportType :: (MonadError MultipleErrors m) => Exports -> ProperName 'TypeName -> [ProperName 'ConstructorName] -> ModuleName -> m Exports
 exportType exps name dctors mn = do
   let exTypes' = exportedTypes exps
   let exTypes = filter ((/= mn) . snd) exTypes'
   let exDctors = (snd . fst) `concatMap` exTypes
   let exClasses = exportedTypeClasses exps
-
   when (any ((== name) . fst . fst) exTypes) $ throwConflictError ConflictingTypeDecls name
-  when (any ((== name) . fst) exClasses) $ throwConflictError TypeConflictsWithClass name
+  when (any ((== coerceProperName name) . fst) exClasses) $ throwConflictError TypeConflictsWithClass name
   forM_ dctors $ \dctor -> do
     when (dctor `elem` exDctors) $ throwConflictError ConflictingCtorDecls dctor
-    when (any ((== dctor) . fst) exClasses) $ throwConflictError CtorConflictsWithClass dctor
+    when (any ((== coerceProperName dctor) . fst) exClasses) $ throwConflictError CtorConflictsWithClass dctor
   return $ exps { exportedTypes = nub $ ((name, dctors), mn) : exTypes' }
 
 -- |
 -- Safely adds a class to some exports, returning an error if a conflict occurs.
 --
-exportTypeClass :: (MonadError MultipleErrors m) => Exports -> ProperName -> ModuleName -> m Exports
+exportTypeClass :: (MonadError MultipleErrors m) => Exports -> ProperName 'ClassName -> ModuleName -> m Exports
 exportTypeClass exps name mn = do
   let exTypes = exportedTypes exps
   let exDctors = (snd . fst) `concatMap` exTypes
-  when (any ((== name) . fst . fst) exTypes) $ throwConflictError ClassConflictsWithType name
-  when (name `elem` exDctors) $ throwConflictError ClassConflictsWithCtor name
+  when (any ((== coerceProperName name) . fst . fst) exTypes) $ throwConflictError ClassConflictsWithType name
+  when (coerceProperName name `elem` exDctors) $ throwConflictError ClassConflictsWithCtor name
   classes <- addExport DuplicateClassExport name mn (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
 
@@ -197,16 +229,29 @@ getExports env mn = maybe (throwError . errorMessage $ UnknownModule mn) (return
 --
 checkImportConflicts
   :: forall m a
-   . (MonadError MultipleErrors m, Ord a)
-  => (a -> String)
-  -> [(Qualified a, ModuleName)]
-  -> m ()
-checkImportConflicts render xs =
-  let byOrig = groupBy ((==) `on` snd) . sortBy (compare `on` snd) $ xs
+   . (Show a, MonadError MultipleErrors m, MonadWriter MultipleErrors m, Ord a)
+  => ModuleName
+  -> (a -> String)
+  -> [ImportRecord a]
+  -> m (ModuleName, ModuleName)
+checkImportConflicts currentModule render xs =
+  let
+    byOrig = sortBy (compare `on` importSourceModule) xs
+    groups = groupBy ((==) `on` importSourceModule) byOrig
+    nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
+    name = render' (importName . head $ xs)
+    conflictModules = map (getQual . importName . head) groups
   in
-    if length byOrig > 1
-    then throwError . errorMessage $ ScopeConflict (render' (fst . head $ xs)) (map (getQual . fst . head) byOrig)
-    else return ()
+    if length groups > 1
+    then case nonImplicit of
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig _] -> do
+        let warningModule = if mnNew == currentModule then Nothing else Just mnNew
+        tell . errorMessage $ ScopeShadowing name warningModule $ delete mnNew conflictModules
+        return (mnNew, mnOrig)
+      _ -> throwError . errorMessage $ ScopeConflict name conflictModules
+    else
+      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ = head byOrig
+      in return (mnNew, mnOrig)
   where
   getQual :: Qualified a -> ModuleName
   getQual (Qualified (Just mn) _) = mn

@@ -1,13 +1,5 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleContexts #-}
+
 -- |
 -- This module optimizes code in the simplified-Javascript intermediate representation.
 --
@@ -29,13 +21,7 @@
 --
 --  * Inlining primitive Javascript operators
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-
-module Language.PureScript.CodeGen.JS.Optimizer (
-    optimize
-) where
+module Language.PureScript.CodeGen.JS.Optimizer (optimize) where
 
 import Prelude ()
 import Prelude.Compat
@@ -57,19 +43,29 @@ import Language.PureScript.CodeGen.JS.Optimizer.Blocks
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (Monad m, MonadReader Options m, Applicative m, MonadSupply m) => JS -> m JS
+optimize :: (Monad m, MonadReader Options m, MonadSupply m) => JS -> m JS
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (Monad m, MonadReader Options m, Applicative m, MonadSupply m) => JS -> m JS
+optimize' :: (Monad m, MonadReader Options m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  untilFixedPoint (inlineFnComposition . applyAll
+  js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
+    [ inlineCommonValues
+    , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp Nothing f [x]
+    , inlineOperator (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
+    , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp Nothing f [x]
+    , inlineOperator (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
+    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip (JSIndexer Nothing)
+    , inlineCommonOperators
+    ]) js
+  untilFixedPoint (return . tidyUp) . tco opts . magicDo opts $ js'
+  where
+  tidyUp :: JS -> JS
+  tidyUp = applyAll
     [ collapseNestedBlocks
     , collapseNestedIfs
-    , tco opts
-    , magicDo opts
     , removeCodeAfterReturnStatements
     , removeUnusedArg
     , removeUndefinedApp
@@ -77,11 +73,7 @@ optimize' js = do
     , etaConvert
     , evaluateIifes
     , inlineVariables
-    , inlineValues
-    , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp f [x]
-    , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp f [x]
-    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip JSIndexer
-    , inlineCommonOperators ]) js
+    ]
 
 untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a
 untilFixedPoint f = go

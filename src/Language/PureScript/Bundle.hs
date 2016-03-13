@@ -95,7 +95,7 @@ data ExportType
 -- Each is labelled with the original AST node which generated it, so that we can dump it back
 -- into the output during codegen.
 data ModuleElement
-  = Require JSNode String ModuleIdentifier
+  = Require JSNode String (Either String ModuleIdentifier)
   | Member JSNode Bool String [JSNode] [Key]
   | ExportsList [(ExportType, String, JSNode, [Key])]
   | Other JSNode
@@ -137,13 +137,13 @@ node (NN n) = n
 node (NT n _ _) = n
 
 -- | Calculate the ModuleIdentifier which a require(...) statement imports.
-checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String -> Maybe ModuleIdentifier
+checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
 checkImportPath _ "./foreign" m _ =
-  Just (ModuleIdentifier (moduleName m) Foreign)
+  Right (ModuleIdentifier (moduleName m) Foreign)
 checkImportPath requirePath name _ names
   | Just name' <- stripPrefix (fromMaybe "" requirePath) name
-  , name' `S.member` names = Just (ModuleIdentifier name' Regular)
-checkImportPath _ _ _ _ = Nothing
+  , name' `S.member` names = Right (ModuleIdentifier name' Regular)
+checkImportPath _ name _ _ = Left name
 
 -- | Compute the dependencies of all elements in a module, and add them to the tree.
 --
@@ -166,7 +166,7 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
   imports = mapMaybe toImport es
     where
     toImport :: ModuleElement -> Maybe (String, ModuleIdentifier)
-    toImport (Require _ nm mid) = Just (nm, mid)
+    toImport (Require _ nm (Right mid)) = Just (nm, mid)
     toImport _ = Nothing
 
   -- | Collects all member names in scope, so that we can identify dependencies of the second type.
@@ -209,7 +209,7 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (Applicative m, MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSNode -> m Module
+toModule :: forall m. (MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSNode -> m Module
 toModule requirePath mids mid top
   | JSSourceElementsTop ns <- node top = Module mid <$> traverse toModuleElement ns
   | otherwise = err InvalidTopLevel
@@ -226,7 +226,7 @@ toModule requirePath mids mid top
     , JSIdentifier "require" <- node req
     , JSArguments _ [ impS ] _ <- node impP
     , JSStringLiteral _ importPath <- node impS
-    , Just importPath' <- checkImportPath requirePath importPath mid mids
+    , importPath' <- checkImportPath requirePath importPath mid mids
     = pure (Require n importName importPath')
   toModuleElement n
     | JSVariables var [ varIntro ] _ <- node n
@@ -371,7 +371,7 @@ sortModules modules = map (\v -> case nodeFor v of (n, _, _) -> n) (reverse (top
     return (m, mid, mapMaybe getKey els)
 
   getKey :: ModuleElement -> Maybe ModuleIdentifier
-  getKey (Require _ _ mi) = Just mi
+  getKey (Require _ _ (Right mi)) = Just mi
   getKey _ = Nothing
 
 -- | A module is empty if it contains no exported members (in other words,
@@ -416,9 +416,7 @@ codeGen optionsMainModule optionsNamespace ms = renderToString (NN (JSSourceElem
     declToJS (Require _ nm req) =
       [ NN (JSVariables (NT (JSLiteral "var") tokenPosnEmpty [ WhiteSpace tokenPosnEmpty "\n  " ])
                         [ NN (JSVarDecl (sp (JSIdentifier nm))
-                                        [ sp (JSLiteral "=")
-                                        , moduleReference sp (moduleName req)
-                                        ])
+                                        (sp (JSLiteral "=") : either require (return . moduleReference sp . moduleName) req))
                         ]
                         (nt (JSLiteral ";"))) ]
     declToJS (ExportsList exps) = map toExport exps
@@ -466,6 +464,11 @@ codeGen optionsMainModule optionsNamespace ms = renderToString (NN (JSSourceElem
                                                            (nt (JSLiteral ";")))
     , lf
     ]
+
+  require :: String -> [JSNode]
+  require mn = [ sp (JSIdentifier "require")
+               , NN (JSArguments (nt (JSLiteral "(")) [ nt (JSStringLiteral '"' mn) ] (nt (JSLiteral ")")))
+               ]
 
   moduleReference :: (Node -> JSNode) -> String -> JSNode
   moduleReference f mn =
@@ -530,7 +533,7 @@ codeGen optionsMainModule optionsNamespace ms = renderToString (NN (JSSourceElem
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-bundle :: (Applicative m, MonadError ErrorMessage m)
+bundle :: (MonadError ErrorMessage m)
        => [(ModuleIdentifier, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.

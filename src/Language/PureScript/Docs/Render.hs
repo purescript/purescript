@@ -49,7 +49,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       [ keywordClass ]
       ++ maybeToList superclasses
       ++ [renderType' (typeApp declTitle args)]
-      ++ [keywordWhere | any (isTypeClassMember . cdeclInfo) declChildren]
+      ++ [keywordWhere | any isTypeClassMember declChildren]
 
       where
       superclasses
@@ -58,11 +58,23 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
+    AliasDeclaration for (P.Fixity associativity precedence) ->
+      [ keywordFixity associativity
+      , syntax $ show precedence
+      , ident $
+          either
+            (P.showQualified P.runIdent . dequalifyCurrentModule)
+            (P.showQualified P.runProperName . dequalifyCurrentModule)
+            for
+      , keyword "as"
+      , ident . tail . init $ declTitle
+      ]
 
-      isTypeClassMember (ChildTypeClassMember _) = True
-      isTypeClassMember _ = False
   where
   renderType' = renderTypeWithOptions opts
+  dequalifyCurrentModule (P.Qualified mn a)
+    | mn == currentModule opts = P.Qualified Nothing a
+    | otherwise = P.Qualified mn a
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
@@ -86,12 +98,12 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   where
   renderType' = renderTypeWithOptions opts
 
-renderConstraint :: (P.Qualified P.ProperName, [P.Type]) -> RenderedCode
+renderConstraint :: P.Constraint -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
 
-renderConstraintWithOptions :: RenderTypeOptions -> (P.Qualified P.ProperName, [P.Type]) -> RenderedCode
+renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint -> RenderedCode
 renderConstraintWithOptions opts (pn, tys) =
-  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor pn) tys
+  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName pn)) tys
 
 renderConstraints :: [P.Constraint] -> Maybe RenderedCode
 renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
@@ -108,7 +120,7 @@ renderConstraintsWithOptions opts constraints
     mintersperse (syntax "," <> sp)
                  (map (renderConstraintWithOptions opts) constraints)
 
-notQualified :: String -> P.Qualified P.ProperName
+notQualified :: String -> P.Qualified (P.ProperName a)
 notQualified = P.Qualified Nothing . P.ProperName
 
 typeApp :: String -> [(String, Maybe P.Kind)] -> P.Type

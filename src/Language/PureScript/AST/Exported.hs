@@ -1,8 +1,7 @@
-
-module Language.PureScript.AST.Exported (
-  exportedDeclarations,
-  isExported
-) where
+module Language.PureScript.AST.Exported
+  ( exportedDeclarations
+  , isExported
+  ) where
 
 import Control.Category ((>>>))
 import Data.Maybe (mapMaybe)
@@ -23,12 +22,12 @@ import Language.PureScript.Names
 -- instances will be incorrectly removed in some cases.
 --
 exportedDeclarations :: Module -> [Declaration]
-exportedDeclarations (Module _ _ _ decls exps) = go decls
+exportedDeclarations (Module _ _ mn decls exps) = go decls
   where
   go = flattenDecls
         >>> filter (isExported exps)
         >>> map (filterDataConstructors exps)
-        >>> filterInstances exps
+        >>> filterInstances mn exps
 
 -- |
 -- Filter out all data constructors from a declaration which are not exported.
@@ -52,10 +51,15 @@ filterDataConstructors _ other = other
 -- produce incorrect results if this is not the case - for example, type class
 -- instances will be incorrectly removed in some cases.
 --
-filterInstances :: Maybe [DeclarationRef] -> [Declaration] -> [Declaration]
-filterInstances Nothing = id
-filterInstances (Just exps) =
-  let refs = mapMaybe typeName exps ++ mapMaybe typeClassName exps
+filterInstances
+  :: ModuleName
+  -> Maybe [DeclarationRef]
+  -> [Declaration]
+  -> [Declaration]
+filterInstances _ Nothing = id
+filterInstances mn (Just exps) =
+  let refs = Left `map` mapMaybe typeClassName exps
+          ++ Right `map` mapMaybe typeName exps
   in filter (all (visibleOutside refs) . typeInstanceConstituents)
   where
   -- Given a Qualified ProperName, and a list of all exported types and type
@@ -65,13 +69,24 @@ filterInstances (Just exps) =
   --  * the name is defined in the same module and is exported,
   --  * the name is defined in a different module (and must be exported from
   --    that module; the code would fail to compile otherwise).
-  visibleOutside _ (Qualified (Just _) _) = True
-  visibleOutside refs (Qualified Nothing n) = n `elem` refs
+  visibleOutside
+    :: [Either (ProperName 'ClassName) (ProperName 'TypeName)]
+    -> Either (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'TypeName))
+    -> Bool
+  visibleOutside refs q
+    | either checkQual checkQual q = True
+    | otherwise = either (Left . disqualify) (Right . disqualify) q `elem` refs
 
+  -- Check that a qualified name is qualified for a different module
+  checkQual :: Qualified a -> Bool
+  checkQual q = isQualified q && not (isQualifiedWith mn q)
+
+  typeName :: DeclarationRef -> Maybe (ProperName 'TypeName)
   typeName (TypeRef n _) = Just n
   typeName (PositionedDeclarationRef _ _ r) = typeName r
   typeName _ = Nothing
 
+  typeClassName :: DeclarationRef -> Maybe (ProperName 'ClassName)
   typeClassName (TypeClassRef n) = Just n
   typeClassName (PositionedDeclarationRef _ _ r) = typeClassName r
   typeClassName _ = Nothing
@@ -79,17 +94,17 @@ filterInstances (Just exps) =
 -- |
 -- Get all type and type class names referenced by a type instance declaration.
 --
-typeInstanceConstituents :: Declaration -> [Qualified ProperName]
+typeInstanceConstituents :: Declaration -> [Either (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'TypeName))]
 typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _) =
-  className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
+  Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
 
-  fromConstraint (name, tys') = name : concatMap fromType tys'
+  fromConstraint (name, tys') = Left name : concatMap fromType tys'
   fromType = everythingOnTypes (++) go
 
   -- Note that type synonyms are disallowed in instance declarations, so
   -- we don't need to handle them here.
-  go (TypeConstructor n) = [n]
+  go (TypeConstructor n) = [Right n]
   go (ConstrainedType cs _) = concatMap fromConstraint cs
   go _ = []
 
@@ -118,8 +133,8 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _)    = ident == ident'
   matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
 
-  matches (DataDeclaration _ ident _ _)      (ProperRef ident')    = ident == ident'
-  matches (TypeClassDeclaration ident _ _ _) (ProperRef ident')    = ident == ident'
+  matches (DataDeclaration _ ident _ _)      (ProperRef ident')    = runProperName ident == ident'
+  matches (TypeClassDeclaration ident _ _ _) (ProperRef ident')    = runProperName ident == ident'
 
   matches (PositionedDeclaration _ _ d) r = d `matches` r
   matches d (PositionedDeclarationRef _ _ r) = d `matches` r
@@ -129,7 +144,7 @@ isExported (Just exps) decl = any (matches decl) exps
 -- Test if a data constructor for a given type is exported, given a module's
 -- export list. Prefer 'exportedDeclarations' to this function, where possible.
 --
-isDctorExported :: ProperName -> Maybe [DeclarationRef] -> ProperName -> Bool
+isDctorExported :: ProperName 'TypeName -> Maybe [DeclarationRef] -> ProperName 'ConstructorName -> Bool
 isDctorExported _ Nothing _ = True
 isDctorExported ident (Just exps) ctor = test `any` exps
   where

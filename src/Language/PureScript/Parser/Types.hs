@@ -36,7 +36,7 @@ parseTypeConstructor :: TokenParser Type
 parseTypeConstructor = TypeConstructor <$> parseQualified properName
 
 parseForAll :: TokenParser Type
-parseForAll = mkForAll <$> (reserved "forall" *> P.many1 (indented *> identifier) <* indented <* dot)
+parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
                        <*> parseType
 
 -- |

@@ -1,5 +1,9 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
+import Prelude ()
+import Prelude.Compat
+
+
 import Data.Function (on)
 import Data.List (sort, sortBy, nub)
 import Data.Maybe (mapMaybe)
@@ -13,7 +17,7 @@ import Language.PureScript.AST.Traversals
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.Environment
@@ -30,37 +34,52 @@ moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
-  let imports = nub $ mapMaybe importToCoreFn decls ++ findQualModules decls
+  let imports = mapMaybe importToCoreFn decls ++ findQualModules decls
+      imports' = nub $ filter (keepImp imports) imports-- TODO could be more efficient
       exps' = nub $ concatMap exportToCoreFn exps
       externs = nub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn Nothing []) decls
-  in Module coms mn imports exps' externs decls'
+  in Module coms mn imports' exps' externs decls'
 
   where
+
+  -- Remove duplicate imports favoring the one containing sourcespan info
+  keepImp :: [(Ann, ModuleName)] -> (Ann, ModuleName) -> Bool
+  keepImp imps (a, i) = hasSS a || not (any hasDup imps)
+    where
+      hasDup (a', i') = i == i' && hasSS a'
+
+  hasSS :: Ann -> Bool
+  hasSS (Just _, _, _, _) = True
+  hasSS _ = False
+
+  ssA :: Maybe SourceSpan -> Ann
+  ssA ss = (ss, [], Nothing, Nothing)
 
   -- |
   -- Desugars member declarations from AST to CoreFn representation.
   --
   declToCoreFn :: Maybe SourceSpan -> [Comment] -> A.Declaration -> [Bind Ann]
   declToCoreFn ss com (A.DataDeclaration Newtype _ _ [(ctor, _)]) =
-    [NonRec (properToIdent ctor) $
+    [NonRec (ssA ss) (properToIdent ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var nullAnn $ Qualified Nothing (Ident "x"))]
   declToCoreFn _ _ d@(A.DataDeclaration Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn ss com (A.DataDeclaration Data tyName _ ctors) =
     flip map ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
-    [NonRec name (exprToCoreFn ss com Nothing e)]
+    [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
-    let qname = Qualified (Just mn) alias
-    in [NonRec (Op name) (Var (ss, com, Nothing, getValueMeta qname) (Qualified Nothing alias))]
+    let meta = either getValueMeta (Just . getConstructorMeta) alias
+        alias' = either id (fmap properToIdent) alias
+    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) alias')]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
-    [Rec $ map (\(name, _, e) -> (name, exprToCoreFn ss [] Nothing e)) ds]
+    [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
-    [NonRec (properToIdent name) $ mkTypeClassConstructor ss com supers members]
+    [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor ss com supers members]
   declToCoreFn _  com (A.PositionedDeclaration ss com1 d) =
     declToCoreFn (Just ss) (com ++ com1) d
   declToCoreFn _ _ _ = []
@@ -69,18 +88,8 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- Desugars expressions from AST to CoreFn representation.
   --
   exprToCoreFn :: Maybe SourceSpan -> [Comment] -> Maybe Type -> A.Expr -> Expr Ann
-  exprToCoreFn ss com ty (A.NumericLiteral v) =
-    Literal (ss, com, ty, Nothing) (NumericLiteral v)
-  exprToCoreFn ss com ty (A.StringLiteral v) =
-    Literal (ss, com, ty, Nothing) (StringLiteral v)
-  exprToCoreFn ss com ty (A.CharLiteral v) =
-    Literal (ss, com, ty, Nothing) (CharLiteral v)
-  exprToCoreFn ss com ty (A.BooleanLiteral v) =
-    Literal (ss, com, ty, Nothing) (BooleanLiteral v)
-  exprToCoreFn ss com ty (A.ArrayLiteral vs) =
-    Literal (ss, com, ty, Nothing) (ArrayLiteral $ map (exprToCoreFn ss [] Nothing) vs)
-  exprToCoreFn ss com ty (A.ObjectLiteral vs) =
-    Literal (ss, com, ty, Nothing) (ObjectLiteral $ map (second (exprToCoreFn ss [] Nothing)) vs)
+  exprToCoreFn ss com ty (A.Literal lit) =
+    Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
   exprToCoreFn ss com ty (A.Accessor name v) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.ObjectUpdate obj vs) =
@@ -107,7 +116,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap (declToCoreFn ss []) ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.ObjectLiteral vs) _)) =
+  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.Literal (A.ObjectLiteral vs)) _)) =
     let args = map (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
@@ -133,31 +142,27 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- Desugars case binders from AST to CoreFn representation.
   --
   binderToCoreFn :: Maybe SourceSpan -> [Comment] -> A.Binder -> Binder Ann
+  binderToCoreFn ss com (A.LiteralBinder lit) =
+    LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
   binderToCoreFn ss com (A.NullBinder) =
     NullBinder (ss, com, Nothing, Nothing)
-  binderToCoreFn ss com (A.BooleanBinder b) =
-    LiteralBinder (ss, com, Nothing, Nothing) (BooleanLiteral b)
-  binderToCoreFn ss com (A.StringBinder s) =
-    LiteralBinder (ss, com, Nothing, Nothing) (StringLiteral s)
-  binderToCoreFn ss com (A.CharBinder c) =
-    LiteralBinder (ss, com, Nothing, Nothing) (CharLiteral c)
-  binderToCoreFn ss com (A.NumberBinder n) =
-    LiteralBinder (ss, com, Nothing, Nothing) (NumericLiteral n)
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
     let (_, tctor, _, _) = lookupConstructor env dctor
     in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.ObjectBinder bs) =
-    LiteralBinder (ss, com, Nothing, Nothing) (ObjectLiteral $ map (second (binderToCoreFn ss [])) bs)
-  binderToCoreFn ss com (A.ArrayBinder bs) =
-    LiteralBinder (ss, com, Nothing, Nothing) (ArrayLiteral $ map (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
     binderToCoreFn (Just ss) (com ++ com1) b
   binderToCoreFn ss com (A.TypedBinder _ b) =
     binderToCoreFn ss com b
+  binderToCoreFn _ _ A.OpBinder{} =
+    internalError "OpBinder should have been desugared before binderToCoreFn"
+  binderToCoreFn _ _ A.BinaryNoParensBinder{} =
+    internalError "BinaryNoParensBinder should have been desugared before binderToCoreFn"
+  binderToCoreFn _ _ A.ParensInBinder{} =
+    internalError "ParensInBinder should have been desugared before binderToCoreFn"
 
   -- |
   -- Gets metadata for values.
@@ -171,7 +176,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   -- |
   -- Gets metadata for data constructors.
   --
-  getConstructorMeta :: Qualified ProperName -> Meta
+  getConstructorMeta :: Qualified (ProperName 'ConstructorName) -> Meta
   getConstructorMeta ctor =
     case lookupConstructor env ctor of
       (Newtype, _, _, _) -> IsNewtype
@@ -179,9 +184,15 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
         let constructorType = if numConstructors (ctor, dc) == 1 then ProductType else SumType
         in IsConstructor constructorType fields
     where
-    numConstructors :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> Int
+
+    numConstructors
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      -> Int
     numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
-    typeConstructor :: (Qualified ProperName, (DataDeclType, ProperName, Type, [Ident])) -> (ModuleName, ProperName)
+
+    typeConstructor
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      -> (ModuleName, ProperName 'TypeName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
 
@@ -190,30 +201,36 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
 -- ensure instances are imported from any module that is referenced by the
 -- current module, not just from those that are imported explicitly (#667).
 --
-findQualModules :: [A.Declaration] -> [ModuleName]
+findQualModules :: [A.Declaration] -> [(Ann, ModuleName)]
 findQualModules decls =
   let (f, _, _, _, _) = everythingOnValues (++) fqDecls fqValues fqBinders (const []) (const [])
   in f `concatMap` decls
   where
-  fqDecls :: A.Declaration -> [ModuleName]
-  fqDecls (A.TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
+  fqDecls :: A.Declaration -> [(Ann, ModuleName)]
+  fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual q
+  fqDecls (A.FixityDeclaration _ _ (Just eq)) = either getQual getQual eq
   fqDecls _ = []
 
-  fqValues :: A.Expr -> [ModuleName]
-  fqValues (A.Var (Qualified (Just mn) _)) = [mn]
-  fqValues (A.Constructor (Qualified (Just mn) _)) = [mn]
+  fqValues :: A.Expr -> [(Ann, ModuleName)]
+  fqValues (A.Var q) = getQual q
+  fqValues (A.Constructor q) = getQual q
   fqValues _ = []
 
-  fqBinders :: A.Binder -> [ModuleName]
-  fqBinders (A.ConstructorBinder (Qualified (Just mn) _) _) = [mn]
+  fqBinders :: A.Binder -> [(Ann, ModuleName)]
+  fqBinders (A.ConstructorBinder q _) = getQual q
   fqBinders _ = []
+
+  getQual :: Qualified a -> [(Ann, ModuleName)]
+  getQual (Qualified (Just mn) _) = [(nullAnn, mn)]
+  getQual _ = []
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.
 --
-importToCoreFn :: A.Declaration -> Maybe ModuleName
-importToCoreFn (A.ImportDeclaration name _ _ _) = Just name
-importToCoreFn (A.PositionedDeclaration _ _ d) = importToCoreFn d
+importToCoreFn :: A.Declaration -> Maybe (Ann, ModuleName)
+importToCoreFn (A.ImportDeclaration name _ _ _) = Just (nullAnn, name)
+importToCoreFn (A.PositionedDeclaration ss _ d) =
+  ((,) (Just ss, [], Nothing, Nothing) . snd) <$> importToCoreFn d
 importToCoreFn _ = Nothing
 
 -- |
@@ -255,5 +272,5 @@ mkTypeClassConstructor ss com supers members =
 -- |
 -- Converts a ProperName to an Ident.
 --
-properToIdent :: ProperName -> Ident
+properToIdent :: ProperName a -> Ident
 properToIdent = Ident . runProperName

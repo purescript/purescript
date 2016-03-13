@@ -1,18 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Kinds
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Kinds where
@@ -20,7 +5,6 @@ module Language.PureScript.Kinds where
 import Prelude ()
 import Prelude.Compat
 
-import Data.Data
 import qualified Data.Aeson.TH as A
 
 -- |
@@ -46,7 +30,8 @@ data Kind
   -- |
   -- Function kinds
   --
-  | FunKind Kind Kind deriving (Show, Read, Eq, Ord, Data, Typeable)
+  | FunKind Kind Kind
+  deriving (Show, Read, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)
 
@@ -57,7 +42,7 @@ everywhereOnKinds f = go
   go (FunKind k1 k2) = f (FunKind (go k1) (go k2))
   go other = f other
 
-everywhereOnKindsM :: (Functor m, Applicative m, Monad m) => (Kind -> m Kind) -> Kind -> m Kind
+everywhereOnKindsM :: Monad m => (Kind -> m Kind) -> Kind -> m Kind
 everywhereOnKindsM f = go
   where
   go (Row k1) = (Row <$> go k1) >>= f

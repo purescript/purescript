@@ -22,7 +22,7 @@ import Language.PureScript.Types
 data Module a = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
-  , moduleImports :: [ModuleName]
+  , moduleImports :: [(a, ModuleName)]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [Bind a]

@@ -1,24 +1,13 @@
------------------------------------------------------------------------------
+-- |
+-- CoreFn traversal helpers
 --
--- Module      :  Language.PureScript.CoreFn.Traversals
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- | CoreFn traversal helpers
---
------------------------------------------------------------------------------
-
 module Language.PureScript.CoreFn.Traversals where
 
 import Control.Arrow (second, (***), (+++))
 
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Literals
+import Language.PureScript.AST.Literals
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->
@@ -26,7 +15,7 @@ everywhereOnValues :: (Bind a -> Bind a) ->
                       (Bind a -> Bind a, Expr a -> Expr a, Binder a -> Binder a)
 everywhereOnValues f g h = (f', g', h')
   where
-  f' (NonRec name e) = f (NonRec name (g' e))
+  f' (NonRec a name e) = f (NonRec a name (g' e))
   f' (Rec es) = f (Rec (map (second g') es))
 
   g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
@@ -40,6 +29,7 @@ everywhereOnValues f g h = (f', g', h')
 
   h' (LiteralBinder a b) = h (LiteralBinder a (handleLiteral h' b))
   h' (NamedBinder a name b) = h (NamedBinder a name (h' b))
+  h' (ConstructorBinder a q1 q2 bs) = h (ConstructorBinder a q1 q2 (map h' bs))
   h' b = h b
 
   handleCaseAlternative ca =
@@ -60,7 +50,7 @@ everythingOnValues :: (r -> r -> r) ->
                       (Bind a -> r, Expr a -> r, Binder a -> r, CaseAlternative a -> r)
 everythingOnValues (<>) f g h i = (f', g', h', i')
   where
-  f' b@(NonRec _ e) = f b <> g' e
+  f' b@(NonRec _ _ e) = f b <> g' e
   f' b@(Rec es) = foldl (<>) (f b) (map (g' . snd) es)
 
   g' v@(Literal _ l) = foldl (<>) (g v) (map g' (extractLiteral l))

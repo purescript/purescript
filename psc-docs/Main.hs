@@ -16,6 +16,7 @@
 module Main where
 
 import Control.Applicative
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Control.Monad.Writer
@@ -68,61 +69,68 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      e <- D.parseAndDesugar input [] (\_ ms -> return ms)
-      case e of
-        Left (D.ParseError err) -> do
-          hPutStrLn stderr $ show err
-          exitFailure
-        Left (D.SortModulesError err) -> do
-          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
-          exitFailure
-        Left (D.DesugarError err) -> do
-          hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
-          exitFailure
-        Right ms' ->
-          case output of
-            EverythingToStdOut ->
-              putStrLn (D.renderModulesAsMarkdown ms')
-            ToStdOut names -> do
-              let (ms, missing) = takeModulesByName ms' names
-              guardMissing missing
-              putStrLn (D.renderModulesAsMarkdown ms)
-            ToFiles names -> do
-              let (ms, missing) = takeModulesByName' ms' names
-              guardMissing missing
-              let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms
-              forM_ ms'' $ \grp -> do
-                let fp = fst (head grp)
-                createDirectoryIfMissing True (takeDirectory fp)
-                writeFile fp (D.renderModulesAsMarkdown $ snd `map` grp)
+      ms <- runExceptT (D.parseAndBookmark input []
+                           >>= (fst >>> D.convertModulesInPackage))
+               >>= successOrExit
+
+      case output of
+        EverythingToStdOut ->
+          putStrLn (D.runDocs (D.modulesAsMarkdown ms))
+        ToStdOut names -> do
+          let (ms', missing) = takeByName ms names
+          guardMissing missing
+          putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
+        ToFiles names -> do
+          let (ms', missing) = takeByName' ms names
+          guardMissing missing
+
+          let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms'
+          forM_ ms'' $ \grp -> do
+            let fp = fst (head grp)
+            createDirectoryIfMissing True (takeDirectory fp)
+            writeFile fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
+
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ show mn ++ "\"")
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ P.runModuleName mn ++ "\"")
     exitFailure
   guardMissing mns = do
     hPutStrLn stderr "psc-docs: error: unknown modules:"
     forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ show mn)
+      hPutStrLn stderr ("  * " ++ P.runModuleName mn)
     exitFailure
+
+  successOrExit :: Either P.MultipleErrors a -> IO a
+  successOrExit act =
+    case act of
+      Right x ->
+        return x
+      Left err -> do
+        hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
+        exitFailure
+
+  takeByName = takeModulesByName D.modName
+  takeByName' = takeModulesByName' D.modName
 
 -- |
 -- Given a list of module names and a list of modules, return a list of modules
 -- whose names appeared in the given name list, together with a list of names
 -- for which no module could be found in the module list.
 --
-takeModulesByName :: [P.Module] -> [P.ModuleName] -> ([P.Module], [P.ModuleName])
-takeModulesByName modules names =
-  first (map fst) (takeModulesByName' modules (map (,()) names))
+takeModulesByName :: (Eq n) => (m -> n) -> [m] -> [n] -> ([m], [n])
+takeModulesByName getModuleName modules names =
+  first (map fst) (takeModulesByName' getModuleName modules (map (,()) names))
 
 -- |
--- Like takeModulesByName but also keeps some extra data with the module.
+-- Like takeModulesByName, but also keeps some extra information with each
+-- module.
 --
-takeModulesByName' :: [P.Module] -> [(P.ModuleName, a)] -> ([(P.Module, a)], [P.ModuleName])
-takeModulesByName' modules = foldl go ([], [])
+takeModulesByName' :: (Eq n) => (m -> n) -> [m] -> [(n, a)] -> ([(m, a)], [n])
+takeModulesByName' getModuleName modules = foldl go ([], [])
   where
   go (ms, missing) (name, x) =
-    case find ((== name) . P.getModuleName) modules of
+    case find ((== name) . getModuleName) modules of
       Just m  -> ((m, x) : ms, missing)
       Nothing -> (ms, name : missing)
 
@@ -236,16 +244,16 @@ examples =
   PP.vcat $ map PP.text
     [ "Examples:"
     , "  print documentation for Data.List to stdout:"
-    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
     , "      --docgen Data.List"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md:"
-    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md, and"
     , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
-    , "    psc-docs src/**/*.purs bower_components/*/src/**/*.purs \\"
+    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md \\"
     , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
     ]

@@ -76,13 +76,13 @@ printWarningsAndErrors verbose True warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
-  when (null input) $ do
+  input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
+  when (null input && not pscmJSONErrors) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
   let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
   moduleFiles <- readInput (InputOptions pursFiles)
-  inputForeign <- globWarningOnMisses warnFileTypeNotFound pscmForeignInput
+  inputForeign <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmForeignInput
   foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     (ms, foreigns) <- parseInputs moduleFiles foreignFiles
@@ -107,7 +107,7 @@ globWarningOnMisses warn = concatMapM globWithWarning
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readUTF8File inFile
 
-parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
+parseInputs :: (MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
             => [(Either P.RebuildPolicy FilePath, String)]
             -> [(FilePath, P.ForeignJS)]
             -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName FilePath)
@@ -177,6 +177,11 @@ jsonErrors :: Parser Bool
 jsonErrors = switch $
      long "json-errors"
   <> help "Print errors to stderr as JSON"
+sourceMaps :: Parser Bool
+sourceMaps = switch $
+     long "source-maps"
+  <> help "Generate source maps"
+
 
 options :: Parser P.Options
 options = P.Options <$> noTco
@@ -186,6 +191,7 @@ options = P.Options <$> noTco
                     <*> verboseErrors
                     <*> (not <$> comments)
                     <*> requirePath
+                    <*> sourceMaps
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

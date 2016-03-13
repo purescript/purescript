@@ -36,7 +36,7 @@ isLeft (Right _) = False
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
+desugarCasesModule :: (MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
 desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
   rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> (desugarCases <=< desugarAbs <=< validateCases $ ds) <*> pure exps
@@ -44,7 +44,7 @@ desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
 -- |
 -- Validates that case head and binder lengths match.
 --
-validateCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+validateCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 validateCases = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return validate return
@@ -69,7 +69,7 @@ validateCases = flip parU f
     positionedBinder (PositionedBinder p _ _) = Just p
     positionedBinder _ = Nothing
 
-desugarAbs :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+desugarAbs :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarAbs = flip parU f
   where
   (f, _, _) = everywhereOnValuesM return replace return
@@ -83,7 +83,7 @@ desugarAbs = flip parU f
 -- |
 -- Replace all top-level binders with case expressions.
 --
-desugarCases :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+desugarCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> m [Declaration]
@@ -109,7 +109,7 @@ inSameGroup (PositionedDeclaration _ _ d1) d2 = inSameGroup d1 d2
 inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
-toDecls :: forall m. (Functor m, Applicative m, Monad m, MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
+toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
@@ -147,10 +147,10 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (Functor m, Applicative m, MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
-      argNames = map join $ foldl1 resolveNames namedArgs
+      argNames = foldl1 resolveNames namedArgs
   args <- if allUnique (catMaybes argNames)
             then mapM argName argNames
             else replicateM (length argNames) freshIdent'
@@ -160,14 +160,11 @@ makeCaseDeclaration ident alternatives = do
   return $ ValueDeclaration ident Public [] (Right value)
   where
   -- We will construct a table of potential names.
-  -- VarBinders will become Just (Just _) which is a potential name.
-  -- NullBinder will become Just Nothing, which indicates that we may
+  -- VarBinders will become Just _ which is a potential name.
+  -- Everything else becomes Nothing, which indicates that we
   -- have to generate a name.
-  -- Everything else becomes Nothing, which indicates that we definitely
-  -- have to generate a name.
-  findName :: Binder -> Maybe (Maybe Ident)
-  findName NullBinder = Just Nothing
-  findName (VarBinder name) = Just (Just name)
+  findName :: Binder -> Maybe Ident
+  findName (VarBinder name) = Just name
   findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 
@@ -182,19 +179,13 @@ makeCaseDeclaration ident alternatives = do
 
   -- Combine two lists of potential names from two case alternatives
   -- by zipping correspoding columns.
-  resolveNames :: [Maybe (Maybe Ident)] ->
-                  [Maybe (Maybe Ident)] ->
-                  [Maybe (Maybe Ident)]
+  resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
   resolveNames = zipWith resolveName
 
   -- Resolve a pair of names. VarBinder beats NullBinder, and everything
   -- else results in Nothing.
-  resolveName :: Maybe (Maybe Ident) ->
-                 Maybe (Maybe Ident) ->
-                 Maybe (Maybe Ident)
-  resolveName (Just (Just a)) (Just (Just b))
-    | a == b = Just (Just a)
+  resolveName :: Maybe Ident -> Maybe Ident -> Maybe Ident
+  resolveName (Just a) (Just b)
+    | a == b = Just a
     | otherwise = Nothing
-  resolveName (Just Nothing) a = a
-  resolveName a (Just Nothing) = a
   resolveName _ _ = Nothing

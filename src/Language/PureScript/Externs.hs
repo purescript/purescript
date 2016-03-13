@@ -73,28 +73,28 @@ data ExternsFixity = ExternsFixity
   -- | The operator symbol
   , efOperator :: String
   -- | The value the operator is an alias for
-  , efAlias :: Maybe Ident
+  , efAlias :: Maybe (Either (Qualified Ident) (Qualified (ProperName 'ConstructorName)))
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
   -- | A type declaration
     EDType
-      { edTypeName :: ProperName
+      { edTypeName :: ProperName 'TypeName
       , edTypeKind :: Kind
       , edTypeDeclarationKind :: TypeKind
       }
   -- | A type synonym
   | EDTypeSynonym
-      { edTypeSynonymName :: ProperName
+      { edTypeSynonymName :: ProperName 'TypeName
       , edTypeSynonymArguments :: [(String, Maybe Kind)]
       , edTypeSynonymType :: Type
       }
   -- | A data construtor
   | EDDataConstructor
-      { edDataCtorName :: ProperName
+      { edDataCtorName :: ProperName 'ConstructorName
       , edDataCtorOrigin :: DataDeclType
-      , edDataCtorTypeCtor :: ProperName
+      , edDataCtorTypeCtor :: ProperName 'TypeName
       , edDataCtorType :: Type
       , edDataCtorFields :: [Ident]
       }
@@ -105,14 +105,14 @@ data ExternsDeclaration =
       }
   -- | A type class declaration
   | EDClass
-      { edClassName :: ProperName
+      { edClassName :: ProperName 'ClassName
       , edClassTypeArguments :: [(String, Maybe Kind)]
       , edClassMembers :: [(Ident, Type)]
       , edClassConstraints :: [Constraint]
       }
   -- | An instance declaration
   | EDInstance
-      { edInstanceClassName :: Qualified ProperName
+      { edInstanceClassName :: Qualified (ProperName 'ClassName)
       , edInstanceName :: Ident
       , edInstanceTypes :: [Type]
       , edInstanceConstraints :: Maybe [Constraint]
@@ -153,7 +153,8 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efDeclarations  = concatMap toExternsDeclaration efExports
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
-  fixityDecl (FixityDeclaration (Fixity assoc prec) op alias) = fmap (const (ExternsFixity assoc prec op alias)) (find exportsOp exps)
+  fixityDecl (FixityDeclaration (Fixity assoc prec) op alias) =
+      fmap (const (ExternsFixity assoc prec op alias)) (find exportsOp exps)
     where
     exportsOp :: DeclarationRef -> Bool
     exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r
@@ -178,7 +179,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
       Just (kind, tk@(DataType _ tys)) ->
         EDType pn kind tk : [ EDDataConstructor dctor dty pn ty args
                             | dctor <- fromMaybe (map fst tys) dctors
-                            , (dty, _, ty, args) <- maybeToList (M.lookup (Qualified (Just mn) dctor) (dataConstructors env))
+                            , (dty, _, ty, args) <- maybeToList (Qualified (Just mn) dctor `M.lookup` dataConstructors env)
                             ]
       _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef ident)
@@ -186,10 +187,10 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
     = [ EDValue ident ty ]
   toExternsDeclaration (TypeClassRef className)
     | Just (args, members, implies) <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, TypeSynonym) <- M.lookup (Qualified (Just mn) className) (types env)
-    , Just (_, synTy) <- Qualified (Just mn) className `M.lookup` typeSynonyms env
-    = [ EDType className kind TypeSynonym
-      , EDTypeSynonym className args synTy
+    , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
+    = [ EDType (coerceProperName className) kind TypeSynonym
+      , EDTypeSynonym (coerceProperName className) args synTy
       , EDClass className args members implies
       ]
   toExternsDeclaration (TypeInstanceRef ident)

@@ -26,10 +26,10 @@ import Control.Monad.Supply.Class
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.bind function,
 -- and all @DoNotationLet@ constructors with let expressions.
 --
-desugarDoModule :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
+desugarDoModule :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
 desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
-desugarDo :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
+desugarDo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
