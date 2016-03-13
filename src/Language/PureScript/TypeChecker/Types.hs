@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- This module implements the type checker
@@ -69,23 +70,38 @@ typesOf moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-    ds2 <- forM untyped $ \e -> typeForBindingGroupElement True e dict untypedDict
-    return $ ds1 ++ ds2
+    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
+    return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
 
-  forM tys $ \(ident, (val, ty)) -> do
+  forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
-    val' <- replaceTypeClassDictionaries moduleName val
+    (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
+    let unsolvedTypeVars = nub $ unknownsInType ty
+    -- Generalize and constrain the type
+    let generalized = generalize unsolved ty
+    -- Make sure any unsolved type constraints only use type variables which appear
+    -- unknown in the inferred type.
+    when shouldGeneralize $ do
+      tell . errorMessage $ MissingTypeDeclaration ident generalized
+      forM_ unsolved $ \(_, (className, classTys)) -> do
+        let constraintTypeVars = nub $ foldMap unknownsInType classTys
+        when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
+          throwError . errorMessage $ NoInstanceFound className classTys
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
     checkDuplicateLabels val'
-    return (ident, (val', varIfUnknown ty))
+    return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
   where
+  -- | Generalize type vars using forall and add inferred constraints
+  generalize unsolved = varIfUnknown . constrain unsolved
+  -- | Add any unsolved constraints
+  constrain [] = id
+  constrain cs = ConstrainedType (map snd cs)
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-  tidyUp (ts, sub) = map (\(i, (val, ty)) -> (i, (overTypes (substituteType sub) val, substituteType sub ty))) ts
+  tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints . WildcardInferredType $ substituteType sub ty
-  replace sub (ErrorMessage hints (MissingTypeDeclaration name ty)) = ErrorMessage hints $ MissingTypeDeclaration name (varIfUnknown (substituteType sub ty))
   replace _ em = em
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
@@ -138,16 +154,14 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
 
 typeForBindingGroupElement ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Bool ->
   (Ident, Expr) ->
   TypeData ->
   UntypedData ->
   m (Ident, (Expr, Type))
-typeForBindingGroupElement warn (ident, val) dict untypedDict = do
+typeForBindingGroupElement (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
   unifyTypes ty $ fromMaybe (internalError "name not found in dictionary") (lookup ident untypedDict)
-  when warn . tell . errorMessage $ MissingTypeDeclaration ident ty
   return (ident, (TypedValue True val' ty, ty))
 
 -- | Check if a value contains a type annotation
@@ -165,20 +179,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
   g (TypeClassDictionary (nm, tys) sco) = TypeClassDictionary (nm, map f tys) sco
   g other = other
-
--- | Replace type class dictionary placeholders with inferred type class dictionaries
-replaceTypeClassDictionaries ::
-  (MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  Expr ->
-  m Expr
-replaceTypeClassDictionaries mn =
-  let (_, f, _) = everywhereOnValuesTopDownM return go return
-  in f
-  where
-  go (TypeClassDictionary constraint dicts) = entails mn dicts constraint
-  go other = return other
-
+  
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
   (MonadState CheckState m, MonadError MultipleErrors m) =>
@@ -329,7 +330,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-  ds2' <- forM untyped $ \e -> typeForBindingGroupElement False e dict untypedDict
+  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
   let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
   bindNames dict $ do
     makeBindingGroupVisible

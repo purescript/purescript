@@ -23,6 +23,7 @@ module Language.PureScript.TypeChecker.Unify (
     freshType,
     solveType,
     substituteType,
+    unknownsInType,
     unifyTypes,
     unifyRows,
     unifiesWith,
