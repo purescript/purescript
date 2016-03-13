@@ -189,8 +189,11 @@ desugarOperatorSections (Module ss coms mn ds exts) =
   (goDecl, _, _) = everywhereOnValuesM return goExpr return
 
   goExpr :: Expr -> m Expr
-  goExpr (OperatorSection op (Left val)) = return $ App op val
-  goExpr (OperatorSection op (Right val)) = do
+  goExpr (OperatorSection op eVal) = do
     arg <- freshIdent'
-    return $ Abs (Left arg) $ App (App op (Var (Qualified Nothing arg))) val
+    let var = Var (Qualified Nothing arg)
+        f2 a b = Abs (Left arg) $ App (App op a) b
+    return $ case eVal of
+      Left  val -> f2 val var
+      Right val -> f2 var val
   goExpr other = return other
