@@ -1,5 +1,6 @@
 language: c
-sudo: false
+dist: trusty
+sudo: required
 matrix:
   include:
     - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=lts-5.4 RUNSDISTTESTS=YES
