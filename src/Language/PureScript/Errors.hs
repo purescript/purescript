@@ -447,6 +447,7 @@ errorSuggestion err = case err of
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
   _ -> Nothing
 
   where
@@ -955,9 +956,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ line $ showSuggestion msg
             ]
 
-    renderSimpleErrorMessage (HidingImport mn refs) =
+    renderSimpleErrorMessage msg@(HidingImport mn _) =
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the inclusive form: "
-            , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            , indent $ line $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
