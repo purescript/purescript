@@ -1181,31 +1181,32 @@ prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = renderBox . prettyPrintMultipleErrorsBox full
+prettyPrintMultipleErrors full = unlines . map renderBox . prettyPrintMultipleErrorsBox full
 
 -- |
 -- Pretty print multiple warnings
 --
-prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = renderBox . prettyPrintMultipleWarningsBox full
+prettyPrintMultipleWarnings :: Bool -> MultipleErrors -> String
+prettyPrintMultipleWarnings full = unlines . map renderBox . prettyPrintMultipleWarningsBox full
 
 -- | Pretty print warnings as a Box
-prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleWarningsBox full = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
 
 -- | Pretty print errors as a Box
-prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsBox full = prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
   let result = prettyPrintSingleError full level True e
-  in Box.vcat Box.left [ Box.text intro
-                       , result
-                       ]
+  in [ Box.vcat Box.left [ Box.text intro
+                         , result
+                         ]
+     ]
 prettyPrintMultipleErrorsWith level _ intro full (MultipleErrors es) =
   let result = map (prettyPrintSingleError full level True) es
-  in Box.vsep 1 Box.left $ concat $ zipWith withIntro [1 :: Int ..] result
+  in concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
                     , Box.moveRight 2 err
