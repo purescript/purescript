@@ -125,6 +125,7 @@ options = Options <$> some inputFile
 main :: IO ()
 main = do
   opts <- execParser (info (version <*> helper <*> options) infoModList)
+  when (optionsRequirePath opts /= Nothing) $ hPutStrLn stderr "The require-path option is deprecated and will be removed in PureScript 0.9."
   output <- runExceptT (app opts)
   case output of
     Left err -> do
