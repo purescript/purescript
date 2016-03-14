@@ -111,7 +111,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   importToJs mnLookup mn' = do
     path <- asks optionsRequirePath
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = JSApp Nothing (JSVar Nothing "require") [JSStringLiteral Nothing (maybe id (</>) path $ runModuleName mn')]
+    let moduleBody = JSApp Nothing (JSVar Nothing "require") [JSStringLiteral Nothing (fromMaybe ".." path </> runModuleName mn')]
     withPos ss $ JSVariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- |

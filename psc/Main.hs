@@ -138,7 +138,7 @@ requirePath :: Parser (Maybe FilePath)
 requirePath = optional $ strOption $
      short 'r'
   <> long "require-path"
-  <> help "The path prefix to use for require() calls in the generated JavaScript"
+  <> help "The path prefix to use for require() calls in the generated JavaScript [deprecated]"
 
 noTco :: Parser Bool
 noTco = switch $

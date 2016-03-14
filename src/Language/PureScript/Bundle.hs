@@ -141,7 +141,7 @@ checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String 
 checkImportPath _ "./foreign" m _ =
   Right (ModuleIdentifier (moduleName m) Foreign)
 checkImportPath requirePath name _ names
-  | Just name' <- stripPrefix (fromMaybe "" requirePath) name
+  | Just name' <- stripPrefix (fromMaybe "../" requirePath) name
   , name' `S.member` names = Right (ModuleIdentifier name' Regular)
 checkImportPath _ name _ _ = Left name
 

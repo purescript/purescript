@@ -119,8 +119,7 @@ options = Options <$> some inputFile
   requirePath = strOption $
        short 'r'
     <> long "require-path"
-    <> Opts.value ""
-    <> help "The path prefix used in require() calls in the generated JavaScript"
+    <> help "The path prefix used in require() calls in the generated JavaScript [deprecated]"
 
 -- | Make it go.
 main :: IO ()
