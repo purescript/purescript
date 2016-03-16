@@ -148,6 +148,7 @@ data SimpleErrorMessage
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
   | InvalidOperatorInBinder Ident Ident
+  | DeprecatedRequirePath
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -328,6 +329,7 @@ errorCode em = case unwrapErrorMessage em of
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
   IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
+  DeprecatedRequirePath{} -> "DeprecatedRequirePath"
 
 -- |
 -- A stack trace for an error
@@ -974,6 +976,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras $ [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
               , line "Only aliases for data constructors may be used in patterns."
               ]
+
+    renderSimpleErrorMessage DeprecatedRequirePath =
+      line "The require-path option is deprecated and will be removed in PureScript 0.9."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

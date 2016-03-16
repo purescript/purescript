@@ -119,13 +119,13 @@ options = Options <$> some inputFile
   requirePath = strOption $
        short 'r'
     <> long "require-path"
-    <> Opts.value ""
-    <> help "The path prefix used in require() calls in the generated JavaScript"
+    <> help "The path prefix used in require() calls in the generated JavaScript [deprecated]"
 
 -- | Make it go.
 main :: IO ()
 main = do
   opts <- execParser (info (version <*> helper <*> options) infoModList)
+  when (optionsRequirePath opts /= Nothing) $ hPutStrLn stderr "The require-path option is deprecated and will be removed in PureScript 0.9."
   output <- runExceptT (app opts)
   case output of
     Left err -> do

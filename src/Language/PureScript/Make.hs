@@ -150,6 +150,9 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadE
      -> [Module]
      -> m Environment
 make MakeActions{..} ms = do
+  requirePath <- asks optionsRequirePath
+  when (requirePath /= Nothing) $ tell $ errorMessage DeprecatedRequirePath
+
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms
