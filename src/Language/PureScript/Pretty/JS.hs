@@ -274,8 +274,7 @@ prettyPrintJSWithSourceMaps js =
   in (s, mp)
 
 prettyPrintJS :: [JS] -> String
-prettyPrintJS = fromMaybe (internalError "Incomplete pattern") . fmap runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
-
+prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
 -- |
 -- Generate an indented, pretty-printed string representing a Javascript expression
 --

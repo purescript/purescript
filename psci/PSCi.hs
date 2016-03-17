@@ -337,7 +337,7 @@ handleKindOf typ = do
               k   = check (P.kindOf typ') chk
 
               check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew cs = fst . runWriter . runExceptT . runStateT sew $ cs
+              check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind

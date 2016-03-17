@@ -21,4 +21,4 @@ instance (MonadSupply m) => MonadSupply (StateT s m) where
   fresh = lift fresh
 
 freshName :: (MonadSupply m) => m String
-freshName = liftM (('$' :) . show) fresh
+freshName = fmap (('$' :) . show) fresh

@@ -78,7 +78,7 @@ nameIsJsReserved name =
 --
 nameIsJsBuiltIn :: String -> Bool
 nameIsJsBuiltIn name =
-  elem name
+  name `elem`
     [ "arguments"
     , "Array"
     , "ArrayBuffer"

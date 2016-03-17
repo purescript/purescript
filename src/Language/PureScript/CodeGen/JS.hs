@@ -55,7 +55,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ map snd $ imps
+    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- T.traverse (T.traverse optimize) jsDecls
@@ -67,7 +67,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
-    let exps' = JSObjectLiteral Nothing $ map (runIdent &&& (JSVar Nothing) . identToJs) standardExps
+    let exps' = JSObjectLiteral Nothing $ map (runIdent &&& JSVar Nothing . identToJs) standardExps
                                ++ map (runIdent &&& foreignIdent) foreignExps
     return $ moduleBody ++ [JSAssignment Nothing (JSAccessor Nothing "exports" (JSVar Nothing "module")) exps']
 
@@ -85,7 +85,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- with declaration names.
   --
   renameImports :: [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
-  renameImports ids mns = go M.empty ids mns
+  renameImports = go M.empty
     where
     go :: M.Map ModuleName (Ann, ModuleName) -> [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
     go acc used ((ann, mn') : mns') =
