@@ -14,4 +14,4 @@ test =
       x = f 1.0
   in not x
 
-main = Control.Monad.Eff.Console.print test
+main = Control.Monad.Eff.Console.logShow test

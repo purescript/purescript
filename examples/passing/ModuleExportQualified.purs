@@ -6,4 +6,4 @@ module Main where
   import qualified A as B
 
   main = do
-    print (B.show 1.0)
+    logShow (B.show 1.0)

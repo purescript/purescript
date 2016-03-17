@@ -5,7 +5,7 @@ module M1 where
   data Foo = Foo String
 
   foo :: M1.Foo -> String
-  foo = \f -> case f of Foo s -> s ++ "foo"
+  foo = \f -> case f of Foo s -> s <> "foo"
 
   bar :: Foo -> String
   bar = foo
@@ -21,7 +21,7 @@ module M2 where
   baz = M1.foo
 
   match :: M1.Foo -> String
-  match = \f -> case f of M1.Foo s -> s ++ "foo"
+  match = \f -> case f of M1.Foo s -> s <> "foo"
 
 module Main where
 

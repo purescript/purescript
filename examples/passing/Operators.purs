@@ -8,9 +8,9 @@ import Control.Monad.Eff.Console
 (?!) x _ = x
 
 bar :: String -> String -> String
-bar = \s1 s2 -> s1 ++ s2
+bar = \s1 s2 -> s1 <> s2
 
-test1 :: forall n. (Num n) => n -> n -> (n -> n -> n) -> n
+test1 :: forall n. (Semiring n) => n -> n -> (n -> n -> n) -> n
 test1 x y z = x * y + z x y
 
 test2 = (\x -> x.foo false) { foo : \_ -> 1.0 }
@@ -31,7 +31,7 @@ test5 = 1.0 %% 2.0 %% 3.0
 test6 = ((\x -> x) `k` 2.0) 3.0
 
 (<+>) :: String -> String -> String
-(<+>) = \s1 s2 -> s1 ++ s2
+(<+>) = \s1 s2 -> s1 <> s2
 
 test7 = "Hello" <+> "World!"
 

@@ -9,5 +9,5 @@ import Control.Monad.Eff.Console as Console
 bind = P.bind
 
 main = do
-  message <- P.return "success!"
+  message <- P.pure "success!"
   Console.log message
