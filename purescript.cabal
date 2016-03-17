@@ -27,8 +27,12 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/setup.js
                   , tests/support/package.json
                   , tests/support/prelude/bower.json
-                  , tests/support/prelude/src/*.purs
-                  , tests/support/prelude/src/*.js
+                  , tests/support/prelude/src/Control/*.purs
+                  , tests/support/prelude/src/Control/*.js
+                  , tests/support/prelude/src/Data/*.purs
+                  , tests/support/prelude/src/Data/*.js
+                  , tests/support/prelude/src/Data/Ord/*.purs
+                  , tests/support/prelude/src/Data/Ord/*.js
                   , tests/support/prelude/LICENSE
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
