@@ -1,5 +1,6 @@
 resolver: lts-5.4
 packages:
 - '.'
-extra-deps: []
+extra-deps:
+- bower-json-0.8.0
 flags: {}
