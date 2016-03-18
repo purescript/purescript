@@ -62,5 +62,5 @@ testPackage dir = do
         pure ()
       other -> do
         putStrLn ("psc-publish tests failed on " ++ dir ++ ":")
-        putStrLn (show other)
+        print other
         exitFailure

@@ -35,10 +35,10 @@ main = do
     forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
       let mdl = takeJust ("module not found in docs: " ++ P.runModuleName mn)
                          (find ((==) mn . Docs.modName) pkgModules)
-      in forM_ pragmas (flip runAssertionIO mdl)
+      in forM_ pragmas (`runAssertionIO` mdl)
 
 takeJust :: String -> Maybe a -> a
-takeJust msg = maybe (error msg) id
+takeJust msg = fromMaybe (error msg)
 
 data Assertion
   -- | Assert that a particular declaration is documented with the given
@@ -254,8 +254,8 @@ testCases =
 
   , ("ExplicitTypeSignatures",
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (ShowFn (hasTypeVar "something"))
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn ((==) P.tyInt))
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn ((==) P.tyNumber))
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn (P.tyInt ==))
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn (P.tyNumber ==))
       ])
   ]
 
