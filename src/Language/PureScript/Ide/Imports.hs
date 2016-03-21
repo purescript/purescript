@@ -81,7 +81,7 @@ addExplicitImport fp identifier moduleName = do
   logDebugN ("Identifier: " <> identifier <> "ModuleName: " <> T.pack (P.runModuleName moduleName))
   let newImports = addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
   pure (pre ++ List.sort (map prettyPrintImport' newImports) ++ post)
-  
+
 addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Import]
 addExplicitImport' identifier moduleName imports =
   case List.findIndex (\case
@@ -94,7 +94,7 @@ addExplicitImport' identifier moduleName imports =
       let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
       in x  ++ [Import mn (P.Explicit (P.ValueRef identifier : refs)) Nothing] ++ ys
 
-type Question = [Text]
+type Question = [Completion]
 addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m) =>
                           FilePath -> Text -> [Filter] -> m (Either Question [Text])
 addImportForIdentifier fp ident filters = do
@@ -102,14 +102,14 @@ addImportForIdentifier fp ident filters = do
   case getExactMatches ident filters modules of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. Have you loaded the corresponding module?")
-      
+
     -- Only one match was found for the given identifier, so we can insert it right away
     [Completion (m, i, _)] ->
       Right <$> addExplicitImport fp i (P.moduleNameFromString (T.unpack m))
-      
+
     -- Multiple matches where found so we need to ask the user to clarify which module he meant
     xs ->
-      pure $ Left $ map (\(Completion (m,_,_)) -> m) xs
+      pure $ Left xs
 
 prettyPrintImport' :: Import -> Text
 prettyPrintImport' (Import mn idt qual) = T.pack $ "import " ++ P.prettyPrintImport mn idt qual

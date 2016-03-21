@@ -68,7 +68,7 @@ handleCommand (Import fp (AddImportForIdentifier ident)) = do
     rs' <- addImportForIdentifier fp ident []
     case rs' of
       Right rs -> pure $ MultilineTextResult rs
-      Left question -> pure $ MultilineTextResult question
+      Left question -> pure $ CompletionResult question
 handleCommand Cwd =
     TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
