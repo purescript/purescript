@@ -3,7 +3,6 @@ module Language.PureScript.Ide.ImportsSpec where
 
 import Test.Hspec
 import Data.Text (Text)
-import qualified Data.Text as T
 import qualified Language.PureScript as P
 import Language.PureScript.Ide.Imports -- (Import(Import), sliceImportSection)
 
@@ -15,6 +14,7 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
+splitSimpleFile :: ([Text], [Import], [Text])
 splitSimpleFile = sliceImportSection simpleFile
 
 withImports :: [Text] -> [Text]
@@ -45,8 +45,7 @@ consoleImport =
     (P.Explicit [P.ValueRef (P.Ident "log")])
     (Just (P.moduleNameFromString "Console"))
 
-xit _ _ = return ()
-
+spec :: Spec
 spec = do
   describe "determining the importsection" $ do
     it "finds a simple import" $
@@ -54,7 +53,7 @@ spec = do
         (sliceImportSection simpleFile)
         (take 1 simpleFile, [preludeImport], drop 3 simpleFile)
 
-    it "allows multiline import statements" $ do
+    it "allows multiline import statements" $
       shouldBe
         (sliceImportSection (withImports [ "import Data.Array (head,"
                                          , "                   cons)"
@@ -80,7 +79,7 @@ spec = do
 
   describe "import commands" $ do
     it "adds an implicit unqualified import" $
-      let (pre, imports, post) = splitSimpleFile
+      let (_, imports, _) = splitSimpleFile
       in
         shouldBe
           (addImplicitImport' imports (P.moduleNameFromString "Data.Map"))
@@ -89,7 +88,7 @@ spec = do
           , ""
           ]
     it "adds an explicit unqualified import" $
-      let (pre, imports, post) = splitSimpleFile
+      let (_, imports, _) = splitSimpleFile
       in
         shouldBe
           (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") imports)

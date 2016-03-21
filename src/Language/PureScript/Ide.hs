@@ -64,6 +64,8 @@ handleCommand (AddClause l wca) =
 handleCommand (Import fp (AddImplicitImport mn)) = do
     rs <- addImplicitImport fp mn
     pure $ MultilineTextResult rs
+handleCommand (Import _ (RemoveImport _)) = do
+    error "Not implemented yet"
 handleCommand (Import fp (AddImportForIdentifier ident)) = do
     rs' <- addImportForIdentifier fp ident []
     case rs' of
