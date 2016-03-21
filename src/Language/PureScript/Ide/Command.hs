@@ -42,6 +42,7 @@ data Command
 
 data ImportCommand
   = AddImplicitImport ModuleName
+  | AddImportForIdentifier DeclIdent
   | RemoveImport ModuleName
   deriving (Show, Eq)
 
@@ -52,6 +53,9 @@ instance FromJSON ImportCommand where
       "addImplicitImport" -> do
         mn <- o .: "module"
         pure (AddImplicitImport (moduleNameFromString mn))
+      "addImport" -> do
+        ident <- o .: "identifier"
+        pure (AddImportForIdentifier ident)
       "removeImport" -> do
         mn <- o .: "module"
         pure (RemoveImport (moduleNameFromString mn))

@@ -215,15 +215,15 @@ typeParse t = case parse parseType "" t of
       type' <- many1 anyChar
       pure (unpack name, type')
 
-identifier :: Parser Text
-identifier = do
-  spaces
-  ident <-
-    -- necessary for being able to parse the following ((++), concat)
-    between (char '(') (char ')') (many1 (noneOf ", )")) <|>
-    many1 (noneOf ", )")
-  spaces
-  pure (pack ident)
+    identifier :: Parser Text
+    identifier = do
+      spaces
+      ident <-
+        -- necessary for being able to parse the following ((++), concat)
+        between (char '(') (char ')') (many1 (noneOf ", )")) <|>
+        many1 (noneOf ", )")
+      spaces
+      pure (pack ident)
 
 instance ToJSON PursuitResponse where
   toJSON (ModuleResponse name package) =
