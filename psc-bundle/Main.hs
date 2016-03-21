@@ -62,7 +62,7 @@ app Options{..} = do
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
-  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath
+  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath True
 
 -- | Command line options parser.
 options :: Parser Options
