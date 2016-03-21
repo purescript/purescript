@@ -11,6 +11,7 @@ import           Control.Monad
 import           Data.Aeson
 import           Data.Maybe
 import           Data.Text                         (Text)
+import           Language.PureScript (ModuleName, moduleNameFromString)
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
@@ -36,7 +37,25 @@ data Command
       addClauseLine          :: Text
       , addClauseAnnotations :: WildcardAnnotations}
     | Cwd
+    | Import FilePath ImportCommand
     | Quit
+
+data ImportCommand
+  = AddImplicitImport ModuleName
+  | RemoveImport ModuleName
+  deriving (Show, Eq)
+
+instance FromJSON ImportCommand where
+  parseJSON = withObject "ImportCommand" $ \o -> do
+    (command :: String) <- o .: "importCommand"
+    case command of
+      "addImplicitImport" -> do
+        mn <- o .: "module"
+        pure (AddImplicitImport (moduleNameFromString mn))
+      "removeImport" -> do
+        mn <- o .: "module"
+        pure (RemoveImport (moduleNameFromString mn))
+      _ -> mzero
 
 data ListType = LoadedModules | Imports FilePath | AvailableModules
 
@@ -97,5 +116,10 @@ instance FromJSON Command where
         return $ AddClause line (if annotations
                                  then explicitAnnotations
                                  else noAnnotations)
+      "import" -> do
+        params <- o .: "params"
+        fp <- params .: "file"
+        importCommand <- params .: "importCommand"
+        pure $ Import fp importCommand
       _ -> mzero
 

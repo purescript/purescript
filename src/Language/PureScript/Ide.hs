@@ -27,6 +27,7 @@ import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Filter
+import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Pursuit
 import           Language.PureScript.Ide.Reexports
@@ -60,6 +61,9 @@ handleCommand (CaseSplit l b e wca t) =
     caseSplit l b e wca t
 handleCommand (AddClause l wca) =
     pure $ addClause l wca
+handleCommand (Import fp (AddImplicitImport mn)) = do
+    rs <- addImplicitImport fp mn
+    pure $ MultilineTextResult rs
 handleCommand Cwd =
     TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
