@@ -3,12 +3,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier
+         -- for tests
+       , addImplicitImport'
+       , addExplicitImport'
+       , sliceImportSection
+       , prettyPrintImport'
+       , Import(Import)
        )
        where
 
@@ -31,28 +36,37 @@ import qualified Data.Text as T
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
 
-
 -- | Parses a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
 parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                         FilePath -> m ([Text], [Import], [Text])
 parseImportsFromFile fp = do
   file <- liftIO (TIO.readFile fp)
-  let fLines = T.lines file
-      preImportSection = takeWhile (not . hasImportPrefix) fLines
+  pure (sliceImportSection (T.lines file))
+
+sliceImportSection :: [Text] -> ([Text], [Import], [Text])
+sliceImportSection ls =
+  let
+      preImportSection = takeWhile (not . hasImportPrefix) ls
       importSection =
         takeWhile continuesImport $
-          dropWhile (not . hasImportPrefix) fLines
+          dropWhile (not . hasImportPrefix) ls
       postImportSection =
         dropWhile continuesImport $
-          dropWhile (not . hasImportPrefix) fLines
+          dropWhile (not . hasImportPrefix) ls
       hasImportPrefix = T.isPrefixOf "import"
       continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
-
-  pure (preImportSection, parseImports importSection, postImportSection)
+  in (preImportSection, parseImports importSection, postImportSection)
 
 parseImports :: [Text] -> [Import]
-parseImports = mapMaybe parseImport
+parseImports ts =
+  let concatMultilineImports = foldl step [] ts
+      step :: [Text] -> Text -> [Text]
+      step acc t = if T.isPrefixOf " " t
+                   then init acc ++ [last acc <> t]
+                   else acc ++ [t]
+  in
+    mapMaybe parseImport concatMultilineImports
 
 parseImport :: Text -> Maybe Import
 parseImport t =
@@ -69,30 +83,38 @@ addImplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
                      FilePath -> P.ModuleName -> m [Text]
 addImplicitImport fp mn = do
   (pre, imports, post) <- parseImportsFromFile fp
+  let newImportSection = addImplicitImport' imports mn
   pure $ pre
-    ++ List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing]))
-    ++ [""]
+    ++ newImportSection
     ++ post
+
+addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
+addImplicitImport' imports mn =
+  List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing])) ++ [""]
 
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
                      FilePath -> Text -> P.ModuleName -> m [Text]
 addExplicitImport fp identifier moduleName = do
   (pre, imports, post) <- parseImportsFromFile fp
   logDebugN ("Identifier: " <> identifier <> "ModuleName: " <> T.pack (P.runModuleName moduleName))
-  let newImports = addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
-  pure (pre ++ List.sort (map prettyPrintImport' newImports) ++ post)
+  let newImportSection = addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
+  pure (pre ++ newImportSection ++ post)
 
-addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Import]
+addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Text]
 addExplicitImport' identifier moduleName imports =
-  case List.findIndex (\case
-                          (Import mn (P.Explicit _) Nothing) -> mn == moduleName
-                          _ -> False) imports of
-    -- The module wasn't imported yet
-    Nothing ->
-      imports ++ [Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing]
-    Just ix ->
-      let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
-      in x  ++ [Import mn (P.Explicit (P.ValueRef identifier : refs)) Nothing] ++ ys
+  let
+    matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
+    matches _ = False
+
+    newImports = case List.findIndex matches imports of
+      -- The module wasn't imported yet
+      Nothing ->
+        imports ++ [Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing]
+      Just ix ->
+        let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
+        in x  ++ [Import mn (P.Explicit (P.ValueRef identifier : refs)) Nothing] ++ ys
+
+  in List.sort (map prettyPrintImport' newImports) ++ [""]
 
 type Question = [Completion]
 addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m) =>
