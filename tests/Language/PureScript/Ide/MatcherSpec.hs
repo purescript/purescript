@@ -24,9 +24,9 @@ runFlex s = runMatcher (flexMatcher s) completions
 setup :: IO ()
 setup = do
   deleteOutputFolder
-  compileTestProject
-  startServer
-  loadMain
+  _ <- compileTestProject
+  _ <- startServer
+  _ <- loadMain
   return ()
 
 teardown :: IO ()

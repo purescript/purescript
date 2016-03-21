@@ -49,7 +49,7 @@ startServer :: IO ProcessHandle
 startServer = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $ (shell "psc-ide-server") {cwd=Just pdir}
-  threadDelay 50000 -- give the server 50ms to start up
+  threadDelay 500000 -- give the server 500ms to start up
   return procHandle
 
 stopServer :: ProcessHandle -> IO ()
