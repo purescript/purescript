@@ -37,7 +37,8 @@ data Command
       addClauseLine          :: Text
       , addClauseAnnotations :: WildcardAnnotations}
     | Cwd
-    | Import FilePath ImportCommand
+      -- Import InputFile OutputFile
+    | Import FilePath (Maybe FilePath) ImportCommand
     | Quit
 
 data ImportCommand
@@ -123,7 +124,8 @@ instance FromJSON Command where
       "import" -> do
         params <- o .: "params"
         fp <- params .: "file"
+        out <- params .:? "outfile"
         importCommand <- params .: "importCommand"
-        pure $ Import fp importCommand
+        pure $ Import fp out importCommand
       _ -> mzero
 

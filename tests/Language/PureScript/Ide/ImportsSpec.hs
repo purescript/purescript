@@ -4,7 +4,7 @@ module Language.PureScript.Ide.ImportsSpec where
 import Test.Hspec
 import Data.Text (Text)
 import qualified Language.PureScript as P
-import Language.PureScript.Ide.Imports -- (Import(Import), sliceImportSection)
+import Language.PureScript.Ide.Imports
 
 simpleFile :: [Text]
 simpleFile =

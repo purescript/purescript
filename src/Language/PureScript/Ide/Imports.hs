@@ -8,6 +8,7 @@
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier
+       , answerRequest
          -- for tests
        , addImplicitImport'
        , addExplicitImport'
@@ -117,6 +118,7 @@ addExplicitImport' identifier moduleName imports =
   in List.sort (map prettyPrintImport' newImports) ++ [""]
 
 type Question = [Completion]
+
 addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m) =>
                           FilePath -> Text -> [Filter] -> m (Either Question [Text])
 addImportForIdentifier fp ident filters = do
@@ -135,3 +137,11 @@ addImportForIdentifier fp ident filters = do
 
 prettyPrintImport' :: Import -> Text
 prettyPrintImport' (Import mn idt qual) = T.pack $ "import " ++ P.prettyPrintImport mn idt qual
+
+answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
+answerRequest outfp rs  =
+    case outfp of
+      Nothing -> pure $ MultilineTextResult rs
+      Just outfp' -> do
+        liftIO $ TIO.writeFile outfp' (T.unlines rs)
+        pure $ TextResult $ "Written to " <> T.pack outfp'

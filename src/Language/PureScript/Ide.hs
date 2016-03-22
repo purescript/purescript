@@ -61,15 +61,14 @@ handleCommand (CaseSplit l b e wca t) =
     caseSplit l b e wca t
 handleCommand (AddClause l wca) =
     pure $ addClause l wca
-handleCommand (Import fp (AddImplicitImport mn)) = do
+handleCommand (Import fp outfp (AddImplicitImport mn)) = do
     rs <- addImplicitImport fp mn
-    pure $ MultilineTextResult rs
-handleCommand (Import _ (RemoveImport _)) = do
-    error "Not implemented yet"
-handleCommand (Import fp (AddImportForIdentifier ident)) = do
-    rs' <- addImportForIdentifier fp ident []
-    case rs' of
-      Right rs -> pure $ MultilineTextResult rs
+    answerRequest outfp rs
+handleCommand (Import _ _ (RemoveImport _)) = error "Not implemented yet"
+handleCommand (Import fp outfp (AddImportForIdentifier ident)) = do
+    rs <- addImportForIdentifier fp ident []
+    case rs of
+      Right rs' -> answerRequest outfp rs'
       Left question -> pure $ CompletionResult question
 handleCommand Cwd =
     TextResult . T.pack <$> liftIO getCurrentDirectory
