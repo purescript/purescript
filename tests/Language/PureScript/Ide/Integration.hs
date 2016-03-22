@@ -19,6 +19,8 @@ module Language.PureScript.Ide.Integration
        , addImplicitImport
          -- checking results
        , resultIsSuccess
+       , parseCompletions
+       , parseTextResult
        ) where
 
 import Language.PureScript.Ide.CodecJSON
@@ -70,10 +72,11 @@ withServer s = do
 compileTestProject :: IO Bool
 compileTestProject = do
   pdir <- projectDirectory
-  (_, _, _, procHandle) <- createProcess $ (shell $ "psc " ++ fileGlob) {cwd=Just pdir
-                                                                        ,std_out=CreatePipe
-                                                                        ,std_err=CreatePipe
-                                                                        }
+  (_, _, _, procHandle) <- createProcess $
+    (shell $ "psc " ++ fileGlob) {cwd=Just pdir
+                                 ,std_out=CreatePipe
+                                 ,std_err=CreatePipe
+                                 }
   isSuccess <$> waitForProcess procHandle
 
 deleteOutputFolder :: IO ()
