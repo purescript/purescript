@@ -17,4 +17,3 @@ tmp/
 output
 examples/docs/docs/
 core-tests/full-core-docs.md
-/tests/support/pscide/src/*.tmp
