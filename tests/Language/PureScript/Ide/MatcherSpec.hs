@@ -26,7 +26,7 @@ setup = do
   deleteOutputFolder
   _ <- compileTestProject
   _ <- startServer
-  _ <- loadMain
+  _ <- loadModuleWithDeps "Main"
   return ()
 
 teardown :: IO ()

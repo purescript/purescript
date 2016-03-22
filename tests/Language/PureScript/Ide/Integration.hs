@@ -11,7 +11,7 @@ module Language.PureScript.Ide.Integration
        , compileTestProject
        , deleteOutputFolder
          -- sending commands
-       , loadMain
+       , loadModuleWithDeps
        , getFlexCompletions
        , getType
          -- checking results
@@ -107,8 +107,8 @@ quitServer = do
   _ <- try $ sendCommand quitCommand :: IO (Either SomeException String)
   return ()
 
-loadMain :: IO String
-loadMain = sendCommand $ load [] ["Main"]
+loadModuleWithDeps :: String -> IO String
+loadModuleWithDeps m = sendCommand $ load [] [m]
 
 getFlexCompletions :: String -> IO [(String, String, String)]
 getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)))
