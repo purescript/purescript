@@ -16,6 +16,7 @@ module Language.PureScript.Ide.Integration
        , getFlexCompletions
        , getType
        , addImport
+       , addImplicitImport
          -- checking results
        , resultIsSuccess
        ) where
@@ -121,6 +122,9 @@ getType q = parseCompletions <$> sendCommand (typeC q [])
 addImport :: String -> FilePath -> FilePath -> IO String
 addImport identifier fp outfp = parseTextResult <$> sendCommand (addImportC identifier fp outfp)
 
+addImplicitImport :: String -> FilePath -> FilePath -> IO String
+addImplicitImport mn fp outfp = parseTextResult <$> sendCommand (addImplicitImportC mn fp outfp)
+
 -- Command Encoding
 
 commandWrapper :: String -> Value -> Value
@@ -133,13 +137,23 @@ typeC :: String -> [Value] -> Value
 typeC q filters = commandWrapper "type" (object ["search" .= q, "filters" .= filters])
 
 addImportC :: String -> FilePath -> FilePath -> Value
-addImportC identifier fp outfp = commandWrapper "import" (object [ "file" .= fp
-                                                                 , "outfile" .= outfp
-                                                                 , "importCommand" .= object
-                                                                   [ "importCommand" .= ("addImport" :: String)
-                                                                   , "identifier" .= identifier
-                                                                   ]
-                                                                 ])
+addImportC identifier = addImportW $
+  object [ "importCommand" .= ("addImport" :: String)
+         , "identifier" .= identifier
+         ]
+
+addImplicitImportC :: String -> FilePath -> FilePath -> Value
+addImplicitImportC mn = addImportW $
+  object [ "importCommand" .= ("addImplicitImport" :: String)
+         , "module" .= mn
+         ]
+
+addImportW :: Value -> FilePath -> FilePath -> Value
+addImportW importCommand fp outfp = commandWrapper "import" (object [ "file" .= fp
+                                                                    , "outfile" .= outfp
+                                                                    , "importCommand" .= importCommand
+                                                                    ])
+
 
 completion :: [Value] -> Maybe Value -> Value
 completion filters Nothing =
