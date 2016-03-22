@@ -61,12 +61,11 @@ handleCommand (CaseSplit l b e wca t) =
     caseSplit l b e wca t
 handleCommand (AddClause l wca) =
     pure $ addClause l wca
-handleCommand (Import fp outfp (AddImplicitImport mn)) = do
+handleCommand (Import fp outfp _ (AddImplicitImport mn)) = do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
-handleCommand (Import _ _ (RemoveImport _)) = error "Not implemented yet"
-handleCommand (Import fp outfp (AddImportForIdentifier ident)) = do
-    rs <- addImportForIdentifier fp ident []
+handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
+    rs <- addImportForIdentifier fp ident filters
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question -> pure $ CompletionResult question

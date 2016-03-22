@@ -38,13 +38,12 @@ data Command
       , addClauseAnnotations :: WildcardAnnotations}
     | Cwd
       -- Import InputFile OutputFile
-    | Import FilePath (Maybe FilePath) ImportCommand
+    | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | Quit
 
 data ImportCommand
   = AddImplicitImport ModuleName
   | AddImportForIdentifier DeclIdent
-  | RemoveImport ModuleName
   deriving (Show, Eq)
 
 instance FromJSON ImportCommand where
@@ -57,9 +56,6 @@ instance FromJSON ImportCommand where
       "addImport" -> do
         ident <- o .: "identifier"
         pure (AddImportForIdentifier ident)
-      "removeImport" -> do
-        mn <- o .: "module"
-        pure (RemoveImport (moduleNameFromString mn))
       _ -> mzero
 
 data ListType = LoadedModules | Imports FilePath | AvailableModules
@@ -125,7 +121,8 @@ instance FromJSON Command where
         params <- o .: "params"
         fp <- params .: "file"
         out <- params .:? "outfile"
+        filters <- params .:? "filters"
         importCommand <- params .: "importCommand"
-        pure $ Import fp out importCommand
+        pure $ Import fp out (fromMaybe [] filters) importCommand
       _ -> mzero
 

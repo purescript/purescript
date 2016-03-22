@@ -164,7 +164,7 @@ Arguments:
 
 - `file` :: String
 - `outfile` :: Maybe String
-- `filters` :: [Filter]
+- `filters` :: Maybe [Filter]
 
 Example:
 
