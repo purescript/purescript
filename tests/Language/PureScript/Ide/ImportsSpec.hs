@@ -2,9 +2,15 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import Test.Hspec
+import Control.Monad
 import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Language.PureScript as P
 import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.Integration
+
+import System.FilePath
 
 simpleFile :: [Text]
 simpleFile =
@@ -105,3 +111,33 @@ spec = do
           , "import Prelude"
           , ""
           ]
+  beforeAll_ setup $ afterAll_ teardown $
+    describe "Integration Tests:" $ do
+      it "adds an explicit unqualified import" $ do
+        pdir <- projectDirectory
+        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
+            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
+        _ <- addImport "exportedFunction" sourceFp outFp
+        res <- TIO.readFile outFp
+        shouldBe
+          (T.lines res)
+          [ "module ImportsSpec where"
+          , ""
+          , "import ImportsSpec1 (exportedFunction)"
+          , "import Main (id)"
+          , ""
+          , "myId = id"
+          ]
+
+setup :: IO ()
+setup = do
+  deleteOutputFolder
+  s <- compileTestProject
+  unless s $ fail "Failed to compile .purs sources"
+  _ <- startServer
+  _ <- loadModuleWithDeps "ImportsSpec"
+  _ <- loadModuleWithDeps "ImportsSpec1"
+  return ()
+
+teardown :: IO ()
+teardown = quitServer

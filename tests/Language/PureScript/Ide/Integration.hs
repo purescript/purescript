@@ -10,10 +10,12 @@ module Language.PureScript.Ide.Integration
          -- util
        , compileTestProject
        , deleteOutputFolder
+       , projectDirectory
          -- sending commands
        , loadModuleWithDeps
        , getFlexCompletions
        , getType
+       , addImport
          -- checking results
        , resultIsSuccess
        ) where
@@ -116,6 +118,9 @@ getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (fl
 getType :: String -> IO [(String, String, String)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
 
+addImport :: String -> FilePath -> FilePath -> IO String
+addImport identifier fp outfp = parseTextResult <$> sendCommand (addImportC identifier fp outfp)
+
 -- Command Encoding
 
 commandWrapper :: String -> Value -> Value
@@ -126,6 +131,15 @@ load ms ds = commandWrapper "load" (object ["modules" .= ms, "dependencies" .= d
 
 typeC :: String -> [Value] -> Value
 typeC q filters = commandWrapper "type" (object ["search" .= q, "filters" .= filters])
+
+addImportC :: String -> FilePath -> FilePath -> Value
+addImportC identifier fp outfp = commandWrapper "import" (object [ "file" .= fp
+                                                                 , "outfile" .= outfp
+                                                                 , "importCommand" .= object
+                                                                   [ "importCommand" .= ("addImport" :: String)
+                                                                   , "identifier" .= identifier
+                                                                   ]
+                                                                 ])
 
 completion :: [Value] -> Maybe Value -> Value
 completion filters Nothing =
@@ -179,3 +193,10 @@ parseCompletions s = fromJust $ do
   case cs of
     Left _ -> error "Failed to parse completions"
     Right cs' -> pure cs'
+
+parseTextResult :: String -> String
+parseTextResult s = fromJust $ do
+  r <- parseMaybe (withResult (withText "tr" pure)) (valueFromString s)
+  case r of
+    Left _ -> error "Failed to parse textResult"
+    Right r' -> pure (T.unpack r')
