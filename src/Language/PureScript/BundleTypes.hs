@@ -16,9 +16,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 module Language.PureScript.BundleTypes where
 
