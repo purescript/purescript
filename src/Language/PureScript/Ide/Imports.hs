@@ -117,10 +117,8 @@ addExplicitImport' identifier moduleName imports =
 
   in List.sort (map prettyPrintImport' newImports) ++ [""]
 
-type Question = [Completion]
-
 addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m) =>
-                          FilePath -> Text -> [Filter] -> m (Either Question [Text])
+                          FilePath -> Text -> [Filter] -> m (Either [Completion] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
   case getExactMatches ident filters modules of

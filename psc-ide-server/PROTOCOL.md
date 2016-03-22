@@ -148,6 +148,97 @@ The following format is returned as the Result:
 ```
 You should then be able to replace the affected line of code in the editor with the new suggestions.
 
+### Import
+
+For now all of the import related commands work with a file on the filesystem.
+
+You can specify it with the `file` parameter.
+
+If you supply the optional `outfile` parameter, the output will be written to
+that file, and an info message will be returned from the client.
+
+If you don't supply `outfile`, the server responds with a list of strings which,
+when inserted into a file linewise create the module with the applied changes.
+
+Arguments:
+
+- `file` :: String
+- `outfile` :: Maybe String
+- `filters` :: [Filter]
+
+Example:
+
+```json
+{
+  "command": "import",
+  "params": {
+    "file": "/home/creek/Documents/chromacannon/src/Main.purs",
+    "outfile": "/home/creek/Documents/chromacannon/src/Main.purs",
+    "filters": [{
+      "filter": "modules",
+      "params": {
+        "modules": ["My.Module"]
+      }
+    }],
+    "importCommand": {
+      "yadda": "yadda"
+    }
+  }
+}
+```
+
+
+#### Subcommand `addImplicitImport`
+
+This command just adds an unqualified import for the given modulename.
+
+Arguments:
+- `moduleName :: String`
+
+Example:
+```json
+{
+  "command": "import",
+  "params": {
+    "file": "/home/creek/Documents/chromacannon/src/Main.purs",
+    "importCommand": {
+      "importCommand": "addImplicitImport",
+      "module": "Data.Array.LOL"
+    }
+  }
+}
+```
+#### Subcommand `addImport`
+
+This command takes an identifier and searches the currently loaded modules for
+it. If it finds no matches it responds with an Error. If it finds exactly one
+match it adds the import and returns. If it finds more than one match it
+responds with a list of the found matches as completions like the complete
+command.
+
+You can also supply a list of filters like the ones for completion. This way you
+can narrow down the search to a certain module and resolve the case in which
+more then one match was found.
+
+Arguments:
+- `moduleName :: String`
+- `filters :: [Filter]`
+
+Example:
+```json
+{
+  "command": "import",
+  "params": {
+    "file": "/home/creek/Documents/chromacannon/src/Demo.purs",
+    "outfile": "/home/creek/Documents/chromacannon/src/Demo.purs",
+    "importCommand": {
+      "importCommand": "addImport",
+      "identifier": "bind"
+    } 
+  }
+} 
+```
+
 ### Pursuit
 The `pursuit` command looks up the packages/completions for a given identifier from Pursuit.
 
