@@ -120,10 +120,10 @@ getType :: String -> IO [(String, String, String)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
 
 addImport :: String -> FilePath -> FilePath -> IO String
-addImport identifier fp outfp = parseTextResult <$> sendCommand (addImportC identifier fp outfp)
+addImport identifier fp outfp = sendCommand (addImportC identifier fp outfp)
 
 addImplicitImport :: String -> FilePath -> FilePath -> IO String
-addImplicitImport mn fp outfp = parseTextResult <$> sendCommand (addImplicitImportC mn fp outfp)
+addImplicitImport mn fp outfp = sendCommand (addImplicitImportC mn fp outfp)
 
 -- Command Encoding
 

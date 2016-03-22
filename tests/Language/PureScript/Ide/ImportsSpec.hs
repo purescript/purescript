@@ -8,7 +8,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Language.PureScript as P
 import Language.PureScript.Ide.Imports
-import Language.PureScript.Ide.Integration
+import Language.PureScript.Ide.Integration as Integration
 
 import System.FilePath
 
@@ -113,6 +113,22 @@ spec = do
           ]
   beforeAll_ setup $ afterAll_ teardown $
     describe "Integration Tests:" $ do
+      let
+        sourceFileSkeleton :: [Text] -> [Text]
+        sourceFileSkeleton importSection =
+            [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId = id"]
+      it "adds an implicit import" $ do
+        pdir <- projectDirectory
+        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
+            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
+        _ <- Integration.addImplicitImport "Prelude" sourceFp outFp
+        res <- TIO.readFile outFp
+        shouldBe
+          (T.lines res)
+          (sourceFileSkeleton
+           [ "import Main (id)"
+           , "import Prelude"
+           ])
       it "adds an explicit unqualified import" $ do
         pdir <- projectDirectory
         let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
@@ -121,13 +137,24 @@ spec = do
         res <- TIO.readFile outFp
         shouldBe
           (T.lines res)
-          [ "module ImportsSpec where"
-          , ""
-          , "import ImportsSpec1 (exportedFunction)"
-          , "import Main (id)"
-          , ""
-          , "myId = id"
-          ]
+          (sourceFileSkeleton
+           [ "import ImportsSpec1 (exportedFunction)"
+           , "import Main (id)"
+           ])
+      it "adds an explicit unqualified import (typeclass)" $ do
+        pdir <- projectDirectory
+        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
+            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
+        r <- addImport "ATypeClass" sourceFp outFp
+        shouldBe True (resultIsSuccess r)
+        res <- TIO.readFile outFp
+        pendingWith "Not implemented yet"
+        shouldBe
+          (T.lines res)
+          (sourceFileSkeleton
+           [ "import ImportsSpec1 (class ATypeClass)"
+           , "import Main (id)"
+           ])
 
 setup :: IO ()
 setup = do
