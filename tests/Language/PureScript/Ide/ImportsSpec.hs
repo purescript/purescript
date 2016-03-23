@@ -141,6 +141,19 @@ spec = do
            [ "import ImportsSpec1 (exportedFunction)"
            , "import Main (id)"
            ])
+      it "adds an explicit unqualified import (type)" $ do
+        pdir <- projectDirectory
+        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
+            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
+        r <- addImport "MyType" sourceFp outFp
+        shouldBe True (resultIsSuccess r)
+        res <- TIO.readFile outFp
+        shouldBe
+          (T.lines res)
+          (sourceFileSkeleton
+           [ "import ImportsSpec1 (MyType)"
+           , "import Main (id)"
+           ])
       it "adds an explicit unqualified import (typeclass)" $ do
         pdir <- projectDirectory
         let sourceFp = pdir </> "src" </> "ImportsSpec.purs"

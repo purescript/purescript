@@ -35,6 +35,7 @@ module Language.PureScript.Ide.Imports
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
+import           Data.Function (on)
 import qualified Data.List                          as List
 import           Data.Maybe                         (mapMaybe)
 import           Data.Monoid                        ((<>))
@@ -153,7 +154,7 @@ addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m)
                           -> m (Either [Completion] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
-  case getExactMatches ident filters modules of
+  case List.nubBy ((==) `on` getModule') (getExactMatches ident filters modules) of
     [] ->
       throwError (NotFound "Couldn't find the given identifier.\
                            \Have you loaded the corresponding module?")
@@ -167,6 +168,8 @@ addImportForIdentifier fp ident filters = do
     -- module he meant
     xs ->
       pure $ Left xs
+  where
+    getModule' (Completion (m, _, _)) = m
 
 prettyPrintImport' :: Import -> Text
 prettyPrintImport' (Import mn idt qual) =
