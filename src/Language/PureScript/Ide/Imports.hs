@@ -155,18 +155,22 @@ addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
   case getExactMatches ident filters modules of
     [] ->
-      throwError (NotFound "Couldn't find the given identifier. Have you loaded the corresponding module?")
+      throwError (NotFound "Couldn't find the given identifier.\
+                           \Have you loaded the corresponding module?")
 
-    -- Only one match was found for the given identifier, so we can insert it right away
+    -- Only one match was found for the given identifier, so we can insert it
+    -- right away
     [Completion (m, i, _)] ->
       Right <$> addExplicitImport fp i (P.moduleNameFromString (T.unpack m))
 
-    -- Multiple matches where found so we need to ask the user to clarify which module he meant
+    -- Multiple matches where found so we need to ask the user to clarify which
+    -- module he meant
     xs ->
       pure $ Left xs
 
 prettyPrintImport' :: Import -> Text
-prettyPrintImport' (Import mn idt qual) = T.pack $ "import " ++ P.prettyPrintImport mn idt qual
+prettyPrintImport' (Import mn idt qual) =
+  T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
 answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
 answerRequest outfp rs  =
