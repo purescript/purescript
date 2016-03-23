@@ -10,6 +10,7 @@ module Language.PureScript.Publish.ErrorsWarnings
   , RepositoryFieldError(..)
   , JSONSource(..)
   , printError
+  , printErrorToStdout
   , renderError
   , printWarnings
   , renderWarnings
@@ -87,6 +88,9 @@ data OtherError
 
 printError :: PackageError -> IO ()
 printError = printToStderr . renderError
+
+printErrorToStdout :: PackageError -> IO ()
+printErrorToStdout = printToStdout . renderError
 
 renderError :: PackageError -> Box
 renderError err =

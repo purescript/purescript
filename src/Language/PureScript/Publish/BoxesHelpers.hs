@@ -36,3 +36,6 @@ bulletedList f = map (indented . para . ("* " ++) . f)
 
 printToStderr :: Boxes.Box -> IO ()
 printToStderr = hPutStr stderr . Boxes.render
+
+printToStdout :: Boxes.Box -> IO ()
+printToStdout = putStr . Boxes.render
