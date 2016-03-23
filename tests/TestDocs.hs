@@ -18,6 +18,7 @@ import System.Exit
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as Docs
 import qualified Language.PureScript.Publish as Publish
+import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 
 import TestUtils
 
@@ -29,16 +30,18 @@ publishOpts = Publish.defaultPublishOptions
   where testVersion = ("v999.0.0", Version [999,0,0] [])
 
 main :: IO ()
-main = do
-  pushd "examples/docs" $ do
-    Docs.Package{..} <- Publish.preparePackage publishOpts
-    forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
-      let mdl = takeJust ("module not found in docs: " ++ P.runModuleName mn)
-                         (find ((==) mn . Docs.modName) pkgModules)
-      in forM_ pragmas (flip runAssertionIO mdl)
+main = pushd "examples/docs" $ do
+  res <- Publish.preparePackage publishOpts
+  case res of
+    Left e -> Publish.printErrorToStdout e >> exitFailure
+    Right Docs.Package{..} ->
+      forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
+        let mdl = takeJust ("module not found in docs: " ++ P.runModuleName mn)
+                          (find ((==) mn . Docs.modName) pkgModules)
+        in forM_ pragmas (flip runAssertionIO mdl)
 
 takeJust :: String -> Maybe a -> a
-takeJust msg = maybe (error msg) id
+takeJust msg = fromMaybe (error msg)
 
 data Assertion
   -- | Assert that a particular declaration is documented with the given

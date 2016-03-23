@@ -19,12 +19,12 @@ import Data.Version
 
 import Language.PureScript.Docs
 import Language.PureScript.Publish
+import Language.PureScript.Publish.ErrorsWarnings as Publish
 
 import TestUtils
 
 main :: IO ()
-main = do
-  testPackage "tests/support/prelude"
+main = testPackage "tests/support/prelude"
 
 data TestResult
   = ParseFailed String
@@ -53,10 +53,11 @@ testRunOptions = defaultPublishOptions
 -- | Given a directory which contains a package, produce JSON from it, and then
 -- | attempt to parse it again, and ensure that it doesn't change.
 testPackage :: String -> IO ()
-testPackage dir = do
-  pushd dir $ do
-    r <- roundTrip <$> preparePackage testRunOptions
-    case r of
+testPackage dir = pushd dir $ do
+  res <- preparePackage testRunOptions
+  case res of
+    Left e -> preparePackageError e
+    Right package -> case roundTrip package of
       Pass _ -> do
         putStrLn ("psc-publish test passed for: " ++ dir)
         pure ()
@@ -64,3 +65,14 @@ testPackage dir = do
         putStrLn ("psc-publish tests failed on " ++ dir ++ ":")
         putStrLn (show other)
         exitFailure
+  where
+    preparePackageError e@(UserError BowerJSONNotFound) = do
+      Publish.printErrorToStdout e
+      putStrLn ""
+      putStrLn "=========================================="
+      putStrLn "Did you forget to update the submodules?"
+      putStrLn "$ git submodule sync; git submodule update"
+      putStrLn "=========================================="
+      putStrLn ""
+      exitFailure
+    preparePackageError e = Publish.printErrorToStdout e >> exitFailure
