@@ -68,7 +68,7 @@ library
                    boxes >= 0.1.4 && < 0.2.0,
                    aeson >= 0.8 && < 0.12,
                    vector -any,
-                   bower-json >= 0.7,
+                   bower-json >= 0.8,
                    aeson-better-errors >= 0.8,
                    bytestring -any,
                    text -any,
