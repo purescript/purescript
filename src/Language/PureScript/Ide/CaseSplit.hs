@@ -54,7 +54,8 @@ noAnnotations = WildcardAnnotations False
 caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
-  (tc, args) <- splitTypeConstructor (parseType' (T.unpack q))
+  type' <- parseType' (T.unpack q)
+  (tc, args) <- splitTypeConstructor type'
   (EDType _ _ (DataType typeVars ctors)) <- findTypeDeclaration tc
   let applyTypeVars = everywhereOnTypes (replaceAllTypeVars (zip (map fst typeVars) args))
   let appliedCtors = map (\(n, ts) -> (n, map applyTypeVars ts)) ctors
@@ -119,11 +120,14 @@ addClause s wca =
         " = ?" <> (T.strip . T.pack . runIdent $ fName)
   in [s, template]
 
-parseType' :: String -> Type
-parseType' s = let (Right t) = do
-                     ts <- lex "" s
-                     runTokenParser "" (parseType <* P.eof) ts
-               in t
+parseType' :: (MonadError PscIdeError m) =>
+              String -> m Type
+parseType' s =
+  case lex "<psc-ide>" s >>= runTokenParser "<psc-ide>" (parseType <* P.eof) of
+    Right type' -> pure type'
+    Left err ->
+      throwError (GeneralError ("Parsing the splittype failed with:"
+                                ++ show err))
 
 parseTypeDeclaration' :: String -> (Ident, Type)
 parseTypeDeclaration' s =
