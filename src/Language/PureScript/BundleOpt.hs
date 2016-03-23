@@ -21,11 +21,14 @@ module Language.PureScript.BundleOpt (
 ) where
 
 import Debug.Trace
-import Data.List (intersperse)
+import Data.List (intersperse, intercalate)
 import qualified Data.Map as M
 
 import Language.PureScript.BundleTypes
 import Language.JavaScript.Parser.AST
+
+suffix :: String
+suffix = "$_$_$"
 
 -- | Main function for uncurry optimization
 uncurryFunc :: [Module] -> [Module]
@@ -35,9 +38,8 @@ uncurryFunc modules =
     -- add exports for uncurried functions
         (modulesWithExports,adminMap2)  = foldr generateUncurriedExports ([],adminMap) modulesWithUncurried
     -- replace satured calls to calls to uncurried functions
-        (modulesWithCalls,adminMap3)    = foldr generateSaturedCalls ([],adminMap2) modulesWithExports
-
-    in  trace (show adminMap2) $ modulesWithCalls
+        (modulesWithCalls, adminMap3)    = foldr generateSaturedCalls ([],adminMap2) modulesWithExports
+    in  trace (show adminMap3) $ modulesWithCalls
 
 -- * Admin
 data FuncAdmin = FuncAdmin
@@ -55,8 +57,8 @@ replaceAdmin :: String -> FuncAdmin -> FuncAdmin -> FuncAdminMap ->  FuncAdminMa
 replaceAdmin funcName oldFuncAdmin newFuncAdmin funcAdminMap = M.adjust replaceFunc funcName funcAdminMap
     where
         replaceFunc [o] | o == oldFuncAdmin =  [newFuncAdmin]
-        replaceFunc l = (filter (\e -> e /= oldFuncAdmin) l) ++  [newFuncAdmin]
-        replaceFunc _ = error "BundleOpt>>replaceAdmin: Impossible with FuncAdmin"
+        replaceFunc l@(_hd:_) = (filter (\e -> e /= oldFuncAdmin) l) ++  [newFuncAdmin]
+        replaceFunc [] = error "BundleOpt>>replaceAdmin: Impossible with FuncAdmin"
 
 findAdminFor :: String -> ModuleIdentifier -> FuncAdminMap -> Maybe FuncAdmin
 findAdminFor name mid funcAdminMap =
@@ -77,23 +79,23 @@ generateUncurried (Module moduleIdentifier moduleElements) (modules, adminMap) =
 
 -- |  Generate uncurried functions from curried functions
 generateUncurriedEle :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateUncurriedEle mid m@(Member jSNode sort name [decl] keys) (eles, adminMap) -- a var decl
-    | JSFunctionExpression fn _names lb [parameter] rb block <- node decl
+generateUncurriedEle mid m@(Member _jSNode sort name [decl] _keys) (eles, adminMap) -- a var decl
+    | JSFunctionExpression fn _names _lb [parameter] _rb block <- node decl
     , JSLiteral "function" <- node fn
     , JSIdentifier idi <- node parameter
         = trace ("candidate: " ++ name ++ " para: " ++ show idi) $
             case analyzeUncurriedPrim [idi] block of
                 Nothing -> (m : eles, adminMap)
-                Just (argList,block) -> if not sort
-                                            then trace ("generateFor: " ++ name) $ generateUncurried1 argList block m
-                                            else trace ("generateFor2: " ++ name) $ generateUncurried2 argList block m
+                Just (argList,block') -> if not sort
+                                            then trace ("generateFor: " ++ name) $ generateUncurried1 argList block' m
+                                            else trace ("generateFor2: " ++ name) $ generateUncurried2 argList block' m
   where
     generateUncurried1 :: [String] -> JSNode -> ModuleElement -> ([ModuleElement],FuncAdminMap)
-    generateUncurried1 argList block m@(Member jsNode typ name [decl] keys)
-        | JSFunctionExpression fn names lb _ rb1 _ <- node decl
+    generateUncurried1 argList block (Member jsNode typ name2 [decl2] keys)
+        | JSFunctionExpression fn names lb _ rb1 _ <- node decl2
         , JSVariables var [ varIntro ] rb2 <- node jsNode
-        , JSVarDecl declN (eq : decl) <- node varIntro
-        = let newName = name ++ "_"
+        , JSVarDecl _declN (eq : _decl3) <- node varIntro
+        = let newName = name2 ++ suffix
               newArgList    = intersperse (nt (JSLiteral ","))
                                     $ map (nt . JSIdentifier)
                                         argList
@@ -101,14 +103,14 @@ generateUncurriedEle mid m@(Member jSNode sort name [decl] keys) (eles, adminMap
               newVarIntro   = NN $ JSVarDecl (sp $ JSIdentifier newName) (eq : [newDecl])
               newNode       = NN $ JSVariables var [newVarIntro] rb2
               newAdmin      = FuncAdmin { moduleId = mid, arity = length argList, exported = False}
-              in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name newAdmin adminMap)
+              in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name2 newAdmin adminMap)
     generateUncurried1 _ _ _ = (m : eles, adminMap)
 
     generateUncurried2 :: [String] -> JSNode -> ModuleElement -> ([ModuleElement],FuncAdminMap)
-    generateUncurried2 argList block m@(Member jsNode typ name1 [decl] keys)
-        | JSFunctionExpression fn names lb _ rb1 _ <- node decl
-        , JSExpression (e : op : decl) <- node jsNode
-        =   let newName = name ++ "_"
+    generateUncurried2 argList block (Member jsNode typ name1 [decl2] keys)
+        | JSFunctionExpression fn names lb _ rb1 _ <- node decl2
+        , JSExpression (e : op : _decl3) <- node jsNode
+        =   let newName = name1 ++ suffix
             in case setAccessor (node e) newName of
                 Nothing -> (m : eles, adminMap)
                 Just newE ->
@@ -118,7 +120,7 @@ generateUncurriedEle mid m@(Member jSNode sort name [decl] keys) (eles, adminMap
                         newDecl       = NN $ JSFunctionExpression fn names lb newArgList rb1 block
                         newNode       = NN $ JSExpression (NN newE : op : [newDecl])
                         newAdmin      = FuncAdmin { moduleId = mid, arity = length argList, exported = False}
-                    in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name newAdmin adminMap)
+                    in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name1 newAdmin adminMap)
     generateUncurried2 _ _ _ = (m : eles, adminMap)
 generateUncurriedEle _mid m (eles, adminMap) = (m : eles, adminMap)
 
@@ -127,11 +129,11 @@ analyzeUncurriedPrim idList decl
     | JSBlock _ [ef] _      <- node decl
     , JSReturn _ [ef2] _    <- node ef
     , JSExpression [ef3]    <- node ef2
-    , JSFunctionExpression fn _names lb [parameter] rb block <- node ef3
+    , JSFunctionExpression fn _names _lb [parameter] _rb block <- node ef3
     , JSLiteral "function"  <- node fn
     , JSIdentifier idi      <- node parameter
     = trace ("found deeper: " ++ show idList ++ " para: " ++ show idi) $ analyzeUncurriedPrim (idi : idList) block
-analyzeUncurriedPrim l@(a:b:_) block = Just (reverse l,block)
+analyzeUncurriedPrim l@(_a:_b:_) block = Just (reverse l,block)
 analyzeUncurriedPrim _ _ = Nothing
 
 -- * Exports
@@ -146,21 +148,21 @@ generateUncurriedExpo :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],F
 generateUncurriedExpo mid (ExportsList l) (eles, adminMap) =
     let (newExports,adminMap') = foldr (generateUncurriedEx mid) ([],adminMap) l
     in (ExportsList newExports : eles, adminMap')
-generateUncurriedExpo mid other (eles, adminMap) = (other : eles, adminMap)
+generateUncurriedExpo _mid other (eles, adminMap) = (other : eles, adminMap)
 
 generateUncurriedEx :: ModuleIdentifier -> (ExportType, String, JSNode, [Key])
     -> ([(ExportType, String, JSNode, [Key])],FuncAdminMap) -> ([(ExportType, String, JSNode, [Key])],FuncAdminMap)
 generateUncurriedEx mid t@(RegularExport name1, name2, jSNode, [key]) (eles, adminMap)
-    | JSIdentifier name3 <- node jSNode
+    | JSIdentifier _name3 <- node jSNode
     = -- [(ExportType, String, JSNode, [Key])]
         case findAdminFor name2 mid adminMap of
             Nothing -> (t : eles, adminMap)
             Just admin ->
-                let newName   = name2 ++ "_"
+                let newName   = name2 ++ suffix
                     newAdmin  = admin {exported = True}
                     newNode   = nt (JSIdentifier newName)
                     newKeys   = [(fst key,newName)]
-                    newExport = (RegularExport (name1 ++ "_"), newName, newNode, newKeys)
+                    newExport = (RegularExport (name1 ++ suffix    ), newName, newNode, newKeys)
                 in  (t : newExport : eles, replaceAdmin name2 admin newAdmin adminMap)
 
 generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, adminMap)
@@ -171,7 +173,7 @@ generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, adminMap
     =     case findAdminFor name2 mid adminMap of
             Nothing -> (t : eles, adminMap)
             Just admin ->
-                let newName   = name ++ "_"
+                let newName   = name ++ suffix
                     newAdmin  = admin {exported = True}
                     newNode   = NN (JSMemberDot [nt (JSIdentifier "$foreign")] (nt (JSLiteral "."))
                                         (nt (JSIdentifier newName)))
@@ -179,7 +181,7 @@ generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, adminMap
                     newExport = (ForeignReexport, newName, newNode, newKeys)
                 in  (t : newExport : eles, replaceAdmin name2 admin newAdmin adminMap)
 
-generateUncurriedEx mid t (eles, adminMap) =
+generateUncurriedEx _mid t (eles, adminMap) =
     trace ("export in unknown form: " ++ show t) (t : eles, adminMap)
 
 -- * Call replacement
@@ -187,155 +189,192 @@ generateUncurriedEx mid t (eles, adminMap) =
 -- | replace satured calls to calls to uncurried functions
 generateSaturedCalls :: Module -> ([Module],FuncAdminMap) -> ([Module],FuncAdminMap)
 generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, adminMap) =
+    trace ("generateSaturedCalls: " ++ show moduleIdentifier) $
     let (eles,adminMap') = foldr (generateSaturedC moduleIdentifier) ([],adminMap) moduleElements
     in (Module moduleIdentifier eles : modules, adminMap')
 
 -- |  Generate uncurried functions from curried functions
 generateSaturedC :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateSaturedC mid m@(Member jSNode sort name [decl] keys) (eles, adminMap) =
-    let replaceSaturedNode = rscJS adminMap jSNode
-        replaceSaturedDecl = rscJS adminMap decl
-    in  (Member replaceSaturedNode sort name [replaceSaturedDecl] keys : eles, adminMap)
+generateSaturedC mid (Member jSNode' sort name decls keys) (eles, adminMap) =
+    let replaceSaturedNode = rscJS jSNode'
+        replaceSaturedDecls = map rscJS decls
+    in  (Member replaceSaturedNode sort name replaceSaturedDecls keys : eles, adminMap)
   where
-    rscJS :: FuncAdminMap -> JSNode -> JSNode
-    rscJS adminMap (NN node) = (NN (rsc adminMap node))
-    rscJS adminMap (NT node tokenPosn commentAnnotations) = (NT (rsc adminMap node) tokenPosn commentAnnotations)
+    rscJS :: JSNode -> JSNode
+    rscJS (NN node') = (NN (rsc node'))
+    rscJS (NT node' tokenPosn commentAnnotations) = (NT (rsc node') tokenPosn commentAnnotations)
 
     -- | AST traversal to replace satured function calls
-    rsc :: FuncAdminMap -> Node -> Node
-    rsc adminMap (JSArguments jSNodeL jSNodesM jSNodeR) =
-        JSArguments (rscJS adminMap jSNodeL) (mapReplace adminMap jSNodesM) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSArrayLiteral jSNodeL jSNodesM jSNodeR)	=
-        JSArrayLiteral (rscJS adminMap jSNodeL) (mapReplace adminMap jSNodesM) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSBlock jSNodesL jSNodesM jSNodesR) =
-    	JSBlock (mapReplace adminMap jSNodesL) (mapReplace adminMap jSNodesM) (mapReplace adminMap jSNodesR)
-    rsc adminMap (JSBreak jSNodeL jSNodesM jSNodeR) =
-        JSBreak (rscJS adminMap jSNodeL) (mapReplace adminMap jSNodesM) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSCallExpression string jSNodesL jSNodesM jSNodesR) =
-     	JSCallExpression string (mapReplace adminMap jSNodesL) (mapReplace adminMap jSNodesM) (mapReplace adminMap jSNodesR)
-    rsc adminMap (JSCase jSNodeL jSNodeM jSNodeR jSNodesE) =
-        JSCase (rscJS adminMap jSNodeL) (rscJS adminMap jSNodeM) (rscJS adminMap jSNodeR) (mapReplace adminMap jSNodesE)
-    rsc adminMap (JSCatch jSNodeL jSNodeM jSNodeR jSNodesE1 jSNodeE2 jSNodeE3) =
-        JSCatch (rscJS adminMap jSNodeL) (rscJS adminMap jSNodeM) (rscJS adminMap jSNodeR) (mapReplace adminMap jSNodesE1)
-                (rscJS adminMap jSNodeE2) (rscJS adminMap jSNodeE3)
-    rsc adminMap (JSContinue jSNodeL jSNodesM jSNodeR) =
-     	JSContinue (rscJS adminMap jSNodeL) (mapReplace adminMap jSNodesM) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSDefault jSNodeL jSNodeM jSNodesR) =
-    	JSDefault (rscJS adminMap jSNodeL) (rscJS adminMap jSNodeM) (mapReplace adminMap jSNodesR)
-    rsc adminMap (JSDoWhile jSNode1 jSNode2 jSNode3 jSNode4 jSNode5 jSNode6 jSNode7) =
-        JSDoWhile (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3) (rscJS adminMap jSNode4)
-                    (rscJS adminMap jSNode5) (rscJS adminMap jSNode6) (rscJS adminMap jSNode7)
-    rsc adminMap (JSElision jSNode) =
-    	JSElision (rscJS adminMap jSNode)
-    rsc adminMap (JSExpression jSNodes) =
-    	JSExpression (mapReplace adminMap jSNodes)
-    rsc adminMap (JSExpressionBinary string jSNodesL jSNodeM jSNodesR) =
-        JSExpressionBinary string (mapReplace adminMap jSNodesL) (rscJS adminMap jSNodeM) (mapReplace adminMap jSNodesR)
-    rsc adminMap (JSExpressionParen jSNodeL jSNodeM jSNodeR) =
-        JSExpressionParen (rscJS adminMap jSNodeL) (rscJS adminMap jSNodeM) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSExpressionPostfix string jSNodesL jSNodeR) =
-        JSExpressionPostfix string (mapReplace adminMap jSNodesL) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSExpressionTernary jSNodesL jSNodeM jSNodesR jSNodeE1 jSNodesE2) =
-        JSExpressionTernary (mapReplace adminMap jSNodesL) (rscJS adminMap jSNodeM)(mapReplace adminMap jSNodesR)
-            (rscJS adminMap jSNodeE1)(mapReplace adminMap jSNodesE2)
-    rsc adminMap (JSFinally jSNodeL jSNodeR) =
-        JSFinally (rscJS adminMap jSNodeL) (rscJS adminMap jSNodeR)
-    rsc adminMap (JSFor jSNode1 jSNode2 jSNodes3 jSNode4 jSNodes5 jSNode6 jSNodes7 jSNode8 jSNode9) =
-        JSFor (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (mapReplace adminMap jSNodes3)
-                (rscJS adminMap jSNode4) (mapReplace adminMap jSNodes5)
-                (rscJS adminMap jSNode6) (mapReplace adminMap jSNodes7)
-                (rscJS adminMap jSNode8) (rscJS adminMap jSNode9)
-    rsc adminMap (JSForIn jSNode1 jSNode2 jSNodes3 jSNode4 jSNode5 jSNode6 jSNode7) =
-        JSForIn (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (mapReplace adminMap jSNodes3)
-            (rscJS adminMap jSNode4) (rscJS adminMap jSNode5)
-            (rscJS adminMap jSNode6) (rscJS adminMap jSNode7)
-    rsc adminMap (JSForVar jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNodes6 jSNode7 jSNodes8 jSNode9 jSNode10) =
-        JSForVar (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-                (mapReplace adminMap jSNodes4) (rscJS adminMap jSNode5)
-                (mapReplace adminMap jSNodes6) (rscJS adminMap jSNode7)
-                (mapReplace adminMap jSNodes8) (rscJS adminMap jSNode9) (rscJS adminMap jSNode10)
-    rsc adminMap (JSForVarIn jSNode1 jSNode2 jSNode3 jSNode4 jSNode5 jSNode6 jSNode7 jSNode8) =
-        JSForVarIn (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (rscJS adminMap jSNode4) (rscJS adminMap jSNode5)
-            (rscJS adminMap jSNode6) (rscJS adminMap jSNode6)
-            (rscJS adminMap jSNode8)
-    rsc adminMap (JSFunction jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNode6) =
-        JSFunction (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (mapReplace adminMap jSNodes4) (rscJS adminMap jSNode5)
-            (rscJS adminMap jSNode6)
-    rsc adminMap (JSFunctionExpression jSNode1 jSNodes2 jSNode3 jSNodes4 jSNode5 jSNode6) =
-        JSFunctionExpression (rscJS adminMap jSNode1) (mapReplace adminMap jSNodes2) (rscJS adminMap jSNode3)
-            (mapReplace adminMap jSNodes4) (rscJS adminMap jSNode5)
-            (rscJS adminMap jSNode6)
-    rsc adminMap (JSIf jSNode1 jSNode2 jSNode3 jSNode4 jSNodes5 jSNodes6) =
-        JSIf (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (rscJS adminMap jSNode4) (mapReplace adminMap jSNodes5)
-            (mapReplace adminMap jSNodes6)
-    rsc adminMap (JSLabelled jSNode1 jSNode2 jSNode3) =
-        JSLabelled (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-    rsc adminMap (JSMemberDot jSNodes1 jSNode2 jSNode3) =
-        JSMemberDot (mapReplace adminMap jSNodes1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-    rsc adminMap (JSMemberSquare jSNodes1 jSNode2 jSNode3 jSNode4) =
-        JSMemberSquare (mapReplace adminMap jSNodes1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-                (rscJS adminMap jSNode4)
-    rsc adminMap (JSObjectLiteral jSNode1 jSNodes2 jSNode3) =
-        JSObjectLiteral (rscJS adminMap jSNode1) (mapReplace adminMap jSNodes2) (rscJS adminMap jSNode3)
-    rsc adminMap (JSOperator jSNode) =
-        JSOperator (rscJS adminMap jSNode)
-    rsc adminMap (JSPropertyAccessor jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNode6) =
-        JSPropertyAccessor (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (mapReplace adminMap jSNodes4) (rscJS adminMap jSNode5)
-            (rscJS adminMap jSNode6)
-    rsc adminMap (JSPropertyNameandValue jSNode1 jSNode2 jSNodes3) =
-        JSPropertyNameandValue (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (mapReplace adminMap jSNodes3)
-    rsc adminMap (JSReturn jSNode1 jSNodes2 jSNode3) =
-        JSReturn (rscJS adminMap jSNode1) (mapReplace adminMap jSNodes2) (rscJS adminMap jSNode3)
-    rsc adminMap (JSSourceElementsTop jSNodes) =
-        JSSourceElementsTop (mapReplace adminMap jSNodes)
-    rsc adminMap (JSSwitch jSNode1 jSNode2 jSNode3 jSNode4 jSNode5) =
-        JSSwitch (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (rscJS adminMap jSNode4) (rscJS adminMap jSNode5)
-    rsc adminMap (JSThrow jSNode1 jSNode2) =
-        JSThrow (rscJS adminMap jSNode1) (rscJS adminMap jSNode2)
-    rsc adminMap (JSTry jSNode1 jSNode2 jSNodes3) =
-        JSTry (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (mapReplace adminMap jSNodes3)
-    rsc adminMap (JSUnary string jSNode) =
-        JSUnary string (rscJS adminMap jSNode)
-    rsc adminMap (JSVarDecl jSNode jSNodes) =
-        JSVarDecl (rscJS adminMap jSNode) (mapReplace adminMap jSNodes)
-    rsc adminMap (JSVariables jSNode1 jSNodes2 jSNode3) =
-        JSVariables (rscJS adminMap jSNode1) (mapReplace adminMap jSNodes2) (rscJS adminMap jSNode3)
-    rsc adminMap (JSWhile jSNode1 jSNode2 jSNode3 jSNode4 jSNode5) =
-        JSWhile (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (rscJS adminMap jSNode4) (rscJS adminMap jSNode5)
-    rsc adminMap (JSWith jSNode1 jSNode2 jSNode3 jSNode4 jSNodes5) =
-        JSWith (rscJS adminMap jSNode1) (rscJS adminMap jSNode2) (rscJS adminMap jSNode3)
-            (rscJS adminMap jSNode4) (mapReplace adminMap jSNodes5)
-    rsc _ e = e
+    rsc :: Node -> Node
+    rsc (JSArguments jSNodeL jSNodesM jSNodeR) =
+        JSArguments (rscJS jSNodeL) (mapReplace jSNodesM) (rscJS jSNodeR)
+    rsc (JSArrayLiteral jSNodeL jSNodesM jSNodeR) =
+        JSArrayLiteral (rscJS jSNodeL) (mapReplace jSNodesM) (rscJS jSNodeR)
+    rsc (JSBlock jSNodesL jSNodesM jSNodesR) =
+        JSBlock (mapReplace jSNodesL) (mapReplace jSNodesM) (mapReplace jSNodesR)
+    rsc (JSBreak jSNodeL jSNodesM jSNodeR) =
+        JSBreak (rscJS jSNodeL) (mapReplace jSNodesM) (rscJS jSNodeR)
+    rsc (JSCallExpression string jSNodesL jSNodesM jSNodesR) =
+         JSCallExpression string (mapReplace jSNodesL) (mapReplace jSNodesM) (mapReplace jSNodesR)
+    rsc (JSCase jSNodeL jSNodeM jSNodeR jSNodesE) =
+        JSCase (rscJS jSNodeL) (rscJS jSNodeM) (rscJS jSNodeR) (mapReplace jSNodesE)
+    rsc (JSCatch jSNodeL jSNodeM jSNodeR jSNodesE1 jSNodeE2 jSNodeE3) =
+        JSCatch (rscJS jSNodeL) (rscJS jSNodeM) (rscJS jSNodeR) (mapReplace jSNodesE1)
+                (rscJS jSNodeE2) (rscJS jSNodeE3)
+    rsc (JSContinue jSNodeL jSNodesM jSNodeR) =
+         JSContinue (rscJS jSNodeL) (mapReplace jSNodesM) (rscJS jSNodeR)
+    rsc (JSDefault jSNodeL jSNodeM jSNodesR) =
+        JSDefault (rscJS jSNodeL) (rscJS jSNodeM) (mapReplace jSNodesR)
+    rsc (JSDoWhile jSNode1 jSNode2 jSNode3 jSNode4 jSNode5 jSNode6 jSNode7) =
+        JSDoWhile (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3) (rscJS jSNode4)
+                    (rscJS jSNode5) (rscJS jSNode6) (rscJS jSNode7)
+    rsc (JSElision jSNode) =
+        JSElision (rscJS jSNode)
+    rsc (JSExpression jSNodes) =
+        JSExpression (mapReplace jSNodes)
+    rsc (JSExpressionBinary string jSNodesL jSNodeM jSNodesR) =
+        JSExpressionBinary string (mapReplace jSNodesL) (rscJS jSNodeM) (mapReplace jSNodesR)
+    rsc (JSExpressionParen jSNodeL jSNodeM jSNodeR) =
+        JSExpressionParen (rscJS jSNodeL) (rscJS jSNodeM) (rscJS jSNodeR)
+    rsc (JSExpressionPostfix string jSNodesL jSNodeR) =
+        JSExpressionPostfix string (mapReplace jSNodesL) (rscJS jSNodeR)
+    rsc (JSExpressionTernary jSNodesL jSNodeM jSNodesR jSNodeE1 jSNodesE2) =
+        JSExpressionTernary (mapReplace jSNodesL) (rscJS jSNodeM)(mapReplace jSNodesR)
+            (rscJS jSNodeE1)(mapReplace jSNodesE2)
+    rsc (JSFinally jSNodeL jSNodeR) =
+        JSFinally (rscJS jSNodeL) (rscJS jSNodeR)
+    rsc (JSFor jSNode1 jSNode2 jSNodes3 jSNode4 jSNodes5 jSNode6 jSNodes7 jSNode8 jSNode9) =
+        JSFor (rscJS jSNode1) (rscJS jSNode2) (mapReplace jSNodes3)
+                (rscJS jSNode4) (mapReplace jSNodes5)
+                (rscJS jSNode6) (mapReplace jSNodes7)
+                (rscJS jSNode8) (rscJS jSNode9)
+    rsc (JSForIn jSNode1 jSNode2 jSNodes3 jSNode4 jSNode5 jSNode6 jSNode7) =
+        JSForIn (rscJS jSNode1) (rscJS jSNode2) (mapReplace jSNodes3)
+            (rscJS jSNode4) (rscJS jSNode5)
+            (rscJS jSNode6) (rscJS jSNode7)
+    rsc (JSForVar jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNodes6 jSNode7 jSNodes8 jSNode9 jSNode10) =
+        JSForVar (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+                (mapReplace jSNodes4) (rscJS jSNode5)
+                (mapReplace jSNodes6) (rscJS jSNode7)
+                (mapReplace jSNodes8) (rscJS jSNode9) (rscJS jSNode10)
+    rsc (JSForVarIn jSNode1 jSNode2 jSNode3 jSNode4 jSNode5 jSNode6 jSNode7 jSNode8) =
+        JSForVarIn (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (rscJS jSNode4) (rscJS jSNode5)
+            (rscJS jSNode6) (rscJS jSNode7)
+            (rscJS jSNode8)
+    rsc (JSFunction jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNode6) =
+        JSFunction (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (mapReplace jSNodes4) (rscJS jSNode5)
+            (rscJS jSNode6)
+    rsc (JSFunctionExpression jSNode1 jSNodes2 jSNode3 jSNodes4 jSNode5 jSNode6) =
+        JSFunctionExpression (rscJS jSNode1) (mapReplace jSNodes2) (rscJS jSNode3)
+            (mapReplace jSNodes4) (rscJS jSNode5)
+            (rscJS jSNode6)
+    rsc (JSIf jSNode1 jSNode2 jSNode3 jSNode4 jSNodes5 jSNodes6) =
+        JSIf (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (rscJS jSNode4) (mapReplace jSNodes5)
+            (mapReplace jSNodes6)
+    rsc (JSLabelled jSNode1 jSNode2 jSNode3) =
+        JSLabelled (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+    rsc (JSMemberDot jSNodes1 jSNode2 jSNode3) =
+        JSMemberDot (mapReplace jSNodes1) (rscJS jSNode2) (rscJS jSNode3)
+    rsc (JSMemberSquare jSNodes1 jSNode2 jSNode3 jSNode4) =
+        JSMemberSquare (mapReplace jSNodes1) (rscJS jSNode2) (rscJS jSNode3)
+                (rscJS jSNode4)
+    rsc (JSObjectLiteral jSNode1 jSNodes2 jSNode3) =
+        JSObjectLiteral (rscJS jSNode1) (mapReplace jSNodes2) (rscJS jSNode3)
+    rsc (JSOperator jSNode) =
+        JSOperator (rscJS jSNode)
+    rsc (JSPropertyAccessor jSNode1 jSNode2 jSNode3 jSNodes4 jSNode5 jSNode6) =
+        JSPropertyAccessor (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (mapReplace jSNodes4) (rscJS jSNode5)
+            (rscJS jSNode6)
+    rsc (JSPropertyNameandValue jSNode1 jSNode2 jSNodes3) =
+        JSPropertyNameandValue (rscJS jSNode1) (rscJS jSNode2) (mapReplace jSNodes3)
+    rsc (JSReturn jSNode1 jSNodes2 jSNode3) =
+        JSReturn (rscJS jSNode1) (mapReplace jSNodes2) (rscJS jSNode3)
+    rsc (JSSourceElementsTop jSNodes) =
+        JSSourceElementsTop (mapReplace jSNodes)
+    rsc (JSSwitch jSNode1 jSNode2 jSNode3 jSNode4 jSNode5) =
+        JSSwitch (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (rscJS jSNode4) (rscJS jSNode5)
+    rsc (JSThrow jSNode1 jSNode2) =
+        JSThrow (rscJS jSNode1) (rscJS jSNode2)
+    rsc (JSTry jSNode1 jSNode2 jSNodes3) =
+        JSTry (rscJS jSNode1) (rscJS jSNode2) (mapReplace jSNodes3)
+    rsc (JSUnary string jSNode) =
+        JSUnary string (rscJS jSNode)
+    rsc (JSVarDecl jSNode jSNodes) =
+        JSVarDecl (rscJS jSNode) (mapReplace jSNodes)
+    rsc (JSVariables jSNode1 jSNodes2 jSNode3) =
+        JSVariables (rscJS jSNode1) (mapReplace jSNodes2) (rscJS jSNode3)
+    rsc (JSWhile jSNode1 jSNode2 jSNode3 jSNode4 jSNode5) =
+        JSWhile (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (rscJS jSNode4) (rscJS jSNode5)
+    rsc (JSWith jSNode1 jSNode2 jSNode3 jSNode4 jSNodes5) =
+        JSWith (rscJS jSNode1) (rscJS jSNode2) (rscJS jSNode3)
+            (rscJS jSNode4) (mapReplace jSNodes5)
+    rsc e = e
 
-    mapReplace :: FuncAdminMap -> [JSNode] -> [JSNode]
-    mapReplace funcAdminMap nodes@(n1:n2:n3:rest)
-        |  JSIdentifier name <- node n1
-        ,  JSArguments al [am] ar <- node n2
-        ,  JSCallExpression str cl [cm] cr <- node n3
-        ,  JSArguments a2l [a2m] a2r <- node cm
-        = trace ("replace candidate: " ++ name) $
-            case findAdminFor name mid funcAdminMap of
-                Nothing -> trace ("replace candidate: not in map: " ++ name) map (rscJS funcAdminMap) nodes
+    mapReplace :: [JSNode] -> [JSNode]
+    mapReplace [] = []
+    mapReplace nodes@(n1:n2:n3:rest)
+        |  JSIdentifier name' <- node n1
+        ,  JSArguments _al [am] _ar <- node n2
+        ,  JSCallExpression _str _cl [cm] _cr <- node n3
+        ,  JSArguments _a2l [a2m] _a2r <- node cm
+        = trace ("replace candidate: " ++ name' ++ " " ++ intercalate " " (map showStripped nodes)) $
+            case findAdminFor name' mid adminMap of
+                Nothing -> trace ("replace candidate: not in map: " ++ name') $
+                                (rscJS n1) : mapReplace (n2:n3:rest)
                 Just admin ->
-                    let moreCallFuncs = getCallFunc rest
-                    in if arity admin == 2 + length moreCallFuncs
-                        then trace "replace!!!" $ map (rscJS funcAdminMap) nodes
-                        else map (rscJS funcAdminMap) nodes
+                    let moreCallArgs = getCallArgs rest
+                        newName = name' ++ suffix
+                    in if arity admin == 2 + length moreCallArgs
+                        then trace ("replace!!! " ++ show (arity admin)) $
+                            let newNodes = generateNewCall (JSIdentifier newName)
+                                                (node n2) (node am: node a2m : moreCallArgs)
+                            in mapReplace newNodes ++ drop (1 + arity admin) nodes
+                        else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
+                            (rscJS n1) : mapReplace (n2:n3:rest)
 
-    mapReplace funcAdminMap nodes = map (rscJS funcAdminMap) nodes
+    mapReplace nodes@(n1:n2:n3:rest)
+        |  JSMemberDot [l] m r <- node n1
+        ,  JSIdentifier "$foreign" <- node l
+        ,  JSIdentifier name' <- node r
+        ,  JSArguments _al [am] _ar <- node n2
+        ,  JSCallExpression _str _cl [cm] _cr <- node n3
+        ,  JSArguments _a2l [a2m] _a2r <- node cm
+        = trace ("replace candidate: " ++ name' ++ " " ++  intercalate " " (map showStripped nodes)) $
+            case findAdminFor name' mid adminMap of
+                Nothing -> trace ("replace candidate: not in map: " ++ name') $
+                                (rscJS n1) : mapReplace (n2:n3:rest)
+                Just admin ->
+                    let moreCallArgs = getCallArgs rest
+                        newName = name' ++ suffix
+                    in if arity admin == 2 + length moreCallArgs
+                        then trace ("replace!!! " ++ show (arity admin)) $
+                            let newNodes = generateNewCall (JSMemberDot [l] m (nt (JSIdentifier newName)))
+                                                (node n2) (node am: node a2m : moreCallArgs)
+                            in mapReplace newNodes ++ drop (1 + arity admin) nodes
+                        else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
+                            (rscJS n1) : mapReplace (n2:n3:rest)
+
+    mapReplace (hd:tl) = (rscJS hd) : mapReplace tl
 
 generateSaturedC _ e (eles, adminMap) = (e : eles, adminMap)
 
-
-getCallFunc (hd:tl)
-    |  JSCallExpression str cl [cm] cr <- node hd
-    ,  JSArguments a2l [a2m] a2r <- node cm
+getCallArgs :: [JSNode] -> [Node]
+getCallArgs (hd:tl)
+    |  JSCallExpression _str _cl [cm] _cr <- node hd
+    ,  JSArguments _a2l [a2m] _a2r <- node cm
     ,  oneArg <- node a2m
-    = oneArg : getCallFunc tl
-getCallFunc _ = []
+    = oneArg : getCallArgs tl
+getCallArgs _ = []
+
+generateNewCall :: Node -> Node -> [Node] -> [JSNode]
+generateNewCall idNode (JSArguments al [_am] ar) argNodes
+    = let argList = intersperse (nt (JSLiteral ", ")) $ map nt argNodes
+      in [nt idNode, nt (JSArguments al argList ar)]
+generateNewCall _idNode _args _argNodes
+    = error "BundleOpt>>generateNewCall: Impossible match error."
