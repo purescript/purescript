@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Command
+-- Description : Datatypes for the commands psc-ide accepts
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Datatypes for the commands psc-ide accepts
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -11,34 +25,45 @@ import           Control.Monad
 import           Data.Aeson
 import           Data.Maybe
 import           Data.Text                         (Text)
-import           Language.PureScript (ModuleName, moduleNameFromString)
+import           Language.PureScript               (ModuleName,
+                                                    moduleNameFromString)
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 
 data Command
-    = Load { loadModules      :: [ModuleIdent]
-           , loadDependencies :: [ModuleIdent]}
-    | Type { typeSearch  :: DeclIdent
-           , typeFilters :: [Filter]}
-    | Complete { completeFilters :: [Filter]
-               , completeMatcher :: Matcher}
-    | Pursuit { pursuitQuery      :: PursuitQuery
-              , pursuitSearchType :: PursuitSearchType}
-    | List {listType :: ListType}
-    | CaseSplit {
-      caseSplitLine          :: Text
+    = Load
+      { loadModules      :: [ModuleIdent]
+      , loadDependencies :: [ModuleIdent]
+      }
+    | Type
+      { typeSearch  :: DeclIdent
+      , typeFilters :: [Filter]
+      }
+    | Complete
+      { completeFilters :: [Filter]
+      , completeMatcher :: Matcher
+      }
+    | Pursuit
+      { pursuitQuery      :: PursuitQuery
+      , pursuitSearchType :: PursuitSearchType
+      }
+    | CaseSplit
+      { caseSplitLine        :: Text
       , caseSplitBegin       :: Int
       , caseSplitEnd         :: Int
       , caseSplitAnnotations :: WildcardAnnotations
-      , caseSplitType        :: Type}
-    | AddClause {
-      addClauseLine          :: Text
-      , addClauseAnnotations :: WildcardAnnotations}
-    | Cwd
+      , caseSplitType        :: Type
+      }
+    | AddClause
+      { addClauseLine        :: Text
+      , addClauseAnnotations :: WildcardAnnotations
+      }
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
+    | List { listType :: ListType }
+    | Cwd
     | Quit
 
 data ImportCommand

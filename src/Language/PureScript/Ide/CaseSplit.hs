@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Imports
+-- Description : Casesplitting and adding function clauses
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Casesplitting and adding function clauses
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}

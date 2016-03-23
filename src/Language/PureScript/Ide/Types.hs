@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Types
+-- Description : Type definitions for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Type definitions for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

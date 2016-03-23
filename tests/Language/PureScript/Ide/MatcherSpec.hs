@@ -2,10 +2,10 @@
 
 module Language.PureScript.Ide.MatcherSpec where
 
-import           Data.Text                       (Text)
+import           Data.Text                           (Text)
+import           Language.PureScript.Ide.Integration
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Integration
 import           Test.Hspec
 
 completions :: [Completion]

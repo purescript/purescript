@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Error
+-- Description : Error types for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Error types for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Error
        (ErrorMsg, PscIdeError(..), textError, first)

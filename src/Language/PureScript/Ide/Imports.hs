@@ -1,9 +1,23 @@
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Imports
+-- Description : Provides functionality to manage imports
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Provides functionality to manage imports
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PackageImports        #-}
 
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
@@ -18,26 +32,26 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import qualified Language.PureScript as P
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Filter
-import Language.PureScript.Ide.State
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Completion
-import "monad-logger" Control.Monad.Logger
-import Control.Monad.Error.Class
-import Control.Monad.IO.Class
-import qualified Data.List as List
-import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
-import qualified Data.Text.IO as TIO
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Control.Monad.Error.Class
+import           Control.Monad.IO.Class
+import           "monad-logger" Control.Monad.Logger
+import qualified Data.List                          as List
+import           Data.Maybe                         (mapMaybe)
+import           Data.Monoid                        ((<>))
+import           Data.Text                          (Text)
+import qualified Data.Text                          as T
+import qualified Data.Text.IO                       as TIO
+import qualified Language.PureScript                as P
+import           Language.PureScript.Ide.Completion
+import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.Filter
+import           Language.PureScript.Ide.State
+import           Language.PureScript.Ide.Types
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
 
--- | Parses a file and returns the (lines before the imports, the imports, the
+-- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
 parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                         FilePath -> m ([Text], [Import], [Text])
@@ -48,24 +62,25 @@ parseImportsFromFile fp = do
 sliceImportSection :: [Text] -> ([Text], [Import], [Text])
 sliceImportSection ls =
   let
-      preImportSection = takeWhile (not . hasImportPrefix) ls
-      importSection =
-        takeWhile continuesImport $
-          dropWhile (not . hasImportPrefix) ls
-      postImportSection =
-        dropWhile continuesImport $
-          dropWhile (not . hasImportPrefix) ls
-      hasImportPrefix = T.isPrefixOf "import"
-      continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
+    preImportSection = takeWhile (not . hasImportPrefix) ls
+    importSection =
+      takeWhile continuesImport $
+        dropWhile (not . hasImportPrefix) ls
+    postImportSection =
+      dropWhile continuesImport $
+        dropWhile (not . hasImportPrefix) ls
+    hasImportPrefix = T.isPrefixOf "import"
+    continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
   in (preImportSection, parseImports importSection, postImportSection)
 
 parseImports :: [Text] -> [Import]
 parseImports ts =
-  let concatMultilineImports = foldl step [] ts
-      step :: [Text] -> Text -> [Text]
-      step acc t = if T.isPrefixOf " " t
-                   then init acc ++ [last acc <> t]
-                   else acc ++ [t]
+  let
+    concatMultilineImports = foldl step [] ts
+    step :: [Text] -> Text -> [Text]
+    step acc t = if T.isPrefixOf " " t
+                 then init acc ++ [last acc <> t]
+                 else acc ++ [t]
   in
     mapMaybe parseImport concatMultilineImports
 
@@ -80,8 +95,12 @@ parseImport t =
       Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
       Left _ -> Nothing
 
-addImplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
-                     FilePath -> P.ModuleName -> m [Text]
+
+-- | Adds an implicit import like @import Prelude@ to a Sourcefile.
+addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
+                     => FilePath     -- ^ The Sourcefile read from
+                     -> P.ModuleName -- ^ The module to import
+                     -> m [Text]
 addImplicitImport fp mn = do
   (pre, imports, post) <- parseImportsFromFile fp
   let newImportSection = addImplicitImport' imports mn
@@ -117,8 +136,21 @@ addExplicitImport' identifier moduleName imports =
 
   in List.sort (map prettyPrintImport' newImports) ++ [""]
 
-addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m) =>
-                          FilePath -> Text -> [Filter] -> m (Either [Completion] [Text])
+
+-- | Looks up the given identifier in the currently loaded modules.
+--
+-- * Throws an error if the identifier cannot be found.
+--
+-- * If exactly one match is found, adds an explicit import to the importsection
+--
+-- * If more than one possible imports are found, reports the possibilities as a
+-- list of completions.
+addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m)
+                          => FilePath -- ^ The Sourcefile to read from
+                          -> Text     -- ^ The identifier to import
+                          -> [Filter] -- ^ Filters to apply before searching for
+                                      -- the identifier
+                          -> m (Either [Completion] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
   case getExactMatches ident filters modules of
@@ -138,8 +170,8 @@ prettyPrintImport' (Import mn idt qual) = T.pack $ "import " ++ P.prettyPrintImp
 
 answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
 answerRequest outfp rs  =
-    case outfp of
-      Nothing -> pure $ MultilineTextResult rs
-      Just outfp' -> do
-        liftIO $ TIO.writeFile outfp' (T.unlines rs)
-        pure $ TextResult $ "Written to " <> T.pack outfp'
+  case outfp of
+    Nothing -> pure $ MultilineTextResult rs
+    Just outfp' -> do
+      liftIO $ TIO.writeFile outfp' (T.unlines rs)
+      pure $ TextResult $ "Written to " <> T.pack outfp'

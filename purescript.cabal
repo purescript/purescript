@@ -363,5 +363,15 @@ test-suite tests
                    TestPsci
                    TestPscIde
                    PscIdeSpec
+                   Language.PureScript.Ide.FilterSpec
+                   Language.PureScript.Ide.ImportsSpec
+                   Language.PureScript.Ide.Integration
+                   Language.PureScript.Ide.MatcherSpec
+                   Language.PureScript.Ide.ReexportsSpec
+                   Language.PureScript.IdeSpec
+                   PSCi.Completion
+                   PSCi.Directive
+                   PSCi.Module
+                   PSCi.Types
     buildable: True
     hs-source-dirs: tests psci

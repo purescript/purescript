@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Externs
+-- Description : Handles externs files for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Handles externs files for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -5,8 +19,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 
 module Language.PureScript.Ide.Externs
-  (
-    ExternDecl(..),
+  ( ExternDecl(..),
     ModuleIdent,
     DeclIdent,
     Type,

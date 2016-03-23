@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import Test.Hspec
-import Control.Monad
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import qualified Language.PureScript as P
-import Language.PureScript.Ide.Imports
-import Language.PureScript.Ide.Integration as Integration
+import           Control.Monad
+import           Data.Text                           (Text)
+import qualified Data.Text                           as T
+import qualified Data.Text.IO                        as TIO
+import qualified Language.PureScript                 as P
+import           Language.PureScript.Ide.Imports
+import           Language.PureScript.Ide.Integration as Integration
+import           Test.Hspec
 
-import System.FilePath
+import           System.FilePath
 
 simpleFile :: [Text]
 simpleFile =

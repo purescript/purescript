@@ -1,6 +1,22 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Reexports
+-- Description : Resolves reexports for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+--               Brian Sermons 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Resolves reexports for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards     #-}
 {-# LANGUAGE TupleSections     #-}
+
 module Language.PureScript.Ide.Reexports where
 
 

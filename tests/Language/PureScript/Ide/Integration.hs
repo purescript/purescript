@@ -1,5 +1,19 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Integration
+-- Description : A psc-ide client for use in integration tests
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- A psc-ide client for use in integration tests
+-----------------------------------------------------------------------------
+
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Integration
        (
          -- managing the server process
@@ -23,27 +37,21 @@ module Language.PureScript.Ide.Integration
        , parseTextResult
        ) where
 
-import Language.PureScript.Ide.CodecJSON
-
-import Control.Concurrent (threadDelay)
-import Control.Exception
-
-import Control.Monad (join, when)
-
-import qualified Data.Vector as V
-
-import Data.Aeson
-import Data.Aeson.Types
-import Data.Maybe (fromJust)
-import Data.Either (isRight)
-import qualified Data.Text as T
-
-import qualified Data.ByteString.Lazy.UTF8 as BSL
-
-import System.Directory
-import System.Exit
-import System.FilePath
-import System.Process
+import           Control.Concurrent                (threadDelay)
+import           Control.Exception
+import           Control.Monad                     (join, when)
+import           Data.Aeson
+import           Data.Aeson.Types
+import qualified Data.ByteString.Lazy.UTF8         as BSL
+import           Data.Either                       (isRight)
+import           Data.Maybe                        (fromJust)
+import qualified Data.Text                         as T
+import qualified Data.Vector                       as V
+import           Language.PureScript.Ide.CodecJSON
+import           System.Directory
+import           System.Exit
+import           System.FilePath
+import           System.Process
 
 projectDirectory :: IO FilePath
 projectDirectory = do
@@ -152,17 +160,21 @@ addImplicitImportC mn = addImportW $
          ]
 
 addImportW :: Value -> FilePath -> FilePath -> Value
-addImportW importCommand fp outfp = commandWrapper "import" (object [ "file" .= fp
-                                                                    , "outfile" .= outfp
-                                                                    , "importCommand" .= importCommand
-                                                                    ])
+addImportW importCommand fp outfp =
+  commandWrapper "import" (object [ "file" .= fp
+                                  , "outfile" .= outfp
+                                  , "importCommand" .= importCommand
+                                  ])
 
 
 completion :: [Value] -> Maybe Value -> Value
-completion filters Nothing =
-  commandWrapper "complete" (object ["filters" .= filters])
-completion filters (Just matcher) =
-  commandWrapper "complete" (object [ "filters" .= filters, "matcher" .= matcher ])
+completion filters matcher =
+  let
+    matcher' = case matcher of
+      Nothing -> []
+      Just m -> ["matcher" .= m]
+  in
+    commandWrapper "complete" (object $ "filters" .= filters : matcher')
 
 flexMatcher :: String -> Value
 flexMatcher q = object [ "matcher" .= ("flex" :: String)

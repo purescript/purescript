@@ -1,7 +1,26 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Matcher
+-- Description : Matchers for psc-ide commands
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Matchers for psc-ide commands
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-module Language.PureScript.Ide.Matcher (Matcher, flexMatcher, runMatcher) where
+
+module Language.PureScript.Ide.Matcher
+       ( Matcher
+       , flexMatcher
+       , runMatcher
+       ) where
 
 import           Prelude                       ()
 import           Prelude.Compat

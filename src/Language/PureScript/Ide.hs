@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide
+-- Description : Interface for the psc-ide-server
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Interface for the psc-ide-server
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -6,7 +20,11 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 
-module Language.PureScript.Ide where
+module Language.PureScript.Ide
+       ( handleCommand
+         -- for tests
+       , printModules
+       ) where
 
 import           Prelude                            ()
 import           Prelude.Compat
@@ -42,35 +60,35 @@ import           System.Exit
 handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
 handleCommand (Load modules deps) =
-    loadModulesAndDeps modules deps
+  loadModulesAndDeps modules deps
 handleCommand (Type search filters) =
-    findType search filters
+  findType search filters
 handleCommand (Complete filters matcher) =
-    findCompletions filters matcher
+  findCompletions filters matcher
 handleCommand (Pursuit query Package) =
-    findPursuitPackages query
+  findPursuitPackages query
 handleCommand (Pursuit query Identifier) =
-    findPursuitCompletions query
+  findPursuitCompletions query
 handleCommand (List LoadedModules) =
-    printModules
+  printModules
 handleCommand (List AvailableModules) =
-    listAvailableModules
+  listAvailableModules
 handleCommand (List (Imports fp)) =
-    importsForFile fp
+  importsForFile fp
 handleCommand (CaseSplit l b e wca t) =
-    caseSplit l b e wca t
+  caseSplit l b e wca t
 handleCommand (AddClause l wca) =
-    pure $ addClause l wca
+  pure $ addClause l wca
 handleCommand (Import fp outfp _ (AddImplicitImport mn)) = do
-    rs <- addImplicitImport fp mn
-    answerRequest outfp rs
+  rs <- addImplicitImport fp mn
+  answerRequest outfp rs
 handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
-    rs <- addImportForIdentifier fp ident filters
-    case rs of
-      Right rs' -> answerRequest outfp rs'
-      Left question -> pure $ CompletionResult question
+  rs <- addImportForIdentifier fp ident filters
+  case rs of
+    Right rs' -> answerRequest outfp rs'
+    Left question -> pure $ CompletionResult question
 handleCommand Cwd =
-    TextResult . T.pack <$> liftIO getCurrentDirectory
+  TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
 
 findCompletions :: (PscIde m, MonadLogger m) =>
@@ -199,10 +217,3 @@ filePathFromModule moduleName = do
     then pure path
     else throwError (ModuleFileNotFound moduleName)
 
--- | Taken from Data.Either.Utils
-maybeToEither :: MonadError e m =>
-                 e                      -- ^ (Left e) will be returned if the Maybe value is Nothing
-              -> Maybe a                -- ^ (Right a) will be returned if this is (Just a)
-              -> m a
-maybeToEither errorval Nothing = throwError errorval
-maybeToEither _ (Just normalval) = return normalval
