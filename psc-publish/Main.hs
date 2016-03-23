@@ -38,8 +38,8 @@ publish :: Bool -> IO ()
 publish isDryRun =
   if isDryRun
     then do
-      _ <- preparePackage dryRunOptions
+      _ <- unsafePreparePackage dryRunOptions
       putStrLn "Dry run completed, no errors."
     else do
-      pkg <- preparePackage defaultPublishOptions
+      pkg <- unsafePreparePackage defaultPublishOptions
       BL.putStrLn (A.encode pkg)

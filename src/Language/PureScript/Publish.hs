@@ -6,6 +6,7 @@
 module Language.PureScript.Publish
   ( preparePackage
   , preparePackage'
+  , unsafePreparePackage
   , PrepareM()
   , runPrepareM
   , warn
@@ -79,11 +80,16 @@ defaultPublishOptions = PublishOptions
 
 -- | Attempt to retrieve package metadata from the current directory.
 -- Calls exitFailure if no package metadata could be retrieved.
-preparePackage :: PublishOptions -> IO D.UploadedPackage
+unsafePreparePackage :: PublishOptions -> IO D.UploadedPackage
+unsafePreparePackage opts = either (\e -> printError e >> exitFailure) pure =<< preparePackage opts
+
+-- | Attempt to retrieve package metadata from the current directory.
+-- Returns a PackageError on failure
+preparePackage :: PublishOptions -> IO (Either PackageError D.UploadedPackage)
 preparePackage opts =
   runPrepareM (preparePackage' opts)
-    >>= either (\e -> printError e >> exitFailure)
-               handleWarnings
+    >>= either (pure . Left) (fmap Right . handleWarnings)
+
   where
   handleWarnings (result, warns) = do
     printWarnings warns
