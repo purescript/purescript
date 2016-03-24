@@ -32,7 +32,7 @@ module Language.PureScript.Bundle (
 import Prelude ()
 import Prelude.Compat
 
-import Data.List (nub, stripPrefix)
+import Data.List (nub, stripPrefix, intercalate)
 import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
@@ -47,6 +47,7 @@ import Language.JavaScript.Parser
 import Language.PureScript.BundleTypes
 
 import qualified Paths_purescript as Paths
+import Debug.Trace
 
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.
@@ -472,13 +473,15 @@ bundle inputStrs entryPoints mainModule namespace requirePath shouldUncurry = do
                 ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
 
-  let mids = S.fromList (map (moduleName . fst) input)
+  let mids = -- trace (intercalate " " (map (\(ident, ast) -> "\n\n!!!   " ++ show ident ++ "\n" ++ showStripped ast) input)) $
+                    S.fromList (map (moduleName . fst) input)
 
   modules <- traverse (fmap withDeps . uncurry (toModule requirePath mids)) input
 
   let compiled = compile modules entryPoints
       compiled'= if shouldUncurry
-                    then uncurryFunc compiled
+                    then let i = uncurryFunc compiled
+                         in i -- TODO: traverse and comile again
                     else compiled
       sorted   = sortModules (filter (not . isModuleEmpty) compiled')
 
