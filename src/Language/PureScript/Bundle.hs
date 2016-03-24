@@ -479,10 +479,14 @@ bundle inputStrs entryPoints mainModule namespace requirePath shouldUncurry = do
   modules <- traverse (fmap withDeps . uncurry (toModule requirePath mids)) input
 
   let compiled = compile modules entryPoints
-      compiled'= if shouldUncurry
-                    then let i = uncurryFunc compiled
-                         in i -- TODO: traverse and comile again
-                    else compiled
-      sorted   = sortModules (filter (not . isModuleEmpty) compiled')
+
+  compiled' <- if shouldUncurry
+                    then do
+                        let modules' = uncurryFunc compiled
+                        modules'' <- traverse (fmap withDeps. pure) modules' -- TODO: traverse and compile again
+                        return (compile modules'' entryPoints)
+                    else return compiled
+
+  let sorted   = sortModules (filter (not . isModuleEmpty) compiled')
 
   return (codeGen mainModule namespace sorted)
