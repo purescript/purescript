@@ -23,6 +23,7 @@ module Language.PureScript.BundleOpt (
 import Debug.Trace
 import Data.List (intersperse, intercalate)
 import qualified Data.Map as M
+import Data.Maybe (mapMaybe)
 
 import Language.PureScript.BundleTypes
 import Language.JavaScript.Parser.AST
@@ -190,12 +191,20 @@ generateUncurriedEx _mid t (eles, adminMap) =
 generateSaturedCalls :: Module -> ([Module],FuncAdminMap) -> ([Module],FuncAdminMap)
 generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, adminMap) =
     trace ("generateSaturedCalls: " ++ show moduleIdentifier) $
-    let (eles,adminMap') = foldr (generateSaturedC moduleIdentifier) ([],adminMap) moduleElements
+    let (eles,adminMap') = foldr (generateSaturedC moduleIdentifier imports) ([],adminMap) moduleElements
     in (Module moduleIdentifier eles : modules, adminMap')
+  where
+    imports :: [(String, ModuleIdentifier)]
+    imports = mapMaybe toImport moduleElements
+      where
+      toImport :: ModuleElement -> Maybe (String, ModuleIdentifier)
+      toImport (Require _ nm (Right mid)) = Just (nm, mid)
+      toImport _ = Nothing
 
 -- |  Generate uncurried functions from curried functions
-generateSaturedC :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateSaturedC mid (Member jSNode' sort name decls keys) (eles, adminMap) =
+generateSaturedC :: ModuleIdentifier -> [(String, ModuleIdentifier)] -> ModuleElement ->
+    ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
+generateSaturedC mid imports (Member jSNode' sort name decls keys) (eles, adminMap) =
     let replaceSaturedNode = rscJS jSNode'
         replaceSaturedDecls = map rscJS decls
     in  (Member replaceSaturedNode sort name replaceSaturedDecls keys : eles, adminMap)
@@ -320,9 +329,9 @@ generateSaturedC mid (Member jSNode' sort name decls keys) (eles, adminMap) =
     mapReplace [] = []
     mapReplace nodes@(n1:n2:n3:rest)
         |  JSIdentifier name' <- node n1
-        ,  JSArguments _al [am] _ar <- node n2
+        ,  JSArguments _al arg1 _ar <- node n2
         ,  JSCallExpression _str _cl [cm] _cr <- node n3
-        ,  JSArguments _a2l [a2m] _a2r <- node cm
+        ,  JSArguments _a2l arg2 _a2r <- node cm
         = trace ("replace candidate: " ++ name' ++ " " ++ intercalate " " (map showStripped nodes)) $
             case findAdminFor name' mid adminMap of
                 Nothing -> trace ("replace candidate: not in map: " ++ name') $
@@ -330,51 +339,55 @@ generateSaturedC mid (Member jSNode' sort name decls keys) (eles, adminMap) =
                 Just admin ->
                     let moreCallArgs = getCallArgs rest
                         newName = name' ++ suffix
-                    in if arity admin == 2 + length moreCallArgs
+                        arityFound = 2 + length moreCallArgs
+                    in if arity admin <= arityFound
                         then trace ("replace!!! " ++ show (arity admin)) $
-                            let newNodes = generateNewCall (JSIdentifier newName)
-                                                (node n2) (node am: node a2m : moreCallArgs)
+                            let newNodes = generateNewCall (sp $ JSIdentifier newName)
+                                                (node n2) (arg1: arg2 : take (arity admin - 2) moreCallArgs)
                             in mapReplace newNodes ++ drop (1 + arity admin) nodes
                         else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
                             (rscJS n1) : mapReplace (n2:n3:rest)
 
     mapReplace nodes@(n1:n2:n3:rest)
         |  JSMemberDot [l] m r <- node n1
-        ,  JSIdentifier "$foreign" <- node l
+        ,  JSIdentifier scope <- node l
         ,  JSIdentifier name' <- node r
-        ,  JSArguments _al [am] _ar <- node n2
+        ,  JSArguments _al arg1 _ar <- node n2
         ,  JSCallExpression _str _cl [cm] _cr <- node n3
-        ,  JSArguments _a2l [a2m] _a2r <- node cm
+        ,  JSArguments _a2l arg2 _a2r <- node cm
         = trace ("replace candidate: " ++ name' ++ " " ++  intercalate " " (map showStripped nodes)) $
-            case findAdminFor name' mid adminMap of
+            let realMod = case lookup scope imports of
+                            Nothing -> mid
+                            Just moduleIdentifier -> moduleIdentifier
+            in case findAdminFor name' realMod adminMap of
                 Nothing -> trace ("replace candidate: not in map: " ++ name') $
                                 (rscJS n1) : mapReplace (n2:n3:rest)
                 Just admin ->
                     let moreCallArgs = getCallArgs rest
                         newName = name' ++ suffix
-                    in if arity admin == 2 + length moreCallArgs
+                        arityFound = 2 + length moreCallArgs
+                    in if arity admin <= arityFound
                         then trace ("replace!!! " ++ show (arity admin)) $
-                            let newNodes = generateNewCall (JSMemberDot [l] m (nt (JSIdentifier newName)))
-                                                (node n2) (node am: node a2m : moreCallArgs)
+                            let newNodes = generateNewCall (NN $ JSMemberDot [l] m (nt (JSIdentifier newName)))
+                                                (node n2) (arg1: arg2 : take (arity admin - 2) moreCallArgs)
                             in mapReplace newNodes ++ drop (1 + arity admin) nodes
                         else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
                             (rscJS n1) : mapReplace (n2:n3:rest)
 
     mapReplace (hd:tl) = (rscJS hd) : mapReplace tl
 
-generateSaturedC _ e (eles, adminMap) = (e : eles, adminMap)
+generateSaturedC _ _ e (eles, adminMap) = (e : eles, adminMap)
 
-getCallArgs :: [JSNode] -> [Node]
+getCallArgs :: [JSNode] -> [[JSNode]]
 getCallArgs (hd:tl)
     |  JSCallExpression _str _cl [cm] _cr <- node hd
-    ,  JSArguments _a2l [a2m] _a2r <- node cm
-    ,  oneArg <- node a2m
-    = oneArg : getCallArgs tl
+    ,  JSArguments _a2l arg _a2r <- node cm
+    = arg : getCallArgs tl
 getCallArgs _ = []
 
-generateNewCall :: Node -> Node -> [Node] -> [JSNode]
-generateNewCall idNode (JSArguments al [_am] ar) argNodes
-    = let argList = intersperse (nt (JSLiteral ", ")) $ map nt argNodes
-      in [nt idNode, nt (JSArguments al argList ar)]
+generateNewCall :: JSNode -> Node -> [[JSNode]] -> [JSNode]
+generateNewCall idNode (JSArguments al old ar) argNodes
+    = let argList = concat $ intersperse [(sp (JSLiteral ","))] argNodes
+      in [idNode, NN (JSArguments al argList ar)]
 generateNewCall _idNode _args _argNodes
     = error "BundleOpt>>generateNewCall: Impossible match error."
