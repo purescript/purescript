@@ -2,6 +2,7 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Control.Monad
+import           Data.Maybe                          (fromJust)
 import           Data.Text                           (Text)
 import qualified Data.Text                           as T
 import qualified Data.Text.IO                        as TIO
@@ -27,29 +28,15 @@ withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ is ++ drop 2 simpleFile
 
-preludeImport :: Import
-preludeImport = Import (P.moduleNameFromString "Prelude") P.Implicit Nothing
+testParseImport :: Text -> Import
+testParseImport = fromJust . parseImport
 
-arrayImport :: Import
-arrayImport =
-  Import
-    (P.moduleNameFromString "Data.Array")
-    (P.Explicit [P.ValueRef (P.Ident "head"), P.ValueRef (P.Ident "cons")])
-    Nothing
-
-listImport :: Import
-listImport =
-  Import
-    (P.moduleNameFromString "Data.List")
-    P.Implicit
-    (Just (P.moduleNameFromString "List"))
-
-consoleImport :: Import
-consoleImport =
-  Import
-    (P.moduleNameFromString "Control.Monad.Eff.Console")
-    (P.Explicit [P.ValueRef (P.Ident "log")])
-    (Just (P.moduleNameFromString "Console"))
+preludeImport, arrayImport, listImport, consoleImport, maybeImport :: Import
+preludeImport = testParseImport "import Prelude"
+arrayImport = testParseImport "import Data.Array (head, cons)"
+listImport = testParseImport "import Data.List as List"
+consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
+maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
 spec :: Spec
 spec = do
@@ -82,6 +69,10 @@ spec = do
       shouldBe
         (prettyPrintImport' consoleImport)
         "import Control.Monad.Eff.Console (log) as Console"
+    it "pretty prints an import with a datatype (and PositionedRef's for the dtors)" $
+      shouldBe
+        (prettyPrintImport' maybeImport)
+        "import Data.Maybe (Maybe(Just))"
 
   describe "import commands" $ do
     it "adds an implicit unqualified import" $

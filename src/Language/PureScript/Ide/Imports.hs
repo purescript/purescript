@@ -24,6 +24,7 @@ module Language.PureScript.Ide.Imports
        , addImportForIdentifier
        , answerRequest
          -- for tests
+       , parseImport
        , addImplicitImport'
        , addExplicitImport'
        , sliceImportSection
@@ -48,6 +49,7 @@ import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
+import           Language.PureScript.Ide.Externs (unwrapPositionedRef)
 import           Language.PureScript.Ide.Types
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
@@ -173,6 +175,9 @@ addImportForIdentifier fp ident filters = do
     getModule' (Completion (m, _, _)) = m
 
 prettyPrintImport' :: Import -> Text
+-- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
+prettyPrintImport' (Import mn (P.Explicit refs) qual) =
+  T.pack $ "import " ++ P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
