@@ -33,13 +33,12 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Control.Arrow (second)
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
+import           Data.Bifunctor (first, second)
 import           Data.Function (on)
 import qualified Data.List                          as List
-import           Data.Maybe                         (mapMaybe)
 import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
@@ -49,7 +48,8 @@ import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Externs (unwrapPositionedRef)
+import           Language.PureScript.Ide.Externs ( unwrapPositionedRef
+                                                 , unwrapPositioned)
 import           Language.PureScript.Ide.Types
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
@@ -61,37 +61,68 @@ parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                         FilePath -> m ([Text], [Import], [Text])
 parseImportsFromFile fp = do
   file <- liftIO (TIO.readFile fp)
-  pure (sliceImportSection (T.lines file))
+  case sliceImportSection (T.lines file) of
+    Right res -> pure res
+    Left err -> throwError (GeneralError err)
 
-sliceImportSection :: [Text] -> ([Text], [Import], [Text])
-sliceImportSection ls =
-  let
-    (preImportSection, (importSection, postImportSection)) =
-      span continuesImport `second` break hasImportPrefix ls
-    hasImportPrefix = T.isPrefixOf "import"
-    continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
-  in
-    (preImportSection, parseImports importSection, postImportSection)
+parseImports :: [Text] -> Either String [Import]
+parseImports ls = do
+  (P.Module _ _ _ decls _) <- moduleParse ("module Dummy where" : ls)
+  pure $ concatMap mkImport (unwrapPositioned <$> decls)
+  where
+    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual _) =
+      [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
+    mkImport (P.ImportDeclaration mn it qual _) = [Import mn it qual]
+    mkImport _ = []
 
--- | Concatenates multiline imports into a single line and tries to parse them.
--- Anything that fails to parse gets left out
-parseImports :: [Text] -> [Import]
-parseImports ts =
-  let
-    concatMultilineImports = foldl step [] ts
-    step acc t = if T.isPrefixOf " " t
-                 then init acc ++ [last acc <> t]
-                 else acc ++ [t]
-  in
-    mapMaybe parseImport concatMultilineImports
+sliceImportSection :: [Text] -> Either String ([Text], [Import], [Text])
+sliceImportSection ts =
+  case foldl step ModuleHeader (zip [0..] ts) of
+    Res start end ->
+      let
+        (moduleHeader, (importSection, remainingFile)) =
+          List.splitAt (succ (end - start)) `second` List.splitAt start ts
+      in
+        (\is -> (moduleHeader, is, remainingFile)) <$> parseImports importSection
+    _ -> Left "Failed to detect the import section"
 
-parseImport :: Text -> Maybe Import
-parseImport t =
-  case P.lex "<psc-ide>" (T.unpack t)
-       >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
-    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
-    Left _ -> Nothing
+data ImportStateMachine = ModuleHeader | ImportSection Int Int | Res Int Int
 
+-- | We start in the
+--
+-- * ModuleHeader state.
+--
+-- We skip every line we encounter, that doesn't start with "import". Once we
+-- find a line with "import" we store its linenumber as the start of the import
+-- section and change into the
+--
+-- * ImportSection state
+--
+-- For any line that starts with import or whitespace(is thus indented) we
+-- expand the end of the import section to that line and continue. If we
+-- encounter a commented or empty line, we continue moving forward in the
+-- ImportSection state but don't expand the import section end yet. This allows
+-- us to exclude newlines or comments that directly follow the import section.
+-- Once we encounter a line that is not a comment, newline, indentation or
+-- import we switch into the
+--
+-- * Res state
+--
+-- , which just shortcuts to the end of the file and carries the detected import
+-- section boundaries
+step :: ImportStateMachine -> (Int, Text) -> ImportStateMachine
+step ModuleHeader (ix, l) =
+  if T.isPrefixOf "import" l then ImportSection ix ix else ModuleHeader
+step (ImportSection start lastImportLine) (ix, l)
+  | any (`T.isPrefixOf` l) ["import", " "] = ImportSection start ix
+  | T.isPrefixOf "--" l || l == ""         = ImportSection start lastImportLine
+  | otherwise                              = Res start lastImportLine
+step (Res start end) _ = Res start end
+
+moduleParse :: [Text] -> Either String P.Module
+moduleParse t = first show $ do
+  tokens <- (P.lex "" . T.unpack . T.unlines) t
+  P.runTokenParser "<psc-ide>" P.parseModule tokens
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
@@ -101,13 +132,11 @@ addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
 addImplicitImport fp mn = do
   (pre, imports, post) <- parseImportsFromFile fp
   let newImportSection = addImplicitImport' imports mn
-  pure $ pre
-    ++ newImportSection
-    ++ post
+  pure $ pre ++ newImportSection ++ post
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
-  List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing])) ++ [""]
+  List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing]))
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
@@ -138,7 +167,7 @@ addExplicitImport' identifier moduleName imports =
         let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
         in x  ++ [Import mn (P.Explicit (P.ValueRef identifier : refs)) Nothing] ++ ys
 
-  in List.sort (map prettyPrintImport' newImports) ++ [""]
+  in List.sort (map prettyPrintImport' newImports)
 
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -191,3 +220,14 @@ answerRequest outfp rs  =
     Just outfp' -> do
       liftIO $ TIO.writeFile outfp' (T.unlines rs)
       pure $ TextResult $ "Written to " <> T.pack outfp'
+
+-- | Test and ghci helper
+parseImport :: Text -> Maybe Import
+parseImport t =
+  case P.lex "<psc-ide>" (T.unpack t)
+       >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
+    Right (mn, P.Explicit refs, mmn, _) ->
+      Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)
+    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
+    Left _ -> Nothing
+

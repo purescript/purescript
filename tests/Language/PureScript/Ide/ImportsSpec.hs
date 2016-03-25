@@ -16,7 +16,10 @@ simpleFile =
   ]
 
 splitSimpleFile :: ([Text], [Import], [Text])
-splitSimpleFile = sliceImportSection simpleFile
+splitSimpleFile = fromRight $ sliceImportSection simpleFile
+  where
+    fromRight (Right r) = r
+    fromRight (Left _) = error "fromRight"
 
 withImports :: [Text] -> [Text]
 withImports is =
@@ -38,14 +41,14 @@ spec = do
     it "finds a simple import" $
       shouldBe
         (sliceImportSection simpleFile)
-        (take 1 simpleFile, [preludeImport], drop 3 simpleFile)
+        (Right (take 1 simpleFile, [preludeImport], drop 2 simpleFile))
 
     it "allows multiline import statements" $
       shouldBe
         (sliceImportSection (withImports [ "import Data.Array (head,"
                                          , "                   cons)"
                                          ]))
-        (take 1 simpleFile, [preludeImport, arrayImport], drop 3 simpleFile)
+        (Right (take 1 simpleFile, [preludeImport, arrayImport], drop 2 simpleFile))
   describe "pretty printing imports" $ do
     it "pretty prints a simple import" $
       shouldBe (prettyPrintImport' preludeImport) "import Prelude"
@@ -65,21 +68,18 @@ spec = do
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
         [ "import Data.Map"
         , "import Prelude"
-        , ""
         ]
     it "adds an explicit unqualified import" $
       shouldBe
         (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") simpleFileImports)
         [ "import Data.Array (head)"
         , "import Prelude"
-        , ""
         ]
     it "adds an identifier to an explicit import list" $
-      let (_, imports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
+      let Right (_, imports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
       in
         shouldBe
           (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") imports)
           [ "import Data.Array (head, tail)"
           , "import Prelude"
-          , ""
           ]
