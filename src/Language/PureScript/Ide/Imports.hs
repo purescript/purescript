@@ -74,6 +74,9 @@ sliceImportSection ls =
     continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
   in (preImportSection, parseImports importSection, postImportSection)
 
+
+-- | Concatenates multiline imports into a single line and tries to parse them.
+-- Anything that fails to parse gets left out
 parseImports :: [Text] -> [Import]
 parseImports ts =
   let
@@ -87,14 +90,10 @@ parseImports ts =
 
 parseImport :: Text -> Maybe Import
 parseImport t =
-  let
-    parseResult = do
-      tokens <- P.lex "" (T.unpack t)
-      P.runTokenParser "" P.parseImportDeclaration' tokens
-  in
-    case parseResult of
-      Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
-      Left _ -> Nothing
+  case P.lex "<psc-ide>" (T.unpack t)
+       >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
+    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
+    Left _ -> Nothing
 
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
@@ -113,6 +112,13 @@ addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
   List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing])) ++ [""]
 
+-- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
+-- explicit import already exists for the given module, it adds the identifier
+-- to that imports list.
+--
+-- So @addExplicitImport "/File.purs" "bind" "Prelude"@ with an already existing
+-- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
+-- (bind, unit)"]@
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
                      FilePath -> Text -> P.ModuleName -> m [Text]
 addExplicitImport fp identifier moduleName = do
@@ -175,6 +181,9 @@ prettyPrintImport' :: Import -> Text
 prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
+-- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
+-- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the
+-- first argument.
 answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
 answerRequest outfp rs  =
   case outfp of
