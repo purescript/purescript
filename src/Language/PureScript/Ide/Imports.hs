@@ -32,6 +32,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
+import           Control.Arrow (second)
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
@@ -63,17 +64,12 @@ parseImportsFromFile fp = do
 sliceImportSection :: [Text] -> ([Text], [Import], [Text])
 sliceImportSection ls =
   let
-    preImportSection = takeWhile (not . hasImportPrefix) ls
-    importSection =
-      takeWhile continuesImport $
-        dropWhile (not . hasImportPrefix) ls
-    postImportSection =
-      dropWhile continuesImport $
-        dropWhile (not . hasImportPrefix) ls
+    (preImportSection, (importSection, postImportSection)) =
+      span continuesImport `second` break hasImportPrefix ls
     hasImportPrefix = T.isPrefixOf "import"
     continuesImport x = hasImportPrefix x || T.isPrefixOf " " x || x == ""
-  in (preImportSection, parseImports importSection, postImportSection)
-
+  in
+    (preImportSection, parseImports importSection, postImportSection)
 
 -- | Concatenates multiline imports into a single line and tries to parse them.
 -- Anything that fails to parse gets left out
@@ -81,7 +77,6 @@ parseImports :: [Text] -> [Import]
 parseImports ts =
   let
     concatMultilineImports = foldl step [] ts
-    step :: [Text] -> Text -> [Text]
     step acc t = if T.isPrefixOf " " t
                  then init acc ++ [last acc <> t]
                  else acc ++ [t]
