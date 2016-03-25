@@ -1181,7 +1181,10 @@ prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
 prettyPrintRef (ProperRef name) = name
 prettyPrintRef (TypeInstanceRef ident) = showIdent ident
 prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
-prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintRef ref
+-- We can not call prettyPrintRef again here, because there might be bottoms
+-- inside @ref@. This happens because the information necessary to construct the
+-- ref is not always available when the error occurs.
+prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 
 -- |
 -- Pretty print multiple errors
