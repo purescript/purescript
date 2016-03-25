@@ -444,25 +444,17 @@ errorSuggestion err = case err of
   RedundantEmptyHidingImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
   RedundantUnqualifiedImport{} -> emptySuggestion
-  DeprecatedQualifiedSyntax name qualName -> suggest $
-    "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
-  UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
-  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+  DeprecatedQualifiedSyntax name qualName -> suggestImport name Implicit (Just qualName)
+  UnusedExplicitImport mn _ qual refs -> suggestImport mn (Explicit refs) qual
+  ImplicitImport mn refs -> suggestImport mn (Explicit refs) Nothing
+  ImplicitQualifiedImport mn asModule refs -> suggestImport mn (Explicit refs) (Just asModule)
+  HidingImport mn refs -> suggestImport mn (Explicit refs) Nothing
   _ -> Nothing
 
   where
+    suggestImport mn importType qual = suggest $ "import " ++ prettyPrintImport mn importType qual
     emptySuggestion = Just $ ErrorSuggestion ""
     suggest = Just . ErrorSuggestion
-
-    importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> String
-    importSuggestion mn refs qual =
-      "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")" ++ qstr qual
-
-    qstr :: Maybe ModuleName -> String
-    qstr (Just mn) = " as " ++ runModuleName mn
-    qstr Nothing = ""
 
 showSuggestion :: SimpleErrorMessage -> String
 showSuggestion suggestion = case errorSuggestion suggestion of
