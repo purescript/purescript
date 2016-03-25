@@ -1,17 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Control.Monad
 import           Data.Maybe                          (fromJust)
 import           Data.Text                           (Text)
-import qualified Data.Text                           as T
-import qualified Data.Text.IO                        as TIO
 import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.Integration as Integration
 import           Test.Hspec
-
-import           System.FilePath
 
 simpleFile :: [Text]
 simpleFile =
@@ -54,45 +48,32 @@ spec = do
         (take 1 simpleFile, [preludeImport, arrayImport], drop 3 simpleFile)
   describe "pretty printing imports" $ do
     it "pretty prints a simple import" $
-      shouldBe
-        (prettyPrintImport' preludeImport)
-        "import Prelude"
+      shouldBe (prettyPrintImport' preludeImport) "import Prelude"
     it "pretty prints an explicit import" $
-      shouldBe
-        (prettyPrintImport' arrayImport)
-        "import Data.Array (head, cons)"
+      shouldBe (prettyPrintImport' arrayImport) "import Data.Array (head, cons)"
     it "pretty prints a qualified import" $
-      shouldBe
-        (prettyPrintImport' listImport)
-        "import Data.List as List"
+      shouldBe (prettyPrintImport' listImport) "import Data.List as List"
     it "pretty prints a qualified explicit import" $
-      shouldBe
-        (prettyPrintImport' consoleImport)
-        "import Control.Monad.Eff.Console (log) as Console"
+      shouldBe (prettyPrintImport' consoleImport) "import Control.Monad.Eff.Console (log) as Console"
     it "pretty prints an import with a datatype (and PositionedRef's for the dtors)" $
-      shouldBe
-        (prettyPrintImport' maybeImport)
-        "import Data.Maybe (Maybe(Just))"
+      shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 
   describe "import commands" $ do
+    let simpleFileImports = let (_, i, _) = splitSimpleFile in i
     it "adds an implicit unqualified import" $
-      let (_, imports, _) = splitSimpleFile
-      in
-        shouldBe
-          (addImplicitImport' imports (P.moduleNameFromString "Data.Map"))
-          [ "import Data.Map"
-          , "import Prelude"
-          , ""
-          ]
+      shouldBe
+        (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
+        [ "import Data.Map"
+        , "import Prelude"
+        , ""
+        ]
     it "adds an explicit unqualified import" $
-      let (_, imports, _) = splitSimpleFile
-      in
-        shouldBe
-          (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") imports)
-          [ "import Data.Array (head)"
-          , "import Prelude"
-          , ""
-          ]
+      shouldBe
+        (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") simpleFileImports)
+        [ "import Data.Array (head)"
+        , "import Prelude"
+        , ""
+        ]
     it "adds an identifier to an explicit import list" $
       let (_, imports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
       in
@@ -102,73 +83,3 @@ spec = do
           , "import Prelude"
           , ""
           ]
-  beforeAll_ setup $ afterAll_ teardown $
-    describe "Integration Tests:" $ do
-      let
-        sourceFileSkeleton :: [Text] -> [Text]
-        sourceFileSkeleton importSection =
-            [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId = id"]
-      it "adds an implicit import" $ do
-        pdir <- projectDirectory
-        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
-            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
-        _ <- Integration.addImplicitImport "Prelude" sourceFp outFp
-        res <- TIO.readFile outFp
-        shouldBe
-          (T.lines res)
-          (sourceFileSkeleton
-           [ "import Main (id)"
-           , "import Prelude"
-           ])
-      it "adds an explicit unqualified import" $ do
-        pdir <- projectDirectory
-        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
-            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
-        _ <- addImport "exportedFunction" sourceFp outFp
-        res <- TIO.readFile outFp
-        shouldBe
-          (T.lines res)
-          (sourceFileSkeleton
-           [ "import ImportsSpec1 (exportedFunction)"
-           , "import Main (id)"
-           ])
-      it "adds an explicit unqualified import (type)" $ do
-        pdir <- projectDirectory
-        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
-            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
-        r <- addImport "MyType" sourceFp outFp
-        shouldBe True (resultIsSuccess r)
-        res <- TIO.readFile outFp
-        shouldBe
-          (T.lines res)
-          (sourceFileSkeleton
-           [ "import ImportsSpec1 (MyType)"
-           , "import Main (id)"
-           ])
-      it "adds an explicit unqualified import (typeclass)" $ do
-        pdir <- projectDirectory
-        let sourceFp = pdir </> "src" </> "ImportsSpec.purs"
-            outFp = pdir </> "src" </> "ImportsSpecOut.tmp"
-        r <- addImport "ATypeClass" sourceFp outFp
-        shouldBe True (resultIsSuccess r)
-        res <- TIO.readFile outFp
-        pendingWith "Not implemented yet"
-        shouldBe
-          (T.lines res)
-          (sourceFileSkeleton
-           [ "import ImportsSpec1 (class ATypeClass)"
-           , "import Main (id)"
-           ])
-
-setup :: IO ()
-setup = do
-  deleteOutputFolder
-  s <- compileTestProject
-  unless s $ fail "Failed to compile .purs sources"
-  _ <- startServer
-  _ <- loadModuleWithDeps "ImportsSpec"
-  _ <- loadModuleWithDeps "ImportsSpec1"
-  return ()
-
-teardown :: IO ()
-teardown = quitServer

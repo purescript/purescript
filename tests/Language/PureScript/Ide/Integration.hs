@@ -25,6 +25,7 @@ module Language.PureScript.Ide.Integration
        , compileTestProject
        , deleteOutputFolder
        , projectDirectory
+       , deleteFileIfExists
          -- sending commands
        , loadModuleWithDeps
        , getFlexCompletions
@@ -90,9 +91,16 @@ compileTestProject = do
 deleteOutputFolder :: IO ()
 deleteOutputFolder = do
   odir <- fmap (</> "output") projectDirectory
-  ex <- doesDirectoryExist odir
-  when ex $
-    removeDirectoryRecursive odir
+  whenM (doesDirectoryExist odir) (removeDirectoryRecursive odir)
+
+deleteFileIfExists :: FilePath -> IO ()
+deleteFileIfExists fp = do
+  whenM (doesFileExist fp) (removeFile fp)
+
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM p f = do
+  x <- p
+  when x f
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True
