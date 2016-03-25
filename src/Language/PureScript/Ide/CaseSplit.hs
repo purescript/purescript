@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      : Language.PureScript.Ide.Imports
+-- Module      : Language.PureScript.Ide.CaseSplit
 -- Description : Casesplitting and adding function clauses
 -- Copyright   : Christoph Hegemann 2016
 -- License     : MIT (http://opensource.org/licenses/MIT)
