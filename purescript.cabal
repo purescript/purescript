@@ -315,7 +315,7 @@ executable psc-bundle
 
 executable psc-ide-server
   main-is:             Main.hs
-  other-modules:
+  other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5
                      , purescript -any
@@ -335,7 +335,7 @@ executable psc-ide-server
 
 executable psc-ide-client
   main-is:             Main.hs
-  other-modules:
+  other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5
                      , mtl -any
@@ -366,6 +366,7 @@ test-suite tests
                    PscIdeSpec
                    Language.PureScript.Ide.FilterSpec
                    Language.PureScript.Ide.ImportsSpec
+                   Language.PureScript.Ide.Imports.IntegrationSpec
                    Language.PureScript.Ide.Integration
                    Language.PureScript.Ide.MatcherSpec
                    Language.PureScript.Ide.ReexportsSpec

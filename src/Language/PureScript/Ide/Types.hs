@@ -67,16 +67,6 @@ data ExternDecl
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 
-instance ToJSON ExternDecl where
-  toJSON (FunctionDecl n t)        = object ["name" .= n, "type" .= t]
-  toJSON (ModuleDecl   n t)        = object ["name" .= n, "type" .= t]
-  toJSON (DataDecl     n t)        = object ["name" .= n, "type" .= t]
-  toJSON (Dependency   n names _)  = object ["module" .= n, "names" .= names]
-  toJSON (FixityDeclaration f p n) = object ["name" .= n
-                                            , "fixity" .= show f
-                                            , "precedence" .= p]
-  toJSON (Export _) = object []
-
 type Module = (ModuleIdent, [ExternDecl])
 
 data Configuration =
@@ -139,14 +129,6 @@ identifierFromDeclarationRef (D.TypeRef name _) = N.runProperName name
 identifierFromDeclarationRef (D.ValueRef ident) = N.runIdent ident
 identifierFromDeclarationRef (D.TypeClassRef name) = N.runProperName name
 identifierFromDeclarationRef _ = ""
-
-instance FromJSON Completion where
-  parseJSON (Object o) = do
-    m <- o .: "module"
-    d <- o .: "identifier"
-    t <- o .: "type"
-    pure (Completion (m, d, t))
-  parseJSON _ = mzero
 
 instance ToJSON Completion where
   toJSON (Completion (m,d,t)) =
