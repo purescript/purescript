@@ -35,6 +35,7 @@ data Command
     | AddClause {
       addClauseLine          :: Text
       , addClauseAnnotations :: WildcardAnnotations}
+    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
     | Cwd
     | Quit
 
@@ -97,5 +98,8 @@ instance FromJSON Command where
         return $ AddClause line (if annotations
                                  then explicitAnnotations
                                  else noAnnotations)
+      "rebuild" -> do
+        params <- o .: "params"
+        filePath <- params .: "filepath"
+        return $ Rebuild filePath
       _ -> mzero
-
