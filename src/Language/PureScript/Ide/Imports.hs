@@ -25,6 +25,7 @@ module Language.PureScript.Ide.Imports
        , answerRequest
          -- for tests
        , parseImport
+       , prettyPrintImportSection
        , addImplicitImport'
        , addExplicitImport'
        , sliceImportSection
@@ -58,24 +59,24 @@ data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
 parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
-                        FilePath -> m ([Text], [Import], [Text])
+                        FilePath -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile fp = do
   file <- liftIO (TIO.readFile fp)
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
 
-parseImports :: [Text] -> Either String [Import]
-parseImports ls = do
-  (P.Module _ _ _ decls _) <- moduleParse ("module Dummy where" : ls)
-  pure $ concatMap mkImport (unwrapPositioned <$> decls)
+parseImportsWithModuleName :: [Text] -> Either String (P.ModuleName, [Import])
+parseImportsWithModuleName ls = do
+  (P.Module _ _ mn decls _) <- moduleParse ls
+  pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
   where
     mkImport (P.ImportDeclaration mn (P.Explicit refs) qual _) =
       [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
     mkImport (P.ImportDeclaration mn it qual _) = [Import mn it qual]
     mkImport _ = []
 
-sliceImportSection :: [Text] -> Either String ([Text], [Import], [Text])
+sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection ts =
   case foldl step ModuleHeader (zip [0..] ts) of
     Res start end ->
@@ -83,7 +84,8 @@ sliceImportSection ts =
         (moduleHeader, (importSection, remainingFile)) =
           List.splitAt (succ (end - start)) `second` List.splitAt start ts
       in
-        (\is -> (moduleHeader, is, remainingFile)) <$> parseImports importSection
+        (\(mn, is) -> (mn, moduleHeader, is, remainingFile)) <$>
+          parseImportsWithModuleName (moduleHeader <> importSection)
     _ -> Left "Failed to detect the import section"
 
 data ImportStateMachine = ModuleHeader | ImportSection Int Int | Res Int Int
@@ -130,13 +132,13 @@ addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
                      -> P.ModuleName -- ^ The module to import
                      -> m [Text]
 addImplicitImport fp mn = do
-  (pre, imports, post) <- parseImportsFromFile fp
+  (_, pre, imports, post) <- parseImportsFromFile fp
   let newImportSection = addImplicitImport' imports mn
   pure $ pre ++ newImportSection ++ post
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
-  List.sort (map prettyPrintImport' (imports ++ [Import mn P.Implicit Nothing]))
+  prettyPrintImportSection (Import mn P.Implicit Nothing : imports)
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
@@ -148,27 +150,31 @@ addImplicitImport' imports mn =
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
                      FilePath -> Text -> P.ModuleName -> m [Text]
 addExplicitImport fp identifier moduleName = do
-  (pre, imports, post) <- parseImportsFromFile fp
-  logDebugN ("Identifier: " <> identifier <> "ModuleName: " <> T.pack (P.runModuleName moduleName))
-  let newImportSection = addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
-  pure (pre ++ newImportSection ++ post)
+  (mn, pre, imports, post) <- parseImportsFromFile fp
+  let newImportSection =
+        -- TODO: Open an issue when this PR is merged. We should optimize both
+        -- this case and the nubBy inside addExplicitImport'
+        if mn == moduleName
+        then imports
+        else addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
+  pure (pre ++ prettyPrintImportSection newImportSection ++ post)
 
-addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Text]
+addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Import]
 addExplicitImport' identifier moduleName imports =
   let
     matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
     matches _ = False
-
-    newImports = case List.findIndex matches imports of
+  in
+    case List.findIndex matches imports of
       -- The module wasn't imported yet
       Nothing ->
-        imports ++ [Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing]
+        Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing : imports
       Just ix ->
-        let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
-            newRefs = List.nubBy ((==) `on` P.prettyPrintRef) (P.ValueRef identifier : refs)
-        in x ++ [Import mn (P.Explicit newRefs) Nothing] ++ ys
-
-  in List.sort (map prettyPrintImport' newImports)
+        let
+          (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
+          newRefs = List.nubBy ((==) `on` P.prettyPrintRef)
+            (P.ValueRef identifier : refs)
+        in Import mn (P.Explicit newRefs) Nothing : x ++ ys
 
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -210,6 +216,9 @@ prettyPrintImport' (Import mn (P.Explicit refs) qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
+
+prettyPrintImportSection :: [Import] -> [Text]
+prettyPrintImportSection = List.sort . map prettyPrintImport'
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the

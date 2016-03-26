@@ -15,7 +15,7 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
-splitSimpleFile :: ([Text], [Import], [Text])
+splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
 splitSimpleFile = fromRight $ sliceImportSection simpleFile
   where
     fromRight (Right r) = r
@@ -38,17 +38,17 @@ maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 spec :: Spec
 spec = do
   describe "determining the importsection" $ do
+    let moduleSkeleton imports =
+          Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
     it "finds a simple import" $
-      shouldBe
-        (sliceImportSection simpleFile)
-        (Right (take 1 simpleFile, [preludeImport], drop 2 simpleFile))
+      shouldBe (sliceImportSection simpleFile) (moduleSkeleton [preludeImport])
 
     it "allows multiline import statements" $
       shouldBe
         (sliceImportSection (withImports [ "import Data.Array (head,"
                                          , "                   cons)"
                                          ]))
-        (Right (take 1 simpleFile, [preludeImport, arrayImport], drop 2 simpleFile))
+        (moduleSkeleton [preludeImport, arrayImport])
   describe "pretty printing imports" $ do
     it "pretty prints a simple import" $
       shouldBe (prettyPrintImport' preludeImport) "import Prelude"
@@ -62,7 +62,8 @@ spec = do
       shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 
   describe "import commands" $ do
-    let simpleFileImports = let (_, i, _) = splitSimpleFile in i
+    let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
+        addExplicitImportTest i mn is = prettyPrintImportSection (addExplicitImport' i mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
@@ -71,20 +72,20 @@ spec = do
         ]
     it "adds an explicit unqualified import" $
       shouldBe
-        (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") simpleFileImports)
+        (addExplicitImportTest (P.Ident "head") (P.moduleNameFromString "Data.Array") simpleFileImports)
         [ "import Data.Array (head)"
         , "import Prelude"
         ]
-    let Right (_, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
+    let Right (_, _, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
     it "adds an identifier to an explicit import list" $
       shouldBe
-        (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") explicitImports)
+        (addExplicitImportTest (P.Ident "head") (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Data.Array (head, tail)"
         , "import Prelude"
         ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
       shouldBe
-      (addExplicitImport' (P.Ident "tail") (P.moduleNameFromString "Data.Array") explicitImports)
+      (addExplicitImportTest (P.Ident "tail") (P.moduleNameFromString "Data.Array") explicitImports)
       [ "import Data.Array (tail)"
       , "import Prelude"
       ]
