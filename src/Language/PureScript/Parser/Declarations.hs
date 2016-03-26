@@ -184,7 +184,6 @@ parseTypeClassDeclaration = do
     indented *> reserved "where"
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
-  where
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = (,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)

@@ -637,7 +637,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ showIdent nm ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
-      paras [ line $ "There is a cycle in module dependencies in these modules: "
+      paras [ line "There is a cycle in module dependencies in these modules: "
             , indent $ paras (map (line . runModuleName) mns)
             ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
@@ -671,7 +671,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             sortRows' :: ([(String, Type)], Type) -> ([(String, Type)], Type) -> (Type, Type)
             sortRows' (s1, r1) (s2, r2) =
               let common :: [(String, (Type, Type))]
-                  common = sortBy (comparing fst) $ [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+                  common = sortBy (comparing fst) [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
 
                   sd1, sd2 :: [(String, Type)]
                   sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
@@ -840,8 +840,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:\n"
             , indent $ paras $
-                [ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs)) ]
-                ++ [ line "..." | not b ]
+                Box.hsep 1 Box.left
+                  (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
+                  : [line "..." | not b]
             , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
             , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
             ]
@@ -973,7 +974,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line "An anonymous function argument appears in an invalid context."
 
     renderSimpleErrorMessage (InvalidOperatorInBinder op fn) =
-      paras $ [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
+      paras [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
               , line "Only aliases for data constructors may be used in patterns."
               ]
 
@@ -1197,11 +1198,11 @@ prettyPrintMultipleWarnings full = unlines . map renderBox . prettyPrintMultiple
 
 -- | Pretty print warnings as a Box
 prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleWarningsBox full = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
+prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning"
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox full = prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
+prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error" 
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =

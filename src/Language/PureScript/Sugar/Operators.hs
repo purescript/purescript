@@ -103,7 +103,7 @@ rebracket externs ms = do
       Nothing ->
         maybe id rethrowWithPosition pos $
           throwError . errorMessage $ UnknownValue name
-    goBinder _ (BinaryNoParensBinder _ _ _) =
+    goBinder _ (BinaryNoParensBinder {}) =
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
 

@@ -72,9 +72,8 @@ insertModule externsFile = do
   liftIO . atomically $ insertModule' (envStateVar env) externsFile
 
 insertModule' :: TVar PscIdeState -> ExternsFile -> STM ()
-insertModule' st ef = do
-    modifyTVar st $ \x ->
-      x { externsFiles = M.insert (efModuleName ef) ef (externsFiles x)
-        , pscStateModules = let (mn, decls) = convertExterns ef
-                            in M.insert mn decls (pscStateModules x)
-        }
+insertModule' st ef = modifyTVar st $ \x ->
+                      x { externsFiles = M.insert (efModuleName ef) ef (externsFiles x)
+                        , pscStateModules = let (mn, decls) = convertExterns ef
+                                            in M.insert mn decls (pscStateModules x)
+                        }

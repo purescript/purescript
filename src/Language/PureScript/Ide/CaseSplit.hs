@@ -19,6 +19,7 @@ module Language.PureScript.Ide.CaseSplit
 import           Prelude                                 ()
 import           Prelude.Compat                          hiding (lex)
 
+import           Control.Arrow                           (second)
 import           Control.Monad.Error.Class
 import           "monad-logger" Control.Monad.Logger
 import           Data.List                               (find)
@@ -58,7 +59,7 @@ caseSplit q = do
   (tc, args) <- splitTypeConstructor type'
   (EDType _ _ (DataType typeVars ctors)) <- findTypeDeclaration tc
   let applyTypeVars = everywhereOnTypes (replaceAllTypeVars (zip (map fst typeVars) args))
-  let appliedCtors = map (\(n, ts) -> (n, map applyTypeVars ts)) ctors
+  let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
 findTypeDeclaration :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>

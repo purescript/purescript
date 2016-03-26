@@ -144,7 +144,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   binderToCoreFn :: Maybe SourceSpan -> [Comment] -> A.Binder -> Binder Ann
   binderToCoreFn ss com (A.LiteralBinder lit) =
     LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
-  binderToCoreFn ss com (A.NullBinder) =
+  binderToCoreFn ss com A.NullBinder =
     NullBinder (ss, com, Nothing, Nothing)
   binderToCoreFn ss com (A.VarBinder name) =
     VarBinder (ss, com, Nothing, Nothing) name

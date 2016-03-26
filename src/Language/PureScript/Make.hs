@@ -40,7 +40,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Concurrent.Lifted as C
 
 import Data.List (foldl', sort)
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (fromMaybe, catMaybes, isJust)
 import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
@@ -151,7 +151,7 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadE
      -> m Environment
 make MakeActions{..} ms = do
   requirePath <- asks optionsRequirePath
-  when (requirePath /= Nothing) $ tell $ errorMessage DeprecatedRequirePath
+  when (isJust requirePath) $ tell $ errorMessage DeprecatedRequirePath
 
   checkModuleNamesAreUnique
 
@@ -364,8 +364,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         , mapSourceFile = sourceFile
         , mapGenerated = convertPos $ add (extraLines+1) 0 gen
         , mapName = Nothing
-        }) $
-        mappings
+        }) mappings
     }
     let mapping = generate rawMapping
     writeTextFile mapFile $ BU8.toString . B.toStrict . encode $ mapping

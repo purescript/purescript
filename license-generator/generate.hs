@@ -27,7 +27,7 @@ depsLicense dep = do
     putStrLn ""
     putStrLn $ f license
   where
-    f = unlines . map trimEnd . map ("  " ++) . lines
+    f = unlines . map (trimEnd . ("  " ++)) . lines
     trimEnd = reverse . dropWhile isSpace . reverse
 
 main :: IO ()

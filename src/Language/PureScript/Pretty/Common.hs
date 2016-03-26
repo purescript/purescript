@@ -148,7 +148,7 @@ prettyPrintMany :: (Emit gen) => (a -> StateT PrinterState Maybe gen) -> [a] -> 
 prettyPrintMany f xs = do
   ss <- mapM f xs
   indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map (\s -> mappend indentString s) ss
+  return $ intercalate (emit "\n") $ map (mappend indentString) ss
 
 -- |
 -- Prints an object key, escaping reserved names.

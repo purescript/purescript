@@ -152,7 +152,7 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
     in foldr go used (classes ++ types ++ dctors ++ values)
     where
     go :: (ModuleName, Name) -> UsedImports -> UsedImports
-    go (q, name) acc = M.alter (Just . maybe [name] (name :)) q acc
+    go (q, name) = M.alter (Just . maybe [name] (name :)) q
 
   extractByQual
     :: (Eq a)

@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -217,8 +216,7 @@ lookupValueDeclaration importedFrom ident = do
             pure (importedFrom, [Left r'])
           other ->
             errOther other
-    other -> do
-      errOther other
+    other -> errOther other
 
   where
   thd :: (a, b, c) -> c
@@ -381,7 +379,7 @@ handleEnv TypeClassEnv{..} =
   promoteChild constraint ChildDeclaration{..} =
     case cdeclInfo of
       ChildTypeClassMember typ ->
-        pure $ Declaration
+        pure Declaration
           { declTitle      = cdeclTitle
           , declComments   = cdeclComments
           , declSourceSpan = cdeclSourceSpan
