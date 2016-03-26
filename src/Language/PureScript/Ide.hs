@@ -59,6 +59,7 @@ import           System.Exit
 
 handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
+handleCommand (Load [] []) = loadAllModules
 handleCommand (Load modules deps) =
   loadModulesAndDeps modules deps
 handleCommand (Type search filters) =
@@ -205,6 +206,26 @@ loadModule mn = do
   loadExtern path
   $(logDebug) ("Loaded extern file at: " <> T.pack path)
   pure ("Loaded extern file at: " <> T.pack path)
+
+loadAllModules :: (PscIde m, MonadLogger m, MonadError PscIdeError m) => m Success
+loadAllModules = do
+  outputPath <- confOutputPath . envConfiguration <$> ask
+  cwd <- liftIO getCurrentDirectory
+  let outputDirectory = cwd </> outputPath
+  liftIO (getDirectoryContents outputDirectory)
+    >>= liftIO . traverse (getExternsPath outputDirectory)
+    >>= traverse_ loadExtern . catMaybes
+  pure (TextResult "All modules loaded.")
+  where
+    getExternsPath :: FilePath -> FilePath -> IO (Maybe FilePath)
+    getExternsPath outputDirectory d
+      | d `elem` [".", ".."] = pure Nothing
+      | otherwise = do
+          let file = outputDirectory </> d </> "externs.json"
+          ex <- doesFileExist file
+          if ex
+            then pure (Just file)
+            else pure Nothing
 
 filePathFromModule :: (PscIde m, MonadError PscIdeError m) =>
                       ModuleIdent -> m FilePath

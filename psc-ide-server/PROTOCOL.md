@@ -8,8 +8,9 @@ this document.
 
 ## Command:
 ### Load
-The `load` command "loads" the requested modules into the server
-for completion and type info.
+The `load` command "loads" the requested modules into the server for completion
+and type info. If the `params` object is left off, the `load` command will try
+to detect all the compiled modules in your project and load them.
 
 **Params:**
  - `modules :: (optional) [ModuleName]`: A list of modules to load.
@@ -21,7 +22,7 @@ for completion and type info.
 ```json
 {
   "command": "load",
-  "params": {
+  "params": (optional) {
     "modules": (optional)["Module.Name1", "Module.Name2"],
     "dependencies": (optional)["Module.Name3"]
   }

@@ -105,11 +105,11 @@ instance FromJSON Command where
         return $ List (fromMaybe LoadedModules listType')
       "cwd"  -> return Cwd
       "quit" -> return Quit
-      "load" -> do
-        params <- o .: "params"
-        mods <- params .:? "modules"
-        deps <- params .:? "dependencies"
-        return $ Load (fromMaybe [] mods) (fromMaybe [] deps)
+      "load" ->
+        maybe (pure (Load [] [])) (\params -> do
+          mods <- params .:? "modules"
+          deps <- params .:? "dependencies"
+          pure $ Load (fromMaybe [] mods) (fromMaybe [] deps)) =<< o .:? "params"
       "type" -> do
         params <- o .: "params"
         search <- params .: "search"
