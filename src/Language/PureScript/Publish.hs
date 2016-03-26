@@ -18,7 +18,7 @@ module Language.PureScript.Publish
   , getGitWorkingTreeStatus
   , checkCleanWorkingTree
   , getVersionFromGitTag
-  , getBowerInfo
+  , getBowerRepositoryInfo
   , getModulesAndBookmarks
   , getResolvedDependencies
   ) where
@@ -127,18 +127,23 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
+unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM cond act = cond >>= flip unless act 
+
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
-  exists <- liftIO (doesFileExist "bower.json")
-  unless exists (userError BowerJSONNotFound)
-
+  unlessM (liftIO (doesFileExist "bower.json")) (userError BowerJSONNotFound)
   checkCleanWorkingTree opts
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntDecodeBowerJSON)
+  unlessM (liftIO (doesFileExist "LICENSE")) (userError LicenseNotFound)
+
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
-  pkgGithub                   <- getBowerInfo pkgMeta
+  pkgGithub                   <- getBowerRepositoryInfo pkgMeta
   (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
+
+  unless (bowerLicenseExists pkgMeta) (userError NoLicenseSpecified)
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
@@ -199,8 +204,8 @@ getVersionFromGitTag = do
   dropPrefix prefix str =
     fromMaybe str (stripPrefix prefix str)
 
-getBowerInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
-getBowerInfo = either (userError . BadRepositoryField) return . tryExtract
+getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
+getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
   where
   tryExtract pkgMeta =
     case bowerRepository pkgMeta of
@@ -209,6 +214,9 @@ getBowerInfo = either (userError . BadRepositoryField) return . tryExtract
         unless (repositoryType == "git")
           (Left (BadRepositoryType repositoryType))
         maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
+
+bowerLicenseExists :: PackageMeta -> Bool
+bowerLicenseExists = any (not . null) . bowerLicense
 
 extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes
