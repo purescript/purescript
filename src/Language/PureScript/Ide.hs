@@ -57,7 +57,6 @@ import           System.Directory
 import           System.FilePath
 import           System.Exit
 
-
 handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
 handleCommand (Load [] []) = loadAllModules
@@ -89,6 +88,9 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
   case rs of
     Right rs' -> answerRequest outfp rs'
     Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
+    pure $ addClause l wca
+handleCommand (Rebuild path) =
+    rebuildFile path
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
