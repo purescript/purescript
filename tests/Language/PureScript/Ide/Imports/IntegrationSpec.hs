@@ -16,6 +16,7 @@ setup = do
   Integration.deleteOutputFolder
   s <- Integration.compileTestProject
   unless s $ fail "Failed to compile .purs sources"
+  Integration.quitServer -- kill a eventually running psc-ide-server instance
   _ <- Integration.startServer
   mapM_ Integration.loadModuleWithDeps ["ImportsSpec", "ImportsSpec1"]
 
@@ -66,6 +67,9 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
                          pendingWith "Not implemented yet")
     outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (class ATypeClass)"
                                            , "import Main (id)"])
+  it "doesn't add an import if the identifier is defined in the module itself" $ do
+    withSupportFiles (Integration.addImport "myId")
+    outputFileShouldBe (sourceFileSkeleton [ "import Main (id)"])
   it "responds with an error if the identifier cannot be found and doesn't \
      \write to the output file" $
     withSupportFiles (\sourceFp outFp -> do
