@@ -165,7 +165,8 @@ addExplicitImport' identifier moduleName imports =
         imports ++ [Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing]
       Just ix ->
         let (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
-        in x  ++ [Import mn (P.Explicit (P.ValueRef identifier : refs)) Nothing] ++ ys
+            newRefs = List.nubBy ((==) `on` P.prettyPrintRef) (P.ValueRef identifier : refs)
+        in x ++ [Import mn (P.Explicit newRefs) Nothing] ++ ys
 
   in List.sort (map prettyPrintImport' newImports)
 

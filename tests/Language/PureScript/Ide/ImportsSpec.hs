@@ -75,11 +75,16 @@ spec = do
         [ "import Data.Array (head)"
         , "import Prelude"
         ]
+    let Right (_, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
     it "adds an identifier to an explicit import list" $
-      let Right (_, imports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
-      in
-        shouldBe
-          (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") imports)
-          [ "import Data.Array (head, tail)"
-          , "import Prelude"
-          ]
+      shouldBe
+        (addExplicitImport' (P.Ident "head") (P.moduleNameFromString "Data.Array") explicitImports)
+        [ "import Data.Array (head, tail)"
+        , "import Prelude"
+        ]
+    it "doesn't add an identifier to an explicit import list if it's already imported" $
+      shouldBe
+      (addExplicitImport' (P.Ident "tail") (P.moduleNameFromString "Data.Array") explicitImports)
+      [ "import Data.Array (tail)"
+      , "import Prelude"
+      ]
