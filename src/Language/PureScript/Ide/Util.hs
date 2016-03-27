@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Util
+-- Description : Generally useful functions and conversions
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Generally useful functions and conversions
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.Util where
@@ -6,6 +20,10 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
+
+import Data.Aeson
+import Data.Text.Lazy (toStrict, fromStrict)
+import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
 
 runProperNameT :: P.ProperName a -> Text
 runProperNameT = T.pack . P.runProperName
@@ -43,3 +61,9 @@ completionFromMatch (Match _ Dependency{}) =
   error "Can't make a Completion from a Dependency"
 completionFromMatch (Match _ Export{}) =
   error "Can't make a Completion from an Export"
+
+encodeT :: (ToJSON a) => a -> Text
+encodeT = toStrict . decodeUtf8 . encode
+
+decodeT :: (FromJSON a) => Text -> Maybe a
+decodeT = decode . encodeUtf8 . fromStrict

@@ -202,7 +202,6 @@ library
                      Language.PureScript.Ide.Command
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.CodecJSON
                      Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Completion
                      Language.PureScript.Ide.Matcher

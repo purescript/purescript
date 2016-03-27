@@ -39,7 +39,6 @@ import           Data.Monoid
 import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
-import           Language.PureScript.Ide.CodecJSON
 import           Language.PureScript.Ide.Error        (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
