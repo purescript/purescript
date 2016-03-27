@@ -93,6 +93,20 @@ spec = do
           [ "import Data.Maybe (Maybe(Just))"
           , "import Prelude"
           ]
+    it "adds a dataconstructor to an existing type import" $ do
+      let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
+      shouldBe
+        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        [ "import Data.Maybe (Maybe(Just))"
+        , "import Prelude"
+        ]
+    it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
+      let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe(..))"])
+      shouldBe
+        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        [ "import Data.Maybe (Maybe(..))"
+        , "import Prelude"
+        ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
       shouldBe
       (addValueImport "tail" (P.moduleNameFromString "Data.Array") explicitImports)
