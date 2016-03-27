@@ -64,9 +64,22 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
     withSupportFiles (Integration.addImport "ATypeClass")
     outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (class ATypeClass)"
                                            , "import Main (id)"])
+  it "adds an explicit unqualified import (dataconstructor)" $ do
+    withSupportFiles (Integration.addImport "MyJust")
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyMaybe(..))"
+                                           , "import Main (id)"])
+  it "adds an explicit unqualified import (newtype)" $ do
+    withSupportFiles (Integration.addImport "MyNewtype")
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyNewtype(..))"
+                                           , "import Main (id)"])
   it "doesn't add an import if the identifier is defined in the module itself" $ do
     withSupportFiles (Integration.addImport "myId")
     outputFileShouldBe (sourceFileSkeleton [ "import Main (id)"])
+  it "responds with an error if it's undecidable whether we want a type or constructor" $
+    withSupportFiles (\sourceFp outFp -> do
+                         r <- Integration.addImport "SpecialCase" sourceFp outFp
+                         shouldBe False (Integration.resultIsSuccess r)
+                         shouldBe False =<< doesFileExist outFp)
   it "responds with an error if the identifier cannot be found and doesn't \
      \write to the output file" $
     withSupportFiles (\sourceFp outFp -> do
