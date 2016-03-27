@@ -33,7 +33,9 @@ import           Prelude.Compat
 
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
+import           Data.List                            (nub)
 import           Data.Maybe                           (mapMaybe)
+import           Data.Monoid
 import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
@@ -61,7 +63,7 @@ identToText :: P.Ident -> Text
 identToText  = T.pack . P.runIdent
 
 convertExterns :: PE.ExternsFile -> Module
-convertExterns ef = (moduleName, exportDecls ++ importDecls ++ otherDecls)
+convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls)
   where
     moduleName = moduleNameToText (PE.efModuleName ef)
     importDecls = convertImport <$> PE.efImports ef
@@ -69,6 +71,19 @@ convertExterns ef = (moduleName, exportDecls ++ importDecls ++ otherDecls)
     -- Ignoring operator fixities for now since we're not using them
     -- operatorDecls = convertOperator <$> PE.efFixities ef
     otherDecls = mapMaybe convertDecl (PE.efDeclarations ef)
+
+    typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration otherDecls)
+    decls = nub $ appEndo typeClassFilter otherDecls
+
+removeTypeDeclarationsForClass :: ExternDecl -> Endo [ExternDecl]
+removeTypeDeclarationsForClass (TypeClassDeclaration n) = Endo (filter notDuplicate)
+  where notDuplicate (TypeDeclaration n' _) = runProperNameT n /= runProperNameT n'
+        notDuplicate _ = True
+removeTypeDeclarationsForClass _ = mempty
+
+isTypeClassDeclaration :: ExternDecl -> Bool
+isTypeClassDeclaration TypeClassDeclaration{} = True
+isTypeClassDeclaration _ = False
 
 convertImport :: PE.ExternsImport -> ExternDecl
 convertImport ei = Dependency
