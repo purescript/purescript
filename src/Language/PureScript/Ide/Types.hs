@@ -33,24 +33,20 @@ import           Data.Maybe                           (maybeToList)
 import           Data.Text                            (Text (), pack, unpack)
 import qualified Language.PureScript.AST.Declarations as D
 import           Language.PureScript.Externs
-import           Language.PureScript.Names
 import qualified Language.PureScript.Names            as N
+import qualified Language.PureScript as P
 
 import           Text.Parsec
 import           Text.Parsec.Text
 
+type Ident = Text
+type DeclIdent = Text
 type ModuleIdent = Text
-type DeclIdent   = Text
-type Type        = Text
-
-data Fixity = Infix | Infixl | Infixr deriving(Show, Eq, Ord)
 
 data ExternDecl
     -- | A function/value declaration
-    = FunctionDecl
-        DeclIdent -- The functions name
-        Type      -- The functions type
-    | FixityDeclaration Fixity Int DeclIdent
+    = ValueDeclaration Ident P.Type
+    | TypeDeclaration (P.ProperName 'P.TypeName) P.Kind
     -- | A Dependency onto another Module
     | Dependency
         ModuleIdent  -- name of the dependency
@@ -61,9 +57,12 @@ data ExternDecl
         ModuleIdent -- The modules name
         [DeclIdent] -- The exported identifiers
     -- | A data/newtype declaration
-    | DataDecl DeclIdent -- The type name
-               Text      -- The "type"
+    | DataConstructor
+      DeclIdent -- ^ The type name
+      (P.ProperName 'P.TypeName)
+      P.Type      -- ^ The "type"
     -- | An exported module
+    | TypeClassDeclaration (P.ProperName 'P.ClassName)
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 
@@ -86,7 +85,7 @@ type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 data PscIdeState =
   PscIdeState
   { pscStateModules :: M.Map Text [ExternDecl]
-  , externsFiles    :: M.Map ModuleName ExternsFile
+  , externsFiles    :: M.Map P.ModuleName ExternsFile
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
@@ -95,20 +94,8 @@ emptyPscIdeState = PscIdeState M.empty M.empty
 data Match = Match ModuleIdent ExternDecl
                deriving (Show, Eq)
 
-identifierFromMatch :: Match -> Text
-identifierFromMatch (Match _ (FunctionDecl name _)) = name
-identifierFromMatch (Match _ (DataDecl name _)) = name
-identifierFromMatch (Match _ (ModuleDecl name _)) = name
-identifierFromMatch _ = ""
-
-completionFromMatch :: Match -> Completion
-completionFromMatch (Match m (FunctionDecl name t)) = Completion (m, name, t)
-completionFromMatch (Match m (DataDecl name t)) = Completion (m, name, t)
-completionFromMatch (Match _ (ModuleDecl name _)) = Completion ("module", name, "module")
-completionFromMatch _ = error "wat"
-
 newtype Completion =
-  Completion (ModuleIdent, DeclIdent, Type)
+  Completion (ModuleIdent, DeclIdent, Text)
   deriving (Show,Eq)
 
 instance ToJSON Completion where
@@ -192,7 +179,7 @@ data PursuitResponse =
   ModuleResponse ModuleIdent Text
   -- | A Pursuit Response for a declaration. Consist of the declarations type,
   -- module, name and package
-  | DeclarationResponse Type ModuleIdent DeclIdent Text
+  | DeclarationResponse Text ModuleIdent DeclIdent Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where

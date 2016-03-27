@@ -6,13 +6,17 @@ import           Data.Text                           (Text)
 import           Language.PureScript.Ide.Integration
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import qualified Language.PureScript as P
 import           Test.Hspec
+
+value :: Text -> ExternDecl
+value s = ValueDeclaration s P.TypeWildcard
 
 completions :: [Match]
 completions = [
-  Match "" $ DataDecl "firstResult" "",
-  Match "" $ DataDecl "secondResult" "",
-  Match "" $ DataDecl "fiult" ""
+  Match "" $ value "firstResult",
+  Match "" $ value "secondResult",
+  Match "" $ value "fiult"
   ]
 
 mkResult :: [Int] -> [Match]

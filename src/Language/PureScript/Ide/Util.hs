@@ -1,0 +1,42 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+module Language.PureScript.Ide.Util where
+
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import qualified Language.PureScript           as P
+import           Language.PureScript.Ide.Types
+
+runProperNameT :: P.ProperName a -> Text
+runProperNameT = T.pack . P.runProperName
+
+prettyTypeT :: P.Type -> Text
+prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
+
+identifierFromExternDecl :: ExternDecl -> Text
+identifierFromExternDecl (ValueDeclaration name _) = name
+identifierFromExternDecl (TypeDeclaration name _) = runProperNameT name
+identifierFromExternDecl (DataConstructor name _ _) = name
+identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
+identifierFromExternDecl (ModuleDecl name _) = name
+identifierFromExternDecl Dependency{} = "~Dependency~"
+identifierFromExternDecl Export{} = "~Export~"
+
+identifierFromMatch :: Match -> Text
+identifierFromMatch (Match _ ed) = identifierFromExternDecl ed
+
+completionFromMatch :: Match -> Completion
+completionFromMatch (Match m (ValueDeclaration name type')) =
+  Completion (m, name, prettyTypeT type')
+completionFromMatch (Match m (TypeDeclaration name kind)) =
+  Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
+completionFromMatch (Match m (DataConstructor name _ type')) =
+  Completion (m, name, prettyTypeT type')
+completionFromMatch (Match m (TypeClassDeclaration name)) =
+  Completion (m, runProperNameT name, "class")
+completionFromMatch (Match _ (ModuleDecl name _)) =
+  Completion ("module", name, "module")
+completionFromMatch (Match _ Dependency{}) =
+  error "Can't make a Completion from a Dependency"
+completionFromMatch (Match _ Export{}) =
+  error "Can't make a Completion from an Export"

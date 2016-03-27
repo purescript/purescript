@@ -35,6 +35,7 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           Text.EditDistance
 import           Text.Regex.TDFA               ((=~))
 

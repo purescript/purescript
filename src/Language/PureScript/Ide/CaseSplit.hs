@@ -40,6 +40,7 @@ import           Data.List                               (find)
 import           Data.Monoid
 import           Data.Text                               (Text)
 import qualified Data.Text                               as T
+import qualified Language.PureScript                     as P
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
 import           Language.PureScript.Externs
@@ -144,14 +145,14 @@ parseType' s =
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 ++ show err))
 
-parseTypeDeclaration' :: String -> (Ident, Type)
+parseTypeDeclaration' :: String -> (P.Ident, Type)
 parseTypeDeclaration' s =
   let x = do
         ts <- lex "" s
         runTokenParser "" (parseDeclaration <* P.eof) ts
   in
     case unwrapPositioned <$> x of
-      Right (TypeDeclaration i t) -> (i, t)
+      Right (P.TypeDeclaration i t) -> (i, t)
       y -> error (show y)
 
 splitFunctionType :: Type -> ([Type], Type)

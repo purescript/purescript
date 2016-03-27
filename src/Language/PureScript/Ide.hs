@@ -52,6 +52,7 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           System.Directory
 import           System.FilePath
 import           System.Exit

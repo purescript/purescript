@@ -214,6 +214,7 @@ library
                      Language.PureScript.Ide.Watcher
                      Language.PureScript.Ide.Reexports
                      Language.PureScript.Ide.Imports
+                     Language.PureScript.Ide.Util
 
                      Control.Monad.Logger
                      Control.Monad.Supply

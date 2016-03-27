@@ -22,8 +22,6 @@ module Language.PureScript.Ide.Externs
   ( ExternDecl(..),
     ModuleIdent,
     DeclIdent,
-    Type,
-    Fixity(..),
     readExternFile,
     convertExterns,
     unwrapPositioned,
@@ -39,13 +37,14 @@ import           Data.Maybe                           (mapMaybe)
 import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
-import qualified Language.PureScript.AST.Declarations as D
-import qualified Language.PureScript.Externs          as PE
 import           Language.PureScript.Ide.CodecJSON
 import           Language.PureScript.Ide.Error        (PscIdeError (..))
 import           Language.PureScript.Ide.Types
-import qualified Language.PureScript.Names            as N
-import qualified Language.PureScript.Pretty           as PP
+import           Language.PureScript.Ide.Util
+
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Externs as PE
+import qualified Language.PureScript.Kinds as Kinds
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m PE.ExternsFile
@@ -55,14 +54,11 @@ readExternFile fp = do
      Nothing -> throwError . GeneralError $ "Parsing the extern at: " ++ fp ++ " failed"
      Just externs -> pure externs
 
-moduleNameToText :: N.ModuleName -> Text
-moduleNameToText = T.pack . N.runModuleName
+moduleNameToText :: P.ModuleName -> Text
+moduleNameToText = T.pack . P.runModuleName
 
-properNameToText :: N.ProperName a -> Text
-properNameToText = T.pack . N.runProperName
-
-identToText :: N.Ident -> Text
-identToText  = T.pack . N.runIdent
+identToText :: P.Ident -> Text
+identToText  = T.pack . P.runIdent
 
 convertExterns :: PE.ExternsFile -> Module
 convertExterns ef = (moduleName, exportDecls ++ importDecls ++ otherDecls)
@@ -80,36 +76,25 @@ convertImport ei = Dependency
   []
   (moduleNameToText <$> PE.eiImportedAs ei)
 
-convertExport :: D.DeclarationRef -> Maybe ExternDecl
-convertExport (D.ModuleRef mn) = Just (Export (moduleNameToText mn))
+convertExport :: P.DeclarationRef -> Maybe ExternDecl
+convertExport (P.ModuleRef mn) = Just (Export (moduleNameToText mn))
 convertExport _ = Nothing
 
 convertDecl :: PE.ExternsDeclaration -> Maybe ExternDecl
-convertDecl PE.EDType{..} = Just $
-  DataDecl
-  (properNameToText edTypeName)
-  (packAndStrip (PP.prettyPrintKind edTypeKind))
+convertDecl PE.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
 convertDecl PE.EDTypeSynonym{..} = Just $
-  DataDecl
-  (properNameToText edTypeSynonymName)
-  (packAndStrip (PP.prettyPrintType edTypeSynonymType))
+  TypeDeclaration edTypeSynonymName Kinds.Star
 convertDecl PE.EDDataConstructor{..} = Just $
-  DataDecl
-  (properNameToText edDataCtorName)
-  (packAndStrip (PP.prettyPrintType edDataCtorType))
+  DataConstructor (runProperNameT edDataCtorName) edDataCtorTypeCtor edDataCtorType
 convertDecl PE.EDValue{..} = Just $
-  FunctionDecl
-  (identToText edValueName)
-  (packAndStrip (PP.prettyPrintType edValueType))
-convertDecl _ = Nothing
+  ValueDeclaration (identToText edValueName) edValueType
+convertDecl PE.EDClass{..} = Just $ TypeClassDeclaration edClassName
+convertDecl PE.EDInstance{} = Nothing
 
-packAndStrip :: String -> Text
-packAndStrip = T.unwords . fmap T.strip . T.lines . T.pack
-
-unwrapPositioned :: D.Declaration -> D.Declaration
-unwrapPositioned (D.PositionedDeclaration _ _ x) = x
+unwrapPositioned :: P.Declaration -> P.Declaration
+unwrapPositioned (P.PositionedDeclaration _ _ x) = x
 unwrapPositioned x = x
 
-unwrapPositionedRef :: D.DeclarationRef -> D.DeclarationRef
-unwrapPositionedRef (D.PositionedDeclarationRef _ _ x) = x
+unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
+unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = x
 unwrapPositionedRef x = x

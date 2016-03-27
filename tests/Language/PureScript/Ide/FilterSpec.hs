@@ -4,15 +4,19 @@ module Language.PureScript.Ide.FilterSpec where
 import           Data.Text                      (Text)
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Types
+import qualified Language.PureScript as P
 import           Test.Hspec
+
+value :: Text -> ExternDecl
+value s = ValueDeclaration s P.TypeWildcard
 
 modules :: [Module]
 modules =
   [
-    ("Module.A", [FunctionDecl "function1" ""]),
-    ("Module.B", [DataDecl "data1" ""]),
+    ("Module.A", [value "function1"]),
+    ("Module.B", [value "data1"]),
     ("Module.C", [ModuleDecl "Module.C" []]),
-    ("Module.D", [Dependency "Module.C" [] Nothing, FunctionDecl "asd" ""])
+    ("Module.D", [Dependency "Module.C" [] Nothing, value "asd"])
   ]
 
 runEq :: Text -> [Module]

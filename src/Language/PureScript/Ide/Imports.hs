@@ -52,6 +52,7 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Externs ( unwrapPositionedRef
                                                  , unwrapPositioned)
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)

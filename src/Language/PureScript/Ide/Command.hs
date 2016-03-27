@@ -54,7 +54,7 @@ data Command
       , caseSplitBegin       :: Int
       , caseSplitEnd         :: Int
       , caseSplitAnnotations :: WildcardAnnotations
-      , caseSplitType        :: Type
+      , caseSplitType        :: Text
       }
     | AddClause
       { addClauseLine        :: Text
