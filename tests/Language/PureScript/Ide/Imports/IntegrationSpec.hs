@@ -57,7 +57,7 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
                         ])
   it "adds an explicit unqualified import (type)" $ do
     withSupportFiles (Integration.addImport "MyType")
-    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyType(..))"
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyType)"
                                            , "import Main (id)"
                                            ])
   it "adds an explicit unqualified import (typeclass)" $ do
@@ -66,12 +66,20 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
                                            , "import Main (id)"])
   it "adds an explicit unqualified import (dataconstructor)" $ do
     withSupportFiles (Integration.addImport "MyJust")
-    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyMaybe(..))"
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyMaybe(MyJust))"
                                            , "import Main (id)"])
   it "adds an explicit unqualified import (newtype)" $ do
     withSupportFiles (Integration.addImport "MyNewtype")
-    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyNewtype(..))"
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyNewtype(MyNewtype))"
                                            , "import Main (id)"])
+  it "adds an explicit unqualified import (typeclass member function)" $ do
+    withSupportFiles (Integration.addImport "typeClassFun")
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (typeClassFun)"
+                                           , "import Main (id)"])
+  it "doesn't add a newtypes constructor if only the type is exported" $ do
+    withSupportFiles (Integration.addImport "OnlyTypeExported")
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (OnlyTypeExported)"
+                                            , "import Main (id)"])
   it "doesn't add an import if the identifier is defined in the module itself" $ do
     withSupportFiles (Integration.addImport "myId")
     outputFileShouldBe (sourceFileSkeleton [ "import Main (id)"])

@@ -90,7 +90,7 @@ spec = do
     it "adds the type for a given DataConstructor" $
         shouldBe
           (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
-          [ "import Data.Maybe (Maybe(..))"
+          [ "import Data.Maybe (Maybe(Just))"
           , "import Prelude"
           ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
