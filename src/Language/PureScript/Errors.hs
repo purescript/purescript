@@ -120,6 +120,7 @@ data SimpleErrorMessage
   | UnusedTypeVar String
   | WildcardInferredType Type
   | MissingTypeDeclaration Ident Type
+  | CannotGeneralizeRecursiveFunction Ident Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -301,6 +302,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
+  CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -420,6 +422,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
+  gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
   gSimple other = pure other
 
@@ -831,10 +834,16 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
-      paras [ line $ "No type declaration was provided for the top-level declaration of " ++ showIdent ident ++ "."
+      paras [ line $ "No type declaration was provided for the declaration of " ++ showIdent ident ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " ++ showIdent ident ++ " was:"
             , indent $ typeAsBox ty
+            ]
+    renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
+      paras [ line $ "Unable to generalize the type of the mutually recursive function " ++ showIdent ident ++ "."
+            , line $ "The inferred type of " ++ showIdent ident ++ " was:"
+            , indent $ typeAsBox ty
+            , line "Try adding a type signature."
             ]
     renderSimpleErrorMessage (NotExhaustivePattern bs b) =
       paras [ line "A case expression could not be determined to cover all inputs."
@@ -1202,7 +1211,7 @@ prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning 
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error" 
+prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error"
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
