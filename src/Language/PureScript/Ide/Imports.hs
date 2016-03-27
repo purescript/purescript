@@ -79,7 +79,7 @@ parseImportsWithModuleName ls = do
 
 sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection ts =
-  case foldl step ModuleHeader (zip [0..] ts) of
+  case foldl step (ModuleHeader 0) (zip [0..] ts) of
     Res start end ->
       let
         (moduleHeader, (importSection, remainingFile)) =
@@ -87,17 +87,26 @@ sliceImportSection ts =
       in
         (\(mn, is) -> (mn, moduleHeader, is, remainingFile)) <$>
           parseImportsWithModuleName (moduleHeader <> importSection)
+
+    -- If we don't find any imports, we insert a newline after the module
+    -- declaration and begin a new importsection
+    ModuleHeader ix ->
+      let (moduleHeader, remainingFile) = List.splitAt (succ ix) ts
+      in
+        (\(mn, is) -> (mn, moduleHeader ++ [""], is, remainingFile)) <$>
+          parseImportsWithModuleName moduleHeader
     _ -> Left "Failed to detect the import section"
 
-data ImportStateMachine = ModuleHeader | ImportSection Int Int | Res Int Int
+data ImportStateMachine = ModuleHeader Int | ImportSection Int Int | Res Int Int
 
 -- | We start in the
 --
 -- * ModuleHeader state.
 --
--- We skip every line we encounter, that doesn't start with "import". Once we
--- find a line with "import" we store its linenumber as the start of the import
--- section and change into the
+-- We skip every line we encounter, that doesn't start with "import". If we find
+-- a line that starts with module we store that linenumber. Once we find a line
+-- with "import" we store its linenumber as the start of the import section and
+-- change into the
 --
 -- * ImportSection state
 --
@@ -114,8 +123,10 @@ data ImportStateMachine = ModuleHeader | ImportSection Int Int | Res Int Int
 -- , which just shortcuts to the end of the file and carries the detected import
 -- section boundaries
 step :: ImportStateMachine -> (Int, Text) -> ImportStateMachine
-step ModuleHeader (ix, l) =
-  if T.isPrefixOf "import" l then ImportSection ix ix else ModuleHeader
+step (ModuleHeader mi) (ix, l)
+  | T.isPrefixOf "module " l = ModuleHeader ix
+  | T.isPrefixOf "import " l = ImportSection ix ix
+  | otherwise = ModuleHeader mi
 step (ImportSection start lastImportLine) (ix, l)
   | any (`T.isPrefixOf` l) ["import", " "] = ImportSection start ix
   | T.isPrefixOf "--" l || l == ""         = ImportSection start lastImportLine
