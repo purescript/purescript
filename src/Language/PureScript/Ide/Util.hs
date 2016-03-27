@@ -10,6 +10,9 @@ import           Language.PureScript.Ide.Types
 runProperNameT :: P.ProperName a -> Text
 runProperNameT = T.pack . P.runProperName
 
+runIdentT :: P.Ident -> Text
+runIdentT = T.pack . P.runIdent
+
 prettyTypeT :: P.Type -> Text
 prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
 
