@@ -172,7 +172,11 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
     refFromDeclaration (DataConstructor n tn _) = P.TypeRef tn (Just [P.ProperName (T.unpack n)])
     refFromDeclaration (TypeDeclaration n _) = P.TypeRef n (Just [])
-    refFromDeclaration d = P.ValueRef (P.Ident (T.unpack (identifierFromExternDecl d)))
+    refFromDeclaration d =
+      let
+        ident = T.unpack (identifierFromExternDecl d)
+      in
+        P.ValueRef ((if all P.isSymbolChar ident then P.Op else P.Ident) ident)
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)

@@ -87,6 +87,12 @@ spec = do
         [ "import Data.Array (head, tail)"
         , "import Prelude"
         ]
+    it "adds an operator to an explicit import list" $
+      shouldBe
+        (addValueImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
+        [ "import Data.Array ((<~>), tail)"
+        , "import Prelude"
+        ]
     it "adds the type for a given DataConstructor" $
         shouldBe
           (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
