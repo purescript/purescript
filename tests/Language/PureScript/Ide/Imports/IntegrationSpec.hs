@@ -57,14 +57,11 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
                         ])
   it "adds an explicit unqualified import (type)" $ do
     withSupportFiles (Integration.addImport "MyType")
-    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyType)"
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyType(..))"
                                            , "import Main (id)"
                                            ])
   it "adds an explicit unqualified import (typeclass)" $ do
-    withSupportFiles (\sourceFp outFp -> do
-                         r <- Integration.addImport "ATypeClass" sourceFp outFp
-                         shouldBe True (Integration.resultIsSuccess r)
-                         pendingWith "Not implemented yet")
+    withSupportFiles (Integration.addImport "ATypeClass")
     outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (class ATypeClass)"
                                            , "import Main (id)"])
   it "doesn't add an import if the identifier is defined in the module itself" $ do

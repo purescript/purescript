@@ -94,8 +94,7 @@ deleteOutputFolder = do
   whenM (doesDirectoryExist odir) (removeDirectoryRecursive odir)
 
 deleteFileIfExists :: FilePath -> IO ()
-deleteFileIfExists fp = do
-  whenM (doesFileExist fp) (removeFile fp)
+deleteFileIfExists fp = whenM (doesFileExist fp) (removeFile fp)
 
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM p f = do

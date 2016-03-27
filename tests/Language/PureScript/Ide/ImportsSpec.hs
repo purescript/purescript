@@ -4,6 +4,7 @@ module Language.PureScript.Ide.ImportsSpec where
 import           Data.Maybe                          (fromJust)
 import           Data.Text                           (Text)
 import qualified Language.PureScript                 as P
+import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Imports
 import           Test.Hspec
 
@@ -63,7 +64,10 @@ spec = do
 
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
-        addExplicitImportTest i mn is = prettyPrintImportSection (addExplicitImport' i mn is)
+        addValueImport i mn is =
+          prettyPrintImportSection (addExplicitImport' (ValueDeclaration i P.TypeWildcard) mn is)
+        addDtorImport i t mn is =
+          prettyPrintImportSection (addExplicitImport' (DataConstructor i t P.TypeWildcard) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
@@ -72,20 +76,26 @@ spec = do
         ]
     it "adds an explicit unqualified import" $
       shouldBe
-        (addExplicitImportTest (P.Ident "head") (P.moduleNameFromString "Data.Array") simpleFileImports)
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") simpleFileImports)
         [ "import Data.Array (head)"
         , "import Prelude"
         ]
     let Right (_, _, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
     it "adds an identifier to an explicit import list" $
       shouldBe
-        (addExplicitImportTest (P.Ident "head") (P.moduleNameFromString "Data.Array") explicitImports)
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Data.Array (head, tail)"
         , "import Prelude"
         ]
+    it "adds the type for a given DataConstructor" $
+        shouldBe
+          (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          [ "import Data.Maybe (Maybe(..))"
+          , "import Prelude"
+          ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
       shouldBe
-      (addExplicitImportTest (P.Ident "tail") (P.moduleNameFromString "Data.Array") explicitImports)
+      (addValueImport "tail" (P.moduleNameFromString "Data.Array") explicitImports)
       [ "import Data.Array (tail)"
       , "import Prelude"
       ]
