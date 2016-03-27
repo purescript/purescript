@@ -92,9 +92,28 @@ data PscIdeState =
 emptyPscIdeState :: PscIdeState
 emptyPscIdeState = PscIdeState M.empty M.empty
 
+data Match = Match ModuleIdent ExternDecl
+               deriving (Show, Eq)
+
+identifierFromMatch :: Match -> Text
+identifierFromMatch (Match _ (FunctionDecl name _)) = name
+identifierFromMatch (Match _ (DataDecl name _)) = name
+identifierFromMatch (Match _ (ModuleDecl name _)) = name
+identifierFromMatch _ = ""
+
+completionFromMatch :: Match -> Completion
+completionFromMatch (Match m (FunctionDecl name t)) = Completion (m, name, t)
+completionFromMatch (Match m (DataDecl name t)) = Completion (m, name, t)
+completionFromMatch (Match _ (ModuleDecl name _)) = Completion ("module", name, "module")
+completionFromMatch _ = error "wat"
+
 newtype Completion =
-    Completion (ModuleIdent, DeclIdent, Type)
-    deriving (Show,Eq)
+  Completion (ModuleIdent, DeclIdent, Type)
+  deriving (Show,Eq)
+
+instance ToJSON Completion where
+  toJSON (Completion (m,d,t)) =
+    object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data ModuleImport =
   ModuleImport
@@ -129,10 +148,6 @@ identifierFromDeclarationRef (D.TypeRef name _) = N.runProperName name
 identifierFromDeclarationRef (D.ValueRef ident) = N.runIdent ident
 identifierFromDeclarationRef (D.TypeClassRef name) = N.runProperName name
 identifierFromDeclarationRef _ = ""
-
-instance ToJSON Completion where
-  toJSON (Completion (m,d,t)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data Success =
   CompletionResult [Completion]

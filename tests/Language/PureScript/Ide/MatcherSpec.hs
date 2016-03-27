@@ -8,17 +8,17 @@ import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
-completions :: [Completion]
+completions :: [Match]
 completions = [
-  Completion ("", "firstResult", ""),
-  Completion ("", "secondResult", ""),
-  Completion ("", "fiult", "")
+  Match "" $ DataDecl "firstResult" "",
+  Match "" $ DataDecl "secondResult" "",
+  Match "" $ DataDecl "fiult" ""
   ]
 
-mkResult :: [Int] -> [Completion]
+mkResult :: [Int] -> [Match]
 mkResult = map (completions !!)
 
-runFlex :: Text -> [Completion]
+runFlex :: Text -> [Match]
 runFlex s = runMatcher (flexMatcher s) completions
 
 setup :: IO ()

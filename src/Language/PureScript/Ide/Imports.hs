@@ -190,25 +190,27 @@ addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m)
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for
                                       -- the identifier
-                          -> m (Either [Completion] [Text])
+                          -> m (Either [Match] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
   case List.nubBy ((==) `on` getModule') (getExactMatches ident filters modules) of
     [] ->
-      throwError (NotFound "Couldn't find the given identifier.\
+      throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")
 
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
-    [Completion (m, i, _)] ->
-      Right <$> addExplicitImport fp i (P.moduleNameFromString (T.unpack m))
+    [match] ->
+      Right <$> addExplicitImport fp
+        (identifierFromMatch match)
+        (P.moduleNameFromString (T.unpack (getModule' match)))
 
     -- Multiple matches where found so we need to ask the user to clarify which
     -- module he meant
     xs ->
       pure $ Left xs
   where
-    getModule' (Completion (m, _, _)) = m
+    getModule' (Match m _) = m
 
 prettyPrintImport' :: Import -> Text
 -- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs

@@ -87,7 +87,7 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
   rs <- addImportForIdentifier fp ident filters
   case rs of
     Right rs' -> answerRequest outfp rs'
-    Left question -> pure $ CompletionResult question
+    Left question -> pure $ CompletionResult (completionFromMatch <$> question)
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
@@ -95,12 +95,12 @@ handleCommand Quit = liftIO exitSuccess
 findCompletions :: (PscIde m, MonadLogger m) =>
                    [Filter] -> Matcher -> m Success
 findCompletions filters matcher =
-  CompletionResult . getCompletions filters matcher <$> getAllModulesWithReexports
+  CompletionResult . map completionFromMatch . getCompletions filters matcher <$> getAllModulesWithReexports
 
 findType :: (PscIde m, MonadLogger m) =>
             DeclIdent -> [Filter] -> m Success
 findType search filters =
-  CompletionResult . getExactMatches search filters <$> getAllModulesWithReexports
+  CompletionResult . map completionFromMatch . getExactMatches search filters <$> getAllModulesWithReexports
 
 findPursuitCompletions :: (MonadIO m, MonadLogger m) =>
                           PursuitQuery -> m Success
