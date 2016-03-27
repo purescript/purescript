@@ -149,19 +149,19 @@ addImplicitImport' imports mn =
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
-                     FilePath -> Text -> P.ModuleName -> m [Text]
-addExplicitImport fp identifier moduleName = do
+                     FilePath -> ExternDecl -> P.ModuleName -> m [Text]
+addExplicitImport fp decl moduleName = do
   (mn, pre, imports, post) <- parseImportsFromFile fp
   let newImportSection =
-        -- TODO: Open an issue when this PR is merged. We should optimize both
-        -- this case and the nubBy inside addExplicitImport'
+        -- TODO: Open an issue when this PR is merged, we should optimise this
+        -- so that this case does not write to disc
         if mn == moduleName
         then imports
-        else addExplicitImport' (P.Ident (T.unpack identifier)) moduleName imports
+        else addExplicitImport' decl moduleName imports
   pure (pre ++ prettyPrintImportSection newImportSection ++ post)
 
-addExplicitImport' :: P.Ident -> P.ModuleName -> [Import] -> [Import]
-addExplicitImport' identifier moduleName imports =
+addExplicitImport' :: ExternDecl -> P.ModuleName -> [Import] -> [Import]
+addExplicitImport' decl moduleName imports =
   let
     matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
     matches _ = False
@@ -169,13 +169,19 @@ addExplicitImport' identifier moduleName imports =
     case List.findIndex matches imports of
       -- The module wasn't imported yet
       Nothing ->
-        Import moduleName (P.Explicit [P.ValueRef identifier]) Nothing : imports
+        Import moduleName (P.Explicit [refFromDeclaration decl]) Nothing : imports
       Just ix ->
         let
           (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
           newRefs = List.nubBy ((==) `on` P.prettyPrintRef)
-            (P.ValueRef identifier : refs)
+            (refFromDeclaration decl : refs)
         in Import mn (P.Explicit newRefs) Nothing : x ++ ys
+  where
+    refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
+    refFromDeclaration (DataConstructor _ tn _) = P.TypeRef tn Nothing
+      -- P.TypeRef tn (Just [P.ProperName (T.unpack n)])
+    refFromDeclaration (TypeDeclaration n _) = P.TypeRef n Nothing
+    refFromDeclaration d = P.ValueRef (P.Ident (T.unpack $ identifierFromExternDecl d))
 
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -194,24 +200,20 @@ addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m)
                           -> m (Either [Match] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModulesWithReexports
-  case List.nubBy ((==) `on` getModule') (getExactMatches ident filters modules) of
+  case getExactMatches ident filters modules of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")
 
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
-    [match] ->
-      Right <$> addExplicitImport fp
-        (identifierFromMatch match)
-        (P.moduleNameFromString (T.unpack (getModule' match)))
+    [Match m decl] ->
+      Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m))
 
     -- Multiple matches where found so we need to ask the user to clarify which
     -- module he meant
     xs ->
       pure $ Left xs
-  where
-    getModule' (Match m _) = m
 
 prettyPrintImport' :: Import -> Text
 -- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
