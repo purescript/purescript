@@ -165,24 +165,49 @@ addExplicitImport' decl moduleName imports =
   let
     matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
     matches _ = False
+    freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) Nothing
   in
-    case List.findIndex matches imports of
-      -- The module wasn't imported yet
-      Nothing ->
-        Import moduleName (P.Explicit [refFromDeclaration decl]) Nothing : imports
-      Just ix ->
-        let
-          (x, Import mn (P.Explicit refs) Nothing : ys) = List.splitAt ix imports
-          newRefs = List.nubBy ((==) `on` P.prettyPrintRef)
-            (refFromDeclaration decl : refs)
-        in Import mn (P.Explicit newRefs) Nothing : x ++ ys
+    updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
     refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
-    refFromDeclaration (DataConstructor _ tn _) = P.TypeRef tn Nothing
-      -- P.TypeRef tn (Just [P.ProperName (T.unpack n)])
-    refFromDeclaration (TypeDeclaration n _) = P.TypeRef n Nothing
-    refFromDeclaration d = P.ValueRef (P.Ident (T.unpack $ identifierFromExternDecl d))
+    refFromDeclaration (DataConstructor n tn _) = P.TypeRef tn (Just [P.ProperName (T.unpack n)])
+    refFromDeclaration (TypeDeclaration n _) = P.TypeRef n (Just [])
+    refFromDeclaration d = P.ValueRef (P.Ident (T.unpack (identifierFromExternDecl d)))
 
+    -- | Adds a declaration to an import:
+    -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
+    insertDeclIntoImport :: ExternDecl -> Import -> Import
+    insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
+      Import mn (P.Explicit (insertDeclIntoRefs decl' refs)) Nothing
+    insertDeclIntoImport _ is = is
+
+    insertDeclIntoRefs :: ExternDecl -> [P.DeclarationRef] -> [P.DeclarationRef]
+    insertDeclIntoRefs (DataConstructor dtor tn _) refs =
+      let
+        dtor' = P.ProperName (T.unpack dtor)
+      in
+        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
+    insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
+
+    insertDtor dtor (P.TypeRef tn' dtors) =
+      case dtors of
+        Just dtors' -> P.TypeRef tn' (Just (List.nub (dtor : dtors')))
+        -- This means only the type was imported so far
+        -- import Data.Maybe (Maybe) -> import Data.Maybe (Maybe(Just))
+        Nothing -> P.TypeRef tn' (Just [dtor])
+    insertDtor _ refs = refs
+
+    matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
+    matchType tn (P.TypeRef n _) = tn == n
+    matchType _ _ = False
+
+updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
+updateAtFirstOrPrepend p t d l =
+  case List.findIndex p l of
+    Nothing -> d : l
+    Just ix ->
+      let (x, a : y) = List.splitAt ix l
+      in t a : x ++ y
 
 -- | Looks up the given identifier in the currently loaded modules.
 --
@@ -227,7 +252,8 @@ addImportForIdentifier fp ident filters = do
           Right <$> addExplicitImport fp dtor (P.moduleNameFromString (T.unpack m1))
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
-        Nothing -> throwError (GeneralError "Undecidable between type and dataconstructor")
+        Nothing ->
+          throwError (GeneralError "Undecidable between type and dataconstructor")
 
     -- Multiple matches were found so we need to ask the user to clarify which
     -- module he meant

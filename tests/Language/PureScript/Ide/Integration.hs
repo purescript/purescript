@@ -48,7 +48,7 @@ import           Data.Either                       (isRight)
 import           Data.Maybe                        (fromJust)
 import qualified Data.Text                         as T
 import qualified Data.Vector                       as V
-import           Language.PureScript.Ide.CodecJSON
+import           Language.PureScript.Ide.Util
 import           System.Directory
 import           System.Exit
 import           System.FilePath
