@@ -66,7 +66,10 @@ data Command
     | AddClause {
       addClauseLine          :: Text
       , addClauseAnnotations :: WildcardAnnotations}
-    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
+    | Rebuild FilePath (Maybe FilePath) -- ^ Rebuild the specified file using
+                                        -- the loaded externs and output the
+                                        -- generated JS to the specified
+                                        -- location
     | Cwd
     | Quit
 
@@ -155,6 +158,7 @@ instance FromJSON Command where
         pure $ Import fp out (fromMaybe [] filters) importCommand
       "rebuild" -> do
         params <- o .: "params"
-        filePath <- params .: "filepath"
-        return $ Rebuild filePath
+        filePath <- params .: "file"
+        outPath <- params .:? "outfile"
+        return $ Rebuild filePath outPath
       _ -> mzero
