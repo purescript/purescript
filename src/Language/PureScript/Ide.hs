@@ -60,8 +60,8 @@ handleCommand (CaseSplit l b e wca t) =
     caseSplit l b e wca t
 handleCommand (AddClause l wca) =
     pure $ addClause l wca
-handleCommand (Rebuild path) =
-    rebuildFile path
+handleCommand (Rebuild file outFile) =
+    rebuildFile file outFile
 handleCommand Cwd =
     TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess

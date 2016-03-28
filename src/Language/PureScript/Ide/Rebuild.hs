@@ -13,8 +13,10 @@ import           Language.PureScript.Ide.Error
 
 import           Control.Monad (unless)
 import           Control.Monad.Error.Class
+import           Control.Monad.Reader.Class
 import           Data.Foldable
 import qualified Data.Map.Lazy                      as M
+import           Data.Maybe (fromMaybe)
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
 import           Control.Monad.Trans.Except
@@ -30,9 +32,12 @@ import           System.FilePath
 rebuildFile
   :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
+  -> Maybe FilePath
   -> m Success
-rebuildFile path = do
+rebuildFile path outpath = do
   externs <- M.elems <$> getExternFiles
+
+  outputDirectory <- confOutputPath . envConfiguration <$> ask
 
   let initEnv = foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs
 
@@ -56,8 +61,12 @@ rebuildFile path = do
                $ P.MissingFFIModule moduleName
              P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs renamed Nothing
            case resultMay of
-             Left errs -> throwError . GeneralError . P.prettyPrintMultipleErrors False $ errs
-             Right js -> liftIO $ writeFile ("output" </> P.runModuleName (P.getModuleName m) </> "index.js") js
+             Left errs ->
+               throwError . GeneralError . P.prettyPrintMultipleErrors False $ errs
+             Right js -> do
+               let jsPath = fromMaybe
+                     (outputDirectory </> P.runModuleName (P.getModuleName m) </> "index.js") outpath
+               liftIO $ writeFile jsPath js
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
   return $ TextResult "OK"
