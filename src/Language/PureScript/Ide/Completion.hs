@@ -26,11 +26,7 @@ completionsFromModules :: [Module] -> [Match]
 completionsFromModules = foldMap completionFromModule
   where
     completionFromModule :: Module -> [Match]
-    completionFromModule (moduleIdent, decls) = mapMaybe (completionFromDecl moduleIdent) decls
+    completionFromModule (moduleIdent, decls) = mapMaybe (matchFromDecl moduleIdent) decls
 
-completionFromDecl :: ModuleIdent -> ExternDecl -> Maybe Match
-completionFromDecl mi = Just . Match mi
--- completionFromDecl mi (FunctionDecl name type') = Just (Match (mi, name, type'))
--- completionFromDecl mi (DataDecl name kind)      = Just (Completion (mi, name, kind))
--- completionFromDecl _  (ModuleDecl name _)       = Just (Completion ("module", name, "module"))
--- completionFromDecl _ _                          = Nothing
+matchFromDecl :: ModuleIdent -> ExternDecl -> Maybe Match
+matchFromDecl mi = Just . Match mi

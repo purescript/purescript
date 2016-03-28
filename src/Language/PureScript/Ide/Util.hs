@@ -46,21 +46,16 @@ identifierFromExternDecl Export{} = "~Export~"
 identifierFromMatch :: Match -> Text
 identifierFromMatch (Match _ ed) = identifierFromExternDecl ed
 
-completionFromMatch :: Match -> Completion
-completionFromMatch (Match m (ValueDeclaration name type')) =
-  Completion (m, name, prettyTypeT type')
-completionFromMatch (Match m (TypeDeclaration name kind)) =
-  Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
-completionFromMatch (Match m (DataConstructor name _ type')) =
-  Completion (m, name, prettyTypeT type')
-completionFromMatch (Match m (TypeClassDeclaration name)) =
-  Completion (m, runProperNameT name, "class")
-completionFromMatch (Match _ (ModuleDecl name _)) =
-  Completion ("module", name, "module")
-completionFromMatch (Match _ Dependency{}) =
-  error "Can't make a Completion from a Dependency"
-completionFromMatch (Match _ Export{}) =
-  error "Can't make a Completion from an Export"
+completionFromMatch :: Match -> Maybe Completion
+completionFromMatch (Match _ Dependency{}) = Nothing
+completionFromMatch (Match _ Export{}) = Nothing
+completionFromMatch (Match m d) = Just $ case d of
+  ValueDeclaration name type' -> Completion (m, name, prettyTypeT type')
+  TypeDeclaration name kind -> Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
+  DataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
+  TypeClassDeclaration name -> Completion (m, runProperNameT name, "class")
+  ModuleDecl name _ -> Completion ("module", name, "module")
+  _ -> error "the impossible happened in completionFromMatch"
 
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toStrict . decodeUtf8 . encode
