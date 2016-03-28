@@ -90,8 +90,8 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
     Right rs' -> answerRequest outfp rs'
     Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
     pure $ addClause l wca
-handleCommand (Rebuild path) =
-    rebuildFile path
+handleCommand (Rebuild file outFile) =
+    rebuildFile file outFile
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
