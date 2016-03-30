@@ -74,7 +74,7 @@ library
                    bytestring -any,
                    text -any,
                    split -any,
-                   language-javascript == 0.5.*,
+                   language-javascript == 0.6.*,
                    syb -any,
                    Glob >= 0.7 && < 0.8,
                    process >= 1.2.0 && < 1.5,
