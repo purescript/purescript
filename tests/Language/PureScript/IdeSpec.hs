@@ -22,13 +22,13 @@ defaultConfig =
   }
 
 spec :: SpecWith ()
-spec = do
-  describe "list" $ do
+spec =
+  describe "list" $
     describe "loadedModules" $ do
       it "returns an empty list when no modules are loaded" $ do
-       st <- newTVarIO emptyPscIdeState
-       result <- runReaderT printModules (PscIdeEnvironment st defaultConfig)
-       result `shouldBe` ModuleList []
+        st <- newTVarIO emptyPscIdeState
+        result <- runReaderT printModules (PscIdeEnvironment st defaultConfig)
+        result `shouldBe` ModuleList []
       it "returns the list of loaded modules" $ do
         st <- newTVarIO testState
         ModuleList result <- runReaderT printModules (PscIdeEnvironment st defaultConfig)

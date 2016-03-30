@@ -34,14 +34,14 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Control.Applicative ((<|>))
+import           Control.Applicative                ((<|>))
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
-import           Data.Bifunctor (first, second)
-import           Data.Function (on)
+import           Data.Bifunctor                     (first, second)
+import           Data.Function                      (on)
 import qualified Data.List                          as List
-import           Data.Maybe (isNothing)
+import           Data.Maybe                         (isNothing)
 import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
@@ -49,10 +49,10 @@ import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.Externs    (unwrapPositioned,
+                                                     unwrapPositionedRef)
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Externs ( unwrapPositionedRef
-                                                 , unwrapPositioned)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 

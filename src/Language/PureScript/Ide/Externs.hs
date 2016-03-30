@@ -28,23 +28,23 @@ module Language.PureScript.Ide.Externs
     unwrapPositionedRef
   ) where
 
-import           Prelude                              ()
+import           Prelude                       ()
 import           Prelude.Compat
 
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
-import           Data.List                            (nub)
-import           Data.Maybe                           (mapMaybe)
+import           Data.List                     (nub)
+import           Data.Maybe                    (mapMaybe)
 import           Data.Monoid
-import           Data.Text                            (Text)
-import qualified Data.Text                            as T
-import qualified Data.Text.IO                         as T
-import           Language.PureScript.Ide.Error        (PscIdeError (..))
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
+import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Externs as PE
+import qualified Language.PureScript           as P
+import qualified Language.PureScript.Externs   as PE
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m PE.ExternsFile

@@ -16,14 +16,13 @@
 
 module Language.PureScript.Ide.Util where
 
+import           Data.Aeson
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
+import           Data.Text.Lazy                (fromStrict, toStrict)
+import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
-
-import Data.Aeson
-import Data.Text.Lazy (toStrict, fromStrict)
-import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
 
 runProperNameT :: P.ProperName a -> Text
 runProperNameT = T.pack . P.runProperName

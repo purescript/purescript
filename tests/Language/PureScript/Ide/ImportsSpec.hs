@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Data.Maybe                          (fromJust)
-import           Data.Text                           (Text)
-import qualified Language.PureScript                 as P
-import           Language.PureScript.Ide.Types
+import           Data.Maybe                      (fromJust)
+import           Data.Text                       (Text)
+import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Imports
+import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
 simpleFile :: [Text]
