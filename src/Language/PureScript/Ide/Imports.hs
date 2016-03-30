@@ -174,14 +174,21 @@ addExplicitImport fp decl moduleName = do
 addExplicitImport' :: ExternDecl -> P.ModuleName -> [Import] -> [Import]
 addExplicitImport' decl moduleName imports =
   let
+    isImplicitlyImported =
+      not . null $ filter (\case
+                              (Import mn P.Implicit Nothing) -> mn == moduleName
+                              _ -> False) imports
     matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
     matches _ = False
     freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) Nothing
   in
-    updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
+    if isImplicitlyImported
+    then imports
+    else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
     refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
-    refFromDeclaration (DataConstructor n tn _) = P.TypeRef tn (Just [P.ProperName (T.unpack n)])
+    refFromDeclaration (DataConstructor n tn _) =
+      P.TypeRef tn (Just [P.ProperName (T.unpack n)])
     refFromDeclaration (TypeDeclaration n _) = P.TypeRef n (Just [])
     refFromDeclaration d =
       let

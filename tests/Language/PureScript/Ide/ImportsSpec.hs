@@ -80,6 +80,10 @@ spec = do
         [ "import Data.Array (head)"
         , "import Prelude"
         ]
+    it "doesn't add an import if the containing module is imported implicitly" $
+      shouldBe
+      (addValueImport "const" (P.moduleNameFromString "Prelude") simpleFileImports)
+      ["import Prelude"]
     let Right (_, _, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
     it "adds an identifier to an explicit import list" $
       shouldBe
