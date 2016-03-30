@@ -41,6 +41,7 @@ import           "monad-logger" Control.Monad.Logger
 import           Data.Bifunctor (first, second)
 import           Data.Function (on)
 import qualified Data.List                          as List
+import           Data.Maybe (isNothing)
 import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
@@ -57,6 +58,27 @@ import           Language.PureScript.Ide.Util
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
+
+instance Ord Import where
+  compare = compImport
+
+compImportType :: P.ImportDeclarationType -> P.ImportDeclarationType -> Ordering
+compImportType P.Implicit P.Implicit = EQ
+compImportType P.Implicit _ = LT
+compImportType (P.Explicit _) (P.Hiding _) = LT
+compImportType (P.Explicit _) (P.Explicit _) = EQ
+compImportType (P.Explicit _) P.Implicit = GT
+compImportType (P.Hiding _) (P.Hiding _) = EQ
+compImportType (P.Hiding _) _ = GT
+
+compImport :: Import -> Import -> Ordering
+compImport (Import n i q) (Import n' i' q')
+  | compImportType i i' /= EQ = compImportType i i'
+    -- This means that for a stable sort, the first implicit import will stay
+    -- the first implicit import
+  | P.isImplicit i && isNothing q = LT
+  | P.isImplicit i && isNothing q' = GT
+  | otherwise = compare n n'
 
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
@@ -308,9 +330,7 @@ prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
-prettyPrintImportSection imports =
-  let (implicit, explicit) = List.partition (\(Import _ it _) -> P.isImplicit it) imports
-  in map prettyPrintImport' implicit ++ List.sort (map prettyPrintImport' explicit)
+prettyPrintImportSection imports = map prettyPrintImport' (List.sort imports)
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the
