@@ -46,8 +46,8 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
   it "adds an implicit import" $ do
     withSupportFiles (Integration.addImplicitImport "Prelude")
     outputFileShouldBe (sourceFileSkeleton
-                        [ "import Main (id)"
-                        , "import Prelude"
+                        [ "import Prelude"
+                        , "import Main (id)"
                         ])
   it "adds an explicit unqualified import" $ do
     withSupportFiles (Integration.addImport "exportedFunction")

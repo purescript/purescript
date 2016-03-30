@@ -151,7 +151,10 @@ addImplicitImport fp mn = do
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
-  prettyPrintImportSection (Import mn P.Implicit Nothing : imports)
+  -- We need to append the new import, because there could already be implicit
+  -- imports and we need to preserve the order on these, as the first implicit
+  -- import is the one that doesn't generate warnings.
+  prettyPrintImportSection ( imports ++ [Import mn P.Implicit Nothing])
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
@@ -237,7 +240,7 @@ updateAtFirstOrPrepend p t d l =
     Nothing -> d : l
     Just ix ->
       let (x, a : y) = List.splitAt ix l
-      in t a : x ++ y
+      in x ++ [t a] ++ y
 
 -- | Looks up the given identifier in the currently loaded modules.
 --
@@ -305,7 +308,9 @@ prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
-prettyPrintImportSection = List.sort . map prettyPrintImport'
+prettyPrintImportSection imports =
+  let (implicit, explicit) = List.partition (\(Import _ it _) -> P.isImplicit it) imports
+  in map prettyPrintImport' implicit ++ List.sort (map prettyPrintImport' explicit)
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the
