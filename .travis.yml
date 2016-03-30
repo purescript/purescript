@@ -35,8 +35,8 @@ install:
     fi
   - mkdir -p .cabal-sandbox
   - cabal sandbox init --sandbox .cabal-sandbox
-  # Download stackage cabal.config, not sure whether filtering is necessary
-  - if [ -n "$STACKAGE" ]; then curl https://www.stackage.org/$STACKAGE/cabal.config | egrep -v 'purescript|sourcemap|bower-json' > cabal.config; fi
+  # Download stackage cabal.config. Filter this package and 'extra deps'
+  - if [ -n "$STACKAGE" ]; then curl https://www.stackage.org/$STACKAGE/cabal.config | egrep -v 'purescript|language-javascript|bower-json' > cabal.config; fi
   - cabal install --only-dependencies --enable-tests
   - cabal install hpc-coveralls
   # Snapshot state of the sandbox now, so we don't need to make new one for test install
