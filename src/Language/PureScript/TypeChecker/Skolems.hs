@@ -53,7 +53,7 @@ newSkolemConstant = do
 -- |
 -- Introduce skolem scope at every occurence of a ForAll
 --
-introduceSkolemScope :: (Functor m, Applicative m, MonadState CheckState m) => Type -> m Type
+introduceSkolemScope :: (MonadState CheckState m) => Type -> m Type
 introduceSkolemScope = everywhereOnTypesM go
   where
   go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)

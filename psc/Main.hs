@@ -107,7 +107,7 @@ globWarningOnMisses warn = concatMapM globWithWarning
 readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
 readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readUTF8File inFile
 
-parseInputs :: (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
+parseInputs :: (MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
             => [(Either P.RebuildPolicy FilePath, String)]
             -> [(FilePath, P.ForeignJS)]
             -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName FilePath)
@@ -138,7 +138,7 @@ requirePath :: Parser (Maybe FilePath)
 requirePath = optional $ strOption $
      short 'r'
   <> long "require-path"
-  <> help "The path prefix to use for require() calls in the generated JavaScript"
+  <> help "The path prefix to use for require() calls in the generated JavaScript [deprecated]"
 
 noTco :: Parser Bool
 noTco = switch $

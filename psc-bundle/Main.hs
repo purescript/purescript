@@ -19,6 +19,7 @@
 
 module Main (main) where
 
+import Data.Maybe 
 import Data.Traversable (for)
 import Data.Version (showVersion)
 
@@ -51,7 +52,7 @@ data Options = Options
   } deriving Show
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
-guessModuleIdentifier :: (Applicative m, MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
+guessModuleIdentifier :: (MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
 guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
   where
   guessModuleType "index.js" = pure Regular
@@ -61,7 +62,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
 -- | The main application function.
 -- This function parses the input files, performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-app :: (Applicative m, MonadError ErrorMessage m, MonadIO m) => Options -> m String
+app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m String
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
@@ -119,13 +120,13 @@ options = Options <$> some inputFile
   requirePath = strOption $
        short 'r'
     <> long "require-path"
-    <> Opts.value ""
-    <> help "The path prefix used in require() calls in the generated JavaScript"
+    <> help "The path prefix used in require() calls in the generated JavaScript [deprecated]"
 
 -- | Make it go.
 main :: IO ()
 main = do
   opts <- execParser (info (version <*> helper <*> options) infoModList)
+  when (isJust (optionsRequirePath opts)) $ hPutStrLn stderr "The require-path option is deprecated and will be removed in PureScript 0.9."
   output <- runExceptT (app opts)
   case output of
     Left err -> do

@@ -32,7 +32,7 @@ import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStrLn, hPrint, stderr)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
@@ -139,7 +139,7 @@ dumpTags input renderTags = do
   e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
   case e of
     Left err -> do
-      hPutStrLn stderr (show err)
+      hPrint stderr err
       exitFailure
     Right ms ->
       ldump (renderTags (pairs ms))

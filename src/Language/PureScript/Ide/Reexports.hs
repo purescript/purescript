@@ -15,10 +15,10 @@ import           Language.PureScript.Ide.Types
 
 getReexports :: Module -> [ExternDecl]
 getReexports (mn, decls)= concatMap getExport decls
-   where getExport d
-           | (Export mn') <- d
-           , mn /= mn' = replaceExportWithAliases decls mn'
-           | otherwise = []
+  where getExport d
+          | (Export mn') <- d
+          , mn /= mn' = replaceExportWithAliases decls mn'
+          | otherwise = []
 
 dependencyToExport :: ExternDecl -> ExternDecl
 dependencyToExport (Dependency m _ _) = Export m
@@ -51,23 +51,25 @@ removeExportDecls = fmap (filter (not . isExport))
 
 replaceReexports :: Module -> Map ModuleIdent [ExternDecl] -> Module
 replaceReexports m db = result
-  where reexports = getReexports m
-        result = foldl go (removeExportDecls m) reexports
+  where
+    reexports = getReexports m
+    result = foldl go (removeExportDecls m) reexports
 
-        go :: Module -> ExternDecl -> Module
-        go m' re@(Export name) = replaceReexport re m' (getModule name)
-        go _ _ = error "partiality! woohoo"
+    go :: Module -> ExternDecl -> Module
+    go m' re@(Export name) = replaceReexport re m' (getModule name)
+    go _ _ = error "partiality! woohoo"
 
-        getModule :: ModuleIdent -> Module
-        getModule name = clean res
-          where res = fromMaybe emptyModule $ (name , ) <$> Map.lookup name db
-                -- we have to do this because keeping self exports in will result in
-                -- infinite loops
-                clean (mn, decls) = (mn,) (filter (/= Export mn) decls)
+    getModule :: ModuleIdent -> Module
+    getModule name = clean res
+      where
+        res = fromMaybe emptyModule $ (name , ) <$> Map.lookup name db
+        -- we have to do this because keeping self exports in will result in
+        -- infinite loops
+        clean (mn, decls) = (mn,) (filter (/= Export mn) decls)
 
 resolveReexports :: Map ModuleIdent [ExternDecl] -> Module ->  Module
-resolveReexports modules m = do
+resolveReexports modules m =
   let replaced = replaceReexports m modules
-  if null . getReexports $ replaced
-    then replaced
-    else resolveReexports modules replaced
+  in if null (getReexports replaced)
+     then replaced
+     else resolveReexports modules replaced

@@ -1,6 +1,0 @@
-resolver: lts-3.22
-packages:
-- '.'
-extra-deps:
-- sourcemap-0.1.6
-flags: {}

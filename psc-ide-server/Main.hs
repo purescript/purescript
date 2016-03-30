@@ -11,8 +11,9 @@ import           Prelude.Compat
 
 import           Control.Concurrent                (forkFinally)
 import           Control.Concurrent.STM
-import           Control.Exception                 (bracketOnError)
+import           Control.Exception                 (bracketOnError, catchJust)
 import           Control.Monad
+import           Control.Monad.Error.Class
 import           "monad-logger" Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
@@ -32,6 +33,7 @@ import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           System.IO
+import           System.IO.Error                   (isEOFError)
 
 import qualified Paths_purescript                  as Paths
 
@@ -87,7 +89,7 @@ main = do
         (PortNumber . fromIntegral <$>
          option auto (long "port" <> short 'p' <> value (4242 :: Integer))) <*>
         switch (long "debug")
-    opts = info (version <*> parser) mempty
+    opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
       (long "version" <> help "Show the version number")
@@ -101,32 +103,43 @@ startServer port env = withSocketsDo $ do
 
     loop :: (PscIde m, MonadLogger m) => Socket -> m ()
     loop sock = do
-      (cmd,h) <- acceptCommand sock
-      case decodeT cmd of
-        Just cmd' -> do
-          result <- runExceptT (handleCommand cmd')
-          $(logDebug) ("Answer was: " <> T.pack (show result))
-          liftIO (hFlush stdout)
-          case result of
-            -- What function can I use to clean this up?
-            Right r  -> liftIO $ T.hPutStrLn h (encodeT r)
-            Left err -> liftIO $ T.hPutStrLn h (encodeT err)
-        Nothing -> do
-          $(logDebug) ("Parsing the command failed. Command: " <> cmd)
-          liftIO $ do
-            T.hPutStrLn h (encodeT (GeneralError "Error parsing Command."))
-            hFlush stdout
-      liftIO (hClose h)
+      accepted <- runExceptT $ acceptCommand sock
+      case accepted of
+        Left err -> $(logDebug) err
+        Right (cmd, h) -> do
+          case decodeT cmd of
+            Just cmd' -> do
+              result <- runExceptT (handleCommand cmd')
+              $(logDebug) ("Answer was: " <> T.pack (show result))
+              liftIO (hFlush stdout)
+              case result of
+                -- What function can I use to clean this up?
+                Right r  -> liftIO $ T.hPutStrLn h (encodeT r)
+                Left err -> liftIO $ T.hPutStrLn h (encodeT err)
+            Nothing -> do
+              $(logDebug) ("Parsing the command failed. Command: " <> cmd)
+              liftIO $ do
+                T.hPutStrLn h (encodeT (GeneralError "Error parsing Command."))
+                hFlush stdout
+          liftIO (hClose h)
 
 
-acceptCommand :: (Applicative m, MonadIO m, MonadLogger m)
+acceptCommand :: (MonadIO m, MonadLogger m, MonadError T.Text m)
                  => Socket -> m (T.Text, Handle)
 acceptCommand sock = do
   h <- acceptConnection
   $(logDebug) "Accepted a connection"
-  cmd <- liftIO (T.hGetLine h)
-  $(logDebug) cmd
-  pure (cmd, h)
+  cmd' <- liftIO (catchJust
+                  -- this means that the connection was
+                  -- terminated without receiving any input
+                  (\e -> if isEOFError e then Just () else Nothing)
+                  (Just <$> T.hGetLine h)
+                  (const (pure Nothing)))
+  case cmd' of
+    Nothing -> throwError "Connection was closed before any input arrived"
+    Just cmd -> do
+      $(logDebug) cmd
+      pure (cmd, h)
   where
    acceptConnection = liftIO $ do
      (h,_,_) <- accept sock

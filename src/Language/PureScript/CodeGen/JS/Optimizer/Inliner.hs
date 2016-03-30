@@ -96,9 +96,9 @@ inlineCommonValues = everywhereOnJS convert
   fnOne = [(C.prelude, C.one), (C.dataSemiring, C.one)]
   fnBottom = [(C.prelude, C.bottom), (C.dataBounded, C.bottom)]
   fnTop = [(C.prelude, C.top), (C.dataBounded, C.top)]
-  fnAdd = [(C.prelude, (C.+)), (C.prelude, (C.add)), (C.dataSemiring, (C.+)), (C.dataSemiring, (C.add))]
-  fnDivide = [(C.prelude, (C./)), (C.prelude, (C.div)), (C.dataModuloSemiring, C.div)]
-  fnMultiply = [(C.prelude, (C.*)), (C.prelude, (C.mul)), (C.dataSemiring, (C.*)), (C.dataSemiring, (C.mul))]
+  fnAdd = [(C.prelude, (C.+)), (C.prelude, C.add), (C.dataSemiring, (C.+)), (C.dataSemiring, C.add)]
+  fnDivide = [(C.prelude, (C./)), (C.prelude, C.div), (C.dataModuloSemiring, C.div)]
+  fnMultiply = [(C.prelude, (C.*)), (C.prelude, C.mul), (C.dataSemiring, (C.*)), (C.dataSemiring, C.mul)]
   fnSubtract = [(C.prelude, (C.-)), (C.prelude, C.sub), (C.dataRing, C.sub)]
   intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
@@ -235,7 +235,7 @@ inlineCommonOperators = applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: (Applicative m, MonadSupply m) => JS -> m JS
+inlineFnComposition :: (MonadSupply m) => JS -> m JS
 inlineFnComposition = everywhereOnJSTopDownM convert
   where
   convert :: (MonadSupply m) => JS -> m JS

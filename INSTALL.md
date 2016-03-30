@@ -6,8 +6,8 @@ alternatively Stack Overflow.
 
 ## Using prebuilt binaries
 
-The prebuilt binaries are compiled with GHC 7.8.4, and therefore they should
-run on any operating system supported by GHC 7.8.4, such as:
+The prebuilt binaries are compiled with GHC 7.10.3, and therefore they should
+run on any operating system supported by GHC 7.10.3, such as:
 
 * Windows 2000 or later,
 * OS X 10.7 or later,
@@ -23,11 +23,11 @@ requirements.
 
 ## Compiling from source
 
-GHC 7.6.1 or newer is required to compile from source. The easiest way is to
+GHC 7.10.1 or newer is required to compile from source. The easiest way is to
 use stack:
 
 ```
-$ stack install --resolver lts purescript
+$ stack install --resolver=nightly purescript
 ```
 
 This will then copy the compiler and utilities into `~/.local/bin`.
@@ -38,10 +38,6 @@ If you don't have stack installed yet there are install instructions
 
 If you don't have ghc installed yet, stack will prompt you to run `stack setup`
 which will install ghc for you.
-
-The PureScript compiler has been known to run on OS X 10.6 when built with GHC
-7.6.
-
 
 ## The "curses" library
 

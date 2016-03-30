@@ -214,7 +214,7 @@ handleDecls :: [P.Declaration] -> PSCI ()
 handleDecls ds = do
   st <- PSCI $ lift get
   let st' = updateLets ds st
-  let m = createTemporaryModule False st' (P.ObjectLiteral [])
+  let m = createTemporaryModule False st' (P.Literal (P.ObjectLiteral []))
   e <- psciIO . runMake $ make st' [m]
   case e of
     Left err -> PSCI $ printErrors err
@@ -337,7 +337,7 @@ handleKindOf typ = do
               k   = check (P.kindOf typ') chk
 
               check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew cs = fst . runWriter . runExceptT . runStateT sew $ cs
+              check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left errStack   -> PSCI . outputStrLn . P.prettyPrintMultipleErrors False $ errStack
             Right (kind, _) -> PSCI . outputStrLn . P.prettyPrintKind $ kind

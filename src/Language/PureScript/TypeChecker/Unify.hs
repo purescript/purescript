@@ -23,6 +23,7 @@ module Language.PureScript.TypeChecker.Unify (
     freshType,
     solveType,
     substituteType,
+    unknownsInType,
     unifyTypes,
     unifyRows,
     unifiesWith,
@@ -56,7 +57,7 @@ freshType = do
   return $ TUnknown t
 
 -- | Update the substitution to solve a type constraint
-solveType :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Int -> Type -> m ()
+solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> Type -> m ()
 solveType u t = do
   occursCheck u t
   modify $ \cs -> cs { checkSubstitution =
@@ -77,7 +78,7 @@ substituteType sub = everywhereOnTypes go
   go other = other
 
 -- | Make sure that an unknown does not occur in a type
-occursCheck :: (Functor m, Applicative m, MonadError MultipleErrors m) => Int -> Type -> m ()
+occursCheck :: (MonadError MultipleErrors m) => Int -> Type -> m ()
 occursCheck _ TUnknown{} = return ()
 occursCheck u t = void $ everywhereOnTypesM go t
   where
@@ -93,7 +94,7 @@ unknownsInType t = everythingOnTypes (.) go t []
   go _ = id
 
 -- | Unify two types, updating the current substitution
-unifyTypes :: (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
+unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
   rethrow (addHint (ErrorUnifyingTypes t1 t2)) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
@@ -139,7 +140,7 @@ unifyTypes t1 t2 = do
 -- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
 -- error.
 --
-unifyRows :: forall m. (Functor m, Applicative m, MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
+unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyRows r1 r2 =
   let
     (s1, r1') = rowToList r1
@@ -205,7 +206,7 @@ replaceVarWithUnknown ident ty = do
 -- |
 -- Replace type wildcards with unknowns
 --
-replaceTypeWildcards :: (Functor m, Applicative m, MonadWriter MultipleErrors m, MonadState CheckState m) => Type -> m Type
+replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type -> m Type
 replaceTypeWildcards = everywhereOnTypesM replace
   where
   replace TypeWildcard = do

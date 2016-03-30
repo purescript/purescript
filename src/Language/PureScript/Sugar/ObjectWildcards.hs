@@ -19,7 +19,11 @@ import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Names
 
-desugarObjectConstructors :: forall m. (Applicative m, MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
+desugarObjectConstructors
+  :: forall m
+   . (MonadSupply m, MonadError MultipleErrors m)
+  => Module
+  -> m Module
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
   where
 
@@ -38,7 +42,7 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
     | b' <- stripPositionInfo b
     , BinaryNoParens op u val <- b'
     , isAnonymousArgument u = return $ OperatorSection op (Right val)
-  desugarExpr (ObjectLiteral ps) = wrapLambda ObjectLiteral ps
+  desugarExpr (Literal (ObjectLiteral ps)) = wrapLambda (Literal . ObjectLiteral) ps
   desugarExpr (ObjectUpdate u ps) | isAnonymousArgument u = do
     obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (Var (Qualified Nothing obj))) ps

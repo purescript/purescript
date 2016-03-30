@@ -148,6 +148,7 @@ data SimpleErrorMessage
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
   | InvalidOperatorInBinder Ident Ident
+  | DeprecatedRequirePath
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -328,6 +329,7 @@ errorCode em = case unwrapErrorMessage em of
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
   IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
+  DeprecatedRequirePath{} -> "DeprecatedRequirePath"
 
 -- |
 -- A stack trace for an error
@@ -447,6 +449,7 @@ errorSuggestion err = case err of
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
   _ -> Nothing
 
   where
@@ -634,7 +637,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ showIdent nm ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
-      paras [ line $ "There is a cycle in module dependencies in these modules: "
+      paras [ line "There is a cycle in module dependencies in these modules: "
             , indent $ paras (map (line . runModuleName) mns)
             ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
@@ -668,7 +671,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             sortRows' :: ([(String, Type)], Type) -> ([(String, Type)], Type) -> (Type, Type)
             sortRows' (s1, r1) (s2, r2) =
               let common :: [(String, (Type, Type))]
-                  common = sortBy (comparing fst) $ [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+                  common = sortBy (comparing fst) [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
 
                   sd1, sd2 :: [(String, Type)]
                   sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
@@ -837,8 +840,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:\n"
             , indent $ paras $
-                [ Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs)) ]
-                ++ [ line "..." | not b ]
+                Box.hsep 1 Box.left
+                  (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
+                  : [line "..." | not b]
             , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
             , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
             ]
@@ -955,9 +959,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ line $ showSuggestion msg
             ]
 
-    renderSimpleErrorMessage (HidingImport mn refs) =
+    renderSimpleErrorMessage msg@(HidingImport mn _) =
       paras [ line $ "Module " ++ runModuleName mn ++ " has unspecified imports, consider using the inclusive form: "
-            , indent $ line $ "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
+            , indent $ line $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
@@ -970,9 +974,12 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line "An anonymous function argument appears in an invalid context."
 
     renderSimpleErrorMessage (InvalidOperatorInBinder op fn) =
-      paras $ [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
+      paras [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
               , line "Only aliases for data constructors may be used in patterns."
               ]
+
+    renderSimpleErrorMessage DeprecatedRequirePath =
+      line "The require-path option is deprecated and will be removed in PureScript 0.9."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
@@ -1181,31 +1188,32 @@ prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 -- Pretty print multiple errors
 --
 prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = renderBox . prettyPrintMultipleErrorsBox full
+prettyPrintMultipleErrors full = unlines . map renderBox . prettyPrintMultipleErrorsBox full
 
 -- |
 -- Pretty print multiple warnings
 --
-prettyPrintMultipleWarnings :: Bool -> MultipleErrors ->  String
-prettyPrintMultipleWarnings full = renderBox . prettyPrintMultipleWarningsBox full
+prettyPrintMultipleWarnings :: Bool -> MultipleErrors -> String
+prettyPrintMultipleWarnings full = unlines . map renderBox . prettyPrintMultipleWarningsBox full
 
 -- | Pretty print warnings as a Box
-prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleWarningsBox full = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning" full
+prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning"
 
 -- | Pretty print errors as a Box
-prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> Box.Box
-prettyPrintMultipleErrorsBox full = prettyPrintMultipleErrorsWith Error "Error found:" "Error" full
+prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error" 
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> Box.Box
+prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
   let result = prettyPrintSingleError full level True e
-  in Box.vcat Box.left [ Box.text intro
-                       , result
-                       ]
+  in [ Box.vcat Box.left [ Box.text intro
+                         , result
+                         ]
+     ]
 prettyPrintMultipleErrorsWith level _ intro full (MultipleErrors es) =
   let result = map (prettyPrintSingleError full level True) es
-  in Box.vsep 1 Box.left $ concat $ zipWith withIntro [1 :: Int ..] result
+  in concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
                     , Box.moveRight 2 err
@@ -1283,7 +1291,7 @@ renderBox = unlines
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
 
-reifyErrors :: (Functor m, MonadError e m) => m a -> m (Either e a)
+reifyErrors :: (MonadError e m) => m a -> m (Either e a)
 reifyErrors ma = catchError (fmap Right ma) (return . Left)
 
 reflectErrors :: (MonadError e m) => m (Either e a) -> m a
@@ -1310,13 +1318,13 @@ withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : h
 -- |
 -- Collect errors in in parallel
 --
-parU :: (MonadError MultipleErrors m, Functor m) => [a] -> (a -> m b) -> m [b]
+parU :: (MonadError MultipleErrors m) => [a] -> (a -> m b) -> m [b]
 parU xs f = forM xs (withError . f) >>= collectErrors
   where
-  withError :: (MonadError MultipleErrors m, Functor m) => m a -> m (Either MultipleErrors a)
+  withError :: (MonadError MultipleErrors m) => m a -> m (Either MultipleErrors a)
   withError u = catchError (Right <$> u) (return . Left)
 
-  collectErrors :: (MonadError MultipleErrors m, Functor m) => [Either MultipleErrors a] -> m [a]
+  collectErrors :: (MonadError MultipleErrors m) => [Either MultipleErrors a] -> m [a]
   collectErrors es = case lefts es of
     [] -> return $ rights es
     errs -> throwError $ fold errs

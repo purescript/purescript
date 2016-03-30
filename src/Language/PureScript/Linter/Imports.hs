@@ -70,7 +70,7 @@ type UsedImports = M.Map ModuleName [Name]
 --
 lintImports
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Module
   -> Env
   -> UsedImports
@@ -152,7 +152,7 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
     in foldr go used (classes ++ types ++ dctors ++ values)
     where
     go :: (ModuleName, Name) -> UsedImports -> UsedImports
-    go (q, name) acc = M.alter (Just . maybe [name] (name :)) q acc
+    go (q, name) = M.alter (Just . maybe [name] (name :)) q
 
   extractByQual
     :: (Eq a)
@@ -170,7 +170,7 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
 
 lintImportDecl
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Env
   -> ModuleName
   -> Maybe ModuleName

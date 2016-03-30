@@ -1,17 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.AST.Traversals
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | AST traversal helpers
---
------------------------------------------------------------------------------
+{-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- AST traversal helpers
+--
 module Language.PureScript.AST.Traversals where
 
 import Prelude ()
@@ -26,15 +17,20 @@ import Control.Monad
 import Control.Arrow ((***), (+++))
 
 import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
 import Language.PureScript.Types
 import Language.PureScript.Traversals
 import Language.PureScript.Names
 
-everywhereOnValues :: (Declaration -> Declaration) ->
-                      (Expr -> Expr) ->
-                      (Binder -> Binder) ->
-                      (Declaration -> Declaration, Expr -> Expr, Binder -> Binder)
+everywhereOnValues
+  :: (Declaration -> Declaration)
+  -> (Expr -> Expr)
+  -> (Binder -> Binder)
+  -> ( Declaration -> Declaration
+     , Expr -> Expr
+     , Binder -> Binder
+     )
 everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
@@ -47,13 +43,12 @@ everywhereOnValues f g h = (f', g', h')
   f' other = f other
 
   g' :: Expr -> Expr
+  g' (Literal l) = g (Literal (lit g' l))
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens (g' op) (g' v1) (g' v2))
   g' (Parens v) = g (Parens (g' v))
   g' (OperatorSection op (Left v)) = g (OperatorSection (g' op) (Left $ g' v))
   g' (OperatorSection op (Right v)) = g (OperatorSection (g' op) (Right $ g' v))
-  g' (ArrayLiteral vs) = g (ArrayLiteral (map g' vs))
-  g' (ObjectLiteral vs) = g (ObjectLiteral (map (fmap g') vs))
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
@@ -71,12 +66,16 @@ everywhereOnValues f g h = (f', g', h')
   h' (ConstructorBinder ctor bs) = h (ConstructorBinder ctor (map h' bs))
   h' (BinaryNoParensBinder b1 b2 b3) = h (BinaryNoParensBinder (h' b1) (h' b2) (h' b3))
   h' (ParensInBinder b) = h (ParensInBinder (h' b))
-  h' (ObjectBinder bs) = h (ObjectBinder (map (fmap h') bs))
-  h' (ArrayBinder bs) = h (ArrayBinder (map h' bs))
+  h' (LiteralBinder l) = h (LiteralBinder (lit h' l))
   h' (NamedBinder name b) = h (NamedBinder name (h' b))
   h' (PositionedBinder pos com b) = h (PositionedBinder pos com (h' b))
   h' (TypedBinder t b) = h (TypedBinder t (h' b))
   h' other = h other
+
+  lit :: (a -> a) -> Literal a -> Literal a
+  lit go (ArrayLiteral as) = ArrayLiteral (map go as)
+  lit go (ObjectLiteral as) = ObjectLiteral (map (fmap go) as)
+  lit _ other = other
 
   handleCaseAlternative :: CaseAlternative -> CaseAlternative
   handleCaseAlternative ca =
@@ -90,13 +89,20 @@ everywhereOnValues f g h = (f', g', h')
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet (map f' ds)
   handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com (handleDoNotationElement e)
 
-everywhereOnValuesTopDownM :: (Functor m, Applicative m, Monad m) =>
-  (Declaration -> m Declaration) ->
-  (Expr -> m Expr) ->
-  (Binder -> m Binder) ->
-  (Declaration -> m Declaration, Expr -> m Expr, Binder -> m Binder)
+everywhereOnValuesTopDownM
+  :: forall m
+   . (Monad m)
+  => (Declaration -> m Declaration)
+  -> (Expr -> m Expr)
+  -> (Binder -> m Binder)
+  -> ( Declaration -> m Declaration
+     , Expr -> m Expr
+     , Binder -> m Binder
+     )
 everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
+
+  f' :: Declaration -> m Declaration
   f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds
   f' (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> traverse (h' <=< h) bs <*> eitherM (traverse (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
@@ -105,13 +111,13 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (f d >>= f')
   f' other = f other
 
+  g' :: Expr -> m Expr
+  g' (Literal l) = Literal <$> lit (g >=> g') l
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
   g' (Parens v) = Parens <$> (g v >>= g')
   g' (OperatorSection op (Left v)) = OperatorSection <$> (g op >>= g') <*> (Left <$> (g v >>= g'))
   g' (OperatorSection op (Right v)) = OperatorSection <$> (g op >>= g') <*> (Right <$> (g v >>= g'))
-  g' (ArrayLiteral vs) = ArrayLiteral <$> traverse (g' <=< g) vs
-  g' (ObjectLiteral vs) = ObjectLiteral <$> traverse (sndM (g' <=< g)) vs
   g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
@@ -125,31 +131,47 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
   g' other = g other
 
+  h' :: Binder -> m Binder
+  h' (LiteralBinder l) = LiteralBinder <$> lit (h >=> h') l
   h' (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> traverse (h' <=< h) bs
   h' (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> (h b1 >>= h') <*> (h b2 >>= h') <*> (h b3 >>= h')
   h' (ParensInBinder b) = ParensInBinder <$> (h b >>= h')
-  h' (ObjectBinder bs) = ObjectBinder <$> traverse (sndM (h' <=< h)) bs
-  h' (ArrayBinder bs) = ArrayBinder <$> traverse (h' <=< h) bs
   h' (NamedBinder name b) = NamedBinder name <$> (h b >>= h')
   h' (PositionedBinder pos com b) = PositionedBinder pos com <$> (h b >>= h')
   h' (TypedBinder t b) = TypedBinder t <$> (h b >>= h')
   h' other = h other
 
-  handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> traverse (h' <=< h) bs
-                                                                   <*> eitherM (traverse (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val
+  lit :: (a -> m a) -> Literal a -> m (Literal a)
+  lit go (ObjectLiteral as) = ObjectLiteral <$> traverse (sndM go) as
+  lit go (ArrayLiteral as) = ArrayLiteral <$> traverse go as
+  lit _ other = pure other
 
+  handleCaseAlternative :: CaseAlternative -> m CaseAlternative
+  handleCaseAlternative (CaseAlternative bs val) =
+    CaseAlternative
+      <$> traverse (h' <=< h) bs
+      <*> eitherM (traverse (pairM (g' <=< g) (g' <=< g))) (g' <=< g) val
+
+  handleDoNotationElement :: DoNotationElement -> m DoNotationElement
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> (g' <=< g) v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> (h' <=< h) b <*> (g' <=< g) v
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> traverse (f' <=< f) ds
   handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com <$> handleDoNotationElement e
 
-everywhereOnValuesM :: (Functor m, Applicative m, Monad m) =>
-  (Declaration -> m Declaration) ->
-  (Expr -> m Expr) ->
-  (Binder -> m Binder) ->
-  (Declaration -> m Declaration, Expr -> m Expr, Binder -> m Binder)
+everywhereOnValuesM
+  :: forall m
+   . (Monad m)
+  => (Declaration -> m Declaration)
+  -> (Expr -> m Expr)
+  -> (Binder -> m Binder)
+  -> ( Declaration -> m Declaration
+     , Expr -> m Expr
+     , Binder -> m Binder
+     )
 everywhereOnValuesM f g h = (f', g', h')
   where
+
+  f' :: Declaration -> m Declaration
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
   f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> traverse h' bs <*> eitherM (traverse (pairM g' g')) g' val) >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
@@ -158,13 +180,13 @@ everywhereOnValuesM f g h = (f', g', h')
   f' (PositionedDeclaration pos com d) = (PositionedDeclaration pos com <$> f' d) >>= f
   f' other = f other
 
+  g' :: Expr -> m Expr
+  g' (Literal l) = (Literal <$> lit g' l) >>= g
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens <$> g' op <*> g' v1 <*> g' v2) >>= g
   g' (Parens v) = (Parens <$> g' v) >>= g
   g' (OperatorSection op (Left v)) = (OperatorSection <$> g' op <*> (Left <$> g' v)) >>= g
   g' (OperatorSection op (Right v)) = (OperatorSection <$> g' op <*> (Right <$> g' v)) >>= g
-  g' (ArrayLiteral vs) = (ArrayLiteral <$> traverse g' vs) >>= g
-  g' (ObjectLiteral vs) = (ObjectLiteral <$> traverse (sndM g') vs) >>= g
   g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
@@ -178,33 +200,51 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (PositionedValue pos com v) = (PositionedValue pos com <$> g' v) >>= g
   g' other = g other
 
+  h' :: Binder -> m Binder
+  h' (LiteralBinder l) = (LiteralBinder <$> lit h' l) >>= h
   h' (ConstructorBinder ctor bs) = (ConstructorBinder ctor <$> traverse h' bs) >>= h
   h' (BinaryNoParensBinder b1 b2 b3) = (BinaryNoParensBinder <$> h' b1 <*> h' b2 <*> h' b3) >>= h
   h' (ParensInBinder b) = (ParensInBinder <$> h' b) >>= h
-  h' (ObjectBinder bs) = (ObjectBinder <$> traverse (sndM h') bs) >>= h
-  h' (ArrayBinder bs) = (ArrayBinder <$> traverse h' bs) >>= h
   h' (NamedBinder name b) = (NamedBinder name <$> h' b) >>= h
   h' (PositionedBinder pos com b) = (PositionedBinder pos com <$> h' b) >>= h
   h' (TypedBinder t b) = (TypedBinder t <$> h' b) >>= h
   h' other = h other
 
-  handleCaseAlternative (CaseAlternative bs val) = CaseAlternative <$> traverse h' bs
-                                                                   <*> eitherM (traverse (pairM g' g')) g' val
+  lit :: (a -> m a) -> Literal a -> m (Literal a)
+  lit go (ObjectLiteral as) = ObjectLiteral <$> traverse (sndM go) as
+  lit go (ArrayLiteral as) = ArrayLiteral <$> traverse go as
+  lit _ other = pure other
 
+  handleCaseAlternative :: CaseAlternative -> m CaseAlternative
+  handleCaseAlternative (CaseAlternative bs val) =
+    CaseAlternative
+      <$> traverse h' bs
+      <*> eitherM (traverse (pairM g' g')) g' val
+
+  handleDoNotationElement :: DoNotationElement -> m DoNotationElement
   handleDoNotationElement (DoNotationValue v) = DoNotationValue <$> g' v
   handleDoNotationElement (DoNotationBind b v) = DoNotationBind <$> h' b <*> g' v
   handleDoNotationElement (DoNotationLet ds) = DoNotationLet <$> traverse f' ds
   handleDoNotationElement (PositionedDoNotationElement pos com e) = PositionedDoNotationElement pos com <$> handleDoNotationElement e
 
-everythingOnValues :: (r -> r -> r) ->
-                      (Declaration -> r) ->
-                      (Expr -> r) ->
-                      (Binder -> r) ->
-                      (CaseAlternative -> r) ->
-                      (DoNotationElement -> r) ->
-                      (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+everythingOnValues
+  :: forall r
+   . (r -> r -> r)
+  -> (Declaration -> r)
+  -> (Expr -> r)
+  -> (Binder -> r)
+  -> (CaseAlternative -> r)
+  -> (DoNotationElement -> r)
+  -> ( Declaration -> r
+     , Expr -> r
+     , Binder -> r
+     , CaseAlternative -> r
+     , DoNotationElement -> r
+     )
 everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   where
+
+  f' :: Declaration -> r
   f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
   f' d@(ValueDeclaration _ _ bs (Right val)) = foldl (<>) (f d) (map h' bs) <> g' val
   f' d@(ValueDeclaration _ _ bs (Left gs)) = foldl (<>) (f d) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
@@ -214,13 +254,13 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(PositionedDeclaration _ _ d1) = f d <> f' d1
   f' d = f d
 
+  g' :: Expr -> r
+  g' v@(Literal l) = lit (g v) g' l
   g' v@(UnaryMinus v1) = g v <> g' v1
   g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
   g' v@(Parens v1) = g v <> g' v1
   g' v@(OperatorSection op (Left v1)) = g v <> g' op <> g' v1
   g' v@(OperatorSection op (Right v1)) = g v <> g' op <> g' v1
-  g' v@(ArrayLiteral vs) = foldl (<>) (g v) (map g' vs)
-  g' v@(ObjectLiteral vs) = foldl (<>) (g v) (map (g' . snd) vs)
   g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
@@ -234,42 +274,53 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(PositionedValue _ _ v1) = g v <> g' v1
   g' v = g v
 
+  h' :: Binder -> r
+  h' b@(LiteralBinder l) = lit (h b) h' l
   h' b@(ConstructorBinder _ bs) = foldl (<>) (h b) (map h' bs)
   h' b@(BinaryNoParensBinder b1 b2 b3) = h b <> h' b1 <> h' b2 <> h' b3
   h' b@(ParensInBinder b1) = h b <> h' b1
-  h' b@(ObjectBinder bs) = foldl (<>) (h b) (map (h' . snd) bs)
-  h' b@(ArrayBinder bs) = foldl (<>) (h b) (map h' bs)
   h' b@(NamedBinder _ b1) = h b <> h' b1
   h' b@(PositionedBinder _ _ b1) = h b <> h' b1
   h' b@(TypedBinder _ b1) = h b <> h' b1
   h' b = h b
 
+  lit :: r -> (a -> r) -> Literal a -> r
+  lit r go (ArrayLiteral as) = foldl (<>) r (map go as)
+  lit r go (ObjectLiteral as) = foldl (<>) r (map (go . snd) as)
+  lit r _ _ = r
+
+  i' :: CaseAlternative -> r
   i' ca@(CaseAlternative bs (Right val)) = foldl (<>) (i ca) (map h' bs) <> g' val
   i' ca@(CaseAlternative bs (Left gs)) = foldl (<>) (i ca) (map h' bs ++ concatMap (\(grd, val) -> [g' grd, g' val]) gs)
 
+  j' :: DoNotationElement -> r
   j' e@(DoNotationValue v) = j e <> g' v
   j' e@(DoNotationBind b v) = j e <> h' b <> g' v
   j' e@(DoNotationLet ds) = foldl (<>) (j e) (map f' ds)
   j' e@(PositionedDoNotationElement _ _ e1) = j e <> j' e1
 
-everythingWithContextOnValues ::
-  s ->
-  r ->
-  (r -> r -> r) ->
-  (s -> Declaration       -> (s, r)) ->
-  (s -> Expr              -> (s, r)) ->
-  (s -> Binder            -> (s, r)) ->
-  (s -> CaseAlternative   -> (s, r)) ->
-  (s -> DoNotationElement -> (s, r)) ->
-  ( Declaration       -> r
-  , Expr              -> r
-  , Binder            -> r
-  , CaseAlternative   -> r
-  , DoNotationElement -> r)
+everythingWithContextOnValues
+  :: forall s r
+   . s
+  -> r
+  -> (r -> r -> r)
+  -> (s -> Declaration       -> (s, r))
+  -> (s -> Expr              -> (s, r))
+  -> (s -> Binder            -> (s, r))
+  -> (s -> CaseAlternative   -> (s, r))
+  -> (s -> DoNotationElement -> (s, r))
+  -> ( Declaration       -> r
+     , Expr              -> r
+     , Binder            -> r
+     , CaseAlternative   -> r
+     , DoNotationElement -> r)
 everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
   where
+
+  f'' :: s -> Declaration -> r
   f'' s d = let (s', r) = f s d in r <> f' s' d
 
+  f' :: s -> Declaration -> r
   f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (ValueDeclaration _ _ bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> g'' s val
   f' s (ValueDeclaration _ _ bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
@@ -279,15 +330,16 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f' s (PositionedDeclaration _ _ d1) = f'' s d1
   f' _ _ = r0
 
+  g'' :: s -> Expr -> r
   g'' s v = let (s', r) = g s v in r <> g' s' v
 
+  g' :: s -> Expr -> r
+  g' s (Literal l) = lit g'' s l
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
-  g' s (ArrayLiteral vs) = foldl (<>) r0 (map (g'' s) vs)
-  g' s (ObjectLiteral vs) = foldl (<>) r0 (map (g'' s . snd) vs)
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
@@ -301,42 +353,54 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = r0
 
+  h'' :: s -> Binder -> r
   h'' s b = let (s', r) = h s b in r <> h' s' b
 
+  h' :: s -> Binder -> r
+  h' s (LiteralBinder l) = lit h'' s l
   h' s (ConstructorBinder _ bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (BinaryNoParensBinder b1 b2 b3) = h'' s b1 <> h'' s b2 <> h'' s b3
   h' s (ParensInBinder b) = h'' s b
-  h' s (ObjectBinder bs) = foldl (<>) r0 (map (h'' s . snd) bs)
-  h' s (ArrayBinder bs) = foldl (<>) r0 (map (h'' s) bs)
   h' s (NamedBinder _ b1) = h'' s b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
   h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = r0
 
+  lit :: (s -> a -> r) -> s -> Literal a -> r
+  lit go s (ArrayLiteral as) = foldl (<>) r0 (map (go s) as)
+  lit go s (ObjectLiteral as) = foldl (<>) r0 (map (go s . snd) as)
+  lit _ _ _ = r0
+
+  i'' :: s -> CaseAlternative -> r
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
 
+  i' :: s -> CaseAlternative -> r
   i' s (CaseAlternative bs (Right val)) = foldl (<>) r0 (map (h'' s) bs) <> g'' s val
   i' s (CaseAlternative bs (Left gs)) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(grd, val) -> [g'' s grd, g'' s val]) gs)
 
+  j'' :: s -> DoNotationElement -> r
   j'' s e = let (s', r) = j s e in r <> j' s' e
 
+  j' :: s -> DoNotationElement -> r
   j' s (DoNotationValue v) = g'' s v
   j' s (DoNotationBind b v) = h'' s b <> g'' s v
   j' s (DoNotationLet ds) = foldl (<>) r0 (map (f'' s) ds)
   j' s (PositionedDoNotationElement _ _ e1) = j'' s e1
 
-everywhereWithContextOnValuesM :: (Functor m, Applicative m, Monad m) =>
-  s ->
-  (s -> Declaration       -> m (s, Declaration)) ->
-  (s -> Expr              -> m (s, Expr)) ->
-  (s -> Binder            -> m (s, Binder)) ->
-  (s -> CaseAlternative   -> m (s, CaseAlternative)) ->
-  (s -> DoNotationElement -> m (s, DoNotationElement)) ->
-  ( Declaration       -> m Declaration
-  , Expr              -> m Expr
-  , Binder            -> m Binder
-  , CaseAlternative   -> m CaseAlternative
-  , DoNotationElement -> m DoNotationElement)
+everywhereWithContextOnValuesM
+  :: forall m s
+   . (Monad m)
+  => s
+  -> (s -> Declaration       -> m (s, Declaration))
+  -> (s -> Expr              -> m (s, Expr))
+  -> (s -> Binder            -> m (s, Binder))
+  -> (s -> CaseAlternative   -> m (s, CaseAlternative))
+  -> (s -> DoNotationElement -> m (s, DoNotationElement))
+  -> ( Declaration       -> m Declaration
+     , Expr              -> m Expr
+     , Binder            -> m Binder
+     , CaseAlternative   -> m CaseAlternative
+     , DoNotationElement -> m DoNotationElement)
 everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
   where
   f'' s = uncurry f' <=< f s
@@ -351,13 +415,12 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   g'' s = uncurry g' <=< g s
 
+  g' s (Literal l) = Literal <$> lit g'' s l
   g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens <$> g'' s op <*> g'' s v1 <*> g'' s v2
   g' s (Parens v) = Parens <$> g'' s v
   g' s (OperatorSection op (Left v)) = OperatorSection <$> g'' s op <*> (Left <$> g'' s v)
   g' s (OperatorSection op (Right v)) = OperatorSection <$> g'' s op <*> (Right <$> g'' s v)
-  g' s (ArrayLiteral vs) = ArrayLiteral <$> traverse (g'' s) vs
-  g' s (ObjectLiteral vs) = ObjectLiteral <$> traverse (sndM (g'' s)) vs
   g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
@@ -373,15 +436,19 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   h'' s = uncurry h' <=< h s
 
+  h' s (LiteralBinder l) = LiteralBinder <$> lit h'' s l
   h' s (ConstructorBinder ctor bs) = ConstructorBinder ctor <$> traverse (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> h'' s b1 <*> h'' s b2 <*> h'' s b3
   h' s (ParensInBinder b) = ParensInBinder <$> h'' s b
-  h' s (ObjectBinder bs) = ObjectBinder <$> traverse (sndM (h'' s)) bs
-  h' s (ArrayBinder bs) = ArrayBinder <$> traverse (h'' s) bs
   h' s (NamedBinder name b) = NamedBinder name <$> h'' s b
   h' s (PositionedBinder pos com b) = PositionedBinder pos com <$> h'' s b
   h' s (TypedBinder t b) = TypedBinder t <$> h'' s b
   h' _ other = return other
+
+  lit :: (s -> a -> m a) -> s -> Literal a -> m (Literal a)
+  lit go s (ArrayLiteral as) = ArrayLiteral <$> traverse (go s) as
+  lit go s (ObjectLiteral as) = ObjectLiteral <$> traverse (sndM (go s)) as
+  lit _ _ other = return other
 
   i'' s = uncurry i' <=< i s
 
@@ -394,25 +461,29 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   j' s (DoNotationLet ds) = DoNotationLet <$> traverse (f'' s) ds
   j' s (PositionedDoNotationElement pos com e1) = PositionedDoNotationElement pos com <$> j'' s e1
 
-everythingWithScope ::
-  (Monoid r) =>
-  (S.Set Ident -> Declaration -> r) ->
-  (S.Set Ident -> Expr -> r) ->
-  (S.Set Ident -> Binder -> r) ->
-  (S.Set Ident -> CaseAlternative -> r) ->
-  (S.Set Ident -> DoNotationElement -> r) ->
-  ( S.Set Ident -> Declaration       -> r
-  , S.Set Ident -> Expr              -> r
-  , S.Set Ident -> Binder            -> r
-  , S.Set Ident -> CaseAlternative   -> r
-  , S.Set Ident -> DoNotationElement -> r)
+everythingWithScope
+  :: forall r
+   . (Monoid r)
+  => (S.Set Ident -> Declaration -> r)
+  -> (S.Set Ident -> Expr -> r)
+  -> (S.Set Ident -> Binder -> r)
+  -> (S.Set Ident -> CaseAlternative -> r)
+  -> (S.Set Ident -> DoNotationElement -> r)
+  -> ( S.Set Ident -> Declaration -> r
+     , S.Set Ident -> Expr -> r
+     , S.Set Ident -> Binder -> r
+     , S.Set Ident -> CaseAlternative -> r
+     , S.Set Ident -> DoNotationElement -> r
+     )
 everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   where
   -- Avoid importing Data.Monoid and getting shadowed names above
   (<>) = mappend
 
+  f'' :: S.Set Ident -> Declaration -> r
   f'' s a = f s a <> f' s a
 
+  f' :: S.Set Ident -> Declaration -> r
   f' s (DataBindingGroupDeclaration ds) =
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in foldMap (f'' s') ds
@@ -431,15 +502,16 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f' s (PositionedDeclaration _ _ d) = f'' s d
   f' _ _ = mempty
 
+  g'' :: S.Set Ident -> Expr -> r
   g'' s a = g s a <> g' s a
 
+  g' :: S.Set Ident -> Expr -> r
+  g' s (Literal l) = lit g'' s l
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g' s op <> g' s v1 <> g' s v2
   g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
-  g' s (ArrayLiteral vs) = foldMap (g'' s) vs
-  g' s (ObjectLiteral vs) = foldMap (g'' s . snd) vs
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
@@ -460,20 +532,28 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = mempty
 
+  h'' :: S.Set Ident -> Binder -> r
   h'' s a = h s a <> h' s a
 
+  h' :: S.Set Ident -> Binder -> r
+  h' s (LiteralBinder l) = lit h'' s l
   h' s (ConstructorBinder _ bs) = foldMap (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = foldMap (h'' s) [b1, b2, b3]
   h' s (ParensInBinder b) = h'' s b
-  h' s (ObjectBinder bs) = foldMap (h'' s . snd) bs
-  h' s (ArrayBinder bs) = foldMap (h'' s) bs
   h' s (NamedBinder name b1) = h'' (S.insert name s) b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
   h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = mempty
 
+  lit :: (S.Set Ident -> a -> r) -> S.Set Ident -> Literal a -> r
+  lit go s (ArrayLiteral as) = foldMap (go s) as
+  lit go s (ObjectLiteral as) = foldMap (go s . snd) as
+  lit _ _ _ = mempty
+
+  i'' :: S.Set Ident -> CaseAlternative -> r
   i'' s a = i s a <> i' s a
 
+  i' :: S.Set Ident -> CaseAlternative -> r
   i' s (CaseAlternative bs (Right val)) =
     let s' = S.union s (S.fromList (concatMap binderNames bs))
     in foldMap (h'' s) bs <> g'' s' val
@@ -481,8 +561,10 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     let s' = S.union s (S.fromList (concatMap binderNames bs))
     in foldMap (h'' s) bs <> foldMap (\(grd, val) -> g'' s' grd <> g'' s' val) gs
 
+  j'' :: S.Set Ident -> DoNotationElement -> (S.Set Ident, r)
   j'' s a = let (s', r) = j' s a in (s', j s a <> r)
 
+  j' :: S.Set Ident -> DoNotationElement -> (S.Set Ident, r)
   j' s (DoNotationValue v) = (s, g'' s v)
   j' s (DoNotationBind b v) =
     let s' = S.union (S.fromList (binderNames b)) s
@@ -498,7 +580,15 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   getDeclIdent (TypeDeclaration ident _) = Just ident
   getDeclIdent _ = Nothing
 
-accumTypes :: (Monoid r) => (Type -> r) -> (Declaration -> r, Expr -> r, Binder -> r, CaseAlternative -> r, DoNotationElement -> r)
+accumTypes
+  :: (Monoid r)
+  => (Type -> r)
+  -> ( Declaration -> r
+     , Expr -> r
+     , Binder -> r
+     , CaseAlternative -> r
+     , DoNotationElement -> r
+     )
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)

@@ -10,6 +10,7 @@ module Language.PureScript.Publish.ErrorsWarnings
   , RepositoryFieldError(..)
   , JSONSource(..)
   , printError
+  , printErrorToStdout
   , renderError
   , printWarnings
   , renderWarnings
@@ -54,11 +55,13 @@ data PackageWarning
 -- | An error that should be fixed by the user.
 data UserError
   = BowerJSONNotFound
+  | LicenseNotFound
   | BowerExecutableNotFound [String] -- list of executable names tried
   | CouldntDecodeBowerJSON (ParseError BowerError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
+  | NoLicenseSpecified
   | MissingDependencies (NonEmpty PackageName)
   | CompileError P.MultipleErrors
   | DirtyWorkingTree
@@ -69,6 +72,7 @@ data RepositoryFieldError
   | BadRepositoryType String
   | NotOnGithub
   deriving (Show)
+
 
 -- | An error that probably indicates a bug in this module.
 data InternalError
@@ -87,6 +91,9 @@ data OtherError
 
 printError :: PackageError -> IO ()
 printError = printToStderr . renderError
+
+printErrorToStdout :: PackageError -> IO ()
+printErrorToStdout = printToStdout . renderError
 
 renderError :: PackageError -> Box
 renderError err =
@@ -122,6 +129,12 @@ displayUserError e = case e of
       "The bower.json file was not found. Please create one, or run " ++
       "`pulp init`."
       )
+  LicenseNotFound ->
+    para (concat
+      ["No LICENSE file was found. Please create one. ",
+       "Distributing code without a license means that nobody ",
+       "will be able to (legally) use it."
+      ])
   BowerExecutableNotFound names ->
     para (concat
       [ "The Bower executable was not found (tried: ", format names, "). Please"
@@ -168,6 +181,12 @@ displayUserError e = case e of
       ] ++ bulletedList showVersion vs
   BadRepositoryField err ->
     displayRepositoryError err
+  NoLicenseSpecified ->
+    para (concat
+      ["No license specified in bower.json. Please add one. ",
+       "Distributing code without a license means that nobody ",
+       "will be able to (legally) use it."
+      ])
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
         pl a b = if singular then b else a
@@ -190,7 +209,7 @@ displayUserError e = case e of
   CompileError err ->
     vcat
       [ para "Compile error:"
-      , indented (P.prettyPrintMultipleErrorsBox False err)
+      , indented (vcat (P.prettyPrintMultipleErrorsBox False err))
       ]
   DirtyWorkingTree ->
     para (

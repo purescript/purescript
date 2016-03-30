@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -69,8 +68,7 @@ updateReExports env order modules =
 -- have already been converted.
 --
 getReExports ::
-  (Functor m, Applicative m,
-  MonadState (Map P.ModuleName Module) m) =>
+  (MonadState (Map P.ModuleName Module) m) =>
   P.Env ->
   P.ModuleName ->
   m [(P.ModuleName, [Declaration])]
@@ -105,9 +103,7 @@ getReExports env mn =
 --      class members are listed.
 --
 collectDeclarations ::
-  (Functor m, Applicative m,
-  MonadState (Map P.ModuleName Module) m,
-  MonadReader P.ModuleName m) =>
+  (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
   P.Imports ->
   P.Exports ->
   m [(P.ModuleName, [Declaration])]
@@ -154,7 +150,7 @@ collectDeclarations imports exports = do
 -- instantiate @name@ as both 'P.Ident' and 'P.ProperName'.
 --
 findImport ::
-  (Show name, Eq name, Applicative m, MonadReader P.ModuleName m) =>
+  (Show name, Eq name, MonadReader P.ModuleName m) =>
   [P.ImportRecord name] ->
   (name, P.ModuleName) ->
   m (P.ModuleName, name)
@@ -174,9 +170,8 @@ findImport imps (name, orig) =
         internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
 lookupValueDeclaration ::
-  (Applicative m,
-  MonadState (Map P.ModuleName Module) m,
-  MonadReader P.ModuleName m) =>
+  (MonadState (Map P.ModuleName Module) m,
+   MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
   m (P.ModuleName, [Either (String, P.Constraint, ChildDeclaration) Declaration])
@@ -221,8 +216,7 @@ lookupValueDeclaration importedFrom ident = do
             pure (importedFrom, [Left r'])
           other ->
             errOther other
-    other -> do
-      errOther other
+    other -> errOther other
 
   where
   thd :: (a, b, c) -> c
@@ -233,9 +227,8 @@ lookupValueDeclaration importedFrom ident = do
 -- are only included in the output if they are listed in the arguments.
 --
 lookupTypeDeclaration ::
-  (Applicative m,
-  MonadState (Map P.ModuleName Module) m,
-  MonadReader P.ModuleName m) =>
+  (MonadState (Map P.ModuleName Module) m,
+   MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.ProperName 'P.TypeName ->
   m (P.ModuleName, [Declaration])
@@ -251,9 +244,8 @@ lookupTypeDeclaration importedFrom ty = do
         ("lookupTypeDeclaration: unexpected result: " ++ show other)
 
 lookupTypeClassDeclaration ::
-  (Applicative m,
-  MonadState (Map P.ModuleName Module) m,
-  MonadReader P.ModuleName m) =>
+  (MonadState (Map P.ModuleName Module) m,
+   MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.ProperName 'P.ClassName ->
   m (P.ModuleName, [Declaration])
@@ -276,9 +268,8 @@ lookupTypeClassDeclaration importedFrom tyClass = do
 -- state, or raise an internal error if it is not there.
 --
 lookupModuleDeclarations ::
-  (Applicative m,
-  MonadState (Map P.ModuleName Module) m,
-  MonadReader P.ModuleName m) =>
+  (MonadState (Map P.ModuleName Module) m,
+   MonadReader P.ModuleName m) =>
   String ->
   P.ModuleName ->
   m [Declaration]
@@ -293,8 +284,7 @@ lookupModuleDeclarations definedIn moduleName = do
       pure (allDeclarations mdl)
 
 handleTypeClassMembers ::
-  (Functor m, Applicative m,
-  MonadReader P.ModuleName m) =>
+  (MonadReader P.ModuleName m) =>
   Map P.ModuleName [Either (String, P.Constraint, ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
@@ -364,8 +354,7 @@ instance Monoid TypeClassEnv where
 -- Returns a tuple of (values, type classes).
 --
 handleEnv ::
-  (Functor m, Applicative m,
-  MonadReader P.ModuleName m) =>
+  (MonadReader P.ModuleName m) =>
   TypeClassEnv ->
   m ([Declaration], [Declaration])
 handleEnv TypeClassEnv{..} =
@@ -390,7 +379,7 @@ handleEnv TypeClassEnv{..} =
   promoteChild constraint ChildDeclaration{..} =
     case cdeclInfo of
       ChildTypeClassMember typ ->
-        pure $ Declaration
+        pure Declaration
           { declTitle      = cdeclTitle
           , declComments   = cdeclComments
           , declSourceSpan = cdeclSourceSpan

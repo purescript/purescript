@@ -11,11 +11,10 @@ module Language.PureScript.Docs.Convert.Single
 
 import Prelude ()
 import Prelude.Compat
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe, isNothing)
 
 import Control.Monad
 import Control.Category ((>>>))
-import Data.Maybe (mapMaybe, isNothing)
 import Data.Either
 import Data.List (nub, isPrefixOf, isSuffixOf)
 
@@ -137,7 +136,7 @@ basicDeclaration title info = Just $ Right $ mkDeclaration title info
 convertDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
 convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
   basicDeclaration title (ValueDeclaration ty)
-convertDeclaration (P.ValueDeclaration _ _ _ _) title =
+convertDeclaration (P.ValueDeclaration {}) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
   basicDeclaration title (ValueDeclaration P.TypeWildcard)
@@ -205,7 +204,7 @@ convertDeclaration _ _ = Nothing
 convertComments :: [P.Comment] -> Maybe String
 convertComments cs = do
   let raw = concatMap toLines cs
-  let docs = catMaybes (map stripPipe raw)
+  let docs = mapMaybe stripPipe raw
   guard (not (null docs))
   pure (unlines docs)
 

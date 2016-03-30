@@ -19,6 +19,7 @@ module Language.PureScript.Ide.CaseSplit
 import           Prelude                                 ()
 import           Prelude.Compat                          hiding (lex)
 
+import           Control.Arrow                           (second)
 import           Control.Monad.Error.Class
 import           "monad-logger" Control.Monad.Logger
 import           Data.List                               (find)
@@ -54,20 +55,12 @@ noAnnotations = WildcardAnnotations False
 caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
-  (tc, args) <- splitTypeConstructor (parseType' (T.unpack q))
+  type' <- parseType' (T.unpack q)
+  (tc, args) <- splitTypeConstructor type'
   (EDType _ _ (DataType typeVars ctors)) <- findTypeDeclaration tc
   let applyTypeVars = everywhereOnTypes (replaceAllTypeVars (zip (map fst typeVars) args))
-  let appliedCtors = map (\(n, ts) -> (n, map applyTypeVars ts)) ctors
+  let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
-
-{- ["EDType {
-     edTypeName = ProperName {runProperName = \"Either\"}
-   , edTypeKind = FunKind Star (FunKind Star Star)
-   , edTypeDeclarationKind =
-       DataType [(\"a\",Just Star),(\"b\",Just Star)]
-                [(ProperName {runProperName = \"Left\"},[TypeVar \"a\"])
-                ,(ProperName {runProperName = \"Right\"},[TypeVar \"b\"])]}"]
--}
 
 findTypeDeclaration :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                          ProperName 'TypeName -> m ExternsDeclaration
@@ -87,7 +80,7 @@ findTypeDeclaration' t ExternsFile{..} =
             EDType tn _ _ -> tn == t
             _ -> False) efDeclarations
 
-splitTypeConstructor :: (Applicative m, MonadError PscIdeError m) =>
+splitTypeConstructor :: (MonadError PscIdeError m) =>
                         Type -> m (ProperName 'TypeName, [Type])
 splitTypeConstructor = go []
   where
@@ -128,11 +121,14 @@ addClause s wca =
         " = ?" <> (T.strip . T.pack . runIdent $ fName)
   in [s, template]
 
-parseType' :: String -> Type
-parseType' s = let (Right t) = do
-                     ts <- lex "" s
-                     runTokenParser "" (parseType <* P.eof) ts
-               in t
+parseType' :: (MonadError PscIdeError m) =>
+              String -> m Type
+parseType' s =
+  case lex "<psc-ide>" s >>= runTokenParser "<psc-ide>" (parseType <* P.eof) of
+    Right type' -> pure type'
+    Left err ->
+      throwError (GeneralError ("Parsing the splittype failed with:"
+                                ++ show err))
 
 parseTypeDeclaration' :: String -> (Ident, Type)
 parseTypeDeclaration' s =

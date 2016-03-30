@@ -31,7 +31,7 @@ import Language.PureScript.Sugar.Names.Env
 -- |
 -- Finds all exportable members of a module, disregarding any explicit exports.
 --
-findExportable :: forall m. (Applicative m, MonadError MultipleErrors m) => Module -> m Exports
+findExportable :: forall m. (MonadError MultipleErrors m) => Module -> m Exports
 findExportable (Module _ _ mn ds _) =
   rethrow (addHint (ErrorInModule mn)) $ foldM updateExports nullExports ds
   where
@@ -56,7 +56,7 @@ findExportable (Module _ _ mn ds _) =
 -- Resolves the exports for a module, filtering out members that have not been
 -- exported and elaborating re-exports of other modules.
 --
-resolveExports :: forall m. (Applicative m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> ModuleName -> Imports -> Exports -> [DeclarationRef] -> m Exports
+resolveExports :: forall m. (MonadError MultipleErrors m, MonadWriter MultipleErrors m) => Env -> ModuleName -> Imports -> Exports -> [DeclarationRef] -> m Exports
 resolveExports env mn imps exps refs =
   rethrow (addHint (ErrorInModule mn)) $ do
     filtered <- filterModule mn exps refs
@@ -164,7 +164,7 @@ resolveExports env mn imps exps refs =
       exps' <- envModuleExports <$> mn'' `M.lookup` env
       ((_, dctors'), mnOrig) <- find (\((name', _), _) -> name == name') (exportedTypes exps')
       let relevantDctors = mapMaybe (\(Qualified mn''' dctor) -> if mn''' == Just mn'' then Just dctor else Nothing) dctors
-      return ((name, intersect relevantDctors dctors'), mnOrig)
+      return ((name, relevantDctors `intersect` dctors'), mnOrig)
     go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
 
@@ -199,7 +199,7 @@ resolveExports env mn imps exps refs =
 --
 filterModule
   :: forall m
-   . (Applicative m, MonadError MultipleErrors m)
+   . (MonadError MultipleErrors m)
   => ModuleName
   -> Exports
   -> [DeclarationRef]

@@ -40,7 +40,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Concurrent.Lifted as C
 
 import Data.List (foldl', sort)
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (fromMaybe, catMaybes, isJust)
 import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
@@ -145,11 +145,14 @@ data RebuildPolicy
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Functor m, Applicative m, Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
      -> m Environment
 make MakeActions{..} ms = do
+  requirePath <- asks optionsRequirePath
+  when (isJust requirePath) $ tell $ errorMessage DeprecatedRequirePath
+
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms
@@ -361,8 +364,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         , mapSourceFile = sourceFile
         , mapGenerated = convertPos $ add (extraLines+1) 0 gen
         , mapName = Nothing
-        }) $
-        mappings
+        }) mappings
     }
     let mapping = generate rawMapping
     writeTextFile mapFile $ BU8.toString . B.toStrict . encode $ mapping

@@ -35,7 +35,7 @@ import Language.PureScript.Docs.Convert (collectBookmarks)
 --    * Collect a list of bookmarks from the whole set of source files
 --    * Return the parsed modules and the bookmarks
 parseAndBookmark ::
-  (Functor m, Applicative m, MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError P.MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
   -> m ([InPackage P.Module], [Bookmark])
@@ -82,7 +82,7 @@ fileInfoToString (FromDep _ fn) = fn
 parseFile :: FilePath -> IO (FilePath, String)
 parseFile input' = (,) input' <$> readFile input'
 
-parseAs :: (Functor m, MonadIO m) => (FilePath -> a) -> FilePath -> m (a, String)
+parseAs :: (MonadIO m) => (FilePath -> a) -> FilePath -> m (a, String)
 parseAs g = fmap (first g) . liftIO . parseFile
 
 getDepsModuleNames :: [InPackage (FilePath, P.Module)] -> M.Map P.ModuleName PackageName
