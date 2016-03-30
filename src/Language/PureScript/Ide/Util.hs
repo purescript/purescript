@@ -37,6 +37,7 @@ prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
 identifierFromExternDecl :: ExternDecl -> Text
 identifierFromExternDecl (ValueDeclaration name _) = name
 identifierFromExternDecl (TypeDeclaration name _) = runProperNameT name
+identifierFromExternDecl (TypeSynonymDeclaration name _) = runProperNameT name
 identifierFromExternDecl (DataConstructor name _ _) = name
 identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
 identifierFromExternDecl (ModuleDecl name _) = name
@@ -52,6 +53,7 @@ completionFromMatch (Match _ Export{}) = Nothing
 completionFromMatch (Match m d) = Just $ case d of
   ValueDeclaration name type' -> Completion (m, name, prettyTypeT type')
   TypeDeclaration name kind -> Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
+  TypeSynonymDeclaration name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
   DataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
   TypeClassDeclaration name -> Completion (m, runProperNameT name, "class")
   ModuleDecl name _ -> Completion ("module", name, "module")

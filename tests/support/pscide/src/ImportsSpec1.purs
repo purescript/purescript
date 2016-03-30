@@ -1,6 +1,7 @@
 module ImportsSpec1
        ( exportedFunction
        , MyType
+       , MyParamType
        , MyNewtype(..)
        , MyMaybe(..)
        , SpecialCase
@@ -15,6 +16,8 @@ exportedFunction ∷ ∀ a. a → a
 exportedFunction x = x
 
 type MyType = String
+
+type MyParamType a = Array a
 
 newtype MyNewtype = MyNewtype String
 

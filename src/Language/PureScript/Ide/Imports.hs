@@ -34,6 +34,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
+import           Control.Applicative ((<|>))
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
@@ -266,19 +267,20 @@ addImportForIdentifier fp ident filters = do
 
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
-    -- module.
+    -- module. This also happens for parameterized types, as these generate both
+    -- a type aswell as a type synonym.
 
     ms@[Match m1 d1, Match m2 d2] ->
       if m1 /= m2
          -- If the modules don't line up we just ask the user to specify the
          -- module
       then pure $ Left ms
-      else case dtorAndTypeMatch d1 d2 of
+      else case decideRedundantCase d1 d2 <|> decideRedundantCase d2 d1 of
         -- If dataconstructor and type line up we just import the
         -- dataconstructor as that will give us an unnecessary import warning at
         -- worst
-        Just dtor ->
-          Right <$> addExplicitImport fp dtor (P.moduleNameFromString (T.unpack m1))
+        Just decl ->
+          Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m1))
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
         Nothing ->
@@ -289,11 +291,11 @@ addImportForIdentifier fp ident filters = do
     xs ->
       pure $ Left xs
     where
-      dtorAndTypeMatch dtor@(DataConstructor _ t _) (TypeDeclaration t' _) =
+      decideRedundantCase dtor@(DataConstructor _ t _) (TypeDeclaration t' _) =
         if t == t' then Just dtor else Nothing
-      dtorAndTypeMatch (TypeDeclaration t' _) dtor@(DataConstructor _ t _) =
-        if t' == t then Just dtor else Nothing
-      dtorAndTypeMatch _ _ = Nothing
+      decideRedundantCase TypeDeclaration{} ts@TypeSynonymDeclaration{} =
+        Just ts
+      decideRedundantCase _ _ = Nothing
 
 prettyPrintImport' :: Import -> Text
 -- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs

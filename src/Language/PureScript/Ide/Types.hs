@@ -47,6 +47,7 @@ data ExternDecl
     -- | A function/value declaration
     = ValueDeclaration Ident P.Type
     | TypeDeclaration (P.ProperName 'P.TypeName) P.Kind
+    | TypeSynonymDeclaration (P.ProperName 'P.TypeName) P.Type
     -- | A Dependency onto another Module
     | Dependency
         ModuleIdent  -- name of the dependency

@@ -45,7 +45,6 @@ import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Externs as PE
-import qualified Language.PureScript.Kinds as Kinds
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m PE.ExternsFile
@@ -77,6 +76,7 @@ convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls)
 removeTypeDeclarationsForClass :: ExternDecl -> Endo [ExternDecl]
 removeTypeDeclarationsForClass (TypeClassDeclaration n) = Endo (filter notDuplicate)
   where notDuplicate (TypeDeclaration n' _) = runProperNameT n /= runProperNameT n'
+        notDuplicate (TypeSynonymDeclaration n' _) = runProperNameT n /= runProperNameT n'
         notDuplicate _ = True
 removeTypeDeclarationsForClass _ = mempty
 
@@ -97,7 +97,7 @@ convertExport _ = Nothing
 convertDecl :: PE.ExternsDeclaration -> Maybe ExternDecl
 convertDecl PE.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
 convertDecl PE.EDTypeSynonym{..} = Just $
-  TypeDeclaration edTypeSynonymName Kinds.Star
+  TypeSynonymDeclaration edTypeSynonymName edTypeSynonymType
 convertDecl PE.EDDataConstructor{..} = Just $
   DataConstructor (runProperNameT edDataCtorName) edDataCtorTypeCtor edDataCtorType
 convertDecl PE.EDValue{..} = Just $

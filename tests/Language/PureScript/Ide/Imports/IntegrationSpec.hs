@@ -60,6 +60,11 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
     outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyType)"
                                            , "import Main (id)"
                                            ])
+  it "adds an explicit unqualified import (parameterized type)" $ do
+    withSupportFiles (Integration.addImport "MyParamType")
+    outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (MyParamType)"
+                                           , "import Main (id)"
+                                           ])
   it "adds an explicit unqualified import (typeclass)" $ do
     withSupportFiles (Integration.addImport "ATypeClass")
     outputFileShouldBe (sourceFileSkeleton [ "import ImportsSpec1 (class ATypeClass)"
