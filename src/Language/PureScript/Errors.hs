@@ -1182,7 +1182,7 @@ prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
 prettyPrintRef (ProperRef name) = name
 prettyPrintRef (TypeInstanceRef ident) = showIdent ident
 prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
-prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
+prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintRef ref
 
 -- |
 -- Pretty print multiple errors
@@ -1201,8 +1201,7 @@ prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning"
 
 -- | Pretty print errors as a Box
-prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error" 
+prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error"
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
