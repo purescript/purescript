@@ -508,7 +508,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' :: S.Set Ident -> Expr -> r
   g' s (Literal l) = lit g'' s l
   g' s (UnaryMinus v1) = g'' s v1
-  g' s (BinaryNoParens op v1 v2) = g' s op <> g' s v1 <> g' s v2
+  g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
   g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
   g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
