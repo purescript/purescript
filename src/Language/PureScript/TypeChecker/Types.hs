@@ -179,7 +179,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
   g (TypeClassDictionary (nm, tys) sco) = TypeClassDictionary (nm, map f tys) sco
   g other = other
-  
+
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
   (MonadState CheckState m, MonadError MultipleErrors m) =>
@@ -283,8 +283,10 @@ infer' (IfThenElse cond th el) = do
   cond' <- check cond tyBoolean
   th'@(TypedValue _ _ thTy) <- infer th
   el'@(TypedValue _ _ elTy) <- infer el
-  unifyTypes thTy elTy
-  return $ TypedValue True (IfThenElse cond' th' el') thTy
+  (th'', thTy') <- instantiatePolyTypeWithUnknowns th' thTy
+  (el'', elTy') <- instantiatePolyTypeWithUnknowns el' elTy
+  unifyTypes thTy' elTy'
+  return $ TypedValue True (IfThenElse cond' th'' el'') thTy'
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
