@@ -1,5 +1,6 @@
 flags: {}
 packages:
 - '.'
-extra-deps: []
+extra-deps: 
+- language-javascript-0.6.0.4
 resolver: nightly-2016-03-17
