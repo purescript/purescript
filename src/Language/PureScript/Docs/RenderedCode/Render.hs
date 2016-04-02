@@ -44,24 +44,29 @@ typeLiterals = mkPattern match
               ]
   match (TypeConstructor (Qualified mn name)) =
     Just (ctor (runProperName name) (maybeToContainingModule mn))
-  match (ConstrainedType deps ty) =
-    Just $ mintersperse sp
-            [ syntax "(" <> constraints <> syntax ")"
-            , syntax "=>"
-            , renderType ty
-            ]
-    where
-    constraints = mintersperse (syntax "," <> sp) (map renderDep deps)
-    renderDep :: Constraint -> RenderedCode
-    renderDep (pn, tys) =
-      let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
-      in  renderType instApp
   match REmpty =
     Just (syntax "()")
   match row@RCons{} =
     Just (syntax "(" <> renderRow row <> syntax ")")
   match _ =
     Nothing
+
+renderConstraint :: Constraint -> RenderedCode
+renderConstraint (pn, tys) =
+  let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
+  in  renderType instApp
+
+renderConstraints :: [Constraint] -> RenderedCode -> RenderedCode
+renderConstraints deps ty =
+  mintersperse sp
+    [ if length deps == 1
+         then constraints
+         else syntax "(" <> constraints <> syntax ")"
+    , syntax "=>"
+    , ty
+    ]
+  where
+    constraints = mintersperse (syntax "," <> sp) (map renderConstraint deps)
 
 -- |
 -- Render code representing a Row
@@ -104,6 +109,12 @@ kinded = mkPattern match
   match (KindedType t k) = Just (k, t)
   match _ = Nothing
 
+constrained :: Pattern () Type ([Constraint], Type)
+constrained = mkPattern match
+  where
+  match (ConstrainedType deps ty) = Just (deps, ty)
+  match _ = Nothing
+
 matchTypeAtom :: Pattern () Type RenderedCode
 matchTypeAtom = typeLiterals <+> fmap parens matchType
   where
@@ -116,6 +127,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
+                  , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \idents ty -> mconcat [syntax "forall", sp, mintersperse sp (map ident idents), syntax ".", sp, ty] ]
                   , [ Wrap kinded $ \k ty -> mintersperse sp [ty, syntax "::", renderKind k] ]
                   ]

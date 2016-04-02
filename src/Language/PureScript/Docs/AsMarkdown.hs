@@ -6,6 +6,7 @@ module Language.PureScript.Docs.AsMarkdown
   , Docs
   , runDocs
   , modulesAsMarkdown
+  , codeToString
   ) where
 
 import Prelude ()
