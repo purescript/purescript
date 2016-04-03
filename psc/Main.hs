@@ -1,17 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Main
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -34,7 +20,7 @@ import qualified Data.ByteString.UTF8 as BU8
 import Options.Applicative as Opts
 
 import System.Exit (exitSuccess, exitFailure)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
 import System.IO.UTF8
 import System.FilePath.Glob (glob)
 
@@ -202,7 +188,10 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> jsonErrors
 
 main :: IO ()
-main = execParser opts >>= compile
+main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
+  execParser opts >>= compile
   where
   opts        = info (version <*> helper <*> pscMakeOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo

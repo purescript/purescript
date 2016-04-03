@@ -7,6 +7,8 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 
 import Options.Applicative hiding (str)
 
+import System.IO (hSetEncoding, stderr, stdout, utf8)
+
 import qualified Paths_purescript as Paths
 import Language.PureScript.Publish
 import Language.PureScript.Publish.ErrorsWarnings
@@ -24,7 +26,10 @@ dryRunOptions = defaultPublishOptions
   where dummyVersion = ("0.0.0", Version [0,0,0] [])
 
 main :: IO ()
-main = execParser opts >>= publish
+main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
+  execParser opts >>= publish
   where
   opts        = info (version <*> helper <*> dryRun) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo

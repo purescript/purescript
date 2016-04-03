@@ -1,25 +1,12 @@
------------------------------------------------------------------------------
---
--- Module      :  psc-bundle
--- Copyright   :  (c) Phil Freeman 2015
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Bundles compiled PureScript modules for the browser.
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Bundles compiled PureScript modules for the browser.
 module Main (main) where
 
-import Data.Maybe 
+import Data.Maybe
 import Data.Traversable (for)
 import Data.Version (showVersion)
 
@@ -32,7 +19,7 @@ import Control.Monad.IO.Class
 import System.FilePath (takeFileName, takeDirectory)
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure)
-import System.IO (stderr, hPutStrLn)
+import System.IO (stderr, stdout, hPutStrLn, hSetEncoding, utf8)
 import System.Directory (createDirectoryIfMissing)
 
 import Language.PureScript.Bundle
@@ -125,6 +112,8 @@ options = Options <$> some inputFile
 -- | Make it go.
 main :: IO ()
 main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   opts <- execParser (info (version <*> helper <*> options) infoModList)
   when (isJust (optionsRequirePath opts)) $ hPutStrLn stderr "The require-path option is deprecated and will be removed in PureScript 0.9."
   output <- runExceptT (app opts)
