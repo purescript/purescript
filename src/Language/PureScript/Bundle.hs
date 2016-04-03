@@ -27,6 +27,7 @@ module Language.PureScript.Bundle (
    , ModuleType(..)
    , ErrorMessage(..)
    , printErrorMessage
+   , getExportedIdentifiers
 ) where
 
 import Prelude ()
@@ -235,7 +236,6 @@ toModule requirePath mids mid top
   toModuleElement stmt
     | Just (exported, name, decl) <- matchMember stmt
     = pure (Member stmt exported name decl [])
-  -- module.exports = { ... }
   toModuleElement stmt
     | Just props <- matchExportsAssignment stmt
     = (ExportsList <$> traverse toExport (trailingCommaList props))
@@ -260,6 +260,35 @@ toModule requirePath mids mid top
 
   toModuleElement other = pure (Other other)
 
+-- Get a list of all the exported identifiers from a foreign module.
+--
+-- TODO: what if we assign to exports.foo and then later assign to
+-- module.exports (presumably overwriting exports.foo)?
+getExportedIdentifiers :: (MonadError ErrorMessage m)
+                          => String
+                          -> JSAST
+                          -> m [String]
+getExportedIdentifiers mname top
+  | JSAstProgram stmts _ <- top = concat <$> traverse go stmts
+  | otherwise = err InvalidTopLevel
+  where
+  err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
+
+  go stmt
+    | Just props <- matchExportsAssignment stmt
+    = traverse toIdent (trailingCommaList props)
+    | Just (True, name, _) <- matchMember stmt
+    = pure [name]
+    | otherwise
+    = pure []
+
+  toIdent (JSPropertyNameandValue name _ [_]) =
+    extractLabel' name
+  toIdent _ =
+    err UnsupportedExport
+
+  extractLabel' = maybe (err UnsupportedExport) pure . extractLabel
+
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
 matchRequire :: Maybe FilePath
@@ -280,6 +309,7 @@ matchRequire requirePath mids mid stmt
   | otherwise
   = Nothing
 
+-- Matches JS member declarations.
 matchMember :: JSStatement -> Maybe (Bool, String, JSExpression)
 matchMember stmt
   -- var foo = expr;
@@ -295,6 +325,8 @@ matchMember stmt
   | otherwise
   = Nothing
 
+-- Matches assignments to module.exports, like this:
+-- module.exports = { ... }
 matchExportsAssignment :: JSStatement -> Maybe JSObjectPropertyList
 matchExportsAssignment stmt
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
