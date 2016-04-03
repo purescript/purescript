@@ -229,53 +229,21 @@ toModule requirePath mids mid top
   err = throwError . ErrorInModule mid
 
   toModuleElement :: JSStatement -> m ModuleElement
-  -- var ModuleName = require("file");
   toModuleElement stmt
-    | JSVariable _ jsInit _ <- stmt
-    , [JSVarInitExpression var varInit] <- commaList jsInit
-    , JSIdentifier _ importName <- var
-    , JSVarInit _ jsInitEx <- varInit
-    , JSMemberExpression req _ argsE _ <- jsInitEx
-    , JSIdentifier _ "require" <- req
-    , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
-    , importPath' <- checkImportPath requirePath importPath mid mids
-    = pure (Require stmt importName importPath')
-  -- var foo = expr;
+    | Just (importName, importPath) <- matchRequire requirePath mids mid stmt
+    = pure (Require stmt importName importPath)
   toModuleElement stmt
-    | JSVariable _ jsInit _ <- stmt
-    , [JSVarInitExpression var varInit] <- commaList jsInit
-    , JSIdentifier _ name <- var
-    , JSVarInit _ decl <- varInit
-    = pure (Member stmt False name decl [])
-  -- exports.foo = expr; exports["foo"] = expr;
-  toModuleElement stmt
-    | JSAssignStatement e (JSAssign _) decl _ <- stmt
-    , Just name <- accessor e
-    = pure (Member stmt True name decl [])
-    where
-    accessor :: JSExpression -> Maybe String
-    accessor (JSMemberDot exports _ nm)
-      | JSIdentifier _ "exports" <- exports
-      , JSIdentifier _ name <- nm
-      = Just name
-    accessor (JSMemberSquare exports _ nm _)
-      | JSIdentifier _ "exports" <- exports
-      , Just name <- fromStringLiteral nm
-      = Just name
-    accessor _ = Nothing
+    | Just (exported, name, decl) <- matchMember stmt
+    = pure (Member stmt exported name decl [])
   -- module.exports = { ... }
   toModuleElement stmt
-    | JSAssignStatement e (JSAssign _) decl _ <- stmt
-    , JSMemberDot module' _ exports <- e
-    , JSIdentifier _ "module" <- module'
-    , JSIdentifier _ "exports" <- exports
-    , JSObjectLiteral _ props _ <- decl
+    | Just props <- matchExportsAssignment stmt
     = (ExportsList <$> traverse toExport (trailingCommaList props))
     where
       toExport :: JSObjectProperty -> m (ExportType, String, JSExpression, [Key])
       toExport (JSPropertyNameandValue name _ [val]) =
         (,,val,[]) <$> exportType val
-                   <*> extractLabel name
+                   <*> extractLabel' name
       toExport _ = err UnsupportedExport
 
       exportType :: JSExpression -> m ExportType
@@ -287,13 +255,72 @@ toModule requirePath mids mid top
         = pure ForeignReexport
       exportType (JSIdentifier _ s) = pure (RegularExport s)
       exportType _ = err UnsupportedExport
---
-      extractLabel :: JSPropertyName -> m String
-      extractLabel (JSPropertyString _ nm) = pure (trimStringQuotes nm)
-      extractLabel (JSPropertyIdent _ nm) = pure nm
-      extractLabel _ = err UnsupportedExport
+
+      extractLabel' = maybe (err UnsupportedExport) pure . extractLabel
 
   toModuleElement other = pure (Other other)
+
+-- Matches JS statements like this:
+-- var ModuleName = require("file");
+matchRequire :: Maybe FilePath
+                -> S.Set String
+                -> ModuleIdentifier
+                -> JSStatement
+                -> Maybe (String, Either String ModuleIdentifier)
+matchRequire requirePath mids mid stmt
+  | JSVariable _ jsInit _ <- stmt
+  , [JSVarInitExpression var varInit] <- commaList jsInit
+  , JSIdentifier _ importName <- var
+  , JSVarInit _ jsInitEx <- varInit
+  , JSMemberExpression req _ argsE _ <- jsInitEx
+  , JSIdentifier _ "require" <- req
+  , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
+  , importPath' <- checkImportPath requirePath importPath mid mids
+  = Just (importName, importPath')
+  | otherwise
+  = Nothing
+
+matchMember :: JSStatement -> Maybe (Bool, String, JSExpression)
+matchMember stmt
+  -- var foo = expr;
+  | JSVariable _ jsInit _ <- stmt
+  , [JSVarInitExpression var varInit] <- commaList jsInit
+  , JSIdentifier _ name <- var
+  , JSVarInit _ decl <- varInit
+  = Just (False, name, decl)
+  | JSAssignStatement e (JSAssign _) decl _ <- stmt
+  , Just name <- accessor e
+  -- exports.foo = expr; exports["foo"] = expr;
+  = Just (True, name, decl)
+  | otherwise
+  = Nothing
+
+matchExportsAssignment :: JSStatement -> Maybe JSObjectPropertyList
+matchExportsAssignment stmt
+  | JSAssignStatement e (JSAssign _) decl _ <- stmt
+  , JSMemberDot module' _ exports <- e
+  , JSIdentifier _ "module" <- module'
+  , JSIdentifier _ "exports" <- exports
+  , JSObjectLiteral _ props _ <- decl
+  = Just props
+  | otherwise
+  = Nothing
+
+accessor :: JSExpression -> Maybe String
+accessor (JSMemberDot exports _ nm)
+  | JSIdentifier _ "exports" <- exports
+  , JSIdentifier _ name <- nm
+  = Just name
+accessor (JSMemberSquare exports _ nm _)
+  | JSIdentifier _ "exports" <- exports
+  , Just name <- fromStringLiteral nm
+  = Just name
+accessor _ = Nothing
+
+extractLabel :: JSPropertyName -> Maybe String
+extractLabel (JSPropertyString _ nm) = Just (trimStringQuotes nm)
+extractLabel (JSPropertyIdent _ nm) = Just nm
+extractLabel _ = Nothing
 
 -- | Eliminate unused code based on the specified entry point set.
 compile :: [Module] -> [ModuleIdentifier] -> [Module]
