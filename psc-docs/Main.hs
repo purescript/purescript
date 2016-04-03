@@ -1,17 +1,4 @@
 {-# LANGUAGE TupleSections #-}
-----------------------------------------------------------------------------
---
--- Module      :  Main
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
 
 module Main where
 
@@ -32,7 +19,7 @@ import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn, hPrint, stderr)
+import System.IO (hPutStrLn, hPrint, hSetEncoding, stderr, stdout, utf8)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
@@ -228,7 +215,10 @@ buildOptions (fmt, input, mapping) =
       exitFailure
 
 main :: IO ()
-main = execParser opts >>= buildOptions >>= docgen
+main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
+  execParser opts >>= buildOptions >>= docgen
   where
   opts        = info (version <*> helper <*> pscDocsOptions) infoModList
   infoModList = fullDesc <> headerInfo <> footerInfo
