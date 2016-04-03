@@ -12,6 +12,7 @@ import Data.Char (isSpace)
 import Data.Either (lefts, rights)
 import Data.List (intercalate, transpose, nub, nubBy, sortBy)
 import Data.Foldable (fold)
+import Data.Maybe (maybeToList)
 
 import qualified Data.Map as M
 
@@ -28,6 +29,7 @@ import Language.PureScript.Pretty.Common (before)
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import qualified Language.PureScript.Bundle as Bundle
 
 import qualified Text.PrettyPrint.Boxes as Box
 
@@ -37,11 +39,13 @@ import Text.Parsec.Error (Message(..))
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ErrorParsingFFIModule FilePath
+  = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
   | UnnecessaryFFIModule ModuleName FilePath
+  | MissingFFIImplementations ModuleName [Ident]
+  | UnusedFFIImplementations ModuleName [Ident]
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
@@ -223,6 +227,8 @@ errorCode em = case unwrapErrorMessage em of
   MissingFFIModule{} -> "MissingFFIModule"
   MultipleFFIModules{} -> "MultipleFFIModules"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
+  MissingFFIImplementations{} -> "MissingFFIImplementations"
+  UnusedFFIImplementations{} -> "UnusedFFIImplementations"
   CannotGetFileInfo{} -> "CannotGetFileInfo"
   CannotReadFile{} -> "CannotReadFile"
   CannotWriteFile{} -> "CannotWriteFile"
@@ -522,10 +528,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line "Unable to write file: "
             , indent . line $ path
             ]
-    renderSimpleErrorMessage (ErrorParsingFFIModule path) =
-      paras [ line "Unable to parse foreign module:"
-            , indent . line $ path
-            ]
+    renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
+      paras $ [ line "Unable to parse foreign module:"
+              , indent . line $ path
+              ] ++
+              (map (indent . line) (concatMap Bundle.printErrorMessage (maybeToList extra)))
     renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
@@ -536,6 +543,14 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "An unnecessary foreign module implementation was provided for module " ++ runModuleName mn ++ ": "
             , indent . line $ path
             , line $ "Module " ++ runModuleName mn ++ " does not contain any foreign import declarations, so a foreign module is not necessary."
+            ]
+    renderSimpleErrorMessage (MissingFFIImplementations mn idents) =
+      paras [ line $ "The following values are not defined in the foreign module for module " ++ runModuleName mn ++ ": "
+            , indent . paras $ map (line . runIdent) idents
+            ]
+    renderSimpleErrorMessage (UnusedFFIImplementations mn idents) =
+      paras [ line $ "The following definitions in the foreign module for module " ++ runModuleName mn ++ " are unused: "
+            , indent . paras $ map (line . runIdent) idents
             ]
     renderSimpleErrorMessage (MultipleFFIModules mn paths) =
       paras [ line $ "Multiple foreign module implementations have been provided for module " ++ runModuleName mn ++ ": "

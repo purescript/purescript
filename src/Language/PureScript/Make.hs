@@ -25,6 +25,7 @@ module Language.PureScript.Make
 import Prelude ()
 import Prelude.Compat
 
+import Control.Applicative ((<|>))
 import Control.Monad hiding (sequence)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -52,6 +53,8 @@ import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Set as S
 import qualified Data.Map as M
 
+import qualified Text.Parsec as Parsec
+
 import SourceMap.Types
 import SourceMap
 
@@ -60,6 +63,8 @@ import System.Directory
 import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
 import System.IO.Error (tryIOError)
 import System.IO.UTF8 (readUTF8File, writeUTF8File)
+
+import qualified Language.JavaScript.Parser as JS
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -76,6 +81,8 @@ import Language.PureScript.Renamer
 import Language.PureScript.Sugar
 import Language.PureScript.TypeChecker
 import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.Parser as PSParser
 
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.CoreFn as CF
@@ -331,7 +338,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         | not $ requiresForeign m -> do
             tell $ errorMessage $ UnnecessaryFFIModule mn path
             return Nothing
-        | otherwise -> return $ Just $ J.JSApp Nothing (J.JSVar Nothing "require") [J.JSStringLiteral Nothing "./foreign"]
+        | otherwise -> do
+            checkForeignDecls m path
+            return $ Just $ J.JSApp Nothing (J.JSVar Nothing "require") [J.JSStringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
     rawJs <- J.moduleToJs m foreignInclude
@@ -384,9 +393,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
 
-  readTextFile :: FilePath -> Make String
-  readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
-
   writeTextFile :: FilePath -> String -> Make ()
   writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
     mkdirp path
@@ -397,3 +403,50 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
+
+readTextFile :: FilePath -> Make String
+readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
+
+-- |
+-- Check that the declarations in a given PureScript module match with those
+-- in its corresponding foreign module.
+--
+checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
+checkForeignDecls m path = do
+  jsStr <- lift $ readTextFile path
+  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
+
+  foreignIdentsStrs <- either errorParsingModule pure $ getExps js
+  let foreignIdents =
+        either
+          (internalError . ("checkForeignDecls: unexpected idents: " ++) . show)
+          S.fromList
+          (traverse parseIdent foreignIdentsStrs)
+  let importedIdents = S.fromList $ map fst (CF.moduleForeign m)
+
+  let unusedFFI = foreignIdents S.\\ importedIdents
+  unless (null unusedFFI) $
+    tell . errorMessage . UnusedFFIImplementations mname $
+      S.toList unusedFFI
+
+  let missingFFI = importedIdents S.\\ foreignIdents
+  unless (null missingFFI) $
+    throwError . errorMessage . MissingFFIImplementations mname $
+      S.toList missingFFI
+
+  where
+  mname = CF.moduleName m
+
+  errorParsingModule :: Bundle.ErrorMessage -> SupplyT Make a
+  errorParsingModule = throwError . errorMessage . ErrorParsingFFIModule path . Just
+
+  getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
+  getExps = Bundle.getExportedIdentifiers (runModuleName mname)
+
+  -- TODO: Handling for parenthesised operators should be removed after 0.9.
+  parseIdent :: String -> Either String Ident
+  parseIdent str = try str <|> try ("(" ++ str ++ ")")
+    where
+    try s = either (Left . show) Right $ do
+      ts <- PSParser.lex "" s
+      PSParser.runTokenParser "" (PSParser.parseIdent <* Parsec.eof) ts

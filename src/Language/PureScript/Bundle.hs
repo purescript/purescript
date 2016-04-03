@@ -318,12 +318,23 @@ matchMember stmt
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
   = Just (False, name, decl)
+  -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- accessor e
-  -- exports.foo = expr; exports["foo"] = expr;
   = Just (True, name, decl)
   | otherwise
   = Nothing
+  where
+  accessor :: JSExpression -> Maybe String
+  accessor (JSMemberDot exports _ nm)
+    | JSIdentifier _ "exports" <- exports
+    , JSIdentifier _ name <- nm
+    = Just name
+  accessor (JSMemberSquare exports _ nm _)
+    | JSIdentifier _ "exports" <- exports
+    , Just name <- fromStringLiteral nm
+    = Just name
+  accessor _ = Nothing
 
 -- Matches assignments to module.exports, like this:
 -- module.exports = { ... }
@@ -337,17 +348,6 @@ matchExportsAssignment stmt
   = Just props
   | otherwise
   = Nothing
-
-accessor :: JSExpression -> Maybe String
-accessor (JSMemberDot exports _ nm)
-  | JSIdentifier _ "exports" <- exports
-  , JSIdentifier _ name <- nm
-  = Just name
-accessor (JSMemberSquare exports _ nm _)
-  | JSIdentifier _ "exports" <- exports
-  , Just name <- fromStringLiteral nm
-  = Just name
-accessor _ = Nothing
 
 extractLabel :: JSPropertyName -> Maybe String
 extractLabel (JSPropertyString _ nm) = Just (trimStringQuotes nm)
