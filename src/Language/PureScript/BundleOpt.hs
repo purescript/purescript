@@ -21,28 +21,15 @@ module Language.PureScript.BundleOpt (
 ) where
 
 import Debug.Trace
-import Data.List (intersperse, intercalate)
+import Data.List (intersperse)
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.BundleTypes
 import Language.JavaScript.Parser.AST
 
-suffix :: String
-suffix = "$_$_$"
+-- * Types
 
--- | Main function for uncurry optimization
-uncurryFunc :: [Module] -> [Module]
-uncurryFunc modules =
-    -- add uncurried functions
-    let (modulesWithUncurried,adminMap) = foldr generateUncurried ([],M.empty) modules
-    -- add exports for uncurried functions
-        (modulesWithExports,adminMap2)  = foldr generateUncurriedExports ([],adminMap) modulesWithUncurried
-    -- replace satured calls to calls to uncurried functions
-        (modulesWithCalls, adminMap3)    = foldr generateSaturedCalls ([],adminMap2) modulesWithExports
-    in  trace (show adminMap3) $ modulesWithCalls
-
--- * Admin
 data FuncAdmin = FuncAdmin
     { moduleId  :: ModuleIdentifier
     , arity     :: Int
@@ -51,48 +38,72 @@ data FuncAdmin = FuncAdmin
 
 type FuncAdminMap = M.Map String [FuncAdmin]
 
-addAdmin :: String -> FuncAdmin -> FuncAdminMap ->  FuncAdminMap
-addAdmin funcName funcAdmin funcAdminMap = M.insertWith (++) funcName [funcAdmin] funcAdminMap
 
-replaceAdmin :: String -> FuncAdmin -> FuncAdmin -> FuncAdminMap ->  FuncAdminMap
-replaceAdmin funcName oldFuncAdmin newFuncAdmin funcAdminMap = M.adjust replaceFunc funcName funcAdminMap
-    where
-        replaceFunc [o] | o == oldFuncAdmin =  [newFuncAdmin]
-        replaceFunc l@(_hd:_) = (filter (\e -> e /= oldFuncAdmin) l) ++  [newFuncAdmin]
-        replaceFunc [] = error "BundleOpt>>replaceAdmin: Impossible with FuncAdmin"
+data FuncStats = FuncStats {
+    moduleCount :: Int,
+    moduleFunctions :: Int,
+    uncurriedFuncs :: Int,
+    exportedEntities :: Int,
+    uncurriedFuncsExported :: Int,
+    exportedForeignEntities :: Int,
+    uncurriedForeignFuncsExported :: Int
+} deriving (Eq,Show)
 
-findAdminFor :: String -> ModuleIdentifier -> FuncAdminMap -> Maybe FuncAdmin
-findAdminFor name mid funcAdminMap =
-    case M.lookup name funcAdminMap of
-        Nothing -> Nothing
-        Just li -> case filter (\fa -> moduleName (moduleId fa) == moduleName mid) li of
-                        [] -> Nothing
-                        [e] -> Just e
-                        _ -> error "BundleOpt>>findAdminFor: Impossible with Export"
+data FuncCollector = FuncCollector {
+    adminMap :: FuncAdminMap,
+    stats :: FuncStats
+} deriving (Eq,Show)
+
+-- * Constants
+
+suffix :: String
+suffix = "$_$_$"
+
 
 -- * Functions
 
+-- | Main function for uncurry optimization
+uncurryFunc :: [Module] -> [ModuleIdentifier] -> [Module]
+uncurryFunc modules entryPoints =
+    -- add uncurried functions
+    let (modulesWithUncurried,funcCollector) = foldr generateUncurried ([],emptyCollector) modules
+    -- add exports for uncurried functions
+        (modulesWithExports,funcCollector2)  = foldr (generateUncurriedExports entryPoints) ([],funcCollector) modulesWithUncurried
+    -- replace satured calls to calls to uncurried functions
+        (modulesWithCalls, _funcCollector3)    = trace ("Uncurry Stats: " ++ (show (stats funcCollector2))) $
+                                                foldr generateSaturedCalls ([],funcCollector2) modulesWithExports
+
+    in  modulesWithCalls
+
+
 -- | Generation of uncurried functions
-generateUncurried :: Module -> ([Module],FuncAdminMap) -> ([Module],FuncAdminMap)
-generateUncurried (Module moduleIdentifier moduleElements) (modules, adminMap) =
-        let (eles,adminMap') = foldr (generateUncurriedEle moduleIdentifier) ([],adminMap) moduleElements
-        in (Module moduleIdentifier eles : modules, adminMap')
+generateUncurried :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
+generateUncurried (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+    let newCollector = funcCollector {adminMap = adminMap funcCollector,
+                                      stats = (stats funcCollector){moduleCount = moduleCount (stats funcCollector) + 1}}
+        (eles,funcCollector') = foldr (generateUncurriedEle moduleIdentifier) ([],newCollector) moduleElements
+    in (Module moduleIdentifier eles : modules, funcCollector')
 
 -- |  Generate uncurried functions from curried functions
-generateUncurriedEle :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateUncurriedEle mid m@(Member _jSNode sort name [decl] _keys) (eles, adminMap) -- a var decl
+generateUncurriedEle :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncCollector) -> ([ModuleElement],FuncCollector)
+generateUncurriedEle mid m@(Member _jSNode sort _name [decl] _keys) (eles, funcCollector) -- a var decl
     | JSFunctionExpression fn _names _lb [parameter] _rb block <- node decl
     , JSLiteral "function" <- node fn
     , JSIdentifier idi <- node parameter
-        = trace ("candidate: " ++ name ++ " para: " ++ show idi) $
-            case analyzeUncurriedPrim [idi] block of
-                Nothing -> (m : eles, adminMap)
-                Just (argList,block') -> if not sort
-                                            then trace ("generateFor: " ++ name) $ generateUncurried1 argList block' m
-                                            else trace ("generateFor2: " ++ name) $ generateUncurried2 argList block' m
+            =   let newCollector = funcCollector
+                        {adminMap = adminMap funcCollector,
+                         stats = (stats funcCollector){moduleFunctions = moduleFunctions (stats funcCollector) + 1}}
+                {-trace ("candidate: " ++ name ++ " para: " ++ show idi) $-}
+                in case analyzeUncurriedPrim [idi] block of
+                    Nothing -> (m : eles, newCollector)
+                    Just (argList,block') -> if not sort
+                                                then {-trace ("generateFor: " ++ name) $-}
+                                                    generateUncurried1 argList block' m newCollector
+                                                else {-trace ("generateFor2: " ++ name) $-}
+                                                    generateUncurried2 argList block' m newCollector
   where
-    generateUncurried1 :: [String] -> JSNode -> ModuleElement -> ([ModuleElement],FuncAdminMap)
-    generateUncurried1 argList block (Member jsNode typ name2 [decl2] keys)
+    generateUncurried1 :: [String] -> JSNode -> ModuleElement -> FuncCollector -> ([ModuleElement],FuncCollector)
+    generateUncurried1 argList block (Member jsNode typ name2 [decl2] keys) funcCollector'
         | JSFunctionExpression fn names lb _ rb1 _ <- node decl2
         , JSVariables var [ varIntro ] rb2 <- node jsNode
         , JSVarDecl _declN (eq : _decl3) <- node varIntro
@@ -104,16 +115,18 @@ generateUncurriedEle mid m@(Member _jSNode sort name [decl] _keys) (eles, adminM
               newVarIntro   = NN $ JSVarDecl (sp $ JSIdentifier newName) (eq : [newDecl])
               newNode       = NN $ JSVariables var [newVarIntro] rb2
               newAdmin      = FuncAdmin { moduleId = mid, arity = length argList, exported = False}
-              in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name2 newAdmin adminMap)
-    generateUncurried1 _ _ _ = (m : eles, adminMap)
+              newCollector  = funcCollector' {adminMap = addAdmin name2 newAdmin (adminMap funcCollector'),
+                                stats = (stats funcCollector'){uncurriedFuncs = uncurriedFuncs (stats funcCollector') + 1}}
+              in (m : Member newNode typ newName [newDecl] keys : eles, newCollector)
+    generateUncurried1 _ _ _ funcCollector' = (m : eles, funcCollector')
 
-    generateUncurried2 :: [String] -> JSNode -> ModuleElement -> ([ModuleElement],FuncAdminMap)
-    generateUncurried2 argList block (Member jsNode typ name1 [decl2] keys)
+    generateUncurried2 :: [String] -> JSNode -> ModuleElement -> FuncCollector -> ([ModuleElement],FuncCollector)
+    generateUncurried2 argList block (Member jsNode typ name1 [decl2] keys) funcCollector'
         | JSFunctionExpression fn names lb _ rb1 _ <- node decl2
         , JSExpression (e : op : _decl3) <- node jsNode
         =   let newName = name1 ++ suffix
             in case setAccessor (node e) newName of
-                Nothing -> (m : eles, adminMap)
+                Nothing -> (m : eles, funcCollector')
                 Just newE ->
                     let newArgList    = intersperse (nt (JSLiteral ","))
                                             $ map (nt . JSIdentifier)
@@ -121,9 +134,11 @@ generateUncurriedEle mid m@(Member _jSNode sort name [decl] _keys) (eles, adminM
                         newDecl       = NN $ JSFunctionExpression fn names lb newArgList rb1 block
                         newNode       = NN $ JSExpression (NN newE : op : [newDecl])
                         newAdmin      = FuncAdmin { moduleId = mid, arity = length argList, exported = False}
-                    in (m : Member newNode typ newName [newDecl] keys : eles, addAdmin name1 newAdmin adminMap)
-    generateUncurried2 _ _ _ = (m : eles, adminMap)
-generateUncurriedEle _mid m (eles, adminMap) = (m : eles, adminMap)
+                        newCollector  = funcCollector' {adminMap = addAdmin name1 newAdmin (adminMap funcCollector'),
+                                          stats = (stats funcCollector'){uncurriedFuncs = uncurriedFuncs (stats funcCollector') + 1}}
+                    in (m : Member newNode typ newName [newDecl] keys : eles, newCollector)
+    generateUncurried2 _ _ _ funcCollector' = (m : eles, funcCollector')
+generateUncurriedEle _mid m (eles, funcCollector) = (m : eles, funcCollector)
 
 analyzeUncurriedPrim :: [String] -> JSNode -> Maybe ([String], JSNode)
 analyzeUncurriedPrim idList decl
@@ -133,46 +148,54 @@ analyzeUncurriedPrim idList decl
     , JSFunctionExpression fn _names _lb [parameter] _rb block <- node ef3
     , JSLiteral "function"  <- node fn
     , JSIdentifier idi      <- node parameter
-    = trace ("found deeper: " ++ show idList ++ " para: " ++ show idi) $ analyzeUncurriedPrim (idi : idList) block
+    = {-trace ("found deeper: " ++ show idList ++ " para: " ++ show idi) $-}
+        analyzeUncurriedPrim (idi : idList) block
 analyzeUncurriedPrim l@(_a:_b:_) block = Just (reverse l,block)
 analyzeUncurriedPrim _ _ = Nothing
 
 -- * Exports
 
 -- | Generation of uncurried exports
-generateUncurriedExports :: Module -> ([Module],FuncAdminMap) -> ([Module],FuncAdminMap)
-generateUncurriedExports (Module moduleIdentifier moduleElements) (modules, adminMap) =
-        let (eles,adminMap') = foldr (generateUncurriedExpo moduleIdentifier) ([],adminMap) moduleElements
-        in (Module moduleIdentifier eles : modules, adminMap')
+generateUncurriedExports :: [ModuleIdentifier] -> Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
+generateUncurriedExports entryPoints (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+    if elem moduleIdentifier entryPoints
+        then (Module moduleIdentifier moduleElements : modules, funcCollector)
+        else
+            let (eles,funcCollector') = foldr (generateUncurriedExpo moduleIdentifier) ([],funcCollector) moduleElements
+            in (Module moduleIdentifier eles : modules, funcCollector')
 
-generateUncurriedExpo :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateUncurriedExpo mid (ExportsList l) (eles, adminMap) =
-    let (newExports,adminMap') = foldr (generateUncurriedEx mid) ([],adminMap) l
-    in (ExportsList newExports : eles, adminMap')
-generateUncurriedExpo _mid other (eles, adminMap) = (other : eles, adminMap)
+generateUncurriedExpo :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncCollector) -> ([ModuleElement],FuncCollector)
+generateUncurriedExpo mid (ExportsList l) (eles, funcCollector) =
+    let (newExports,funcCollector') = foldr (generateUncurriedEx mid) ([],funcCollector) l
+    in (ExportsList newExports : eles, funcCollector')
+generateUncurriedExpo _mid other (eles, funcCollector) = (other : eles, funcCollector)
 
 generateUncurriedEx :: ModuleIdentifier -> (ExportType, String, JSNode, [Key])
-    -> ([(ExportType, String, JSNode, [Key])],FuncAdminMap) -> ([(ExportType, String, JSNode, [Key])],FuncAdminMap)
-generateUncurriedEx mid t@(RegularExport name1, name2, jSNode, [key]) (eles, adminMap)
+    -> ([(ExportType, String, JSNode, [Key])],FuncCollector) -> ([(ExportType, String, JSNode, [Key])],FuncCollector)
+generateUncurriedEx mid t@(RegularExport name1, name2, jSNode, [key]) (eles, funcCollector)
     | JSIdentifier _name3 <- node jSNode
     = -- [(ExportType, String, JSNode, [Key])]
-        case findAdminFor name2 mid adminMap of
-            Nothing -> (t : eles, adminMap)
+        let newCollector  = funcCollector {stats = (stats funcCollector){exportedEntities = exportedEntities (stats funcCollector) + 1}}
+        in case findAdminFor name2 mid (adminMap newCollector) of
+            Nothing -> (t : eles, newCollector)
             Just admin ->
                 let newName   = name2 ++ suffix
                     newAdmin  = admin {exported = True}
                     newNode   = nt (JSIdentifier newName)
                     newKeys   = [(fst key,newName)]
                     newExport = (RegularExport (name1 ++ suffix    ), newName, newNode, newKeys)
-                in  (t : newExport : eles, replaceAdmin name2 admin newAdmin adminMap)
+                    newCollector' =  newCollector {adminMap = replaceAdmin name2 admin newAdmin (adminMap newCollector),
+                                      stats = (stats newCollector){uncurriedFuncsExported = uncurriedFuncsExported (stats newCollector) + 1}}
+                in  (t : newExport : eles, newCollector')
 
-generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, adminMap)
+generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, funcCollector)
     | JSMemberDot [l] m r <- node jSNode
     , JSIdentifier "$foreign" <- node l
     , JSLiteral "." <- node m
     , JSIdentifier name2 <- node r
-    =     case findAdminFor name2 mid adminMap of
-            Nothing -> (t : eles, adminMap)
+    = let newCollector  = funcCollector {stats = (stats funcCollector){exportedForeignEntities = exportedForeignEntities (stats funcCollector) + 1}}
+      in case findAdminFor name2 mid (adminMap newCollector) of
+            Nothing -> (t : eles, newCollector)
             Just admin ->
                 let newName   = name ++ suffix
                     newAdmin  = admin {exported = True}
@@ -180,19 +203,21 @@ generateUncurriedEx mid t@(ForeignReexport, name, jSNode, [key]) (eles, adminMap
                                         (nt (JSIdentifier newName)))
                     newKeys   = [(fst key,newName)]
                     newExport = (ForeignReexport, newName, newNode, newKeys)
-                in  (t : newExport : eles, replaceAdmin name2 admin newAdmin adminMap)
+                    newCollector' =  newCollector {adminMap = replaceAdmin name2 admin newAdmin (adminMap newCollector),
+                                      stats = (stats newCollector){uncurriedForeignFuncsExported = uncurriedForeignFuncsExported (stats newCollector) + 1}}
+                in  (t : newExport : eles, newCollector')
 
-generateUncurriedEx _mid t (eles, adminMap) =
-    trace ("export in unknown form: " ++ show t) (t : eles, adminMap)
+generateUncurriedEx _mid t (eles, funcCollector) =
+    trace ("export in unknown form: " ++ show t) (t : eles, funcCollector)
 
 -- * Call replacement
 
 -- | replace satured calls to calls to uncurried functions
-generateSaturedCalls :: Module -> ([Module],FuncAdminMap) -> ([Module],FuncAdminMap)
-generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, adminMap) =
-    trace ("generateSaturedCalls: " ++ show moduleIdentifier) $
-    let (eles,adminMap') = foldr (generateSaturedC moduleIdentifier imports) ([],adminMap) moduleElements
-    in (Module moduleIdentifier eles : modules, adminMap')
+generateSaturedCalls :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
+generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+    {- trace ("generateSaturedCalls: " ++ show moduleIdentifier) $ -}
+    let (eles,funcCollector') = foldr (generateSaturedC moduleIdentifier imports) ([],funcCollector) moduleElements
+    in (Module moduleIdentifier eles : modules, funcCollector')
   where
     imports :: [(String, ModuleIdentifier)]
     imports = mapMaybe toImport moduleElements
@@ -203,11 +228,11 @@ generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, adminMap
 
 -- |  Generate uncurried functions from curried functions
 generateSaturedC :: ModuleIdentifier -> [(String, ModuleIdentifier)] -> ModuleElement ->
-    ([ModuleElement],FuncAdminMap) -> ([ModuleElement],FuncAdminMap)
-generateSaturedC mid imports (Member jSNode' sort name decls keys) (eles, adminMap) =
+    ([ModuleElement],FuncCollector) -> ([ModuleElement],FuncCollector)
+generateSaturedC mid imports (Member jSNode' sort name decls keys) (eles, funcCollector) =
     let replaceSaturedNode = rscJS jSNode'
         replaceSaturedDecls = map rscJS decls
-    in  (Member replaceSaturedNode sort name replaceSaturedDecls keys : eles, adminMap)
+    in  (Member replaceSaturedNode sort name replaceSaturedDecls keys : eles, funcCollector)
   where
     rscJS :: JSNode -> JSNode
     rscJS (NN node') = (NN (rsc node'))
@@ -332,20 +357,20 @@ generateSaturedC mid imports (Member jSNode' sort name decls keys) (eles, adminM
         ,  JSArguments _al arg1 _ar <- node n2
         ,  JSCallExpression _str _cl [cm] _cr <- node n3
         ,  JSArguments _a2l arg2 _a2r <- node cm
-        = trace ("replace candidate: " ++ name' ++ " " ++ intercalate " " (map showStripped nodes)) $
-            case findAdminFor name' mid adminMap of
-                Nothing -> trace ("replace candidate: not in map: " ++ name') $
+        = {-trace ("replace candidate: " ++ name' ++ " " ++ intercalate " " (map showStripped nodes)) $-}
+            case findAdminFor name' mid (adminMap funcCollector) of
+                Nothing -> {-trace ("replace candidate: not in map: " ++ name') $-}
                                 (rscJS n1) : mapReplace (n2:n3:rest)
                 Just admin ->
                     let moreCallArgs = getCallArgs rest
                         newName = name' ++ suffix
                         arityFound = 2 + length moreCallArgs
                     in if arity admin <= arityFound
-                        then trace ("replace!!! " ++ show (arity admin)) $
+                        then {-trace ("!*" ++ show (arity admin)) $-}
                             let newNodes = generateNewCall (sp $ JSIdentifier newName)
                                                 (node n2) (arg1: arg2 : take (arity admin - 2) moreCallArgs)
                             in mapReplace newNodes ++ drop (1 + arity admin) nodes
-                        else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
+                        else {-trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $-}
                             (rscJS n1) : mapReplace (n2:n3:rest)
 
     mapReplace nodes@(n1:n2:n3:rest)
@@ -355,28 +380,28 @@ generateSaturedC mid imports (Member jSNode' sort name decls keys) (eles, adminM
         ,  JSArguments _al arg1 _ar <- node n2
         ,  JSCallExpression _str _cl [cm] _cr <- node n3
         ,  JSArguments _a2l arg2 _a2r <- node cm
-        = trace ("replace candidate: " ++ name' ++ " " ++  intercalate " " (map showStripped nodes)) $
+        = {-trace ("replace candidate: " ++ name' ++ " " ++  intercalate " " (map showStripped nodes)) $-}
             let realMod = case lookup scope imports of
                             Nothing -> mid
                             Just moduleIdentifier -> moduleIdentifier
-            in case findAdminFor name' realMod adminMap of
-                Nothing -> trace ("replace candidate: not in map: " ++ name') $
+            in case findAdminFor name' realMod (adminMap funcCollector) of
+                Nothing -> {-trace ("replace candidate: not in map: " ++ name') $-}
                                 (rscJS n1) : mapReplace (n2:n3:rest)
                 Just admin ->
                     let moreCallArgs = getCallArgs rest
                         newName = name' ++ suffix
                         arityFound = 2 + length moreCallArgs
                     in if arity admin <= arityFound
-                        then trace ("replace!!! " ++ show (arity admin)) $
+                        then {-trace ("!*" ++ show (arity admin)) $-}
                             let newNodes = generateNewCall (NN $ JSMemberDot [l] m (nt (JSIdentifier newName)))
                                                 (node n2) (arg1: arg2 : take (arity admin - 2) moreCallArgs)
                             in mapReplace newNodes ++ drop (1 + arity admin) nodes
-                        else trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $
+                        else {-trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show (2 + length moreCallArgs)) $-}
                             (rscJS n1) : mapReplace (n2:n3:rest)
 
     mapReplace (hd:tl) = (rscJS hd) : mapReplace tl
 
-generateSaturedC _ _ e (eles, adminMap) = (e : eles, adminMap)
+generateSaturedC _ _ e (eles, funcCollector) = (e : eles, funcCollector)
 
 getCallArgs :: [JSNode] -> [[JSNode]]
 getCallArgs (hd:tl)
@@ -386,8 +411,46 @@ getCallArgs (hd:tl)
 getCallArgs _ = []
 
 generateNewCall :: JSNode -> Node -> [[JSNode]] -> [JSNode]
-generateNewCall idNode (JSArguments al old ar) argNodes
+generateNewCall idNode (JSArguments al _old ar) argNodes
     = let argList = concat $ intersperse [(sp (JSLiteral ","))] argNodes
       in [idNode, NN (JSArguments al argList ar)]
 generateNewCall _idNode _args _argNodes
     = error "BundleOpt>>generateNewCall: Impossible match error."
+
+-- * Admin
+
+emptyStats :: FuncStats
+emptyStats = FuncStats {
+    moduleCount = 0,
+    moduleFunctions = 0,
+    uncurriedFuncs = 0,
+    exportedEntities = 0,
+    uncurriedFuncsExported = 0,
+    exportedForeignEntities = 0,
+    uncurriedForeignFuncsExported = 0
+}
+
+emptyCollector :: FuncCollector
+emptyCollector = FuncCollector {
+    adminMap = M.empty,
+    stats = emptyStats
+}
+
+addAdmin :: String -> FuncAdmin -> FuncAdminMap ->  FuncAdminMap
+addAdmin funcName funcAdmin funcAdminMap = M.insertWith (++) funcName [funcAdmin] funcAdminMap
+
+replaceAdmin :: String -> FuncAdmin -> FuncAdmin -> FuncAdminMap ->  FuncAdminMap
+replaceAdmin funcName oldFuncAdmin newFuncAdmin funcAdminMap = M.adjust replaceFunc funcName funcAdminMap
+    where
+        replaceFunc [o] | o == oldFuncAdmin =  [newFuncAdmin]
+        replaceFunc l@(_hd:_) = (filter (\e -> e /= oldFuncAdmin) l) ++  [newFuncAdmin]
+        replaceFunc [] = error "BundleOpt>>replaceAdmin: Impossible with FuncAdmin"
+
+findAdminFor :: String -> ModuleIdentifier -> FuncAdminMap -> Maybe FuncAdmin
+findAdminFor name mid funcAdminMap =
+    case M.lookup name funcAdminMap of
+        Nothing -> Nothing
+        Just li -> case filter (\fa -> moduleName (moduleId fa) == moduleName mid) li of
+                        [] -> Nothing
+                        [e] -> Just e
+                        _ -> error "BundleOpt>>findAdminFor: Impossible with Export"
