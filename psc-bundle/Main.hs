@@ -36,6 +36,7 @@ data Options = Options
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
   , optionsRequirePath :: Maybe FilePath
+  , optionsShouldUncurry :: Maybe String
   } deriving Show
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
@@ -61,8 +62,7 @@ app Options{..} = do
     length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
-
-  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath True
+  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath optionsShouldUncurry
 
 -- | Command line options parser.
 options :: Parser Options
@@ -72,6 +72,7 @@ options = Options <$> some inputFile
                   <*> optional mainModule
                   <*> namespace
                   <*> optional requirePath
+                  <*> optional shouldUncurry
   where
   inputFile :: Parser FilePath
   inputFile = strArgument $
@@ -108,6 +109,12 @@ options = Options <$> some inputFile
        short 'r'
     <> long "require-path"
     <> help "The path prefix used in require() calls in the generated JavaScript [deprecated]"
+
+  shouldUncurry :: Parser String
+  shouldUncurry = strOption $
+       short 'p'
+    <> long "optimize"
+    <> help "optimize uncurry or optimize u - When given this option psc-bundle will apply an uncurry optimization"
 
 -- | Make it go.
 main :: IO ()
