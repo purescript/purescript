@@ -48,6 +48,9 @@ source-repository head
     type: git
     location: https://github.com/purescript/purescript.git
 
+flag library-only
+     default: False
+
 library
     build-depends: base >=4.8 && <5,
                    base-compat >=0.6.0,
@@ -227,26 +230,31 @@ library
     ghc-options: -Wall -O2
 
 executable psc
-    build-depends: base >=4 && <5, base-compat >=0.6.0,
-                   containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any, purescript -any,
-                   time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
-                   aeson >= 0.8 && < 0.12, bytestring -any, utf8-string >= 1 && < 2
+    if !flag(library-only)
+      build-depends: base >=4 && <5, base-compat >=0.6.0,
+                     containers -any, directory -any, filepath -any,
+                     mtl -any, optparse-applicative >= 0.12.1, parsec -any, purescript -any,
+                     time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
+                     aeson >= 0.8 && < 0.12, bytestring -any, utf8-string >= 1 && < 2
+      buildable: True
+    else
+      buildable: False
     main-is: Main.hs
-    buildable: True
     hs-source-dirs: psc
     other-modules: JSON, Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any,
-                   haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
-                   boxes >= 0.1.4 && < 0.2.0
-
+    if !flag(library-only)
+      build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
+                     mtl -any, optparse-applicative >= 0.12.1, parsec -any,
+                     haskeline >= 0.7.0.0, purescript -any, transformers -any,
+                     transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
+                     boxes >= 0.1.4 && < 0.2.0
+      buildable: True
+    else
+      buildable: False
     main-is: Main.hs
-    buildable: True
     hs-source-dirs: psci psci/main
     other-modules: PSCi
                    PSCi.Types
@@ -262,14 +270,17 @@ executable psci
     ghc-options: -Wall -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.12.1, process -any, mtl -any,
-                   split -any, ansi-wl-pprint -any, directory -any,
-                   filepath -any, Glob -any, transformers -any,
-                   transformers-compat -any
+    if !flag(library-only)
+      build-depends: base >=4 && <5, purescript -any,
+                     optparse-applicative >= 0.12.1, process -any, mtl -any,
+                     split -any, ansi-wl-pprint -any, directory -any,
+                     filepath -any, Glob -any, transformers -any,
+                     transformers-compat -any
+      buildable: True
+    else
+      buildable: False
     main-is: Main.hs
     other-modules: Paths_purescript
-    buildable: True
     hs-source-dirs: psc-docs
     other-modules: Ctags
                    Etags
@@ -277,20 +288,26 @@ executable psc-docs
     ghc-options: -Wall -O2
 
 executable psc-publish
-    build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
+    if !flag(library-only)
+      build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
+      buildable: True
+    else
+      buildable: False
     main-is: Main.hs
     other-modules: Paths_purescript
-    buildable: True
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
-    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
-                   process -any, mtl -any, parsec -any, filepath -any, directory -any,
-                   Glob -any
+    if !flag(library-only)
+      build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
+                     process -any, mtl -any, parsec -any, filepath -any, directory -any,
+                     Glob -any
+      buildable: True
+    else
+      buildable: False
     main-is: Main.hs
     other-modules: Paths_purescript
-    buildable: True
     hs-source-dirs: hierarchy
     other-modules:
     ghc-options: -Wall -O2
@@ -299,15 +316,19 @@ executable psc-bundle
   main-is:             Main.hs
   other-modules:       Paths_purescript
   other-extensions:
-  build-depends:       base >=4 && <5,
-                       purescript -any,
-                       filepath -any,
-                       directory -any,
-                       mtl -any,
-                       transformers -any,
-                       transformers-compat -any,
-                       optparse-applicative >= 0.12.1,
-                       Glob -any
+  if !flag(library-only)
+    build-depends:       base >=4 && <5,
+                         purescript -any,
+                         filepath -any,
+                         directory -any,
+                         mtl -any,
+                         transformers -any,
+                         transformers-compat -any,
+                         optparse-applicative >= 0.12.1,
+                         Glob -any
+    buildable: True
+  else
+    buildable: False
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
@@ -315,19 +336,23 @@ executable psc-ide-server
   main-is:             Main.hs
   other-modules:
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , purescript -any
-                     , directory -any
-                     , filepath -any
-                     , monad-logger -any
-                     , mtl -any
-                     , transformers -any
-                     , transformers-compat -any
-                     , network -any
-                     , optparse-applicative >= 0.12.1
-                     , stm -any
-                     , text -any
-                     , base-compat >=0.6.0
+  if !flag(library-only)
+    build-depends:       base >=4 && <5
+                       , purescript -any
+                       , directory -any
+                       , filepath -any
+                       , monad-logger -any
+                       , mtl -any
+                       , transformers -any
+                       , transformers-compat -any
+                       , network -any
+                       , optparse-applicative >= 0.12.1
+                       , stm -any
+                       , text -any
+                       , base-compat >=0.6.0
+    buildable: True
+  else
+    buildable: False
   ghc-options:         -Wall -O2 -threaded
   hs-source-dirs:      psc-ide-server
 
@@ -335,12 +360,16 @@ executable psc-ide-client
   main-is:             Main.hs
   other-modules:
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , mtl -any
-                     , text -any
-                     , optparse-applicative >= 0.12.1
-                     , network -any
-                     , base-compat >=0.6.0
+  if !flag(library-only)
+    build-depends:       base >=4 && <5
+                       , mtl -any
+                       , text -any
+                       , optparse-applicative >= 0.12.1
+                       , network -any
+                       , base-compat >=0.6.0
+    buildable: True
+  else
+    buildable: False
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-ide-client
 
