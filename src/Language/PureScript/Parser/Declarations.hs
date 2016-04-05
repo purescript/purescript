@@ -131,28 +131,19 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
-  (mn, declType, asQ, isOldSyntax) <- parseImportDeclaration'
-  return $ ImportDeclaration mn declType asQ isOldSyntax
+  (mn, declType, asQ) <- parseImportDeclaration'
+  return $ ImportDeclaration mn declType asQ
 
-parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName, Bool)
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
   reserved "import"
   indented
-  qualImport <|> stdImport
+  moduleName' <- moduleName
+  declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
+  qName <- P.optionMaybe qualifiedName
+  return (moduleName', declType, qName)
   where
-  stdImport = do
-    moduleName' <- moduleName
-    declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
-    qName <- P.optionMaybe qualifiedName
-    return (moduleName', declType, qName, False)
   qualifiedName = reserved "as" *> moduleName
-  qualImport = do
-    reserved "qualified"
-    indented
-    moduleName' <- moduleName
-    declType <- qualifyingList Explicit
-    qName <- qualifiedName
-    return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
     declType <- P.optionMaybe (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
     return $ fromMaybe Implicit declType

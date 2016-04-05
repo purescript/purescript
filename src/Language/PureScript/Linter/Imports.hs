@@ -107,8 +107,8 @@ lintImports (Module _ _ mn mdecls mexports) env usedImps = do
   where
 
   countOpenImports :: Declaration -> Int
-  countOpenImports (ImportDeclaration mn' Implicit Nothing _) | not (isPrim mn') = 1
-  countOpenImports (ImportDeclaration mn' (Hiding _) Nothing _) | not (isPrim mn') = 1
+  countOpenImports (ImportDeclaration mn' Implicit Nothing) | not (isPrim mn') = 1
+  countOpenImports (ImportDeclaration mn' (Hiding _) Nothing) | not (isPrim mn') = 1
   countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
   countOpenImports _ = 0
 

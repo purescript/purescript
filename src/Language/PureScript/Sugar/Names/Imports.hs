@@ -13,7 +13,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.List (find, delete, (\\))
-import Data.Maybe (fromMaybe, isJust, isNothing, fromJust)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Foldable (traverse_, for_)
 import Data.Traversable (for)
 
@@ -42,8 +42,7 @@ findImports
   -> m (M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])
 findImports = foldM (go Nothing) M.empty
   where
-  go pos result (ImportDeclaration mn typ qual isOldSyntax) = do
-    when isOldSyntax . tell . errorMessage $ DeprecatedQualifiedSyntax mn (fromJust qual)
+  go pos result (ImportDeclaration mn typ qual) = do
     let imp = (pos, typ, qual)
     return $ M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
   go _ result (PositionedDeclaration pos _ d) = warnAndRethrowWithPosition pos $ go (Just pos) result d
@@ -137,13 +136,13 @@ resolveImports env (Module ss coms currentModule decls exps) =
   updateImportRef :: Declaration -> m Declaration
   updateImportRef (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> updateImportRef d
-  updateImportRef (ImportDeclaration mn typ qual isOldSyntax) = do
+  updateImportRef (ImportDeclaration mn typ qual) = do
     modExports <- getExports env mn
     typ' <- case typ of
       Implicit -> return Implicit
       Explicit refs -> Explicit <$> updateProperRef mn modExports `traverse` refs
       Hiding refs -> Hiding <$> updateProperRef mn modExports `traverse` refs
-    return $ ImportDeclaration mn typ' qual isOldSyntax
+    return $ ImportDeclaration mn typ' qual
   updateImportRef other = return other
 
   updateProperRef :: ModuleName -> Exports -> DeclarationRef -> m DeclarationRef

@@ -87,10 +87,8 @@ directiveArg _ Kind        = [CtxType]
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =
   case (ws, w') of
-    (["import"], w) | headSatisfies isUpper w -> [CtxModule]
-    (["import"], _)                           -> [CtxModule, CtxFixed "qualified"]
-    (["import", "qualified"], _)              -> [CtxModule]
-    _                                         -> []
+    (["import"], _) -> [CtxModule]
+    _               -> []
 
 headSatisfies :: (a -> Bool) -> [a] -> Bool
 headSatisfies p str =
