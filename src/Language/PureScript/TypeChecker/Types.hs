@@ -92,7 +92,7 @@ typesOf bindingGroupType moduleName vals = do
       tell . errorMessage $ MissingTypeDeclaration ident generalized
       -- For non-recursive binding groups, can generalize over constraints.
       -- For recursive binding groups, we throw an error here for now.
-      when (bindingGroupType == RecursiveBindingGroup)
+      when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
         . throwError
         . errorMessage
         $ CannotGeneralizeRecursiveFunction ident generalized
@@ -102,7 +102,7 @@ typesOf bindingGroupType moduleName vals = do
         let constraintTypeVars = nub $ foldMap unknownsInType classTys
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
           throwError . errorMessage $ NoInstanceFound className classTys
-          
+
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels
