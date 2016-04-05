@@ -234,7 +234,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
   go (ValueDeclaration name nameKind [] (Right val)) =
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
       valueIsNotDefined moduleName name
-      [(_, (val', ty))] <- typesOf moduleName [(name, val)]
+      [(_, (val', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val)]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] $ Right val'
   go ValueDeclaration{} = internalError "Binders were not desugared"
@@ -242,7 +242,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
       for_ (map (\(ident, _, _) -> ident) vals) $ \name ->
         valueIsNotDefined moduleName name
-      tys <- typesOf moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
+      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
       vals' <- forM [ (name, val, nameKind, ty)
                     | (name, nameKind, _) <- vals
                     , (name', (val, ty)) <- tys
