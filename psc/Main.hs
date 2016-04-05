@@ -120,12 +120,6 @@ outputDirectory = strOption $
   <> showDefault
   <> help "The output directory"
 
-requirePath :: Parser (Maybe FilePath)
-requirePath = optional $ strOption $
-     short 'r'
-  <> long "require-path"
-  <> help "The path prefix to use for require() calls in the generated JavaScript [deprecated]"
-
 noTco :: Parser Bool
 noTco = switch $
      long "no-tco"
@@ -176,7 +170,6 @@ options = P.Options <$> noTco
                     <*> noOpts
                     <*> verboseErrors
                     <*> (not <$> comments)
-                    <*> requirePath
                     <*> sourceMaps
 
 pscMakeOptions :: Parser PSCMakeOptions
