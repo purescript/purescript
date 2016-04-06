@@ -212,6 +212,7 @@ library
                      Language.PureScript.Ide.SourceFile
                      Language.PureScript.Ide.Watcher
                      Language.PureScript.Ide.Reexports
+                     Language.PureScript.Ide.Rebuild
 
                      Control.Monad.Logger
                      Control.Monad.Supply

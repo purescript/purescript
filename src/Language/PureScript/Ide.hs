@@ -33,10 +33,10 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Rebuild
 import           System.Directory
 import           System.FilePath
 import           System.Exit
-
 
 handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
@@ -60,6 +60,8 @@ handleCommand (CaseSplit l b e wca t) =
     caseSplit l b e wca t
 handleCommand (AddClause l wca) =
     pure $ addClause l wca
+handleCommand (Rebuild file outFile) =
+    rebuildFile file outFile
 handleCommand Cwd =
     TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
