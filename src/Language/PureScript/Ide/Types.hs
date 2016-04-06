@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Types
+-- Description : Type definitions for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Type definitions for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -19,50 +33,39 @@ import           Data.Maybe                           (maybeToList)
 import           Data.Text                            (Text (), pack, unpack)
 import qualified Language.PureScript.AST.Declarations as D
 import           Language.PureScript.Externs
-import           Language.PureScript.Names
 import qualified Language.PureScript.Names            as N
+import qualified Language.PureScript as P
 
 import           Text.Parsec
 import           Text.Parsec.Text
 
+type Ident = Text
+type DeclIdent = Text
 type ModuleIdent = Text
-type DeclIdent   = Text
-type Type        = Text
-
-data Fixity = Infix | Infixl | Infixr deriving(Show, Eq, Ord)
 
 data ExternDecl
     -- | A function/value declaration
-    = FunctionDecl
-        DeclIdent -- The functions name
-        Type      -- The functions type
-    | FixityDeclaration Fixity Int DeclIdent
+    = ValueDeclaration Ident P.Type
+    | TypeDeclaration (P.ProperName 'P.TypeName) P.Kind
+    | TypeSynonymDeclaration (P.ProperName 'P.TypeName) P.Type
     -- | A Dependency onto another Module
     | Dependency
         ModuleIdent  -- name of the dependency
         [Text]       -- explicit imports
         (Maybe Text) -- An eventual qualifier
-
     -- | A module declaration
     | ModuleDecl
         ModuleIdent -- The modules name
         [DeclIdent] -- The exported identifiers
     -- | A data/newtype declaration
-    | DataDecl DeclIdent -- The type name
-               Text      -- The "type"
+    | DataConstructor
+      DeclIdent -- ^ The type name
+      (P.ProperName 'P.TypeName)
+      P.Type      -- ^ The "type"
     -- | An exported module
+    | TypeClassDeclaration (P.ProperName 'P.ClassName)
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
-
-instance ToJSON ExternDecl where
-  toJSON (FunctionDecl n t)        = object ["name" .= n, "type" .= t]
-  toJSON (ModuleDecl   n t)        = object ["name" .= n, "type" .= t]
-  toJSON (DataDecl     n t)        = object ["name" .= n, "type" .= t]
-  toJSON (Dependency   n names _)  = object ["module" .= n, "names" .= names]
-  toJSON (FixityDeclaration f p n) = object ["name" .= n
-                                            , "fixity" .= show f
-                                            , "precedence" .= p]
-  toJSON (Export _) = object []
 
 type Module = (ModuleIdent, [ExternDecl])
 
@@ -83,15 +86,22 @@ type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 data PscIdeState =
   PscIdeState
   { pscStateModules :: M.Map Text [ExternDecl]
-  , externsFiles    :: M.Map ModuleName ExternsFile
+  , externsFiles    :: M.Map P.ModuleName ExternsFile
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
 emptyPscIdeState = PscIdeState M.empty M.empty
 
+data Match = Match ModuleIdent ExternDecl
+               deriving (Show, Eq)
+
 newtype Completion =
-    Completion (ModuleIdent, DeclIdent, Type)
-    deriving (Show,Eq)
+  Completion (ModuleIdent, DeclIdent, Text)
+  deriving (Show,Eq)
+
+instance ToJSON Completion where
+  toJSON (Completion (m,d,t)) =
+    object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data ModuleImport =
   ModuleImport
@@ -126,18 +136,6 @@ identifierFromDeclarationRef (D.TypeRef name _) = N.runProperName name
 identifierFromDeclarationRef (D.ValueRef ident) = N.runIdent ident
 identifierFromDeclarationRef (D.TypeClassRef name) = N.runProperName name
 identifierFromDeclarationRef _ = ""
-
-instance FromJSON Completion where
-  parseJSON (Object o) = do
-    m <- o .: "module"
-    d <- o .: "identifier"
-    t <- o .: "type"
-    pure (Completion (m, d, t))
-  parseJSON _ = mzero
-
-instance ToJSON Completion where
-  toJSON (Completion (m,d,t)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data Success =
   CompletionResult [Completion]
@@ -174,7 +172,7 @@ instance FromJSON PursuitSearchType where
   parseJSON _ = mzero
 
 instance FromJSON PursuitQuery where
-  parseJSON o = PursuitQuery <$> (parseJSON o)
+  parseJSON o = PursuitQuery <$> parseJSON o
 
 data PursuitResponse =
   -- | A Pursuit Response for a module. Consists of the modules name and the
@@ -182,7 +180,7 @@ data PursuitResponse =
   ModuleResponse ModuleIdent Text
   -- | A Pursuit Response for a declaration. Consist of the declarations type,
   -- module, name and package
-  | DeclarationResponse Type ModuleIdent DeclIdent Text
+  | DeclarationResponse Text ModuleIdent DeclIdent Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where
@@ -215,15 +213,15 @@ typeParse t = case parse parseType "" t of
       type' <- many1 anyChar
       pure (unpack name, type')
 
-identifier :: Parser Text
-identifier = do
-  spaces
-  ident <-
-    -- necessary for being able to parse the following ((++), concat)
-    between (char '(') (char ')') (many1 (noneOf ", )")) <|>
-    many1 (noneOf ", )")
-  spaces
-  pure (pack ident)
+    identifier :: Parser Text
+    identifier = do
+      spaces
+      ident <-
+        -- necessary for being able to parse the following ((++), concat)
+        between (char '(') (char ')') (many1 (noneOf ", )")) <|>
+        many1 (noneOf ", )")
+      spaces
+      pure (pack ident)
 
 instance ToJSON PursuitResponse where
   toJSON (ModuleResponse name package) =

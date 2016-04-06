@@ -69,6 +69,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@vkorablin](https://github.com/vkorablin) (Vladimir Korablin) - My existing contributions and all future contributions until further notice are Copyright Vladimir Korablin, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
 - [@zudov](https://github.com/zudov) (Konstantin Zudov) My existing contributions and all future contributions until further notice are Copyright Konstantin Zudov, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@LiamGoodacre](https://github.com/LiamGoodacre) (Liam Goodacre) My existing contributions and all future contributions until further notice are Copyright Liam Goodacre, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- [@bsermons](https://github.com/bsermons) (Brian Sermons) My existing contributions and all future contributions until further notice are Copyright Brian Sermons, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 

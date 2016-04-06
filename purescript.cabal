@@ -36,6 +36,7 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
+                  , tests/support/pscide/src/*.purs
                   , stack.yaml
                   , stack-lts-5.yaml
                   , stack-nightly.yaml
@@ -201,7 +202,6 @@ library
                      Language.PureScript.Ide.Command
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.CodecJSON
                      Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Completion
                      Language.PureScript.Ide.Matcher
@@ -212,6 +212,8 @@ library
                      Language.PureScript.Ide.SourceFile
                      Language.PureScript.Ide.Watcher
                      Language.PureScript.Ide.Reexports
+                     Language.PureScript.Ide.Imports
+                     Language.PureScript.Ide.Util
 
                      Control.Monad.Logger
                      Control.Monad.Supply
@@ -313,7 +315,7 @@ executable psc-bundle
 
 executable psc-ide-server
   main-is:             Main.hs
-  other-modules:
+  other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5
                      , purescript -any
@@ -333,7 +335,7 @@ executable psc-ide-server
 
 executable psc-ide-client
   main-is:             Main.hs
-  other-modules:
+  other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5
                      , mtl -any
@@ -350,7 +352,8 @@ test-suite tests
                    transformers -any, process -any, transformers-compat -any, time -any,
                    Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
                    base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
-                   boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any
+                   boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
+                   vector -any, utf8-string -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
@@ -361,5 +364,16 @@ test-suite tests
                    TestPsci
                    TestPscIde
                    PscIdeSpec
+                   Language.PureScript.Ide.FilterSpec
+                   Language.PureScript.Ide.ImportsSpec
+                   Language.PureScript.Ide.Imports.IntegrationSpec
+                   Language.PureScript.Ide.Integration
+                   Language.PureScript.Ide.MatcherSpec
+                   Language.PureScript.Ide.ReexportsSpec
+                   Language.PureScript.IdeSpec
+                   PSCi.Completion
+                   PSCi.Directive
+                   PSCi.Module
+                   PSCi.Types
     buildable: True
     hs-source-dirs: tests psci

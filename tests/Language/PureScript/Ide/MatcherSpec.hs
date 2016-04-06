@@ -2,23 +2,39 @@
 
 module Language.PureScript.Ide.MatcherSpec where
 
-import           Data.Text                       (Text)
+import           Data.Text                           (Text)
+import           Language.PureScript.Ide.Integration
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import qualified Language.PureScript as P
 import           Test.Hspec
 
-completions :: [Completion]
+value :: Text -> ExternDecl
+value s = ValueDeclaration s P.TypeWildcard
+
+completions :: [Match]
 completions = [
-  Completion ("", "firstResult", ""),
-  Completion ("", "secondResult", ""),
-  Completion ("", "fiult", "")
+  Match "" $ value "firstResult",
+  Match "" $ value "secondResult",
+  Match "" $ value "fiult"
   ]
 
-mkResult :: [Int] -> [Completion]
+mkResult :: [Int] -> [Match]
 mkResult = map (completions !!)
 
-runFlex :: Text -> [Completion]
+runFlex :: Text -> [Match]
 runFlex s = runMatcher (flexMatcher s) completions
+
+setup :: IO ()
+setup = do
+  deleteOutputFolder
+  _ <- compileTestProject
+  _ <- startServer
+  _ <- loadModuleWithDeps "Main"
+  return ()
+
+teardown :: IO ()
+teardown = quitServer
 
 spec :: Spec
 spec = do
@@ -29,3 +45,12 @@ spec = do
       runFlex "firstResult" `shouldBe` mkResult [0]
     it "scores short matches higher and sorts accordingly" $
       runFlex "filt" `shouldBe` mkResult [2, 0]
+
+  beforeAll_ setup $ afterAll_ teardown $
+    describe "Integration Tests: Flex Matcher" $ do
+      it "doesn't match on an empty string" $ do
+        cs <- getFlexCompletions ""
+        cs `shouldBe` []
+      it "matches on equality" $ do
+        cs <- getFlexCompletions "const"
+        cs `shouldBe` [("Main", "const", "forall a b. a -> b -> a")]
