@@ -29,14 +29,14 @@ import qualified TestPscIde
 
 main :: IO ()
 main = do
-  heading "Main compiler test suite"
-  TestCompiler.main
-  heading "Documentation test suite"
-  TestDocs.main
-  heading "psc-publish test suite"
-  TestPscPublish.main
-  heading "psci test suite"
-  TestPsci.main
+  -- heading "Main compiler test suite"
+  -- TestCompiler.main
+  -- heading "Documentation test suite"
+  -- TestDocs.main
+  -- heading "psc-publish test suite"
+  -- TestPscPublish.main
+  -- heading "psci test suite"
+  -- TestPsci.main
   heading "psc-ide test suite"
   TestPscIde.main
 
