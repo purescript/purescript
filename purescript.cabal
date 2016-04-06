@@ -372,6 +372,7 @@ test-suite tests
                    Language.PureScript.Ide.Imports.IntegrationSpec
                    Language.PureScript.Ide.Integration
                    Language.PureScript.Ide.MatcherSpec
+                   Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.IdeSpec
                    PSCi.Completion
