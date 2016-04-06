@@ -125,7 +125,7 @@ startServer port env = withSocketsDo $ do
           case decodeT cmd of
             Just cmd' -> do
               result <- runExceptT (handleCommand cmd')
-              $(logDebug) ("Answer was: " <> T.pack (show result))
+              -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
                 -- What function can I use to clean this up?

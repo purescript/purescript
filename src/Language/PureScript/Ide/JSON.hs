@@ -14,7 +14,7 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module JSON where
+module Language.PureScript.Ide.JSON where
 
 import Prelude ()
 import Prelude.Compat

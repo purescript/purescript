@@ -63,9 +63,6 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | AddClause {
-      addClauseLine          :: Text
-      , addClauseAnnotations :: WildcardAnnotations}
     | Rebuild FilePath (Maybe FilePath) -- ^ Rebuild the specified file using
                                         -- the loaded externs and output the
                                         -- generated JS to the specified

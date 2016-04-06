@@ -11,6 +11,7 @@ module Language.PureScript.Ide.Rebuild where
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.JSON
 
 import           Control.Monad (unless)
 import           Control.Monad.Error.Class
@@ -68,7 +69,7 @@ rebuildFile path outpath = do
     P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs renamed Nothing
   case resultMay of
     Left errs ->
-      throwError . GeneralError . P.prettyPrintMultipleErrors False $ errs
+      throwError . RebuildError . toJSONErrors False P.Error $ errs
     Right js -> do
       let jsPath = fromMaybe
             (outputDirectory </> P.runModuleName (P.getModuleName m) </> "index.js") outpath
@@ -78,8 +79,8 @@ rebuildFile path outpath = do
 
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)
-     => M.Map P.ModuleName P.ExternsFile
-     -> m [P.ExternsFile]
+  => M.Map P.ModuleName P.ExternsFile
+  -> m [P.ExternsFile]
 sortExterns ex = do
   sorted' <- runExceptT . P.sortModules . map mkShallowModule .M.elems $ ex
   case sorted' of
@@ -92,5 +93,3 @@ sortExterns ex = do
     mkImport (P.ExternsImport mn it iq) =
       P.ImportDeclaration mn it iq False
     getExtern m = M.lookup (P.getModuleName m) ex
-
-
