@@ -149,6 +149,7 @@ data SimpleErrorMessage
   | IncorrectAnonymousArgument
   | InvalidOperatorInBinder Ident Ident
   | DeprecatedRequirePath
+  | CannotGeneralizeRecursiveFunction Ident Type
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -330,6 +331,7 @@ errorCode em = case unwrapErrorMessage em of
   IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
   DeprecatedRequirePath{} -> "DeprecatedRequirePath"
+  CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
 
 -- |
 -- A stack trace for an error
@@ -420,6 +422,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
+  gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
   gSimple other = pure other
 
@@ -981,6 +984,13 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage DeprecatedRequirePath =
       line "The require-path option is deprecated and will be removed in PureScript 0.9."
 
+    renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
+      paras [ line $ "Unable to generalize the type of the recursive function " ++ showIdent ident ++ "."
+            , line $ "The inferred type of " ++ showIdent ident ++ " was:"
+            , indent $ typeAsBox ty
+            , line "Try adding a type signature."
+            ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
@@ -1202,7 +1212,7 @@ prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning 
 
 -- | Pretty print errors as a Box
 prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error" 
+prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error"
 
 prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
