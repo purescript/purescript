@@ -21,6 +21,7 @@ import           Data.Aeson
 import           Data.Monoid
 import           Data.Text                     (Text, pack)
 import           Language.PureScript.Ide.Types (ModuleIdent)
+import           Language.PureScript.Ide.JSON  (JSONError)
 import qualified Text.Parsec.Error             as P
 
 type ErrorMsg = String
@@ -31,9 +32,13 @@ data PscIdeError
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
     | ParseError P.ParseError ErrorMsg
-    deriving (Show, Eq)
+    | RebuildError [JSONError]
 
 instance ToJSON PscIdeError where
+  toJSON (RebuildError errs) = object
+    [ "resultType" .= ("error" :: Text)
+    , "result" .= errs
+    ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= textError err
@@ -46,6 +51,8 @@ textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
 textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <>" could not be found"
 textError (ParseError parseError msg) = pack $ msg <> ": " <> show (escape parseError)
   where
-    -- escape newlines and other special chars so we can send the error over the socket as a single line
+    -- escape newlines and other special chars so we can send the error over the
+    -- socket as a single line
     escape :: P.ParseError -> String
     escape = show
+textError (RebuildError _) = error "wat?"

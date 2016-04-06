@@ -127,6 +127,7 @@ library
                      Language.PureScript.Comments
                      Language.PureScript.Environment
                      Language.PureScript.Errors
+                     Language.PureScript.Errors.JSON
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
@@ -215,6 +216,7 @@ library
                      Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Util
                      Language.PureScript.Ide.Rebuild
+                     Language.PureScript.Ide.JSON
 
                      Control.Monad.Logger
                      Control.Monad.Supply
@@ -238,7 +240,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules: JSON, Paths_purescript
+    other-modules: Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
