@@ -277,15 +277,16 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
 
   checkFixities :: Declaration -> m ()
-  checkFixities (FixityDeclaration _ name (Just (Left alias))) = do
-    ty <- lookupVariable moduleName alias
+  checkFixities (FixityDeclaration _ name (Just (Qualified mn' (AliasValue ident)))) = do
+    ty <- lookupVariable moduleName (Qualified mn' ident)
     addValue moduleName (Op name) ty Public
-  checkFixities (FixityDeclaration _ name (Just (Right alias))) = do
+  checkFixities (FixityDeclaration _ name (Just (Qualified mn' (AliasConstructor ctor)))) = do
     env <- getEnv
+    let alias = Qualified mn' ctor
     case M.lookup alias (dataConstructors env) of
       Nothing -> throwError . errorMessage $ UnknownDataConstructor alias Nothing
       Just (_, _, ty, _) -> addValue moduleName (Op name) ty Public
-  checkFixities (FixityDeclaration _ name _) = do
+  checkFixities (FixityDeclaration _ name Nothing) = do
     env <- getEnv
     guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
   checkFixities (PositionedDeclaration pos _ d) =
@@ -438,21 +439,18 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
   checkNonAliasesAreExported :: [ProperName 'ConstructorName] -> DeclarationRef -> m ()
   checkNonAliasesAreExported exportedDctors dr@(ValueRef (Op name)) =
     case listToMaybe (mapMaybe getAlias decls) of
-      Just (Left ident) ->
+      Just (AliasValue ident) ->
         unless (ValueRef ident `elem` exps) $
           throwError . errorMessage $ TransitiveExportError dr [ValueRef ident]
-      Just (Right ctor) ->
+      Just (AliasConstructor ctor) ->
         unless (ctor `elem` exportedDctors) $
           throwError . errorMessage $ TransitiveDctorExportError dr ctor
       _ -> return ()
     where
-    getAlias :: Declaration -> Maybe (Either Ident (ProperName 'ConstructorName))
+    getAlias :: Declaration -> Maybe FixityAlias
     getAlias (PositionedDeclaration _ _ d) = getAlias d
-    getAlias (FixityDeclaration _ name' (Just alias)) | name == name' =
-      case alias of
-        Left (Qualified (Just mn') ident) | mn == mn' -> Just (Left ident)
-        Right (Qualified (Just mn') ctor) | mn == mn' -> Just (Right ctor)
-        _ -> Nothing
+    getAlias (FixityDeclaration _ name' (Just (Qualified (Just mn') alias)))
+      | name == name' && mn == mn' = Just alias
     getAlias _ = Nothing
   checkNonAliasesAreExported _ _ = return ()
 

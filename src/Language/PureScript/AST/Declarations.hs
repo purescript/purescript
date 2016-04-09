@@ -62,6 +62,10 @@ data DeclarationRef
   --
   = TypeRef (ProperName 'TypeName) (Maybe [ProperName 'ConstructorName])
   -- |
+  -- A type operator
+  --
+  | TypeOpRef Ident
+  -- |
   -- A value
   --
   | ValueRef Ident
@@ -89,6 +93,7 @@ data DeclarationRef
 
 instance Eq DeclarationRef where
   (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
+  (TypeOpRef name)       == (TypeOpRef name')       = name == name'
   (ValueRef name)        == (ValueRef name')        = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
@@ -190,7 +195,7 @@ data Declaration
   -- |
   -- A fixity declaration (fixity data, operator name, value the operator is an alias for)
   --
-  | FixityDeclaration Fixity String (Maybe (Either (Qualified Ident) (Qualified (ProperName 'ConstructorName))))
+  | FixityDeclaration Fixity String (Maybe (Qualified FixityAlias))
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)
@@ -210,6 +215,22 @@ data Declaration
   --
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, Read)
+
+data FixityAlias
+  = AliasValue Ident
+  | AliasConstructor (ProperName 'ConstructorName)
+  | AliasType (ProperName 'TypeName)
+  deriving (Eq, Ord, Show, Read)
+
+foldFixityAlias
+  :: (Ident -> a)
+  -> (ProperName 'ConstructorName -> a)
+  -> (ProperName 'TypeName -> a)
+  -> FixityAlias
+  -> a
+foldFixityAlias f _ _ (AliasValue name) = f name
+foldFixityAlias _ g _ (AliasConstructor name) = g name
+foldFixityAlias _ _ h (AliasType name) = h name
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
@@ -453,3 +474,4 @@ data DoNotationElement
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''FixityAlias)

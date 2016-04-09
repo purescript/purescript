@@ -60,12 +60,15 @@ data SimpleErrorMessage
   | OverlappingNamesInLet
   | UnknownModule ModuleName
   | UnknownType (Qualified (ProperName 'TypeName))
+  | UnknownTypeOp (Qualified Ident)
   | UnknownTypeClass (Qualified (ProperName 'ClassName))
   | UnknownValue (Qualified Ident)
   | UnknownDataConstructor (Qualified (ProperName 'ConstructorName)) (Maybe (Qualified (ProperName 'ConstructorName)))
   | UnknownTypeConstructor (Qualified (ProperName 'TypeName))
   | UnknownImportType ModuleName (ProperName 'TypeName)
   | UnknownExportType (ProperName 'TypeName)
+  | UnknownImportTypeOp ModuleName Ident
+  | UnknownExportTypeOp Ident
   | UnknownImportTypeClass ModuleName (ProperName 'ClassName)
   | UnknownExportTypeClass (ProperName 'ClassName)
   | UnknownImportValue ModuleName Ident
@@ -84,6 +87,7 @@ data SimpleErrorMessage
   | DuplicateModuleName ModuleName
   | DuplicateClassExport (ProperName 'ClassName)
   | DuplicateValueExport Ident
+  | DuplicateTypeOpExport Ident
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
@@ -244,12 +248,15 @@ errorCode em = case unwrapErrorMessage em of
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownModule{} -> "UnknownModule"
   UnknownType{} -> "UnknownType"
+  UnknownTypeOp{} -> "UnknownTypeOp"
   UnknownTypeClass{} -> "UnknownTypeClass"
   UnknownValue{} -> "UnknownValue"
   UnknownDataConstructor{} -> "UnknownDataConstructor"
   UnknownTypeConstructor{} -> "UnknownTypeConstructor"
   UnknownImportType{} -> "UnknownImportType"
+  UnknownImportTypeOp{} -> "UnknownImportTypeOp"
   UnknownExportType{} -> "UnknownExportType"
+  UnknownExportTypeOp{} -> "UnknownExportTypeOp"
   UnknownImportTypeClass{} -> "UnknownImportTypeClass"
   UnknownExportTypeClass{} -> "UnknownExportTypeClass"
   UnknownImportValue{} -> "UnknownImportValue"
@@ -268,6 +275,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateModuleName{} -> "DuplicateModuleName"
   DuplicateClassExport{} -> "DuplicateClassExport"
   DuplicateValueExport{} -> "DuplicateValueExport"
+  DuplicateTypeOpExport{} -> "DuplicateTypeOpExport"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
@@ -595,6 +603,8 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Unknown module " ++ runModuleName mn
     renderSimpleErrorMessage (UnknownType name) =
       line $ "Unknown type " ++ showQualified runProperName name
+    renderSimpleErrorMessage (UnknownTypeOp name) =
+      line $ "Unknown type operator " ++ showQualified showIdent name
     renderSimpleErrorMessage (UnknownTypeClass name) =
       line $ "Unknown type class " ++ showQualified runProperName name
     renderSimpleErrorMessage (UnknownValue name) =
@@ -609,6 +619,12 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage (UnknownExportType name) =
       line $ "Cannot export unknown type " ++ runProperName name
+    renderSimpleErrorMessage (UnknownImportTypeOp mn name) =
+      paras [ line $ "Cannot import type operator " ++ showIdent name ++ " from module " ++ runModuleName mn
+            , line "It either does not exist or the module does not export it."
+            ]
+    renderSimpleErrorMessage (UnknownExportTypeOp name) =
+      line $ "Cannot export unknown type operator " ++ showIdent name
     renderSimpleErrorMessage (UnknownImportTypeClass mn name) =
       paras [ line $ "Cannot import type class " ++ runProperName name ++ " from module " ++ runModuleName mn
             , line "It either does not exist or the module does not export it."
@@ -658,6 +674,8 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Duplicate export declaration for type class " ++ runProperName nm
     renderSimpleErrorMessage (DuplicateValueExport nm) =
       line $ "Duplicate export declaration for value " ++ showIdent nm
+    renderSimpleErrorMessage (DuplicateTypeOpExport nm) =
+      line $ "Duplicate export declaration for type operator " ++ showIdent nm
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ showIdent nm ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
@@ -996,8 +1014,8 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
 
     renderSimpleErrorMessage (InvalidOperatorInBinder op fn) =
       paras [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
-              , line "Only aliases for data constructors may be used in patterns."
-              ]
+            , line "Only aliases for data constructors may be used in patterns."
+            ]
 
     renderSimpleErrorMessage DeprecatedRequirePath =
       line "The require-path option is deprecated and will be removed in PureScript 0.9."
@@ -1205,6 +1223,7 @@ prettyPrintRef :: DeclarationRef -> String
 prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
 prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
 prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
+prettyPrintRef (TypeOpRef ident) = "type " ++ showIdent ident
 prettyPrintRef (ValueRef ident) = showIdent ident
 prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
 prettyPrintRef (ProperRef name) = name

@@ -133,7 +133,7 @@ data DeclarationInfo
   -- An operator alias declaration, with the member the alias is for and the
   -- operator's fixity.
   --
-  | AliasDeclaration (Either (P.Qualified P.Ident) (P.Qualified (P.ProperName 'P.ConstructorName))) P.Fixity
+  | AliasDeclaration (P.Qualified P.FixityAlias) P.Fixity
   deriving (Show, Eq, Ord)
 
 declInfoToString :: DeclarationInfo -> String
@@ -411,7 +411,7 @@ asDeclarationInfo = do
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asAliasFor :: Parse e (Either (P.Qualified P.Ident) (P.Qualified (P.ProperName 'P.ConstructorName)))
+asAliasFor :: Parse e (P.Qualified P.FixityAlias)
 asAliasFor = fromAesonParser
 
 asTypeArguments :: Parse PackageError [(String, Maybe P.Kind)]

@@ -8,6 +8,7 @@ module Language.PureScript.Parser.Types (
 import Control.Applicative
 import Control.Monad (when, unless)
 
+import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
@@ -53,7 +54,7 @@ parseTypeAtom = indented *> P.choice
             , parseTypeConstructor
             -- This try is needed due to some unfortunate ambiguities between rows and kinded types
             , P.try (parens parseRow)
-            , parens parsePolyType
+            , ParensInType <$> parens parsePolyType
             ]
 
 parseConstrainedType :: TokenParser Type
@@ -74,7 +75,10 @@ parseConstrainedType = do
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
-  operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
+  operators = [ [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
+                    return (BinaryNoParensType (TypeOp ident))) P.AssocRight
+                ]
+              , [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)

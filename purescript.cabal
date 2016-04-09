@@ -163,6 +163,7 @@ library
                      Language.PureScript.Sugar.Operators.Common
                      Language.PureScript.Sugar.Operators.Expr
                      Language.PureScript.Sugar.Operators.Binders
+                     Language.PureScript.Sugar.Operators.Types
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeClasses.Deriving
                      Language.PureScript.Sugar.TypeDeclarations

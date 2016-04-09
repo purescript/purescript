@@ -27,8 +27,13 @@ import qualified TestDocs
 import qualified TestPsci
 import qualified TestPscIde
 
+import System.IO (hSetEncoding, stdout, stderr, utf8)
+
 main :: IO ()
 main = do
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
+
   heading "Main compiler test suite"
   TestCompiler.main
   heading "Documentation test suite"

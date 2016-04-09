@@ -61,20 +61,22 @@ renderDeclarationWithOptions opts Declaration{..} =
     AliasDeclaration for (P.Fixity associativity precedence) ->
       [ keywordFixity associativity
       , syntax $ show precedence
-      , ident $
-          either
-            (P.showQualified P.runIdent . dequalifyCurrentModule)
-            (P.showQualified P.runProperName . dequalifyCurrentModule)
-            for
+      , ident $ renderAlias for
       , keyword "as"
       , ident . tail . init $ declTitle
       ]
 
   where
   renderType' = renderTypeWithOptions opts
-  dequalifyCurrentModule (P.Qualified mn a)
-    | mn == currentModule opts = P.Qualified Nothing a
-    | otherwise = P.Qualified mn a
+  renderAlias (P.Qualified mn alias)
+    | mn == currentModule opts =
+        P.foldFixityAlias P.runIdent P.runProperName P.runProperName alias
+    | otherwise =
+        P.foldFixityAlias
+          (P.showQualified P.runIdent . P.Qualified mn)
+          (P.showQualified P.runProperName . P.Qualified mn)
+          (P.showQualified P.runProperName . P.Qualified mn)
+          alias
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
