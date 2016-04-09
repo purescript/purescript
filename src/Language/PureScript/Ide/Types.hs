@@ -59,9 +59,9 @@ data ExternDecl
         [DeclIdent] -- The exported identifiers
     -- | A data/newtype declaration
     | DataConstructor
-      DeclIdent -- ^ The type name
+      DeclIdent -- The type name
       (P.ProperName 'P.TypeName)
-      P.Type      -- ^ The "type"
+      P.Type      -- The "type"
     -- | An exported module
     | TypeClassDeclaration (P.ProperName 'P.ClassName)
     | Export ModuleIdent -- The exported Modules name
