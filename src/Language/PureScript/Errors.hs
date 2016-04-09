@@ -139,7 +139,6 @@ data SimpleErrorMessage
   | DeprecatedQualifiedSyntax ModuleName ModuleName
   | DeprecatedClassImport ModuleName (ProperName 'ClassName)
   | DeprecatedClassExport (ProperName 'ClassName)
-  | RedundantUnqualifiedImport ModuleName ImportDeclarationType
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef String
@@ -323,7 +322,6 @@ errorCode em = case unwrapErrorMessage em of
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
   DeprecatedClassImport{} -> "DeprecatedClassImport"
   DeprecatedClassExport{} -> "DeprecatedClassExport"
-  RedundantUnqualifiedImport{} -> "RedundantUnqualifiedImport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
   DuplicateImportRef{} -> "DuplicateImportRef"
@@ -452,7 +450,6 @@ errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
   RedundantEmptyHidingImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
-  RedundantUnqualifiedImport{} -> emptySuggestion
   DeprecatedQualifiedSyntax name qualName -> suggest $
     "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
@@ -943,9 +940,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , indent $ line $ "class " ++ runProperName name
             , line "The deprecated syntax will be removed in PureScript 0.9."
             ]
-
-    renderSimpleErrorMessage (RedundantUnqualifiedImport name imp) =
-      line $ "Import of " ++ prettyPrintImport name imp Nothing ++ " is redundant due to a whole-module import"
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ runModuleName name ++ ", consider merging the import lists"
