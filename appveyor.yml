@@ -1,0 +1,57 @@
+platform: x64
+version: '{build}'
+environment:
+  # Keep the path as short as possible, just in case.
+  STACK_ROOT: c:\s
+  # Appveyor does not seem to be able to cope with the symbolic link
+  # stack.yaml, so this is a workaround.
+  STACK_YAML: stack-lts-5.yaml
+  RELEASE_USER: purescript
+  RELEASE_REPO: purescript
+cache:
+- c:\s
+install:
+- git submodule update --init
+- ps: Install-Product node 5
+- npm install -g bower
+
+- ps: |
+    New-Item -ItemType Directory -Force -Path C:\tools
+    $env:Path += ";C:\tools"
+    (New-Object Net.WebClient).DownloadFile('https://www.stackage.org/stack/windows-x86_64', 'c:\tools\stack.zip')
+    pushd c:\tools
+    7z x c:\tools\stack.zip stack.exe
+    popd
+
+- stack --no-terminal --verbosity=error setup 1>stack-setup.log 2>&1 || type stack-setup.log
+
+build_script:
+# Override the default build script.
+- echo ""
+test_script:
+- stack -j1 --no-terminal test --pedantic
+on_success:
+# this seems to be necessary; if omitted, the bash script fails to find the
+# tool 'strip'.
+- copy C:\MinGW\bin\strip.exe C:\tools\strip.exe
+- ps: |
+    function UploadFile
+    {
+      github-release upload --user $env:RELEASE_USER --repo $env:RELEASE_REPO --tag $env:APPVEYOR_REPO_TAG_NAME --file $args[0] --name $args[0]
+    }
+
+    if ($env:APPVEYOR_REPO_TAG_NAME)
+    {
+      bash ./bundle/build-stack.sh win64
+
+      (New-Object Net.WebClient).DownloadFile('https://github.com/aktau/github-release/releases/download/v0.6.2/windows-amd64-github-release.zip', 'c:\tools\github-release.zip')
+      pushd c:\tools
+      7z x github-release.zip bin/windows/amd64/github-release.exe
+      Copy-Item bin/windows/amd64/github-release.exe github-release.exe
+      popd
+
+      pushd bundle
+      UploadFile win64.tar.gz
+      UploadFile win64.sha
+      popd
+    }
