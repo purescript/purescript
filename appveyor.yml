@@ -1,8 +1,6 @@
 platform: x64
 version: '{build}'
 environment:
-  GITHUB_TOKEN:
-    secure: PUrCLwiP1G73fP5hr5HVpwBQU6n6t0A7CtfQxrFRAlTC+fnkntcA+9TR58OTEy7y
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
   # Appveyor does not seem to be able to cope with the symbolic link
