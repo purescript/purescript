@@ -11,7 +11,6 @@ module Language.PureScript.Ide.Rebuild where
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.JSON
 
 import           Control.Monad (unless)
 import           Control.Monad.Error.Class
@@ -28,6 +27,7 @@ import qualified Language.PureScript as P
 import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CodeGen.JS as J
+import           Language.PureScript.Errors.JSON
 
 import           System.FilePath
 
@@ -54,7 +54,7 @@ rebuildFile path outpath = do
 
   let initEnv = foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs
 
-  (resultMay, _) <- liftIO . Logger.runLogger' . runExceptT . flip runReaderT P.defaultOptions $ do
+  (resultMay, warnings) <- liftIO . Logger.runLogger' . runExceptT . flip runReaderT P.defaultOptions $ do
     ((P.Module ss coms moduleName elaborated exps, env), nextVar) <- P.runSupplyT 0 $ do
       [desugared] <- P.desugar externs [ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m ]
       P.runCheck' initEnv $ P.typeCheckModule desugared
@@ -69,13 +69,13 @@ rebuildFile path outpath = do
     P.evalSupplyT nextVar $ P.prettyPrintJS <$> J.moduleToJs renamed Nothing
   case resultMay of
     Left errs ->
-      throwError . RebuildError . toJSONErrors False P.Error $ errs
+      throwError . RebuildError $ toJSONErrors False P.Error errs
     Right js -> do
       let jsPath = fromMaybe
             (outputDirectory </> P.runModuleName (P.getModuleName m) </> "index.js") outpath
       liftIO $ writeFile jsPath js
 
-  return $ TextResult "OK"
+  pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
 
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)

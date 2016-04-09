@@ -32,7 +32,7 @@ spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecSingleModule.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
-    it "rebuilds an incorrect module without dependencies and returns the errors" $ do
+    it "fails to rebuild an incorrect module without dependencies and returns the errors" $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecSingleModule.fail"
       Integration.rebuildModule file >>= shouldBeFailure

@@ -20,8 +20,8 @@ module Language.PureScript.Ide.Error
 import           Data.Aeson
 import           Data.Monoid
 import           Data.Text                     (Text, pack)
+import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types (ModuleIdent)
-import           Language.PureScript.Ide.JSON  (JSONError)
 import qualified Text.Parsec.Error             as P
 
 type ErrorMsg = String
@@ -49,10 +49,9 @@ textError (GeneralError msg)          = pack msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
 textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <>" could not be found"
-textError (ParseError parseError msg) = pack $ msg <> ": " <> show (escape parseError)
-  where
-    -- escape newlines and other special chars so we can send the error over the
-    -- socket as a single line
-    escape :: P.ParseError -> String
-    escape = show
-textError (RebuildError _) = error "wat?"
+textError (ParseError parseError msg) = let escape = show
+                                            -- escape newlines and other special
+                                            -- chars so we can send the error
+                                            -- over the socket as a single line
+                                        in pack $ msg <> ": " <> show (escape parseError)
+textError (RebuildError err)          = pack (show err)

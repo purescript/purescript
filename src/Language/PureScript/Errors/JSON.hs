@@ -28,9 +28,9 @@ data ErrorPosition = ErrorPosition
   , startColumn :: Int
   , endLine :: Int
   , endColumn :: Int
-  }
+  } deriving (Show, Eq, Ord)
 
-data ErrorSuggestion = ErrorSuggestion { replacement :: String }
+data ErrorSuggestion = ErrorSuggestion { replacement :: String } deriving (Show, Eq)
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
@@ -40,12 +40,12 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe String
   , suggestion :: Maybe ErrorSuggestion
-  }
+  }  deriving (Show, Eq)
 
 data JSONResult = JSONResult
   { warnings :: [JSONError]
   , errors :: [JSONError]
-  }
+  } deriving (Show, Eq)
 
 $(A.deriveJSON A.defaultOptions ''ErrorPosition)
 $(A.deriveJSON A.defaultOptions ''JSONError)

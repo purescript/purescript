@@ -216,7 +216,6 @@ library
                      Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Util
                      Language.PureScript.Ide.Rebuild
-                     Language.PureScript.Ide.JSON
 
                      Control.Monad.Logger
                      Control.Monad.Supply

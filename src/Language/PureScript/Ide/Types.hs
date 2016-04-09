@@ -33,6 +33,7 @@ import           Data.Maybe                           (maybeToList)
 import           Data.Text                            (Text (), pack, unpack)
 import qualified Language.PureScript.AST.Declarations as D
 import           Language.PureScript.Externs
+import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript.Names            as N
 import qualified Language.PureScript as P
 
@@ -144,6 +145,7 @@ data Success =
   | PursuitResult [PursuitResponse]
   | ImportList [ModuleImport]
   | ModuleList [ModuleIdent]
+  | RebuildSuccess [P.JSONError]
   deriving(Show, Eq)
 
 encodeSuccess :: (ToJSON a) => a -> Value
@@ -157,6 +159,7 @@ instance ToJSON Success where
   toJSON (PursuitResult resp) = encodeSuccess resp
   toJSON (ImportList decls) = encodeSuccess decls
   toJSON (ModuleList modules) = encodeSuccess modules
+  toJSON (RebuildSuccess modules) = encodeSuccess modules
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)
