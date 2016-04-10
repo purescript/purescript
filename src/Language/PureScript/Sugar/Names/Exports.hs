@@ -119,9 +119,10 @@ resolveExports env mn imps exps refs =
   extract useQual name render = fmap (map (importName . head . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
-      let isMatch = if useQual then eqQual name name' else any (eqQual name . importName) options
+      let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options
       when (isMatch && length options > 1) $ void $ checkImportConflicts mn render options
       return isMatch
+    checkUnqual name' ir = isUnqualified name' && isQualifiedWith name (importName ir)
 
   -- Check whether a module name refers to a "pseudo module" that came into
   -- existence in an import scope due to importing one or more modules as
@@ -134,20 +135,15 @@ resolveExports env mn imps exps refs =
     -- value being re-exported belongs to a qualified module, and we test the
     -- values if that fails to see whether the value has been imported at all.
     testQuals :: (forall a b. M.Map (Qualified a) b -> [Qualified a]) -> ModuleName -> Bool
-    testQuals f mn' = any (eqQual mn') (f (importedTypes imps))
-                   || any (eqQual mn') (f (importedDataConstructors imps))
-                   || any (eqQual mn') (f (importedTypeClasses imps))
-                   || any (eqQual mn') (f (importedValues imps))
+    testQuals f mn' = any (isQualifiedWith mn') (f (importedTypes imps))
+                   || any (isQualifiedWith mn') (f (importedDataConstructors imps))
+                   || any (isQualifiedWith mn') (f (importedTypeClasses imps))
+                   || any (isQualifiedWith mn') (f (importedValues imps))
 
   -- Check whether a module name refers to a module that has been imported
   -- without qualification into an import scope.
   isImportedModule :: ModuleName -> Bool
   isImportedModule = flip elem (importedModules imps)
-
-  -- Check whether a module name matches that of a qualified value.
-  eqQual :: ModuleName -> Qualified a -> Bool
-  eqQual mn'' (Qualified (Just mn''') _) = mn'' == mn'''
-  eqQual _ _ = False
 
   -- Constructs a list of types with their data constructors and the original
   -- module they were defined in from a list of type and data constructor names.
