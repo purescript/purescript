@@ -191,23 +191,19 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
   go :: Declaration -> m Declaration
   go (DataDeclaration dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name)) $ do
-      when (dtype == Newtype) $ checkNewtype dctors
+      when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration dtype name args dctors
-    where
-    checkNewtype :: [(ProperName 'ConstructorName, [Type])] -> m ()
-    checkNewtype [(_, [_])] = return ()
-    checkNewtype [(_, _)] = throwError . errorMessage $ InvalidNewtype name
-    checkNewtype _ = throwError . errorMessage $ InvalidNewtype name
   go (d@(DataBindingGroupDeclaration tys)) = do
     warnAndRethrow (addHint ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
+        when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` ctorKind
         addDataType moduleName dtype name args' dctors ctorKind
@@ -326,6 +322,10 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     checkType (TypeApp t1 _) = checkType t1
     checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
   checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
+
+  checkNewtype :: ProperName 'TypeName -> [(ProperName 'ConstructorName, [Type])] -> m ()
+  checkNewtype _ [(_, [_])] = return ()
+  checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
