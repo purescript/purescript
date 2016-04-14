@@ -126,8 +126,8 @@ parseFixityDeclaration = do
   name <- symbol
   return $ FixityDeclaration fixity name alias
   where
-  aliased = (Left <$> parseQualified (Ident <$> identifier))
-        <|> (Right <$> parseQualified (ProperName <$> uname))
+  aliased = P.try (Left <$> parseQualified (Ident <$> identifier))
+        <|> (Right <$> parseQualified properName)
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
