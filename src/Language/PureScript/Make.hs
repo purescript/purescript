@@ -42,6 +42,7 @@ import Control.Concurrent.Lifted as C
 
 import Data.List (foldl', sort)
 import Data.Maybe (fromMaybe, catMaybes, isJust)
+import Data.Either (partitionEithers)
 import Data.Time.Clock
 import Data.String (fromString)
 import Data.Foldable (for_)
@@ -417,11 +418,10 @@ checkForeignDecls m path = do
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
-  let foreignIdents =
-        either
-          (internalError . ("checkForeignDecls: unexpected idents: " ++) . show)
-          S.fromList
-          (traverse parseIdent foreignIdentsStrs)
+  foreignIdents <- either
+                     errorInvalidForeignIdentifiers
+                     (pure . S.fromList)
+                     (parseIdents foreignIdentsStrs)
   let importedIdents = S.fromList $ map fst (CF.moduleForeign m)
 
   let unusedFFI = foreignIdents S.\\ importedIdents
@@ -443,10 +443,24 @@ checkForeignDecls m path = do
   getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
   getExps = Bundle.getExportedIdentifiers (runModuleName mname)
 
+  errorInvalidForeignIdentifiers :: [String] -> SupplyT Make a
+  errorInvalidForeignIdentifiers =
+    throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname)
+
+  parseIdents :: [String] -> Either [String] [Ident]
+  parseIdents strs =
+    case partitionEithers (map parseIdent strs) of
+      ([], idents) ->
+        Right idents
+      (errs, _) ->
+        Left errs
+
   -- TODO: Handling for parenthesised operators should be removed after 0.9.
+  -- We ignore the error message here, just being told it's an invalid
+  -- identifier should be enough.
   parseIdent :: String -> Either String Ident
   parseIdent str = try str <|> try ("(" ++ str ++ ")")
     where
-    try s = either (Left . show) Right $ do
+    try s = either (const (Left str)) Right $ do
       ts <- PSParser.lex "" s
       PSParser.runTokenParser "" (PSParser.parseIdent <* Parsec.eof) ts

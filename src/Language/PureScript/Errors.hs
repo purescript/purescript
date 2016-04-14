@@ -46,6 +46,7 @@ data SimpleErrorMessage
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
+  | InvalidFFIIdentifier ModuleName String
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
@@ -229,6 +230,7 @@ errorCode em = case unwrapErrorMessage em of
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
+  InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   CannotGetFileInfo{} -> "CannotGetFileInfo"
   CannotReadFile{} -> "CannotReadFile"
   CannotWriteFile{} -> "CannotWriteFile"
@@ -551,6 +553,13 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (UnusedFFIImplementations mn idents) =
       paras [ line $ "The following definitions in the foreign module for module " ++ runModuleName mn ++ " are unused: "
             , indent . paras $ map (line . runIdent) idents
+            ]
+    renderSimpleErrorMessage (InvalidFFIIdentifier mn ident) =
+      paras [ line $ "In the FFI module for " ++ runModuleName mn ++ ":"
+            , indent . paras $
+                [ line $ "The identifier `" ++ ident ++ "` is not valid in PureScript."
+                , line "Note that exported identifiers in FFI modules must be valid PureScript identifiers."
+                ]
             ]
     renderSimpleErrorMessage (MultipleFFIModules mn paths) =
       paras [ line $ "Multiple foreign module implementations have been provided for module " ++ runModuleName mn ++ ": "
