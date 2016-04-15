@@ -7,7 +7,6 @@ import Prelude.Compat
 
 import Data.Maybe (mapMaybe)
 import Data.List (nub, nubBy, sortBy, isPrefixOf, stripPrefix)
-import Data.Char (isUpper)
 import Data.Function (on)
 
 import Control.Arrow (second)
