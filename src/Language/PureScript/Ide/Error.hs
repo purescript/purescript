@@ -1,6 +1,20 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Error
+-- Description : Error types for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Error types for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Error
-       (ErrorMsg, PscIdeError(..), textError, first)
+       (ErrorMsg, PscIdeError(..), textError)
        where
 
 import           Data.Aeson
@@ -35,8 +49,3 @@ textError (ParseError parseError msg) = pack $ msg <> ": " <> show (escape parse
     -- escape newlines and other special chars so we can send the error over the socket as a single line
     escape :: P.ParseError -> String
     escape = show
-
--- | Specialized version of `first` from `Data.Bifunctors`
-first :: (a -> b) -> Either a r -> Either b r
-first f (Left x)   = Left (f x)
-first _ (Right r2) = Right r2

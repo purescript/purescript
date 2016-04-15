@@ -19,6 +19,9 @@ before_install:
   - export PATH="$HOME/.cabal/bin:$PATH"
   - export PATH="/opt/happy/1.19.5/bin:/$PATH"
   - export PATH="/opt/alex/3.1.4/bin:/$PATH"
+  - export PATH="$HOME/build/purescript/purescript/dist/build/psc:/$PATH"
+  - export PATH="$HOME/build/purescript/purescript/dist/build/psc-ide-server:/$PATH"
+  - export PATH="$HOME/build/purescript/purescript/dist/build/psc-ide-client:/$PATH"
 install:
   - cabal --version
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"

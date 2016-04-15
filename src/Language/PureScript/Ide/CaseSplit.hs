@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.CaseSplit
+-- Description : Casesplitting and adding function clauses
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Casesplitting and adding function clauses
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -26,23 +40,18 @@ import           Data.List                               (find)
 import           Data.Monoid
 import           Data.Text                               (Text)
 import qualified Data.Text                               as T
-import           Language.PureScript.AST
-import           Language.PureScript.Environment
+import qualified Language.PureScript                     as P
+
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Externs         (unwrapPositioned)
 import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types           hiding (Type)
-import           Language.PureScript.Names
-import           Language.PureScript.Parser.Common       (runTokenParser)
-import           Language.PureScript.Parser.Declarations
-import           Language.PureScript.Parser.Lexer        (lex)
-import           Language.PureScript.Parser.Types
-import           Language.PureScript.Pretty
-import           Language.PureScript.Types
-import           Text.Parsec                             as P
+import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 
-type Constructor = (ProperName 'ConstructorName, [Type])
+import           Text.Parsec                             as Parsec
+
+type Constructor = (P.ProperName 'P.ConstructorName, [P.Type])
 
 newtype WildcardAnnotations = WildcardAnnotations Bool
 
@@ -57,13 +66,13 @@ caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
 caseSplit q = do
   type' <- parseType' (T.unpack q)
   (tc, args) <- splitTypeConstructor type'
-  (EDType _ _ (DataType typeVars ctors)) <- findTypeDeclaration tc
-  let applyTypeVars = everywhereOnTypes (replaceAllTypeVars (zip (map fst typeVars) args))
+  (EDType _ _ (P.DataType typeVars ctors)) <- findTypeDeclaration tc
+  let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
 findTypeDeclaration :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-                         ProperName 'TypeName -> m ExternsDeclaration
+                         P.ProperName 'P.TypeName -> m ExternsDeclaration
 findTypeDeclaration q = do
   efs <- getExternFiles
   let m = getFirst $ foldMap (findTypeDeclaration' q) efs
@@ -72,7 +81,7 @@ findTypeDeclaration q = do
     Nothing -> throwError (GeneralError "Not Found")
 
 findTypeDeclaration' ::
-  ProperName 'TypeName
+  P.ProperName 'P.TypeName
   -> ExternsFile
   -> First ExternsDeclaration
 findTypeDeclaration' t ExternsFile{..} =
@@ -81,25 +90,25 @@ findTypeDeclaration' t ExternsFile{..} =
             _ -> False) efDeclarations
 
 splitTypeConstructor :: (MonadError PscIdeError m) =>
-                        Type -> m (ProperName 'TypeName, [Type])
+                        P.Type -> m (P.ProperName 'P.TypeName, [P.Type])
 splitTypeConstructor = go []
   where
-    go acc (TypeApp ty arg) = go (arg : acc) ty
-    go acc (TypeConstructor tc) = pure (disqualify tc, acc)
+    go acc (P.TypeApp ty arg) = go (arg : acc) ty
+    go acc (P.TypeConstructor tc) = pure (P.disqualify tc, acc)
     go _ _ = throwError (GeneralError "Failed to read TypeConstructor")
 
 prettyCtor :: WildcardAnnotations -> Constructor -> Text
-prettyCtor _ (ctorName, []) = T.pack (runProperName ctorName)
+prettyCtor _ (ctorName, []) = runProperNameT ctorName
 prettyCtor wsa (ctorName, ctorArgs) =
-  "("<> T.pack (runProperName ctorName) <> " "
+  "("<> runProperNameT ctorName <> " "
   <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <>")"
 
-prettyPrintWildcard :: WildcardAnnotations -> Type -> Text
+prettyPrintWildcard :: WildcardAnnotations -> P.Type -> Text
 prettyPrintWildcard (WildcardAnnotations True) = prettyWildcard
 prettyPrintWildcard (WildcardAnnotations False) = const "_"
 
-prettyWildcard :: Type -> Text
-prettyWildcard t = "( _ :: " <> T.strip (T.pack (prettyPrintTypeAtom t)) <> ")"
+prettyWildcard :: P.Type -> Text
+prettyWildcard t = "( _ :: " <> T.strip (T.pack (P.prettyPrintTypeAtom t)) <> ")"
 
 -- | Constructs Patterns to insert into a sourcefile
 makePattern :: Text -- ^ Current line
@@ -116,38 +125,38 @@ addClause :: Text -> WildcardAnnotations -> [Text]
 addClause s wca =
   let (fName, fType) = parseTypeDeclaration' (T.unpack s)
       (args, _) = splitFunctionType fType
-      template = T.pack (runIdent fName) <> " " <>
+      template = runIdentT fName <> " " <>
         T.unwords (map (prettyPrintWildcard wca) args) <>
-        " = ?" <> (T.strip . T.pack . runIdent $ fName)
+        " = ?" <> (T.strip . runIdentT $ fName)
   in [s, template]
 
 parseType' :: (MonadError PscIdeError m) =>
-              String -> m Type
+              String -> m P.Type
 parseType' s =
-  case lex "<psc-ide>" s >>= runTokenParser "<psc-ide>" (parseType <* P.eof) of
+  case P.lex "<psc-ide>" s >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
     Right type' -> pure type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 ++ show err))
 
-parseTypeDeclaration' :: String -> (Ident, Type)
+parseTypeDeclaration' :: String -> (P.Ident, P.Type)
 parseTypeDeclaration' s =
   let x = do
-        ts <- lex "" s
-        runTokenParser "" (parseDeclaration <* P.eof) ts
+        ts <- P.lex "" s
+        P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
   in
     case unwrapPositioned <$> x of
-      Right (TypeDeclaration i t) -> (i, t)
+      Right (P.TypeDeclaration i t) -> (i, t)
       y -> error (show y)
 
-splitFunctionType :: Type -> ([Type], Type)
+splitFunctionType :: P.Type -> ([P.Type], P.Type)
 splitFunctionType t = (arguments, returns)
   where
     returns = last splitted
     arguments = init splitted
     splitted = splitType' t
-    splitType' (ForAll _ t' _) = splitType' t'
-    splitType' (ConstrainedType _ t') = splitType' t'
-    splitType' (TypeApp (TypeApp t' lhs) rhs)
-          | t' == tyFunction = lhs : splitType' rhs
+    splitType' (P.ForAll _ t' _) = splitType' t'
+    splitType' (P.ConstrainedType _ t') = splitType' t'
+    splitType' (P.TypeApp (P.TypeApp t' lhs) rhs)
+          | t' == P.tyFunction = lhs : splitType' rhs
     splitType' t' = [t']

@@ -11,8 +11,13 @@ module Main where
   import Control.Monad.Eff.Console (CONSOLE, log)
   import Test.Assert (ASSERT, assert')
   import Data.List (List(..), (:))
+  import Data.List as L
 
+  -- unqualified
   infixl 6 Cons as !
+
+  -- qualified
+  infixl 6 L.Cons as !!
 
   get1 ∷ ∀ a. a → List a → a
   get1 y xs = case xs of

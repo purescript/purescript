@@ -1,4 +1,19 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Watcher
+-- Description : File watcher for externs files
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- File watcher for externs files
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE RecordWildCards #-}
+
 module Language.PureScript.Ide.Watcher where
 
 import           Prelude                         ()
