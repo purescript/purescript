@@ -41,6 +41,11 @@ spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
+    it "rebuilds a correct module that has reverse dependencies" $ do
+      _ <- Integration.loadModuleWithDeps "RebuildSpecWithDeps"
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecDep.purs"
+      Integration.rebuildModule file >>= shouldBeSuccess
     it "fails to rebuild a module if its dependencies are not loaded" $ do
       _ <- Integration.loadModule "RebuildSpecWithDeps"
       pdir <- Integration.projectDirectory

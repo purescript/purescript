@@ -15,7 +15,7 @@ import           Language.PureScript.Ide.Error
 import           Control.Monad.Error.Class
 import           Control.Monad.Reader.Class
 import qualified Data.Map.Lazy                      as M
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (mapMaybe, fromMaybe)
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
 import           Control.Monad.Trans.Except
@@ -37,9 +37,7 @@ rebuildFile path = do
          Right [m] -> pure m
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
-  let externFilter mn _ = mn /= P.getModuleName m
-
-  externs <- sortExterns . M.filterWithKey externFilter =<< getExternFiles
+  externs <- sortExterns . gatherTransitiveDependencies (P.getModuleName m) =<< getExternFiles
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
@@ -55,12 +53,25 @@ rebuildFile path = do
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
 
+gatherTransitiveDependencies
+  :: P.ModuleName
+  -> M.Map P.ModuleName P.ExternsFile
+  -> M.Map P.ModuleName P.ExternsFile
+gatherTransitiveDependencies mn efs =
+  M.filterWithKey (\key _ -> elem key transitiveDeps) efs
+  where
+    transitiveDeps = go (dependencies mn)
+    go [] = []
+    go deps = deps ++ concatMap dependencies deps
+    dependencies mn' =
+      fromMaybe [] (map P.eiModule . P.efImports <$> M.lookup mn' efs)
+
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)
   => M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns ex = do
-  sorted' <- runExceptT . P.sortModules . map mkShallowModule .M.elems $ ex
+  sorted' <- runExceptT . P.sortModules . map mkShallowModule . M.elems $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, _) ->
