@@ -50,7 +50,7 @@ rebuildFile path = do
   (result, warnings) <- liftIO
                    . P.runMake P.defaultOptions
                    . P.rebuildModule ma externs
-                   $ m
+                   $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
