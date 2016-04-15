@@ -62,7 +62,7 @@ gatherTransitiveDependencies mn efs =
   where
     transitiveDeps = go (dependencies mn)
     go [] = []
-    go deps = deps ++ concatMap dependencies deps
+    go deps = deps ++ go (concatMap dependencies deps)
     dependencies mn' =
       fromMaybe [] (map P.eiModule . P.efImports <$> M.lookup mn' efs)
 
