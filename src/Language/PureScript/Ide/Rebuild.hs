@@ -43,7 +43,10 @@ rebuildFile path = do
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
-  let ma = P.buildMakeActions outputDirectory M.empty M.empty False
+  let ma = P.buildMakeActions outputDirectory
+                              (M.singleton (P.getModuleName m) (Left P.RebuildAlways))
+                              M.empty {- TODO: add foreign module here, if it exists -}
+                              False
 
   (_, warnings) <- liftIO
                    . P.runMake P.defaultOptions
