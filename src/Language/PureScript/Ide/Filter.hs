@@ -1,10 +1,30 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Filter
+-- Description : Filters for psc-ide commands
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Filters for psc-ide commands
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+
 module Language.PureScript.Ide.Filter
-       (Filter, moduleFilter, prefixFilter, equalityFilter, dependencyFilter,
-        runFilter, applyFilters)
-       where
+       ( Filter
+       , moduleFilter
+       , prefixFilter
+       , equalityFilter
+       , dependencyFilter
+       , runFilter
+       , applyFilters
+       ) where
 
 import           Prelude                       ()
 import           Prelude.Compat
@@ -16,6 +36,7 @@ import           Data.Maybe                    (listToMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Text                     (Text, isPrefixOf)
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 
 newtype Filter = Filter (Endo [Module]) deriving(Monoid)
 
@@ -57,10 +78,9 @@ prefixFilter "" = mkFilter id
 prefixFilter t = mkFilter $ identFilter prefix t
   where
     prefix :: ExternDecl -> Text -> Bool
-    prefix (FunctionDecl name _) search = search `isPrefixOf` name
-    prefix (DataDecl name _) search = search `isPrefixOf` name
-    prefix (ModuleDecl name _) search = search `isPrefixOf` name
-    prefix _ _ = False
+    prefix Export{} _ = False
+    prefix Dependency{} _ = False
+    prefix ed search = search `isPrefixOf` identifierFromExternDecl ed
 
 
 -- | Only keeps Identifiers that are equal to the search string
@@ -68,10 +88,7 @@ equalityFilter :: Text -> Filter
 equalityFilter = mkFilter . identFilter equality
   where
     equality :: ExternDecl -> Text -> Bool
-    equality (FunctionDecl name _) prefix = prefix == name
-    equality (DataDecl name _) prefix = prefix == name
-    equality _ _ = False
-
+    equality ed search = identifierFromExternDecl ed == search
 
 identFilter :: (ExternDecl -> Text -> Bool ) -> Text -> [Module] -> [Module]
 identFilter predicate search =

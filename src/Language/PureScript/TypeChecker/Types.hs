@@ -7,9 +7,10 @@
 -- |
 -- This module implements the type checker
 --
-module Language.PureScript.TypeChecker.Types (
-    typesOf
-) where
+module Language.PureScript.TypeChecker.Types
+  ( BindingGroupType(..)
+  , typesOf
+  ) where
 
 {-
   The following functions represent the corresponding type checking judgements:
@@ -59,14 +60,20 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
+data BindingGroupType
+  = RecursiveBindingGroup
+  | NonRecursiveBindingGroup
+  deriving (Show, Eq, Ord)
+
 -- | Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 typesOf ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  BindingGroupType ->
   ModuleName ->
   [(Ident, Expr)] ->
   m [(Ident, (Expr, Type))]
-typesOf moduleName vals = do
+typesOf bindingGroupType moduleName vals = do
   tys <- fmap tidyUp . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
@@ -79,14 +86,23 @@ typesOf moduleName vals = do
     let unsolvedTypeVars = nub $ unknownsInType ty
     -- Generalize and constrain the type
     let generalized = generalize unsolved ty
-    -- Make sure any unsolved type constraints only use type variables which appear
-    -- unknown in the inferred type.
+
     when shouldGeneralize $ do
+      -- Show the inferred type in a warning
       tell . errorMessage $ MissingTypeDeclaration ident generalized
+      -- For non-recursive binding groups, can generalize over constraints.
+      -- For recursive binding groups, we throw an error here for now.
+      when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
+        . throwError
+        . errorMessage
+        $ CannotGeneralizeRecursiveFunction ident generalized
+      -- Make sure any unsolved type constraints only use type variables which appear
+      -- unknown in the inferred type.
       forM_ unsolved $ \(_, (className, classTys)) -> do
         let constraintTypeVars = nub $ foldMap unknownsInType classTys
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
           throwError . errorMessage $ NoInstanceFound className classTys
+
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
     -- Check rows do not contain duplicate labels

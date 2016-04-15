@@ -43,7 +43,7 @@ parseForeignModulesFromFiles files = do
   foreigns <- parU files $ \(path, file) ->
     case findModuleName (lines file) of
       Just name -> return (name, path)
-      Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path)
+      Nothing -> throwError (errorMessage $ ErrorParsingFFIModule path Nothing)
   let grouped = groupBy ((==) `on` fst) $ sortBy (compare `on` fst) foreigns
   forM_ grouped $ \grp ->
     when (length grp > 1) $ do

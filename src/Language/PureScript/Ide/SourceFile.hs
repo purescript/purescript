@@ -1,6 +1,21 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.SourceFile
+-- Description : Getting declarations from PureScript sourcefiles
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Getting declarations from PureScript sourcefiles
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+
 module Language.PureScript.Ide.SourceFile where
 
 import           Prelude
@@ -69,7 +84,7 @@ getPositionedImports :: D.Module -> [D.Declaration]
 getPositionedImports (D.Module _ _ _ declarations _) =
   mapMaybe isImport declarations
   where
-    isImport i@(D.PositionedDeclaration _ _ (D.ImportDeclaration{})) = Just i
+    isImport i@(D.PositionedDeclaration _ _ D.ImportDeclaration{}) = Just i
     isImport _ = Nothing
 
 getDeclPosition :: D.Module -> String -> Maybe SP.SourceSpan

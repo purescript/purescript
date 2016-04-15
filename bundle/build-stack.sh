@@ -1,6 +1,7 @@
+## This script can be run on any supported OS to create a binary .tar.gz
+## bundle.
+## For Windows, msysgit contains all of the pieces needed to run this script.
 set -e
-
-SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 
 OS=$1
 
@@ -10,39 +11,51 @@ then
   exit 1
 fi
 
-pushd ${SCRIPTPATH} > /dev/null
+pushd $(stack path --project-root)
+
+LOCAL_INSTALL_ROOT=$(stack path --local-install-root)
+
+if [ "$OS" = "win64" ]
+then
+  BIN_EXT=".exe"
+else
+  BIN_EXT=""
+fi
 
 # Make the staging directory
-mkdir -p build/purescript/
+mkdir -p bundle/build/purescript
 
-# Strip the binaries
-strip ~/.local/bin/psc
-strip ~/.local/bin/psci
-strip ~/.local/bin/psc-docs
-strip ~/.local/bin/psc-publish
-strip ~/.local/bin/psc-bundle
-strip ~/.local/bin/psc-ide-server
-strip ~/.local/bin/psc-ide-client
+# Strip the binaries, and copy them to the staging directory
+for BIN in psc psci psc-docs psc-publish psc-bundle psc-ide-server psc-ide-client
+do
+  FULL_BIN="$LOCAL_INSTALL_ROOT/bin/${BIN}${BIN_EXT}"
+  strip "$FULL_BIN" || true # not the end of the world if this fails, and
+                            # AppVeyor can't seem to handle it for some reason
+  cp "$FULL_BIN" bundle/build/purescript
+done
 
-# Copy files to staging directory
-cp ~/.local/bin/psc            build/purescript/
-cp ~/.local/bin/psci           build/purescript/
-cp ~/.local/bin/psc-docs       build/purescript/
-cp ~/.local/bin/psc-publish    build/purescript/
-cp ~/.local/bin/psc-bundle     build/purescript/
-cp ~/.local/bin/psc-ide-server build/purescript/
-cp ~/.local/bin/psc-ide-client build/purescript/
-cp README                      build/purescript/
-cp ../LICENSE                  build/purescript/
-cp ../INSTALL.md               build/purescript/
+# Copy extra files to the staging directory
+cp bundle/README         bundle/build/purescript/
+cp LICENSE               bundle/build/purescript/
+cp INSTALL.md            bundle/build/purescript/
+
+stack list-dependencies >bundle/build/purescript/dependencies.txt
 
 # Make the binary bundle
-pushd build > /dev/null
-tar -zcvf ../$OS.tar.gz purescript
+pushd bundle/build > /dev/null
+tar -zcvf ../${OS}.tar.gz purescript
 popd > /dev/null
 
 # Calculate the SHA hash
-shasum $OS.tar.gz > $OS.sha
+if [ "$OS" = "win64" ]
+then
+  # msys/mingw does not include shasum. :(
+  SHASUM="openssl dgst -sha1"
+else
+  SHASUM="shasum"
+fi
+
+$SHASUM bundle/${OS}.tar.gz > bundle/${OS}.sha
 
 # Remove the staging directory
 rm -rf build/

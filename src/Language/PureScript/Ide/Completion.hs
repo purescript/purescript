@@ -13,23 +13,20 @@ import           Language.PureScript.Ide.Types
 
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score
-getCompletions :: [Filter] -> Matcher -> [Module] -> [Completion]
+getCompletions :: [Filter] -> Matcher -> [Module] -> [Match]
 getCompletions filters matcher modules =
     runMatcher matcher $ completionsFromModules (applyFilters filters modules)
 
-getExactMatches :: DeclIdent -> [Filter] -> [Module] -> [Completion]
+getExactMatches :: DeclIdent -> [Filter] -> [Module] -> [Match]
 getExactMatches search filters modules =
     completionsFromModules $
     applyFilters (equalityFilter search : filters) modules
 
-completionsFromModules :: [Module] -> [Completion]
+completionsFromModules :: [Module] -> [Match]
 completionsFromModules = foldMap completionFromModule
   where
-    completionFromModule :: Module -> [Completion]
-    completionFromModule (moduleIdent, decls) = mapMaybe (completionFromDecl moduleIdent) decls
+    completionFromModule :: Module -> [Match]
+    completionFromModule (moduleIdent, decls) = mapMaybe (matchFromDecl moduleIdent) decls
 
-completionFromDecl :: ModuleIdent -> ExternDecl -> Maybe Completion
-completionFromDecl mi (FunctionDecl name type') = Just (Completion (mi, name, type'))
-completionFromDecl mi (DataDecl name kind)      = Just (Completion (mi, name, kind))
-completionFromDecl _  (ModuleDecl name _)       = Just (Completion ("module", name, "module"))
-completionFromDecl _ _                          = Nothing
+matchFromDecl :: ModuleIdent -> ExternDecl -> Maybe Match
+matchFromDecl mi = Just . Match mi

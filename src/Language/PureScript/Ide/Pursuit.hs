@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Pursuit
+-- Description : Pursuit client for psc-ide
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Pursuit client for psc-ide
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 

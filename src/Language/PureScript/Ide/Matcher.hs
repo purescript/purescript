@@ -1,7 +1,26 @@
+-----------------------------------------------------------------------------
+--
+-- Module      : Language.PureScript.Ide.Matcher
+-- Description : Matchers for psc-ide commands
+-- Copyright   : Christoph Hegemann 2016
+-- License     : MIT (http://opensource.org/licenses/MIT)
+--
+-- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
+-- Stability   : experimental
+--
+-- |
+-- Matchers for psc-ide commands
+-----------------------------------------------------------------------------
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-module Language.PureScript.Ide.Matcher (Matcher, flexMatcher, runMatcher) where
+
+module Language.PureScript.Ide.Matcher
+       ( Matcher
+       , flexMatcher
+       , runMatcher
+       ) where
 
 import           Prelude                       ()
 import           Prelude.Compat
@@ -16,13 +35,14 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           Text.EditDistance
 import           Text.Regex.TDFA               ((=~))
 
 
-type ScoredCompletion = (Completion, Double)
+type ScoredMatch = (Match, Double)
 
-newtype Matcher = Matcher (Endo [Completion]) deriving(Monoid)
+newtype Matcher = Matcher (Endo [Match]) deriving(Monoid)
 
 instance FromJSON Matcher where
   parseJSON = withObject "matcher" $ \o -> do
@@ -41,42 +61,43 @@ instance FromJSON Matcher where
       Nothing -> return mempty
 
 -- | Matches any occurence of the search string with intersections
--- |
--- | The scoring measures how far the matches span the string where
--- | closer is better.
--- | Examples:
--- |   flMa matches flexMatcher. Score: 14.28
--- |   sons matches sortCompletions. Score: 6.25
+--
+-- The scoring measures how far the matches span the string where
+-- closer is better.
+-- Examples:
+--   flMa matches flexMatcher. Score: 14.28
+--   sons matches sortCompletions. Score: 6.25
 flexMatcher :: Text -> Matcher
-flexMatcher pattern = mkMatcher (flexMatch pattern)
+flexMatcher p = mkMatcher (flexMatch p)
 
 distanceMatcher :: Text -> Int -> Matcher
 distanceMatcher q maxDist = mkMatcher (distanceMatcher' q maxDist)
 
-distanceMatcher' :: Text -> Int -> [Completion] -> [ScoredCompletion]
+distanceMatcher' :: Text -> Int -> [Match] -> [ScoredMatch]
 distanceMatcher' q maxDist = mapMaybe go
   where
-    go c@(Completion (_, y, _)) = let d = dist (T.unpack y)
-                                  in if d <= maxDist
-                                     then Just (c, 1 / fromIntegral d)
-                                     else Nothing
+    go m = let d = dist (T.unpack y)
+               y = identifierFromMatch m
+          in if d <= maxDist
+             then Just (m, 1 / fromIntegral d)
+             else Nothing
     dist = levenshteinDistance defaultEditCosts (T.unpack q)
 
-mkMatcher :: ([Completion] -> [ScoredCompletion]) -> Matcher
+mkMatcher :: ([Match] -> [ScoredMatch]) -> Matcher
 mkMatcher matcher = Matcher . Endo  $ fmap fst . sortCompletions . matcher
 
-runMatcher :: Matcher -> [Completion] -> [Completion]
+runMatcher :: Matcher -> [Match] -> [Match]
 runMatcher (Matcher m)= appEndo m
 
-sortCompletions :: [ScoredCompletion] -> [ScoredCompletion]
+sortCompletions :: [ScoredMatch] -> [ScoredMatch]
 sortCompletions = sortBy (flip compare `on` snd)
 
-flexMatch :: Text -> [Completion] -> [ScoredCompletion]
-flexMatch pattern = mapMaybe (flexRate pattern)
+flexMatch :: Text -> [Match] -> [ScoredMatch]
+flexMatch = mapMaybe . flexRate
 
-flexRate :: Text -> Completion -> Maybe ScoredCompletion
-flexRate pattern c@(Completion (_,ident,_)) = do
-  score <- flexScore pattern ident
+flexRate :: Text -> Match -> Maybe ScoredMatch
+flexRate p c = do
+  score <- flexScore p (identifierFromMatch c)
   return (c, score)
 
 -- FlexMatching ala Sublime.
@@ -89,13 +110,13 @@ flexScore :: Text -> DeclIdent -> Maybe Double
 flexScore pat str =
   case T.uncons pat of
     Nothing -> Nothing
-    Just (first, pattern) ->
+    Just (first, p) ->
       case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
         (-1,0) -> Nothing
         (start,len) -> Just $ calcScore start (start + len)
       where
         escapedPattern :: [Text]
-        escapedPattern = map escape (T.unpack pattern)
+        escapedPattern = map escape (T.unpack p)
 
         -- escape prepends a backslash to "regexy" characters to prevent the
         -- matcher from crashing when trying to build the regex
