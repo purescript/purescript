@@ -47,13 +47,13 @@ rebuildFile path = do
                               (M.singleton (P.getModuleName m) (Left P.RebuildAlways))
                               M.empty {- TODO: add foreign module here, if it exists -}
                               False
-
-  (_, warnings) <- liftIO
+  (result, warnings) <- liftIO
                    . P.runMake P.defaultOptions
                    . P.rebuildModule ma externs
                    $ m
-
-  pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
+  case result of
+    Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
+    Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
 
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)
