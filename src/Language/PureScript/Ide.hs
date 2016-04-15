@@ -89,8 +89,8 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
   case rs of
     Right rs' -> answerRequest outfp rs'
     Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
-handleCommand (Rebuild file outFile) =
-  rebuildFile file outFile
+handleCommand (Rebuild file) =
+  rebuildFile file
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess
@@ -240,4 +240,3 @@ filePathFromModule moduleName = do
   if ex
     then pure path
     else throwError (ModuleFileNotFound moduleName)
-

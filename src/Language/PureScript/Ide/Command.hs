@@ -63,10 +63,7 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | Rebuild FilePath (Maybe FilePath) -- ^ Rebuild the specified file using
-                                        -- the loaded externs and output the
-                                        -- generated JS to the specified
-                                        -- location
+    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
     | Cwd
     | Quit
 
@@ -156,6 +153,5 @@ instance FromJSON Command where
       "rebuild" -> do
         params <- o .: "params"
         filePath <- params .: "file"
-        outPath <- params .:? "outfile"
-        return $ Rebuild filePath outPath
+        return $ Rebuild filePath
       _ -> mzero
