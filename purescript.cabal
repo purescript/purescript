@@ -37,6 +37,8 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
                   , tests/support/pscide/src/*.purs
+                  , tests/support/pscide/src/*.js
+                  , tests/support/pscide/src/*.fail
                   , stack.yaml
                   , stack-lts-5.yaml
                   , stack-nightly.yaml

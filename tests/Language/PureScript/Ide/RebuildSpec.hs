@@ -51,4 +51,12 @@ spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
       Integration.rebuildModule file >>= shouldBeFailure
-
+    it "rebuilds a correct module with a foreign file" $ do
+      _ <- Integration.loadModuleWithDeps "RebuildSpecWithForeign"
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithForeign.purs"
+      Integration.rebuildModule file >>= shouldBeSuccess
+    it "fails to rebuild a module with a foreign import but no file" $ do
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithMissingForeign.fail"
+      Integration.rebuildModule file >>= shouldBeFailure
