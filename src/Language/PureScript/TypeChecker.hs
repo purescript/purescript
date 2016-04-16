@@ -357,8 +357,26 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     checkClassMembersAreExported e
     checkClassesAreExported e
     checkNonAliasesAreExported (exportedDataConstructors exps) e
+  for_ decls' errorOnHole
   return $ Module ss coms mn decls' (Just exps)
   where
+
+  errorOnHole :: Declaration -> m ()
+  errorOnHole decl =
+    for_ (f decl) $ \(ss', name, ty) ->
+      maybe id rethrowWithPosition ss' $
+        throwError . errorMessage $ HoleInferredType name ty
+    where
+    (f, _, _, _, _) = everythingOnValues (++) (const []) goExpr (const []) (const []) (const [])
+    goExpr :: Expr -> [(Maybe SourceSpan, String, Type)]
+    goExpr (TypedValue _ v ty)
+      | Just (ss', name) <- extractHole Nothing v = [(ss', name, ty)]
+    goExpr _ = []
+    extractHole :: Maybe SourceSpan -> Expr -> Maybe (Maybe SourceSpan, String)
+    extractHole ss' (Hole name) = Just (ss', name)
+    extractHole _ (PositionedValue ss' _ d) = extractHole (Just ss') d
+    extractHole _ _ = Nothing
+
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
   checkMemberExport extract dr@(TypeRef name dctors) = do

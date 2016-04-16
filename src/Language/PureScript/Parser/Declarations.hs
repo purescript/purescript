@@ -392,6 +392,7 @@ parseValueAtom = P.choice
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
                  , parseOperatorSection
+                 , parseHole
                  ]
 
 -- |
@@ -406,6 +407,9 @@ parseOperatorSection = parens $ left <|> right
   where
   right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
   left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
+
+parseHole :: TokenParser Expr
+parseHole = Hole <$> holeLit
 
 parsePropertyUpdate :: TokenParser (String, Expr)
 parsePropertyUpdate = do

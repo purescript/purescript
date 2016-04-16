@@ -316,6 +316,9 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
+infer' (Hole name) = do
+  ty <- freshType
+  return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty

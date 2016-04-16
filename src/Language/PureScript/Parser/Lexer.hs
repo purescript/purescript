@@ -48,6 +48,7 @@ module Language.PureScript.Parser.Lexer
   , semi
   , at
   , underscore
+  , holeLit
   , semiSep
   , semiSep1
   , commaSep
@@ -115,6 +116,7 @@ data Token
   | CharLiteral Char
   | StringLiteral String
   | Number (Either Integer Double)
+  | HoleLit String
   deriving (Show, Read, Eq, Ord)
 
 prettyPrintToken :: Token -> String
@@ -146,6 +148,7 @@ prettyPrintToken (Symbol s)        = s
 prettyPrintToken (CharLiteral c)   = show c
 prettyPrintToken (StringLiteral s) = show s
 prettyPrintToken (Number n)        = either show show n
+prettyPrintToken (HoleLit name)    = "?" ++ name
 
 data PositionedToken = PositionedToken
   { ptSourcePos :: P.SourcePos
@@ -209,6 +212,7 @@ parseToken = P.choice
   , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
   , P.try $ P.char '_'    *> P.notFollowedBy identLetter *> pure Underscore
+  , HoleLit <$> P.try (P.char '?' *> P.many1 identLetter)
   , LName         <$> parseLName
   , do uName <- parseUName
        (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
@@ -375,6 +379,12 @@ at = match At
 
 underscore :: TokenParser ()
 underscore = match Underscore
+
+holeLit :: TokenParser String
+holeLit = token go P.<?> "hole literal"
+  where
+  go (HoleLit n) = Just n
+  go _ = Nothing
 
 -- |
 -- Parse zero or more values separated by semicolons

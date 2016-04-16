@@ -128,6 +128,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
+  | HoleInferredType String Type
   | MissingTypeDeclaration Ident Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
@@ -316,6 +317,7 @@ errorCode em = case unwrapErrorMessage em of
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
+  HoleInferredType{} -> "HoleInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
@@ -435,6 +437,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
+  gSimple (HoleInferredType name ty) = HoleInferredType name <$> f ty
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
@@ -870,6 +873,10 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "Wildcard type definition has the inferred type "
+            , indent $ typeAsBox ty
+            ]
+    renderSimpleErrorMessage (HoleInferredType name ty) =
+      paras [ line $ "Hole '" ++ name ++ "' has the inferred type "
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
