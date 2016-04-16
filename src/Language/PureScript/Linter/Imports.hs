@@ -190,7 +190,7 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
       Just q ->
         let usedModuleNames = mapMaybe extractQualName names
         in unless (q `elem` usedModuleNames) unused
-    Hiding _ -> checkImplicit HidingImport
+    Hiding _ -> unless allowImplicit (checkImplicit HidingImport)
     Explicit [] -> unused
     Explicit declrefs -> checkExplicit declrefs
 
