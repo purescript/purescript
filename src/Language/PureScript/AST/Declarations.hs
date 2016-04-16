@@ -352,10 +352,6 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- Operator section. This will be removed during desugaring and replaced with lambda.
-  --
-  | OperatorSection Expr (Either Expr Expr)
-  -- |
   -- An object property getter (e.g. `_.x`). This will be removed during
   -- desugaring and expanded into a lambda that reads a property from an object.
   --

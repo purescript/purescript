@@ -67,7 +67,6 @@ desugar :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErro
 desugar externs =
   map removeSignedLiterals
     >>> traverse desugarObjectConstructors
-    >=> traverse desugarOperatorSections
     >=> traverse desugarDoModule
     >=> desugarCasesModule
     >=> desugarTypeDeclarationsModule

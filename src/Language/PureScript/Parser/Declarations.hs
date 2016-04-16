@@ -391,7 +391,6 @@ parseValueAtom = P.choice
                  , parseDo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
-                 , parseOperatorSection
                  ]
 
 -- |
@@ -400,12 +399,6 @@ parseValueAtom = P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr = P.between tick tick parseValue
                  <|> Var <$> parseQualified (Op <$> symbol)
-
-parseOperatorSection :: TokenParser Expr
-parseOperatorSection = parens $ left <|> right
-  where
-  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
-  left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
 parsePropertyUpdate :: TokenParser (String, Expr)
 parsePropertyUpdate = do

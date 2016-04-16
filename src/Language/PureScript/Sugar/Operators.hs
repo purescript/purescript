@@ -13,7 +13,6 @@
 module Language.PureScript.Sugar.Operators
   ( rebracket
   , removeSignedLiterals
-  , desugarOperatorSections
   ) where
 
 import Prelude ()
@@ -259,28 +258,6 @@ customOperatorTable fixities =
     groups = groupBy ((==) `on` (\(_, p, _) -> p)) sorted
   in
     map (map (\(name, _, a) -> (name, a))) groups
-
-desugarOperatorSections
-  :: forall m
-   . (MonadSupply m, MonadError MultipleErrors m)
-  => Module
-  -> m Module
-desugarOperatorSections (Module ss coms mn ds exts) =
-  Module ss coms mn <$> traverse goDecl ds <*> pure exts
-  where
-
-  goDecl :: Declaration -> m Declaration
-  (goDecl, _, _) = everywhereOnValuesM return goExpr return
-
-  goExpr :: Expr -> m Expr
-  goExpr (OperatorSection op eVal) = do
-    arg <- freshIdent'
-    let var = Var (Qualified Nothing arg)
-        f2 a b = Abs (Left arg) $ App (App op a) b
-    return $ case eVal of
-      Left  val -> f2 val var
-      Right val -> f2 var val
-  goExpr other = return other
 
 updateTypes
   :: forall m

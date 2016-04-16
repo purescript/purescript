@@ -67,7 +67,6 @@ prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@OperatorSection{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
@@ -79,8 +78,6 @@ prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
 prettyPrintValueAtom _ (Constructor name) = text $ runProperName (disqualify name)
 prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
-prettyPrintValueAtom d (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue (d - 1) op) `beforeWithSpace` prettyPrintValue (d - 1) val) `before` text ")"
-prettyPrintValueAtom d (OperatorSection op (Left val)) = ((text "(" <> prettyPrintValue (d - 1) val) `beforeWithSpace` prettyPrintValue (d - 1) op) `before` text ")"
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where

@@ -25,7 +25,6 @@ import Control.Arrow ((&&&))
 import Language.PureScript.Crash
 import Language.PureScript.AST
 import Language.PureScript.Pretty
-import Language.PureScript.Pretty.Common (before)
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
@@ -140,7 +139,6 @@ data SimpleErrorMessage
   | UnusedDctorImport (ProperName 'TypeName)
   | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | DeprecatedOperatorDecl String
-  | DeprecatedOperatorSection Expr (Either Expr Expr)
   | DeprecatedQualifiedSyntax ModuleName ModuleName
   | DeprecatedClassImport ModuleName (ProperName 'ClassName)
   | DeprecatedClassExport (ProperName 'ClassName)
@@ -328,7 +326,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
   DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
-  DeprecatedOperatorSection{} -> "DeprecatedOperatorSection"
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
   DeprecatedClassImport{} -> "DeprecatedClassImport"
   DeprecatedClassExport{} -> "DeprecatedClassExport"
@@ -454,7 +451,7 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 -- TODO Other possible suggestions:
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
--- DeprecatedClassExport, DeprecatedClassImport, DeprecatedOperatorSection, would want to replace smaller span?
+-- DeprecatedClassExport, DeprecatedClassImport, would want to replace smaller span?
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
 errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
@@ -920,30 +917,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "Support for value-declared operators will be removed in PureScript 0.9."
             ]
 
-    renderSimpleErrorMessage (DeprecatedOperatorSection op val) =
-      paras [ line "An operator section uses legacy syntax. Operator sections are now written using anonymous function syntax:"
-            , indent $ foldr1 before $
-                case val of
-                  Left l ->
-                    [ line "("
-                    , prettyPrintValue valueDepth l
-                    , line " "
-                    , renderOperator op
-                    , line " _)"
-                    ]
-                  Right r ->
-                    [ line "(_ "
-                    , renderOperator op
-                    , line " "
-                    , prettyPrintValue valueDepth r
-                    , line ")"
-                    ]
-            , line "Support for legacy operator sections will be removed in PureScript 0.9."
-            ]
-      where
-        renderOperator (PositionedValue _ _ ex) = renderOperator ex
-        renderOperator (Var (Qualified _ (Op ident))) = line ident
-        renderOperator other = Box.hcat Box.top [ line "`", prettyPrintValue valueDepth other, line "`" ]
     renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
       paras [ line "Import uses the deprecated 'qualified' syntax:"
             , indent $ line $ "import qualified " ++ runModuleName name ++ " as " ++ runModuleName qualName
