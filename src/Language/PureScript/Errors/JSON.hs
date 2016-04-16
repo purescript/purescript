@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Main
+-- Module      :  Language.PureScript.Errors.JSON
 -- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
 -- License     :  MIT (http://opensource.org/licenses/MIT)
 --
@@ -14,7 +14,7 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module JSON where
+module Language.PureScript.Errors.JSON where
 
 import Prelude ()
 import Prelude.Compat
@@ -28,9 +28,9 @@ data ErrorPosition = ErrorPosition
   , startColumn :: Int
   , endLine :: Int
   , endColumn :: Int
-  }
+  } deriving (Show, Eq, Ord)
 
-data ErrorSuggestion = ErrorSuggestion { replacement :: String }
+data ErrorSuggestion = ErrorSuggestion { replacement :: String } deriving (Show, Eq)
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
@@ -40,12 +40,12 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe String
   , suggestion :: Maybe ErrorSuggestion
-  }
+  }  deriving (Show, Eq)
 
 data JSONResult = JSONResult
   { warnings :: [JSONError]
   , errors :: [JSONError]
-  }
+  } deriving (Show, Eq)
 
 $(A.deriveJSON A.defaultOptions ''ErrorPosition)
 $(A.deriveJSON A.defaultOptions ''JSONError)
@@ -64,7 +64,7 @@ toJSONError verbose level e =
             (P.wikiUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
-            (toSuggestion <$> (P.errorSuggestion $ P.unwrapErrorMessage e))
+            (toSuggestion <$> P.errorSuggestion (P.unwrapErrorMessage e))
   where
   sspan :: Maybe P.SourceSpan
   sspan = P.errorSpan e

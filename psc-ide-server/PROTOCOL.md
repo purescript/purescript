@@ -240,6 +240,30 @@ Example:
 } 
 ```
 
+### Rebuild
+
+The `rebuild` command provides a fast rebuild for a single module. It doesn't
+recompile the entire project though. All the modules dependencies need to be
+loaded.
+
+Arguments:
+- `file :: String` the path to the module to rebuild
+
+```json
+{
+  "command": "rebuild",
+  "params": {
+    "file": "/path/to/file.purs"
+  }
+}
+```
+
+**Result**
+
+In the Success case you get a list of warnings in the compilers json format.
+
+In the Error case you get the errors in the compilers json format
+
 ### Pursuit
 The `pursuit` command looks up the packages/completions for a given identifier from Pursuit.
 

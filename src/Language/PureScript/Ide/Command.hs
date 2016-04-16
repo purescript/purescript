@@ -63,6 +63,7 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
+    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
     | Cwd
     | Quit
 
@@ -149,5 +150,8 @@ instance FromJSON Command where
         filters <- params .:? "filters"
         importCommand <- params .: "importCommand"
         pure $ Import fp out (fromMaybe [] filters) importCommand
+      "rebuild" -> do
+        params <- o .: "params"
+        filePath <- params .: "file"
+        return $ Rebuild filePath
       _ -> mzero
-
