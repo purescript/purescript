@@ -3,25 +3,26 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TupleSections         #-}
 
 module Language.PureScript.Ide.Rebuild where
 
+import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Error
 
 import           Control.Monad.Error.Class
-import           Control.Monad.Reader.Class
-import qualified Data.Map.Lazy                      as M
-import           Data.Maybe (mapMaybe, fromMaybe)
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
+import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Externs as P
+import qualified Data.Map.Lazy                   as M
+import           Data.Maybe                      (fromJust, mapMaybe)
+import qualified Data.Set                        as S
+import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
+import qualified Language.PureScript.Externs     as P
 
 rebuildFile
   :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
@@ -37,7 +38,7 @@ rebuildFile path = do
          Right [m] -> pure m
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
-  externs <- sortExterns . gatherTransitiveDependencies (P.getModuleName m) =<< getExternFiles
+  externs <- sortExterns m . M.delete (P.getModuleName m) =<< getExternFiles
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
@@ -53,32 +54,24 @@ rebuildFile path = do
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
 
-gatherTransitiveDependencies
-  :: P.ModuleName
-  -> M.Map P.ModuleName P.ExternsFile
-  -> M.Map P.ModuleName P.ExternsFile
-gatherTransitiveDependencies mn efs =
-  M.filterWithKey (\key _ -> elem key transitiveDeps) efs
-  where
-    transitiveDeps = go (dependencies mn)
-    go [] = []
-    go deps = deps ++ go (concatMap dependencies deps)
-    dependencies mn' =
-      fromMaybe [] (map P.eiModule . P.efImports <$> M.lookup mn' efs)
-
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)
-  => M.Map P.ModuleName P.ExternsFile
+  => P.Module
+  -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
-sortExterns ex = do
-  sorted' <- runExceptT . P.sortModules . map mkShallowModule . M.elems $ ex
+sortExterns m ex = do
+  sorted' <- runExceptT . P.sortModules . (:) m . map mkShallowModule . M.elems $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
-    Right (sorted, _) ->
-       pure $ mapMaybe getExtern sorted
+    Right (sorted, graph) -> do
+      let deps = fromJust (lookup (P.getModuleName m) graph)
+      pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
   where
     mkShallowModule P.ExternsFile{..} =
       P.Module undefined [] efModuleName (map mkImport efImports) Nothing
     mkImport (P.ExternsImport mn it iq) =
       P.ImportDeclaration mn it iq False
-    getExtern m = M.lookup (P.getModuleName m) ex
+    getExtern mn = M.lookup mn ex
+    -- Sort a list so its elements appear in the same order as in another list.
+    inOrderOf :: (Ord a) => [a] -> [a] -> [a]
+    inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
