@@ -85,6 +85,12 @@ desugarImportsWithEnv externs modules = do
         forTyCon _ = Nothing
       toExportedType (PositionedDeclarationRef _ _ r) = toExportedType r
       toExportedType _ = Nothing
+    exportedTypeOps :: [(Ident, ModuleName)]
+    exportedTypeOps = mapMaybe toExportedTypeOp efExports
+      where
+      toExportedTypeOp (TypeOpRef ident) = Just (ident, efModuleName)
+      toExportedTypeOp (PositionedDeclarationRef _ _ r) = toExportedTypeOp r
+      toExportedTypeOp _ = Nothing
     exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
     exportedTypeClasses = mapMaybe toExportedTypeClass efExports
       where
@@ -126,6 +132,7 @@ elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $
     Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (my exportedTypes) ++
+           map TypeOpRef (my exportedTypeOps) ++
            map TypeClassRef (my exportedTypeClasses) ++
            map ValueRef (my exportedValues) ++
            maybe [] (filter isModuleRef) refs
@@ -171,7 +178,15 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (FixityDeclaration fx name alias) =
-    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse (eitherM (`updateValueName` pos) (`updateDataConstructorName` pos)) alias)
+    (,) (pos, bound) <$> (FixityDeclaration fx name <$> traverse updateAlias alias)
+    where
+    updateAlias :: Qualified FixityAlias -> m (Qualified FixityAlias)
+    updateAlias (Qualified mn' (AliasValue ident)) =
+      fmap AliasValue <$> updateValueName (Qualified mn' ident) pos
+    updateAlias (Qualified mn' (AliasConstructor ctor)) =
+      fmap AliasConstructor <$> updateDataConstructorName (Qualified mn' ctor) pos
+    updateAlias (Qualified mn' (AliasType ty)) =
+      fmap AliasType <$> updateTypeName (Qualified mn' ty) pos
   updateDecl s d = return (s, d)
 
   updateValue
@@ -231,6 +246,7 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateTypesEverywhere pos = everywhereOnTypesM updateType
     where
     updateType :: Type -> m Type
+    updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
     updateType (ConstrainedType cs t) = ConstrainedType <$> updateConstraints pos cs <*> pure t
     updateType t = return t
@@ -242,22 +258,57 @@ renameInModule env imports (Module ss coms mn decls exps) =
     :: Qualified (ProperName 'TypeName)
     -> Maybe SourceSpan
     -> m (Qualified (ProperName 'TypeName))
-  updateTypeName = update UnknownType (importedTypes imports) (resolveType . exportedTypes) TyName (("type " ++) . runProperName)
+  updateTypeName =
+    update UnknownType
+      (importedTypes imports)
+      (resolveType . exportedTypes)
+      TyName
+      (("type " ++) . runProperName)
+
+  updateTypeOpName
+    :: Qualified Ident
+    -> Maybe SourceSpan
+    -> m (Qualified Ident)
+  updateTypeOpName =
+    update
+      UnknownTypeOp
+      (importedTypeOps imports)
+      (resolve . exportedTypeOps)
+      TyOpName
+      (("type operator" ++) . runIdent)
 
   updateDataConstructorName
     :: Qualified (ProperName 'ConstructorName)
     -> Maybe SourceSpan
     -> m (Qualified (ProperName 'ConstructorName))
-  updateDataConstructorName = update (flip UnknownDataConstructor Nothing) (importedDataConstructors imports) (resolveDctor . exportedTypes) DctorName (("data constructor " ++) . runProperName)
+  updateDataConstructorName =
+    update
+      (flip UnknownDataConstructor Nothing)
+      (importedDataConstructors imports)
+      (resolveDctor . exportedTypes)
+      DctorName
+      (("data constructor " ++) . runProperName)
 
   updateClassName
     :: Qualified (ProperName 'ClassName)
     -> Maybe SourceSpan
     -> m (Qualified (ProperName 'ClassName))
-  updateClassName = update UnknownTypeClass (importedTypeClasses imports) (resolve . exportedTypeClasses) TyClassName (("class " ++) . runProperName)
+  updateClassName =
+    update
+      UnknownTypeClass
+      (importedTypeClasses imports)
+      (resolve . exportedTypeClasses)
+      TyClassName
+      (("class " ++) . runProperName)
 
   updateValueName :: Qualified Ident -> Maybe SourceSpan -> m (Qualified Ident)
-  updateValueName = update UnknownValue (importedValues imports) (resolve . exportedValues) IdentName (("value " ++) . runIdent)
+  updateValueName =
+    update
+      UnknownValue
+      (importedValues imports)
+      (resolve . exportedValues)
+      IdentName
+      (("value " ++) . runIdent)
 
   -- Used when performing an update to qualify values and classes with their
   -- module of original definition.

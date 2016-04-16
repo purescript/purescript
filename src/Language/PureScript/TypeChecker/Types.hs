@@ -319,7 +319,7 @@ infer' (TypedValue checkType val ty) = do
 infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty
-infer' _ = internalError "Invalid argument to infer"
+infer' v = internalError $ "Invalid argument to infer: " ++ show v
 
 inferLetBinding ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>

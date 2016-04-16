@@ -127,7 +127,6 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (TypeDeclaration ident _)          (ValueRef ident')     = ident == ident'
   matches (ValueDeclaration ident _ _ _)     (ValueRef ident')     = ident == ident'
   matches (ExternDeclaration ident _)        (ValueRef ident')     = ident == ident'
-  matches (FixityDeclaration _ name _)       (ValueRef ident')     = name == runIdent ident'
   matches (DataDeclaration _ ident _ _)      (TypeRef ident' _)    = ident == ident'
   matches (ExternDataDeclaration ident _)    (TypeRef ident' _)    = ident == ident'
   matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _)    = ident == ident'
@@ -135,6 +134,10 @@ isExported (Just exps) decl = any (matches decl) exps
 
   matches (DataDeclaration _ ident _ _)      (ProperRef ident')    = runProperName ident == ident'
   matches (TypeClassDeclaration ident _ _ _) (ProperRef ident')    = runProperName ident == ident'
+
+  matches (FixityDeclaration _ name (Just (Qualified _ (AliasValue _)))) (ValueRef ident') = name == runIdent ident'
+  matches (FixityDeclaration _ name (Just (Qualified _ (AliasConstructor _)))) (ValueRef ident') = name == runIdent ident'
+  matches (FixityDeclaration _ name (Just (Qualified _ (AliasType _)))) (TypeOpRef ident') = name == runIdent ident'
 
   matches (PositionedDeclaration _ _ d) r = d `matches` r
   matches d (PositionedDeclarationRef _ _ r) = d `matches` r

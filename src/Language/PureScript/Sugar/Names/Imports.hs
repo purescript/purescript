@@ -97,6 +97,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
     let imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
         scope = M.insert currentModule [(Nothing, Nothing, Nothing)] imports'
     resolved <- foldM (resolveModuleImport env) nullImports (M.toList scope)
+
     return (Module ss coms currentModule decls' exps, resolved)
 
   where
@@ -118,6 +119,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
   warnDupeRefs :: Maybe SourceSpan -> [DeclarationRef] -> m ()
   warnDupeRefs pos = traverse_ $ \case
     TypeRef name _ -> warnDupe pos $ "type " ++ runProperName name
+    TypeOpRef name -> warnDupe pos $ "type operator " ++ runIdent name
     ValueRef name -> warnDupe pos $ "value " ++ runIdent name
     TypeClassRef name -> warnDupe pos $ "class " ++ runProperName name
     ModuleRef name -> warnDupe pos $ "module " ++ runModuleName name
@@ -203,6 +205,7 @@ resolveImport importModule exps imps impQual = resolveByType
     imps' <- checkRefs True refs >> importAll (importNonHidden refs)
     let isEmptyImport
            = M.null (importedTypes imps')
+          && M.null (importedTypeOps imps')
           && M.null (importedDataConstructors imps')
           && M.null (importedTypeClasses imps')
           && M.null (importedValues imps')
@@ -221,6 +224,8 @@ resolveImport importModule exps imps impQual = resolveByType
       checkImportExists UnknownImportType ((fst . fst) `map` exportedTypes exps) name
       let allDctors = fst `map` allExportedDataConstructors name
       maybe (return ()) (traverse_ $ checkDctorExists name allDctors) dctors
+    check (TypeOpRef name) =
+      checkImportExists UnknownImportTypeOp (fst `map` exportedTypeOps exps) name
     check (TypeClassRef name) =
       checkImportExists UnknownImportTypeClass (fst `map` exportedTypeClasses exps) name
     check (ModuleRef name) | isHiding =
@@ -267,8 +272,9 @@ resolveImport importModule exps imps impQual = resolveByType
   importAll :: (Imports -> DeclarationRef -> m Imports) -> m Imports
   importAll importer = do
     imp' <- foldM (\m ((name, dctors), _) -> importer m (TypeRef name (Just dctors))) imps (exportedTypes exps)
-    imp'' <- foldM (\m (name, _) -> importer m (ValueRef name)) imp' (exportedValues exps)
-    foldM (\m (name, _) -> importer m (TypeClassRef name)) imp'' (exportedTypeClasses exps)
+    imp'' <- foldM (\m (name, _) -> importer m (TypeOpRef name)) imp' (exportedTypeOps exps)
+    imp''' <- foldM (\m (name, _) -> importer m (ValueRef name)) imp'' (exportedValues exps)
+    foldM (\m (name, _) -> importer m (TypeClassRef name)) imp''' (exportedTypeClasses exps)
 
   importRef :: ImportProvenance -> Imports -> DeclarationRef -> m Imports
   importRef prov imp (PositionedDeclarationRef pos _ r) =
@@ -286,6 +292,9 @@ resolveImport importModule exps imps impQual = resolveByType
     when (null dctorNames && isNothing dctors) . tell . errorMessage $ MisleadingEmptyTypeImport importModule name
     let dctors' = foldl (\m d -> updateImports m exportedDctors d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
+  importRef prov imp (TypeOpRef name) = do
+    let ops' = updateImports (importedTypeOps imp) (exportedTypeOps exps) name prov
+    return $ imp { importedTypeOps = ops' }
   importRef prov imp (TypeClassRef name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) name prov
     return $ imp { importedTypeClasses = typeClasses' }
