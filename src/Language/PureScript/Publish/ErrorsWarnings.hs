@@ -202,6 +202,12 @@ displayUserError e = case e of
           [ "Note that distributing code without a license means that nobody "
           , "will (legally) be able to use it."
           ])
+      , spacer
+      , para (concat
+          [ "It is also recommended to add a LICENSE file to the repository, "
+          , "including your name and the current year, although this is not "
+          , "necessary."
+          ])
       ]
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
