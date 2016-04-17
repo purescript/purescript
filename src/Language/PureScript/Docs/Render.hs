@@ -58,12 +58,12 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
-    AliasDeclaration for (P.Fixity associativity precedence) ->
+    AliasDeclaration for@(P.Qualified _ alias) (P.Fixity associativity precedence) ->
       [ keywordFixity associativity
       , syntax $ show precedence
       , ident $ renderAlias for
       , keyword "as"
-      , ident . tail . init $ declTitle
+      , ident $ adjustAliasName alias declTitle
       ]
 
   where
@@ -77,6 +77,9 @@ renderDeclarationWithOptions opts Declaration{..} =
           (P.showQualified P.runProperName . P.Qualified mn)
           (("type " ++) . P.showQualified P.runProperName . P.Qualified mn)
           alias
+
+  adjustAliasName (P.AliasType{}) title = drop 6 (init title)
+  adjustAliasName _ title = tail (init title)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions

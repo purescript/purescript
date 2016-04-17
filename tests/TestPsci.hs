@@ -17,6 +17,7 @@ import System.Exit (exitFailure)
 import System.Console.Haskeline
 import System.FilePath ((</>))
 import System.Directory (getCurrentDirectory)
+import System.IO.UTF8 (readUTF8File)
 import qualified System.FilePath.Glob as Glob
 
 import Test.HUnit
@@ -132,7 +133,7 @@ getPSCiState = do
   jsFiles   <- supportFiles "js"
 
   modulesOrFirstError <- loadAllModules pursFiles
-  foreignFiles <- forM jsFiles (\f -> (f,) <$> readFile f)
+  foreignFiles <- forM jsFiles (\f -> (f,) <$> readUTF8File f)
   Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   case modulesOrFirstError of
     Left err ->

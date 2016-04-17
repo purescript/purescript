@@ -30,6 +30,7 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStr, stderr)
+import System.IO.UTF8 (readUTF8File)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -56,7 +57,7 @@ runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
-  content <- mapM (\path -> (path, ) <$> readFile path) paths
+  content <- mapM (\path -> (path, ) <$> readUTF8File path) paths
   return $ map snd <$> P.parseModulesFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
