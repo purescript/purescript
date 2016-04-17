@@ -18,7 +18,7 @@ import qualified Data.Map as M
 import Control.Arrow (second)
 import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -235,19 +235,11 @@ liftUnify ::
   (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
   m a ->
   m (a, Substitution)
-liftUnify = liftUnifyWarnings (const id)
-
--- | Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
-liftUnifyWarnings ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
-  (Substitution -> ErrorMessage -> ErrorMessage) ->
-  m a ->
-  m (a, Substitution)
-liftUnifyWarnings replace ma = do
+liftUnify ma = do
   orig <- get
   modify $ \st -> st { checkSubstitution = emptySubstitution }
-  (a, w) <- reflectErrors . censor (const mempty) . reifyErrors . listen $ ma
+  a <- ma
   subst <- gets checkSubstitution
-  tell . onErrorMessages (replace subst) $ w
   modify $ \st -> st { checkSubstitution = checkSubstitution orig }
   return (a, subst)
+
