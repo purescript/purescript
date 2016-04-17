@@ -58,25 +58,28 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
-    AliasDeclaration for (P.Fixity associativity precedence) ->
+    AliasDeclaration for@(P.Qualified _ alias) (P.Fixity associativity precedence) ->
       [ keywordFixity associativity
       , syntax $ show precedence
       , ident $ renderAlias for
       , keyword "as"
-      , ident . tail . init $ declTitle
+      , ident $ adjustAliasName alias declTitle
       ]
 
   where
   renderType' = renderTypeWithOptions opts
   renderAlias (P.Qualified mn alias)
     | mn == currentModule opts =
-        P.foldFixityAlias P.runIdent P.runProperName P.runProperName alias
+        P.foldFixityAlias P.runIdent P.runProperName (("type " ++) . P.runProperName) alias
     | otherwise =
         P.foldFixityAlias
           (P.showQualified P.runIdent . P.Qualified mn)
           (P.showQualified P.runProperName . P.Qualified mn)
-          (P.showQualified P.runProperName . P.Qualified mn)
+          (("type " ++) . P.showQualified P.runProperName . P.Qualified mn)
           alias
+
+  adjustAliasName (P.AliasType{}) title = drop 6 (init title)
+  adjustAliasName _ title = tail (init title)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions

@@ -111,13 +111,14 @@ collectDeclarations imports exports = do
   valsAndMembers <- collect lookupValueDeclaration     impVals  expVals
   typeClasses    <- collect lookupTypeClassDeclaration impTCs   expTCs
   types          <- collect lookupTypeDeclaration      impTypes expTypes
+  typeOps        <- collect lookupTypeOpDeclaration    impTypeOps expTypeOps
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
   let filteredClasses = filterTypeClassMembers (map fst expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, typeOps, filteredClasses, vals]))
 
   where
   collect lookup' imps exps = do
@@ -129,6 +130,9 @@ collectDeclarations imports exports = do
 
   expTypes = map (first fst) (P.exportedTypes exports)
   impTypes = concat (Map.elems (P.importedTypes imports))
+
+  expTypeOps = P.exportedTypeOps exports
+  impTypeOps = concat (Map.elems (P.importedTypeOps imports))
 
   expCtors = concatMap (snd . fst) (P.exportedTypes exports)
 
@@ -180,7 +184,7 @@ lookupValueDeclaration importedFrom ident = do
   let
     rs =
       filter (\d -> declTitle d == P.showIdent ident
-                    && (isValue d || isAlias d)) decls
+                    && (isValue d || isValueAlias d)) decls
     errOther other =
       internalErrorInModule
         ("lookupValueDeclaration: unexpected result:\n" ++
@@ -242,6 +246,23 @@ lookupTypeDeclaration importedFrom ty = do
     other ->
       internalErrorInModule
         ("lookupTypeDeclaration: unexpected result: " ++ show other)
+
+lookupTypeOpDeclaration ::
+  (MonadState (Map P.ModuleName Module) m,
+   MonadReader P.ModuleName m) =>
+  P.ModuleName ->
+  P.Ident ->
+  m (P.ModuleName, [Declaration])
+lookupTypeOpDeclaration importedFrom tyOp = do
+  decls <- lookupModuleDeclarations "lookupTypeOpDeclaration" importedFrom
+  let
+    ds = filter (\d -> declTitle d == ("type " ++ P.showIdent tyOp) && isTypeAlias d) decls
+  case ds of
+    [d] ->
+      pure (importedFrom, [d])
+    other ->
+      internalErrorInModule
+        ("lookupTypeOpDeclaration: unexpected result: " ++ show other)
 
 lookupTypeClassDeclaration ::
   (MonadState (Map P.ModuleName Module) m,

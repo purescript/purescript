@@ -33,6 +33,7 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 import System.IO.Error (tryIOError)
+import System.IO.UTF8 (readUTF8File)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -75,7 +76,7 @@ loop PSCiOptions{..} = do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readFile inFile))
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readUTF8File inFile))
         P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
@@ -167,7 +168,7 @@ handleCommand (LoadFile filePath) = PSCI $ whenFileExists filePath $ \absPath ->
     Right mods -> lift $ modify (updateModules (map (absPath,) mods))
 handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath -> do
   foreignsOrError <- lift . lift . runMake $ do
-    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readFile absPath)
+    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readUTF8File absPath)
     P.parseForeignModulesFromFiles [(absPath, foreignFile)]
   case foreignsOrError of
     Left err -> outputStrLn $ P.prettyPrintMultipleErrors False err
@@ -360,7 +361,7 @@ loadUserConfig = onFirstFileMatching readCommands pathGetters
     exists <- doesFileExist configFile
     if exists
     then do
-      ls <- lines <$> readFile configFile
+      ls <- lines <$> readUTF8File configFile
       case traverse parseCommand ls of
         Left err -> print err >> exitFailure
         Right cs -> return $ Just cs

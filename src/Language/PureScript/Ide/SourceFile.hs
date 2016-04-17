@@ -35,6 +35,7 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Names            as N
 import qualified Language.PureScript.Parser           as P
 import           System.Directory
+import           System.IO.UTF8                       (readUTF8File)
 
 parseModuleFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                        FilePath -> m D.Module
@@ -42,7 +43,7 @@ parseModuleFromFile fp = do
   exists <- liftIO (doesFileExist fp)
   if exists
     then do
-      content <- liftIO (readFile fp)
+      content <- liftIO (readUTF8File fp)
       let m = do tokens <- P.lex fp content
                  P.runTokenParser "" P.parseModule tokens
       either (throwError . (`ParseError` "File could not be parsed.")) pure m

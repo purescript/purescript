@@ -164,10 +164,17 @@ isType Declaration{..} =
     ExternDataDeclaration{} -> True
     _ -> False
 
-isAlias :: Declaration -> Bool
-isAlias Declaration{..} =
+isValueAlias :: Declaration -> Bool
+isValueAlias Declaration{..} =
   case declInfo of
-    AliasDeclaration{} -> True
+    (AliasDeclaration (P.Qualified _ P.AliasConstructor{}) _) -> True
+    (AliasDeclaration (P.Qualified _ P.AliasValue{}) _) -> True
+    _ -> False
+
+isTypeAlias :: Declaration -> Bool
+isTypeAlias Declaration{..} =
+  case declInfo of
+    (AliasDeclaration (P.Qualified _ P.AliasType{}) _) -> True
     _ -> False
 
 -- | Discard any children which do not satisfy the given predicate.
