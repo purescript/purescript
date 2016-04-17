@@ -23,7 +23,6 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
-                  , examples/docs/LICENSE
                   , examples/docs/src/*.purs
                   , tests/support/setup.js
                   , tests/support/package.json
