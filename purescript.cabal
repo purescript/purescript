@@ -92,7 +92,8 @@ library
                    monad-logger >= 0.3 && < 0.4,
                    pipes >= 4.0.0 && < 4.2.0 ,
                    pipes-http -any,
-                   http-types -any
+                   http-types -any,
+                   spdx == 0.2.*
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
