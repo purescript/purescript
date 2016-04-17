@@ -257,7 +257,6 @@ handleShowImportedModules = do
   showRef (P.TypeOpRef ident) = "type (" ++ N.runIdent ident ++ ")"
   showRef (P.ValueRef ident) = N.runIdent ident
   showRef (P.TypeClassRef pn) = "class " ++ N.runProperName pn
-  showRef (P.ProperRef pn) = pn
   showRef (P.TypeInstanceRef ident) = N.runIdent ident
   showRef (P.ModuleRef name) = "module " ++ N.runModuleName name
   showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref

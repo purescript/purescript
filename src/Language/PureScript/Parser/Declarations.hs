@@ -162,15 +162,15 @@ parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
   withSourceSpan PositionedDeclarationRef
     $ (ValueRef <$> parseIdent)
-    <|> parseProperRef
+    <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens (Op <$> symbol)))
   where
-  parseProperRef = do
+  parseTypeRef = do
     name <- properName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
-    return $ maybe (ProperRef (runProperName name)) (TypeRef name) dctors
+    return $ TypeRef name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do

@@ -233,10 +233,8 @@ addExplicitImport' decl moduleName imports =
     insertDeclIntoRefs (DataConstructor dtor tn _) refs =
       let
         dtor' = P.ProperName (T.unpack dtor)
-        -- TODO: Get rid of this once typeclasses can't be imported like types
-        refs' = properRefToTypeRef <$> refs
       in
-        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs'
+        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
     insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
@@ -246,11 +244,6 @@ addExplicitImport' decl moduleName imports =
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
     insertDtor _ refs = refs
-
-
-    -- TODO: Get rid of this once typeclasses can't be imported like types
-    properRefToTypeRef (P.ProperRef n) = P.TypeRef (P.ProperName n) (Just [])
-    properRefToTypeRef r = r
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
     matchType tn (P.TypeRef n _) = tn == n
