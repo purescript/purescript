@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternGuards #-}
 
 -- |
 -- The top-level type checker, which checks all declarations in a module.
@@ -438,21 +439,31 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
 
   checkNonAliasesAreExported :: [ProperName 'ConstructorName] -> DeclarationRef -> m ()
   checkNonAliasesAreExported exportedDctors dr@(ValueRef (Op name)) =
-    case listToMaybe (mapMaybe getAlias decls) of
-      Just (AliasValue ident) ->
+    case listToMaybe (mapMaybe (getAlias getValueAlias name) decls) of
+      Just (Left ident) ->
         unless (ValueRef ident `elem` exps) $
           throwError . errorMessage $ TransitiveExportError dr [ValueRef ident]
-      Just (AliasConstructor ctor) ->
+      Just (Right ctor) ->
         unless (ctor `elem` exportedDctors) $
           throwError . errorMessage $ TransitiveDctorExportError dr ctor
       _ -> return ()
+  checkNonAliasesAreExported _ dr@(TypeOpRef (Op name)) =
+    case listToMaybe (mapMaybe (getAlias getTypeAlias name) decls) of
+      Just ty ->
+        unless (any (isTypeRefFor ty) exps) $
+          throwError . errorMessage $ TransitiveExportError dr [TypeRef ty Nothing]
+      _ -> return ()
     where
-    getAlias :: Declaration -> Maybe FixityAlias
-    getAlias (PositionedDeclaration _ _ d) = getAlias d
-    getAlias (FixityDeclaration _ name' (Just (Qualified (Just mn') alias)))
-      | name == name' && mn == mn' = Just alias
-    getAlias _ = Nothing
+    isTypeRefFor :: ProperName 'TypeName -> DeclarationRef -> Bool
+    isTypeRefFor ty (TypeRef ty' _) = ty == ty'
+    isTypeRefFor _ _ = False
   checkNonAliasesAreExported _ _ = return ()
+
+  getAlias :: (FixityAlias -> Maybe a) -> String -> Declaration -> Maybe a
+  getAlias match name (PositionedDeclaration _ _ d) = getAlias match name d
+  getAlias match name (FixityDeclaration _ name' (Just (Qualified (Just mn') a)))
+    | Just alias <- match a, name == name' && mn == mn' = Just alias
+  getAlias _ _ _ = Nothing
 
   exportedDataConstructors :: [DeclarationRef] -> [ProperName 'ConstructorName]
   exportedDataConstructors = foldMap extractCtor
