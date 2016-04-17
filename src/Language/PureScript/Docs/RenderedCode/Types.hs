@@ -18,6 +18,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , sp
  , syntax
  , ident
+ , ident'
  , ctor
  , kind
  , keyword
@@ -46,7 +47,7 @@ import qualified Language.PureScript as P
 --
 data RenderedCodeElement
   = Syntax String
-  | Ident String
+  | Ident String ContainingModule
   | Ctor String ContainingModule
   | Kind String
   | Keyword String
@@ -56,8 +57,8 @@ data RenderedCodeElement
 instance A.ToJSON RenderedCodeElement where
   toJSON (Syntax str) =
     A.toJSON ["syntax", str]
-  toJSON (Ident str) =
-    A.toJSON ["ident", str]
+  toJSON (Ident str mn) =
+    A.toJSON ["ident", A.toJSON str, A.toJSON mn]
   toJSON (Ctor str mn) =
     A.toJSON ["ctor", A.toJSON str, A.toJSON mn ]
   toJSON (Kind str) =
@@ -70,7 +71,7 @@ instance A.ToJSON RenderedCodeElement where
 asRenderedCodeElement :: Parse String RenderedCodeElement
 asRenderedCodeElement =
   a Syntax "syntax" <|>
-  a Ident "ident" <|>
+  asIdent <|>
   asCtor <|>
   a Kind "kind" <|>
   a Keyword "keyword" <|>
@@ -80,6 +81,7 @@ asRenderedCodeElement =
   p <|> q = catchError p (const q)
 
   a ctor' ctorStr = ctor' <$> (nth 0 (withString (eq ctorStr)) *> nth 1 asString)
+  asIdent = nth 0 (withString (eq "ident")) *> (Ident <$> nth 1 asString <*> nth 2 asContainingModule)
   asCtor = nth 0 (withString (eq "ctor")) *> (Ctor <$> nth 1 asString <*> nth 2 asContainingModule)
   asSpace = nth 0 (withString (eq "space")) *> pure Space
 
@@ -159,7 +161,10 @@ syntax :: String -> RenderedCode
 syntax x = RC [Syntax x]
 
 ident :: String -> RenderedCode
-ident x = RC [Ident x]
+ident x = RC [Ident x ThisModule]
+
+ident' :: String -> ContainingModule -> RenderedCode
+ident' x m = RC [Ident x m]
 
 ctor :: String -> ContainingModule -> RenderedCode
 ctor x m = RC [Ctor x m]

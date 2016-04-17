@@ -55,7 +55,7 @@ type FixityRecord = (Qualified Ident, SourceSpan, Fixity, Maybe (Qualified Fixit
 --
 rebracket
   :: forall m
-   . (MonadError MultipleErrors m)
+   . MonadError MultipleErrors m
   => [ExternsFile]
   -> [Module]
   -> m [Module]

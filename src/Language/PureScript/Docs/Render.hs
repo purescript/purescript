@@ -70,12 +70,12 @@ renderDeclarationWithOptions opts Declaration{..} =
   renderType' = renderTypeWithOptions opts
   renderAlias (P.Qualified mn alias)
     | mn == currentModule opts =
-        P.foldFixityAlias P.runIdent P.runProperName P.runProperName alias
+        P.foldFixityAlias P.runIdent P.runProperName (("type " ++) . P.runProperName) alias
     | otherwise =
         P.foldFixityAlias
           (P.showQualified P.runIdent . P.Qualified mn)
           (P.showQualified P.runProperName . P.Qualified mn)
-          (P.showQualified P.runProperName . P.Qualified mn)
+          (("type " ++) . P.showQualified P.runProperName . P.Qualified mn)
           alias
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
