@@ -29,6 +29,7 @@ module Language.PureScript.Ide
 import           Prelude                            ()
 import           Prelude.Compat
 
+import           Control.Monad                      (unless)
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
@@ -45,18 +46,18 @@ import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports hiding (Import)
+import           Language.PureScript.Ide.Imports    hiding (Import)
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Pursuit
+import           Language.PureScript.Ide.Rebuild
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Language.PureScript.Ide.Rebuild
 import           System.Directory
-import           System.FilePath
 import           System.Exit
+import           System.FilePath
 
 handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
@@ -215,6 +216,8 @@ loadAllModules = do
   outputPath <- confOutputPath . envConfiguration <$> ask
   cwd <- liftIO getCurrentDirectory
   let outputDirectory = cwd </> outputPath
+  liftIO (doesDirectoryExist outputDirectory)
+    >>= flip unless (throwError (GeneralError "Couldn't locate your output directory"))
   liftIO (getDirectoryContents outputDirectory)
     >>= liftIO . traverse (getExternsPath outputDirectory)
     >>= traverse_ loadExtern . catMaybes

@@ -82,7 +82,17 @@ main = do
   maybe (pure ()) setCurrentDirectory dir
   serverState <- newTVarIO emptyPscIdeState
   cwd <- getCurrentDirectory
-  _ <- forkFinally (watcher serverState (cwd </> outputPath)) print
+  let fullOutputPath = cwd </> outputPath
+
+  doesDirectoryExist fullOutputPath
+    >>= flip unless
+    (do putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
+        createDirectory fullOutputPath
+        putStrLn "This usually means you didn't compile your project yet."
+        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
+    )
+
+  _ <- forkFinally (watcher serverState fullOutputPath) print
   let conf =
         Configuration
         {
