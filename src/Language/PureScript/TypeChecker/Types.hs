@@ -74,7 +74,7 @@ typesOf ::
   [(Ident, Expr)] ->
   m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = do
-  ((tys, subst), warnings) <- reflectErrors . censor (const mempty) . reifyErrors . listen $ withEmptySubstitution $ do
+  ((tys, warnings), subst) <- withEmptySubstitution . reflectErrors . censor (const mempty) . reifyErrors . listen $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
     ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
