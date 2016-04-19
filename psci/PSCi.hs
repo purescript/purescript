@@ -243,9 +243,8 @@ handleShowImportedModules = do
   where
   showModules = return . unlines . sort . map showModule
   showModule (mn, declType, asQ) =
-    "import " ++ case asQ of
-      Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
-      Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
+    "import " ++ N.runModuleName mn ++ showDeclType declType ++
+    foldMap (\mn' -> " as " ++ N.runModuleName mn') asQ
 
   showDeclType P.Implicit = ""
   showDeclType (P.Explicit refs) = refsList refs
