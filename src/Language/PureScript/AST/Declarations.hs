@@ -440,6 +440,10 @@ data Expr
   --
   | AnonymousArgument
   -- |
+  -- A typed hole that will be turned into a hint/error duing typechecking
+  --
+  | Hole String
+  -- |
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr

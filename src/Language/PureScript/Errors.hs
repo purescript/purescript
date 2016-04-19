@@ -10,7 +10,7 @@ import Prelude.Compat
 import Data.Ord (comparing)
 import Data.Char (isSpace)
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub, nubBy, sortBy)
+import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
 import Data.Foldable (fold)
 import Data.Maybe (maybeToList)
 
@@ -128,6 +128,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
+  | HoleInferredType String Type
   | MissingTypeDeclaration Ident Type
   | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
@@ -316,6 +317,7 @@ errorCode em = case unwrapErrorMessage em of
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
+  HoleInferredType{} -> "HoleInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
@@ -435,6 +437,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
+  gSimple (HoleInferredType name ty) = HoleInferredType name <$> f ty
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
@@ -870,6 +873,10 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "Wildcard type definition has the inferred type "
+            , indent $ typeAsBox ty
+            ]
+    renderSimpleErrorMessage (HoleInferredType name ty) =
+      paras [ line $ "Hole '" ++ name ++ "' has the inferred type "
             , indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
@@ -1361,6 +1368,22 @@ warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
 withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : hints) se
+
+-- |
+-- Runs a computation listening for warnings and then escalating any warnings
+-- that match the predicate to error status.
+--
+escalateWarningWhen
+  :: (MonadWriter MultipleErrors m, MonadError MultipleErrors m)
+  => (ErrorMessage -> Bool)
+  -> m a
+  -> m a
+escalateWarningWhen isError ma = do
+  (a, w) <- censor (const mempty) $ listen ma
+  let (errors, warnings) = partition isError (runMultipleErrors w)
+  tell $ MultipleErrors warnings
+  unless (null errors) $ throwError $ MultipleErrors errors
+  return a
 
 -- |
 -- Collect errors in in parallel
