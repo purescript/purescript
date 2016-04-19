@@ -33,12 +33,13 @@ import           Prelude.Compat
 
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
+import           Data.Aeson                    (decodeStrict)
 import           Data.List                     (nub)
 import           Data.Maybe                    (mapMaybe)
 import           Data.Monoid
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
-import qualified Data.Text.IO                  as T
+import qualified Data.ByteString               as BS
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -49,7 +50,7 @@ import qualified Language.PureScript.Externs   as PE
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m PE.ExternsFile
 readExternFile fp = do
-   parseResult <- liftIO (decodeT <$> T.readFile fp)
+   parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
      Nothing -> throwError . GeneralError $ "Parsing the extern at: " ++ fp ++ " failed"
      Just externs -> pure externs
