@@ -113,7 +113,7 @@ kindOfWithScopedVars ::
   m (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
   rethrow (addHint (ErrorCheckingKind ty)) $
-    fmap tidyUp . withEmptySubstitution $ infer ty
+    fmap tidyUp . liftUnify $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (substituteKind sub k)
                             , map (second (starIfUnknown . substituteKind sub)) args
@@ -128,7 +128,7 @@ kindsOf
   -> [(String, Maybe Kind)]
   -> [Type]
   -> m Kind
-kindsOf isData moduleName name args ts = fmap tidyUp . withEmptySubstitution $ do
+kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
   tyCon <- freshKind
   kargs <- replicateM (length args) freshKind
   rest <- zipWithM freshKindVar args kargs
@@ -155,7 +155,7 @@ kindsOfAll
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], Type)]
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], [Type])]
   -> m ([Kind], [Kind])
-kindsOfAll moduleName syns tys = fmap tidyUp . withEmptySubstitution $ do
+kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
   synVars <- replicateM (length syns) freshKind
   let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
   bindLocalTypeVariables moduleName dict $ do

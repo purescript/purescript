@@ -10,7 +10,7 @@ import Prelude.Compat
 import Data.Ord (comparing)
 import Data.Char (isSpace)
 import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub, nubBy, sortBy)
+import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
 import Data.Foldable (fold)
 import Data.Maybe (maybeToList)
 
@@ -1368,6 +1368,22 @@ warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
 withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : hints) se
+
+-- |
+-- Runs a computation listening for warnings and then escalating any warnings
+-- that match the predicate to error status.
+--
+escalateWarningWhen
+  :: (MonadWriter MultipleErrors m, MonadError MultipleErrors m)
+  => (ErrorMessage -> Bool)
+  -> m a
+  -> m a
+escalateWarningWhen isError ma = do
+  (a, w) <- censor (const mempty) $ listen ma
+  let (errors, warnings) = partition isError (runMultipleErrors w)
+  tell $ MultipleErrors warnings
+  unless (null errors) $ throwError $ MultipleErrors errors
+  return a
 
 -- |
 -- Collect errors in in parallel

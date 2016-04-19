@@ -40,7 +40,7 @@ import Control.Monad
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Language.PureScript.Crash
 import Language.PureScript.AST
@@ -74,17 +74,13 @@ typesOf ::
   [(Ident, Expr)] ->
   m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = do
-  ((tys, warnings), subst) <- withEmptySubstitution . reflectErrors . censor (const mempty) . reifyErrors . listen $ do
+  tys <- fmap tidyUp . escalateWarningWhen isHoleError . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
     ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
     return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
 
-  let (holeErrors, warnings') = partition isHoleError $ map (replace subst) $ runMultipleErrors warnings
-  tell $ MultipleErrors warnings'
-  unless (null holeErrors) $ throwError $ MultipleErrors holeErrors
-
-  forM (tidyUp (tys, subst)) $ \(shouldGeneralize, (ident, (val, ty))) -> do
+  forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
     let unsolvedTypeVars = nub $ unknownsInType ty
@@ -113,6 +109,7 @@ typesOf bindingGroupType moduleName vals = do
     checkDuplicateLabels val'
     return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
   where
+
   -- | Generalize type vars using forall and add inferred constraints
   generalize unsolved = varIfUnknown . constrain unsolved
 
@@ -123,15 +120,16 @@ typesOf bindingGroupType moduleName vals = do
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
 
-  isHoleError (ErrorMessage _ HoleInferredType{}) = True
-  isHoleError _ = False
-
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) =
     ErrorMessage hints . WildcardInferredType $ substituteType sub ty
   replace sub (ErrorMessage hints (HoleInferredType name ty)) =
     ErrorMessage hints . HoleInferredType name $ substituteType sub ty
   replace _ em = em
+
+  isHoleError :: ErrorMessage -> Bool
+  isHoleError (ErrorMessage _ HoleInferredType{}) = True
+  isHoleError _ = False
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
 
