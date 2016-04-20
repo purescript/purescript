@@ -37,7 +37,7 @@ rebuildFile path = do
 
   m <- case map snd <$> P.parseModulesFromFiles id [(path, input)] of
          Left parseError ->
-           throwError . GeneralError $ P.prettyPrintMultipleErrors False parseError
+           throwError . RebuildError . toJSONErrors False P.Error $ parseError
          Right [m] -> pure m
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
