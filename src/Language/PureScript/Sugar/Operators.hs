@@ -31,7 +31,6 @@ import Language.PureScript.Types
 
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
 
 import Data.Function (on)
 import Data.Functor.Identity
