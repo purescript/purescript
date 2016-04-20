@@ -886,7 +886,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
                   (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
                   : [line "..." | not b]
             , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
-            , line "Non-exhaustive patterns for values without a `Partial` constraint will be disallowed in PureScript 0.9."
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
