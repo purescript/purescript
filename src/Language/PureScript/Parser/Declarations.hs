@@ -93,6 +93,7 @@ parseValueDeclaration = do
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
+    C.indented
     value <- parseValue
     whereClause <- P.optionMaybe $ do
       C.indented
