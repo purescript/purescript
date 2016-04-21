@@ -244,7 +244,6 @@ executable psc
     hs-source-dirs: psc
     other-modules: Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
-    ld-options: -Wl,--as-needed
 
 executable psci
     build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
@@ -268,7 +267,6 @@ executable psci
                    PSCi.Printer
                    Paths_purescript
     ghc-options: -Wall -O2
-    ld-options: -Wl,--as-needed
 
 executable psc-docs
     build-depends: base >=4 && <5, purescript -any,
@@ -284,7 +282,6 @@ executable psc-docs
                    Etags
                    Tags
     ghc-options: -Wall -O2
-    ld-options: -Wl,--as-needed
 
 executable psc-publish
     build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
@@ -293,7 +290,6 @@ executable psc-publish
     buildable: True
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
-    ld-options: -Wl,--as-needed
 
 executable psc-hierarchy
     build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
@@ -303,12 +299,13 @@ executable psc-hierarchy
     other-modules: Paths_purescript
     buildable: True
     hs-source-dirs: hierarchy
+    other-modules:
     ghc-options: -Wall -O2
-    ld-options: -Wl,--as-needed
 
 executable psc-bundle
   main-is:             Main.hs
   other-modules:       Paths_purescript
+  other-extensions:
   build-depends:       base >=4 && <5,
                        purescript -any,
                        filepath -any,
@@ -318,13 +315,13 @@ executable psc-bundle
                        transformers-compat -any,
                        optparse-applicative >= 0.12.1,
                        Glob -any
-  hs-source-dirs:      psc-bundle
   ghc-options:         -Wall -O2
-  ld-options:          -Wl,--as-needed
+  hs-source-dirs:      psc-bundle
 
 executable psc-ide-server
   main-is:             Main.hs
   other-modules:       Paths_purescript
+  other-extensions:
   build-depends:       base >=4 && <5
                      , purescript -any
                      , directory -any
@@ -338,22 +335,21 @@ executable psc-ide-server
                      , stm -any
                      , text -any
                      , base-compat >=0.6.0
-  hs-source-dirs:      psc-ide-server
   ghc-options:         -Wall -O2 -threaded
-  ld-options:          -Wl,--as-needed
+  hs-source-dirs:      psc-ide-server
 
 executable psc-ide-client
   main-is:             Main.hs
   other-modules:       Paths_purescript
+  other-extensions:
   build-depends:       base >=4 && <5
                      , mtl -any
                      , text -any
                      , optparse-applicative >= 0.12.1
                      , network -any
                      , base-compat >=0.6.0
-  hs-source-dirs:      psc-ide-client
   ghc-options:         -Wall -O2
-  ld-options:          -Wl,--as-needed
+  hs-source-dirs:      psc-ide-client
 
 test-suite tests
     build-depends: base >=4 && <5, containers -any, directory -any,
@@ -363,6 +359,7 @@ test-suite tests
                    base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
                    boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
                    vector -any, utf8-string -any
+    ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules: TestUtils
@@ -386,5 +383,3 @@ test-suite tests
                    PSCi.Types
     buildable: True
     hs-source-dirs: tests psci
-    ghc-options: -Wall
-    ld-options: -Wl,--as-needed
