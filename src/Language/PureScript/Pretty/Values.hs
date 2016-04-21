@@ -41,7 +41,7 @@ prettyPrintValue d (IfThenElse cond th el) =
   // moveRight 2 (vcat left [ text "then " <> prettyPrintValueAtom (d - 1) th
                             , text "else " <> prettyPrintValueAtom (d - 1) el
                             ])
-prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> text ("." ++ show prop)
+prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> text ("." ++ prettyPrintObjectKey prop)
 prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> prettyPrintValue (d - 1) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : showIdent arg ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
