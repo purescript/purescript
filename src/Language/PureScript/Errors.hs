@@ -143,8 +143,6 @@ data SimpleErrorMessage
   | DeprecatedOperatorDecl String
   | DeprecatedOperatorSection Expr (Either Expr Expr)
   | DeprecatedQualifiedSyntax ModuleName ModuleName
-  | DeprecatedClassImport ModuleName (ProperName 'ClassName)
-  | DeprecatedClassExport (ProperName 'ClassName)
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef String
@@ -332,8 +330,6 @@ errorCode em = case unwrapErrorMessage em of
   DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
   DeprecatedOperatorSection{} -> "DeprecatedOperatorSection"
   DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
-  DeprecatedClassImport{} -> "DeprecatedClassImport"
-  DeprecatedClassExport{} -> "DeprecatedClassExport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
   DuplicateImportRef{} -> "DuplicateImportRef"
@@ -959,22 +955,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "The deprecated syntax will be removed in PureScript 0.9."
             ]
 
-    renderSimpleErrorMessage (DeprecatedClassImport mn name) =
-      paras [ line $ "Class import from " ++ runModuleName mn ++ " uses deprecated syntax that omits the 'class' keyword:"
-            , indent $ line $ runProperName name
-            , line "Should instead use the form:"
-            , indent $ line $ "class " ++ runProperName name
-            , line "The deprecated syntax will be removed in PureScript 0.9."
-            ]
-
-    renderSimpleErrorMessage (DeprecatedClassExport name) =
-      paras [ line "Class export uses deprecated syntax that omits the 'class' keyword:"
-            , indent $ line $ runProperName name
-            , line "Should instead use the form:"
-            , indent $ line $ "class " ++ runProperName name
-            , line "The deprecated syntax will be removed in PureScript 0.9."
-            ]
-
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ runModuleName name ++ ", consider merging the import lists"
 
@@ -1233,7 +1213,6 @@ prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercala
 prettyPrintRef (TypeOpRef ident) = "type " ++ showIdent ident
 prettyPrintRef (ValueRef ident) = showIdent ident
 prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
-prettyPrintRef (ProperRef name) = name
 prettyPrintRef (TypeInstanceRef ident) = showIdent ident
 prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
 prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
