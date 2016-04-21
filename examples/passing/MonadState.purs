@@ -58,4 +58,4 @@ modify f =
     same :: forall a. (a -> a) -> (a -> a)
     same = id
 
-main = print $ runState 0 (modify (+ 1))
+main = logShow $ runState 0 (modify (+ 1))

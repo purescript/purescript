@@ -12,7 +12,7 @@ collatz n = runPure (runST (do
     modifySTRef count $ (+) 1
     m <- readSTRef r
     writeSTRef r $ if m `mod` 2 == 0 then m / 2 else 3 * m + 1
-    return $ m == 1
+    pure $ m == 1
   readSTRef count))
 
-main = Control.Monad.Eff.Console.print $ collatz 1000
+main = Control.Monad.Eff.Console.logShow $ collatz 1000

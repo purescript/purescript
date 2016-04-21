@@ -17,7 +17,7 @@ test8 = \_ -> show $ "testing"
 data Data a = Data a
 
 instance showData :: (Prelude.Show a) => Prelude.Show (Data a) where
-  show (Data a) = "Data (" ++ show a ++ ")"
+  show (Data a) = "Data (" <> show a <> ")"
 
 test3 = \_ -> show (Data "testing")
 
@@ -53,9 +53,9 @@ instance bindMaybe :: Bind Maybe where
 instance monadMaybe :: Monad Maybe
 
 test4 :: forall a m. (Monad m) => a -> m Number
-test4 = \_ -> return 1.0
+test4 = \_ -> pure 1.0
 
-test5 = \_ -> Just 1.0 >>= \n -> return (n + 1.0)
+test5 = \_ -> Just 1.0 >>= \n -> pure (n + 1.0)
 
 ask r = r
 
@@ -63,7 +63,7 @@ runReader r f = f r
 
 test9 _ = runReader 0.0 $ do
   n <- ask
-  return $ n + 1.0
+  pure $ n + 1.0
 
 main = Control.Monad.Eff.Console.log (test7 "Done")
 

@@ -19,4 +19,4 @@ runId (Id a) = a
 three :: Expr Number
 three = add (num 1.0) (num 2.0)
 
-main = Control.Monad.Eff.Console.print $ runId three
+main = Control.Monad.Eff.Console.logShow $ runId three

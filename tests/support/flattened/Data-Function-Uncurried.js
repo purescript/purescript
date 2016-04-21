@@ -1,7 +1,6 @@
-/* global exports */
 "use strict";
 
-// module Data.Function
+// module Data.Function.Uncurried
 
 exports.mkFn0 = function (fn) {
   return function () {

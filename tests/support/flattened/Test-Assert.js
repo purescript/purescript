@@ -1,4 +1,3 @@
-/* global exports */
 "use strict";
 
 // module Test.Assert

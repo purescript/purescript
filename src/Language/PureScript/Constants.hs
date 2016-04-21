@@ -247,6 +247,12 @@ moduloSemiringNumber = "moduloSemiringNumber"
 moduloSemiringInt :: String
 moduloSemiringInt = "moduloSemiringInt"
 
+euclideanRingNumber :: String
+euclideanRingNumber = "euclideanRingNumber"
+
+euclideanRingInt :: String
+euclideanRingInt = "euclideanRingInt"
+
 ordBoolean :: String
 ordBoolean = "ordBoolean"
 
@@ -282,6 +288,9 @@ boundedBoolean = "boundedBoolean"
 
 booleanAlgebraBoolean :: String
 booleanAlgebraBoolean = "booleanAlgebraBoolean"
+
+heytingAlgebraBoolean :: String
+heytingAlgebraBoolean = "heytingAlgebraBoolean"
 
 semigroupString :: String
 semigroupString = "semigroupString"
@@ -348,11 +357,8 @@ dataBounded = "Data_Bounded"
 dataSemigroup :: String
 dataSemigroup = "Data_Semigroup"
 
-dataModuloSemiring :: String
-dataModuloSemiring = "Data_ModuloSemiring"
-
-dataBooleanAlgebra :: String
-dataBooleanAlgebra = "Data_BooleanAlgebra"
+dataHeytingAlgebra :: String
+dataHeytingAlgebra = "Data_HeytingAlgebra"
 
 dataEq :: String
 dataEq = "Data_Eq"
@@ -365,6 +371,9 @@ dataSemiring = "Data_Semiring"
 
 dataRing :: String
 dataRing = "Data_Ring"
+
+dataEuclideanRing :: String
+dataEuclideanRing = "Data_EuclideanRing"
 
 dataFunction :: String
 dataFunction = "Data_Function"

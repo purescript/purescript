@@ -11,4 +11,4 @@ module Main where
   otherwise = false
 
   main = do
-    print "1.0"
+    logShow "1.0"
