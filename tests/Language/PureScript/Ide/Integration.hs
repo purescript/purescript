@@ -33,8 +33,10 @@ module Language.PureScript.Ide.Integration
        , loadModuleWithDeps
        , getCwd
        , getFlexCompletions
+       , getFlexCompletionsInModule
        , getType
        , rebuildModule
+       , rebuildModuleWithCache
        , reset
          -- checking results
        , resultIsSuccess
@@ -49,7 +51,7 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.UTF8    as BSL
 import           Data.Either                  (isRight)
-import           Data.Maybe                   (fromJust, isNothing)
+import           Data.Maybe                   (fromJust, isNothing, fromMaybe)
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as V
 import           Language.PureScript.Ide.Util
@@ -95,11 +97,12 @@ compileTestProject :: IO Bool
 compileTestProject = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $
-    (shell $ "psc " ++ fileGlob) {cwd=Just pdir
-                                 ,std_out=CreatePipe
-                                 ,std_err=CreatePipe
+    (shell $ "psc " ++ fileGlob) { cwd = Just pdir
+                                 , std_out = CreatePipe
+                                 , std_err = CreatePipe
                                  }
-  isSuccess <$> waitForProcess procHandle
+  r <- tryNTimes 5 (getProcessExitCode procHandle)
+  pure (fromMaybe False (isSuccess <$> r))
 
 tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
 tryNTimes 0 _ = pure Nothing
@@ -166,7 +169,10 @@ loadModule :: String -> IO String
 loadModule m = sendCommand $ load [m] []
 
 getFlexCompletions :: String -> IO [(String, String, String)]
-getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)))
+getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) Nothing)
+
+getFlexCompletionsInModule :: String -> String -> IO [(String, String, String)]
+getFlexCompletionsInModule q m = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) (Just m))
 
 getType :: String -> IO [(String, String, String)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
@@ -178,8 +184,10 @@ addImplicitImport :: String -> FilePath -> FilePath -> IO String
 addImplicitImport mn fp outfp = sendCommand (addImplicitImportC mn fp outfp)
 
 rebuildModule :: FilePath -> IO String
-rebuildModule m = sendCommand (rebuildC m Nothing)
+rebuildModule m = sendCommand (rebuildC m Nothing False)
 
+rebuildModuleWithCache :: FilePath -> IO String
+rebuildModuleWithCache m = sendCommand (rebuildC m Nothing True)
 -- Command Encoding
 
 commandWrapper :: String -> Value -> Value
@@ -203,10 +211,11 @@ addImplicitImportC mn = addImportW $
          , "module" .= mn
          ]
 
-rebuildC :: FilePath -> Maybe FilePath -> Value
-rebuildC file outFile =
+rebuildC :: FilePath -> Maybe FilePath -> Bool -> Value
+rebuildC file outFile cacheSuccess =
   commandWrapper "rebuild" (object [ "file" .= file
                                    , "outfile" .= outFile
+                                   , "cacheSuccess" .= cacheSuccess
                                    ])
 
 addImportW :: Value -> FilePath -> FilePath -> Value
@@ -217,14 +226,17 @@ addImportW importCommand fp outfp =
                                   ])
 
 
-completion :: [Value] -> Maybe Value -> Value
-completion filters matcher =
+completion :: [Value] -> Maybe Value -> Maybe String -> Value
+completion filters matcher currentModule =
   let
     matcher' = case matcher of
       Nothing -> []
       Just m -> ["matcher" .= m]
+    currentModule' = case currentModule of
+      Nothing -> []
+      Just cm -> ["currentModule" .= cm]
   in
-    commandWrapper "complete" (object $ "filters" .= filters : matcher')
+    commandWrapper "complete" (object $ "filters" .= filters : matcher' ++ currentModule' )
 
 flexMatcher :: String -> Value
 flexMatcher q = object [ "matcher" .= ("flex" :: String)

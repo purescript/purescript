@@ -11,7 +11,7 @@ shouldBeFailure :: String -> IO ()
 shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
 spec :: Spec
-spec = before_ Integration.reset $ describe "Rebuilding single modules" $ do
+spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
     it "rebuilds a correct module without dependencies successfully" $ do
       _ <- Integration.loadModuleWithDeps "RebuildSpecSingleModule"
       pdir <- Integration.projectDirectory
@@ -45,3 +45,15 @@ spec = before_ Integration.reset $ describe "Rebuilding single modules" $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithMissingForeign.fail"
       Integration.rebuildModule file >>= shouldBeFailure
+    it "completes a hidden identifier after rebuilding with caching enabled" $ do
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
+      Integration.rebuildModuleWithCache file >>= shouldBeSuccess
+      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
+      shouldBe False (null res)
+    it "fails to complete a hidden identifier after rebuilding with caching disabled" $ do
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
+      Integration.rebuildModule file >>= shouldBeSuccess
+      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
+      shouldBe True (null res)

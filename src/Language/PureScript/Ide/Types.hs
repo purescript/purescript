@@ -83,12 +83,13 @@ type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 
 data PscIdeState =
   PscIdeState
-  { pscStateModules :: M.Map Text [ExternDecl]
-  , externsFiles    :: M.Map P.ModuleName ExternsFile
+  { pscIdeStateModules       :: M.Map Text [ExternDecl]
+  , pscIdeStateExternsFiles  :: M.Map P.ModuleName ExternsFile
+  , pscIdeStateCachedRebuild :: Maybe (P.ModuleName, ExternsFile)
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
-emptyPscIdeState = PscIdeState M.empty M.empty
+emptyPscIdeState = PscIdeState M.empty M.empty Nothing
 
 data Match = Match ModuleIdent ExternDecl
                deriving (Show, Eq)
