@@ -27,6 +27,22 @@ import           System.FilePath (replaceExtension)
 import           System.Directory (doesFileExist)
 import           System.IO.UTF8 (readUTF8File)
 
+-- | Given a filepath does the following steps:
+--
+-- * Reads and parses a PureScript module from the filepath.
+--
+-- * Builds a dependency graph for the parsed module from the already loaded
+-- ExternsFiles.
+--
+-- * Attempts to find an FFI definition file for the module by looking
+-- for a file with the same filepath except for a .js extension.
+--
+-- * Adds a default import for Prim to the parsed module and passes all the
+-- created artifacts to @rebuildModule@.
+--
+-- * If the rebuilding succeeds, returns a @RebuildSuccess@ with the generated
+-- warnings, and if rebuilding fails, returns a @RebuildError@ with the
+-- generated errors.
 rebuildFile
   :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
@@ -41,7 +57,7 @@ rebuildFile path = do
          Right [m] -> pure m
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
-  externs <- sortExterns m . M.delete (P.getModuleName m) =<< getExternFiles
+  externs <- sortExterns m =<< getExternFiles
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
@@ -60,15 +76,25 @@ rebuildFile path = do
                    $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
-    Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
+    Right ef -> do
+      setCachedRebuild ef
+      pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
 
+-- | Returns a topologically sorted list of dependent ExternsFiles for the given
+-- module. Throws an error if there is a cyclic dependency within the
+-- ExternsFiles
 sortExterns
   :: (PscIde m, MonadError PscIdeError m)
   => P.Module
   -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
-  sorted' <- runExceptT . P.sortModules . (:) m . map mkShallowModule . M.elems $ ex
+  sorted' <- runExceptT
+           . P.sortModules
+           . (:) m
+           . map mkShallowModule
+           . M.elems
+           . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, graph) -> do

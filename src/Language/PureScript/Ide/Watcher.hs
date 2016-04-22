@@ -41,8 +41,9 @@ reloadFile stateVar ev = do
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
 -- they change on disc
 watcher :: TVar PscIdeState -> FilePath -> IO ()
-watcher stateVar fp = withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
-  _ <- watchTree mgr fp
-    (\ev -> takeFileName (eventPath ev) == "externs.json")
-    (reloadFile stateVar)
-  forever (threadDelay 100000)
+watcher stateVar fp =
+  withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
+    _ <- watchTree mgr fp
+      (\ev -> takeFileName (eventPath ev) == "externs.json")
+      (reloadFile stateVar)
+    forever (threadDelay 100000)

@@ -32,27 +32,27 @@ import           Control.Monad.Reader.Class
 import qualified Data.Map.Lazy                     as M
 import           Data.Maybe                        (catMaybes)
 import           Data.Monoid
-import qualified Data.Text                         as T
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Names
+import           Language.PureScript.Ide.Util
+import qualified Language.PureScript as P
 
 getPscIdeState :: (PscIde m) =>
                   m (M.Map ModuleIdent [ExternDecl])
 getPscIdeState = do
   stateVar <- envStateVar <$> ask
-  liftIO $ pscStateModules <$> readTVarIO stateVar
+  liftIO $ pscIdeStateModules <$> readTVarIO stateVar
 
 getExternFiles :: (PscIde m) =>
-                  m (M.Map ModuleName ExternsFile)
+                  m (M.Map P.ModuleName ExternsFile)
 getExternFiles = do
   stateVar <- envStateVar <$> ask
-  liftIO (externsFiles <$> readTVarIO stateVar)
+  liftIO (pscIdeStateExternsFiles <$> readTVarIO stateVar)
 
 getExternFile :: (PscIde m) =>
-                 ModuleName -> m (Maybe ExternsFile)
+                 P.ModuleName -> m (Maybe ExternsFile)
 getExternFile mn = M.lookup mn <$> getExternFiles
 
 getAllDecls :: (PscIde m) => m [ExternDecl]
@@ -86,13 +86,23 @@ insertModule ::(PscIde m, MonadLogger m) =>
 insertModule externsFile = do
   env <- ask
   let moduleName = efModuleName externsFile
-  $(logDebug) $ "Inserting Module: " <> T.pack (runModuleName moduleName)
+  $(logDebug) $ "Inserting Module: " <> runModuleNameT moduleName
   liftIO . atomically $ insertModule' (envStateVar env) externsFile
 
 insertModule' :: TVar PscIdeState -> ExternsFile -> STM ()
 insertModule' st ef =
     modifyTVar st $ \x ->
-      x { externsFiles = M.insert (efModuleName ef) ef (externsFiles x)
-        , pscStateModules = let (mn, decls) = convertExterns ef
-                            in M.insert mn decls (pscStateModules x)
+      x { pscIdeStateExternsFiles =
+            M.insert (efModuleName ef) ef (pscIdeStateExternsFiles x)
+        , pscIdeStateModules = let (mn, decls) = convertExterns ef
+                               in M.insert mn decls (pscIdeStateModules x)
         }
+
+setCachedRebuild
+  :: PscIde m
+  => ExternsFile
+  -> m ()
+setCachedRebuild ef = do
+  st <- envStateVar <$> ask
+  liftIO . atomically . modifyTVar st $ \x ->
+    x { pscIdeStateCachedRebuild = Just ef }
