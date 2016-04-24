@@ -464,6 +464,7 @@ errorSuggestion err = case err of
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
   MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
+  WildcardInferredType ty -> suggest $ prettyPrintType ty
   _ -> Nothing
 
   where

@@ -28,7 +28,7 @@ import Text.PrettyPrint.Boxes hiding ((<+>))
 typeLiterals :: Pattern () Type Box
 typeLiterals = mkPattern match
   where
-  match TypeWildcard = Just $ text "_"
+  match TypeWildcard{} = Just $ text "_"
   match (TypeVar var) = Just $ text var
   match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor

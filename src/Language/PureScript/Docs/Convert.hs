@@ -107,8 +107,9 @@ typeCheckIfNecessary modules convertedModules =
     else pure convertedModules
 
   where
-  hasWildcards =
-     any ((==) (ValueDeclaration P.TypeWildcard) . declInfo) . modDeclarations
+  hasWildcards = any (isWild . declInfo) . modDeclarations
+  isWild (ValueDeclaration P.TypeWildcard{}) = True
+  isWild _ = False
 
   go = do
     checkEnv <- snd <$> typeCheck modules
@@ -147,7 +148,7 @@ insertValueTypes ::
 insertValueTypes env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
-  go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard }) =
+  go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} }) =
     let
       ident = parseIdent (declTitle d)
       ty = lookupName ident
