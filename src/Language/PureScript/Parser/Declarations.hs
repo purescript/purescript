@@ -52,7 +52,11 @@ withSourceSpan f p = do
   comments <- C.readComments
   x <- p
   end <- P.getPosition
-  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
+  input <- P.getInput
+  let end' = case input of
+        pt:_ -> ptPrevEndPos pt
+        _ -> Nothing
+  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
 kindedIdent :: TokenParser (String, Maybe Kind)
@@ -272,6 +276,7 @@ parseModulesFromFiles toFilePath input = do
   -- to a different spark.
   inParallel :: [Either P.ParseError (k, [Module])] -> [Either P.ParseError (k, [Module])]
   inParallel = withStrategy (parList rseq)
+
 
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)

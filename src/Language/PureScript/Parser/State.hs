@@ -26,5 +26,3 @@ data ParseState = ParseState {
     --
     indentationLevel :: P.Column
   } deriving Show
-
-
