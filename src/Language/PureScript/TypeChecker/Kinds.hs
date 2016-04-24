@@ -268,4 +268,4 @@ infer' other = (, []) <$> go other
     k <- go ty
     unifyKinds k Star
     return Star
-  go _ = internalError "Invalid argument to infer"
+  go ty = internalError $ "Invalid argument to infer: " ++ show ty

@@ -1,0 +1,3 @@
+module RebuildSpecWithMissingForeign where
+
+foreign import f :: Int

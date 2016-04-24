@@ -14,6 +14,7 @@ module Language.PureScript.Make
   , ProgressMessage(..), renderProgressMessage
   , MakeActions(..)
   , Externs()
+  , rebuildModule
   , make
 
   -- * Implementation of Make API using files on disk
@@ -147,6 +148,28 @@ data RebuildPolicy
   -- | Always rebuild this module
   | RebuildAlways deriving (Show, Read, Eq, Ord)
 
+-- | Rebuild a single module
+rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+     => MakeActions m
+     -> [ExternsFile]
+     -> Module
+     -> m ExternsFile
+rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
+  progress $ CompilingModule moduleName
+  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+  lint m
+  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
+    [desugared] <- desugar externs [m]
+    runCheck' env $ typeCheckModule desugared
+  checkExhaustiveModule env' checked
+  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+  let mod' = Module ss coms moduleName regrouped exps
+      corefn = CF.moduleToCoreFn env' mod'
+      [renamed] = renameInModules [corefn]
+      exts = moduleToExternsFile mod' env'
+  evalSupplyT nextVar . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
+  return exts
+
 -- |
 -- Compiles in "make" mode, compiling each module separately to a js files and an externs file
 --
@@ -157,7 +180,7 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadE
      => MakeActions m
      -> [Module]
      -> m Environment
-make MakeActions{..} ms = do
+make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms
@@ -218,21 +241,7 @@ make MakeActions{..} ms = do
                               _ -> True
 
         let rebuild = do
-              (exts, warnings) <- listen $ do
-                progress $ CompilingModule moduleName
-                let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-                lint m
-                ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
-                  [desugared] <- desugar externs [m]
-                  runCheck' env $ typeCheckModule desugared
-                checkExhaustiveModule env' checked
-                regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
-                let mod' = Module ss coms moduleName regrouped exps
-                    corefn = CF.moduleToCoreFn env' mod'
-                    [renamed] = renameInModules [corefn]
-                    exts = moduleToExternsFile mod' env'
-                evalSupplyT nextVar . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
-                return exts
+              (exts, warnings) <- listen $ rebuildModule ma externs m
               markComplete (Just (warnings, exts)) Nothing
 
         if shouldRebuild

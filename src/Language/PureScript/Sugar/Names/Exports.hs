@@ -47,6 +47,7 @@ findExportable (Module _ _ mn ds _) =
   updateExports exps (TypeSynonymDeclaration tn _ _) = exportType exps tn [] mn
   updateExports exps (ExternDataDeclaration tn _) = exportType exps tn [] mn
   updateExports exps (ValueDeclaration name _ _ _) = exportValue exps name mn
+  updateExports exps (FixityDeclaration _ name (Just (Qualified _ (AliasType _)))) = exportTypeOp exps (Op name) mn
   updateExports exps (FixityDeclaration _ name (Just _)) = exportValue exps (Op name) mn
   updateExports exps (ExternDeclaration name _) = exportValue exps name mn
   updateExports exps (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ updateExports exps d
@@ -70,6 +71,7 @@ resolveExports env mn imps exps refs =
   warnDupeRefs :: [DeclarationRef] -> m ()
   warnDupeRefs = traverse_ $ \case
     TypeRef name _ -> warnDupe $ "type " ++ runProperName name
+    TypeOpRef name -> warnDupe $ "type operator " ++ runIdent name
     ValueRef name -> warnDupe $ "value " ++ runIdent name
     TypeClassRef name -> warnDupe $ "class " ++ runProperName name
     ModuleRef name -> warnDupe $ "module " ++ runModuleName name
@@ -89,22 +91,28 @@ resolveExports env mn imps exps refs =
     rethrowWithPosition pos $ elaborateModuleExports result r
   elaborateModuleExports result (ModuleRef name) | name == mn = do
     let types' = exportedTypes result ++ exportedTypes exps
+    let typeOps' = exportedTypeOps result ++ exportedTypeOps exps
     let classes' = exportedTypeClasses result ++ exportedTypeClasses exps
     let values' = exportedValues result ++ exportedValues exps
-    return result { exportedTypes = types'
-                  , exportedTypeClasses = classes'
-                  , exportedValues = values' }
+    return result
+      { exportedTypes = types'
+      , exportedTypeOps = typeOps'
+      , exportedTypeClasses = classes'
+      , exportedValues = values'
+      }
   elaborateModuleExports result (ModuleRef name) = do
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name)) $
       throwError . errorMessage . UnknownExportModule $ name
     reTypes <- extract isPseudo name (("type " ++) . runProperName) (importedTypes imps)
+    reTypeOps <- extract isPseudo name (("type operator " ++) . runIdent) (importedTypeOps imps)
     reDctors <- extract isPseudo name (("data constructor " ++) . runProperName) (importedDataConstructors imps)
     reClasses <- extract isPseudo name (("class " ++) . runProperName) (importedTypeClasses imps)
     reValues <- extract isPseudo name (("value " ++) . runIdent) (importedValues imps)
     result' <- foldM (\exps' ((tctor, dctors), mn') -> exportType exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
-    result'' <- foldM (uncurry . exportTypeClass) result' (map resolveClass reClasses)
-    foldM (uncurry . exportValue) result'' (map resolveValue reValues)
+    result'' <- foldM (uncurry . exportTypeOp) result' (map resolveTypeOp reTypeOps)
+    result''' <- foldM (uncurry . exportTypeClass) result'' (map resolveClass reClasses)
+    foldM (uncurry . exportValue) result''' (map resolveValue reValues)
   elaborateModuleExports result _ = return result
 
   -- Extracts a list of values for a module based on a lookup table. If the
@@ -163,6 +171,11 @@ resolveExports env mn imps exps refs =
       return ((name, relevantDctors `intersect` dctors'), mnOrig)
     go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
+  -- Looks up an imported type operator and re-qualifies it with the original
+  -- module it came from.
+  resolveTypeOp :: Qualified Ident -> (Ident, ModuleName)
+  resolveTypeOp ident = splitQual $ fromMaybe (internalError "Missing value in resolveValue") $
+    resolve exportedTypeOps ident
 
   -- Looks up an imported class and re-qualifies it with the original module it
   -- came from.
@@ -202,9 +215,15 @@ filterModule
   -> m Exports
 filterModule mn exps refs = do
   types <- foldM (filterTypes $ exportedTypes exps) [] refs
+  typeOps <- foldM (filterTypeOps $ exportedTypeOps exps) [] refs
   values <- foldM (filterValues $ exportedValues exps) [] refs
   classes <- foldM (filterClasses $ exportedTypeClasses exps) [] refs
-  return exps { exportedTypes = types , exportedTypeClasses = classes , exportedValues = values }
+  return $ exps
+    { exportedTypes = types
+    , exportedTypeOps = typeOps
+    , exportedTypeClasses = classes
+    , exportedValues = values
+    }
 
   where
 
@@ -240,6 +259,19 @@ filterModule mn exps refs = do
   checkDcon tcon exps' name =
     unless (name `elem` exps') $
       throwError . errorMessage $ UnknownExportDataConstructor tcon name
+
+  -- Takes a list of all the exportable type operators, the accumulated list of
+  -- filtered exports, and a `DeclarationRef` for an explicit export. When the
+  -- ref refers to a value in the list of exportable values, the value is
+  -- included in the result.
+  filterTypeOps :: [(Ident, ModuleName)] -> [(Ident, ModuleName)] -> DeclarationRef -> m [(Ident, ModuleName)]
+  filterTypeOps exps' result (PositionedDeclarationRef pos _ r) =
+    rethrowWithPosition pos $ filterTypeOps exps' result r
+  filterTypeOps exps' result (TypeOpRef name) =
+    if (name, mn) `elem` exps'
+    then return $ (name, mn) : result
+    else throwError . errorMessage . UnknownExportTypeOp $ name
+  filterTypeOps _ result _ = return result
 
   -- Takes a list of all the exportable classes, the accumulated list of
   -- filtered exports, and a `DeclarationRef` for an explicit export. When the

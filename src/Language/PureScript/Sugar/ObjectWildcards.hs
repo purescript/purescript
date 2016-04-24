@@ -9,6 +9,7 @@ module Language.PureScript.Sugar.ObjectWildcards (
 import Prelude ()
 import Prelude.Compat
 
+import Control.Monad (forM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
@@ -45,11 +46,21 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   desugarExpr (Literal (ObjectLiteral ps)) = wrapLambda (Literal . ObjectLiteral) ps
   desugarExpr (ObjectUpdate u ps) | isAnonymousArgument u = do
     obj <- freshIdent'
-    Abs (Left obj) <$> wrapLambda (ObjectUpdate (Var (Qualified Nothing obj))) ps
+    Abs (Left obj) <$> wrapLambda (ObjectUpdate (argToExpr obj)) ps
   desugarExpr (ObjectUpdate obj ps) = wrapLambda (ObjectUpdate obj) ps
   desugarExpr (Accessor prop u) | isAnonymousArgument u = do
     arg <- freshIdent'
-    return $ Abs (Left arg) (Accessor prop (Var (Qualified Nothing arg)))
+    return $ Abs (Left arg) (Accessor prop (argToExpr arg))
+  desugarExpr (Case args cas) | any isAnonymousArgument args = do
+    argIdents <- forM args freshIfAnon
+    let args' = zipWith (\p -> maybe p argToExpr) args argIdents
+    return $ foldr (Abs . Left) (Case args' cas) (catMaybes argIdents)
+  desugarExpr (IfThenElse u t f) | any isAnonymousArgument [u, t, f] = do
+    u' <- freshIfAnon u
+    t' <- freshIfAnon t
+    f' <- freshIfAnon f
+    let if_ = IfThenElse (maybe u argToExpr u') (maybe t argToExpr t') (maybe f argToExpr f')
+    return $ foldr (Abs . Left) if_ (catMaybes [u', t', f'])
   desugarExpr e = return e
 
   wrapLambda :: ([(String, Expr)] -> Expr) -> [(String, Expr)] -> m Expr
@@ -71,8 +82,14 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   isAnonymousArgument _ = False
 
   mkProp :: (String, Expr) -> m (Maybe Ident, (String, Expr))
-  mkProp (name, e)
-    | isAnonymousArgument e = do
-      arg <- freshIdent'
-      return (Just arg, (name, Var (Qualified Nothing arg)))
-    | otherwise = return (Nothing, (name, e))
+  mkProp (name, e) = do
+    arg <- freshIfAnon e
+    return (arg, (name, maybe e argToExpr arg))
+
+  freshIfAnon :: Expr -> m (Maybe Ident)
+  freshIfAnon u
+    | isAnonymousArgument u = Just <$> freshIdent'
+    | otherwise = return Nothing
+
+  argToExpr :: Ident -> Expr
+  argToExpr = Var . Qualified Nothing

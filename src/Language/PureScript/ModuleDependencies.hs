@@ -1,19 +1,8 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.ModuleDependencies
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Provides the ability to sort modules based on module dependencies
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE FlexibleContexts #-}
 
+-- |
+-- Provides the ability to sort modules based on module dependencies
+--
 module Language.PureScript.ModuleDependencies (
   sortModules,
   ModuleGraph
@@ -40,7 +29,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 sortModules :: (MonadError MultipleErrors m) => [Module] -> m ([Module], ModuleGraph)
 sortModules ms = do
-  let verts = map (\m@(Module _ _ _ ds _) -> (m, getModuleName m, nub (concatMap usedModules ds))) ms
+  let verts = map goModule ms
   ms' <- mapM toModule $ stronglyConnComp verts
   let (graph, fromVertex, toVertex) = graphFromEdges verts
       moduleGraph = do (_, mn, _) <- verts
@@ -49,30 +38,53 @@ sortModules ms = do
                            toKey i = case fromVertex i of (_, key, _) -> key
                        return (mn, filter (/= mn) (map toKey deps))
   return (ms', moduleGraph)
+  where
+  goModule :: Module -> (Module, ModuleName, [ModuleName])
+  goModule m@(Module _ _ _ ds _) =
+    let ams = concatMap extractQualAs ds
+    in (m, getModuleName m, nub (concatMap (usedModules ams) ds))
+
+  -- Extract module names that have been brought into scope by an `as` import.
+  extractQualAs :: Declaration -> [ModuleName]
+  extractQualAs (PositionedDeclaration _ _ d) = extractQualAs d
+  extractQualAs (ImportDeclaration _ _ (Just am) _) = [am]
+  extractQualAs _ = []
 
 -- |
--- Calculate a list of used modules based on explicit imports and qualified names
+-- Calculate a list of used modules based on explicit imports and qualified
+-- names. `ams` is a list of `ModuleNames` that refer to names brought into
+-- scope by importing with `as` - this ensures that when building the list we
+-- don't inadvertantly assume a dependency on an actual module, if there is a
+-- module that has the same name as the qualified import.
 --
-usedModules :: Declaration -> [ModuleName]
-usedModules d =
+usedModules :: [ModuleName] -> Declaration -> [ModuleName]
+usedModules ams d =
   let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const [])
       (g, _, _, _, _) = accumTypes (everythingOnTypes (++) forTypes)
   in nub (f d ++ g d)
   where
+
   forDecls :: Declaration -> [ModuleName]
-  forDecls (ImportDeclaration mn _ _ _) = [mn]
-  forDecls (FixityDeclaration _ _ (Just (Left (Qualified (Just mn) _)))) = [mn]
-  forDecls (FixityDeclaration _ _ (Just (Right (Qualified (Just mn) _)))) = [mn]
-  forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _) = [mn]
+  forDecls (ImportDeclaration mn _ _ _) =
+    -- Regardless of whether an imported module is qualified we still need to
+    -- take into account its import to build an accurate list of dependencies.
+    [mn]
+  forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _)))
+    | mn `notElem` ams = [mn]
+  forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _)
+    | mn `notElem` ams = [mn]
   forDecls _ = []
 
   forValues :: Expr -> [ModuleName]
-  forValues (Var (Qualified (Just mn) _)) = [mn]
-  forValues (Constructor (Qualified (Just mn) _)) = [mn]
+  forValues (Var (Qualified (Just mn) _))
+    | mn `notElem` ams = [mn]
+  forValues (Constructor (Qualified (Just mn) _))
+    | mn `notElem` ams = [mn]
   forValues _ = []
 
   forTypes :: Type -> [ModuleName]
-  forTypes (TypeConstructor (Qualified (Just mn) _)) = [mn]
+  forTypes (TypeConstructor (Qualified (Just mn) _))
+    | mn `notElem` ams = [mn]
   forTypes _ = []
 
 -- |

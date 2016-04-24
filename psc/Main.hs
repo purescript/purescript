@@ -28,8 +28,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 
 import Language.PureScript.Make
-
-import JSON
+import Language.PureScript.Errors.JSON
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]

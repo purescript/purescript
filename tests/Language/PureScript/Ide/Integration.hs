@@ -27,11 +27,13 @@ module Language.PureScript.Ide.Integration
        , projectDirectory
        , deleteFileIfExists
          -- sending commands
+       , loadModule
        , loadModuleWithDeps
        , getFlexCompletions
        , getType
        , addImport
        , addImplicitImport
+       , rebuildModule
          -- checking results
        , resultIsSuccess
        , parseCompletions
@@ -131,6 +133,9 @@ quitServer = do
 loadModuleWithDeps :: String -> IO String
 loadModuleWithDeps m = sendCommand $ load [] [m]
 
+loadModule :: String -> IO String
+loadModule m = sendCommand $ load [m] []
+
 getFlexCompletions :: String -> IO [(String, String, String)]
 getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)))
 
@@ -142,6 +147,9 @@ addImport identifier fp outfp = sendCommand (addImportC identifier fp outfp)
 
 addImplicitImport :: String -> FilePath -> FilePath -> IO String
 addImplicitImport mn fp outfp = sendCommand (addImplicitImportC mn fp outfp)
+
+rebuildModule :: FilePath -> IO String
+rebuildModule m = sendCommand (rebuildC m Nothing)
 
 -- Command Encoding
 
@@ -165,6 +173,12 @@ addImplicitImportC mn = addImportW $
   object [ "importCommand" .= ("addImplicitImport" :: String)
          , "module" .= mn
          ]
+
+rebuildC :: FilePath -> Maybe FilePath -> Value
+rebuildC file outFile =
+  commandWrapper "rebuild" (object [ "file" .= file
+                                   , "outfile" .= outFile
+                                   ])
 
 addImportW :: Value -> FilePath -> FilePath -> Value
 addImportW importCommand fp outfp =

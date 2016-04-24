@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternGuards #-}
 
 module Language.PureScript.Sugar.Operators.Common where
 
@@ -15,6 +16,7 @@ import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Expr as P
 
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Names
 
 type Chain a = [Either a a]
@@ -51,3 +53,32 @@ opTable
 opTable ops fromOp reapply =
   map (map (\(name, a) -> P.Infix (P.try (matchOp fromOp name) >> return (reapply name)) (toAssoc a))) ops
   ++ [[ P.Infix (P.try (parseOp fromOp >>= \ident -> return (reapply ident))) P.AssocLeft ]]
+
+matchOperators
+  :: forall a
+   . Show a
+  => (a -> Bool)
+  -> (a -> Maybe (a, a, a))
+  -> (a -> Maybe (Qualified Ident))
+  -> (Qualified Ident -> a -> a -> a)
+  -> ([[P.Operator (Chain a) () Identity a]] -> P.OperatorTable (Chain a) () Identity a)
+  -> [[(Qualified Ident, Associativity)]]
+  -> a
+  -> a
+matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
+  where
+  parseChains :: a -> a
+  parseChains ty
+    | True <- isBinOp ty = bracketChain (extendChain ty)
+    | otherwise = ty
+  extendChain :: a -> Chain a
+  extendChain ty
+    | Just (op, l, r) <- extractOp ty = Left l : Right op : extendChain r
+    | otherwise = [Left ty]
+  bracketChain :: Chain a -> a
+  bracketChain =
+    either
+      (\_ -> internalError "matchTypeOperators: cannot reorder operators")
+      id
+    . P.parse opParser "operator expression"
+  opParser = P.buildExpressionParser (modOpTable (opTable ops fromOp reapply)) parseValue <* P.eof

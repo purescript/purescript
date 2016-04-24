@@ -27,12 +27,7 @@ the licenses of all dependencies, including transitive ones, in the LICENSE
 file. Therefore, whenever the dependencies change, the LICENSE file should be
 updated.
 
-You can automate this (if you have bash):
-
-- get a copy of [cabal-dependency-licenses][]
-- run at the command line: `runhaskell license-generator/generate.hs > LICENSE`
-
-[cabal-dependency-licenses]: https://github.com/jaspervdj/cabal-dependency-licenses
+This can be automated; see the `license-generator/generate.hs` file.
 
 ## Writing Issues
 
