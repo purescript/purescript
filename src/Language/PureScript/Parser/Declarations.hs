@@ -382,7 +382,7 @@ parseValueAtom = P.choice
                  , Literal <$> parseStringLiteral
                  , Literal <$> parseBooleanLiteral
                  , Literal <$> parseArrayLiteral parseValue
-                 , Literal <$> P.try (parseObjectLiteral parseIdentifierAndValue)
+                 , Literal <$> parseObjectLiteral parseIdentifierAndValue
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -391,7 +391,6 @@ parseValueAtom = P.choice
                  , parseDo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
-                 , parseOperatorSection
                  , parseHole
                  ]
 
@@ -401,12 +400,6 @@ parseValueAtom = P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr = P.between tick tick parseValue
                  <|> Var <$> parseQualified (Op <$> symbol)
-
-parseOperatorSection :: TokenParser Expr
-parseOperatorSection = parens $ left <|> right
-  where
-  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
-  left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit

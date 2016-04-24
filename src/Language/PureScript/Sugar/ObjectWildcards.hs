@@ -39,10 +39,12 @@ desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> ma
   desugarExpr (Parens b)
     | b' <- stripPositionInfo b
     , BinaryNoParens op val u <- b'
-    , isAnonymousArgument u = return $ OperatorSection op (Left val)
+    , isAnonymousArgument u = do arg <- freshIdent'
+                                 return $ Abs (Left arg) $ App (App op val) (Var (Qualified Nothing arg))
     | b' <- stripPositionInfo b
     , BinaryNoParens op u val <- b'
-    , isAnonymousArgument u = return $ OperatorSection op (Right val)
+    , isAnonymousArgument u = do arg <- freshIdent'
+                                 return $ Abs (Left arg) $ App (App op (Var (Qualified Nothing arg))) val
   desugarExpr (Literal (ObjectLiteral ps)) = wrapLambda (Literal . ObjectLiteral) ps
   desugarExpr (ObjectUpdate u ps) | isAnonymousArgument u = do
     obj <- freshIdent'
