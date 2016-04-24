@@ -20,6 +20,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, hPrint, hSetEncoding, stderr, stdout, utf8)
+import System.IO.UTF8 (readUTF8File)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
@@ -139,7 +140,7 @@ dumpTags input renderTags = do
   ldump = mapM_ putStrLn
 
 parseFile :: FilePath -> IO (FilePath, String)
-parseFile input = (,) input <$> readFile input
+parseFile input = (,) input <$> readUTF8File input
 
 inputFile :: Parser FilePath
 inputFile = strArgument $

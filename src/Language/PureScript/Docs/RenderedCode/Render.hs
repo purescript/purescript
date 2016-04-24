@@ -48,6 +48,10 @@ typeLiterals = mkPattern match
     Just (syntax "()")
   match row@RCons{} =
     Just (syntax "(" <> renderRow row <> syntax ")")
+  match (BinaryNoParensType op l r) =
+    Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
+  match (TypeOp (Qualified mn op)) =
+    Just (ident' (runIdent op) (maybeToContainingModule mn))
   match _ =
     Nothing
 
@@ -115,6 +119,12 @@ constrained = mkPattern match
   match (ConstrainedType deps ty) = Just (deps, ty)
   match _ = Nothing
 
+explicitParens :: Pattern () Type ((), Type)
+explicitParens = mkPattern match
+  where
+  match (ParensInType ty) = Just ((), ty)
+  match _ = Nothing
+
 matchTypeAtom :: Pattern () Type RenderedCode
 matchTypeAtom = typeLiterals <+> fmap parens matchType
   where
@@ -130,6 +140,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \idents ty -> mconcat [syntax "forall", sp, mintersperse sp (map ident idents), syntax ".", sp, ty] ]
                   , [ Wrap kinded $ \k ty -> mintersperse sp [ty, syntax "::", renderKind k] ]
+                  , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
 forall_ :: Pattern () Type ([String], Type)
@@ -156,7 +167,7 @@ convert _ other = other
 convertForAlls :: Type -> Type
 convertForAlls (ForAll i ty _) = go [i] ty
   where
-  go idents (ForAll ident' ty' _) = go (ident' : idents) ty'
+  go idents (ForAll i' ty' _) = go (i' : idents) ty'
   go idents other = PrettyPrintForAll idents other
 convertForAlls other = other
 

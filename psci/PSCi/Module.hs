@@ -6,6 +6,7 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 import PSCi.Types
 import System.FilePath (pathSeparator)
+import System.IO.UTF8 (readUTF8File)
 import Control.Monad
 
 -- | The name of the PSCI support module
@@ -45,7 +46,7 @@ supportModule =
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
-  content <- readFile filename
+  content <- readUTF8File filename
   return $ either (Left . P.prettyPrintMultipleErrors False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
@@ -54,7 +55,7 @@ loadModule filename = do
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
-    content <- readFile filename
+    content <- readUTF8File filename
     return (filename, content)
   return $ P.parseModulesFromFiles id filesAndContent
 

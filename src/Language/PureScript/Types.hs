@@ -49,6 +49,11 @@ data Type
   --
   | TypeConstructor (Qualified (ProperName 'TypeName))
   -- |
+  -- A type operator. This will be desugared into a type constructor during the
+  -- "operators" phase of desugaring.
+  --
+  | TypeOp (Qualified Ident)
+  -- |
   -- A type application
   --
   | TypeApp Type Type
@@ -89,6 +94,19 @@ data Type
   -- A placeholder used in pretty printing
   --
   | PrettyPrintForAll [String] Type
+  -- |
+  -- Binary operator application. During the rebracketing phase of desugaring,
+  -- this data constructor will be removed.
+  --
+  | BinaryNoParensType Type Type Type
+  -- |
+  -- Explicit parentheses. During the rebracketing phase of desugaring, this
+  -- data constructor will be removed.
+  --
+  -- Note: although it seems this constructor is not used, it _is_ useful,
+  -- since it prevents certain traversals from matching.
+  --
+  | ParensInType Type
   deriving (Show, Read, Eq, Ord)
 
 -- |
@@ -154,6 +172,8 @@ replaceAllTypeVars = go []
   go bs m (ConstrainedType cs t) = ConstrainedType (map (second $ map (go bs m)) cs) (go bs m t)
   go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
   go bs m (KindedType t k) = KindedType (go bs m t) k
+  go bs m (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go bs m t1) (go bs m t2) (go bs m t3)
+  go bs m (ParensInType t) = ParensInType (go bs m t)
   go _  _ ty = ty
 
   genName orig inUse = try 0
@@ -184,6 +204,8 @@ freeTypeVariables = nub . go []
   go bound (ConstrainedType cs t) = concatMap (concatMap (go bound) . snd) cs ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
   go bound (KindedType t _) = go bound t
+  go bound (BinaryNoParensType t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
+  go bound (ParensInType t) = go bound t
   go _ _ = []
 
 -- |
@@ -233,6 +255,8 @@ everywhereOnTypes f = go
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
   go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
   go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
+  go (BinaryNoParensType t1 t2 t3) = f (BinaryNoParensType (go t1) (go t2) (go t3))
+  go (ParensInType t) = f (ParensInType (go t))
   go other = f other
 
 everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
@@ -246,6 +270,8 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
+  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (f (go t1)) (f (go t2)) (f (go t3))
+  go (ParensInType t) = ParensInType (f (go t))
   go other = f other
 
 everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
@@ -259,6 +285,8 @@ everywhereOnTypesM f = go
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
   go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
+  go (BinaryNoParensType t1 t2 t3) = (BinaryNoParensType <$> go t1 <*> go t2 <*> go t3) >>= f
+  go (ParensInType t) = (ParensInType <$> go t) >>= f
   go other = f other
 
 everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
@@ -272,6 +300,8 @@ everywhereOnTypesTopDownM f = go <=< f
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
   go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
+  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
+  go (ParensInType t) = ParensInType <$> (f t >>= go)
   go other = f other
 
 everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
@@ -285,6 +315,8 @@ everythingOnTypes (<>) f = go
   go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
   go t@(PrettyPrintObject t1) = f t <> go t1
   go t@(PrettyPrintForAll _ t1) = f t <> go t1
+  go t@(BinaryNoParensType t1 t2 t3) = f t <> go t1 <> go t2 <> go t3
+  go t@(ParensInType t1) = f t <> go t1
   go other = f other
 
 everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type -> (s, r)) -> Type -> r
@@ -299,4 +331,6 @@ everythingWithContextOnTypes s0 r0 (<>) f = go' s0
   go s (PrettyPrintFunction t1 t2) = go' s t1 <> go' s t2
   go s (PrettyPrintObject t1) = go' s t1
   go s (PrettyPrintForAll _ t1) = go' s t1
+  go s (BinaryNoParensType t1 t2 t3) = go' s t1 <> go' s t2 <> go' s t3
+  go s (ParensInType t1) = go' s t1
   go _ _ = r0

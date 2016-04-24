@@ -1,22 +1,28 @@
+-- |
+-- A small script which regenerates the LICENSE file with all
+-- dependencies' licenses, when the dependencies are provided via standard
+-- input.
+--
+-- It is recommended to run this as follows:
+--
+-- stack list-dependencies | cut -f 1 -d ' ' | stack exec runhaskell license-generator/generate.hs > LICENSE
+--
+
 module Main (main) where
 
 import Control.Monad (forM_)
 import Data.Char (isSpace)
 import Data.List
 import System.Process
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr, getContents)
 
 echoHeader :: IO ()
-echoHeader = 
+echoHeader =
     readFile "license-generator/header.txt" >>= putStr
 
 depsNames :: IO [String]
-depsNames = do
-    i <- readProcess "cabal-dependency-licenses" [] ""
-    return $ sort $ map (drop 2) $ filter startsWithDash $ lines i
-  where
-    startsWithDash ('-' : _) = True
-    startsWithDash _         = False
+depsNames =
+    fmap (filter (/= "purescript") . lines) getContents
 
 depsLicense :: String -> IO ()
 depsLicense dep = do

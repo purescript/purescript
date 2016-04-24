@@ -36,6 +36,9 @@ typeLiterals = mkPattern match
   match (Skolem name s _ _) = Just $ text $ name ++ show s
   match REmpty = Just $ text "()"
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
+  match (BinaryNoParensType op l r) =
+    Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
+  match (TypeOp op) = Just $ text $ showQualified runIdent op
   match _ = Nothing
 
 constraintsAsBox :: [Constraint] -> Box -> Box
@@ -108,6 +111,12 @@ constrained = mkPattern match
   match (ConstrainedType deps ty) = Just (deps, ty)
   match _ = Nothing
 
+explicitParens :: Pattern () Type ((), Type)
+explicitParens = mkPattern match
+  where
+  match (ParensInType ty) = Just ((), ty)
+  match _ = Nothing
+
 matchTypeAtom :: Pattern () Type Box
 matchTypeAtom = typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) matchType
 
@@ -121,6 +130,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text ("forall " ++ unwords idents ++ ".")) ty ]
                   , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ prettyPrintKind k)) ]
+                  , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
   -- If both boxes span a single line, keep them on the same line, or else

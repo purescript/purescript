@@ -108,16 +108,17 @@ addDefaultFixity decl@Declaration{..}
   defaultFixity = P.Fixity P.Infixl (-1)
 
 getDeclarationTitle :: P.Declaration -> Maybe String
-getDeclarationTitle (P.ValueDeclaration name _ _ _)          = Just (P.showIdent name)
-getDeclarationTitle (P.ExternDeclaration name _)             = Just (P.showIdent name)
-getDeclarationTitle (P.DataDeclaration _ name _ _)           = Just (P.runProperName name)
-getDeclarationTitle (P.ExternDataDeclaration name _)         = Just (P.runProperName name)
-getDeclarationTitle (P.TypeSynonymDeclaration name _ _)      = Just (P.runProperName name)
-getDeclarationTitle (P.TypeClassDeclaration name _ _ _)      = Just (P.runProperName name)
+getDeclarationTitle (P.ValueDeclaration name _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.ExternDeclaration name _) = Just (P.showIdent name)
+getDeclarationTitle (P.DataDeclaration _ name _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration name _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.FixityDeclaration _ name _)           = Just ("(" ++ name ++ ")")
-getDeclarationTitle (P.PositionedDeclaration _ _ d)          = getDeclarationTitle d
-getDeclarationTitle _                                        = Nothing
+getDeclarationTitle (P.FixityDeclaration _ name (Just (P.Qualified _ P.AliasType{}))) = Just ("type (" ++ name ++ ")")
+getDeclarationTitle (P.FixityDeclaration _ name _) = Just ("(" ++ name ++ ")")
+getDeclarationTitle (P.PositionedDeclaration _ _ d) = getDeclarationTitle d
+getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
 mkDeclaration :: String -> DeclarationInfo -> Declaration

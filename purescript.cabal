@@ -1,5 +1,5 @@
 name: purescript
-version: 0.8.4.0
+version: 0.8.5.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -23,7 +23,6 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
-                  , examples/docs/LICENSE
                   , examples/docs/src/*.purs
                   , tests/support/setup.js
                   , tests/support/package.json
@@ -37,6 +36,8 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
                   , tests/support/pscide/src/*.purs
+                  , tests/support/pscide/src/*.js
+                  , tests/support/pscide/src/*.fail
                   , stack.yaml
                   , stack-lts-5.yaml
                   , stack-nightly.yaml
@@ -90,7 +91,8 @@ library
                    monad-logger >= 0.3 && < 0.4,
                    pipes >= 4.0.0 && < 4.2.0 ,
                    pipes-http -any,
-                   http-types -any
+                   http-types -any,
+                   spdx == 0.2.*
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -127,6 +129,7 @@ library
                      Language.PureScript.Comments
                      Language.PureScript.Environment
                      Language.PureScript.Errors
+                     Language.PureScript.Errors.JSON
                      Language.PureScript.Kinds
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
@@ -163,6 +166,7 @@ library
                      Language.PureScript.Sugar.Operators.Common
                      Language.PureScript.Sugar.Operators.Expr
                      Language.PureScript.Sugar.Operators.Binders
+                     Language.PureScript.Sugar.Operators.Types
                      Language.PureScript.Sugar.TypeClasses
                      Language.PureScript.Sugar.TypeClasses.Deriving
                      Language.PureScript.Sugar.TypeDeclarations
@@ -214,6 +218,7 @@ library
                      Language.PureScript.Ide.Reexports
                      Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Rebuild
 
                      Control.Monad.Logger
                      Control.Monad.Supply
@@ -237,7 +242,7 @@ executable psc
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
-    other-modules: JSON, Paths_purescript
+    other-modules: Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
@@ -369,6 +374,7 @@ test-suite tests
                    Language.PureScript.Ide.Imports.IntegrationSpec
                    Language.PureScript.Ide.Integration
                    Language.PureScript.Ide.MatcherSpec
+                   Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.IdeSpec
                    PSCi.Completion

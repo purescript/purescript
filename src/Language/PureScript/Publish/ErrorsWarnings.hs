@@ -182,11 +182,33 @@ displayUserError e = case e of
   BadRepositoryField err ->
     displayRepositoryError err
   NoLicenseSpecified ->
-    para (concat
-      ["No license specified in bower.json. Please add one. ",
-       "Distributing code without a license means that nobody ",
-       "will be able to (legally) use it."
-      ])
+    vcat $
+      [ para (concat
+          [ "No license is specified in bower.json. Please add one, using the "
+          , "SPDX license expression format. For example, any of the "
+          , "following would be acceptable:"
+          ])
+      , spacer
+      ] ++
+      map (indented . para)
+        [ "* \"MIT\""
+        , "* \"BSD-2-Clause\""
+        , "* \"GPL-2.0+\""
+        , "* \"(GPL-3.0 OR MIT)\""
+        ]
+        ++
+      [ spacer
+      , para (concat
+          [ "Note that distributing code without a license means that nobody "
+          , "will (legally) be able to use it."
+          ])
+      , spacer
+      , para (concat
+          [ "It is also recommended to add a LICENSE file to the repository, "
+          , "including your name and the current year, although this is not "
+          , "necessary."
+          ])
+      ]
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
         pl a b = if singular then b else a

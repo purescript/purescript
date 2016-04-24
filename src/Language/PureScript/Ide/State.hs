@@ -51,6 +51,10 @@ getExternFiles = do
   stateVar <- envStateVar <$> ask
   liftIO (externsFiles <$> readTVarIO stateVar)
 
+getExternFile :: (PscIde m) =>
+                 ModuleName -> m (Maybe ExternsFile)
+getExternFile mn = M.lookup mn <$> getExternFiles
+
 getAllDecls :: (PscIde m) => m [ExternDecl]
 getAllDecls = concat <$> getPscIdeState
 

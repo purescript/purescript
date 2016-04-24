@@ -26,9 +26,9 @@ import Text.Parsec (eof)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
 
-import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
+import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
+import Language.PureScript.Docs.Types
 
 -- |
 -- Like convertModules, except that it takes a list of modules, together with

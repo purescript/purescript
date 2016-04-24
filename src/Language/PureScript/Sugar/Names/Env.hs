@@ -14,6 +14,7 @@ module Language.PureScript.Sugar.Names.Env
   , envModuleImports
   , envModuleExports
   , exportType
+  , exportTypeOp
   , exportTypeClass
   , exportValue
   , getExports
@@ -70,6 +71,10 @@ data Imports = Imports
   --
     importedTypes :: M.Map (Qualified (ProperName 'TypeName)) [ImportRecord (ProperName 'TypeName)]
   -- |
+  -- Local names for type operators within a module mapped to to their qualified names
+  --
+  , importedTypeOps :: M.Map (Qualified Ident) [ImportRecord Ident]
+  -- |
   -- Local names for data constructors within a module mapped to to their qualified names
   --
   , importedDataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) [ImportRecord (ProperName 'ConstructorName)]
@@ -96,7 +101,7 @@ data Imports = Imports
 -- An empty 'Imports' value.
 --
 nullImports :: Imports
-nullImports = Imports M.empty M.empty M.empty M.empty S.empty S.empty
+nullImports = Imports M.empty M.empty M.empty M.empty M.empty S.empty S.empty
 
 -- |
 -- The exported declarations from a module.
@@ -108,6 +113,11 @@ data Exports = Exports
   -- came from.
   --
     exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+  -- |
+  -- The type operators exported from each module along with the module they
+  -- originally came from.
+  --
+  , exportedTypeOps :: [(Ident, ModuleName)]
   -- |
   -- The classes exported from each module along with the module they originally
   -- came from.
@@ -124,7 +134,7 @@ data Exports = Exports
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports [] [] []
+nullExports = Exports [] [] [] []
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -155,7 +165,7 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports = Exports (mkTypeEntry `map` M.keys primTypes) (mkClassEntry `map` M.keys primClasses) []
+primExports = Exports (mkTypeEntry `map` M.keys primTypes) [] (mkClassEntry `map` M.keys primClasses) []
   where
   mkTypeEntry (Qualified mn name) = ((name, []), fromJust mn)
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
@@ -182,6 +192,15 @@ exportType exps name dctors mn = do
     when (dctor `elem` exDctors) $ throwConflictError ConflictingCtorDecls dctor
     when (any ((== coerceProperName dctor) . fst) exClasses) $ throwConflictError CtorConflictsWithClass dctor
   return $ exps { exportedTypes = nub $ ((name, dctors), mn) : exTypes' }
+
+-- |
+-- Safely adds a type operator to some exports, returning an error if a
+-- conflict occurs.
+--
+exportTypeOp :: (MonadError MultipleErrors m) => Exports -> Ident -> ModuleName -> m Exports
+exportTypeOp exps name mn = do
+  typeOps <- addExport DuplicateTypeOpExport name mn (exportedTypeOps exps)
+  return $ exps { exportedTypeOps = typeOps }
 
 -- |
 -- Safely adds a class to some exports, returning an error if a conflict occurs.

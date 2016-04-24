@@ -76,8 +76,8 @@ compImport (Import n i q) (Import n' i' q')
   | compImportType i i' /= EQ = compImportType i i'
     -- This means that for a stable sort, the first implicit import will stay
     -- the first implicit import
-  | P.isImplicit i && isNothing q = LT
-  | P.isImplicit i && isNothing q' = GT
+  | not (P.isExplicit i) && isNothing q = LT
+  | not (P.isExplicit i) && isNothing q' = GT
   | otherwise = compare n n'
 
 -- | Reads a file and returns the (lines before the imports, the imports, the

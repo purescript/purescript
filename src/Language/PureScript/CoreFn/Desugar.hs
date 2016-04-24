@@ -72,10 +72,12 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
-  declToCoreFn ss com (A.FixityDeclaration _ name (Just alias)) =
-    let meta = either getValueMeta (Just . getConstructorMeta) alias
-        alias' = either id (fmap properToIdent) alias
-    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) alias')]
+  declToCoreFn ss com (A.FixityDeclaration _ name (Just (Qualified mn' (A.AliasValue name')))) =
+    let meta = getValueMeta (Qualified mn' name')
+    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) (Qualified mn' name'))]
+  declToCoreFn ss com (A.FixityDeclaration _ name (Just (Qualified mn' (A.AliasConstructor name')))) =
+    let meta = Just $ getConstructorMeta (Qualified mn' name')
+    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) (Qualified mn' (properToIdent name')))]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
@@ -208,7 +210,7 @@ findQualModules decls =
   where
   fqDecls :: A.Declaration -> [(Ann, ModuleName)]
   fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual q
-  fqDecls (A.FixityDeclaration _ _ (Just eq)) = either getQual getQual eq
+  fqDecls (A.FixityDeclaration _ _ (Just q)) = getQual q
   fqDecls _ = []
 
   fqValues :: A.Expr -> [(Ann, ModuleName)]

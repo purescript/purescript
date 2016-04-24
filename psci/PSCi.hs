@@ -33,6 +33,7 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
 import System.IO.Error (tryIOError)
+import System.IO.UTF8 (readUTF8File)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -75,7 +76,7 @@ loop PSCiOptions{..} = do
       historyFilename <- getHistoryFilename
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
-        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readFile inFile))
+        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readUTF8File inFile))
         P.parseForeignModulesFromFiles foreignFilesContent
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
@@ -167,7 +168,7 @@ handleCommand (LoadFile filePath) = PSCI $ whenFileExists filePath $ \absPath ->
     Right mods -> lift $ modify (updateModules (map (absPath,) mods))
 handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath -> do
   foreignsOrError <- lift . lift . runMake $ do
-    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readFile absPath)
+    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readUTF8File absPath)
     P.parseForeignModulesFromFiles [(absPath, foreignFile)]
   case foreignsOrError of
     Left err -> outputStrLn $ P.prettyPrintMultipleErrors False err
@@ -242,9 +243,8 @@ handleShowImportedModules = do
   where
   showModules = return . unlines . sort . map showModule
   showModule (mn, declType, asQ) =
-    "import " ++ case asQ of
-      Just mn' -> "qualified " ++ N.runModuleName mn ++ " as " ++ N.runModuleName mn'
-      Nothing  -> N.runModuleName mn ++ " " ++ showDeclType declType
+    "import " ++ N.runModuleName mn ++ showDeclType declType ++
+    foldMap (\mn' -> " as " ++ N.runModuleName mn') asQ
 
   showDeclType P.Implicit = ""
   showDeclType (P.Explicit refs) = refsList refs
@@ -253,8 +253,9 @@ handleShowImportedModules = do
 
   showRef :: P.DeclarationRef -> String
   showRef (P.TypeRef pn dctors) = N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
+  showRef (P.TypeOpRef ident) = "type (" ++ N.runIdent ident ++ ")"
   showRef (P.ValueRef ident) = N.runIdent ident
-  showRef (P.TypeClassRef pn) = N.runProperName pn
+  showRef (P.TypeClassRef pn) = "class " ++ N.runProperName pn
   showRef (P.ProperRef pn) = pn
   showRef (P.TypeInstanceRef ident) = N.runIdent ident
   showRef (P.ModuleRef name) = "module " ++ N.runModuleName name
@@ -359,7 +360,7 @@ loadUserConfig = onFirstFileMatching readCommands pathGetters
     exists <- doesFileExist configFile
     if exists
     then do
-      ls <- lines <$> readFile configFile
+      ls <- lines <$> readUTF8File configFile
       case traverse parseCommand ls of
         Left err -> print err >> exitFailure
         Right cs -> return $ Just cs
