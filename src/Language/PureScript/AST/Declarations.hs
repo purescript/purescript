@@ -47,9 +47,9 @@ getModuleName (Module _ _ name _ _) = name
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing False : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
   where
-  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
+  isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 
@@ -198,9 +198,8 @@ data Declaration
   | FixityDeclaration Fixity String (Maybe (Qualified FixityAlias))
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
-  -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)
   --
-  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName) Bool
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --

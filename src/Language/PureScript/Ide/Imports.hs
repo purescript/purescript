@@ -95,9 +95,9 @@ parseImportsWithModuleName ls = do
   (P.Module _ _ mn decls _) <- moduleParse ls
   pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
   where
-    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual _) =
+    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual) =
       [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
-    mkImport (P.ImportDeclaration mn it qual _) = [Import mn it qual]
+    mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
     mkImport _ = []
 
 sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
@@ -348,8 +348,7 @@ parseImport :: Text -> Maybe Import
 parseImport t =
   case P.lex "<psc-ide>" (T.unpack t)
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
-    Right (mn, P.Explicit refs, mmn, _) ->
+    Right (mn, P.Explicit refs, mmn) ->
       Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)
-    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
+    Right (mn, idt, mmn) -> Just (Import mn idt mmn)
     Left _ -> Nothing
-
