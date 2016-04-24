@@ -16,6 +16,8 @@ import Control.Monad.IO.Class (MonadIO(..))
 
 import Web.Bower.PackageMeta (PackageName)
 
+import System.IO.UTF8 (readUTF8File)
+
 import qualified Language.PureScript as P
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Convert (collectBookmarks)
@@ -80,7 +82,7 @@ fileInfoToString (Local fn) = fn
 fileInfoToString (FromDep _ fn) = fn
 
 parseFile :: FilePath -> IO (FilePath, String)
-parseFile input' = (,) input' <$> readFile input'
+parseFile input' = (,) input' <$> readUTF8File input'
 
 parseAs :: (MonadIO m) => (FilePath -> a) -> FilePath -> m (a, String)
 parseAs g = fmap (first g) . liftIO . parseFile

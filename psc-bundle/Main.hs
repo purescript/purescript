@@ -20,6 +20,7 @@ import System.FilePath (takeFileName, takeDirectory)
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure)
 import System.IO (stderr, stdout, hPutStrLn, hSetEncoding, utf8)
+import System.IO.UTF8 (readUTF8File)
 import System.Directory (createDirectoryIfMissing)
 
 import Language.PureScript.Bundle
@@ -56,7 +57,7 @@ app Options{..} = do
     hPutStrLn stderr "psc-bundle: No input files."
     exitFailure
   input <- for inputFiles $ \filename -> do
-    js <- liftIO (readFile filename)
+    js <- liftIO (readUTF8File filename)
     mid <- guessModuleIdentifier filename
     length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 

@@ -232,6 +232,15 @@ foldFixityAlias f _ _ (AliasValue name) = f name
 foldFixityAlias _ g _ (AliasConstructor name) = g name
 foldFixityAlias _ _ h (AliasType name) = h name
 
+getValueAlias :: FixityAlias -> Maybe (Either Ident (ProperName 'ConstructorName))
+getValueAlias (AliasValue name) = Just $ Left name
+getValueAlias (AliasConstructor name) = Just $ Right name
+getValueAlias _ = Nothing
+
+getTypeAlias :: FixityAlias -> Maybe (ProperName 'TypeName)
+getTypeAlias (AliasType name) = Just name
+getTypeAlias _ = Nothing
+
 -- | The members of a type class instance declaration
 data TypeInstanceBody
   -- | This is a derived instance
@@ -426,6 +435,10 @@ data Expr
   -- A placeholder for an anonymous function argument
   --
   | AnonymousArgument
+  -- |
+  -- A typed hole that will be turned into a hint/error duing typechecking
+  --
+  | Hole String
   -- |
   -- A value with source position information
   --

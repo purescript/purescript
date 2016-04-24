@@ -285,12 +285,20 @@ testCases =
       , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn (P.tyNumber ==))
       ])
 
-    --, ("ConstrainedArgument",
-    --    [ TypeSynonymShouldRenderAs (n "ConstrainedArgument") "WithoutArgs" "forall a. (Partial => a) -> a"
-    --    , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "WithArgs" "forall a. (Foo a => a) -> a"
-    --    , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "MultiWithoutArgs" "forall a. ((Partial, Partial) => a) -> a"
-    --    , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "MultiWithArgs" "forall a b. ((Foo a, Foo b) => a) -> a"
-    --    ])
+  , ("ConstrainedArgument",
+      [ TypeSynonymShouldRenderAs (n "ConstrainedArgument") "WithoutArgs" "forall a. (Partial => a) -> a"
+      , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "WithArgs" "forall a. (Foo a => a) -> a"
+      , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "MultiWithoutArgs" "forall a. ((Partial, Partial) => a) -> a"
+      , TypeSynonymShouldRenderAs (n "ConstrainedArgument") "MultiWithArgs" "forall a b. ((Foo a, Foo b) => a) -> a"
+      ])
+
+  , ("TypeOpAliases",
+      [ ValueShouldHaveTypeSignature (n "TypeOpAliases") "test1" (renderedType "forall a b. a ~> b")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test2" (renderedType "forall a b c. a ~> b ~> c")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test3" (renderedType "forall a b c d. a ~> (b ~> c) ~> d")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test4" (renderedType "forall a b c d. ((a ~> b) ~> c) ~> d")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "third" (renderedType "forall a b c. a × b × c -> c")
+      ])
   ]
 
   where
@@ -301,3 +309,6 @@ testCases =
 
   isVar varName (P.TypeVar name) | varName == name = True
   isVar _ _ = False
+
+  renderedType expected =
+    ShowFn $ \ty -> codeToString (Docs.renderType ty) == expected

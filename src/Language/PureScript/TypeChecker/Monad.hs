@@ -225,6 +225,7 @@ runCheck = runCheck' initEnvironment
 -- | Run a computation in the typechecking monad, failing with an error, or succeeding with a return value and the final @Environment@.
 runCheck' :: (Functor m) => Environment -> StateT CheckState m a -> m (a, Environment)
 runCheck' env check = second checkEnv <$> runStateT check (emptyCheckState env)
+
 -- | Make an assertion, failing with an error message
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()

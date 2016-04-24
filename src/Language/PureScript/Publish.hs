@@ -39,6 +39,7 @@ import Data.Aeson.BetterErrors
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
+import qualified Data.SPDX as SPDX
 
 import Control.Category ((>>>))
 import Control.Arrow ((***))
@@ -128,7 +129,7 @@ catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
 unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM cond act = cond >>= flip unless act 
+unlessM cond act = cond >>= flip unless act
 
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
@@ -137,13 +138,11 @@ preparePackage' opts = do
 
   pkgMeta <- liftIO (Bower.decodeFile "bower.json")
                     >>= flip catchLeft (userError . CouldntDecodeBowerJSON)
-  unlessM (liftIO (doesFileExist "LICENSE")) (userError LicenseNotFound)
+  checkLicense pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgGithub                   <- getBowerRepositoryInfo pkgMeta
   (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
-
-  unless (bowerLicenseExists pkgMeta) (userError NoLicenseSpecified)
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
@@ -215,8 +214,16 @@ getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExt
           (Left (BadRepositoryType repositoryType))
         maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
 
-bowerLicenseExists :: PackageMeta -> Bool
-bowerLicenseExists = any (not . null) . bowerLicense
+checkLicense :: PackageMeta -> PrepareM ()
+checkLicense pkgMeta =
+  unless (any isValidSPDX (bowerLicense pkgMeta))
+    (userError NoLicenseSpecified)
+
+-- |
+-- Check if a string is a valid SPDX license expression.
+--
+isValidSPDX :: String -> Bool
+isValidSPDX = (== 1) . length . SPDX.parseExpression
 
 extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes

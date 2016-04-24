@@ -74,7 +74,7 @@ typesOf ::
   [(Ident, Expr)] ->
   m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = do
-  tys <- fmap tidyUp . liftUnifyWarnings replace $ do
+  tys <- fmap tidyUp . escalateWarningWhen isHoleError . liftUnifyWarnings replace $ do
     (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
     ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
@@ -109,16 +109,27 @@ typesOf bindingGroupType moduleName vals = do
     checkDuplicateLabels val'
     return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
   where
+
   -- | Generalize type vars using forall and add inferred constraints
   generalize unsolved = varIfUnknown . constrain unsolved
+
   -- | Add any unsolved constraints
   constrain [] = id
   constrain cs = ConstrainedType (map snd cs)
+
   -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
   tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
+
   -- Replace all the wildcards types with their inferred types
-  replace sub (ErrorMessage hints (WildcardInferredType ty)) = ErrorMessage hints . WildcardInferredType $ substituteType sub ty
+  replace sub (ErrorMessage hints (WildcardInferredType ty)) =
+    ErrorMessage hints . WildcardInferredType $ substituteType sub ty
+  replace sub (ErrorMessage hints (HoleInferredType name ty)) =
+    ErrorMessage hints . HoleInferredType name $ substituteType sub ty
   replace _ em = em
+
+  isHoleError :: ErrorMessage -> Bool
+  isHoleError (ErrorMessage _ HoleInferredType{}) = True
+  isHoleError _ = False
 
 type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
 
@@ -316,6 +327,10 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
+infer' (Hole name) = do
+  ty <- freshType
+  tell . errorMessage $ HoleInferredType name ty
+  return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty

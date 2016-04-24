@@ -48,6 +48,7 @@ module Language.PureScript.Parser.Lexer
   , semi
   , at
   , underscore
+  , holeLit
   , semiSep
   , semiSep1
   , commaSep
@@ -68,12 +69,13 @@ module Language.PureScript.Parser.Lexer
   , reservedPsNames
   , reservedTypeNames
   , isSymbolChar
+  , isUnquotedKey
   )
   where
 
 import Prelude hiding (lex)
 
-import Data.Char (isSpace, isAscii, isSymbol)
+import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
 
 import Control.Monad (void, guard)
 import Data.Functor.Identity
@@ -115,6 +117,7 @@ data Token
   | CharLiteral Char
   | StringLiteral String
   | Number (Either Integer Double)
+  | HoleLit String
   deriving (Show, Read, Eq, Ord)
 
 prettyPrintToken :: Token -> String
@@ -146,6 +149,7 @@ prettyPrintToken (Symbol s)        = s
 prettyPrintToken (CharLiteral c)   = show c
 prettyPrintToken (StringLiteral s) = show s
 prettyPrintToken (Number n)        = either show show n
+prettyPrintToken (HoleLit name)    = "?" ++ name
 
 data PositionedToken = PositionedToken
   { ptSourcePos :: P.SourcePos
@@ -209,6 +213,7 @@ parseToken = P.choice
   , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
   , P.try $ P.char '_'    *> P.notFollowedBy identLetter *> pure Underscore
+  , HoleLit <$> P.try (P.char '?' *> P.many1 identLetter)
   , LName         <$> parseLName
   , do uName <- parseUName
        (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
@@ -376,6 +381,12 @@ at = match At
 underscore :: TokenParser ()
 underscore = match Underscore
 
+holeLit :: TokenParser String
+holeLit = token go P.<?> "hole literal"
+  where
+  go (HoleLit n) = Just n
+  go _ = Nothing
+
 -- |
 -- Parse zero or more values separated by semicolons
 --
@@ -524,3 +535,24 @@ reservedTypeNames = [ "forall", "where" ]
 --
 isSymbolChar :: Char -> Bool
 isSymbolChar c = (c `elem` ":!#$%&*+./<=>?@\\^|-~") || (not (isAscii c) && isSymbol c)
+
+
+-- |
+-- The characters allowed in the head of an unquoted record key
+--
+isUnquotedKeyHeadChar :: Char -> Bool
+isUnquotedKeyHeadChar c = (c == '_') || isAlphaNum c
+
+-- |
+-- The characters allowed in the tail of an unquoted record key
+--
+isUnquotedKeyTailChar :: Char -> Bool
+isUnquotedKeyTailChar c = (c `elem` "_'") || isAlphaNum c
+
+-- |
+-- Strings allowed to be left unquoted in a record key
+--
+isUnquotedKey :: String -> Bool
+isUnquotedKey []        = False
+isUnquotedKey (hd : tl) = isUnquotedKeyHeadChar hd &&
+                          all isUnquotedKeyTailChar tl
