@@ -31,7 +31,7 @@ import Language.PureScript.Crash
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.CoreFn
+import Language.PureScript.CoreFn hiding (optimize)
 import Language.PureScript.Names
 import Language.PureScript.Errors
 import Language.PureScript.CodeGen.JS.Optimizer

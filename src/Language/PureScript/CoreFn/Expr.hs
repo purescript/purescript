@@ -119,3 +119,19 @@ modifyAnn f (App a b c)           = App (f a) b c
 modifyAnn f (Var a b)             = Var (f a) b
 modifyAnn f (Case a b c)          = Case (f a) b c
 modifyAnn f (Let a b c)           = Let (f a) b c
+
+
+-- |
+-- Return the constructor and arguments from what looks like a data constructor
+-- call.
+--
+dissectConstruction :: Expr a -> Maybe (Qualified Ident, [Expr a])
+dissectConstruction e = (,) <$> findConstructor e <*> findArguments e
+  where
+  findConstructor (App _ (Var _ c) _) = Just c
+  findConstructor (App _ c _) = findConstructor c
+  findConstructor _ = Nothing
+
+  findArguments (App _ (Var _ _) a) = Just [a]
+  findArguments (App _ c a) = (++ [a]) <$> findArguments c
+  findArguments _ = Nothing

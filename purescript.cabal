@@ -125,6 +125,8 @@ library
                      Language.PureScript.CoreFn.Expr
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
+                     Language.PureScript.CoreFn.Optimizer
+                     Language.PureScript.CoreFn.Optimizer.PassThroughCases
                      Language.PureScript.CoreFn.Traversals
                      Language.PureScript.Comments
                      Language.PureScript.Environment

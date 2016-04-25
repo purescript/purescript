@@ -155,6 +155,7 @@ supportModules =
   , "Control.Monad.Eff.Unsafe"
   , "Control.Monad.ST"
   , "Data.Function"
+  , "Data.Maybe"
   , "Prelude"
   , "Test.Assert"
   ]
