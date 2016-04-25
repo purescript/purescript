@@ -26,6 +26,7 @@ module Language.PureScript.Make
 import Prelude ()
 import Prelude.Compat
 
+import Control.Arrow (first)
 import Control.Applicative ((<|>))
 import Control.Monad hiding (sequence)
 import Control.Monad.Error.Class (MonadError(..))
@@ -184,22 +185,18 @@ make :: forall m
         , MonadWriter MultipleErrors m
         )
      => MakeActions m
-     -> [(FilePath, ModuleHeader)]
+     -> [(ModuleHeader, Module)]
      -> m Environment
 make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique
 
-  (sorted, graph) <- sortModules (map snd ms)
+  (sorted, graph) <- first (map snd) <$> sortModules fst ms
 
-  let pathMap = M.fromList [ (moduleHeaderName m, path) | (path, m) <- ms ]
+  barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
 
-  barriers <- zip (map moduleHeaderName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
-
-  for_ sorted $ \mh -> fork $ do
-    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (moduleHeaderName mh) graph)
-        path = fromMaybe (internalError "make: module not found in path map.") (M.lookup (moduleHeaderName mh) pathMap)
-    m <- importPrim <$> PSParser.parseModuleFromFile path undefined
-    buildModule barriers m (deps `inOrderOf` map moduleHeaderName sorted)
+  for_ sorted $ \m -> fork $ do
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
+    buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
@@ -214,7 +211,7 @@ make ma@MakeActions{..} ms = do
   where
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
-    case findDuplicate (map (moduleHeaderName . snd) ms) of
+    case findDuplicate (map (moduleHeaderName . fst) ms) of
       Nothing -> return ()
       Just mn -> throwError . errorMessage $ DuplicateModuleName mn
 

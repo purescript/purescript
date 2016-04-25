@@ -9,9 +9,8 @@ module Language.PureScript.Parser.Declarations
   ( parseDeclaration
   , parseModule
   , parseModuleHeader
-  , parseModuleHeaders
-  , parseModuleFromFile
   , parseModulesFromFiles
+  , parseModulesAndHeadersFromFiles
   , parseValue
   , parseGuard
   , parseBinder
@@ -74,28 +73,22 @@ parseModule = do
   let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments (moduleHeaderName header) (moduleHeaderImports header ++ decls) (moduleHeaderExports header)
 
--- | Parse a collection of modules in parallel
-parseModuleHeaders
-   :: (MonadError MultipleErrors m)
-   => (k -> FilePath)
-   -> [(k, String)]
-   -> m [(k, ModuleHeader)]
-parseModuleHeaders toFilePath input = do
+-- | Parse a collection of headers as well as the modules themselves.
+--
+-- The modules can and should be evaluated lazily, since they are much more
+-- expensive to compute.
+parseModulesAndHeadersFromFiles
+  :: (MonadError MultipleErrors m)
+  => (k -> FilePath)
+  -> [(k, String)]
+  -> m [(k, (ModuleHeader, Module))]
+parseModulesAndHeadersFromFiles toFilePath input = do
   parseInParallel . flip map input $ \(k, content) -> do
     let filename = toFilePath k
-        (_, ts) = lexLazy filename content
-    m <- runTokenParser filename parseModuleHeader ts
-    return (k, m)
-
--- | Parse a collection of modules in parallel
-parseModuleFromFile
-   :: (MonadError MultipleErrors m)
-   => FilePath
-   -> String
-   -> m Module
-parseModuleFromFile filename content = throwParserError $ do
-  ts <- lex filename content
-  runTokenParser filename parseModule ts
+    ts <- lex filename content
+    hdr <- runTokenParser filename parseModuleHeader . snd . lexLazy filename $ content
+    m <- runTokenParser filename parseModule ts
+    return (k, (hdr, m))
 
 -- | Parse a collection of modules in parallel
 parseModulesFromFiles

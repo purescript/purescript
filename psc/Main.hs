@@ -71,9 +71,9 @@ compile PSCMakeOptions{..} = do
   foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     (ms, foreigns) <- parseInputs moduleFiles foreignFiles
-    let filePathMap = M.fromList $ map (\(fp, m) -> (P.moduleHeaderName m, fp)) ms
+    let filePathMap = M.fromList $ map (\(fp, (mh, _)) -> (P.moduleHeaderName mh, fp)) ms
         makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
-    P.make makeActions (map (\(Right path, mh) -> (path, mh)) ms)
+    P.make makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
   exitSuccess
 
@@ -95,9 +95,9 @@ readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$>
 parseInputs :: (MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
             => [(Either P.RebuildPolicy FilePath, String)]
             -> [(FilePath, P.ForeignJS)]
-            -> m ([(Either P.RebuildPolicy FilePath, P.ModuleHeader)], M.Map P.ModuleName FilePath)
+            -> m ([(Either P.RebuildPolicy FilePath, (P.ModuleHeader, P.Module))], M.Map P.ModuleName FilePath)
 parseInputs modules foreigns =
-  (,) <$> P.parseModuleHeaders (either (const "") id) modules
+  (,) <$> P.parseModulesAndHeadersFromFiles (either (const "") id) modules
       <*> P.parseForeignModulesFromFiles foreigns
 
 inputFile :: Parser FilePath

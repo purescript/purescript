@@ -68,7 +68,7 @@ sortExterns
   -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
-  sorted' <- runExceptT . P.sortModules . (:) (toModuleHeader m) . map mkShallowModule . M.elems $ ex
+  sorted' <- runExceptT . P.sortModules id . (:) (toModuleHeader m) . map mkShallowModule . M.elems $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, graph) -> do

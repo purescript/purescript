@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- Provides the ability to sort modules based on module dependencies
@@ -26,9 +27,14 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 --
 -- Reports an error if the module graph contains a cycle.
 --
-sortModules :: (MonadError MultipleErrors m) => [ModuleHeader] -> m ([ModuleHeader], ModuleGraph)
-sortModules ms = do
-    let verts = map goModule ms
+sortModules
+  :: forall m header
+   . (MonadError MultipleErrors m)
+  => (header -> ModuleHeader)
+  -> [header]
+  -> m ([header], ModuleGraph)
+sortModules toModuleHeader hdrs = do
+    let verts = map goModule hdrs
     ms' <- mapM toModule $ stronglyConnComp verts
     let (graph, fromVertex, toVertex) = graphFromEdges verts
         moduleGraph = do (_, mn, _) <- verts
@@ -38,18 +44,18 @@ sortModules ms = do
                          return (mn, filter (/= mn) (map toKey deps))
     return (ms', moduleGraph)
   where
-  goModule :: ModuleHeader -> (ModuleHeader, ModuleName, [ModuleName])
-  goModule m = (m, moduleHeaderName m, nub (mapMaybe usedModules (moduleHeaderImports m)))
+  goModule :: header -> (header, ModuleName, [ModuleName])
+  goModule m = (m, moduleHeaderName mh, nub (mapMaybe usedModules (moduleHeaderImports mh)))
+    where
+      mh = toModuleHeader m
 
   -- | Calculate a list of used modules based on explicit imports.
   usedModules :: Declaration -> Maybe ModuleName
   usedModules (ImportDeclaration mn _ _) = Just mn
   usedModules _ = Nothing
 
--- |
--- Convert a strongly connected component of the module graph to a module
---
-toModule :: (MonadError MultipleErrors m) => SCC ModuleHeader -> m ModuleHeader
-toModule (AcyclicSCC m) = return m
-toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map moduleHeaderName ms)
+  -- | Convert a strongly connected component of the module graph to a module
+  toModule :: SCC header -> m header
+  toModule (AcyclicSCC m) = return m
+  toModule (CyclicSCC [m]) = return m
+  toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map (moduleHeaderName . toModuleHeader) ms)

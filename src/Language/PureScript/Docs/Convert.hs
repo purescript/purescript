@@ -68,9 +68,8 @@ convertModules ::
   [P.Module] ->
   m [Module]
 convertModules =
-    map toModuleHeader
-      >>> P.sortModules
-      >>> fmap (fst{- >>> map importPrim -} . error "not implemented yet")
+    P.sortModules toModuleHeader
+      >>> fmap (fst >>> map importPrim)
       >=> convertSorted
   where
     toModuleHeader :: P.Module -> P.ModuleHeader
