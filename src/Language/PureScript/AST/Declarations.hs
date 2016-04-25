@@ -47,6 +47,13 @@ data ModuleHeader = ModuleHeader
 data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef])
   deriving (Show, Read)
 
+-- | Extract a valid module header from an existing module.
+--
+-- Note, it is generally better to obtain a 'ModuleHeader' by parsing it separately,
+-- since parsing is cheaper compared to a full 'Module'.
+extractModuleHeader :: Module -> ModuleHeader
+extractModuleHeader (Module _ _ name ds exps) = ModuleHeader name exps (filter isImportDecl ds)
+
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
 getModuleName (Module _ _ name _ _) = name

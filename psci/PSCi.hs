@@ -17,7 +17,7 @@ import Data.List (intercalate, nub, sort, find)
 import Data.Tuple (swap)
 import qualified Data.Map as M
 
-import Control.Arrow (first)
+import Control.Arrow (first, (&&&))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
@@ -127,7 +127,7 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' undefined --(map snd loadedModules ++ ms)
+make st@PSCiState{..} ms = P.make actions' (map (P.extractModuleHeader &&& id) (map snd loadedModules ++ ms))
   where
   filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
