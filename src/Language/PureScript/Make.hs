@@ -176,20 +176,30 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m
+      . ( Monad m
+        , MonadBaseControl IO m
+        , MonadReader Options m
+        , MonadError MultipleErrors m
+        , MonadWriter MultipleErrors m
+        )
      => MakeActions m
-     -> [Module]
+     -> [(FilePath, ModuleHeader)]
      -> m Environment
 make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique
 
-  (sorted, graph) <- sortModules ms
+  (sorted, graph) <- sortModules (map snd ms)
 
-  barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+  let pathMap = M.fromList [ (moduleHeaderName m, path) | (path, m) <- ms ]
 
-  for_ sorted $ \m -> fork $ do
-    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
-    buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
+  barriers <- zip (map moduleHeaderName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+
+  for_ sorted $ \mh -> fork $ do
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (moduleHeaderName mh) graph)
+        path = fromMaybe (internalError "make: module not found in path map.") (M.lookup (moduleHeaderName mh) pathMap)
+    m <- importPrim <$> PSParser.parseModuleFromFile path undefined
+    buildModule barriers m (deps `inOrderOf` map moduleHeaderName sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
@@ -204,7 +214,7 @@ make ma@MakeActions{..} ms = do
   where
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
-    case findDuplicate (map getModuleName ms) of
+    case findDuplicate (map (moduleHeaderName . snd) ms) of
       Nothing -> return ()
       Just mn -> throwError . errorMessage $ DuplicateModuleName mn
 
@@ -221,7 +231,11 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
+  buildModule
+    :: [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))]
+    -> Module
+    -> [ModuleName]
+    -> m ()
   buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the

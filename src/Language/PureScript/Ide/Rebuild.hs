@@ -68,15 +68,17 @@ sortExterns
   -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
-  sorted' <- runExceptT . P.sortModules . (:) m . map mkShallowModule . M.elems $ ex
+  sorted' <- runExceptT . P.sortModules . (:) (toModuleHeader m) . map mkShallowModule . M.elems $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, graph) -> do
       let deps = fromJust (lookup (P.getModuleName m) graph)
-      pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
+      pure $ mapMaybe getExtern (deps `inOrderOf` map P.moduleHeaderName sorted)
   where
+    toModuleHeader (P.Module _ _ mn ds exps) =
+      P.ModuleHeader mn exps (filter P.isImportDecl ds)
     mkShallowModule P.ExternsFile{..} =
-      P.Module undefined [] efModuleName (map mkImport efImports) Nothing
+      P.ModuleHeader efModuleName Nothing (map mkImport efImports)
     mkImport (P.ExternsImport mn it iq) =
       P.ImportDeclaration mn it iq
     getExtern mn = M.lookup mn ex

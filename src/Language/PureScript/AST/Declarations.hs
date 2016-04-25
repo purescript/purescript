@@ -29,6 +29,16 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
 
+-- | The module header consists of everything up to the end of
+-- the import section.
+--
+-- This is all that is needed to determine the module graph.
+data ModuleHeader = ModuleHeader
+  { moduleHeaderName :: ModuleName
+  , moduleHeaderExports :: Maybe [DeclarationRef]
+  , moduleHeaderImports :: [Declaration]
+  } deriving (Show, Read)
+
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
 -- a list of declarations, and a list of the declarations that are

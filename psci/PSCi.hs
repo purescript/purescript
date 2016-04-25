@@ -127,7 +127,7 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
+make st@PSCiState{..} ms = P.make actions' undefined --(map snd loadedModules ++ ms)
   where
   filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
