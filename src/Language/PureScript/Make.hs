@@ -26,7 +26,6 @@ module Language.PureScript.Make
 import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (first)
 import Control.Applicative ((<|>))
 import Control.Monad hiding (sequence)
 import Control.Monad.Error.Class (MonadError(..))
@@ -185,18 +184,21 @@ make :: forall m
         , MonadWriter MultipleErrors m
         )
      => MakeActions m
-     -> [(ModuleHeader, Module)]
+     -> [ModuleHeader]
+     -> (ModuleName -> m Module)
      -> m Environment
-make ma@MakeActions{..} ms = do
+make ma@MakeActions{..} ms loadModule = do
   checkModuleNamesAreUnique
 
-  (sorted, graph) <- first (map snd) <$> sortModules fst ms
+  (sorted, graph) <- sortModules id ms
 
-  barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+  barriers <- zip (map moduleHeaderName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
 
-  for_ sorted $ \m -> fork $ do
-    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
-    buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
+  for_ sorted $ \mh -> fork $ do
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (moduleHeaderName mh) graph)
+    buildModule barriers
+                (moduleHeaderName mh)
+                (deps `inOrderOf` map moduleHeaderName sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
@@ -211,7 +213,7 @@ make ma@MakeActions{..} ms = do
   where
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
-    case findDuplicate (map (moduleHeaderName . fst) ms) of
+    case findDuplicate (map moduleHeaderName ms) of
       Nothing -> return ()
       Just mn -> throwError . errorMessage $ DuplicateModuleName mn
 
@@ -230,10 +232,10 @@ make ma@MakeActions{..} ms = do
 
   buildModule
     :: [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))]
-    -> Module
+    -> ModuleName
     -> [ModuleName]
     -> m ()
-  buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
+  buildModule barriers moduleName deps = flip catchError (markComplete Nothing . Just) $ do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
@@ -252,6 +254,7 @@ make ma@MakeActions{..} ms = do
                               _ -> True
 
         let rebuild = do
+              m <- importPrim <$> loadModule moduleName
               (exts, warnings) <- listen $ rebuildModule ma externs m
               markComplete (Just (warnings, exts)) Nothing
 

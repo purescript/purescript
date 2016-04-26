@@ -9,8 +9,9 @@ module Language.PureScript.Parser.Declarations
   ( parseDeclaration
   , parseModule
   , parseModuleHeader
+  , parseModuleFromFile
   , parseModulesFromFiles
-  , parseModulesAndHeadersFromFiles
+  , parseModuleHeadersFromFiles
   , parseValue
   , parseGuard
   , parseBinder
@@ -73,22 +74,27 @@ parseModule = do
   let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments (moduleHeaderName header) (moduleHeaderImports header ++ decls) (moduleHeaderExports header)
 
--- | Parse a collection of headers as well as the modules themselves.
---
--- The modules can and should be evaluated lazily, since they are much more
--- expensive to compute.
-parseModulesAndHeadersFromFiles
+-- | Parse a collection of headers.
+parseModuleHeadersFromFiles
   :: (MonadError MultipleErrors m)
   => (k -> FilePath)
   -> [(k, String)]
-  -> m [(k, (ModuleHeader, Module))]
-parseModulesAndHeadersFromFiles toFilePath input = do
+  -> m [(k, ModuleHeader)]
+parseModuleHeadersFromFiles toFilePath input = do
   parseInParallel . flip map input $ \(k, content) -> do
     let filename = toFilePath k
-    ts <- lex filename content
     hdr <- runTokenParser filename parseModuleHeader . snd . lexLazy filename $ content
-    m <- runTokenParser filename parseModule ts
-    return (k, (hdr, m))
+    return (k, hdr)
+
+-- | Parse a collection of modules in parallel
+parseModuleFromFile
+  :: (MonadError MultipleErrors m)
+  => FilePath
+  -> String
+  -> m Module
+parseModuleFromFile path content = throwParserError $ do
+  ts <- lex path content
+  runTokenParser path parseModule ts
 
 -- | Parse a collection of modules in parallel
 parseModulesFromFiles
@@ -98,9 +104,9 @@ parseModulesFromFiles
   -> m [(k, Module)]
 parseModulesFromFiles toFilePath input = do
   parseInParallel . flip map input $ \(k, content) -> do
-    let filename = toFilePath k
-    ts <- lex filename content
-    m <- runTokenParser filename parseModule ts
+    let path = toFilePath k
+    ts <- lex path content
+    m <- runTokenParser path parseModule ts
     return (k, m)
 
 parseInParallel :: MonadError MultipleErrors m => [Either P.ParseError (k, a)] -> m [(k, a)]
@@ -110,7 +116,7 @@ throwParserError :: MonadError MultipleErrors m => Either P.ParseError a -> m a
 throwParserError = either (throwError . MultipleErrors . pure . toPositionedError) return
 
 -- It is enough to force each parse result to WHNF, since success or failure can't be
--- determined until the end of the file, so this effectively distributes parsing of each file
+-- determined until the end of parsing, so this effectively distributes parsing of each file
 -- to a different spark.
 inParallel :: [Either e (k, a)] -> [Either e (k, a)]
 inParallel = withStrategy (parList rseq)

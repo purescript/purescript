@@ -127,13 +127,14 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map (P.extractModuleHeader &&& id) (map snd loadedModules ++ ms))
+make st@PSCiState{..} ms = P.make actions' (map P.extractModuleHeader (map snd loadedModules ++ ms)) loadModule
   where
   filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
   actions' = actions { P.progress = const (return ()) }
   loadedModules = psciLoadedModules st
   allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
+  loadModule = undefined
 
 
 -- Commands
