@@ -24,7 +24,7 @@ import           Prelude.Compat
 import           Control.Monad
 import           Data.Aeson
 import           Data.Text                         (Text)
-import qualified Language.PureScript as P
+import qualified Language.PureScript               as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
@@ -36,8 +36,9 @@ data Command
       , loadDependencies :: [ModuleIdent]
       }
     | Type
-      { typeSearch  :: DeclIdent
-      , typeFilters :: [Filter]
+      { typeSearch        :: DeclIdent
+      , typeFilters       :: [Filter]
+      , typeCurrentModule :: Maybe P.ModuleName
       }
     | Complete
       { completeFilters       :: [Filter]
@@ -111,7 +112,10 @@ instance FromJSON Command where
               <*> params .:? "dependencies" .!= []
       "type" -> do
         params <- o .: "params"
-        Type <$> params .: "search" <*> params .: "filters"
+        Type
+          <$> params .: "search"
+          <*> params .: "filters"
+          <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
       "complete" -> do
         params <- o .: "params"
         Complete

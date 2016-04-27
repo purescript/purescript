@@ -65,8 +65,8 @@ handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
 handleCommand (Load [] []) = loadAllModules
 handleCommand (Load modules deps) =
   loadModulesAndDeps modules deps
-handleCommand (Type search filters) =
-  findType search filters
+handleCommand (Type search filters currentModule) =
+  findType search filters currentModule
 handleCommand (Complete filters matcher currentModule) =
   findCompletions filters matcher currentModule
 handleCommand (Pursuit query Package) =
@@ -104,9 +104,10 @@ findCompletions filters matcher currentModule = do
   pure . CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher $ modules
 
 findType :: (PscIde m, MonadLogger m) =>
-            DeclIdent -> [Filter] -> m Success
-findType search filters =
-  CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters <$> getAllModulesWithReexports
+            DeclIdent -> [Filter] -> Maybe P.ModuleName -> m Success
+findType search filters currentModule = do
+  modules <- getAllModulesWithReexportsAndCache currentModule
+  pure . CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters $ modules
 
 findPursuitCompletions :: (MonadIO m, MonadLogger m) =>
                           PursuitQuery -> m Success
@@ -118,7 +119,7 @@ findPursuitPackages :: (MonadIO m, MonadLogger m) =>
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
-loadExtern ::(PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+loadExtern :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
              FilePath -> m ()
 loadExtern fp = do
   m <- readExternFile fp
