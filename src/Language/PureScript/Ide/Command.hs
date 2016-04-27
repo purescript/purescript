@@ -62,7 +62,9 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
+    | Rebuild FilePath Bool -- ^ Rebuild the specified file using the loaded
+                            -- externs. The Bool decides whether to store a
+                            -- successful result inside the server state.
     | Cwd
     | Quit
 
@@ -143,7 +145,9 @@ instance FromJSON Command where
           <*> params .: "importCommand"
       "rebuild" -> do
         params <- o .: "params"
-        Rebuild <$> params .: "file"
+        Rebuild
+          <$> params .: "file"
+          <*> params .:? "cacheSuccess" .!= False
       _ -> mzero
     where
       mkAnnotations True = explicitAnnotations

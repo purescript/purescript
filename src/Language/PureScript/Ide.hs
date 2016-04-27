@@ -91,8 +91,8 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
   case rs of
     Right rs' -> answerRequest outfp rs'
     Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
-handleCommand (Rebuild file) =
-  rebuildFile file
+handleCommand (Rebuild file cacheSuccess) =
+  rebuildFile file cacheSuccess
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Quit = liftIO exitSuccess

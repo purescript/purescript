@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 
 module Language.PureScript.Ide.Rebuild where
@@ -15,6 +16,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust, mapMaybe)
+import           Data.Monoid                     ((<>))
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
@@ -22,6 +24,7 @@ import qualified Language.PureScript.Externs     as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           System.Directory                (doesFileExist)
 import           System.FilePath                 (replaceExtension)
 import           System.IO.UTF8                  (readUTF8File)
@@ -45,8 +48,9 @@ import           System.IO.UTF8                  (readUTF8File)
 rebuildFile
   :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
+  -> Bool
   -> m Success
-rebuildFile path = do
+rebuildFile path cacheSuccess = do
 
   input <- liftIO $ readUTF8File path
 
@@ -78,9 +82,29 @@ rebuildFile path = do
                    $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
-    Right ef -> do
-      setCachedRebuild ef
+    Right _ -> do
+      when cacheSuccess $ rebuildModuleOpen mbe externs m
       pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
+
+
+-- | Rebuilds a module but opens up its export list first and stores the result
+-- inside the rebuild cache
+rebuildModuleOpen
+  :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
+  => MakeActionsEnv
+  -> [P.ExternsFile]
+  -> P.Module
+  -> m ()
+rebuildModuleOpen mbe externs m = do
+  (openResult, _) <- liftIO
+    . P.runMake P.defaultOptions
+    . P.rebuildModule (buildMakeActions >>= shushProgress >>= shushCodegen $ mbe) externs
+    $ openModuleExports $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
+  case openResult of
+    Left _ -> throwError (GeneralError "Failed when rebuilding with open exports")
+    Right result' -> do
+      $(logDebug) $ "Setting Rebuild cache: " <> runModuleNameT (P.efModuleName result')
+      setCachedRebuild result'
 
 -- | Parameters we can access while building our @MakeActions@
 data MakeActionsEnv =
@@ -136,3 +160,6 @@ sortExterns m ex = do
     -- Sort a list so its elements appear in the same order as in another list.
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]
     inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
+
+openModuleExports :: P.Module -> P.Module
+openModuleExports (P.Module a s d f _) = P.Module a s d f Nothing
