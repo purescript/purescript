@@ -8,14 +8,10 @@
 
 module Language.PureScript.Ide.Rebuild where
 
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
-
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader.Class
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust, mapMaybe)
@@ -23,11 +19,14 @@ import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
 import qualified Language.PureScript.Externs     as P
-import           System.FilePath (replaceExtension)
-import           System.Directory (doesFileExist)
-import           System.IO.UTF8 (readUTF8File)
+import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.State
+import           Language.PureScript.Ide.Types
+import           System.Directory                (doesFileExist)
+import           System.FilePath                 (replaceExtension)
+import           System.IO.UTF8                  (readUTF8File)
 
--- | Given a filepath does the following steps:
+-- | Given a filepath performs the following steps:
 --
 -- * Reads and parses a PureScript module from the filepath.
 --
@@ -64,21 +63,49 @@ rebuildFile path = do
   let foreignModule = replaceExtension path "js"
   foreignExists <- liftIO (doesFileExist foreignModule)
 
-  let ma = P.buildMakeActions outputDirectory
-                              (M.singleton (P.getModuleName m) (Left P.RebuildAlways))
-                              (if foreignExists
-                                 then M.singleton (P.getModuleName m) foreignModule
-                                 else M.empty)
-                              False
+
+  let mbe = MakeActionsEnv
+        { mbeOutputDirectory = outputDirectory
+        , mbeFilePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
+        , mbeForeignPathMap = if foreignExists
+                              then M.singleton (P.getModuleName m) foreignModule
+                              else M.empty
+        , mbePrefixComment = False
+        }
   (result, warnings) <- liftIO
                    . P.runMake P.defaultOptions
-                   . P.rebuildModule (ma { P.progress = const (pure ()) }) externs
+                   . P.rebuildModule (buildMakeActions >>= shushProgress $ mbe) externs
                    $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right ef -> do
       setCachedRebuild ef
       pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
+
+-- | Parameters we can access while building our @MakeActions@
+data MakeActionsEnv =
+  MakeActionsEnv
+  { mbeOutputDirectory :: FilePath
+  , mbeFilePathMap     :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+  , mbeForeignPathMap  :: M.Map P.ModuleName FilePath
+  , mbePrefixComment   :: Bool
+  }
+
+-- | Builds the default @MakeActions@ from a @MakeActionsEnv@
+buildMakeActions :: MakeActionsEnv -> P.MakeActions P.Make
+buildMakeActions MakeActionsEnv{..} =
+  P.buildMakeActions mbeOutputDirectory mbeFilePathMap mbeForeignPathMap mbePrefixComment
+
+-- | Shuts the compiler up about progress messages
+shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
+shushProgress ma _ =
+  ma { P.progress = \_ -> pure () }
+
+-- | Stops any kind of codegen (also silences errors about missing or unused FFI
+-- files though)
+shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
+shushCodegen ma MakeActionsEnv{..} =
+  ma { P.codegen = \_ _ _ -> pure () }
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the
