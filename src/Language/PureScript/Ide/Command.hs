@@ -23,7 +23,6 @@ import           Prelude.Compat
 
 import           Control.Monad
 import           Data.Aeson
-import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.CaseSplit
