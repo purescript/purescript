@@ -7,9 +7,10 @@ import Prelude
 import Test.Assert (assert)
 
 foreign import same :: forall eff a b. a -> b -> Eff eff Boolean
-foreign import exit :: forall eff. Eff eff Unit
 
 data T = C | D Int | E Int Int
+
+data Maybe a = Just a | Nothing
 
 main = do
   let c = C
@@ -43,7 +44,10 @@ main = do
   assert (not justEq2)
 
   let maybe = case (case just of Maybe.Just maybe -> Maybe.Just Maybe.maybe) of Maybe.Just m -> m
-  dangerousEq <- same Maybe.maybe maybe
-  assert dangerousEq
+  dangerousEq1 <- same Maybe.maybe maybe
+  assert dangerousEq1
+
+  dangerousEq2 <- same just (case just of Maybe.Just x -> Just x)
+  assert (not dangerousEq2)
 
   log "Success!"

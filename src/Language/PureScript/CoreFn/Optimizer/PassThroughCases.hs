@@ -51,14 +51,16 @@ passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls 
                    -> [Binder Ann]
                    -> Expr Ann
                    -> Bool
-  isReconstruction ctor prms body =
+  isReconstruction (Qualified (Just ctorModule) ctor) prms body =
     case dissectConstruction body of
-      Just (ctor', args) ->
-        Ident (runProperName $ disqualify ctor) == disqualify ctor'
+      Just (Qualified (Just ctorModule') ctor', args) ->
+        ctorModule == ctorModule'
+        && Ident (runProperName ctor) == ctor'
         && all isBinderArg (prms `zip` args)
-      Nothing -> False
+      _ -> False
     where isBinderArg (VarBinder _ i, Var _ (Qualified Nothing i')) = i == i'
           isBinderArg _ = False
+  isReconstruction _ _ _ = False
 
 
 -- |

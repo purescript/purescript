@@ -9,7 +9,3 @@ exports.same = function(a) {
         };
     };
 };
-
-exports.exit = function() {
-    process.exit(1);
-};
