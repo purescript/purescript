@@ -17,32 +17,35 @@ module Language.PureScript.CoreFn.Optimizer.PassThroughCases
   ( passThroughCases
   ) where
 
+import Control.Monad.Supply.Class (freshName, MonadSupply)
 import Language.PureScript.CoreFn.Ann (Ann)
 import Language.PureScript.CoreFn.Binders (Binder(..))
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Meta (Meta(IsConstructor))
 import Language.PureScript.CoreFn.Module (Module, moduleDecls)
-import Language.PureScript.CoreFn.Traversals (everywhereOnValues)
+import Language.PureScript.CoreFn.Traversals (everywhereOnValuesM)
 import Language.PureScript.Names
 
-passThroughCases :: Module Ann -> Module Ann
-passThroughCases m = m { moduleDecls = onBinds (moduleDecls m) }
+passThroughCases :: (Monad m, MonadSupply m) => Module Ann -> m (Module Ann)
+passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls m)
   where
-  onBinds :: [Bind Ann] -> [Bind Ann]
-  onBinds = let (f, _, _) = everywhereOnValues id onExpr id
-             in map f
+  onBinds :: (Monad m, MonadSupply m) => [Bind Ann] -> m [Bind Ann]
+  onBinds = let (f, _, _) = everywhereOnValuesM return onExpr return
+             in mapM f
 
-  onExpr :: Expr Ann -> Expr Ann
-  onExpr (Case ss ts cs) = Case ss ts (map optimize cs)
-  onExpr e = e
+  onExpr :: (Monad m, MonadSupply m) => Expr Ann -> m (Expr Ann)
+  onExpr (Case ss ts cs) = Case ss ts <$> mapM optimize cs
+  onExpr e = return e
 
-  optimize :: CaseAlternative Ann -> CaseAlternative Ann
+  optimize :: (Monad m, MonadSupply m) => CaseAlternative Ann -> m (CaseAlternative Ann)
   optimize (CaseAlternative [bndr@(ConstructorBinder bndrAnn _ ctor prms)] (Right body))
-    | isReconstruction ctor prms body =
+    | isReconstruction ctor prms body = do
         let (_, comments, type_, _) = bndrAnn
             varAnn = (Nothing, comments, type_, Nothing)
-         in CaseAlternative [NamedBinder bndrAnn v bndr] (Right $ Var varAnn qv)
-  optimize a = a
+        v <- Ident <$> freshName
+        return $ CaseAlternative [NamedBinder bndrAnn v bndr]
+                                 (Right $ Var varAnn (Qualified Nothing $ v))
+  optimize a = return a
 
   isReconstruction :: Qualified (ProperName 'ConstructorName)
                    -> [Binder Ann]
@@ -56,12 +59,6 @@ passThroughCases m = m { moduleDecls = onBinds (moduleDecls m) }
       Nothing -> False
     where isBinderArg (VarBinder _ i, Var _ i') = i == disqualify i'
           isBinderArg _ = False
-
-  v :: Ident
-  v = Ident "v"
-
-  qv :: Qualified Ident
-  qv = Qualified Nothing v
 
 
 -- |
