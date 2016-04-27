@@ -40,6 +40,7 @@ import           Data.Maybe                         (catMaybes, mapMaybe)
 import           Data.Monoid
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
+import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -66,8 +67,8 @@ handleCommand (Load modules deps) =
   loadModulesAndDeps modules deps
 handleCommand (Type search filters) =
   findType search filters
-handleCommand (Complete filters matcher) =
-  findCompletions filters matcher
+handleCommand (Complete filters matcher currentModule) =
+  findCompletions filters matcher currentModule
 handleCommand (Pursuit query Package) =
   findPursuitPackages query
 handleCommand (Pursuit query Identifier) =
@@ -97,9 +98,10 @@ handleCommand Cwd =
 handleCommand Quit = liftIO exitSuccess
 
 findCompletions :: (PscIde m, MonadLogger m) =>
-                   [Filter] -> Matcher -> m Success
-findCompletions filters matcher =
-  CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher <$> getAllModulesWithReexports
+                   [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
+findCompletions filters matcher currentModule = do
+  modules <- getAllModulesWithReexportsAndCache currentModule
+  pure . CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher $ modules
 
 findType :: (PscIde m, MonadLogger m) =>
             DeclIdent -> [Filter] -> m Success
