@@ -16,4 +16,6 @@ optimize m = do
   if noOpt then return m else return (optimize' m)
 
 optimize' :: Module Ann -> Module Ann
-optimize' = passThroughCases
+optimize' = foldl1 (.) passes
+  where passes = [ passThroughCases
+                 ]
