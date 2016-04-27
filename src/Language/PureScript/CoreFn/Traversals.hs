@@ -9,6 +9,7 @@ import Data.Functor.Identity (runIdentity)
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.AST.Literals
+import Language.PureScript.Traversals (eitherM, pairM)
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->
@@ -54,14 +55,10 @@ everywhereOnValuesM f g h = (f', g', h')
   h' (ConstructorBinder a q1 q2 bs) = h . ConstructorBinder a q1 q2 =<< mapM h' bs
   h' b = h b
 
-  handleCaseAlternative ca = do
-    caseAlternativeBinders' <- mapM h' (caseAlternativeBinders ca)
-    caseAlternativeResult' <- case caseAlternativeResult ca of
-      Left guardeds -> Left <$> mapM (\(grd, e) -> (,) <$> g' grd <*> g' e) guardeds
-      Right expr -> Right <$> g' expr
-    return $ ca { caseAlternativeBinders = caseAlternativeBinders'
-                , caseAlternativeResult = caseAlternativeResult'
-                }
+  handleCaseAlternative ca =
+    CaseAlternative
+      <$> traverse h' (caseAlternativeBinders ca)
+      <*> eitherM (traverse (pairM g' g')) g' (caseAlternativeResult ca)
 
   handleLiteral :: (Monad m) => (a -> m a) -> Literal a -> m (Literal a)
   handleLiteral i (ArrayLiteral ls) = ArrayLiteral <$> mapM i ls
