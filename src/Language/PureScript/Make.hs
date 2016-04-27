@@ -158,17 +158,17 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
   lint m
-  ((checked@(Module ss coms _ elaborated exps), env'), nextVar1) <- runSupplyT 0 $ do
+  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [m]
     runCheck' env $ typeCheckModule desugared
   checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-  (optCoreFn, nextVar2) <- runSupplyT nextVar1 $ CF.optimize corefn
+  (optCoreFn, nextVar') <- runSupplyT nextVar $ CF.optimize corefn
   let [renamed] = renameInModules [optCoreFn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar2 . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
+  evalSupplyT nextVar' . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
   return exts
 
 -- |
