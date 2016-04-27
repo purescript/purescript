@@ -69,20 +69,11 @@ passThroughCases m = m { moduleDecls = onBinds (moduleDecls m) }
 -- call.
 --
 dissectConstruction :: Expr Ann -> Maybe (Qualified Ident, [Expr Ann])
-dissectConstruction e = (,) <$> findConstructor e <*> findArguments e
+dissectConstruction e =
+  case unApp e of
+    (Var ann c, args) | isConstructor ann -> Just (c, args)
+    _ -> Nothing
   where
-  findConstructor :: Expr Ann -> Maybe (Qualified Ident)
-  findConstructor (App _ (Var ann c) _)
-    | isConstructor ann = Just c
-    | otherwise         = Nothing
-  findConstructor (App _ c _) = findConstructor c
-  findConstructor _ = Nothing
-
-  findArguments :: Expr Ann -> Maybe [Expr Ann]
-  findArguments (App _ (Var _ _) a) = Just [a]
-  findArguments (App _ c a) = (++ [a]) <$> findArguments c
-  findArguments _ = Nothing
-
   isConstructor :: Ann -> Bool
   isConstructor (_, _, _, Just (IsConstructor _ _)) = True
   isConstructor _ = False

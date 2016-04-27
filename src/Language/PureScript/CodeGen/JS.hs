@@ -222,7 +222,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     ret <- valueToJs val
     return $ JSFunction Nothing Nothing [identToJs arg] (JSBlock Nothing [JSReturn Nothing ret])
   valueToJs' e@App{} = do
-    let (f, args) = unApp e []
+    let (f, args) = unApp e
     args' <- mapM valueToJs args
     case f of
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
@@ -231,10 +231,6 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       Var (_, _, _, Just IsTypeClassConstructor) name ->
         return $ JSUnary Nothing JSNew $ JSApp Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> JSApp Nothing fn [a])) args' <$> valueToJs f
-    where
-    unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
-    unApp (App _ val arg) args = unApp val (arg : args)
-    unApp other args = (other, args)
   valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
     return $ if mn' == mn
              then foreignIdent ident

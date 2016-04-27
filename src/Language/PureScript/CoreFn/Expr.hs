@@ -119,3 +119,13 @@ modifyAnn f (App a b c)           = App (f a) b c
 modifyAnn f (Var a b)             = Var (f a) b
 modifyAnn f (Case a b c)          = Case (f a) b c
 modifyAnn f (Let a b c)           = Let (f a) b c
+
+
+-- |
+-- Extract the callee and arguments of a call.
+--
+unApp :: Expr a -> (Expr a, [Expr a])
+unApp e = go e []
+  where
+  go (App _ val arg) args = go val (arg : args)
+  go other args = (other, args)
