@@ -6,7 +6,7 @@ import Data.Maybe as Maybe
 import Prelude
 import Test.Assert (assert)
 
-foreign import same :: forall eff a. a -> a -> Eff eff Boolean
+foreign import same :: forall eff a b. a -> b -> Eff eff Boolean
 foreign import exit :: forall eff. Eff eff Unit
 
 data T = C | D Int | E Int Int
@@ -41,5 +41,9 @@ main = do
 
   justEq2 <- same just (case just of Maybe.Just x -> Maybe.Just 2)
   assert (not justEq2)
+
+  let maybe = case (case just of Maybe.Just maybe -> Maybe.Just Maybe.maybe) of Maybe.Just m -> m
+  dangerousEq <- same Maybe.maybe maybe
+  assert dangerousEq
 
   log "Success!"
