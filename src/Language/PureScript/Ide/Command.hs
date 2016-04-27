@@ -25,8 +25,7 @@ import           Control.Monad
 import           Data.Aeson
 import           Data.Maybe
 import           Data.Text                         (Text)
-import           Language.PureScript               (ModuleName,
-                                                    moduleNameFromString)
+import qualified Language.PureScript as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
@@ -42,8 +41,9 @@ data Command
       , typeFilters :: [Filter]
       }
     | Complete
-      { completeFilters :: [Filter]
-      , completeMatcher :: Matcher
+      { completeFilters       :: [Filter]
+      , completeMatcher       :: Matcher
+      , completeCurrentModule :: Maybe P.ModuleName
       }
     | Pursuit
       { pursuitQuery      :: PursuitQuery
@@ -68,7 +68,7 @@ data Command
     | Quit
 
 data ImportCommand
-  = AddImplicitImport ModuleName
+  = AddImplicitImport P.ModuleName
   | AddImportForIdentifier DeclIdent
   deriving (Show, Eq)
 
@@ -76,12 +76,10 @@ instance FromJSON ImportCommand where
   parseJSON = withObject "ImportCommand" $ \o -> do
     (command :: String) <- o .: "importCommand"
     case command of
-      "addImplicitImport" -> do
-        mn <- o .: "module"
-        pure (AddImplicitImport (moduleNameFromString mn))
-      "addImport" -> do
-        ident <- o .: "identifier"
-        pure (AddImportForIdentifier ident)
+      "addImplicitImport" ->
+        AddImplicitImport <$> (P.moduleNameFromString <$> o .: "module")
+      "addImport" ->
+        AddImportForIdentifier <$> o .: "identifier"
       _ -> mzero
 
 data ListType = LoadedModules | Imports FilePath | AvailableModules
@@ -90,68 +88,64 @@ instance FromJSON ListType where
   parseJSON = withObject "ListType" $ \o -> do
     (listType' :: String) <- o .: "type"
     case listType' of
-      "import" -> do
-        fp <- o .: "file"
-        return (Imports fp)
-      "loadedModules" -> return LoadedModules
-      "availableModules" -> return AvailableModules
+      "import" -> Imports <$> o .: "file"
+      "loadedModules" -> pure LoadedModules
+      "availableModules" -> pure AvailableModules
       _ -> mzero
 
 instance FromJSON Command where
   parseJSON = withObject "command" $ \o -> do
     (command :: String) <- o .: "command"
     case command of
-      "list" -> do
-        listType' <- o .:? "params"
-        return $ List (fromMaybe LoadedModules listType')
-      "cwd"  -> return Cwd
-      "quit" -> return Quit
-      "load" ->
-        maybe (pure (Load [] [])) (\params -> do
-          mods <- params .:? "modules"
-          deps <- params .:? "dependencies"
-          pure $ Load (fromMaybe [] mods) (fromMaybe [] deps)) =<< o .:? "params"
+      "list" -> List <$> o .:? "params" .!= LoadedModules
+      "cwd"  -> pure Cwd
+      "quit" -> pure Quit
+      "load" -> do
+        params' <- o .:? "params"
+        case params' of
+          Nothing -> pure (Load [] [])
+          Just params ->
+            Load
+              <$> params .:? "modules" .!= []
+              <*> params .:? "dependencies" .!= []
       "type" -> do
         params <- o .: "params"
-        search <- params .: "search"
-        filters <- params .: "filters"
-        return $ Type search filters
+        Type <$> params .: "search" <*> params .: "filters"
       "complete" -> do
         params <- o .: "params"
-        filters <- params .:? "filters"
-        matcher <- params .:? "matcher"
-        return $ Complete (fromMaybe [] filters) (fromMaybe mempty matcher)
+        Complete
+          <$> params .:? "filters" .!= []
+          <*> params .:? "matcher" .!= mempty
+          <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
       "pursuit" -> do
         params <- o .: "params"
-        query <- params .: "query"
-        queryType <- params .: "type"
-        return $ Pursuit query queryType
+        Pursuit
+          <$> params .: "query"
+          <*> params .: "type"
       "caseSplit" -> do
         params <- o .: "params"
-        line <- params .: "line"
-        begin <- params .: "begin"
-        end <- params .: "end"
-        annotations <- params .: "annotations"
-        type' <- params .: "type"
-        return $ CaseSplit line begin end (if annotations
-                                           then explicitAnnotations
-                                           else noAnnotations) type'
+        CaseSplit
+          <$> params .: "line"
+          <*> params .: "begin"
+          <*> params .: "end"
+          <*> (mkAnnotations <$> params .: "annotations")
+          <*> params .: "type"
       "addClause" -> do
         params <- o .: "params"
-        line <- params .: "line"
-        annotations <- params .: "annotations"
-        return $ AddClause line (if annotations
-                                 then explicitAnnotations
-                                 else noAnnotations)
+        AddClause
+          <$> params .: "line"
+          <*> (mkAnnotations <$> params .: "annotations")
       "import" -> do
         params <- o .: "params"
-        fp <- params .: "file"
-        out <- params .:? "outfile"
-        filters <- params .:? "filters"
-        importCommand <- params .: "importCommand"
-        pure $ Import fp out (fromMaybe [] filters) importCommand
+        Import
+          <$> params .: "file"
+          <*> params .:? "outfile"
+          <*> params .:? "filters" .!= []
+          <*> params .: "importCommand"
       "rebuild" -> do
         params <- o .: "params"
-        filePath <- params .: "file"
-        return $ Rebuild filePath
+        Rebuild <$> params .: "file"
       _ -> mzero
+    where
+      mkAnnotations True = explicitAnnotations
+      mkAnnotations False = noAnnotations
