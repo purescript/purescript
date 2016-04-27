@@ -57,7 +57,7 @@ passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls 
         Ident (runProperName $ disqualify ctor) == disqualify ctor'
         && all isBinderArg (prms `zip` args)
       Nothing -> False
-    where isBinderArg (VarBinder _ i, Var _ i') = i == disqualify i'
+    where isBinderArg (VarBinder _ i, Var _ (Qualified Nothing i')) = i == i'
           isBinderArg _ = False
 
 
