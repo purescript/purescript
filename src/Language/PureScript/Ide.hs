@@ -123,7 +123,7 @@ loadExtern fp = do
   insertModule m
 
 printModules :: (PscIde m) => m Success
-printModules = printModules' <$> getPscIdeState
+printModules = printModules' . pscIdeStateModules <$> getPscIdeState
 
 printModules' :: M.Map ModuleIdent [ExternDecl] -> Success
 printModules' = ModuleList . M.keys

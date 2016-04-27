@@ -88,7 +88,7 @@ data PscIdeState =
   PscIdeState
   { pscIdeStateModules       :: M.Map Text [ExternDecl]
   , pscIdeStateExternsFiles  :: M.Map P.ModuleName ExternsFile
-  , pscIdeStateCachedRebuild :: Maybe ExternsFile
+  , pscIdeStateCachedRebuild :: Maybe (P.ModuleName, ExternsFile)
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
