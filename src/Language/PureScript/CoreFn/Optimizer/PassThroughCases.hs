@@ -5,6 +5,13 @@
 -- > -- becomes
 -- > f c@(C _) = c
 --
+-- This optimization is safe; PureScript provides no way to compare the memory
+-- location of values, so data constructor calls can be optimized out freely.
+--
+-- This optimization must be performed after type checking, because it may
+-- change the code in such a way that the result is ill-typed. This optimization
+-- is performed before code generation, because it is common to all back-ends.
+--
 
 module Language.PureScript.CoreFn.Optimizer.PassThroughCases
   ( passThroughCases
