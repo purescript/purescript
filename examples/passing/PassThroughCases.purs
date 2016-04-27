@@ -6,7 +6,7 @@ import Data.Maybe as Maybe
 import Prelude
 import Test.Assert (assert)
 
-foreign import same :: forall eff a b. a -> b -> Eff eff Boolean
+foreign import refEq :: forall eff a b. a -> b -> Eff eff Boolean
 
 data T = C | D Int | E Int Int
 
@@ -19,35 +19,35 @@ main = do
   let nothing = Maybe.Nothing
   let just = Maybe.Just 1
 
-  aEq <- same c (case c of C -> C)
+  aEq <- refEq c (case c of C -> C)
   assert (aEq)
 
-  dEq1 <- same d (case d of D x -> D x)
+  dEq1 <- refEq d (case d of D x -> D x)
   assert (dEq1)
 
-  dEq2 <- same d (case d of D x -> D 2)
+  dEq2 <- refEq d (case d of D x -> D 2)
   assert (not dEq2)
 
-  eEq1 <- same e (case e of E x y -> E x y)
+  eEq1 <- refEq e (case e of E x y -> E x y)
   assert (eEq1)
 
-  eEq2 <- same e (case e of E x y -> E y x)
+  eEq2 <- refEq e (case e of E x y -> E y x)
   assert (not eEq2)
 
-  nothingEq <- same nothing (case nothing of Maybe.Nothing -> Maybe.Nothing)
+  nothingEq <- refEq nothing (case nothing of Maybe.Nothing -> Maybe.Nothing)
   assert (nothingEq)
 
-  justEq1 <- same just (case just of Maybe.Just x -> Maybe.Just x)
+  justEq1 <- refEq just (case just of Maybe.Just x -> Maybe.Just x)
   assert (justEq1)
 
-  justEq2 <- same just (case just of Maybe.Just x -> Maybe.Just 2)
+  justEq2 <- refEq just (case just of Maybe.Just x -> Maybe.Just 2)
   assert (not justEq2)
 
   let maybe = case (case just of Maybe.Just maybe -> Maybe.Just Maybe.maybe) of Maybe.Just m -> m
-  dangerousEq1 <- same Maybe.maybe maybe
-  assert dangerousEq1
+  dangerousEq1 <- refEq Maybe.maybe maybe
+  assert (dangerousEq1)
 
-  dangerousEq2 <- same just (case just of Maybe.Just x -> Just x)
+  dangerousEq2 <- refEq just (case just of Maybe.Just x -> Just x)
   assert (not dangerousEq2)
 
   log "Success!"
