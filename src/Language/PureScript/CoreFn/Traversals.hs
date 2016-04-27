@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 -- |
 -- CoreFn traversal helpers
 --
@@ -25,7 +26,7 @@ everywhereOnValuesM :: (Monad m) =>
 everywhereOnValuesM f g h = (f', g', h')
   where
   f' (NonRec a name e) = f . NonRec a name =<< g' e
-  f' (Rec es) = f . Rec =<< mapM (\(b, e) -> (\e -> (b, e)) <$> g' e) es
+  f' (Rec es) = f . Rec =<< mapM (\(b, e) -> (b,) <$> g' e) es
 
   g' (Literal ann e) = g . Literal ann =<< handleLiteral g' e
   g' (Accessor ann prop e) = g . Accessor ann prop =<< g' e
@@ -56,7 +57,7 @@ everywhereOnValuesM f g h = (f', g', h')
   handleCaseAlternative ca = do
     caseAlternativeBinders' <- mapM h' (caseAlternativeBinders ca)
     caseAlternativeResult' <- case caseAlternativeResult ca of
-      Left guardeds -> Left <$> mapM (\(g, e) -> (,) <$> g' g <*> g' e) guardeds
+      Left guardeds -> Left <$> mapM (\(grd, e) -> (,) <$> g' grd <*> g' e) guardeds
       Right expr -> Right <$> g' expr
     return $ ca { caseAlternativeBinders = caseAlternativeBinders'
                 , caseAlternativeResult = caseAlternativeResult'
