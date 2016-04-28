@@ -66,7 +66,6 @@ getExternFiles = do
 getAllModulesWithReexports :: (PscIde m) => m [Module]
 getAllModulesWithReexports = getAllModulesWithReexports' <$> getPscIdeState
 
-
 -- | Pure version of @getAllModulesWithReexports@
 getAllModulesWithReexports' :: PscIdeState -> [Module]
 getAllModulesWithReexports' state =
@@ -113,7 +112,7 @@ insertModule externsFile = do
   stateVar <- envStateVar <$> ask
   let moduleName = efModuleName externsFile
   $(logDebug) $ "Inserting Module: " <> runModuleNameT moduleName
-  liftIO . atomically $ insertModuleSTM stateVar externsFile 
+  liftIO . atomically $ insertModuleSTM stateVar externsFile
 
 -- | STM version of insertModule
 insertModuleSTM :: TVar PscIdeState -> ExternsFile -> STM ()
