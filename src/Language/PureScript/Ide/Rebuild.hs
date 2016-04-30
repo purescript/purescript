@@ -7,7 +7,9 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 
-module Language.PureScript.Ide.Rebuild where
+module Language.PureScript.Ide.Rebuild
+  ( rebuildFile
+  ) where
 
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
@@ -54,11 +56,12 @@ rebuildFile path cacheSuccess = do
 
   input <- liftIO $ readUTF8File path
 
-  m <- case map snd <$> P.parseModulesFromFiles id [(path, input)] of
-         Left parseError ->
-           throwError . RebuildError . toJSONErrors False P.Error $ parseError
-         Right [m] -> pure m
-         Right _ -> throwError . GeneralError $ "Please define exactly one module."
+  m <- P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) <$>
+    case map snd <$> P.parseModulesFromFiles id [(path, input)] of
+      Left parseError ->
+        throwError . RebuildError . toJSONErrors False P.Error $ parseError
+      Right [m] -> pure m
+      Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
   externs <- sortExterns m =<< getExternFiles
 
@@ -67,25 +70,25 @@ rebuildFile path cacheSuccess = do
   let foreignModule = replaceExtension path "js"
   foreignExists <- liftIO (doesFileExist foreignModule)
 
-
-  let mbe = MakeActionsEnv
-        { mbeOutputDirectory = outputDirectory
-        , mbeFilePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-        , mbeForeignPathMap = if foreignExists
+  let makeEnv =
+        MakeActionsEnv
+        { maeOutputDirectory = outputDirectory
+        , maeFilePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
+        , maeForeignPathMap = if foreignExists
                               then M.singleton (P.getModuleName m) foreignModule
                               else M.empty
-        , mbePrefixComment = False
+        , maePrefixComment = False
         }
   (result, warnings) <- liftIO
-                   . P.runMake P.defaultOptions
-                   . P.rebuildModule (buildMakeActions >>= shushProgress $ mbe) externs
-                   $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
+    . P.runMake P.defaultOptions
+    . P.rebuildModule (buildMakeActions
+                        >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
+    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
     Right _ -> do
-      when cacheSuccess $ rebuildModuleOpen mbe externs m
-      pure . RebuildSuccess $ toJSONErrors False P.Warning warnings
-
+      when cacheSuccess $
+        rebuildModuleOpen makeEnv externs m
+      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
@@ -95,30 +98,38 @@ rebuildModuleOpen
   -> [P.ExternsFile]
   -> P.Module
   -> m ()
-rebuildModuleOpen mbe externs m = do
+rebuildModuleOpen makeEnv externs m = do
   (openResult, _) <- liftIO
     . P.runMake P.defaultOptions
-    . P.rebuildModule (buildMakeActions >>= shushProgress >>= shushCodegen $ mbe) externs
-    $ openModuleExports $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
+    . P.rebuildModule (buildMakeActions
+                       >>= shushProgress
+                       >>= shushCodegen
+                       $ makeEnv) externs $ openModuleExports m
   case openResult of
-    Left _ -> throwError (GeneralError "Failed when rebuilding with open exports")
-    Right result' -> do
-      $(logDebug) $ "Setting Rebuild cache: " <> runModuleNameT (P.efModuleName result')
-      setCachedRebuild result'
+    Left _ ->
+      throwError (GeneralError "Failed when rebuilding with open exports")
+    Right result -> do
+      $(logDebug)
+        ("Setting Rebuild cache: " <> runModuleNameT (P.efModuleName result))
+      setCachedRebuild result
 
 -- | Parameters we can access while building our @MakeActions@
 data MakeActionsEnv =
   MakeActionsEnv
-  { mbeOutputDirectory :: FilePath
-  , mbeFilePathMap     :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-  , mbeForeignPathMap  :: M.Map P.ModuleName FilePath
-  , mbePrefixComment   :: Bool
+  { maeOutputDirectory :: FilePath
+  , maeFilePathMap     :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+  , maeForeignPathMap  :: M.Map P.ModuleName FilePath
+  , maePrefixComment   :: Bool
   }
 
 -- | Builds the default @MakeActions@ from a @MakeActionsEnv@
 buildMakeActions :: MakeActionsEnv -> P.MakeActions P.Make
 buildMakeActions MakeActionsEnv{..} =
-  P.buildMakeActions mbeOutputDirectory mbeFilePathMap mbeForeignPathMap mbePrefixComment
+  P.buildMakeActions
+    maeOutputDirectory
+    maeFilePathMap
+    maeForeignPathMap
+    maePrefixComment
 
 -- | Shuts the compiler up about progress messages
 shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
@@ -161,5 +172,6 @@ sortExterns m ex = do
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]
     inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
+-- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
-openModuleExports (P.Module a s d f _) = P.Module a s d f Nothing
+openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
