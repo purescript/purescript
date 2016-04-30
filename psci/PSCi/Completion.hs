@@ -7,7 +7,6 @@ import Prelude.Compat
 
 import Data.Maybe (mapMaybe)
 import Data.List (nub, nubBy, sortBy, isPrefixOf, stripPrefix)
-import Data.Char (isUpper)
 import Data.Function (on)
 
 import Control.Arrow (second)
@@ -87,10 +86,8 @@ directiveArg _ Kind        = [CtxType]
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =
   case (ws, w') of
-    (["import"], w) | headSatisfies isUpper w -> [CtxModule]
-    (["import"], _)                           -> [CtxModule, CtxFixed "qualified"]
-    (["import", "qualified"], _)              -> [CtxModule]
-    _                                         -> []
+    (["import"], _) -> [CtxModule]
+    _               -> []
 
 headSatisfies :: (a -> Bool) -> [a] -> Bool
 headSatisfies p str =

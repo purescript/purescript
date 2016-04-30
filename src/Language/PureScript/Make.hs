@@ -42,7 +42,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Concurrent.Lifted as C
 
 import Data.List (foldl', sort)
-import Data.Maybe (fromMaybe, catMaybes, isJust)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Either (partitionEithers)
 import Data.Time.Clock
 import Data.String (fromString)
@@ -158,10 +158,9 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
   lint m
-  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
+  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [m]
     runCheck' env $ typeCheckModule desugared
-  checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
@@ -181,9 +180,6 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadE
      -> [Module]
      -> m Environment
 make ma@MakeActions{..} ms = do
-  requirePath <- asks optionsRequirePath
-  when (isJust requirePath) $ tell $ errorMessage DeprecatedRequirePath
-
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms

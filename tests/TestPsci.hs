@@ -60,7 +60,6 @@ completionTestData =
   -- import should complete module names
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
-  , ("import qualified Control.Monad.Eff.", map ("import qualified Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
   -- :load, :module should complete file paths
   , (":l tests/support/psci/", [":l tests/support/psci/Sample.purs"])
@@ -91,8 +90,7 @@ completionTestData =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import q", ["import qualified"])
-  , ("import ", map ("import " ++) supportModules ++ ["import qualified"])
+  , ("import ", map ("import " ++) supportModules)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed
