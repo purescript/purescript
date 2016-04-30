@@ -39,9 +39,6 @@ data Options = Options {
     -- Remove the comments from the generated js
   , optionsNoComments :: Bool
     -- |
-    -- The path to prepend to require statements
-  , optionsRequirePath :: Maybe FilePath
-    -- |
     -- Generate soure maps
   , optionsSourceMaps :: Bool
   } deriving Show
@@ -49,4 +46,4 @@ data Options = Options {
 -- |
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False False False Nothing False
+defaultOptions = Options False False Nothing False False False False

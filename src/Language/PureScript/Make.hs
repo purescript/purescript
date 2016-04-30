@@ -42,7 +42,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Concurrent.Lifted as C
 
 import Data.List (foldl', sort)
-import Data.Maybe (fromMaybe, catMaybes, isJust)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Either (partitionEithers)
 import Data.Time.Clock
 import Data.String (fromString)
@@ -181,9 +181,6 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadE
      -> [Module]
      -> m Environment
 make ma@MakeActions{..} ms = do
-  requirePath <- asks optionsRequirePath
-  when (isJust requirePath) $ tell $ errorMessage DeprecatedRequirePath
-
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms
