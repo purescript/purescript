@@ -6,7 +6,7 @@ module B where
 
 module C (module A, module M2) where
   import A
-  import qualified B as M2
+  import B as M2
 
 module Main where
 

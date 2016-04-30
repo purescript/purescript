@@ -34,7 +34,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.List (nub, stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
 import Data.Version (showVersion)
@@ -134,13 +134,13 @@ printErrorMessage (ErrorInModule mid e) =
     name ++ " (" ++ showModuleType ty ++ ")"
 
 -- | Calculate the ModuleIdentifier which a require(...) statement imports.
-checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
-checkImportPath _ "./foreign" m _ =
+checkImportPath :: String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
+checkImportPath "./foreign" m _ =
   Right (ModuleIdentifier (moduleName m) Foreign)
-checkImportPath requirePath name _ names
-  | Just name' <- stripPrefix (fromMaybe "../" requirePath) name
+checkImportPath name _ names
+  | Just name' <- stripPrefix "../" name
   , name' `S.member` names = Right (ModuleIdentifier name' Regular)
-checkImportPath _ name _ _ = Left name
+checkImportPath name _ _ = Left name
 
 -- | Compute the dependencies of all elements in a module, and add them to the tree.
 --
@@ -222,8 +222,8 @@ trailingCommaList (JSCTLNone l) = commaList l
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSAST -> m Module
-toModule requirePath mids mid top
+toModule :: forall m. (MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSAST -> m Module
+toModule mids mid top
   | JSAstProgram smts _ <- top = Module mid <$> traverse toModuleElement smts
   | otherwise = err InvalidTopLevel
   where
@@ -231,7 +231,7 @@ toModule requirePath mids mid top
 
   toModuleElement :: JSStatement -> m ModuleElement
   toModuleElement stmt
-    | Just (importName, importPath) <- matchRequire requirePath mids mid stmt
+    | Just (importName, importPath) <- matchRequire mids mid stmt
     = pure (Require stmt importName importPath)
   toModuleElement stmt
     | Just (exported, name, decl) <- matchMember stmt
@@ -291,12 +291,11 @@ getExportedIdentifiers mname top
 
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
-matchRequire :: Maybe FilePath
-                -> S.Set String
+matchRequire :: S.Set String
                 -> ModuleIdentifier
                 -> JSStatement
                 -> Maybe (String, Either String ModuleIdentifier)
-matchRequire requirePath mids mid stmt
+matchRequire mids mid stmt
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ importName <- var
@@ -304,7 +303,7 @@ matchRequire requirePath mids mid stmt
   , JSMemberExpression req _ argsE _ <- jsInitEx
   , JSIdentifier _ "require" <- req
   , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
-  , importPath' <- checkImportPath requirePath importPath mid mids
+  , importPath' <- checkImportPath importPath mid mids
   = Just (importName, importPath')
   | otherwise
   = Nothing
@@ -590,16 +589,15 @@ bundle :: (MonadError ErrorMessage m)
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
-       -> Maybe FilePath -- ^ The require path prefix
        -> m String
-bundle inputStrs entryPoints mainModule namespace requirePath = do
+bundle inputStrs entryPoints mainModule namespace = do
   input <- forM inputStrs $ \(ident, js) -> do
                 ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
 
   let mids = S.fromList (map (moduleName . fst) input)
 
-  modules <- traverse (fmap withDeps . uncurry (toModule requirePath mids)) input
+  modules <- traverse (fmap withDeps . uncurry (toModule mids)) input
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)

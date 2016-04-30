@@ -69,12 +69,13 @@ module Language.PureScript.Parser.Lexer
   , reservedPsNames
   , reservedTypeNames
   , isSymbolChar
+  , isUnquotedKey
   )
   where
 
 import Prelude hiding (lex)
 
-import Data.Char (isSpace, isAscii, isSymbol)
+import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
 
 import Control.Monad (void, guard)
 import Data.Functor.Identity
@@ -534,3 +535,24 @@ reservedTypeNames = [ "forall", "where" ]
 --
 isSymbolChar :: Char -> Bool
 isSymbolChar c = (c `elem` ":!#$%&*+./<=>?@\\^|-~") || (not (isAscii c) && isSymbol c)
+
+
+-- |
+-- The characters allowed in the head of an unquoted record key
+--
+isUnquotedKeyHeadChar :: Char -> Bool
+isUnquotedKeyHeadChar c = (c == '_') || isAlphaNum c
+
+-- |
+-- The characters allowed in the tail of an unquoted record key
+--
+isUnquotedKeyTailChar :: Char -> Bool
+isUnquotedKeyTailChar c = (c `elem` "_'") || isAlphaNum c
+
+-- |
+-- Strings allowed to be left unquoted in a record key
+--
+isUnquotedKey :: String -> Bool
+isUnquotedKey []        = False
+isUnquotedKey (hd : tl) = isUnquotedKeyHeadChar hd &&
+                          all isUnquotedKeyTailChar tl
