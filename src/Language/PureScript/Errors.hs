@@ -142,7 +142,6 @@ data SimpleErrorMessage
   | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | DeprecatedOperatorDecl String
   | DeprecatedOperatorSection Expr (Either Expr Expr)
-  | DeprecatedQualifiedSyntax ModuleName ModuleName
   | DeprecatedClassImport ModuleName (ProperName 'ClassName)
   | DeprecatedClassExport (ProperName 'ClassName)
   | DuplicateSelectiveImport ModuleName
@@ -331,7 +330,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
   DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
   DeprecatedOperatorSection{} -> "DeprecatedOperatorSection"
-  DeprecatedQualifiedSyntax{} -> "DeprecatedQualifiedSyntax"
   DeprecatedClassImport{} -> "DeprecatedClassImport"
   DeprecatedClassExport{} -> "DeprecatedClassExport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
@@ -463,8 +461,6 @@ errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
   RedundantEmptyHidingImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
-  DeprecatedQualifiedSyntax name qualName -> suggest $
-    "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
@@ -951,13 +947,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
         renderOperator (PositionedValue _ _ ex) = renderOperator ex
         renderOperator (Var (Qualified _ (Op ident))) = line ident
         renderOperator other = Box.hcat Box.top [ line "`", prettyPrintValue valueDepth other, line "`" ]
-    renderSimpleErrorMessage (DeprecatedQualifiedSyntax name qualName) =
-      paras [ line "Import uses the deprecated 'qualified' syntax:"
-            , indent $ line $ "import qualified " ++ runModuleName name ++ " as " ++ runModuleName qualName
-            , line "Should instead use the form:"
-            , indent $ line $ "import " ++ runModuleName name ++ " as " ++ runModuleName qualName
-            , line "The deprecated syntax will be removed in PureScript 0.9."
-            ]
 
     renderSimpleErrorMessage (DeprecatedClassImport mn name) =
       paras [ line $ "Class import from " ++ runModuleName mn ++ " uses deprecated syntax that omits the 'class' keyword:"
