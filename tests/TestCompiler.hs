@@ -180,15 +180,3 @@ assertDoesNotCompile inputFiles foreigns = do
 
   trim =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
-
-supportModules :: [String]
-supportModules =
-  [ "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.ST"
-  , "Data.Function"
-  , "Prelude"
-  , "Test.Assert"
-  ]
