@@ -183,12 +183,11 @@ missingCasesSingle _ _ b _ = ([b], Left Unknown)
 missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Either RedundancyError Bool)
 missingCasesMultiple env mn = go
   where
-  go [] [] = ([], pure True)
   go (x:xs) (y:ys) = (map (: xs) miss1 ++ map (x :) miss2, liftA2 (&&) pr1 pr2)
     where
     (miss1, pr1) = missingCasesSingle env mn x y
     (miss2, pr2) = go xs ys
-  go _ _ = internalError "Argument lengths did not match in missingCasesMultiple."
+  go _ _ = ([], pure True)
 
 -- |
 -- Guard handling

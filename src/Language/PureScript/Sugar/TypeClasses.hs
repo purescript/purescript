@@ -52,7 +52,8 @@ desugarTypeClasses
 desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModule
   where
   initialState :: MemberMap
-  initialState = M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+  initialState = M.singleton (ModuleName [ProperName C.prim], ProperName C.partial) ([], [], [])
+       `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
 
   fromExternsDecl
     :: ModuleName

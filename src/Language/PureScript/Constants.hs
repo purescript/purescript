@@ -308,6 +308,11 @@ toSignature = "toSignature"
 main :: String
 main = "main"
 
+-- Prim
+
+partial :: String
+partial = "Partial"
+
 -- Code Generation
 
 __superclass_ :: String
