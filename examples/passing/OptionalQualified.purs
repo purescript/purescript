@@ -1,7 +1,6 @@
 module Main where
 
--- qualified import with the "qualified" keyword
-import qualified Prelude as P
+import Prelude as P
 
 -- qualified import without the "qualified" keyword
 import Control.Monad.Eff.Console as Console
