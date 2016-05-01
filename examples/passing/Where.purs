@@ -40,10 +40,10 @@ test7 x = go x
   go y = go $ (y + x / y) / 2.0
 
 main = do
-  Control.Monad.Eff.Console.print (test1 1.0)
-  Control.Monad.Eff.Console.print (test2 1.0 2.0)
-  Control.Monad.Eff.Console.print test3
-  Control.Monad.Eff.Console.print test4
-  Control.Monad.Eff.Console.print test5
-  Control.Monad.Eff.Console.print test6
-  Control.Monad.Eff.Console.print (test7 100.0)
+  Control.Monad.Eff.Console.logShow (test1 1.0)
+  Control.Monad.Eff.Console.logShow (test2 1.0 2.0)
+  Control.Monad.Eff.Console.logShow test3
+  Control.Monad.Eff.Console.logShow test4
+  Control.Monad.Eff.Console.logShow test5
+  Control.Monad.Eff.Console.logShow test6
+  Control.Monad.Eff.Console.logShow (test7 100.0)

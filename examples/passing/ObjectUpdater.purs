@@ -6,7 +6,7 @@ import Control.Monad.Eff.Console
 import Test.Assert
 
 getValue :: forall e. Eff (| e) Boolean
-getValue = return true
+getValue = pure true
 
 main = do
   let record = { value: false }

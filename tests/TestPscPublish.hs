@@ -24,7 +24,7 @@ import Language.PureScript.Publish.ErrorsWarnings as Publish
 import TestUtils
 
 main :: IO ()
-main = testPackage "tests/support/prelude"
+main = testPackage "tests/support/bower_components/purescript-prelude"
 
 data TestResult
   = ParseFailed String

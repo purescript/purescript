@@ -44,10 +44,10 @@ test10 _ =
   in f 10.0
 
 main = do
-  Control.Monad.Eff.Console.print (test1 1.0)
-  Control.Monad.Eff.Console.print (test2 1.0 2.0)
-  Control.Monad.Eff.Console.print test3
-  Control.Monad.Eff.Console.print test4
-  Control.Monad.Eff.Console.print test5
-  Control.Monad.Eff.Console.print test7
-  Control.Monad.Eff.Console.print (test8 100.0)
+  Control.Monad.Eff.Console.logShow (test1 1.0)
+  Control.Monad.Eff.Console.logShow (test2 1.0 2.0)
+  Control.Monad.Eff.Console.logShow test3
+  Control.Monad.Eff.Console.logShow test4
+  Control.Monad.Eff.Console.logShow test5
+  Control.Monad.Eff.Console.logShow test7
+  Control.Monad.Eff.Console.logShow (test8 100.0)

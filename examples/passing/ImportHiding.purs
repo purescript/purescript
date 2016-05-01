@@ -15,4 +15,4 @@ class Show a where
 data Unit = X | Y
 
 main = do
-  print show
+  logShow show
