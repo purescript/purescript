@@ -125,8 +125,8 @@ runCM act = do
 getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
-  let supportDir = cwd </> "tests" </> "support" </> "flattened"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+  let supportDir = cwd </> "tests" </> "support" </> "bower_components"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
   pursFiles <- supportFiles "purs"
   jsFiles   <- supportFiles "js"
 
