@@ -147,7 +147,7 @@ usedTypeNames moduleName =
   usedNames :: Type -> [ProperName 'TypeName]
   usedNames (ConstrainedType constraints _) =
     flip mapMaybe constraints $ \case
-      (Qualified (Just moduleName') name, _)
+      (Constraint (Qualified (Just moduleName') name) _ _)
         | moduleName == moduleName' -> Just (coerceProperName name)
       _ -> Nothing
   usedNames (TypeConstructor (Qualified (Just moduleName') name))

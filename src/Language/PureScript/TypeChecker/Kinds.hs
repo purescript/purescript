@@ -262,7 +262,7 @@ infer' other = (, []) <$> go other
     unifyKinds k2 (Row k1)
     return $ Row k1
   go (ConstrainedType deps ty) = do
-    forM_ deps $ \(className, tys) -> do
+    forM_ deps $ \(Constraint className tys _) -> do
       k <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
       unifyKinds k Star
     k <- go ty

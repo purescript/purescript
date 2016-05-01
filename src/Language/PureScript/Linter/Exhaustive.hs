@@ -32,6 +32,7 @@ import Language.PureScript.AST.Declarations
 import Language.PureScript.Environment
 import Language.PureScript.Names as P
 import Language.PureScript.Kinds
+import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
 import Language.PureScript.Traversals
 import Language.PureScript.Types as P
 import Language.PureScript.Errors
@@ -259,24 +260,26 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
 
   makeResult :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> m Expr
   makeResult (bss, (rr, bss')) =
-    do unless (null bss) tellNonExhaustive
-       unless (null bss') tellRedundant
+    do unless (null bss') tellRedundant
        case rr of
          Left Incomplete -> tellIncomplete
          _ -> return ()
        if null bss
          then return expr
-         else return (addPartialConstraint expr)
+         else return (addPartialConstraint (second null (splitAt 5 bss)) expr)
     where
-    tellNonExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
-    tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
-    tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
+      tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
+      tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
 
   -- | We add a Partial constraint by adding a call to the following identity function:
   --
   -- partial :: forall a. Partial => a -> a
-  addPartialConstraint :: Expr -> Expr
-  addPartialConstraint e = Let [ partial ] (App (Var (Qualified Nothing (Ident C.__unused))) e)
+  --
+  -- The binder information is provided so that it can be embedded in the constraint,
+  -- and then included in the error message.
+  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> Expr
+  addPartialConstraint (bss, complete) e =
+      Let [ partial ] (App (Var (Qualified Nothing (Ident C.__unused))) e)
     where
       partial :: Declaration
       partial = ValueDeclaration (Ident C.__unused)
@@ -287,10 +290,10 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
                                                          ty))
 
       ty :: Type
-      ty = ForAll "a" (ConstrainedType [ ( Qualified (Just (ModuleName [ProperName C.prim]))
-                                                     (ProperName "Partial")
-                                         , []
-                                         )
+      ty = ForAll "a" (ConstrainedType [ Constraint (Qualified (Just (ModuleName [ProperName C.prim]))
+                                                               (ProperName "Partial"))
+                                                    []
+                                                    (Just (PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete))
                                        ]
                                        (TypeApp (TypeApp tyFunction (TypeVar "a"))
                                                 (TypeVar "a")))

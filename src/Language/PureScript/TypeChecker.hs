@@ -274,7 +274,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
-    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . snd
+    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . constraintArgs
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
@@ -421,7 +421,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . fst) cs
+      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) cs
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> Maybe (ProperName 'ClassName)
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name

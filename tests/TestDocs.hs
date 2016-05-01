@@ -197,7 +197,7 @@ checkConstrained ty tyClass =
       False
   where
   matches className =
-    (==) className . P.runProperName . P.disqualify . fst
+    (==) className . P.runProperName . P.disqualify . P.constraintClass
 
 runAssertionIO :: Assertion -> Docs.Module -> IO ()
 runAssertionIO assertion mdl = do

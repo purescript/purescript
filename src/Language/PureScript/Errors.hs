@@ -101,7 +101,7 @@ data SimpleErrorMessage
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
-  | NoInstanceFound (Qualified (ProperName 'ClassName)) [Type]
+  | NoInstanceFound Constraint
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
@@ -129,7 +129,6 @@ data SimpleErrorMessage
   | WildcardInferredType Type
   | HoleInferredType String Type
   | MissingTypeDeclaration Ident Type
-  | NotExhaustivePattern [[Binder]] Bool
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
   | ClassOperator (ProperName 'ClassName) Ident
@@ -316,7 +315,6 @@ errorCode em = case unwrapErrorMessage em of
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
-  NotExhaustivePattern{} -> "NotExhaustivePattern"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
   ClassOperator{} -> "ClassOperator"
@@ -425,7 +423,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound cl ts) = NoInstanceFound cl <$> traverse f ts
+  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -746,7 +744,19 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound nm ts) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint (Qualified (Just (ModuleName [ProperName "Prim"]))
+                                                                     (ProperName "Partial"))
+                                                          _
+                                                          (Just (PartialConstraintData bs b)))) =
+      paras [ line "A case expression could not be determined to cover all inputs."
+            , line "The following additional cases are required to cover all inputs:\n"
+            , indent $ paras $
+                Box.hsep 1 Box.left
+                  (map (paras . map line) (transpose bs))
+                  : [line "..." | not b]
+            , line "Alternatively, add a Partial constraint to the type of the enclosing value."
+            ]
+    renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
       paras [ line "No type class instance was found for"
             , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
                                            , Box.vcat Box.left (map typeAtomAsBox ts)
@@ -877,15 +887,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " ++ showIdent ident ++ " was:"
             , indent $ typeAsBox ty
-            ]
-    renderSimpleErrorMessage (NotExhaustivePattern bs b) =
-      paras [ line "A case expression could not be determined to cover all inputs."
-            , line "The following additional cases are required to cover all inputs:\n"
-            , indent $ paras $
-                Box.hsep 1 Box.left
-                  (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
-                  : [line "..." | not b]
-            , line "Or alternatively, add a Partial constraint to the type of the enclosing value."
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"

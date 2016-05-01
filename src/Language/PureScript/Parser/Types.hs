@@ -69,7 +69,7 @@ parseConstrainedType = do
     className <- parseQualified properName
     indented
     ty <- P.many parseTypeAtom
-    return (className, ty)
+    return (Constraint className ty Nothing)
 
 
 parseAnyType :: TokenParser Type

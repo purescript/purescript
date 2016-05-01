@@ -234,7 +234,7 @@ typeClassDictionaryDeclaration
 typeClassDictionaryDeclaration name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
         [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
-        | (superclass, tyArgs) <- implies
+        | (Constraint superclass tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
@@ -250,7 +250,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   let className = Qualified (Just mn) name
   in ValueDeclaration ident Private [] $ Right $
       TypedValue False (TypeClassDictionaryAccessor className ident) $
-      moveQuantifiersToFront (quantify (ConstrainedType [(className, map (TypeVar . fst) args)] ty))
+      moveQuantifiersToFront (quantify (ConstrainedType [Constraint className (map (TypeVar . fst) args) Nothing] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
   PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
@@ -294,7 +294,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- The dictionary itself is an object literal.
       let superclasses = superClassDictionaryNames implies `zip`
             [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
-            | (superclass, suTyArgs) <- implies
+            | (Constraint superclass suTyArgs _) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             ]
 
@@ -331,5 +331,5 @@ typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration 
 superClassDictionaryNames :: [Constraint] -> [String]
 superClassDictionaryNames supers =
   [ C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer)
-  | (index, (pn, _)) <- zip [0..] supers
+  | (index, Constraint pn _ _) <- zip [0..] supers
   ]
