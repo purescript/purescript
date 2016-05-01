@@ -31,7 +31,6 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 --
 updateSupportCode :: IO ()
 updateSupportCode = do
-  node <- fromMaybe (internalError "cannot find node executable") <$> findNodeProcess
   setCurrentDirectory "tests/support"
   if System.Info.os == "mingw32"
     then callProcess "setup-win.cmd" []
