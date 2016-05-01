@@ -52,7 +52,7 @@ withSourceSpan f p = do
   comments <- C.readComments
   x <- p
   end <- P.getPosition
-  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ f sp comments x
 
 kindedIdent :: TokenParser (String, Maybe Kind)
@@ -248,7 +248,7 @@ parseModule = do
   reserved "where"
   decls <- mark (P.many (same *> parseDeclaration))
   end <- P.getPosition
-  let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
@@ -275,12 +275,9 @@ parseModulesFromFiles toFilePath input = do
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
-  name   = (P.sourceName . P.errorPos) perr
-  start  = (toSourcePos  . P.errorPos) perr
+  name   = (P.sourceName  . P.errorPos) perr
+  start  = (C.toSourcePos . P.errorPos) perr
   end    = start
-
-toSourcePos :: P.SourcePos -> SourcePos
-toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- |
 -- Parse a collection of modules

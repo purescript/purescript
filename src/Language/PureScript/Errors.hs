@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Language.PureScript.Errors where
 
@@ -462,6 +463,8 @@ errorSuggestion err = case err of
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+  MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
+  WildcardInferredType ty -> suggest $ prettyPrintType ty
   _ -> Nothing
 
   where
@@ -475,6 +478,17 @@ errorSuggestion err = case err of
     qstr :: Maybe ModuleName -> String
     qstr (Just mn) = " as " ++ runModuleName mn
     qstr Nothing = ""
+
+suggestionSpan :: ErrorMessage -> Maybe SourceSpan
+suggestionSpan e =
+  getSpan (unwrapErrorMessage e) <$> errorSpan e
+  where
+    startOnly SourceSpan{spanName, spanStart} = SourceSpan {spanName, spanStart, spanEnd = spanStart}
+
+    getSpan simple ss =
+      case simple of
+        MissingTypeDeclaration{} -> startOnly ss
+        _ -> ss
 
 showSuggestion :: SimpleErrorMessage -> String
 showSuggestion suggestion = case errorSuggestion suggestion of
