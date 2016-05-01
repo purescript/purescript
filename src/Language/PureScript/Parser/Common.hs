@@ -13,6 +13,8 @@ import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
 import Language.PureScript.Names
 
+import Language.PureScript.AST.SourcePos
+
 import qualified Text.Parsec as P
 
 properName :: TokenParser (ProperName a)
@@ -120,3 +122,9 @@ readComments = P.lookAhead $ ptComments <$> P.anyToken
 --
 runTokenParser :: FilePath -> TokenParser a -> [PositionedToken] -> Either P.ParseError a
 runTokenParser filePath p = P.runParser p (ParseState 0) filePath
+
+-- |
+-- Convert from Parsec sourcepos
+--
+toSourcePos :: P.SourcePos -> SourcePos
+toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)

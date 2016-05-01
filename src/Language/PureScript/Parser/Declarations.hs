@@ -52,7 +52,7 @@ withSourceSpan f p = do
   comments <- C.readComments
   x <- p
   end <- P.getPosition
-  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ f sp comments x
 
 kindedIdent :: TokenParser (String, Maybe Kind)
@@ -132,28 +132,19 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
-  (mn, declType, asQ, isOldSyntax) <- parseImportDeclaration'
-  return $ ImportDeclaration mn declType asQ isOldSyntax
+  (mn, declType, asQ) <- parseImportDeclaration'
+  return $ ImportDeclaration mn declType asQ
 
-parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName, Bool)
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
   reserved "import"
   indented
-  qualImport <|> stdImport
+  moduleName' <- moduleName
+  declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
+  qName <- P.optionMaybe qualifiedName
+  return (moduleName', declType, qName)
   where
-  stdImport = do
-    moduleName' <- moduleName
-    declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
-    qName <- P.optionMaybe qualifiedName
-    return (moduleName', declType, qName, False)
   qualifiedName = reserved "as" *> moduleName
-  qualImport = do
-    reserved "qualified"
-    indented
-    moduleName' <- moduleName
-    declType <- qualifyingList Explicit
-    qName <- qualifiedName
-    return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
     declType <- P.optionMaybe (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
     return $ fromMaybe Implicit declType
@@ -257,7 +248,7 @@ parseModule = do
   reserved "where"
   decls <- mark (P.many (same *> parseDeclaration))
   end <- P.getPosition
-  let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
@@ -284,12 +275,9 @@ parseModulesFromFiles toFilePath input = do
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
-  name   = (P.sourceName . P.errorPos) perr
-  start  = (toSourcePos  . P.errorPos) perr
+  name   = (P.sourceName  . P.errorPos) perr
+  start  = (C.toSourcePos . P.errorPos) perr
   end    = start
-
-toSourcePos :: P.SourcePos -> SourcePos
-toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- |
 -- Parse a collection of modules
@@ -382,7 +370,7 @@ parseValueAtom = P.choice
                  , Literal <$> parseStringLiteral
                  , Literal <$> parseBooleanLiteral
                  , Literal <$> parseArrayLiteral parseValue
-                 , Literal <$> P.try (parseObjectLiteral parseIdentifierAndValue)
+                 , Literal <$> parseObjectLiteral parseIdentifierAndValue
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -391,7 +379,6 @@ parseValueAtom = P.choice
                  , parseDo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
-                 , parseOperatorSection
                  , parseHole
                  ]
 
@@ -401,12 +388,6 @@ parseValueAtom = P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr = P.between tick tick parseValue
                  <|> Var <$> parseQualified (Op <$> symbol)
-
-parseOperatorSection :: TokenParser Expr
-parseOperatorSection = parens $ left <|> right
-  where
-  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
-  left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
@@ -499,7 +480,7 @@ parseVarOrNamedBinder = do
   -- TODO: once operator aliases are finalized in 0.9, this 'try' won't be needed
   -- any more since identifiers in binders won't be 'Op's.
   name <- P.try C.parseIdent
-  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinder)
+  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinderAtom)
   parseNamedBinder <|> return (VarBinder name)
 
 parseNullBinder :: TokenParser Binder
@@ -531,26 +512,28 @@ parseBinder =
           return (BinaryNoParensBinder op)) P.AssocRight
       ]
     ]
+
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
                  ]
-  parseBinderAtom :: TokenParser Binder
-  parseBinderAtom = P.choice
-                    [ parseNullBinder
-                    , LiteralBinder <$> parseCharLiteral
-                    , LiteralBinder <$> parseStringLiteral
-                    , LiteralBinder <$> parseBooleanLiteral
-                    , parseNumberLiteral
-                    , parseVarOrNamedBinder
-                    , parseConstructorBinder
-                    , parseObjectBinder
-                    , parseArrayBinder
-                    , ParensInBinder <$> parens parseBinder
-                    ] P.<?> "binder"
 
   parseOpBinder :: TokenParser Binder
   parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
 
+parseBinderAtom :: TokenParser Binder
+parseBinderAtom = P.choice
+  [ parseNullBinder
+  , LiteralBinder <$> parseCharLiteral
+  , LiteralBinder <$> parseStringLiteral
+  , LiteralBinder <$> parseBooleanLiteral
+  , parseNumberLiteral
+  , parseVarOrNamedBinder
+  , parseConstructorBinder
+  , parseObjectBinder
+  , parseArrayBinder
+  , ParensInBinder <$> parens parseBinder
+  ] P.<?> "binder"
+  
 -- |
 -- Parse a binder as it would appear in a top level declaration
 --
