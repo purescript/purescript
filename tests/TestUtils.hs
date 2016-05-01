@@ -1,15 +1,3 @@
------------------------------------------------------------------------------
---
--- Module      :  Main
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module TestUtils where
@@ -52,7 +40,6 @@ updateSupportCode = do
       -- Sometimes we run as a root (e.g. in simple docker containers)
       -- And we are non-interactive: https://github.com/bower/bower/issues/1162
       callProcess "node_modules/.bin/bower" ["--allow-root", "install", "--config.interactive=false"]
-  callProcess node ["setup.js"]
   setCurrentDirectory "../.."
 
 pushd :: forall a. FilePath -> IO a -> IO a
@@ -62,4 +49,3 @@ pushd dir act = do
   result <- try act :: IO (Either IOException a)
   setCurrentDirectory original
   either throwIO return result
-

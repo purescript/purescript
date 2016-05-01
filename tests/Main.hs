@@ -9,10 +9,11 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified TestCompiler
-import qualified TestPscPublish
 import qualified TestDocs
 import qualified TestPsci
 import qualified TestPscIde
+import qualified TestPscPublish
+import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
 
@@ -21,6 +22,8 @@ main = do
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
 
+  heading "Updating support code"
+  TestUtils.updateSupportCode
   heading "Main compiler test suite"
   TestCompiler.main
   heading "Documentation test suite"
