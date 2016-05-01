@@ -216,8 +216,12 @@ getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExt
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
-  unless (any isValidSPDX (bowerLicense pkgMeta))
-    (userError NoLicenseSpecified)
+  case bowerLicense pkgMeta of
+    [] ->
+      userError NoLicenseSpecified
+    ls ->
+      unless (any isValidSPDX ls)
+        (userError InvalidLicense)
 
 -- |
 -- Check if a string is a valid SPDX license expression.

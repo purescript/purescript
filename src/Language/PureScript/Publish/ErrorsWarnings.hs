@@ -55,13 +55,13 @@ data PackageWarning
 -- | An error that should be fixed by the user.
 data UserError
   = BowerJSONNotFound
-  | LicenseNotFound
   | BowerExecutableNotFound [String] -- list of executable names tried
   | CouldntDecodeBowerJSON (ParseError BowerError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
   | NoLicenseSpecified
+  | InvalidLicense
   | MissingDependencies (NonEmpty PackageName)
   | CompileError P.MultipleErrors
   | DirtyWorkingTree
@@ -129,12 +129,6 @@ displayUserError e = case e of
       "The bower.json file was not found. Please create one, or run " ++
       "`pulp init`."
       )
-  LicenseNotFound ->
-    para (concat
-      ["No LICENSE file was found. Please create one. ",
-       "Distributing code without a license means that nobody ",
-       "will be able to (legally) use it."
-      ])
   BowerExecutableNotFound names ->
     para (concat
       [ "The Bower executable was not found (tried: ", format names, "). Please"
@@ -189,14 +183,7 @@ displayUserError e = case e of
           , "following would be acceptable:"
           ])
       , spacer
-      ] ++
-      map (indented . para)
-        [ "* \"MIT\""
-        , "* \"BSD-2-Clause\""
-        , "* \"GPL-2.0+\""
-        , "* \"(GPL-3.0 OR MIT)\""
-        ]
-        ++
+      ] ++ spdxExamples ++
       [ spacer
       , para (concat
           [ "Note that distributing code without a license means that nobody "
@@ -209,6 +196,16 @@ displayUserError e = case e of
           , "necessary."
           ])
       ]
+  InvalidLicense ->
+    vcat $
+      [ para (concat
+          [ "The license specified in bower.json is not a valid SPDX license "
+          , "expression. Please use the SPDX license expression format. For "
+          , "example, any of the following would be acceptable:"
+          ])
+      , spacer
+      ] ++
+      spdxExamples
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
         pl a b = if singular then b else a
@@ -238,6 +235,15 @@ displayUserError e = case e of
         "Your git working tree is dirty. Please commit, discard, or stash " ++
         "your changes first."
         )
+
+spdxExamples :: [Box]
+spdxExamples =
+  map (indented . para)
+    [ "* \"MIT\""
+    , "* \"BSD-2-Clause\""
+    , "* \"GPL-2.0+\""
+    , "* \"(GPL-3.0 OR MIT)\""
+    ]
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
