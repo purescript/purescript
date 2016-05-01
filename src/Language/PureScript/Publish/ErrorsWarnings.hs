@@ -240,6 +240,7 @@ spdxExamples :: [Box]
 spdxExamples =
   map (indented . para)
     [ "* \"MIT\""
+    , "* \"Apache-2.0\""
     , "* \"BSD-2-Clause\""
     , "* \"GPL-2.0+\""
     , "* \"(GPL-3.0 OR MIT)\""
