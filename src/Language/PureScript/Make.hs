@@ -165,10 +165,10 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-  (optCoreFn, nextVar') <- runSupplyT nextVar $ CF.optimize corefn
-  let [renamed] = renameInModules [optCoreFn]
+  let [renamed] = renameInModules [corefn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar' . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
+  (optRenamed, nextVar') <- runSupplyT nextVar $ CF.optimize renamed
+  evalSupplyT nextVar' . codegen optRenamed env' . BU8.toString . B.toStrict . encode $ exts
   return exts
 
 -- |

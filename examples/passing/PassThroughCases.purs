@@ -50,4 +50,10 @@ main = do
   dangerousEq2 <- refEq just (case just of Maybe.Just x -> Just x)
   assert (not dangerousEq2)
 
+  nestedEq <- refEq just (case just of Maybe.Just x -> let j = Maybe.Just x in j)
+  assert (nestedEq)
+
+  shadowEq <- refEq just (case just of Maybe.Just x -> let x = 2 in Maybe.Just x)
+  assert (not shadowEq)
+
   log "Success!"

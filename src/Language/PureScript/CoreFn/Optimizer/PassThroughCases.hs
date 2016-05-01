@@ -23,7 +23,7 @@ import Language.PureScript.CoreFn.Binders (Binder(..))
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Meta (Meta(IsConstructor))
 import Language.PureScript.CoreFn.Module (Module, moduleDecls)
-import Language.PureScript.CoreFn.Traversals (everywhereOnValuesM)
+import Language.PureScript.CoreFn.Traversals (everywhereOnValues, everywhereOnValuesM)
 import Language.PureScript.Names
 
 passThroughCases :: (Monad m, MonadSupply m) => Module Ann -> m (Module Ann)
@@ -34,18 +34,27 @@ passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls 
              in mapM f
 
   onExpr :: (Monad m, MonadSupply m) => Expr Ann -> m (Expr Ann)
-  onExpr (Case ss ts cs) = Case ss ts <$> mapM optimize cs
+  onExpr (Case ss ts cs) = Case ss ts <$> mapM onCaseAlternative cs
   onExpr e = return e
 
-  optimize :: (Monad m, MonadSupply m) => CaseAlternative Ann -> m (CaseAlternative Ann)
-  optimize (CaseAlternative [bndr@(ConstructorBinder bndrAnn _ ctor prms)] (Right body))
-    | isReconstruction ctor prms body = do
-        let (_, comments, type_, _) = bndrAnn
-            varAnn = (Nothing, comments, type_, Nothing)
-        v <- Ident <$> freshName
-        return $ CaseAlternative [NamedBinder bndrAnn v bndr]
-                                 (Right $ Var varAnn (Qualified Nothing $ v))
-  optimize a = return a
+  onCaseAlternative :: (Monad m, MonadSupply m) => CaseAlternative Ann -> m (CaseAlternative Ann)
+  onCaseAlternative (CaseAlternative [bndr@(ConstructorBinder bndrAnn _ ctor prms)] (Right body)) = do
+    v <- Ident <$> freshName
+    let (_, comments, type_, _) = bndrAnn
+        vAnn = (Nothing, comments, type_, Nothing)
+        (_, f, _) = everywhereOnValues id (replaceReconstructions v vAnn ctor prms) id
+    return $ CaseAlternative [NamedBinder bndrAnn v bndr] (Right $ f body)
+  onCaseAlternative a = return a
+
+  replaceReconstructions :: Ident
+                         -> Ann
+                         -> Qualified (ProperName 'ConstructorName)
+                         -> [Binder Ann]
+                         -> Expr Ann
+                         -> Expr Ann
+  replaceReconstructions v vAnn ctor prms expr
+    | isReconstruction ctor prms expr = Var vAnn (Qualified Nothing $ v)
+    | otherwise = expr
 
   isReconstruction :: Qualified (ProperName 'ConstructorName)
                    -> [Binder Ann]
@@ -56,6 +65,7 @@ passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls 
       Just (Qualified (Just ctorModule') ctor', args) ->
         ctorModule == ctorModule'
         && Ident (runProperName ctor) == ctor'
+        && length prms == length args
         && all isBinderArg (prms `zip` args)
       _ -> False
     where isBinderArg (VarBinder _ i, Var _ (Qualified Nothing i')) = i == i'

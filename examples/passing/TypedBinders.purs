@@ -46,12 +46,12 @@ test = runState "" $ do
 test2 :: (Int -> Int) -> Int
 test2 = (\(f :: Int -> Int) -> f 10)
 
-test3 :: Int -> Boolean 
+test3 :: Int -> Boolean
 test3 n = case n of
   (0 :: Int) -> true
   _ -> false
 
-test4 :: Tuple Int Int -> Tuple Int Int 
+test4 :: Tuple Int Int -> Tuple Int Int
 test4 = (\(Tuple a b :: Tuple Int Int) -> Tuple b a)
 
 type Int1 = Int
