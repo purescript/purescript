@@ -12,4 +12,4 @@ f x y =
           x -> 1.0 + x * x
   in g + x + y
 
-main = print $ f 1.0 10.0
+main = logShow $ f 1.0 10.0

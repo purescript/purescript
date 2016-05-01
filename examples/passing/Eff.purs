@@ -21,5 +21,5 @@ test3 = pureST (do
 
 main = do
   test1
-  Control.Monad.Eff.Console.print test2
-  Control.Monad.Eff.Console.print test3
+  Control.Monad.Eff.Console.logShow test2
+  Control.Monad.Eff.Console.logShow test3

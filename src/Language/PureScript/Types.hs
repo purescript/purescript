@@ -43,7 +43,7 @@ data Type
   -- |
   -- A type wildcard, as would appear in a partial type synonym
   --
-  | TypeWildcard
+  | TypeWildcard (SourceSpan)
   -- |
   -- A type constructor
   --
@@ -237,7 +237,7 @@ containsWildcards :: Type -> Bool
 containsWildcards = everythingOnTypes (||) go
   where
   go :: Type -> Bool
-  go TypeWildcard = True
+  go TypeWildcard{} = True
   go _ = False
 
 --

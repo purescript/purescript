@@ -11,4 +11,4 @@ module Main where
   bar = true
 
   main = do
-    print (show bar)
+    logShow (show bar)

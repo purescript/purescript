@@ -16,4 +16,4 @@ module Main where
   import Prelude
 
   main = do
-    print (show 1.0)
+    logShow (show 1.0)

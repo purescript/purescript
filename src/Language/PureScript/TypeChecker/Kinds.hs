@@ -235,7 +235,7 @@ infer' other = (, []) <$> go other
     k' <- go ty
     unifyKinds k k'
     return k'
-  go TypeWildcard = freshKind
+  go TypeWildcard{} = freshKind
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

@@ -19,6 +19,6 @@ module Main where
   import Control.Monad.Eff.Console
 
   main = do
-    print (middle unit)
+    logShow (middle unit)
     trace "Done"
-    return unit
+    pure unit

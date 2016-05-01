@@ -28,7 +28,7 @@ instance applyMTrace :: Apply MTrace where
   apply = ap
 
 instance applicativeMTrace :: Applicative MTrace where
-  pure = MTrace <<< return
+  pure = MTrace <<< pure
 
 instance bindMTrace :: Bind MTrace where
   bind m f = MTrace (runMTrace m >>= (runMTrace <<< f))

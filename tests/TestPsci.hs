@@ -60,7 +60,6 @@ completionTestData =
   -- import should complete module names
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
-  , ("import qualified Control.Monad.Eff.", map ("import qualified Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
   -- :load, :module should complete file paths
   , (":l tests/support/psci/", [":l tests/support/psci/Sample.purs"])
@@ -76,13 +75,13 @@ completionTestData =
   , (":show a", [])
 
   -- :type should complete values and data constructors in scope
-  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log"])
-  , (":type uni", [":type unit"])
-  , (":type E", [":type EQ"])
+  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log", ":type Control.Monad.Eff.Console.logShow"])
+  --, (":type uni", [":type unit"])
+  --, (":type E", [":type EQ"])
 
   -- :kind should complete types in scope
-  , (":kind C", [":kind Control.Monad.Eff.Pure"])
-  , (":kind O", [":kind Ordering"])
+  --, (":kind C", [":kind Control.Monad.Eff.Pure"])
+  --, (":kind O", [":kind Ordering"])
 
   -- Only one argument for directives should be completed
   , (":show import ", [])
@@ -91,8 +90,7 @@ completionTestData =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import q", ["import qualified"])
-  , ("import ", map ("import " ++) supportModules ++ ["import qualified"])
+  , ("import ", map ("import " ++) supportModules)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed
@@ -100,10 +98,10 @@ completionTestData =
   , ("34", [])
 
   -- Identifiers and data constructors should be completed
-  , ("uni", ["unit"])
+  --, ("uni", ["unit"])
   , ("Control.Monad.Eff.Class.", ["Control.Monad.Eff.Class.liftEff"])
-  , ("G", ["GT"])
-  , ("Prelude.L", ["Prelude.LT"])
+  --, ("G", ["GT"])
+  , ("Data.Ordering.L", ["Data.Ordering.LT"])
 
   -- if a module is imported qualified, values should complete under the
   -- qualified name, as well as the original name.
@@ -127,8 +125,8 @@ runCM act = do
 getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
-  let supportDir = cwd </> "tests" </> "support" </> "flattened"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+  let supportDir = cwd </> "tests" </> "support" </> "bower_components"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
   pursFiles <- supportFiles "purs"
   jsFiles   <- supportFiles "js"
 
@@ -149,12 +147,37 @@ controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
 
 supportModules :: [String]
 supportModules =
-  [ "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
+  [ "Control.Applicative"
+  , "Control.Apply"
+  , "Control.Bind"
+  , "Control.Category"
+  , "Control.Monad"
   , "Control.Monad.Eff"
+  , "Control.Monad.Eff.Class"
+  , "Control.Monad.Eff.Console"
   , "Control.Monad.Eff.Unsafe"
   , "Control.Monad.ST"
+  , "Control.Semigroupoid"
+  , "Data.Boolean"
+  , "Data.BooleanAlgebra"
+  , "Data.Bounded"
+  , "Data.CommutativeRing"
+  , "Data.Eq"
+  , "Data.EuclideanRing"
+  , "Data.Field"
   , "Data.Function"
+  , "Data.Function.Uncurried"
+  , "Data.Functor"
+  , "Data.HeytingAlgebra"
+  , "Data.Ord"
+  , "Data.Ord.Unsafe"
+  , "Data.Ordering"
+  , "Data.Ring"
+  , "Data.Semigroup"
+  , "Data.Semiring"
+  , "Data.Show"
+  , "Data.Unit"
+  , "Data.Void"
   , "Prelude"
   , "Test.Assert"
   ]

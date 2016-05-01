@@ -47,7 +47,7 @@ sortModules ms = do
   -- Extract module names that have been brought into scope by an `as` import.
   extractQualAs :: Declaration -> [ModuleName]
   extractQualAs (PositionedDeclaration _ _ d) = extractQualAs d
-  extractQualAs (ImportDeclaration _ _ (Just am) _) = [am]
+  extractQualAs (ImportDeclaration _ _ (Just am)) = [am]
   extractQualAs _ = []
 
 -- |
@@ -65,7 +65,7 @@ usedModules ams d =
   where
 
   forDecls :: Declaration -> [ModuleName]
-  forDecls (ImportDeclaration mn _ _ _) =
+  forDecls (ImportDeclaration mn _ _) =
     -- Regardless of whether an imported module is qualified we still need to
     -- take into account its import to build an accurate list of dependencies.
     [mn]
