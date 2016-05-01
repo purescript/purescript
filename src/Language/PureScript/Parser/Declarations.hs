@@ -485,7 +485,7 @@ parseVarOrNamedBinder = do
   -- TODO: once operator aliases are finalized in 0.9, this 'try' won't be needed
   -- any more since identifiers in binders won't be 'Op's.
   name <- P.try C.parseIdent
-  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinder)
+  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinderAtom)
   parseNamedBinder <|> return (VarBinder name)
 
 parseNullBinder :: TokenParser Binder
@@ -517,26 +517,28 @@ parseBinder =
           return (BinaryNoParensBinder op)) P.AssocRight
       ]
     ]
+
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
                  ]
-  parseBinderAtom :: TokenParser Binder
-  parseBinderAtom = P.choice
-                    [ parseNullBinder
-                    , LiteralBinder <$> parseCharLiteral
-                    , LiteralBinder <$> parseStringLiteral
-                    , LiteralBinder <$> parseBooleanLiteral
-                    , parseNumberLiteral
-                    , parseVarOrNamedBinder
-                    , parseConstructorBinder
-                    , parseObjectBinder
-                    , parseArrayBinder
-                    , ParensInBinder <$> parens parseBinder
-                    ] P.<?> "binder"
 
   parseOpBinder :: TokenParser Binder
   parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
 
+parseBinderAtom :: TokenParser Binder
+parseBinderAtom = P.choice
+  [ parseNullBinder
+  , LiteralBinder <$> parseCharLiteral
+  , LiteralBinder <$> parseStringLiteral
+  , LiteralBinder <$> parseBooleanLiteral
+  , parseNumberLiteral
+  , parseVarOrNamedBinder
+  , parseConstructorBinder
+  , parseObjectBinder
+  , parseArrayBinder
+  , ParensInBinder <$> parens parseBinder
+  ] P.<?> "binder"
+  
 -- |
 -- Parse a binder as it would appear in a top level declaration
 --

@@ -8,6 +8,6 @@ shout = log <<< (_ <> "!") <<< show
 -- Here, we should simplify the context so that only one Show
 -- constraint is added.
 usesShowTwice true = shout
-usesShowTwice false = print
+usesShowTwice false = logShow
 
 main = usesShowTwice true "Done"

@@ -6,4 +6,4 @@ module Main where
   import A
 
   main = do
-    print (show 1.0)
+    logShow (show 1.0)

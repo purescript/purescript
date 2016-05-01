@@ -5,13 +5,13 @@ import Control.Monad.Eff.Console
 import Control.Monad.Eff
 
 doIt :: forall eff. Eff eff Boolean
-doIt = return true
+doIt = pure true
 
 set = do
   log "Testing..."
   case 42, 10 of
     42, 10 -> doIt
-    _ , _  -> return false
+    _ , _  -> pure false
 
 main = do
   b <- set

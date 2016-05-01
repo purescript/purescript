@@ -2,6 +2,7 @@
   "private": true,
   "dependencies": {
     "bower": "^1.4.1",
-    "glob": "^5.0.14"
+    "glob": "^5.0.14",
+    "rimraf": "^2.5.2"
   }
 }
