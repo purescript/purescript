@@ -56,9 +56,8 @@ desugarImportsWithEnv
   -> m (Env, [Module])
 desugarImportsWithEnv externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
-  modules' <- traverse updateExportRefs modules
-  (modules'', env') <- first reverse <$> foldM updateEnv ([], env) modules'
-  (env',) <$> traverse (renameInModule' env') modules''
+  (modules', env') <- first reverse <$> foldM updateEnv ([], env) modules
+  (env',) <$> traverse (renameInModule' env') modules'
   where
   silence :: m a -> m a
   silence = censor (const mempty)
@@ -377,37 +376,3 @@ renameInModule env imports (Module ss coms mn decls exps) =
       Nothing -> err
       Just pos' -> rethrowWithPosition pos' err
     throwUnknown = throwError . errorMessage $ unknown qname
-
--- |
--- Replaces `ProperRef` export values with a `TypeRef` or `TypeClassRef`
--- depending on what is availble within the module. Warns when a `ProperRef`
--- desugars into a `TypeClassRef`.
---
-updateExportRefs
-  :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-   => Module
-   -> m Module
-updateExportRefs (Module ss coms mn decls exps) =
-  Module ss coms mn decls <$> traverse (traverse updateRef) exps
-  where
-
-  updateRef :: DeclarationRef -> m DeclarationRef
-  updateRef (ProperRef name)
-     | ProperName name `elem` classNames = do
-        tell . errorMessage . DeprecatedClassExport $ ProperName name
-        return . TypeClassRef $ ProperName name
-       -- Fall through case here - assume it's a type if it's not a class.
-       -- If it's a reference to something that doesn't actually exist it will
-       -- be picked up elsewhere
-     | otherwise = return $ TypeRef (ProperName name) (Just [])
-  updateRef (PositionedDeclarationRef pos com ref) =
-    warnWithPosition pos $ PositionedDeclarationRef pos com <$> updateRef ref
-  updateRef other = return other
-
-  classNames :: [ProperName 'ClassName]
-  classNames = mapMaybe go decls
-    where
-    go (PositionedDeclaration _ _ d) = go d
-    go (TypeClassDeclaration name _ _ _) = Just name
-    go _ = Nothing
